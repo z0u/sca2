@@ -1,0 +1,23 @@
+{
+    "files.exclude": {
+        "__pycache__": true,
+        ".venv": true,
+        ".vulture-cache": true,
+        ".pytest_cache": true,
+        ".ruff_cache": true,
+        "node_modules": true
+    },
+    "jupyter.kernels.excludePythonEnvironments": [
+        "/bin/python3",
+        "/usr/bin/python3",
+        "/usr/local/bin/python"
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+    "notebook.defaultFormatter": "charliermarsh.ruff",
+    "search.exclude": {
+        ".claude/skills": true,
+        ".codex/skills": true
+    },
+}

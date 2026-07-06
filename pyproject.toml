@@ -1,0 +1,159 @@
+[project]
+name = "mi-ni"
+version = "2.0"
+description = "AI experiments"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "cloudpickle>=3.1.2",
+    "datasets>=3.0.0",  # Hugging Face Datasets
+    "equinox>=0.13",  # neural networks as JAX pytrees
+    "ftfy>=6.3.1",  # text cleaning for NLP tasks
+    "huggingface-hub[hf-xet]>=1.19",
+    "imageio-ffmpeg>=0.6.0",  # for video support in matplotlib
+    "jax>=0.6",  # accelerated array computing and program transformation
+    "jaxtyping>=0.2.38",
+    "marimo>=0.19.10",  # interactive notebooks
+    "matplotlib>=3.10.0",  # plotting and visualization
+    "modal[api-proxy-support]>=1.5.1",  # remote (cloud) GPU compute; the extra (new in 1.5.1) lets its gRPC tunnel via HTTPS_PROXY (cloud sandboxes)
+    "numpy>=2.2.3",  # numerical computing (multi-dimensional arrays)
+    "optax>=0.2.4",  # gradient transformations and optimizers for JAX
+    "pandas>=2.2.3",  # tabular data manipulation
+    "pydantic>=2.13.4",  # data validation
+    "pyzmq>=27.1.0",
+    "requests>=2.32.3",
+    "rich>=14.3.2",  # pretty terminal output
+    "scikit-learn>=1.6.1",
+    "wandb>=0.25.0",  # experiment tracking
+]
+
+[project.scripts]
+# Run and monitor memoized experiments: `mini run/ls/status/watch/...`.
+# `bin/mini` wraps this so it works from any cwd without an activated venv.
+mini = "mini.__main__:main"
+
+[dependency-groups]
+# Dependencies that aren't needed remotely (e.g. in Modal)
+#
+#     deps = mini.requirements.uv_freeze(all_groups=True, not_groups=['local', 'dev'])
+#     image = modal.Image.debian_slim().pip_install(*deps)
+#
+dev = [
+    "pandas-stubs",
+    "pytest-asyncio>=0.25.3",
+    "pytest>=8.3.5",
+    "ruff>=0.9.7",  # linter and formatter
+    "scipy-stubs>=1.15.2.2",
+    "segno>=1.6.1",  # QR code generation
+    "ty>=0.0.19",  # type checker
+    "vulture>=2.14",  # dead code detection
+]
+local = [
+]
+# GPU support for remote (Modal) execution only. Locally we install plain
+# (CPU) jax; the Modal image includes this group to get the CUDA plugin.
+# Excluded from local installs by `uv sync --no-group cuda` (see install.sh).
+cuda = [
+    "jax[cuda12]>=0.6",
+]
+pages = [
+    "markdown>=3",
+]
+
+[tool.mini]
+# The project's Hugging Face bucket for the content-addressed artifact store
+# (see .agents/skills/mi-ni/references/storage.md). Committed here so it's set
+# once and shared by every checkout, Modal worker, and CI run — the bucket name
+# is not a secret (the token lives in the env / `hf` cache). Override per-shell
+# with MINI_STORE_BUCKET. Unset → the store stays local (no network).
+# store-bucket = "your-namespace/your-bucket"
+
+# The public, versioned publish tier: a Hugging Face *dataset repo* that backs
+# `publish()` and report exports. Set this to keep the CAS bucket above private
+# (persisting an artifact never makes its bytes world-readable) while published
+# views stay public and gain git history — a citation pins to a commit sha.
+# Unset → publish/exports stay in the bucket (the single-store default). Override
+# per-shell with MINI_PUBLISH_REPO. See eng/publishing.md and issue #38.
+# publish-repo = "your-namespace/your-publish-repo"
+
+[tool.uv]
+# Dependency cooldown to mitigate risk of supply chain attacks.
+# https://docs.astral.sh/uv/concepts/resolution/#dependency-cooldowns
+exclude-newer = "3 days"
+
+[build-system]
+requires = ["uv_build>=0.8.13,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+namespace = true
+
+[tool.ruff]
+line-length = 120
+extend-exclude = [".vulture-*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "C", "D", "T"]
+ignore = [
+    "E501", "E731",
+    "C408",
+    "D100", "D101", "D102", "D103", "D104", "D105", "D107", "D200", "D202", "D203", "D204", "D205", "D211", "D212", "D213", "D400", "D401", "D413", "D415",
+    "F722",
+    "Q000",
+    "T201",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/*.ipynb" = [
+    "C408", "C416",
+    "D205", "D400", "D401", "D407", "D415", "D416", "D417",
+    "E402", "E701", "E731", "E741",
+    "F811",
+]
+"docs/*.py" = [
+    "B018",  # Marimo uses last expression as cell output
+]
+"**/experiment/**/*.py" = [
+    "C416",
+    "D203", "D205", "D400", "D401", "D415",
+]
+"tests/**/*.py" = [
+    "D",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+norecursedirs = ["node_modules", ".venv", "tmp*", "scratch*"]
+
+[tool.vulture]
+exclude = [
+    "*/__pycache__/*",
+    "*.ipynb_checkpoints/*",
+    "*/.venv/*",
+    "*.egg-info/*"
+]
+ignore_decorators = [
+    "@functools.lru_cache",
+    "@property",
+    "@classmethod",
+    "@staticmethod",
+    "@model_validator"
+]
+ignore_names = [
+    "visit_*",
+    "do_*",
+    "test_*",
+    "pytestmark",
+    "setUp",
+    "tearDown"
+]
+# make_whitelist = true
+min_confidence = 60
+paths = [
+    "src/",
+    "tests/",
+    ".vulture-cache/",
+    ".vulture-allowlist.py"
+]
+sort_by_size = true

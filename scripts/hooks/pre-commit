@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Auto-fix formatting and linting on staged Python files.
+# lint-staged stashes unstaged changes so only staged content is processed.
+npx lint-staged
+
+# Note: exported report HTML is never committed (it syncs to the HF bucket via
+# `./go publish`), so there's no Marimo output to scrub here. Cleaning runs at
+# export time.

@@ -1,0 +1,38 @@
+name: Lint & Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    # Allows manual triggering of the workflow from the GitHub UI
+
+jobs:
+  check:
+    name: Run all checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: ./go install
+
+      - name: Formatting
+        run: ./go format --check
+
+      - name: Linting
+        run: ./go lint
+
+      - name: Type checking
+        run: ./go types
+
+      - name: Run tests
+        run: ./go test -v
+
+      - name: Dead code detection
+        continue-on-error: true
+        run: ./go deadcode

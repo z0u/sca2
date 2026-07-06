@@ -1,0 +1,7 @@
+👋 Welcome to mi-ni! To get started, run:
+
+    ./go auth
+
+Then try:
+
+    uv run marimo edit docs/getting_started.py
