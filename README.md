@@ -9,7 +9,7 @@ mi-ni is a template repository and library for doing AI research. Features:
 - **Detached, memoized experiments** driven from a stateless CLI, so you (or an agent) can launch a run, close the laptop, and pick it up later
 - **Agentic coding config** for Claude Code
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/z0u/mi-ni)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/z0u/sca2)
 
 There are two ways to compute: interactive, and detached.
 
@@ -121,20 +121,3 @@ uv run python example.py
 [Modal]: https://modal.com
 [uv]: https://astral.sh/uv
 
-<!-- template-only -->
-
-&nbsp;
-
-## Contributing & licence
-
-This project is dedicated to the public domain [^unlicense]. In your own experiments, there's no need to contribute back! The code is yours to modify as you please.
-
-If you do want to contribute to _this template_, then fork it as usual. Before making a pull request, run:
-
-```bash
-./go check
-```
-
-[^unlicense]: Technically, the licence is the [Unlicense](https://unlicense.org), which is about as close as you can get to "do whatever you want".
-
-<!-- /template-only -->
