@@ -962,90 +962,6 @@ wheels = [
 ]
 
 [[package]]
-name = "mi-ni"
-version = "2.0"
-source = { editable = "." }
-dependencies = [
-    { name = "cloudpickle" },
-    { name = "datasets" },
-    { name = "equinox" },
-    { name = "ftfy" },
-    { name = "huggingface-hub", extra = ["hf-xet"] },
-    { name = "imageio-ffmpeg" },
-    { name = "jax" },
-    { name = "jaxtyping" },
-    { name = "marimo" },
-    { name = "matplotlib" },
-    { name = "modal", extra = ["api-proxy-support"] },
-    { name = "numpy" },
-    { name = "optax" },
-    { name = "pandas" },
-    { name = "pydantic" },
-    { name = "pyzmq" },
-    { name = "requests" },
-    { name = "rich" },
-    { name = "scikit-learn" },
-    { name = "wandb" },
-]
-
-[package.dev-dependencies]
-cuda = [
-    { name = "jax", extra = ["cuda12"] },
-]
-dev = [
-    { name = "pandas-stubs" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-    { name = "scipy-stubs" },
-    { name = "segno" },
-    { name = "ty" },
-    { name = "vulture" },
-]
-pages = [
-    { name = "markdown" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cloudpickle", specifier = ">=3.1.2" },
-    { name = "datasets", specifier = ">=3.0.0" },
-    { name = "equinox", specifier = ">=0.13" },
-    { name = "ftfy", specifier = ">=6.3.1" },
-    { name = "huggingface-hub", extras = ["hf-xet"], specifier = ">=1.19" },
-    { name = "imageio-ffmpeg", specifier = ">=0.6.0" },
-    { name = "jax", specifier = ">=0.6" },
-    { name = "jaxtyping", specifier = ">=0.2.38" },
-    { name = "marimo", specifier = ">=0.19.10" },
-    { name = "matplotlib", specifier = ">=3.10.0" },
-    { name = "modal", extras = ["api-proxy-support"], specifier = ">=1.5.1" },
-    { name = "numpy", specifier = ">=2.2.3" },
-    { name = "optax", specifier = ">=0.2.4" },
-    { name = "pandas", specifier = ">=2.2.3" },
-    { name = "pydantic", specifier = ">=2.13.4" },
-    { name = "pyzmq", specifier = ">=27.1.0" },
-    { name = "requests", specifier = ">=2.32.3" },
-    { name = "rich", specifier = ">=14.3.2" },
-    { name = "scikit-learn", specifier = ">=1.6.1" },
-    { name = "wandb", specifier = ">=0.25.0" },
-]
-
-[package.metadata.requires-dev]
-cuda = [{ name = "jax", extras = ["cuda12"], specifier = ">=0.6" }]
-dev = [
-    { name = "pandas-stubs" },
-    { name = "pytest", specifier = ">=8.3.5" },
-    { name = "pytest-asyncio", specifier = ">=0.25.3" },
-    { name = "ruff", specifier = ">=0.9.7" },
-    { name = "scipy-stubs", specifier = ">=1.15.2.2" },
-    { name = "segno", specifier = ">=1.6.1" },
-    { name = "ty", specifier = ">=0.0.19" },
-    { name = "vulture", specifier = ">=2.14" },
-]
-local = []
-pages = [{ name = "markdown", specifier = ">=3" }]
-
-[[package]]
 name = "ml-dtypes"
 version = "0.5.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1883,6 +1799,90 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/3d/b2/8fc77f3723228836fa5d12497eb71c808f83782e10d058d2b15cfa14640b/ruff-0.15.17-py3-none-win_amd64.whl", hash = "sha256:6769e5fa1710b179b92e0bfa5a51735b35baea9013dadb06d5f44cbcf9547084", size = 12058788, upload-time = "2026-06-11T17:54:41.042Z" },
     { url = "https://files.pythonhosted.org/packages/2d/c7/c53e8dbff9c9dc4b7928773421ae294a5d28fcb8dcda1a089579d3a7e510/ruff-0.15.17-py3-none-win_arm64.whl", hash = "sha256:f3be1fbb34bcdfd146240d8fb92a709d4c2c8191348580a3c044ec60fa0b4456", size = 11355275, upload-time = "2026-06-11T17:54:43.635Z" },
 ]
+
+[[package]]
+name = "sca2"
+version = "2.0"
+source = { editable = "." }
+dependencies = [
+    { name = "cloudpickle" },
+    { name = "datasets" },
+    { name = "equinox" },
+    { name = "ftfy" },
+    { name = "huggingface-hub", extra = ["hf-xet"] },
+    { name = "imageio-ffmpeg" },
+    { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "marimo" },
+    { name = "matplotlib" },
+    { name = "modal", extra = ["api-proxy-support"] },
+    { name = "numpy" },
+    { name = "optax" },
+    { name = "pandas" },
+    { name = "pydantic" },
+    { name = "pyzmq" },
+    { name = "requests" },
+    { name = "rich" },
+    { name = "scikit-learn" },
+    { name = "wandb" },
+]
+
+[package.dev-dependencies]
+cuda = [
+    { name = "jax", extra = ["cuda12"] },
+]
+dev = [
+    { name = "pandas-stubs" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+    { name = "scipy-stubs" },
+    { name = "segno" },
+    { name = "ty" },
+    { name = "vulture" },
+]
+pages = [
+    { name = "markdown" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cloudpickle", specifier = ">=3.1.2" },
+    { name = "datasets", specifier = ">=3.0.0" },
+    { name = "equinox", specifier = ">=0.13" },
+    { name = "ftfy", specifier = ">=6.3.1" },
+    { name = "huggingface-hub", extras = ["hf-xet"], specifier = ">=1.19" },
+    { name = "imageio-ffmpeg", specifier = ">=0.6.0" },
+    { name = "jax", specifier = ">=0.6" },
+    { name = "jaxtyping", specifier = ">=0.2.38" },
+    { name = "marimo", specifier = ">=0.19.10" },
+    { name = "matplotlib", specifier = ">=3.10.0" },
+    { name = "modal", extras = ["api-proxy-support"], specifier = ">=1.5.1" },
+    { name = "numpy", specifier = ">=2.2.3" },
+    { name = "optax", specifier = ">=0.2.4" },
+    { name = "pandas", specifier = ">=2.2.3" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "pyzmq", specifier = ">=27.1.0" },
+    { name = "requests", specifier = ">=2.32.3" },
+    { name = "rich", specifier = ">=14.3.2" },
+    { name = "scikit-learn", specifier = ">=1.6.1" },
+    { name = "wandb", specifier = ">=0.25.0" },
+]
+
+[package.metadata.requires-dev]
+cuda = [{ name = "jax", extras = ["cuda12"], specifier = ">=0.6" }]
+dev = [
+    { name = "pandas-stubs" },
+    { name = "pytest", specifier = ">=8.3.5" },
+    { name = "pytest-asyncio", specifier = ">=0.25.3" },
+    { name = "ruff", specifier = ">=0.9.7" },
+    { name = "scipy-stubs", specifier = ">=1.15.2.2" },
+    { name = "segno", specifier = ">=1.6.1" },
+    { name = "ty", specifier = ">=0.0.19" },
+    { name = "vulture", specifier = ">=2.14" },
+]
+local = []
+pages = [{ name = "markdown", specifier = ">=3" }]
 
 [[package]]
 name = "scikit-learn"
