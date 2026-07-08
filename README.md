@@ -1,123 +1,28 @@
-> **<ruby>見<rt>み</rt>に</ruby> /mi·ni/** — _with intent to see_ [^etymology]
+# SCA2: Concept control in transformers with Sparse Concept Anchoring
 
-[^etymology]: From 見に行く (mi-ni iku), meaning "to go for the purpose of seeing something."
+Develop a training-time method for transformers that puts concepts where you can find them, so removal has predictable efficacy and bounded side-effects.
 
-mi-ni is a template repository and library for doing AI research. Features:
+## Project summary
 
-- **Local Python notebooks** with Marimo, published to GitHub Pages
-- **Remote GPU compute** at the level of functions with [Modal](https://modal.com)
-- **Detached, memoized experiments** driven from a stateless CLI, so you (or an agent) can launch a run, close the laptop, and pick it up later
-- **Agentic coding config** for Claude Code
+Post-hoc interpretability tools (sparse autoencoders, probes, concept activation vectors) search for concepts after training. If a concept is fragmented across redundant directions, the search can miss some of them, and suppressing the ones you found may leave the rest intact. That is a completeness problem no post-hoc method can rule out.
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/z0u/sca2)
+Sparse Concept Anchoring (SCA) takes a different approach. It adds a light geometric regularizer to the training objective that guides a concept toward a known location (a direction or subspace) using a small number of noisy labels. In effect, it lets you shape feature geometry during training, rather than reverse-engineering it later. Because the concept then lives where you put it, suppressing or ablating it has side-effects you can bound analytically from the geometry before you run the intervention. SCA is currently the only training-time localization method with that property.
 
-There are two ways to compute: interactive, and detached.
+This is part of a milestone program.
 
-**Interactive.** Map a function over a sweep, right in a notebook. Swap the apparatus to change where it runs; the code stays the same:
+- M1 anchored concepts in autoencoders (done, [published](https://arxiv.org/abs/2512.12469); [blog post](https://www.lesswrong.com/posts/sGskzx7LgsDkMLvcv/intervening-on-sparse-anchored-concepts); [source](https://github.com/z0u/ex-preppy))
+- **M2 tests whether it transfers to transformers (this project)**
+- M3 & M4 carry it to small language models and LLM fine-tunes with real safety targets.
 
-```py
-# app = LocalApparatus("my-experiment", max_workers=4)
-app = ModalApparatus("my-experiment").w(gpu="L4")
-metrics = list(app.map(train, sweep_configs))
-app.volume.download("outputs", "local/outputs")
-```
+M2 works in a synthetic color-mixing domain with unambiguous ground truth (`red + blue = purple`), in a small transformer:
 
-```bash
-./go open ./docs/getting_started.py  # Edit in Marimo
-```
+- D2.1: Does SCA work in a transformer at all? Anchor a concept such as _red_ across the residual stream in the color-mixing task; probe each layer for the anchored concept, and confirm that completion accuracy (predicting the correct result color) matches an un-anchored baseline.
+- D2.2: Anchor an abstract _operation_ (e.g. _addition_, rather than a concrete attribute like _redness_); sweep over layers; confirm task performance is intact and that suppression scales as it did in the autoencoders.
+- D2.3: Add a verification task (`red + blue = purple TRUE/FALSE`) and test whether suppression can degrade _completion_ while preserving _verification_: the experimental analog for letting a model recognize a behavior without being able to produce it.
+- D2.4: Consolidation/outreach/publication.
 
-[See: getting started notebook](./docs/getting_started.py).
+Why the synthetic domain first, rather than language models straight away? A toy domain keeps a negative result interpretable. In an LLM, a null result at this stage could mean the method failed, or it could mean any of the other things that can go wrong in language-model training. The color domain removes those confounds, so M2 is a clean test of the method itself; M3 and M4 then carry it to natural-language models and real safety targets (sycophancy the lead candidate).
 
-**Detached & memoized.** For sweeps, multi-step pipelines, and long runs. Define the experiment as an importable `main(ctx)` DAG; drive and monitor it from the CLI across separate processes. Work is launched detached, and its results, progress, and errors are written to durable storage — so you can close your laptop and check back later, and so can an agent:
+## Related work
 
-```py
-# docs/pipeline/experiment.py
-def main(ctx):
-    meta = ctx.run(prepare_data)                  # one step
-    return ctx.map(train, derive_configs(meta))   # a sweep that depends on it
-
-experiment = Experiment(name="pipeline", main=main)
-```
-
-```bash
-mini run docs/pipeline/experiment.py --watch   # drive to completion, live bar
-mini status pipeline                            # poll later, from anywhere
-```
-
-[See: pipeline experiment module](./docs/pipeline/experiment.py).
-
-**Report, then publish.** `report.py` is a Marimo notebook that reads the durable results from the experiment and renders them. Figures are externalized and bundled, allowing agents to view them and keeping the report light:
-
-```python
-from mini.reports import report_bundle, use_publisher
-from mini.vis import themed
-
-use_publisher(report_bundle(__file__))   # themed figures → _assets/, by name
-
-@themed(alt_text="Final validation loss...")
-def _loss_chart() -> plt.Figure: ...
-```
-
-```bash
-./go export  docs/pipeline/report.py   # export the bundle locally (offline preview)
-./go publish docs/pipeline/report.py   # export + mirror to the bucket (needs ./go auth)
-./go serve                             # build the static site and serve it
-```
-
-At export the HTML is cleaned: progress-bar terminal sequences are collapsed, and Modal app URLs (which would leak your username) are redacted.
-
-[See: pipeline report notebook](./docs/pipeline/report.py).
-
-&nbsp;
-
-<details><summary>More cool features</summary>
-
-- [Dev container][dc] for a consistent environment, both locally and in [Codespaces][codespaces]
-- ML stack ([JAX, Equinox, Pandas, etc.](pyproject.toml))
-- Modern package management with [uv]
-- Pre-configured for good engineering practices: tests, linting, type-checking (optional!)
-</details>
-
-&nbsp;
-
-## Getting started
-
-```bash
-./go install  # CPU deps for local venv
-./go auth     # Authenticate with Modal for remote compute
-./go open docs/getting_started.py  # Open the notebook in your browser
-```
-
-For a more complete example, have a look at the [nanoGPT notebook](./docs/gpt.py).
-
-&nbsp;
-
-## Running experiments with an assistant
-
-This template is set up for agentic coding (Claude Code and friends). The detached, memoized flow externalizes a run's state, results, and errors to durable storage and is driven by a stateless CLI — so an assistant can run a whole experiment for you, even across the runtime limits of a web session, by working in _wakes_: launch, stop; later check, fix, repeat.
-
-Ask for something like:
-
-> Write an experiment that compares X and Y, run it on Modal, watch for failures, and summarise the results in a report notebook.
-
-The `mi-ni` skill teaches the assistant the conventions: define `main(ctx)`, drive with `mini run`, poll with `mini status`, read tracebacks with `mini logs`, and recover with `mini retry`. For a long run, it delegates launching and babysitting to a cheap monitor agent and can schedule periodic check-ins.
-
-[codespaces]: https://github.com/features/codespaces
-
-<details><summary>Virtual environment</summary>
-
-The Python environment is configured when the dev container is created.
-
-Use [uv] to add and remove packages, and to run scripts:
-
-```bash
-uv add plotly --group local
-uv run python example.py
-```
-
-</details>
-
-[dc]: https://containers.dev
-[Modal]: https://modal.com
-[uv]: https://astral.sh/uv
-
+The closest existing method, gradient routing ([Cloud et al., 2024](https://arxiv.org/abs/2410.04332)), also steers where a concept lands during training, but by masking gradients rather than shaping the loss.
