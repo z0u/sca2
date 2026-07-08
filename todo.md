@@ -3,11 +3,18 @@
 Scratchpad for deferred work that isn't worth a tracking issue yet. When something
 here grows real, promote it to a GitHub issue and remove it from this list.
 
-Right now this file is empty of scratch items — everything below is the
-prioritized index into GitHub issues. Durable design rationale and recorded
+Scratch items sit under _Scratch_; everything below that is the prioritized
+index into GitHub issues. Durable design rationale and recorded
 decisions live in [`eng/`](./eng/README.md); each open issue
 also carries a grounding comment with current file:line refs, so it should be
 readable cold without re-deriving code state.
+
+## Scratch
+
+- Remove the mi-ni template experiments (`docs/pipeline`, `docs/probe`,
+  `docs/acts`, `docs/gpt-sweep`, `docs/gpt.py`, `docs/getting_started.py`)
+  once the first real M2 experiments land — `docs/ex-2.9.1` already covers the
+  worked-example role. Ties into #45 (docs rework).
 
 ## Backlog, grouped by what a single dev session should bundle
 

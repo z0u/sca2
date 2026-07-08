@@ -19,9 +19,11 @@ score means the deletion was clean — errors land on red-like colors and nowher
 else.
 
 The PyTorch/Lightning original becomes a handful of pure functions and one
-`lax.scan`. Hooks, callbacks, and DataLoaders don't survive the port: activations
-are just a second return value, the schedule is an array indexed by step, and a
-"batch" is 64 random rows.
+`lax.scan`. Hooks, callbacks, DataLoaders, and even the model class don't
+survive the port: the model is a pytree of arrays (task functions ship to
+workers by value, so plain data beats clever classes), activations are just a
+second return value, the schedule is an array indexed by step, and a "batch" is
+64 random rows.
 
     bin/mini run docs/ex-2.9.1/experiment.py --app modal --max-containers 8
 
@@ -35,7 +37,6 @@ import io
 import json
 from pathlib import Path
 
-import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -48,7 +49,7 @@ from mini.store import put, set_ref
 from mini.temporal import Dopesheet, Timeline, realize_timeline
 
 K = 5  # bottleneck dim; red is anchored to axis 0
-HIDDEN = 16
+DIMS = (3, 16, 16, K, 16, 16, 3)  # bottleneck sits after layer 2 (~840 params)
 BATCH = 64
 SEEDS = list(range(16))  # the original swept 60 seeds; 16 is plenty for an infra test
 WEIGHT_PROPS = ("separate", "anchor", "anti-anchor", "anti-subspace")
@@ -58,6 +59,8 @@ DOPESHEET_CSV = (Path(__file__).parent / "dopesheet.csv").read_text()
 # Store refs the report reads (see report.py).
 METRICS_REF = "reports/ex-2.9.1/metrics"
 BEST_EVAL_REF = "reports/ex-2.9.1/best-eval"
+
+type Params = list[dict[str, jax.Array]]
 
 
 def _grid(coords: np.ndarray) -> np.ndarray:
@@ -88,33 +91,40 @@ VAL_RGB = np.concatenate([_grid(np.linspace(1 / 16, 15 / 16, 7)), _grid(np.array
 VAL_RED = _redness(VAL_RGB) == 1.0  # exact label: only pure red
 
 
-class ColorAE(eqx.Module):
-    """3 → 16 → 16 → [unit 5-sphere] → 16 → 16 → 3, GELU between the linears."""
+def init_params(key: jax.Array) -> Params:
+    """Linear layers as plain dicts, uniform ±1/√fan_in (matching torch/equinox defaults)."""
 
-    enc: tuple[eqx.nn.Linear, ...]
-    dec: tuple[eqx.nn.Linear, ...]
+    def linear(k: jax.Array, n_in: int, n_out: int) -> dict[str, jax.Array]:
+        kw, kb = jr.split(k)
+        lim = 1.0 / np.sqrt(n_in)
+        return {
+            "w": jr.uniform(kw, (n_out, n_in), minval=-lim, maxval=lim),
+            "b": jr.uniform(kb, (n_out,), minval=-lim, maxval=lim),
+        }
 
-    def __init__(self, key: jax.Array):
-        k = jr.split(key, 6)
-        dims = (3, HIDDEN, HIDDEN, K, HIDDEN, HIDDEN, 3)
-        layers = tuple(eqx.nn.Linear(a, b, key=kk) for a, b, kk in zip(dims[:-1], dims[1:], k, strict=True))
-        self.enc, self.dec = layers[:3], layers[3:]
-
-    def __call__(self, x: jax.Array) -> tuple[jax.Array, jax.Array]:
-        """Return (reconstruction, unit latent) for one sample."""
-        for lin in self.enc[:-1]:
-            x = jax.nn.gelu(lin(x))
-        z = self.enc[-1](x)
-        z = z / jnp.maximum(jnp.linalg.norm(z), 1e-12)
-        y = z
-        for lin in self.dec[:-1]:
-            y = jax.nn.gelu(lin(y))
-        return self.dec[-1](y), z
+    keys = jr.split(key, len(DIMS) - 1)
+    return [linear(k, a, b) for k, a, b in zip(keys, DIMS[:-1], DIMS[1:], strict=True)]
 
 
-def loss_fn(model: ColorAE, x: jax.Array, labels: jax.Array, w: jax.Array) -> tuple[jax.Array, jax.Array]:
+def forward(params: Params, x: jax.Array) -> tuple[jax.Array, jax.Array]:
+    """3 → 16 → 16 → [unit 5-sphere] → 16 → 16 → 3, GELU between the linears.
+
+    Returns (reconstruction, unit latent) for a batch.
+    """
+    enc, dec = params[:3], params[3:]
+    for lyr in enc[:-1]:
+        x = jax.nn.gelu(x @ lyr["w"].T + lyr["b"])
+    z = x @ enc[-1]["w"].T + enc[-1]["b"]
+    z = z / jnp.maximum(jnp.linalg.norm(z, axis=-1, keepdims=True), 1e-12)
+    y = z
+    for lyr in dec[:-1]:
+        y = jax.nn.gelu(y @ lyr["w"].T + lyr["b"])
+    return y @ dec[-1]["w"].T + dec[-1]["b"], z
+
+
+def loss_fn(params: Params, x: jax.Array, labels: jax.Array, w: jax.Array) -> tuple[jax.Array, jax.Array]:
     """Reconstruction MSE plus the four weighted regularizers on the bottleneck."""
-    y, z = jax.vmap(model)(x)
+    y, z = forward(params, x)
     recon = jnp.mean((y - x) ** 2)
 
     cos_red = z[:, 0]  # z is unit-norm and RED = e₀, so cos(z, RED) is just z₀
@@ -130,23 +140,18 @@ def loss_fn(model: ColorAE, x: jax.Array, labels: jax.Array, w: jax.Array) -> tu
     return recon + terms @ w, recon
 
 
-def eval_model(model: ColorAE, x: jax.Array) -> tuple[jax.Array, jax.Array]:
+def eval_model(params: Params, x: jax.Array) -> tuple[jax.Array, jax.Array]:
     """Per-point reconstruction MSE (output clamped to [0,1], as at inference) and latents."""
-    y, z = jax.vmap(model)(x)
+    y, z = forward(params, x)
     return jnp.mean((jnp.clip(y, 0.0, 1.0) - x) ** 2, axis=-1), z
 
 
-def ablate(model: ColorAE) -> ColorAE:
+def ablate(params: Params) -> Params:
     """Delete latent axis 0: zero the encoder's output row 0 (and bias) and the decoder's input column 0."""
-    return eqx.tree_at(
-        lambda m: (m.enc[-1].weight, m.enc[-1].bias, m.dec[0].weight),
-        model,
-        (
-            model.enc[-1].weight.at[0].set(0.0),
-            model.enc[-1].bias.at[0].set(0.0),  # ty:ignore[unresolved-attribute]  (bias is Array | None)
-            model.dec[0].weight.at[:, 0].set(0.0),
-        ),
-    )
+    params = [dict(lyr) for lyr in params]
+    params[2] = {"w": params[2]["w"].at[0].set(0.0), "b": params[2]["b"].at[0].set(0.0)}
+    params[3] = {**params[3], "w": params[3]["w"].at[:, 0].set(0.0)}
+    return params
 
 
 def train_one(seed: int, dopesheet_csv: str) -> dict:
@@ -159,36 +164,34 @@ def train_one(seed: int, dopesheet_csv: str) -> dict:
 
     x_train, p_red = jnp.asarray(GRID_RGB), jnp.asarray(RED_PROB)
     key, k_model = jr.split(jr.key(seed))
-    model = ColorAE(k_model)
+    params = init_params(k_model)
     opt = optax.adam(lambda count: lr[count])  # the dopesheet *is* the LR schedule
-    opt_state = opt.init(eqx.filter(model, eqx.is_inexact_array))
+    opt_state = opt.init(params)
 
-    @eqx.filter_jit
-    def run_chunk(model, opt_state, key, steps):
+    @jax.jit
+    def run_chunk(params, opt_state, key, steps):
         def step(carry, i):
-            model, opt_state, key = carry
+            params, opt_state, key = carry
             key, k_batch, k_label = jr.split(key, 3)
             idx = jr.randint(k_batch, (BATCH,), 0, x_train.shape[0])  # bootstrap sample, like the original
             labels = jr.bernoulli(k_label, p_red[idx]).astype(jnp.float32)  # stochastic sparse labels
-            (_, recon), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(
-                model, x_train[idx], labels, weights[i]
-            )
-            updates, opt_state = opt.update(grads, opt_state, eqx.filter(model, eqx.is_inexact_array))
-            return (eqx.apply_updates(model, updates), opt_state, key), recon
+            (_, recon), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, x_train[idx], labels, weights[i])
+            updates, opt_state = opt.update(grads, opt_state, params)
+            return (optax.apply_updates(params, updates), opt_state, key), recon
 
-        (model, opt_state, key), recons = jax.lax.scan(step, (model, opt_state, key), steps)
-        return model, opt_state, key, recons[-1]
+        (params, opt_state, key), recons = jax.lax.scan(step, (params, opt_state, key), steps)
+        return params, opt_state, key, recons[-1]
 
     for chunk in np.array_split(np.arange(n_steps), 10):
-        model, opt_state, key, recon = run_chunk(model, opt_state, key, jnp.asarray(chunk))
+        params, opt_state, key, recon = run_chunk(params, opt_state, key, jnp.asarray(chunk))
         emit_progress(int(chunk[-1]) + 1, n_steps, message=f"seed {seed}")
         emit_metrics(recon=float(recon), lr=float(lr[chunk[-1]]))
 
     # Final validation (the original also validated mid-run; we only need the endpoint).
-    mse_val, z_val = eval_model(model, jnp.asarray(VAL_RGB))
+    mse_val, z_val = eval_model(params, jnp.asarray(VAL_RGB))
     # Score the run: ablate axis 0, then ask how tightly post-ablation error tracks similarity-to-red.
-    mse_base, z_base = eval_model(model, x_train)
-    mse_abl, z_abl = eval_model(ablate(model), x_train)
+    mse_base, z_base = eval_model(params, x_train)
+    mse_abl, z_abl = eval_model(ablate(params), x_train)
     r = np.corrcoef(SIM3, np.asarray(mse_abl))[0, 1]
 
     buf = io.BytesIO()
