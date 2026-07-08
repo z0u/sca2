@@ -1,0 +1,90 @@
+\subsection{Behavioral Steering: Detailed Formulations}
+\label{sec:intervention_lobes}
+
+This appendix provides detailed mathematical formulations and geometric visualizations for the behavioral steering interventions introduced in~\cref{sec:anchored_architecture}. While the main text presents simplified versions of suppression and mentions repulsion conceptually, here we present the full parametric families of intervention functions and their geometric properties.
+
+\paragraph{Suppression.}
+For latent activations $\hat{\vz} \in \mathbb{R}^E$ and concept vector $\hat{\vv} \in \mathbb{R}^E$ with $\|\hat{\vz}\|_2 = \|\hat{\vv}\|_2 = 1$, the general suppression transformation is:
+%
+\begin{equation}
+    \hat{\vz}' = \hat{\vz} - h(\alpha) (\hat{\vz} \cdot \hat{\vv}) \hat{\vv} \label{eq:suppression_detailed}
+\end{equation}
+%
+where $\alpha = \max(0, \hat{\vz} \cdot \hat{\vv})$ represents the alignment (positive cosine similarity) between the activation and concept direction, and $h(\alpha)$ is a suppression strength function that maps alignment to intervention intensity.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/suppression-plots.png}
+    \caption{\textbf{Suppression Intervention Lobes.} \textit{Top}:~Polar projections where the angular coordinate represents the direction of a unit input vector, and the radial coordinate shows magnitude. The orange region shows suppression strength, while the blue region shows transformed activations, with straight lines showing the transformation from original to suppressed activations (white dots). \textit{Bottom}:~Suppression strength as a function of alignment.}
+    \label{fig:suppression_intervention_lobes}
+\end{figure}
+
+The main text uses the aggressive formulation $h(\alpha) = \alpha$, which completely nullifies the aligned component. However, we can implement bounded falloff functions that create smooth transitions from no suppression to maximum intervention:
+%
+\begin{equation}
+    h(\alpha) =
+    \begin{cases}
+        0 & \text{if } \alpha < a \\
+        b \left(\frac{\alpha - a}{1 - a}\right)^p & \text{if } \alpha \geq a
+    \end{cases} \label{eq:suppression_falloff_detailed}
+\end{equation}
+%
+where $a \in [0,1)$ is the alignment threshold below which no suppression occurs, $b \in [0,1]$ is the maximum suppression strength, and $p \geq 0$ controls the falloff curve shape.
+
+This design preserves representations with low concept alignment while progressively suppressing those with higher alignment. The geometric effect is that suppressed activations are pushed off the unit hypersphere, placing them off-manifold relative to the distribution learned during training (\cref{fig:suppression_intervention_lobes}).
+
+%
+
+\paragraph{Repulsion.}
+Unlike suppression, which pushes embeddings off the hypersphere, repulsion rotates activations away from concept directions to new positions while preserving unit norm:
+%
+\begin{equation}
+    \hat{\vz}' = m(\alpha) \hat{\vv} + \sqrt{1 - m(\alpha)^2} \hat{\mathbf{u}}_\perp \label{eq:repulsion_detailed}
+\end{equation}
+%
+where $m(\alpha)$ is a mapping function that determines the target alignment, and $\hat{\mathbf{u}}_\perp$ is the unit vector perpendicular to $\hat{\vv}$ in the plane spanned by $\hat{\vz}$ and $\hat{\vv}$:
+%
+\begin{equation}
+    \hat{\mathbf{u}}_\perp = \frac{\hat{\vz} - (\hat{\vz} \cdot \hat{\vv})\hat{\vv}}{\|\hat{\vz} - (\hat{\vz} \cdot \hat{\vv})\hat{\vv}\|} \label{eq:perpendicular_detailed}
+\end{equation}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1\linewidth]{figures/repulsion-plots.png}
+    \caption{\textbf{Repulsion Intervention Lobes.} \textit{Top}:~Polar plots show how vectors are rotated to new positions on the unit hypersphere, with curved "chord" lines illustrating the rotation paths from input to output positions (white dots). \textit{Bottom}:~Mapping functions $m(\alpha)$ that determine target alignments. The columns alternate between using linear mappers and Bézier mappers. The filled regions between the identity line and mapping curve indicate the magnitude of alignment reduction.}
+    \label{fig:repulsion_intervention_lobes}
+\end{figure}
+
+Activations are rotated within the 2D plane defined by the original activation and the concept vector, moving them away from the concept direction while staying on the unit hypersphere.
+
+The mapping function $m(\alpha)$ provides flexible control over post-intervention alignment. We implement linear mappings that repel activations from high-alignment regions:
+%
+\begin{equation}
+    m_{\text{linear}}(\alpha) =
+    \begin{cases}
+        \alpha & \text{if } \alpha < a \\
+        b & \text{if } \alpha \geq a
+    \end{cases} \label{eq:linear_mapping_detailed}
+\end{equation}
+%
+where $a$ is the threshold and $b \geq 0$ is the maximum mapped value, creating a ``ceiling effect'' that prevents excessive alignment with the concept vector.
+
+Alternatively, we can use cubic Bézier curves for smoother transitions. The Bézier mapping function is defined as:
+%
+\begin{equation}
+    m_{\text{Bézier}}(\alpha) =
+    \begin{cases}
+        \alpha & \text{if } \alpha \leq a \\
+        B_y(t^*) & \text{if } \alpha > a
+    \end{cases} \label{eq:bezier_mapping_detailed}
+\end{equation}
+%
+where the curve $B(t) = (B_x(t), B_y(t))$ is parameterized by control points $P_0 = (a, a)$, $P_3 = (1, b)$, and interior points $P_1, P_2$ chosen to satisfy desired endpoint slopes. The standard cubic Bézier formulation is:
+%
+\begin{equation}
+    B(t) = (1-t)^3 P_0 + 3(1-t)^2 t P_1 + 3(1-t) t^2 P_2 + t^3 P_3, \quad t \in [0,1] \label{eq:bezier_curve}
+\end{equation}
+%
+For a given $\alpha > a$, we find $t^* \in [0,1]$ such that $B_x(t^*) = \alpha$, and the mapped value is $m_{\text{Bézier}}(\alpha) = B_y(t^*)$. By setting control points appropriately (e.g., with unit start slope and flat end slope), we obtain smooth, monotone mappings that gradually reduce alignment. For instance, choosing $a = \cos(90^\circ) = 0$ and $b = \cos(60^\circ) = 0.5$ yields a smooth map from $[\cos(90^\circ), \cos(0^\circ)] = [0,1]$ to $[\cos(90^\circ), \cos(60^\circ)] = [0, 0.5]$ with desirable geometric properties.
+
+Repulsion creates a radius $\sin^{-1}(b)$ ``hole'' in latent space around the concept direction, redirecting activations to nearby regions while preserving the manifold structure and resulting in a high-density ring between alignments $a$ and $b$ (\cref{fig:repulsion_intervention_lobes}).

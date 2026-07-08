@@ -1,0 +1,156 @@
+\section{Interventions}
+\label{sec:interventions}
+
+We demonstrate two intervention strategies that exploit the geometric structure established through Sparse Concept Anchoring. Because anchoring provides predetermined concept locations, these techniques operate without post-hoc analysis.
+
+\subsection{Experimental Setup}
+\label{sec:experimental_setup}
+
+We trained 60 color autoencoders per experiment with different random seeds, each using 4 or 5 latent dimensions ($E \in \{4,5\}$). The \concept{red} concept was anchored to the first dimension ($\hat{\vv}_{\text{red}}=(1,0,...,0)$) using $83 \pm 8$ labeled examples per model (approximately $0.09\%$ of the dataset). To simulate realistic labeling conditions, we assigned labels stochastically during collation, allowing the same sample to receive different labels across batches.
+
+Samples were drawn randomly with replacement from the full RGB cube throughout training, with selective regularization applied only to labeled samples. Hyperparameters (learning rate $\eta$, $\lambda_{\text{sep}}$, $\lambda_{c_k}$) varied according to tuned schedules detailed in~\cref{sec:hyperparameter_schedules}.
+
+\textit{Optional enhancement.} In some experiments, we anchored \concept{vibrant} colors to the subspace of the first two dimensions, labeling an additional $108 \pm 11$ samples ($\approx 0.11\%$). While not required for \concept{red} interventions, this produced more interpretable latent structure by organizing hues as a color wheel. Results without \concept{vibrant} anchoring appear in~\cref{sec:suppression-no-vibrant}.
+
+\paragraph{Model Selection} For each experiment, we selected models from 60 training runs by identifying the Pareto frontier over intervention selectivity, validation reconstruction loss, and validation organization loss, then choosing the model with highest selectivity. Selectivity was measured as $R^2$ between reconstruction error and a power of similarity to \concept{red}; details in~\cref{sec:color_similarity,sec:additional_results}.
+
+\paragraph{Evaluation Methodology}
+We evaluate interventions through reconstruction error (MSE) and visualization. For MSE, we compute:
+\begin{equation}
+    \text{MSE}(\vx,\vy) = \frac{1}{3}\left[(\vx_r - \vy_r)^2 + (\vx_g - \vy_g)^2 + (\vx_b - \vy_b)^2\right] \label{eq:mse_per_color}
+\end{equation}
+For visualization, we use plots with a consistent three-panel layout throughout. Latent space projections (top) show axis-aligned views of the hypersphere; since our anchors are axis-aligned, these projections are directly interpretable without post-hoc rotation. Reconstruction grids (middle) display the model's output as each cell's background color, with a small inset square showing the true input color; where the two match, the model reconstructs faithfully. Error curves (bottom) plot MSE across hues at several brightness levels, so that spikes reveal which hues an intervention has disrupted.
+
+\begin{table}[htb]
+    \centering
+    \footnotesize
+    \captionsetup{width=\linewidth-20pt}
+    \caption{\textbf{Interventions selectively target \concept{red}.} Reconstruction error (MSE) for two architectures: Anchored (\cref{sec:anchored_architecture}) uses attraction only; Isolated (\cref{sec:isolated_architecture}) adds repulsion to enable selective weight ablation. Both suppression and ablation increase error for \concept{red} while preserving orthogonal colors.}
+    \sisetup{
+        round-mode = places,
+        round-precision = 2,
+        table-auto-round = true,
+    }
+    \input{data/tab-2.4.1-2.9.1-recon-error-merged.tex}
+    \label{tab:intervention-results}
+\end{table}
+
+
+%
+
+\subsection{Anchored Architecture}
+\label{sec:anchored_architecture}
+
+The anchored architecture uses attraction regularizers only, drawing labeled samples toward their target directions. We evaluate two intervention types: \textit{suppression}, which modifies activations at inference, and \textit{weight ablation}, which permanently zeros weights for anchored dimensions.
+
+\paragraph{Suppression}
+Suppression modifies latent activations during the forward pass without changing model weights.\footnote{We also evaluate repulsion, another behavioral steering technique, in~\cref{sec:additional_results}.} We project out the component of a latent activation aligned with a target concept direction. For unit-normalized latent activations $\hat{\vz} \in \mathbb{R}^E$ and concept vector $\hat{\vv} \in \mathbb{R}^E$ with $\|\hat{\vz}\|_2 = \|\hat{\vv}\|_2 = 1$:
+%
+\begin{equation}
+    \hat{\vz}' = \hat{\vz} - (\hat{\vz} \cdot \hat{\vv}) \hat{\vv} \label{eq:suppression}
+\end{equation}
+%
+This removes the component aligned with $\hat{\vv}$ while preserving orthogonal information.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.4.1-results-baseline.png}
+        \caption{Baseline}
+        \label{subfig:baseline}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.4.1-results-suppression.png}
+        \caption{Suppression}
+        \label{subfig:suppression}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.4.1-results-ablated.png}
+        \caption{Weight ablation}
+        \label{subfig:ablation-on-soft-model}
+    \end{subfigure}
+    \caption{\textbf{Concept interventions in structured latent space.} A 4-dimensional autoencoder with \concept{red} and \concept{vibrant} anchored. \textbf{(a)} Baseline: organized color wheel with near-zero reconstruction error. \textbf{(b)} Suppression: \concept{red} hues reconstruct as dark gray (inset squares retain the true color for comparison), producing the error spike near \concept{red}. \textbf{(c)} Weight ablation affects both \concept{red} and \concept{cyan}; additional constraints enable selective deletion (\cref{sec:isolated_architecture}).}
+    \label{fig:intervention-results}
+\end{figure}
+
+Geometrically, suppression pushes activations off the hypersphere, placing them off-manifold. This contrasts with weight ablation (\cref{sec:isolated_architecture}), which maintains on-manifold geometry through renormalization. Since off-manifold activations force the decoder to rely on its biases, and assuming these produce \concept{middle gray} $(0.5, 0.5, 0.5)$, we expect reconstruction error for \concept{red} around $\frac{1}{4}$:
+\begin{equation}
+    \text{MSE}(\vx_{\text{red}}, (0.5, 0.5, 0.5)) = \frac{1}{3}\left[(1-0.5)^2 + (0-0.5)^2 + (0-0.5)^2\right] = \frac{1}{4} \label{eq:mse_gray}
+\end{equation}
+
+\paragraph{Model Architecture}
+The encoder and decoder each had one hidden layer with 16 units. Latent space was four-dimensional ($E = 4$), with \concept{red} anchored at $\hat{\vv}_{\text{red}} = (1,0,0,0)$ and \concept{vibrant} colors constrained to dimensions $\mathcal{D}_{\text{vibrant}} = \{1,2\}$. All 60 training runs induced the target geometry.
+
+Suppression was consistently selective ($R^2 = 0.95 \pm 0.02$; \cref{fig:suppression-boxplots}); see~\cref{sec:color_similarity,sec:additional_results}. Pareto frontier analysis identified 4 non-dominated models, from which we selected the one with highest intervention selectivity.
+
+\paragraph{Results}
+Suppression achieves highly selective concept attenuation (\cref{fig:intervention-results,tab:intervention-results}). Reconstruction error for \concept{red} increases from 0.000 to 0.284, approaching the theoretical bound of $0.25$ and substantially disrupting red appearance. Orthogonal colors remain unaffected: \concept{lime} and \concept{purple} maintain MSE of 0.000. Error correlates strongly with squared color similarity to \concept{red} ($R^2 = 0.99$), confirming the quadratic relationship expected from the projection mechanism (see~\cref{sec:color_similarity}).
+
+In this model, weight ablation increases error for both \concept{red} and \concept{cyan}, demonstrating that additional constraints are needed for selective concept deletion---which we address in the next section.
+
+%
+
+\subsection{Isolated Architecture}
+\label{sec:isolated_architecture}
+
+Unlike suppression, weight ablation requires exclusive use of the target dimension---other concepts can leak into it and be disrupted when its weights are zeroed (\cref{sec:anchored_architecture}). The isolated architecture addresses this by adding repulsion regularizers that push all samples away from the anchored dimension, reserving it exclusively for the target concept and enabling selective weight ablation.
+
+\paragraph{Weight Ablation}
+Weight ablation permanently removes concepts by zeroing weights that produce and consume activations in targeted latent dimensions.\footnote{We also evaluate pruning, which removes dimensions entirely, in~\cref{sec:permanent_removal_details}.} For target dimensions $\mathcal{D}_c$ anchoring concept $c$:
+%
+\begin{equation}
+    \mathbf{W}_{f}[d, :] = \mathbf{0}, \quad b_{f}[d] = 0, \quad \mathbf{W}_{g}[:, d] = \mathbf{0} \quad \forall d \in \mathcal{D}_c \label{eq:ablation}
+\end{equation}
+%
+where $\mathbf{W}_{f}$ and $b_{f}$ are the encoder output weights and bias, and $\mathbf{W}_{g}$ is the decoder input weights. Unlike suppression, weight ablation maintains on-manifold geometry through renormalization.
+
+Weight ablation doesn't redirect activations to any particular alternative concept. Assuming the resulting direction is random, the expected reconstruction error should be $\frac{1}{3}$:
+%
+\begin{equation}
+    \mathbb{E}[\text{MSE}(\vx_{\text{red}}, \vy_{\text{random}})] = \frac{1}{3}\mathbb{E}\left[(1 - r)^2 + g^2 + b^2\right] = \frac{1}{3} \label{eq:mse_random}
+\end{equation}
+%
+where $(r,g,b) \sim \text{Uniform}[0,1]^3$.
+
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.9.1-results-baseline.png}
+        \caption{Baseline}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.9.1-results-suppression.png}
+        \caption{Suppression}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.9.1-results-ablated.png}
+        \caption{Weight ablation}
+    \end{subfigure}
+    \caption{\textbf{Isolated architecture enables selective permanent removal.} A 5-dimensional autoencoder with \concept{red} anchored and repulsive terms applied. Same layout as \cref{fig:intervention-results}. \textbf{(a)} Successful concept organization. \textbf{(b)} Suppression eliminates \concept{red}. \textbf{(c)} Weight ablation eliminates \concept{red} by zeroing its dimension. Both interventions are highly selective.}
+    \label{fig:deletion-results}
+\end{figure}
+
+\paragraph{Model Architecture}
+The encoder and decoder each had two hidden layers with 10 units. Latent space was five-dimensional ($E = 5$), with \concept{red} anchored at $\hat{\vv}_{\text{red}} = (1,0,0,0,0)$. To isolate \concept{red}, we applied anchor attraction plus two repulsion terms pushing all samples away from the \concept{red} dimension and direction. Early training emphasized repulsion to clear the target dimension, then shifted to anchor attraction (see~\cref{sec:hyperparameter_schedules}). All 60 training runs induced the target geometry, though with greater variability than the anchored architecture.
+
+Ablation selectivity also varied more than suppression ($R^2 = 0.86 \pm 0.15$; \cref{fig:ablation-boxplots}); see~\cref{sec:color_similarity,sec:additional_results}. Pareto frontier analysis identified 22 non-dominated models, from which we selected the one with highest intervention selectivity.
+
+%
+
+\paragraph{Results}
+Weight ablation achieves complete elimination of \concept{red} while preserving orthogonal colors (\cref{fig:deletion-results,tab:intervention-results}). Reconstruction error for \concept{red} increases from 0.000 to 0.343, approaching the theoretical bound of $0.\overline{3}$ for random on-manifold directions. Orthogonal and opposing colors---including \concept{cyan}, which opposes \concept{red} in both RGB and HSV spaces---show no measurable degradation. Error exhibits a strong cubic relationship with color similarity to \concept{red} ($R^2 = 0.98$), confirming selective concept removal (see~\cref{sec:color_similarity}).
+
+\subsection{Intervention Trade-offs}
+\label{sec:intervention_tradeoffs}
+
+The two architectures address complementary needs. Attraction regularizers alone (\cref{sec:anchored_architecture}) suffice for reversible, inference-time suppression. Permanent removal via weight ablation requires the additional repulsive regularizers of the isolated architecture (\cref{sec:isolated_architecture}) to reserve the target dimension exclusively, at the cost of additional training complexity. The choice between the two therefore depends on whether the application requires dynamic steering or permanent removal.

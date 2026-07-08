@@ -1,0 +1,98 @@
+\section{Sparse Concept Anchoring with Minimal Supervision}
+\label{sec:sparse_concept_anchoring}
+
+Sparse Concept Anchoring selectively anchors a limited set of concepts using minimal supervision during training. It integrates two complementary inductive biases alongside the primary task objective: \textit{structural constraints} that enforce global latent geometry, and \textit{concept-organizational regularizers} that position specific concepts. This selective shaping preserves representational flexibility while ensuring predictable locations for key concepts.
+
+%
+
+\subsection{Problem Formulation and Architecture}
+
+We consider a dataset $\mathbf{X} = \{\vx^{(i)}\}_{i=1}^N$ of $N$ samples, where each $D$-dimensional vector $\vx^{(i)} \in \mathbb{R}^D$ represents the input space (e.g., RGB color values with $D=3$). We denote $\mathcal{C} = \{c_1, c_2, \ldots, c_K\}$ as the set of $K$ concepts to be anchored, where each concept $c_k \in \mathcal{C}$ corresponds to a semantic category of interest (e.g., \concept{red}, \concept{vibrant}). For concept anchoring, we assume access to sparse supervision in the form of binary labels for a small subset of training samples: $\{(\vx^{(i)}, \ell^{(i)}_{\mathcal{C}})\}$ where $\ell^{(i)}_{\mathcal{C}}\in \{0, 1\}^K$ indicates presence or absence of concepts at sample $\vx^{(i)}$. Empirically, we find less than $0.1\%$ of samples need labels for any particular concept.
+
+Consider an autoencoder architecture~(\cref{fig:autoenc} in~\cref{sec:architecture_details}) comprising encoder $f_\theta: \mathbb{R}^D \rightarrow \mathbb{R}^E$ and decoder $g_\phi: \mathbb{R}^E \rightarrow \mathbb{R}^D$, where $\theta$ and $\phi$ represent learned parameters. The forward pass operates as:
+\begin{align}
+    \vz = f_\theta(\vx), \quad \hat{\vz} = \frac{\vz}{\|\vz\|_2}, \quad \hat{\vy} = g_\phi(\hat{\vz}) \label{eq:forward_pass}
+\end{align}
+where $\hat{\vz} \in \mathbb{R}^E$ represents the normalized latent embedding constrained to the unit hypersphere $\mathbb{S}^{E-1}$. This normalization ensures consistent geometric properties throughout training and is known to work well in language models such as nGPT~\citep{loshchilov2025ngptnormalizedtransformerrepresentation}.
+
+The training objective integrates three components:
+\begin{equation}
+    \mathcal{L}_{\text{total}}(\cdot) = \mathcal{L}_{\text{task}}(\cdot) + \mathcal{L}_{\text{structural}}(\hat{\vz}) + \mathcal{L}_{\text{concept}}(\hat{\vz}, \ell_{\mathcal{C}}) \label{eq:total_loss}
+\end{equation}
+where $\mathcal{L}_{\text{task}}$ maintains primary functionality (for our autoencoder: $\mathcal{L}_{\text{task}}(\vx, \hat{\vy}) = \|\vx - \hat{\vy}\|_2^2$), $\mathcal{L}_{\text{structural}}$ establishes global geometric properties, and $\mathcal{L}_{\text{concept}}$ positions specific concepts using sparse labels. We now detail each component.
+
+%
+
+\subsection{Structural Constraints: Establishing Geometric Foundation}
+
+Structural constraints provide a well-behaved geometric basis for latent representations through architectural design and loss-based regularization. Applied globally across all samples, these constraints create meaningful structure that supports concept organization and intervention.
+
+\paragraph{Unitarity Constraint}
+The explicit normalization in~\cref{eq:forward_pass} projects all representations onto the unit hypersphere $\mathbb{S}^{E-1}$. This constraint, motivated by work showing that hypersphere representations improve separability and information preservation~\citep{wang2022understandingcontrastiverepresentationlearning,loshchilov2025ngptnormalizedtransformerrepresentation}, prevents representational collapse and establishes a space where cosine similarity measures semantic relationships---providing a natural framework for directional interventions. Unlike the regularization terms that follow, this architectural constraint ensures consistent geometric properties across all training phases.
+
+\paragraph{Separation Regularization}
+Without guidance, representations cluster in small regions of the hypersphere, yielding inseparable embeddings that resist intervention. We address this through a repulsion term:
+\begin{align}
+    \Omega_{\text{separate}}(\{\hat{\vz}^{(i)}\}_{i=1}^B) = \frac{1}{B(B-1)} \sum_{i \neq j} (\hat{\vz}^{(i)} \cdot \hat{\vz}^{(j)})^{p} \label{eq:separation}
+\end{align}
+where $i,j \in B$ are sample indices within a training batch. The exponent $p$ (set to $100$ in our experiments) creates a sharp penalty discouraging high cosine similarity while minimally impacting orthogonal or weakly similar pairs, encouraging representations to spread across the hypersphere rather than clustering.
+
+The complete structural loss is:
+\begin{align}
+    \mathcal{L}_{\text{structural}}(\hat{\vz}^{(i)}) &= \lambda_{\text{sep}} \: \Omega_{\text{separate}}(\{\hat{\vz}^{(i)}\}) \label{eq:structural_loss}
+\end{align}
+where $\lambda_{\text{sep}}$ is a hyperparameter controlling the strength of the separation regularization.
+
+%
+
+\subsection{Concept-Organizational Regularizers: Targeted Concept Positioning}
+
+Building on the structured foundation, we now position specific concepts within this space. These regularizers operate selectively on sparsely-labeled samples to create predictable concept locations enabling precise interventions.
+
+\paragraph{Anchor Regularization}
+For concepts representable by a single prototype direction, we attract labeled examples toward fixed anchor points:
+\begin{align}
+    \Omega_{\text{anchor}}(\hat{\vz}, \hat{\vv}_c) &= 1 - \hat{\vz} \cdot \hat{\vv}_c \label{eq:anchor}
+\end{align}
+where $\hat{\vv}_c \in \mathbb{S}^{E-1}$ is the predetermined unit direction for concept $c \in \mathcal{C}$. This is minimized when $\hat{\vz}$ aligns perfectly with the target direction.
+
+\paragraph{Subspace Regularization}
+Some concepts are manifold and cannot be captured by a single direction~\citep{engels2025languagemodelfeaturesonedimensionally}. For these, we attract representations to predetermined axis-aligned subspaces:
+\begin{align}
+    \Omega_{\text{subspace}}(\hat{\vz}, \mathcal{D}_c) &= \sum_{i \notin \mathcal{D}_c} \hat{\vz}_i^2 \label{eq:subspace}
+\end{align}
+where $\mathcal{D}_c \subset \{1, 2, \ldots, E\}$ specifies dimensions allocated to concept $c$. This supports subspaces of any dimensionality. Note that subspace constraints need not fully prescribe concept locations: confining concepts to dimensional subspaces reduces the search space for post-hoc methods while preserving flexibility within those dimensions.
+
+\paragraph{Repulsion Variants}
+Both regularizers can be inverted to repel rather than attract:
+\begin{align}
+    \Omega_{\overline{\text{anchor}}}(\hat{\vz}, \hat{\vv}_c) &= \max(0, \hat{\vz} \cdot \hat{\vv}_c) \label{eq:anti_anchor}\\
+    \Omega_{\overline{\text{subspace}}}(\hat{\vz}, \mathcal{D}_c) &= \sum_{i \in \mathcal{D}_c} \hat{\vz}_i^2 \label{eq:anti_subspace}
+\end{align}
+The inverted anchor penalizes representations within 90° of the anchor direction, while inverted subspace pushes representations away from specific dimensions. In practice, attractive regularizers are applied to sparsely-labeled samples, while repulsive regularizers can be applied to all samples to reserve regions of latent space. Formally:
+\begin{equation}
+    \ell_{c_k}^{(i)} =
+    \begin{cases}
+        1 & \text{if } \Omega_{c_k} \text{ is repulsive} \\
+        1 & \text{if } \Omega_{c_k} \text{ is attractive and } \vx^{(i)} \in S_{c_k} \\
+        0 & \text{otherwise}
+    \end{cases} \label{eq:label_application}
+\end{equation}
+where $S_{c_k}$ denotes the set of samples belonging to concept $c_k$, and $\Omega_{c_k}$ selects the appropriate concept regularizer based on the semantic properties of concept $c_k$.
+
+The concept organizational loss aggregates regularizers across all concepts:
+\begin{align}
+    \mathcal{L}_{\text{concept}}(\hat{\vz}^{(i)}, \ell^{(i)}_{\mathcal{C}}) &= \sum_{k=1}^K \ell^{(i)}_{c_k} \lambda_{c_k} \Omega_{c_k}(\hat{\vz}^{(i)}) \label{eq:multi_concept}
+\end{align}
+where $\ell^{(i)}_{c_k}$ controls which samples receive regularization for concept $c_k$, and $\lambda_{c_k}$ weights the strength of concept organization.
+
+%
+
+\subsection{Complete Objective Function}
+
+Combining all components, the complete training objective becomes:
+\begin{align}
+    \mathcal{L}_{\text{total}}(\cdot) &= \mathcal{L}_{\text{task}}(\cdot) + \lambda_{\text{sep}} \Omega_{\text{separate}}(\{\hat{\vz}^{(i)}\}) + \sum_{k=1}^K \ell^{(i)}_{c_k} \lambda_{c_k} \Omega_{c_k}(\hat{\vz}^{(i)}) \label{eq:expanded_loss}
+\end{align}
+
+This formulation enables interpretable structure through minimal supervision: the vast majority of training samples ($>99.9\%$ in our experiments) contribute only to task performance and global geometric structure, while a small fraction additionally guides concept organization without constraining representational flexibility for unlabeled data.

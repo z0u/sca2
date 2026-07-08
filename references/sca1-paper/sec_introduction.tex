@@ -1,0 +1,25 @@
+\section{Introduction}
+\label{sec:introduction}
+
+As AI systems grow more capable, predicting, understanding, and controlling their internal representations has become a critical challenge for safety and interpretability~\citep{BereskaG24}. Existing approaches navigate trade-offs between supervision requirements, architectural constraints, and intervention reliability. Concept Bottleneck Models achieve strong interpretability by predicting concepts as intermediate representations but require full concept supervision. Recent variants reduce supervision through sparsity and unsupervised discovery, while post-hoc methods such as Concept Activation Vectors~\citep{KimWGCWVS18} and steering vectors~\citep{RimskyGSTHT24} preserve model flexibility but face reliability challenges when concept directions do not align with emergent geometry. Indeed, post-hoc explanations of black-box models cannot be fully faithful to the original computation~\citep{rudin2019stopexplainingblackbox}.
+
+Building on sparse concept learning~\citep{semenov2024sparseconceptbottleneckmodels, Sawada2022ConceptBM, oikarinen2023labelfreeconceptbottleneckmodels, yamaguchi2025zeroshotconceptbottleneckmodels} and geometric representation learning using hypersphere constraints~\citep{wang2022understandingcontrastiverepresentationlearning,loshchilov2025ngptnormalizedtransformerrepresentation}, we introduce a framework combining minimal supervision with explicit geometric separation to induce interpretable representations of \textit{specific concepts}. This approach is advantageous for four reasons.
+%
+First, neural networks lose plasticity early in training and establish connectivity patterns during critical periods that become difficult to reshape later~\citep{AchilleRS17}, favoring up-front over post-hoc approaches.
+%
+Second, related concepts naturally cluster in latent space~\citep{Bengio2013,Mikolov2013,Pennington2014}, and explicit geometric constraints on the hypersphere can complement this natural organization.
+%
+Third, localized concept representations enable reliable targeted interventions: concepts occupying known, separable locations can be selectively removed without relying on the model's emergent geometry.
+%
+Finally, if safety-critical concepts constitute a small fraction of the diverse knowledge encoded in large models---as suggested by the millions of features discovered in Claude 3 Sonnet, of which only a small subset relate to safety concerns~\citep{templeton2024scaling}---then anchoring a handful of such concepts should not interfere with general capability acquisition.
+
+We propose \textbf{Sparse Concept Anchoring}~(SCA), a framework that fixes selected concepts to predetermined locations in latent space using minimal supervision during training. Our approach combines task-specific loss with targeted regularization to embed specific concepts while preserving representational flexibility. The~framework introduces two complementary inductive biases: \textit{structural constraints} across all data points to shape global latent geometry, and \textit{concept organizational regularizers} applied only to samples associated with anchored concepts. This organization enables two intervention classes: \textit{behavioral steering}, which dynamically modifies activations, and \textit{permanent concept removal} through weight ablation.
+
+To validate the approach, we use color reconstruction as a controlled testbed with well-defined concept relationships and interpretable latent geometry. Primary colors provide distinct conceptual anchors, secondary colors emerge from their combinations, and the resulting structure can be visualized directly.\footnote{We shall discuss color spaces, but we make no measurement or claim relating to human perception of color.} Using autoencoders trained on RGB data, we demonstrate that anchoring a single concept (\concept{red}) with noisy supervision on only $83 \pm 8 \approx 0.09\%$ labeled examples out of $96{,}064$ training samples induces sufficient latent organization to enable reliable behavioral steering and targeted concept removal, reducing red channel reconstruction error to near-theoretical limits while preserving reconstruction of orthogonal colors.
+
+In summary, our contributions are:
+\begin{itemize}
+    \item We introduce a framework that inverts traditional interpretability workflows by establishing predictable concept locations during training rather than discovering them post-hoc, using labels for $<0.1\%$ of training examples per concept in our experiments.
+    \item We demonstrate two mechanistically distinct intervention classes on these anchored representations: reversible behavioral steering via activation projection and permanent concept removal via weight ablation, both operating without post-hoc analysis.
+    \item We validate the approach on color reconstruction, achieving selective concept attenuation with reconstruction error approaching theoretical bounds while preserving orthogonal features.
+\end{itemize}

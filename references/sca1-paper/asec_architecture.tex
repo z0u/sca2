@@ -1,0 +1,13 @@
+\subsection{Visualization of the architecture}
+\label{sec:architecture_details}
+
+\Cref{fig:autoenc} illustrates the architecture of the autoencoder used in our experiments.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.7\linewidth]{figures/autoenc.png}
+    \caption{\textbf{Spherical Autoencoder Architecture.} The encoder maps RGB inputs through hidden fully-connected layers (\,\protect\CrossArrows\,) to 4D activations, which are explicitly normalized (\,\protect\NormNode\,) to constrain latent representations to the unit hypersphere. The decoder reconstructs RGB outputs from these normalized latent representations.}
+    \label{fig:autoenc}
+\end{figure}
+
+The architecture takes 3D RGB inputs~$\vx$ through an encoder~$f_\theta$ with 1-2 fully-connected hidden layers with GeLU activations, projecting to 4-5D latent activations~$\vz$. An L2 normalization layer~\protect\NormNode\; constrains these to the unit hypersphere, yielding~$\hat{\vz}$. The decoder~$g_\phi$ mirrors this structure, mapping from the normalized latent space back to RGB through 1-2 hidden layers with GeLU activations and a final linear projection to outputs~$\hat{\vy}$. Outputs are unconstrained during training but clamped to~$[0,1]$ per channel during evaluation.

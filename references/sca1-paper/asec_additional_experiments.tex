@@ -1,0 +1,131 @@
+
+\subsection{Supplementary Experiments}
+\label{sec:additional_experiments}
+
+This section presents two additional experiments that explore concept interventions under alternative organizational constraints. The first experiment demonstrates that interventions remain effective with minimal regularization (single anchor constraint). The second experiment extends our approach to multidimensional concepts, demonstrating practical control over concept subspaces.
+
+\subsubsection{Suppression of Red without Vibrant Organization}
+\label{sec:suppression-no-vibrant}
+
+In this experiment, we investigate the suppression of \concept{red} in the absence of a \concept{vibrant} organization. We aim to understand whether interventions are effective when only a single organizational regularizer is applied.
+
+The encoder and decoder each had one hidden layer with 16 units. Latent space was four-dimensional ($E = 4$), with \concept{red} anchored at $\hat{\vv}_{\text{red}} = (1,0,0,0)$:
+%
+\begin{equation}
+    \mathcal{L}_{\text{concept}}(\cdot) = \lambda_{\text{anchor}} \; \Omega_{\text{anchor}}(\hat{\vz},\hat{\vv}_\text{red})
+\end{equation}
+%
+In contrast to the suppression experiment in~\cref{sec:anchored_architecture}, no \concept{vibrant} regularizer was used---but we expect the intervention to be similarly effective, since \concept{vibrant} was included only for ease of interpretability.
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.5.1-results-baseline.png}
+        \caption{Baseline}
+        \label{subfig:no-vibrant-baseline}
+    \end{subfigure}
+    \hspace{1em}
+    % \hfill
+    \begin{subfigure}[b]{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.5.1-results-suppression.png}
+        \caption{Suppression}
+        \label{subfig:no-vibrant-suppression}
+    \end{subfigure}
+    \hspace{1em}
+    % \hfill
+    \begin{subfigure}[b]{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.5.1-results-ablated.png}
+        \caption{Weight ablation}
+        \label{subfig:no-vibrant-ablation}
+    \end{subfigure}
+    \caption{\textbf{Concept interventions with a single organizational regularizer.} A 4-dimensional autoencoder with only \concept{red} anchored (no \concept{vibrant} constraint). \textbf{(a)} The model structures latent space with \concept{red} anchored as specified. \textbf{(b)} Suppression selectively increases error for \concept{red} while preserving other colors. \textbf{(c)} Weight ablation increases error for both \concept{red} and \concept{cyan}.}
+    \label{fig:no-vibrant-results}
+\end{figure}
+
+The results are consistent with previous findings: suppression of \concept{red} increased reconstruction error specifically for \concept{red} colors while preserving reconstruction quality for other colors (see~\cref{fig:no-vibrant-results,tab:no-vibrant-results}). Weight ablation again increased error for both \concept{red} and its opposing color, \concept{cyan}. These results indicate that concept interventions can be effective even when only a single organizational regularizer is applied.
+
+\begin{table}[hbt]
+    \centering
+    \footnotesize
+    \captionsetup{width=\linewidth-20pt}
+    \caption{\textbf{Suppression selectively targets \concept{red} in a single-constraint model.} Reconstruction error (MSE) for baseline and suppression across representative hues, values, and achromatic colors. Suppression increases error for \concept{red} while preserving reconstruction quality for orthogonal colors. Weight ablation also affects opposing colors.}
+    \sisetup{
+        round-mode = places,
+        round-precision = 2,
+        table-auto-round = true,
+    }
+    \input{data/tab-2.5.1-recon-error.tex}
+    \label{tab:no-vibrant-results}
+\end{table}
+
+%
+
+\FloatBarrier\subsubsection{Weight Ablation of Hue Subspace}
+\label{sec:ablation-hue}
+
+In this experiment, we perform weight ablation of the entire \concept{hue} subspace to test our method on multidimensional concepts.
+
+The encoder and decoder each had one hidden layer with 16 units. Latent space was four-dimensional ($E = 4$), with \concept{vibrant} confined to dimensions $\mathcal{D}_{\text{vibrant}} = \{1,2\}$:
+%
+\begin{equation}
+    \mathcal{L}_{\text{concept}}(\cdot) = \lambda_{\text{subspace}} \; \Omega_{\text{subspace}}(\hat{\vz},\mathcal{D}_\text{vibrant})
+\end{equation}
+
+After training, we ablate all weights connected to the \concept{hue} subspace (dimensions 1 and 2) according to~\cref{eq:ablation}. To allow comparison with earlier experiments, we also implement a suppression intervention targeting the \concept{vibrant} subspace:
+%
+\begin{equation}
+    \hat{\vz}' = \hat{\vz} - P_{\mathcal{D}_\text{vibrant}}(\hat{\vz})
+\end{equation}
+%
+where $P_{\mathcal{D}_\text{vibrant}}(\hat{\vz})$ is the projection of $\hat{\vz}$ onto the subspace spanned by dimensions in $\mathcal{D}_\text{vibrant}$, effectively zeroing out those dimensions. Like directional suppression---but unlike weight ablation---this is applied post-normalization, resulting in activation vectors of length $|\hat{\vz}'| \le 1$.
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.7.1-results-baseline.png}
+        \caption{Baseline}
+        \label{fig:hue-deletion-baseline}
+    \end{subfigure}
+    \hspace{1em}
+    % \hfill
+    \begin{subfigure}[b]{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.7.1-results-suppression.png}
+        \caption{Suppression}
+        \label{fig:hue-deletion-suppression}
+    \end{subfigure}
+    \hspace{1em}
+    % \hfill
+    \begin{subfigure}[b]{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.7.1-results-ablated.png}
+        \caption{Weight ablation}
+        \label{fig:hue-deletion-ablation}
+    \end{subfigure}
+    \caption{\textbf{Deletion of a multidimensional subspace.} A 4-dimensional autoencoder with \concept{vibrant} colors confined to a 2D subspace (no \concept{red} constraint). \textbf{(a)} The model organizes \concept{vibrant} colors in dimensions 1--2, with achromatic colors occupying orthogonal dimensions. \textbf{(b)} Suppression of the \concept{vibrant} subspace removes hue information, mapping all colors toward achromatic values while preserving brightness. \textbf{(c)} Weight ablation produces similar results, degrading reconstruction of all chromatic colors.}
+    \label{fig:hue-deletion-results}
+\end{figure}
+
+\begin{table}[hbt]
+    \centering
+    \footnotesize
+    \captionsetup{width=\linewidth-20pt}
+    \caption{\textbf{Targeted degradation of chromatic colors.} Reconstruction error (MSE) for baseline, suppression, and weight ablation across representative hues and achromatic colors. Both suppression and weight ablation of the \concept{vibrant} subspace increase error for all chromatic colors while preserving achromatic reconstruction.}
+    \sisetup{
+        round-mode = places,
+        round-precision = 2,
+        table-auto-round = true,
+    }
+    \input{data/tab-2.7.1-recon-error-abridged.tex}
+    \label{tab:hue-deletion-results}
+\end{table}
+
+The results demonstrate that Sparse Concept Anchoring extends naturally to multidimensional concepts. As shown in~\cref{fig:hue-deletion-results,tab:hue-deletion-results}, both suppression and weight ablation of the \concept{vibrant} subspace substantially increase reconstruction error for all chromatic colors (red through magenta), while reconstruction of achromatic colors (black through white) remains largely unaffected. This indicates that the model successfully organized \concept{vibrant} information within the specified subspace, with achromatic information occupying orthogonal dimensions.
+
+Unlike single-direction interventions (e.g., \cref{sec:anchored_architecture,sec:isolated_architecture}), subspace interventions target manifold-structured concepts that cannot be captured by a single direction. The circular organization of hues in the \concept{vibrant} subspace exemplifies such structure---analogous to cyclical concepts like days of the week or temporal patterns in language models. Both suppression and weight ablation successfully eliminate this circular structure, demonstrating that our approach applies to concepts with non-trivial geometric organization.
+
+An interesting pattern emerges in the reconstructions: although MSE is similar across chromatic colors, the resulting brightness varies systematically by hue. Red, green, and blue become darker, while yellow, cyan, and magenta become brighter (\cref{sub@fig:hue-deletion-suppression,sub@fig:hue-deletion-ablation}). This reflects the geometry of the RGB cube (\cref{sec:training_data}): when hue information is removed, colors collapse toward the achromatic axis (the black-white diagonal). Primary hues (red, green, blue) lie closer to black, while secondary hues (yellow, cyan, magenta) lie closer to white along this axis. The systematic brightness variation thus arises from the geometric structure of RGB space rather than any bias in the intervention method.

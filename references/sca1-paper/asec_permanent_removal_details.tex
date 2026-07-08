@@ -1,0 +1,14 @@
+\subsection{Permanent Concept Removal: Implementation Details}
+\label{sec:permanent_removal_details}
+
+This appendix provides additional implementation details for the permanent concept removal techniques presented in~\cref{sec:isolated_architecture}.
+
+Weight ablation and pruning both eliminate concepts by severing the information pathways through targeted latent dimensions. For target dimension $d$ anchoring a specific concept, we must prevent both the \textit{production} of activations in dimension $d$ by the encoder and the \textit{consumption} of information from dimension $d$ by the decoder.
+
+\paragraph{Ablation.}
+Ablation achieves this by zeroing the relevant weight matrix entries and bias terms (see~\cref{eq:ablation} in~\cref{sec:isolated_architecture}). This maintains the architectural structure and dimensionality of all intermediate computations.
+
+\paragraph{Pruning.}
+Pruning operates by wholly removing the targeted dimension from the architecture. For target dimensions $\mathcal{D} \subset \{0, 1, \ldots, E-1\}$, pruning constructs reduced weight matrices $\mathbf{W}'_{\text{enc}} \in \mathbb{R}^{(E-|\mathcal{D}|) \times H}$ and $\mathbf{W}'_{\text{dec}} \in \mathbb{R}^{H \times (E-|\mathcal{D}|)}$ containing only the rows and columns corresponding to non-targeted dimensions. This reduces the model's latent dimensionality from $E$ to $E - |\mathcal{D}|$.
+
+Both methods eliminate the targeted concept's contribution to model outputs, and are functionally equivalent. Ablation is somewhat simpler to implement, but pruning may be preferable if one wishes to hide the existence of the removed concept---although in that case, we expect the removed concept to have left a lasting imprint on the representations of the remaining dimensions, which may still be detectable.

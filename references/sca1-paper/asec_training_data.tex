@@ -1,0 +1,26 @@
+\subsection{Training Data}
+\label{sec:training_data}
+
+Training data were drawn from the RGB color cube, which encompasses all colors representable in the RGB color model. Each sample is represented as a 3D vector in RGB space, with each channel in $[0,1]$. The cube was subdivided uniformly along each axis, and training samples were generated at the grid points. In our experiments, we used a $8 \times 8 \times 8$ grid, yielding $512$ training samples, shown in~\cref{fig:rgb-cube}.
+
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-1.1.1-rgb-cube-front.png}
+        \caption{Front}
+    \end{subfigure}
+    % \hfill
+    \hspace{1em}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-1.1.1-rgb-cube-back.png}
+        \caption{Back}
+    \end{subfigure}
+    \caption{\textbf{The RGB cube as training data.} Two views of the cube are shown, both oriented such that the black-to-white diagonal runs from bottom-to-top; thus red, blue, and green are nearer the bottom, whereas cyan, yellow, and magenta are nearer the top. Grays are located in the center of the cube (not visible).
+    \textit{a}:~View facing the warm hues, with red in the middle and yellow and magenta on either side. \textit{b}:~View facing the cool hues, with cyan in the middle and blue and green on either side.
+    }
+    \label{fig:rgb-cube}
+\end{figure}
+
+Superficially, the cube resembles some of our latent space plots---however the spaces are quite different: the RGB cube is solid (the magnitudes of $\vx$ and $\vy$ are significant), whereas our latent spaces are hyperspherical ($\hat{\vz}$ is purely directional).

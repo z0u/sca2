@@ -1,0 +1,125 @@
+
+\documentclass{article} % For LaTeX2e
+% \usepackage{iclr2026_conference,times}
+\usepackage{gram2026,times}
+
+\usepackage{latexml_compat} % Compatibility macros for LaTeXML
+
+\usepackage{calc}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{xurl}           % simple URL typesetting
+\usepackage[x11names,table]{xcolor}
+\iflatexml\else
+    \usepackage{siunitx}    % Numerical column formatting in tables
+    \usepackage{collcell}   % Columnar macros
+    \usepackage{pgfmath}    % For tabular heat maps
+\fi
+\usepackage{etoolbox}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{ifthen}
+\usepackage[font=small,margin=10pt]{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{multirow}
+\usepackage{amsmath}        % math environments
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{csquotes}
+\usepackage[nameinlink,noabbrev]{cleveref}  % \cref etc. Must come after hyperref and other ref packages
+
+% Keep figures in their section https://tex.stackexchange.com/a/235312
+\usepackage[section]{placeins}
+
+\hypersetup{
+    colorlinks=true,
+    allcolors=black,
+    % linkcolor={blue!30!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!70!black},
+}
+
+\usepackage[normalem]{ulem} % provides \sout, \uline
+
+\input{latexml_compat}
+
+% The main text should be 9 pages or fewer.
+% The list of references does not count towards the page limit, and unlimited additional pages are allowed for the bibliography/references.
+% Authors may use as many pages of appendices (after the bibliography) as they wish, but reviewers are not required to read the appendix.
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+\input{authors}
+\input{math_commands}  % https://github.com/goodfeli/dlbook_notation.
+\input{shapes}
+\input{heatmap_table}
+
+% \title{Prescriptive Representation Engineering:\\ Sparse Concept Anchoring for Interpretable and Controllable Neural Representations}
+
+\title{Sparse Concept Anchoring for Interpretable and Controllable Neural Representations}
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+\newcommand{\concept}[1]{\emph{#1}}
+
+\iclrfinalcopy % Camera-ready version.
+\maintrack % Proceedings (long paper) track.
+\begin{document}
+
+\maketitle
+
+%
+
+\input{sec_abstract}
+\input{sec_introduction}
+\input{sec_sparse_concept_anchoring}
+\input{sec_interventions}
+\input{sec_discussion}
+\input{sec_conclusion}
+
+% \subsubsection*{Author Contributions} If you'd like to, you may include  a section for author contributions as is done in many journals. This is optional and at the discretion of the authors.
+
+% \subsubsection*{Acknowledgments} Use unnumbered third level headings for the acknowledgments. All acknowledgments, including those to funding agencies, go at the end of the paper.
+
+%
+
+\bibliography{iclr2026_conference}
+\bibliographystyle{iclr2026_conference}
+
+\clearpage
+
+%
+%
+%
+
+\let\Oldsubsection\subsection
+\renewcommand{\subsection}{\FloatBarrier\Oldsubsection}
+
+\appendix
+\crefalias{section}{appendix}
+
+\input{asec_related_work}
+
+\section{Training Details}
+\input{asec_architecture}
+\input{asec_regularizer_viz}
+\input{asec_minimal_supervision}
+\input{asec_hparam_schedules}
+\input{asec_training_data}
+
+\section{Intervention Details}
+\input{asec_intervention_lobes}
+\input{asec_permanent_removal_details}
+\input{asec_color_similarity}
+\input{asec_additional_results}
+\input{asec_additional_experiments}
+
+\input{asec_code}
+\input{asec_llm_use}
+
+\end{document}

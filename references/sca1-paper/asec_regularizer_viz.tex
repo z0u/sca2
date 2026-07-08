@@ -1,0 +1,55 @@
+\subsection{Visualization of the structural constraints and organizational regularizers}
+
+~\Cref{fig:biases-structural,fig:biases-org} illustrate the geometric effects of the regularization terms introduced in~\cref{sec:sparse_concept_anchoring}. Structural biases (\cref{fig:biases-structural}) show how unitarity constrains embeddings to the hypersphere while separation applies repulsive forces to prevent clustering. Organizational biases (\cref{fig:biases-org}) demonstrate the directional effects: anchor and subspace terms create attractive forces toward specific points and planes respectively, while their anti-variants apply repulsive forces away from designated regions.
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/bias-unitarity.png}
+        \caption{Unitarity (\,\protect\NormNode\,)}
+    \end{subfigure}
+    \hspace{2em}
+    \begin{subfigure}[b]{0.25\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/bias-separation.png}
+        \caption{$\Omega_{\text{separate}}$}
+    \end{subfigure}
+    \caption{\textbf{Structural Biases.} \textit{a}: Unitarity places embeddings ($\bullet$) on the unit hypersphere (\textcolor{red}{$\bigcirc$}). \textit{b}: Separation repels pairs of embeddings from each other to reduce clustering.}
+    \label{fig:biases-structural}
+\end{figure}
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/bias-anchor.png}
+        \caption{$\Omega_{\text{anchor}}$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/bias-subspace.png}
+        \caption{$\Omega_{\text{subspace}}$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/bias-anti-anchor.png}
+        \caption{$\Omega_{\overline{\text{anchor}}}$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.24\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/bias-anti-subspace.png}
+        \caption{$\Omega_{\overline{\text{subspace}}}$}
+    \end{subfigure}
+    \caption{\textbf{Organizationl Biases}.
+        \textit{a}: Anchor applies rotational attraction of embeddings ($\bullet$) to a fixed point on the hypersphere (\textcolor{Firebrick1}{\protect\triangledown}).
+        \textit{b}: Subspace applies linear attraction to a set of embedding dimensions (\textcolor{Firebrick1}{\protect\flatellipse}).
+        \textit{c}: Anti-anchor applies rotational repulsion from a fixed point on the hypersphere (\textcolor{DodgerBlue3}{\protect\triangledown[stroke]}).
+        \textit{d}: Anti-subspace applies linear repulsion from a set of embedding dimensions (\textcolor{DodgerBlue3}{\protect\flatellipse[stroke]}).
+        All are regularization loss terms.
+    }
+    \label{fig:biases-org}
+\end{figure}

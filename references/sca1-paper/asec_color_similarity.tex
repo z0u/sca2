@@ -1,0 +1,63 @@
+\subsection{Color Similarity Metric}
+\label{sec:color_similarity}
+
+To validate that our method preserves logical structure, we measure the relationship between the similarity of inputs to the target concept and reconstruction error under intervention. We construct a heuristic color similarity measure in HSV space designed to capture geometric distance from a target concept $\vv$ (e.g., pure red) for an input $\vx$.
+
+First, we define the \textbf{hue similarity}. We calculate the shortest circular distance $\delta_h$ between the input hue $\vx_h$ and concept hue $\vv_h$. We then apply a linear decay, such that colors within $90^{\circ}$ are considered similar, decreasing to zero similarity at $90^{\circ}$ separation:
+\begin{align}
+    \delta_h(\vv,\vx) &= 360^{\circ} \cdot \min(|\vx_h - \vv_h|, 1 - |\vx_h - \vv_h|) \\
+    \text{sim}_{\text{hue}}(\vv,\vx) &= \max\left(0^{\circ}, \frac{90^{\circ} - \delta_h(\vv,\vx)}{90^{\circ}}\right)
+\end{align}
+
+Second, we account for \textbf{vibrancy}. Hue is only meaningful when a color is vibrant (saturated and bright). For achromatic colors (low saturation or value), hue differences are irrelevant. We define ``vibrancy'' as the product of saturation and value, and compute the average vibrancy $r$ of the input and target:\footnote{We use the symbol $r$ because vibrancy is the distance from the central black-white axis in HSV, and is thus analogous to radius in a cylindrical coordinate system.}
+\begin{align}
+    \text{vibrancy}(\vw) &= \vw_s \; \vw_v \label{eq:vibrancy} \\
+    r &= \frac{\text{vibrancy}(\vx) + \text{vibrancy}(\vv)}{2}
+\end{align}
+
+Third, we compute the \textbf{vibrancy-weighted hue similarity} $\widetilde{\text{sim}}_{\text{hue}}$. This term interpolates between the raw hue similarity (when colors are vibrant) and perfect similarity (when colors are achromatic/low vibrancy, making hue irrelevant):
+\begin{equation}
+    \widetilde{\text{sim}}_{\text{hue}}(\vv,\vx) = r \cdot \text{sim}_{\text{hue}}(\vv,\vx) + (1 - r)
+\end{equation}
+
+Finally, the \textbf{total similarity} combines the weighted hue similarity with proximity in saturation and value. We use linear decay terms for saturation and value differences:
+\begin{equation}
+    \text{sim}(\vv, \vx) = \widetilde{\text{sim}}_{\text{hue}}(\vv, \vx) (1 - |\vx_s - \vv_s|) (1 - |\vx_v - \vv_v|) \label{eq:color_similarity}
+\end{equation}
+In our experiments, we instantiate the target concept $\vv$ as pure red $(h=0, s=1, v=1)$.
+
+\paragraph{Expected Relationship Between Similarity and Reconstruction Error}
+
+We expect reconstruction error under intervention to correlate with the square of this similarity measure. The reasoning proceeds as:
+
+\textbf{Step 1: Latent perturbation magnitude.} The suppression intervention removes the component of latent activations aligned with the \concept{red} anchor direction. For unit-normalized latent activations $\hat{\vz} \in \mathbb{R}^E$ and concept vector $\hat{\vv} \in \mathbb{R}^E$ with $\|\hat{\vz}\|_2 = \|\hat{\vv}\|_2 = 1$, the perturbation is:
+\begin{equation}
+    \Delta \hat{\vz} = -(\hat{\vz} \cdot \hat{\vv}) \hat{\vv}
+\end{equation}
+with magnitude $\|\Delta \hat{\vz}\| = |\hat{\vz} \cdot \hat{\vv}|$, which is simply the cosine similarity between the activation and the anchor direction.
+
+\textbf{Step 2: Latent-to-output mapping.} Assuming the decoder is approximately linear locally (a reasonable assumption given the smooth, low-dimensional nature of color space), the output perturbation is:
+\begin{equation}
+    \Delta \hat{\vy} \approx \mathbf{J}_D \Delta \hat{\vz}
+\end{equation}
+where $\mathbf{J}_D$ is the decoder's Jacobian. Since the Jacobian is approximately constant in a local neighborhood, this implies $\|\Delta \hat{\vy}\| \propto \|\Delta \hat{\vz}\|$.
+
+\textbf{Step 3: Quadratic error scaling.} Since reconstruction error is measured as mean squared error (MSE), we have:
+\begin{equation}
+    \text{MSE} = \|\Delta \hat{\vy}\|^2 \propto \|\Delta \hat{\vz}\|^2
+\end{equation}
+
+\textbf{Step 4: Input-latent correspondence.} The key empirical assumption is that our training procedure---which anchors \concept{red} to a predetermined direction in latent space---induces a correspondence between input-space similarity and latent-space alignment. Specifically, colors that are similar to \concept{red} in HSV space should produce latent activations aligned with the \concept{red} anchor direction:
+\begin{equation}
+    |\hat{\vz} \cdot \hat{\vv}| \approx \text{sim}(\vv, \vx)
+\end{equation}
+This is not a mathematical identity but rather an empirical relationship induced by training. The success of Sparse Concept Anchoring depends on establishing this correspondence: the structural and organizational regularizers encourage the model to align conceptually-similar inputs along consistent directions in latent space.
+
+\textbf{Combining these steps}, we arrive at the expected relationship:
+\begin{equation}
+    \text{MSE} \propto \|\Delta \hat{\vz}\|^2 \propto (\hat{\vz} \cdot \hat{\vv})^2 \approx \text{sim}(\vv, \vx)^2
+\end{equation}
+
+We validate this relationship empirically by computing the Pearson correlation between $\text{sim}(\vv, \vx)^2$ and reconstruction error across all test colors. Strong correlation ($R^2 \approx 0.98$) confirms that: (1) the decoder exhibits approximately local linearity, (2) the training successfully established the desired input-latent correspondence, and (3) interventions operate predictably according to the geometric structure we designed.
+
+For permanent removal interventions (ablation), we observe a cubic relationship ($\text{MSE} \propto \text{sim}(\vv, \vx)^3$). We hypothesize this higher-order relationship arises because weight ablation affects pre-normalization embeddings $\vz$, altering the projection onto the hypersphere in a more complex manner than the direct subtraction of the suppression intervention (which operates on post-normalization embeddings $\hat{\vz}$).

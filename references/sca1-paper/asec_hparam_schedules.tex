@@ -1,0 +1,45 @@
+\subsection{Optimizer Configuration and Hyperparameter Schedules}
+\label{sec:hyperparameter_schedules}
+
+Training employed the Adam optimizer with the default PyTorch options: $\beta_1 = 0.9$, $\beta_2 = 0.999$, $\epsilon = 10^{-8}$, and $\lambda_{wd} = 0$ (no weight decay). We used a batch size of 64, which directly impacts $\Omega_{\text{separate}}$ since it computes pairwise interactions within each batch. All experiments ran for 1,500 training steps.
+
+\paragraph{Time-Varying Loss Terms}
+Both the learning rate $\eta$ and regularizer weights ($\lambda_{\text{sep}}$, $\lambda_{\text{anchor}}$, $\lambda_{\text{subspace}}$, $\lambda_{\overline{\text{anchor}}}$, $\lambda_{\overline{\text{subspace}}}$) varied according to coordinated schedules throughout training. We specified these schedules as transition timelines (inspired by animation keyframe systems), allowing synchronized changes across multiple hyperparameters and straightforward experimental iteration.
+
+\begin{figure}[htb]
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{figures/ex-2.4.1-dopesheet.png}
+        \caption{Anchored architecture (\cref{sec:anchored_architecture})}
+        \label{fig:hparam_schedules_suppression}
+    \end{subfigure}
+
+    \vspace{1em}
+
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{figures/ex-2.9.1-dopesheet.png}
+        \caption{Isolated architecture (\cref{sec:isolated_architecture})}
+        \label{fig:hparam_schedules_permanent_removal}
+    \end{subfigure}
+
+    \caption{
+        \textbf{Managing multiple loss terms with varying weights.}
+        We emphasized different regularizers at different phases of model development.
+        \textbf{(a)} A consistently high subspace weight encouraged formation of the color wheel; anchor weight peaked mid-training to rotate it to align \concept{red} with the target direction.
+        \textbf{(b)} A high initial anti-subspace weight reserves target dimensions for concept anchoring; later, the anchor weight dominates to pull concept representations into position.
+    }
+    \label{fig:hparam_schedules}
+\end{figure}
+
+The learning rate followed a regular pattern for all experiments: brief warmup from $10^{-8}$ to $0.01$ over the first 10 steps, ramp to $0.1$ until step $\sim$750, maintain through the main training phase, then decay to $0.05$ by step 1500.
+
+Regularizer weights had coordinated but distinct trajectories. In experiments requiring dimensional clearing (e.g., the 1D weight ablation experiment in~\cref{sec:isolated_architecture}), the anti-subspace term was initially strong to reserve the target dimension, then reduced to near-zero at step 750; with the anchor term becoming dominant around step 200 (see~\cref{sub@fig:hparam_schedules_permanent_removal}).
+
+In simpler experiments without explicit clearing requirements (e.g., the suppression experiment in~\cref{sec:anchored_architecture}), regularizer weights still varied substantially: the structural separation weight was held low and steady at first but decayed to near-zero over the second half of training; while organizational term weights were strongest mid-training to establish concept positions before relaxing to allow fine-tuning on the primary objective (see~\cref{sub@fig:hparam_schedules_suppression}).
+
+% \paragraph{Necessity of Time-Varying Weights}
+These time-varying schedules proved \emph{necessary for all experiments}: We were unable to find good fixed-weight configurations. The improvement from varying hyperparameters suggests that the changing loss landscape helps the optimizer to navigate competing objectives between task performance, structural constraints, and concept positioning. Our empirical observation of training dynamics---including visualization of evolving latent geometry---enabled effective manual tuning. This approach to hyperparameter configuration through observation of training behavior represents a form of developmental interpretability that may complement theoretical frameworks for understanding neural network training.
+
+Other hyperparameters are detailed elsewhere: the separation exponent $p=100$ in~\cref{sec:sparse_concept_anchoring}, and the label generation process in~\cref{sec:minimal_supervision}.

@@ -1,0 +1,133 @@
+\subsection{Supplementary Details for Main Experiments}
+\label{sec:additional_results}
+
+Here we present regularization configurations, selection criteria, variance analysis, and scatter plots illustrating the relationship between reconstruction error and color similarity for the suppression and weight ablation experiments described in~\cref{sec:interventions}. These details provide insight into model selection, robustness to initialization, and the selectivity of concept interventions.
+
+\paragraph{Anchored Architecture Regularization.}
+The anchored architecture of~\cref{sec:anchored_architecture} uses attraction regularizers to draw labeled samples toward their target directions:
+%
+\begin{equation}
+    \mathcal{L}_{\text{concept}}(\cdot) = \lambda_{\text{anchor}} \; \Omega_{\text{anchor}}(\hat{\vz},\hat{\vv}_\text{red}) + \lambda_{\text{subspace}} \; \Omega_{\text{subspace}}(\hat{\vz},\mathcal{D}_\text{vibrant})
+\end{equation}
+%
+The anchor term attracts \concept{red}-labeled samples toward $\hat{\vv}_\text{red} = (1,0,0,0)$, and the subspace term constrains \concept{vibrant}-labeled samples to dimensions $\mathcal{D}_\text{vibrant} = \{1,2\}$.
+
+\paragraph{Suppression.}
+\Cref{fig:suppression-boxplots} shows plots of intervention selectivity, reconstruction loss, and organization loss for the suppression experiment of~\cref{sec:anchored_architecture} across 60 training runs. The architecture used in these experiments was a 4-dimensional autoencoder with anchor and subspace regularization. Intervention selectivity was computed as $R^2$ between post-suppression reconstruction error $\text{MSE}(\vx,\hat{\vy})$ and the squared similarity $\text{sim}(\vv_{\text{red}}, \vx)^2$, as defined in~\cref{sec:color_similarity}. This quantifies how predictably the suppression intervention affects colors based on their similarity to \concept{red}. The reconstruction loss reflects model performance on its primary objective, and organization loss reflects the overall conformance to the desired latent space structure.
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.4.1-boxplot-score.png}
+        % \caption{Intervention Selectivity}
+        % \caption{$R^2(\text{MSE}, \text{sim}_{\text{red}}^2)$}
+        \caption{$R^2$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.4.1-boxplot-val-recon.png}
+        % \caption{Reconstruction Loss}
+        \caption{$\mathcal{L}_{\text{recon}}$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.4.1-boxplot-val-anchor.png}
+        % \caption{Organization Loss}
+        \caption{$\mathcal{L}_{\text{concept}}$}
+    \end{subfigure}
+    \caption{\textbf{Selection criteria distributions for suppression experiments.} \textit{a}: Intervention selectivity, \textit{b}: Reconstruction loss, and \textit{c}: Organization loss across 60 training runs.}
+    \label{fig:suppression-boxplots}
+\end{figure}
+
+This architecture showed low variance across all three metrics, suggesting that the method is robust to parameter initialization.
+%
+From these 60 runs, we selected the model with the highest $R^2$. \Cref{fig:error-vs-similarity} presents scatter plots of reconstruction error versus similarity to \concept{red} in that model, illustrating the strong quadratic relationship ($R^2=0.99$) achieved by suppression. This confirms that the intervention selectively increases reconstruction error for colors similar to \concept{red}, while preserving accuracy for orthogonal colors. Weight ablation exhibits a very weak relationship in this model due to unintended selection of \concept{anti-red} colors.
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.4.1-error-vs-similarity-suppression.png}
+        \caption{Suppression}
+    \end{subfigure}
+    \hspace{1em}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.4.1-error-vs-similarity-ablated.png}
+        \caption{Weight ablation}
+        \label{subfig:ablation-on-soft-model-scatter}
+    \end{subfigure}
+    \caption{\textbf{Reconstruction error vs. similarity, anchored model.}
+        \textbf{a}: Suppression shows strong quadratic relationship ($R^2=0.99$).
+        \textbf{b}: Weight ablation shows poor correlation ($R^2=0.37$) due to the unintended selection of \concept{anti-red} colors, visible as a vertical cluster of perturbed cyan points near $\text{sim}_{\text{red}}^2 = 0$.
+    }
+    \label{fig:error-vs-similarity}
+\end{figure}
+
+%
+
+\FloatBarrier\paragraph{Isolated Architecture Regularization.}
+The isolated architecture of~\cref{sec:isolated_architecture} adds repulsion regularizers to reserve the anchored dimension exclusively for the target concept:
+%
+\begin{equation}
+    \mathcal{L}_{\text{concept}}(\cdot) = \lambda_{\text{anchor}} \; \Omega_{\text{anchor}}(\hat{\vz}, \hat{\vv}_\text{red}) + \lambda_{\overline{\text{subspace}}} \; \Omega_{\overline{\text{subspace}}}(\hat{\vz}, \mathcal{D}_\text{red}) + \lambda_{\overline{\text{anchor}}} \; \Omega_{\overline{\text{anchor}}}(\hat{\vz}, -\hat{\vv}_\text{red})
+\end{equation}
+%
+The anchor term attracts \concept{red}-labeled samples, while the two repulsion terms push all samples away from the \concept{red} dimension ($\mathcal{D}_\text{red} = \{1\}$) and the \concept{anti-red} direction ($-\hat{\vv}_\text{red}$), respectively.
+
+\paragraph{Weight Ablation.}
+\Cref{fig:ablation-boxplots} presents results for the weight ablation experiment of~\cref{sec:isolated_architecture}, across 60 training runs. The architecture was a 5-dimensional autoencoder with anchor, anti-anchor, and anti-subspace regularization as defined above. Intervention selectivity was computed as $R^2$ between post-weight-ablation reconstruction error and the cubed similarity $\text{sim}(\vv_{\text{red}}, \vx)^3$. Reconstruction and organization losses were computed as before.
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.9.1-boxplot-score.png}
+        % \caption{Intervention Selectivity}
+        % \caption{$R^2(\text{MSE}, \text{sim}_{\text{red}}^3)$}
+        \caption{$R^2$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.9.1-boxplot-val-recon.png}
+        % \caption{Reconstruction Loss}
+        \caption{$\mathcal{L}_{\text{recon}}$}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.9.1-boxplot-val-anchor.png}
+        % \caption{Organization Loss}
+        \caption{$\mathcal{L}_{\text{concept}}$}
+    \end{subfigure}
+    \caption{\textbf{Selection criteria distributions for weight ablation experiments.} \textit{a}: Intervention selectivity, \textit{b}: Reconstruction loss, and \textit{c}: Organization loss; across 60 training runs.}
+    \label{fig:ablation-boxplots}
+\end{figure}
+
+This architecture showed high variance across all three metrics, indicating sensitivity to parameter initialization.
+%
+Again we selected the model with the highest $R^2$. \Cref{fig:error-vs-similarity-hard} presents scatter plots of reconstruction error versus similarity to \concept{red} in that model, illustrating that weight ablation now shows a strong cubic relationship ($R^2=0.98$), confirming that the intervention's impact varies predictably with concept alignment.
+
+\begin{figure}[ht]
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.9.1-error-vs-similarity-suppression.png}
+        \caption{Suppression}
+    \end{subfigure}
+    \hspace{1em}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/ex-2.9.1-error-vs-similarity-ablated.png}
+        \caption{Weight ablation}
+    \end{subfigure}
+    \caption{\textbf{Reconstruction error vs. similarity, with anti-subspace regularization.}
+        \textit{a}: Suppression retains quadratic relationship ($R^2=0.98$).
+        \textit{b}: Weight ablation shows strong cubic relationship ($R^2=0.98$).
+    }
+    \label{fig:error-vs-similarity-hard}
+\end{figure}

@@ -1,0 +1,35 @@
+\section{Discussion}
+\label{sec:discussion}
+
+The predictable geometry established through Sparse Concept Anchoring opens new paths for model control. Traditional interpretability workflows identify concepts post-hoc, then design interventions around discovered structure. By anchoring concepts during training, we invert this relationship: structure enables intervention by design.
+
+\paragraph{Variability and Fallback Control}
+The two intervention modes serve complementary roles (\cref{sec:intervention_tradeoffs}), but weight ablation selectivity varies more (\cref{fig:ablation-boxplots}) because renormalization redistributes removed components. Both would benefit from explicit fallback control: suppression relies on decoder biases (limiting generality), while ablation's redistribution is unreliable. Optimal ablation~\citep{li2024optimalablationinterpretability} could address this by replacing removed components with optimized constants.
+
+\subsection{Limitations and Future Work}
+
+\paragraph{Permanence}
+While ablation permanently removes information, it may leave structural traces aiding adversarial recovery. SCA's clean geometry might paradoxically increase this risk: examining encoder activations could reveal smaller pre-normalization values for certain inputs, exposing removed capabilities. Whether this enables practical attacks remains open.
+
+\paragraph{Extension to Other Domains}
+Our experiments benefit from RGB data, where concept similarity and labels are
+unambiguous. Linguistic domains introduce higher-dimensional manifolds,
+context-dependent similarity, and subjective labeling---the fraction of labeled
+examples required for anchoring may increase with manifold dimensionality and
+curvature. Applying SCA to transformers requires consideration of where to add
+geometric constraints---for example, at which layers of the residual
+stream---and whether anchoring can resist bypass via residual connections. Our
+initial approach might gather concept labels for passages using source metadata
+or automated labeling, then apply weak regularization to all tokens in labeled
+passages. Given SCA's robustness to label noise this may prove sufficient.
+
+Longer-term validation should target GPT-2--scale transformers and progressively
+more abstract concepts. As the number of anchored concepts $K$ grows, the
+cumulative effect of competing attraction and repulsion terms may create a
+difficult optimization landscape; characterizing both data-requirement scaling
+and the point at which anchoring degrades task performance are important open
+questions. Multi-dimensional concepts can anchor to subspaces (as with
+\concept{vibrant} colors), which may mitigate $K$-scaling by reducing the
+effective number of competing terms, while fuzzy concepts might benefit from
+weak subspace anchoring that draws related samples to known regions to reduce
+the post-hoc search space.

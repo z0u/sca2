@@ -1,8 +1,15 @@
-We are running AI experiments.
+We are running experiments to study Sparse Concept Anchoring.
 
-## Infrastructure
+## Repo structure
 
-`mini` is a library providing infra management, with storage, compute, and orchestration abstractions. Use it to run experiments.
+```
+src/  Model code, visualization tools, and vendored libraries
+src/mini/  Our library providing infra management, with storage, compute, and orchestration abstractions. Use it to run experiments.
+docs/  Experiments and reports (both in Python)
+eng/  Decision register
+references/  Related documents, such as earlier papers and blog posts
+README.md  Details about the project including a list of deliverables, and where this milestone fits within the program of work
+```
 
 ## Collaboration style
 

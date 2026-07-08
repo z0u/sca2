@@ -1,0 +1,8 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+Sparse Concept Anchoring inverts traditional interpretability: rather than discovering concept locations post-hoc, it establishes predictable geometric structure during training through minimal supervision. By fixing concept directions and regularizing representations, SCA enables direct interventions on model behavior.
+
+Experiments on color autoencoders show that both inference-time suppression and parameter-level ablation achieve selective concept modification with minimal collateral impact. Sparse, noisy labels ($<0.1\%$ of data) shaped latent geometry into actionable subspaces, demonstrating that anchoring few concepts suffices for controllable representations while preserving flexibility.
+
+Although current experiments use low-dimensional settings, geometric regularization with sparse supervision provides a path toward scalable concept-level control. For safety-critical applications requiring auditable, modifiable systems, proactively shaping representations may prove more tractable than reactive analysis of emergent structure.

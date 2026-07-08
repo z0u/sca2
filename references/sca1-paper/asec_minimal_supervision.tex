@@ -1,0 +1,27 @@
+\subsection{Details on Minimal Supervision}
+\label{sec:minimal_supervision}
+
+Our framework applies organizational biases selectively using sparse, stochastic supervision to simulate realistic deployment scenarios where comprehensive concept labeling is infeasible. This approach demonstrates that meaningful latent structure can emerge from weak supervision signals, addressing a critical bottleneck in scaling interpretability methods to large models.
+
+\paragraph{Continuous Label Probability Design}
+We design concept-specific probability functions that capture the underlying geometric properties of our target concepts. For the \concept{red} concept, we define:
+\begin{equation}
+    p_{\text{red}}(\vx) = 0.08 \left[\vx_r \left(1 - \frac{\vx_g}{2} - \frac{\vx_b}{2}\right)\right]^{8}
+\end{equation}
+where $\vx_r, \vx_g, \vx_b \in [0,1]$ are normalized RGB components. This formula achieves maximum probability for pure red ($\vx_r=1, \vx_g=0, \vx_b=0$) with rapid exponential decay as other color components increase, creating a sharp but imperfect concept boundary.
+
+For experiments requiring broader hue organization, we define a complementary \concept{vibrant} concept:
+\begin{equation}
+    p_{\text{vibrant}}(\vx) = 0.01 (\vx_s \; \vx_v)^{10}
+\end{equation}
+where $\vx_s$ and $\vx_v$ represent saturation and value in HSV color space. The extreme exponent creates a sharp distinction between fully saturated colors and even slightly desaturated ones, enabling precise control over which samples receive vibrant labels.
+
+\paragraph{Stochastic Label Generation}
+These continuous probabilities are stochastically discretized during training to create realistic weak supervision. For each sample and concept, we generate binary labels through probabilistic sampling:
+\begin{equation}
+    \ell_c(\vx) = \mathbf{1}[p_c(\vx) > u], \quad u \sim \text{Uniform}(0,1)
+\end{equation}
+This process creates inherently sparse supervision: pure red receives the \concept{red} label $\ell_{\text{red}}$ only $8\%$ of the time on average, while colors progressively distant from red are labeled with rapidly decreasing frequency. The resulting supervision covers only $0.08\%$ of training samples for our primary experiments, yet proves sufficient to induce global latent organization.
+
+\paragraph{Realistic Supervision Simulation}
+This stochastic approach deliberately simulates real-world labeling scenarios encountered in large-scale model training, such as automated sentiment analysis of web text or crowd-sourced annotation with inherent inconsistencies. Our method's robustness to weak, noisy supervision suggests practical applicability to domains where perfect concept labels are unavailable or prohibitively expensive to obtain. Our experiments demonstrate that minimal signals can effectively structure latent representations, providing a pathway toward intrinsic interpretability in production systems.
