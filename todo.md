@@ -20,20 +20,23 @@ readable cold without re-deriving code state.
 
 - Sweep cells all `save_checkpoint` to the same shared `get_data_dir()`, so the
   checkpoint file is last-writer-wins across a fan-out. Harmless today (the
-  ngpt-sweep cells return their metrics; nothing reads the checkpoints back),
+  ngpt-scaling cells return their metrics; nothing reads the checkpoints back),
   but key checkpoints by cell label before any experiment resumes from or
   evaluates them.
 
-- ngpt-sweep found d128|L8 and d128|L12 unstable at peak LR 1e-2 with the fixed
-  1/n_layer step (d128|L12 never recovers). Not blocking — M2 stays shallow —
-  but if a deep-wide model is ever needed: try a lower LR first, then learnable
-  scalar α, before reaching for the full per-channel recipe.
+- The deep-and-wide instability (d128|L8/L12 at peak LR 1e-2) is **resolved**:
+  ngpt-scaling traced it to the additive residual adding the *raw* sub-module
+  output (‖MLP‖ ∝ √n_embd), fixed by stepping toward the *normalized* output
+  (now the model default). Neither a lower LR nor a learnable scalar α rescues
+  the additive form — normalization is the operative change. Follow-up: confirm
+  the fixed scalar gate holds at a genuinely larger size (wider/deeper than
+  128×12, bigger GPU + batch) before leaning on it for M3.
 
 - Remove the remaining mi-ni template *experiments* (`docs/pipeline`,
   `docs/probe`, `docs/acts` — their report notebooks are already gone) once the
   e2e tests that drive them (`tests/mini/test_experiments_e2e.py`) get their own
   fixtures, or once the first real M2 experiments can play that role. Ties into
-  #45 (docs rework). (`docs/gpt-sweep` has since become `docs/ngpt-sweep`, a
+  #45 (docs rework). (`docs/gpt-sweep` has since become `docs/ngpt-scaling`, a
   real Iteration 0 output rather than a template.)
 
 ## Backlog, grouped by what a single dev session should bundle

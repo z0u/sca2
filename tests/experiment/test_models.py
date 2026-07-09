@@ -1,5 +1,7 @@
 """The model runs, and nGPT keeps activations/weights on the sphere."""
 
+from typing import Any
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -11,8 +13,8 @@ from experiment.model import build_model
 from experiment.model._shared import normalize
 
 
-def make_config(**overrides) -> ModelConfig:
-    defaults = dict(
+def make_config(**overrides: Any) -> ModelConfig:
+    defaults: dict[str, Any] = dict(
         vocab_size=64,
         block_size=64,
         n_embd=64,
