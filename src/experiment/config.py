@@ -26,6 +26,18 @@ class ModelConfig(BaseModel, validate_assignment=True):
     n_layer: PositiveInt
     """Number of transformer blocks; also sets the residual step size (1/n_layer)"""
 
+    residual_alpha_exp: PositiveFloat = 1.0
+    """Residual step exponent: alpha = n_layer ** -exp. 1.0 = 1/n_layer, 0.5 = 1/sqrt(n_layer)."""
+
+    normalize_sublayer: bool = False
+    """Combine the residual as an nGPT LERP toward the *normalized* sublayer output
+    (h + alpha*(norm(sublayer) - h)) instead of the simplified additive step
+    (h + alpha*sublayer). Decouples the effective step from the sublayer's output norm."""
+
+    learnable_alpha: bool = False
+    """Make the residual step a learnable scalar gain (init n_layer ** -exp) per sublayer,
+    rather than a fixed constant."""
+
 
 class DataConfig(BaseModel, validate_assignment=True):
     batch_size: PositiveInt

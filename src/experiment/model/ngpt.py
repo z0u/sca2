@@ -102,25 +102,47 @@ class MLP(eqx.Module):
 
 class Block(eqx.Module):
     alpha: float = eqx.field(static=True)
+    normalize_sublayer: bool = eqx.field(static=True)
 
     attn: CausalSelfAttention
     mlp: MLP
+    s_attn: Scale | None
+    s_mlp: Scale | None
 
     def __init__(self, config: ModelConfig, *, key: PRNGKeyArray):
         attn_key, mlp_key = jr.split(key)
         self.attn = CausalSelfAttention(config, key=attn_key)
         self.mlp = MLP(config, key=mlp_key)
-        # Residual step size, fixed at 1/n_layer: each sub-module's output has
-        # norm ≈ 1 (unit-norm weights, unit-norm input), so an ungated sum would
-        # rotate the hidden state ~45° per layer; 1/n_layer keeps the whole
-        # stack's travel O(1). Learnable gates settled here anyway.
-        self.alpha = 1 / config.n_layer
+        # Residual step size: alpha = n_layer ** -exp (exp=1 → 1/n_layer). The
+        # original justification was that each sub-module's output has norm ≈ 1,
+        # so 1/n_layer keeps the stack's travel O(1). That premise only holds for
+        # the *normalized* combination (``normalize_sublayer``): the plain
+        # additive step adds the *raw* sublayer output, whose norm grows with
+        # width (the MLP scales its pre-activation by √n_embd), so the effective
+        # rotation is alpha·‖sublayer‖ and is *not* width-independent.
+        self.alpha = config.n_layer**-config.residual_alpha_exp
+        self.normalize_sublayer = config.normalize_sublayer
+        if config.learnable_alpha:
+            self.s_attn = Scale(1, init=self.alpha, scale=1.0)
+            self.s_mlp = Scale(1, init=self.alpha, scale=1.0)
+        else:
+            self.s_attn = None
+            self.s_mlp = None
+
+    def _step(self, h, sublayer_out, s: Scale | None):
+        """One residual update: a small step toward the sublayer output, re-projected."""
+        alpha = self.alpha if s is None else s()
+        if self.normalize_sublayer:
+            # nGPT LERP toward the *normalized* sublayer output: alpha is then the
+            # true interpolation fraction, independent of the output's magnitude.
+            return normalize(h + alpha * (normalize(sublayer_out) - h))
+        # Simplified additive step: effective rotation rides on ‖sublayer_out‖.
+        return normalize(h + alpha * sublayer_out)
 
     def __call__(self, h, enc: RotaryEncoding):
         # h is on the unit hypersphere; each sub-module consumes it directly.
-        # Gated additive retraction: small step toward the output, re-project.
-        h = normalize(h + self.alpha * self.attn(h, enc))
-        h = normalize(h + self.alpha * self.mlp(h))
+        h = self._step(h, self.attn(h, enc), self.s_attn)
+        h = self._step(h, self.mlp(h), self.s_mlp)
         return h
 
 
@@ -208,12 +230,17 @@ class NGPT(LanguageModel):
         """Read back the learned scalar temperatures, per layer.
 
         These are all single numbers, so we can see exactly what training
-        settled on. (The residual step size is fixed at 1/n_layer, so it no
-        longer appears here.)
+        settled on. The residual step is a fixed constant unless
+        ``learnable_alpha`` is set, in which case its learned gains appear too.
         """
         blocks = self.transformer.blocks
-        return {
+        report: dict[str, list[float] | float] = {
             "s_qk": [float(jnp.mean(b.attn.s_qk())) for b in blocks],
             "s_u": [float(jnp.mean(b.mlp.s_u())) for b in blocks],
             "s_z": float(jnp.mean(self.s_z())),
         }
+        # Residual step gains, present only when learnable_alpha is set.
+        if blocks and blocks[0].s_attn is not None:
+            report["alpha_attn"] = [float(jnp.mean(s())) for b in blocks if (s := b.s_attn) is not None]
+            report["alpha_mlp"] = [float(jnp.mean(s())) for b in blocks if (s := b.s_mlp) is not None]
+        return report
