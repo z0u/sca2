@@ -9,7 +9,7 @@ project site. The site is built by `./go build` into `_site/`.
 the exported HTML is never committed. `./go publish` exports each notebook to a
 self-contained bundle (`index.html` + named-keyed `_assets/`) and mirrors it to the
 HF bucket under `exports/<key>/`, where `<key>` is the notebook's docs-relative path
-without suffix (`docs/getting_started.py` → `getting_started`, `docs/foo/bar.py` →
+without suffix (`docs/overview.py` → `overview`, `docs/foo/bar.py` →
 `foo/bar`) — except a notebook named `report.py` takes its directory as the key
 (`docs/foo/report.py` → `foo`), so a one-report experiment publishes at `foo/` rather
 than the redundant `foo/report/`. `./go build` then assembles `_site/` from the synced
@@ -28,10 +28,10 @@ rendered `<key>/` page. This `README.md` is excluded from the build.
 docs/
 ├── README.md                This file (excluded from build)
 ├── index.md                 Built as _site/index.html
-├── getting_started.py       Marimo notebook → exported bundle, served at _site/getting_started/
-└── pipeline/                A heavier experiment, split into definition + report
+├── overview.py              Marimo notebook → exported bundle, served at _site/overview/
+└── ex-9.9/                  An experiment, split into definition + report
     ├── experiment.py        Importable main(ctx) DAG — not a notebook, so the build ignores it
-    └── report.py            Marimo notebook → served at _site/pipeline/
+    └── report.py            Marimo notebook → served at _site/ex-9.9/
 ```
 
 Exported bundles live (gitignored) under `.mini/exports/<key>/` locally; their durable
