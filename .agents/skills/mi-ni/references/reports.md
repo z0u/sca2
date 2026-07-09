@@ -29,6 +29,39 @@ the bucket sets no `Content-Disposition`). Two *different* blobs under one name 
 report raises (give each a distinct `name=`). With no publisher, figures inline as
 self-contained `data:` URIs, so a no-frills export still works.
 
+**Consume.** A report reads durable results *by name* and must open cleanly before
+they exist. Resolve refs in one setup-cell helper that returns `None` when
+unpublished, and gate the first data cell with `mo.stop` showing the command that
+produces the data — every cell after it can then assume results:
+
+```py
+def load_results() -> dict | None:
+    store = project_store()
+    art = store.get_ref(METRICS_REF)         # ref name published by experiment.py
+    if art is None:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        return json.loads(store.get(art, Path(d) / "metrics.json").read_text())
+
+mo.stop(loaded is None, mo.md("No results yet — run the experiment:\n```bash\nbin/mini run …\n```"))
+curves = loaded  # re-export under a new name; see below
+```
+
+`mo.stop` halts only cells *downstream of the guard cell*. Cells that read the
+loader's variable directly bypass the guard and crash on `None` in a data-less
+export — so consume the data only through names the guard cell defines (its
+re-export, or stats derived there), never the loader's own output.
+
+Ref names are stringly typed: the experiment `set_ref`s them, the report `get_ref`s
+them, and nothing checks they match — declare each near the top of both files with
+a "kept in sync by hand" note.
+
+Quote numbers in prose as computed values (`mo.md(f"…{best:.2f}…")`), derived in
+the guard cell or below it, so the text can't drift from the data. And compute the
+stats *before* writing any qualitative claim — including figure alt text: a
+placeholder like "the lines nearly coincide" written ahead of the data will
+survive into a published report saying the opposite of what happened.
+
 **Publish, then build.** Two halves, split by trigger. `./go publish` (authenticated)
 exports each report to `.mini/exports/<key>/` and mirrors that bundle to the bucket at
 `exports/<key>/` — the heavy half (it runs the notebook, which needs the data + a write

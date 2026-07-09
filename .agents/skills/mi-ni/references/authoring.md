@@ -35,6 +35,12 @@ remote workers; the report reads persisted results and plots, so it opens
 standalone without re-running the work. See `docs/pipeline/` for a worked,
 runnable example.
 
+CI globs `docs/*/experiment.py` (`tests/mini/test_experiments_e2e.py`): every
+definition is at least *loaded* (import + construct), and the light demos run to
+completion. So a new or renamed experiment gets rot coverage for free — but its
+module top level must stay cheap and side-effect-free (imports of heavy deps
+belong inside task fns, which also keeps the driver light).
+
 ## Write cache-friendly experiments
 
 The memo key is the task's *identity* — `fn name + fingerprint(inputs)` — and

@@ -3,7 +3,7 @@
 import math
 import queue
 
-import equinox as eqx
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -38,7 +38,7 @@ def data_dir(tmp_path):
     return tmp_path
 
 
-def make_training_config(dropout: float = 0.1, **model_overrides) -> TrainingConfig:
+def make_training_config(**model_overrides) -> TrainingConfig:
     return TrainingConfig(
         model=ModelConfig(
             vocab_size=64,
@@ -48,21 +48,19 @@ def make_training_config(dropout: float = 0.1, **model_overrides) -> TrainingCon
             n_head_dim=8,
             n_ff=32,
             n_layer=1,
-            dropout=dropout,
             **model_overrides,
         ),
         tokenizer=TokenizerConfig(vocabulary=VOCAB),
         data=DataConfig(batch_size=8, oversample=1, train_split=0.8, padding_chance=0.1),
-        optimizer=OptimizerConfig(weight_decay=1e-3, learning_rate=1e-3, betas=(0.9, 0.95)),
+        # No weight decay: nGPT pins weight norms to 1, so there is nothing to shrink.
+        optimizer=OptimizerConfig(weight_decay=0, learning_rate=1e-3, betas=(0.9, 0.95)),
         scheduler=SchedulerConfig(epochs=2, warmup_epochs=1, min_lr_factor=0.01),
     )
 
 
-@pytest.mark.parametrize("arch", ["gpt", "ngpt"])
-def test_train_model_end_to_end(data_dir, arch):
+def test_train_model_end_to_end(data_dir):
     """Training produces per-epoch metrics and a checkpoint equivalent to the returned model."""
-    # nGPT is dropout-free (the unit-hypersphere constraint regularizes instead).
-    config = make_training_config(architecture=arch, dropout=0 if arch == "ngpt" else 0.1)
+    config = make_training_config()
     model, metrics = train_model(config, data_dir)
 
     assert [m.epoch for m in metrics] == [0, 1]
@@ -71,11 +69,10 @@ def test_train_model_end_to_end(data_dir, arch):
     assert metrics[-1].val_loss < 2 * math.log(config.model.vocab_size)
 
     loaded, loaded_config, loaded_metrics = load_checkpoint(data_dir)
-    assert loaded_config.model.architecture == arch
+    assert loaded_config.model == config.model
     assert loaded_metrics is not None and loaded_metrics.epoch == 1
 
-    idx = np.tile(np.arange(16), (2, 1))
-    model, loaded = eqx.nn.inference_mode(model), eqx.nn.inference_mode(loaded)
+    idx = jnp.tile(jnp.arange(16), (2, 1))
     np.testing.assert_allclose(loaded(idx), model(idx), rtol=0, atol=0)
 
 

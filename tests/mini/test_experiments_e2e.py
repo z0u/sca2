@@ -12,7 +12,7 @@ contract change fails CI instead of silently rotting the onboarding examples.
   fanning a sweep out with ``.map`` and reducing — no memo store, no CLI.
 
 The light demos (``pipeline``, the ``acts``/``probe`` pair) run to completion; the
-GPU/Modal-heavy ``gpt-sweep`` is only *loaded* (import + construct), which still
+GPU/Modal-heavy ``ngpt-sweep`` is only *loaded* (import + construct), which still
 catches rot cheaply.
 """
 

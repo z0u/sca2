@@ -32,8 +32,7 @@ def train_model(
     data, metadata = load_data(data_dir)
     assert metadata.tokenizer_config.vocab_size <= config.model.vocab_size, "Vocab size mismatch"
 
-    model_key, dropout_key = jr.split(jr.key(config.seed))
-    model = build_model(config.model, key=model_key)
+    model = build_model(config.model, key=jr.key(config.seed))
     rng = np.random.default_rng(config.seed)
 
     train_data, val_data = split_data(data, config.data.train_split)
@@ -55,8 +54,7 @@ def train_model(
 
     for epoch in range(config.scheduler.epochs):
         for x, y in sample_batches(train_data, config.data, config.model, epoch_length, rng):
-            dropout_key, step_key = jr.split(dropout_key)
-            model, opt_state, loss = train_step(model, opt_state, x, y, step_key)
+            model, opt_state, loss = train_step(model, opt_state, x, y)
             step += 1
             emit_progress(step, total_steps, message=f"loss={float(loss):.4f}")
 

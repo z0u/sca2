@@ -1,28 +1,18 @@
-"""Model variants: every one runs, and nGPT keeps activations/weights on the sphere."""
-
-from typing import cast
+"""The model runs, and nGPT keeps activations/weights on the sphere."""
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
-import pytest
 
 from experiment.config import ModelConfig
-from experiment.model import NGPT, build_model
+from experiment.model import build_model
 from experiment.model._shared import normalize
-
-ARCHS = [
-    {"architecture": "gpt"},
-    {"architecture": "ngpt", "ngpt_variant": "crude"},
-    {"architecture": "ngpt", "ngpt_variant": "full"},
-]
-NGPT_ARCHS = [a for a in ARCHS if a["architecture"] == "ngpt"]
 
 
 def make_config(**overrides) -> ModelConfig:
-    return ModelConfig(
+    defaults = dict(
         vocab_size=64,
         block_size=64,
         n_embd=64,
@@ -30,14 +20,12 @@ def make_config(**overrides) -> ModelConfig:
         n_head_dim=8,
         n_ff=64,
         n_layer=2,
-        dropout=0,
-        **overrides,
     )
+    return ModelConfig(**{**defaults, **overrides})
 
 
-@pytest.mark.parametrize("arch", ARCHS)
-def test_forward_shape_and_finite(arch):
-    config = make_config(**arch)
+def test_forward_shape_and_finite():
+    config = make_config()
     model = build_model(config, key=jr.key(0))
     idx = jr.randint(jr.key(1), (2, 16), 0, config.vocab_size)
     logits = model(idx)
@@ -45,13 +33,10 @@ def test_forward_shape_and_finite(arch):
     assert jnp.isfinite(logits).all()
 
 
-@pytest.mark.parametrize("arch", NGPT_ARCHS)
-def test_hidden_state_stays_on_sphere(arch):
-    """Every nGPT block must return unit-norm hidden states."""
-    config = make_config(**arch)
-    # These tests are nGPT-only; cast past the `build_model` base return type so
-    # the type checker sees the concrete attributes (`build_model` -> LanguageModel).
-    model = cast(NGPT, build_model(config, key=jr.key(0)))
+def test_hidden_state_stays_on_sphere():
+    """Every block must return unit-norm hidden states."""
+    config = make_config()
+    model = build_model(config, key=jr.key(0))
     idx = jr.randint(jr.key(1), (2, 16), 0, config.vocab_size)
     enc = model.transformer.rotary_enc
     h = normalize(model.transformer.wte[idx])
@@ -61,10 +46,15 @@ def test_hidden_state_stays_on_sphere(arch):
         np.testing.assert_allclose(norms, jnp.ones_like(norms), rtol=0, atol=1e-5)
 
 
-@pytest.mark.parametrize("arch", NGPT_ARCHS)
-def test_normalize_weights_projects_onto_sphere(arch):
+def test_residual_step_size_is_inverse_depth():
+    """The residual gate is a constant 1/n_layer, not a learned parameter."""
+    model = build_model(make_config(n_layer=4), key=jr.key(0))
+    assert all(block.alpha == 0.25 for block in model.transformer.blocks)
+
+
+def test_normalize_weights_projects_onto_sphere():
     """After normalization, each matrix is a stack of unit vectors along its hidden axis."""
-    model = cast(NGPT, build_model(make_config(**arch), key=jr.key(0)))
+    model = build_model(make_config(), key=jr.key(0))
     # Perturb, then re-project.
     rng = np.random.default_rng(0)
     model = jax.tree.map(
@@ -83,15 +73,3 @@ def test_normalize_weights_projects_onto_sphere(arch):
         unit(block.attn.proj.weight, axis=0)
         unit(block.mlp.fc.weight, axis=1)
         unit(block.mlp.proj.weight, axis=0)
-
-
-def test_baseline_normalize_weights_is_noop():
-    """The baseline carries no hypersphere constraint, so the training hook does nothing."""
-    model = build_model(make_config(architecture="gpt"), key=jr.key(0))
-    normalized = model.normalize_weights()
-    for a, b in zip(
-        jax.tree.leaves(eqx.filter(model, eqx.is_array)),
-        jax.tree.leaves(eqx.filter(normalized, eqx.is_array)),
-        strict=True,
-    ):
-        np.testing.assert_array_equal(a, b)

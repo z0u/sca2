@@ -2,14 +2,14 @@
 
 This is what PyTorch Lightning used to provide; in JAX it's a handful of pure
 functions. The model is a pytree, so one training step is: differentiate the
-loss, apply the optimizer update, then let the model re-impose any weight
-constraints (nGPT's hypersphere projection — identity for the baseline GPT).
+loss, apply the optimizer update, then let the model re-impose its weight
+constraint (nGPT's hypersphere projection).
 """
 
 import equinox as eqx
 import jax.numpy as jnp
 import optax
-from jaxtyping import Array, Float, Int, PRNGKeyArray, PyTree
+from jaxtyping import Array, Float, Int, PyTree
 
 from experiment.model import LanguageModel
 
@@ -21,13 +21,8 @@ def cross_entropy(logits: Float[Array, "B T V"], targets: Int[Array, "B T"]) -> 
     return jnp.sum(losses * mask) / jnp.maximum(jnp.sum(mask), 1)
 
 
-def loss_fn(
-    model: LanguageModel,
-    x: Int[Array, "B T"],
-    y: Int[Array, "B T"],
-    key: PRNGKeyArray | None = None,
-) -> Float[Array, ""]:
-    return cross_entropy(model(x, key=key), y)
+def loss_fn(model: LanguageModel, x: Int[Array, "B T"], y: Int[Array, "B T"]) -> Float[Array, ""]:
+    return cross_entropy(model(x), y)
 
 
 def make_train_step(optimizer: optax.GradientTransformation):
@@ -39,13 +34,11 @@ def make_train_step(optimizer: optax.GradientTransformation):
         opt_state: PyTree,
         x: Int[Array, "B T"],
         y: Int[Array, "B T"],
-        key: PRNGKeyArray,
     ) -> tuple[LanguageModel, PyTree, Float[Array, ""]]:
-        loss, grads = eqx.filter_value_and_grad(loss_fn)(model, x, y, key)
+        loss, grads = eqx.filter_value_and_grad(loss_fn)(model, x, y)
         updates, opt_state = optimizer.update(grads, opt_state, eqx.filter(model, eqx.is_inexact_array))
         model = eqx.apply_updates(model, updates)
-        # Re-project weights onto the unit hypersphere (nGPT constraint;
-        # identity for the baseline GPT).
+        # Re-project weights onto the unit hypersphere (nGPT's weight constraint).
         model = model.normalize_weights()
         return model, opt_state, loss
 
@@ -54,5 +47,5 @@ def make_train_step(optimizer: optax.GradientTransformation):
 
 @eqx.filter_jit
 def eval_step(model: LanguageModel, x: Int[Array, "B T"], y: Int[Array, "B T"]) -> Float[Array, ""]:
-    """Validation loss with dropout disabled."""
-    return loss_fn(eqx.nn.inference_mode(model), x, y)
+    """Validation loss."""
+    return loss_fn(model, x, y)

@@ -66,6 +66,15 @@ and only the wall-clock budget (below) will reap it. A task stuck on `queued`
 with an old `⧖` is a scheduling problem (capacity, container boot), not slow
 code.
 
+**Dead ≠ slow.** The inverse failure: a RUNNING task whose progress is frozen
+and whose heartbeat (♥) has gone stale for minutes while its siblings beat every
+few seconds. That worker is almost certainly dead — most often killed by the
+role's per-task `timeout` (Modal kills the container without the record
+settling, so it reads RUNNING forever; only the budget would eventually reap
+it). Size the timeout for the *largest* cell of a sweep, not the typical one.
+Recover deliberately: `cancel` to reap the record, raise the role's `timeout`
+(execution config — DONE cells stay memo hits), then `retry --key <key>`.
+
 ## Recovery
 
 `FAILED` and `CANCELLED` are **terminal by design** — a plain `run` will **not**

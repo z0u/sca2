@@ -36,6 +36,14 @@ A chart (loss curve, score sweep, schedule) keeps its axes. Use the
 stylesheet defaults from `mini.vis` and prefer meaningful ticks: a hue axis
 gets named ticks (Red, Green, Blue), not 0–1.
 
+For an *ordinal* series (depth, size), encode order as ordered shades of one
+colormap rather than categorical hues — but pick the stops with `light_dark`:
+a colormap's dark end vanishes on a dark background (e.g. viridis
+`[0.75, 0.45, 0.1]` in light mode, `[0.8, 0.5, 0.25]` in dark). Judge the
+dark variant properly: exported figures have transparent backgrounds, so
+composite `_assets/<name>-dark.png` over `#111` first — a viewer's default
+matte hides both real problems and false alarms.
+
 A 2D geometry panel in full:
 
 ```python
