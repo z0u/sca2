@@ -1,56 +1,36 @@
-# mi-ni
+# Sparse Concept Anchoring in transformers
 
-> **<ruby>見<rt>み</rt>に</ruby> /mi·ni/** — _with intent to see_ [^etymology]
+Sparse Concept Anchoring (SCA) is a training-time method for concept control.
+A light geometric regularizer, driven by a small number of noisy labels,
+guides a chosen concept toward a known location in representation space —
+shaping feature geometry during training rather than reverse-engineering it
+afterwards. Because the concept then lives where you put it, suppressing or
+ablating it has side effects you can bound from the geometry before running
+the intervention.
 
-[^etymology]: From 見に行く (mi-ni iku), meaning "to go for the purpose of seeing something."
-
-mi-ni is a template repository and library for doing AI research. Features:
-
-- **Local Python notebooks** with Marimo, published to GitHub Pages with their figures served from a Hugging Face bucket
-- **Remote GPU compute** at the level of functions with [Modal](https://modal.com)
-- **Detached, memoized experiments** driven from a stateless CLI, so you (or an agent) can launch a run, close the laptop, and pick it up later
-- **Agentic coding config** for Claude Code
-
-Compute abstraction pattern:
-
-```py
-# app = LocalApparatus("my-experiment")
-app = ModalApparatus("my-experiment").w(gpu="L4")
-metrics = app.map(train, sweep_configs)
-app.volume.download(...)
-```
-
-[See z0u/mi-ni](https://github.com/z0u/mi-ni).
+The first milestone (M1) established the method in autoencoders:
+[paper](https://arxiv.org/abs/2512.12469),
+[blog post](https://www.lesswrong.com/posts/sGskzx7LgsDkMLvcv/intervening-on-sparse-anchored-concepts),
+[code](https://github.com/z0u/ex-preppy). This site holds the experiment
+reports for the second milestone (M2): does SCA transfer to transformers?
+We anchor concepts in the residual stream of a small transformer trained on
+a synthetic color-mixing task (*red + blue = purple*), where ground truth is
+unambiguous, so a negative result stays interpretable. The plan and
+deliverables are in the [project README](https://github.com/z0u/sca2).
 
 &nbsp;
 
-## Published notebooks
+## Experiment reports
 
-Notebooks are automatically published to GitHub Pages; their figures and other heavy assets are served from a Hugging Face bucket (repointed at build time with one `<base>` tag).
-
-The notebooks build on each other, so they read well in order.
+Each report is a [Marimo](https://marimo.io) notebook that reads durable
+results produced by a separately run experiment. Reports are published
+automatically, with their figures served from a Hugging Face dataset; the
+infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
 
 <!-- These URLs are rewritten to point to the published notebooks -->
 
-### SCA2 experiments
-
-- [Experiment 2.9.1 redux](./ex-2.9.1/report.py): the M1 headline result (delete *red* from a 5D autoencoder), ported from [ex-preppy](https://github.com/z0u/ex-preppy) to JAX as an end-to-end shakedown of the infrastructure below.
-
-### Start here
-
-- [Getting started](./getting_started.py): map a function over a sweep from a notebook, and swap local ↔ Modal compute without changing the code.
-
-### The detached, memoized flow
-
-- [Pipeline](./pipeline/report.py): a multi-step experiment driven by the CLI — a prep step feeds a training sweep, and the report reads the durable results back.
-- [Probe](./probe/report.py): reuses activations that a separate experiment ([acts](./acts/experiment.py)) shared through the content-addressed artifact store, by name.
-
-### A case study at scale
-
-- [Sweep over GPT architectures](./gpt-sweep/report.py): LayerNorm vs. hypersphere (nGPT) across learning rates. Adds hyperparameter schedules, role-based hardware routing, and artifacts published by name.
-- [nanoGPT and nGPT, interactively](./gpt.py): the same models trained inline in one notebook (source only; it re-trains on every run).
-
-### Visualization utilities
-
-- [Themed (light/dark) plots](./themed.py): the `@themed` decorator that every report above uses for dual-mode figures.
-- [Sparkline text annotations](./subline_demo.py): per-token annotations with the sibling `subline` library.
+- [Experiment 2.9.1 redux](./ex-2.9.1/report.py): the M1 headline result
+  (delete *red* from a 5D autoencoder), ported from
+  [ex-preppy](https://github.com/z0u/ex-preppy) to JAX as an end-to-end
+  shakedown of the M2 infrastructure. More reports will appear here as the
+  M2 experiments land.

@@ -11,10 +11,18 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- Remove the mi-ni template experiments (`docs/pipeline`, `docs/probe`,
-  `docs/acts`, `docs/gpt-sweep`, `docs/gpt.py`, `docs/getting_started.py`)
-  once the first real M2 experiments land — `docs/ex-2.9.1` already covers the
-  worked-example role. Ties into #45 (docs rework).
+- `test_publish_serves_with_content_type_from_extension` fails: an anonymous
+  GET of the *store bucket's* `published/` revision now returns 401 (the
+  publish repo `z0u/sca2-pub` still serves 200 anonymously — verified
+  2026-07-09). Looks like a stale test assumption from before exports were
+  routed to the publish repo (#38); either point the test at the publish
+  tier or drop the anonymous-serving assertion for the bucket.
+
+- Remove the remaining mi-ni template *experiments* (`docs/pipeline`,
+  `docs/probe`, `docs/acts`, `docs/gpt-sweep` — their report notebooks are
+  already gone) once the e2e tests that drive them
+  (`tests/mini/test_experiments_e2e.py`) get their own fixtures, or once the
+  first real M2 experiments can play that role. Ties into #45 (docs rework).
 
 ## Backlog, grouped by what a single dev session should bundle
 

@@ -11,6 +11,7 @@ with app.setup(hide_code=True):
     import marimo as mo  # noqa: F401
     import matplotlib.pyplot as plt
     import numpy as np
+    from matplotlib.patches import Circle
 
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
@@ -258,22 +259,38 @@ def _(best_eval):
     @themed(
         name="latents",
         alt_text=(
-            "Two scatter plots of bottleneck latents, axis 0 against axis 1, one point per grid color, "
-            "each drawn in its own color. Left, before ablation: points fan out in an arc — blues, "
-            "greens, and grays hug the vertical line at axis 0 = 0, warm colors spread rightward, and "
-            "pure reds reach axis-0 values near 1. Right, after ablation: every point sits exactly on "
-            "the vertical line at 0, the reds folded in among the other colors."
+            "Two disc-shaped scatter plots of bottleneck latents, one point per grid color, each drawn "
+            "in its own color, inside a circle marking the unit hypersphere bound. The anchored axis "
+            "points up, labeled (1, 0, 0, 0, 0). Left, baseline: blues, greens, and grays hug the "
+            "horizontal diameter, warm colors spread upward, and pure reds reach the top of the circle. "
+            "Right, ablated: every point sits exactly on the horizontal diameter, the reds folded in "
+            "among the other colors."
         ),
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(1, 2, figsize=(8.5, 4), sharex=True, sharey=True)
+        fig, axes = plt.subplots(1, 2, figsize=(8.5, 4.6))
         edge = light_dark("#00000033", "#ffffff55")
-        for ax, z, title in zip(axes, (best_eval["z_base"], best_eval["z_abl"]), ("baseline", "ablated"), strict=True):
-            ax.scatter(z[:, 0], z[:, 1], c=best_eval["rgb"], s=22, edgecolors=edge, lw=0.5)
-            ax.axvline(0, color="grey", alpha=0.3, lw=1)
-            ax.set(title=title, xlabel="latent axis 0 (anchored: red)")
-        axes[0].set_ylabel("latent axis 1")
-        fig.tight_layout()
+        fg = light_dark("#000", "#fff")
+        for ax, z, title in zip(axes, (best_eval["z_base"], best_eval["z_abl"]), ("Baseline", "Ablated"), strict=True):
+            # Latent axis 0 (anchored: red) points up; axis 1 is horizontal.
+            ax.add_patch(Circle((0, 0), 1, facecolor=light_dark("#eee", "#111"), zorder=-10))
+            ax.scatter(z[:, 1], z[:, 0], c=best_eval["rgb"], s=22, edgecolors=edge, lw=0.5)
+            ax.add_patch(Circle((0, 0), 1, facecolor="none", edgecolor="#0005", lw=1, zorder=10))
+            ax.set_aspect("equal")
+            ax.set_xlim(-1.1, 1.1)
+            ax.set_ylim(-1.1, 1.1)
+            ax.set_axis_off()
+            ax.set_title(title, y=-0.12)
+        axes[0].plot([0], [1.05], marker="v", color=fg, clip_on=False)
+        axes[0].annotate(
+            "(1, 0, 0, 0, 0)",
+            xy=(0, 1.1),
+            xytext=(0, 8),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            annotation_clip=False,
+        )
         return fig
 
     mo.Html(_plot())
