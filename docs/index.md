@@ -35,8 +35,8 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   (delete *red* from a 5D autoencoder), ported from
   [ex-preppy](https://github.com/z0u/ex-preppy) to JAX as an end-to-end
   shakedown of the M2 infrastructure.
-- [nGPT hyperparameter sweep](./ngpt-sweep/experiment.py): a small width ×
-  depth sweep of our simplified nGPT (scalar gains, residual step fixed at
+- [nGPT hyperparameter sweep](./ngpt-sweep/report.py): a small width × depth
+  sweep of our simplified nGPT (scalar gains, residual step fixed at
   1/n_layer) — a character-level transformer trained on plain text, to settle
   the architecture defaults before the color-mixing experiments.
 

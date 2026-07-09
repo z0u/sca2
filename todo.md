@@ -18,6 +18,17 @@ readable cold without re-deriving code state.
   routed to the publish repo (#38); either point the test at the publish
   tier or drop the anonymous-serving assertion for the bucket.
 
+- Sweep cells all `save_checkpoint` to the same shared `get_data_dir()`, so the
+  checkpoint file is last-writer-wins across a fan-out. Harmless today (the
+  ngpt-sweep cells return their metrics; nothing reads the checkpoints back),
+  but key checkpoints by cell label before any experiment resumes from or
+  evaluates them.
+
+- ngpt-sweep found d128|L8 and d128|L12 unstable at peak LR 1e-2 with the fixed
+  1/n_layer step (d128|L12 never recovers). Not blocking — M2 stays shallow —
+  but if a deep-wide model is ever needed: try a lower LR first, then learnable
+  scalar α, before reaching for the full per-channel recipe.
+
 - Remove the remaining mi-ni template *experiments* (`docs/pipeline`,
   `docs/probe`, `docs/acts` — their report notebooks are already gone) once the
   e2e tests that drive them (`tests/mini/test_experiments_e2e.py`) get their own

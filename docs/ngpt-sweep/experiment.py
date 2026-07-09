@@ -162,6 +162,8 @@ experiment = Experiment(
     main=main,
     roles={
         "prep": {},  # CPU-only: data download + tokenize
-        "train": dict(gpu="L4", timeout=720),  # GPU sweep cells
+        # 25 min: the largest cell (d128|L12) takes ~13 min on an L4; a 12 min
+        # timeout killed it at 94% while the smaller cells finished comfortably.
+        "train": dict(gpu="L4", timeout=1500),
     },
 )
