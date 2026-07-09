@@ -1,29 +1,28 @@
-"""nGPT scaling investigation: why the simplified recipe fails wide-and-deep.
+"""nGPT scaling: why the simplified residual fails wide-and-deep, and the fix.
 
-The earlier ``ngpt-sweep`` found that at width 128 the fixed residual step
-(``h ← normalize(h + α·sublayer(h))`` with ``α = 1/n_layer``) degrades with
-depth — d128|L8 spikes and recovers worse, d128|L12 never trains. The stated
-reason ("deeper-and-wider can't absorb the peak LR") is a symptom. The cause is
-geometric: the additive step adds the *raw* sublayer output, and the MLP output
-norm scales like √n_embd (it up-projects by a √n_embd baseline), so the
-effective per-layer rotation is ``α·‖sublayer‖`` — *not* width-independent, and
-``1/n_layer`` does not control it. (Init-time diagnostic: total hidden-state
-travel runs 246° → 615° from d32|L4 to d128|L12 under the baseline recipe.)
+We simplified our nGPT residual to a fixed *additive* step,
+``h ← normalize(h + α·sublayer(h))`` with ``α = 1/n_layer``, on the assumption
+that ``sublayer(h)`` has norm ≈ 1. It doesn't: the MLP up-projects its
+pre-activations by a √n_embd baseline, so ``‖MLP(h)‖ ∝ √n_embd``. The *effective*
+per-layer rotation is therefore ``α·‖sublayer‖``, which grows with width, so the
+fixed step never controlled the geometry it claimed to — the model destabilizes
+at width 128, depth 8–12. nGPT proper avoids this by stepping toward the
+*normalized* output, ``h ← normalize(h + α·(normalize(sublayer) − h))``, making
+``α`` a true interpolation fraction; we had dropped that normalization.
 
-This experiment tests the fixes at the failing corner — width 128 × depths
-{4, 8, 12} — across recipe arms:
+This experiment establishes the failure and the fix over two axes:
 
-- ``base``  — the current recipe (control; should reproduce the failure).
-- ``lr3e3`` — same recipe at a lower peak LR (was the failure "just" LR?).
-- ``sqrt``  — additive step at ``α = 1/√n_layer`` (the user's hypothesis).
-- ``norm``  — nGPT-faithful LERP toward the *normalized* sublayer output; this
-  makes ``α`` the true interpolation fraction, restoring width/depth-independence.
-- ``lrn``   — learnable scalar ``α`` per sublayer (init 1/n_layer).
+- **Recipe** (at the failing width 128 × depths {4, 8, 12}):
+  ``base`` (the buggy additive step), ``lr3e3`` (same, lower peak LR),
+  ``sqrt`` (additive at ``α = 1/√n_layer``), ``lrn`` (additive, learnable α),
+  and ``norm`` (the normalized-LERP fix — now the model default).
+- **Width** (``base`` and ``norm`` × widths {32, 64, 128} × depths {4, 8, 12}):
+  shows the failure is width-gated (small widths train fine) and the fix is
+  width-flat.
 
-Everything else matches ``ngpt-sweep`` (batch 16, 100 epochs, Pride and
-Prejudice) so the ``base`` arm is directly comparable to the published failure.
+Everything else is held fixed (batch 16, 100 epochs, Pride and Prejudice).
 
-    bin/mini run docs/ngpt-scaling/experiment.py --app modal --max-containers 15
+    bin/mini run docs/ngpt-scaling/experiment.py --app modal --max-containers 27
     bin/mini status ngpt-scaling
 """
 
@@ -31,17 +30,19 @@ from __future__ import annotations
 
 from mini import Ctx, Experiment, get_data_dir
 
-# Fixed at the failing width; depth is the diagnostic axis (α is tied to it).
-WIDTH = 128
 DEPTHS = [4, 8, 12]
+WIDTHS = [32, 64, 128]
 
-# (arm label, peak LR, model-config knobs). Knobs default to the current recipe.
-ARMS: list[tuple[str, float, dict]] = [
-    ("base", 1e-2, {}),
-    ("lr3e3", 3e-3, {}),
-    ("sqrt", 1e-2, dict(residual_alpha_exp=0.5)),
-    ("norm", 1e-2, dict(normalize_sublayer=True)),
-    ("lrn", 1e-2, dict(learnable_alpha=True)),
+# (arm label, peak LR, model-config knobs, widths). The buggy additive residual
+# is now off by default, so the failing arms pin normalize_sublayer=False
+# explicitly; `norm` is the corrected (now-default) recipe. `base` and `norm`
+# sweep width to expose the width-gating; the rest run only at the failing 128.
+ARMS: list[tuple[str, float, dict, list[int]]] = [
+    ("base", 1e-2, dict(normalize_sublayer=False), WIDTHS),
+    ("lr3e3", 3e-3, dict(normalize_sublayer=False), [128]),
+    ("sqrt", 1e-2, dict(normalize_sublayer=False, residual_alpha_exp=0.5), [128]),
+    ("lrn", 1e-2, dict(normalize_sublayer=False, learnable_alpha=True), [128]),
+    ("norm", 1e-2, dict(normalize_sublayer=True), WIDTHS),
 ]
 
 CURVES_REF = "reports/ngpt-scaling/curves"
@@ -116,12 +117,13 @@ def build_sweep(meta) -> list[tuple]:
     from experiment.utils import align
 
     cells = []
-    for arm, lr, knobs in ARMS:
-        for n_layer in DEPTHS:
-            config = _make_config(WIDTH, n_layer, lr, knobs)
-            config.tokenizer = meta.tokenizer_config.model_copy()
-            config.model.vocab_size = align(meta.tokenizer_config.vocab_size, 64)
-            cells.append((config, f"{arm}|d{WIDTH}|L{n_layer}"))
+    for arm, lr, knobs, widths in ARMS:
+        for n_embd in widths:
+            for n_layer in DEPTHS:
+                config = _make_config(n_embd, n_layer, lr, knobs)
+                config.tokenizer = meta.tokenizer_config.model_copy()
+                config.model.vocab_size = align(meta.tokenizer_config.vocab_size, 64)
+                cells.append((config, f"{arm}|d{n_embd}|L{n_layer}"))
     return cells
 
 
@@ -157,8 +159,8 @@ experiment = Experiment(
     main=main,
     roles={
         "prep": {},  # CPU-only: data download + tokenize
-        # Same regime as ngpt-sweep, so the `base` arm reproduces the published
-        # failure; L4 is right-sized for these batch-16, ≤2M-param cells.
+        # L4 is right-sized for these batch-16, ≤2M-param cells; the largest
+        # (d128|L12) takes ~13 min, so the per-task timeout allows generous slack.
         "train": dict(gpu="L4", timeout=1500),
     },
 )

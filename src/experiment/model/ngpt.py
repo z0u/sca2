@@ -1,11 +1,15 @@
 """nGPT: every activation and weight matrix lives on the unit hypersphere.
 
-A deliberately stripped-back take on the published recipe: scalar gains
-everywhere, and a gated additive retraction for the residual (`h + α·ĥ*`, then
-re-normalize) with the step size α *fixed* at 1/n_layer — the value the learned
-gates settled on anyway. The per-channel eigen learning rates and normalized
-LERP of nGPT proper were carried for a while as an ablation; the finding was
-that the scalar form matches them, so they're gone.
+A stripped-back take on the published recipe: scalar gains everywhere (in place
+of the per-channel eigen learning rates), and the residual step α *fixed* at
+1/n_layer rather than learned — the value the learned gates settled on anyway.
+What we keep from nGPT proper is the residual form itself: a LERP toward the
+sub-module's *normalized* output, `h ← Norm(h + α·(ĥ* − h))`. Normalizing the
+sub-module output (ĥ*) is load-bearing — it makes α the true step size,
+independent of the raw output's norm (which scales like √n_embd for the MLP, so
+an un-normalized step over-rotates the hidden state and grows with width). See
+``normalize_sublayer`` in ``ModelConfig`` for the earlier, incorrect additive
+form, kept only to reproduce its wide-and-deep failure.
 """
 
 import logging
@@ -113,13 +117,13 @@ class Block(eqx.Module):
         attn_key, mlp_key = jr.split(key)
         self.attn = CausalSelfAttention(config, key=attn_key)
         self.mlp = MLP(config, key=mlp_key)
-        # Residual step size: alpha = n_layer ** -exp (exp=1 → 1/n_layer). The
-        # original justification was that each sub-module's output has norm ≈ 1,
-        # so 1/n_layer keeps the stack's travel O(1). That premise only holds for
-        # the *normalized* combination (``normalize_sublayer``): the plain
-        # additive step adds the *raw* sublayer output, whose norm grows with
-        # width (the MLP scales its pre-activation by √n_embd), so the effective
-        # rotation is alpha·‖sublayer‖ and is *not* width-independent.
+        # Residual step size: alpha = n_layer ** -exp (exp=1 → 1/n_layer). Because
+        # the residual normalizes the sub-module output first (``normalize_sublayer``,
+        # the default), alpha is the true interpolation fraction and the per-layer
+        # rotation is ~alpha, holding the stack's travel O(1) regardless of width.
+        # The incorrect additive path (normalize_sublayer=False) instead rotates by
+        # alpha·‖sublayer‖, which grows with width (‖MLP‖ ∝ √n_embd) — the wide-deep
+        # failure this replaced.
         self.alpha = config.n_layer**-config.residual_alpha_exp
         self.normalize_sublayer = config.normalize_sublayer
         if config.learnable_alpha:
@@ -136,7 +140,7 @@ class Block(eqx.Module):
             # nGPT LERP toward the *normalized* sublayer output: alpha is then the
             # true interpolation fraction, independent of the output's magnitude.
             return normalize(h + alpha * (normalize(sublayer_out) - h))
-        # Simplified additive step: effective rotation rides on ‖sublayer_out‖.
+        # Earlier (incorrect) additive step: effective rotation rides on ‖sublayer_out‖.
         return normalize(h + alpha * sublayer_out)
 
     def __call__(self, h, enc: RotaryEncoding):

@@ -29,10 +29,12 @@ class ModelConfig(BaseModel, validate_assignment=True):
     residual_alpha_exp: PositiveFloat = 1.0
     """Residual step exponent: alpha = n_layer ** -exp. 1.0 = 1/n_layer, 0.5 = 1/sqrt(n_layer)."""
 
-    normalize_sublayer: bool = False
-    """Combine the residual as an nGPT LERP toward the *normalized* sublayer output
-    (h + alpha*(norm(sublayer) - h)) instead of the simplified additive step
-    (h + alpha*sublayer). Decouples the effective step from the sublayer's output norm."""
+    normalize_sublayer: bool = True
+    """Combine the residual as the nGPT LERP toward the *normalized* sublayer output
+    (h + alpha*(norm(sublayer) - h)). This is the correct behaviour: it makes alpha the
+    true interpolation fraction, so the per-layer step is independent of the sublayer's
+    output norm (which scales like sqrt(n_embd) for the MLP). Set False for the earlier,
+    incorrect additive step (h + alpha*sublayer) — kept only to reproduce that failure."""
 
     learnable_alpha: bool = False
     """Make the residual step a learnable scalar gain (init n_layer ** -exp) per sublayer,
