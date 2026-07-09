@@ -15,7 +15,7 @@ My key takeaways:
 [^length]: Especially in conjunction with the normalization that forces model vectors to store only direction (i.e. unit length), as in nGPT — which is exactly what this model now does.
 
 
-## [Attention](attention.py)
+## [Attention](ngpt.py)
 
 ### Rotary positional encodings
 
@@ -55,7 +55,7 @@ Reading the previous section, you might think that each token can only provide o
 [^causal]: This is for causal self-attention. For cross-attention, all other tokens are queried.
 
 
-## [MLP](mlp.py)
+## [MLP](ngpt.py)
 
 The multilayer perceptron (MLP) (aka feedforward layer) is an OG[^og] deep learning pattern for nonlinear learned data transformations. That doesn't tell us much about what it does here but [3b1b has a great video on it](https://www.3blue1brown.com/lessons/mlp) (Sanderson, 2024). The structure of an MLP in a transformer does this:
 
@@ -76,7 +76,7 @@ Exactly what is going on in the large matrices that project up and then back dow
 The MLP operates on each token embedding individually: at this point, there is no communication between tokens; that happens in the `CausalSelfAttention` module. Also, it does not _add_ knowledge to the embedding; it outputs an entirely new embedding, which is then added to the residual stream in the `Block`.
 
 
-## [Transformer block](block.py)
+## [Transformer block](ngpt.py)
 
 A transformer "block":
 1. Uses multi-headed attention to pass context between tokens (see _Causal self-attention_, above)
@@ -96,14 +96,14 @@ nGPT keeps that spirit but reframes it geometrically. Adding two unit vectors ge
 
 $$h \leftarrow \text{Norm}\big(h + \alpha\,\text{sub}(h)\big)$$
 
-The gate $\alpha$ is a single learnable scalar per sub-module (a ReZero/LayerScale-style gate). It matters more than it looks. With unit-norm weights and a unit-norm input, $\text{sub}(h)$ already has norm $\approx 1$ — the same scale as the residual — so an _ungated_ sum would rotate the hidden state roughly 45° per layer and overwrite the token's identity within a few layers. The small gate (initialised at 0.05) holds each step to a few degrees, letting information flow past each layer the way the additive residual does in a standard transformer.
+The gate $\alpha$ is a constant, fixed at $1/n_\text{layer}$. It matters more than it looks. With unit-norm weights and a unit-norm input, $\text{sub}(h)$ already has norm $\approx 1$ — the same scale as the residual — so an _ungated_ sum would rotate the hidden state roughly 45° per layer and overwrite the token's identity within a few layers. The $1/n_\text{layer}$ gate holds each step to a few degrees — keeping the whole stack's travel $O(1)$ — letting information flow past each layer the way the additive residual does in a standard transformer.
 
-The full nGPT recipe goes one step further: it takes the step _towards_ the sub-module's normalized output, $h \leftarrow \text{Norm}\big(h + \alpha\,(h_\text{sub} - h)\big)$, with $\alpha$ a learned per-**channel** vector (the paper's _eigen learning rates_). We deliberately strip that back to a scalar. The [architecture sweep](../../../docs/gpt-sweep/experiment.py) showed the simplification is free at this scale: the scalar gate matches per-channel nGPT, while dropping the gate entirely (a raw additive retraction) breaks training outright. The learned gates also settle near $1/n_\text{layer}$ on average — the value that keeps the twelve-layer stack moving an $O(1)$ distance overall.
+The full nGPT recipe _learns_ this gate, per **channel** (the paper's _eigen learning rates_), and steps _towards_ the sub-module's normalized output: $h \leftarrow \text{Norm}\big(h + \alpha\,(h_\text{sub} - h)\big)$. We deliberately strip all of that away. An earlier architecture sweep showed the simplification is free at this scale: a single scalar gate matched per-channel nGPT (while dropping the gate entirely — a raw ungated retraction — broke training outright), and the learned gates settled near $1/n_\text{layer}$ on average anyway. So the model now bakes that value in, and the [hyperparameter sweep](../../../docs/ngpt-sweep/experiment.py) exercises the fixed gate across depths.
 
 
-## [Decoder-only transformer](gpt.py)
+## [Decoder-only transformer](ngpt.py)
 
-Here we tie together all the previous modules into "the transformer". Having discussed those other pieces already, this part is straightforward. The GPT module:
+Here we tie together all the previous modules into "the transformer". Having discussed those other pieces already, this part is straightforward. The NGPT module:
 
 1. Prepares the input embeddings:
    - Converts token indices to the learned embeddings with a literal look-up table, then normalizes each one onto the unit hypersphere so the residual stream starts on the sphere

@@ -1,14 +1,13 @@
-"""Primitives shared by every model variant.
+"""Primitives the model is built from.
 
-The `gpt` (baseline) and `ngpt` (normalized) modules each tell one architecture's
-story end to end; everything that does *not* vary between them lives here:
-last-axis `Linear`/`LayerNorm` layers, positional rotary encoding, the learnable
-`Scale`, head reshaping, the sampling loop, and the `Generation` containers it
-produces.
+The `ngpt` module tells the architecture's story end to end; the supporting
+pieces live here: the last-axis `Linear` layer, positional rotary encoding, the
+learnable `Scale`, head reshaping, the sampling loop, and the `Generation`
+containers it produces.
 
 Models here are Equinox modules: pytrees of arrays transformed by JAX. Forward
-passes are pure functions — randomness (dropout, sampling) enters only through
-explicit PRNG keys, and "mutating" weights means building a new model.
+passes are pure functions — randomness (sampling) enters only through explicit
+PRNG keys, and "mutating" weights means building a new model.
 """
 
 import logging
@@ -27,11 +26,6 @@ log = logging.getLogger(__name__)
 def normalize(x: Array, axis: int = -1, eps: float = 1e-12) -> Array:
     """Project onto the unit hypersphere along *axis* (like `F.normalize`)."""
     return x / jnp.maximum(jnp.linalg.norm(x, axis=axis, keepdims=True), eps)
-
-
-def split_keys(key: PRNGKeyArray | None, n: int) -> tuple[PRNGKeyArray | None, ...]:
-    """Split a PRNG key n ways, or pass `None` through (inference: no dropout)."""
-    return (None,) * n if key is None else tuple(jr.split(key, n))
 
 
 class Linear(eqx.Module):
@@ -54,24 +48,6 @@ class Linear(eqx.Module):
     def __call__(self, x: Float[Array, "... in"]) -> Float[Array, "... out"]:
         y = x @ self.weight.T
         return y if self.bias is None else y + self.bias
-
-
-class LayerNorm(eqx.Module):
-    """Layer normalization over the last axis, broadcasting over the rest."""
-
-    weight: Float[Array, " dim"]
-    bias: Float[Array, " dim"]
-    eps: float = eqx.field(static=True)
-
-    def __init__(self, dim: int, eps: float = 1e-5):
-        self.weight = jnp.ones(dim)
-        self.bias = jnp.zeros(dim)
-        self.eps = eps
-
-    def __call__(self, x: Float[Array, "... dim"]) -> Float[Array, "... dim"]:
-        mean = x.mean(axis=-1, keepdims=True)
-        var = x.var(axis=-1, keepdims=True)
-        return (x - mean) * jax.lax.rsqrt(var + self.eps) * self.weight + self.bias
 
 
 class RotaryEncoding(eqx.Module):

@@ -1,15 +1,11 @@
 """nGPT: every activation and weight matrix lives on the unit hypersphere.
 
-Two flavours, selected by `config.ngpt_variant`:
-
-- `'crude'` (default, first-class): scalar gains everywhere, and a gated additive
-  retraction for the residual (`h + α·ĥ*`, then re-normalize). A handful of
-  learnable numbers per layer — the minimal thing that recovers nGPT.
-- `'full'` (notebook ablation): per-channel eigen learning rates and a true
-  normalized LERP residual (`h + α·(ĥ* − h)`), i.e. nGPT as published.
-
-The empirical finding is that `'crude'` matches `'full'`, so the per-channel
-machinery is carried only for the ablation, not shipped as the default.
+A deliberately stripped-back take on the published recipe: scalar gains
+everywhere, and a gated additive retraction for the residual (`h + α·ĥ*`, then
+re-normalize) with the step size α *fixed* at 1/n_layer — the value the learned
+gates settled on anyway. The per-channel eigen learning rates and normalized
+LERP of nGPT proper were carried for a while as an ablation; the finding was
+that the scalar form matches them, so they're gone.
 """
 
 import logging
@@ -34,16 +30,10 @@ from experiment.model._shared import (
 log = logging.getLogger(__name__)
 
 
-def _is_full(config: ModelConfig) -> bool:
-    return config.ngpt_variant == "full"
-
-
 class CausalSelfAttention(eqx.Module):
     n_head: int = eqx.field(static=True)
     n_kq_tot: int = eqx.field(static=True)
     n_v_tot: int = eqx.field(static=True)
-    full: bool = eqx.field(static=True)
-    qk_scale: float = eqx.field(static=True)
 
     qkv: Linear
     proj: Linear
@@ -60,16 +50,9 @@ class CausalSelfAttention(eqx.Module):
         self.proj = Linear(self.n_v_tot, config.n_embd, key=proj_key, use_bias=False)
 
         # Per-head q/k are unit-normalized, so their dot product is a cosine in
-        # [−1, 1] and needs sharpening back up before softmax.
-        self.full = _is_full(config)
-        if self.full:
-            # Per-dim gain on q and k, then a fixed √d_k score scale.
-            self.s_qk = Scale(config.n_head_dim, init=1.0, scale=config.n_embd**-0.5)
-            self.qk_scale = config.n_head_dim**0.5
-        else:
-            # A single learnable scalar temperature, initialized to √d_k.
-            self.s_qk = Scale(1, init=config.n_head_dim**0.5, scale=config.n_embd**-0.5)
-            self.qk_scale = 1.0
+        # [−1, 1] and needs sharpening back up before softmax: a single learnable
+        # scalar temperature, initialized to √d_k.
+        self.s_qk = Scale(1, init=config.n_head_dim**0.5, scale=config.n_embd**-0.5)
 
     def __call__(self, x: Float[Array, "B T C"], enc: RotaryEncoding):
         _B, T, _C = x.shape
@@ -84,11 +67,8 @@ class CausalSelfAttention(eqx.Module):
         # rotation, so it commutes with normalization.
         q = normalize(q)
         k = normalize(k)
-        if self.full:
-            q = q * self.s_qk()
-            k = k * self.s_qk()
 
-        att = (q @ k.swapaxes(-2, -1)) * (self.qk_scale if self.full else self.s_qk())
+        att = (q @ k.swapaxes(-2, -1)) * self.s_qk()
         att = jnp.where(jnp.tril(jnp.ones((T, T), bool)), att, -jnp.inf)
         att = jax.nn.softmax(att, axis=-1)
         y = att @ v
@@ -112,7 +92,7 @@ class MLP(eqx.Module):
         # With unit-norm input and unit-norm weights the pre-activations would be
         # ~1/√d — far too small, leaving GELU near-linear. Scale the up-projection
         # by a √n_embd baseline (times learnable s_u) so GELU sees O(1) inputs.
-        self.s_u = Scale(config.n_ff if _is_full(config) else 1, init=1.0, scale=1.0)
+        self.s_u = Scale(1, init=1.0, scale=1.0)
         self.su_base = config.n_embd**0.5
 
     def __call__(self, h):
@@ -121,37 +101,26 @@ class MLP(eqx.Module):
 
 
 class Block(eqx.Module):
-    full: bool = eqx.field(static=True)
+    alpha: float = eqx.field(static=True)
 
     attn: CausalSelfAttention
     mlp: MLP
-    alpha_a: Scale
-    alpha_m: Scale
 
     def __init__(self, config: ModelConfig, *, key: PRNGKeyArray):
         attn_key, mlp_key = jr.split(key)
         self.attn = CausalSelfAttention(config, key=attn_key)
         self.mlp = MLP(config, key=mlp_key)
-        self.full = _is_full(config)
-        # Residual gates: 'full' uses per-channel eigen learning rates, 'crude' a
-        # single scalar step size per sub-module (ReZero/LayerScale-style).
-        n = config.n_embd if self.full else 1
-        scale = config.n_embd**-0.5
-        self.alpha_a = Scale(n, init=0.05, scale=scale)
-        self.alpha_m = Scale(n, init=0.05, scale=scale)
+        # Residual step size, fixed at 1/n_layer: each sub-module's output has
+        # norm ≈ 1 (unit-norm weights, unit-norm input), so an ungated sum would
+        # rotate the hidden state ~45° per layer; 1/n_layer keeps the whole
+        # stack's travel O(1). Learnable gates settled here anyway.
+        self.alpha = 1 / config.n_layer
 
     def __call__(self, h, enc: RotaryEncoding):
         # h is on the unit hypersphere; each sub-module consumes it directly.
-        if self.full:
-            # Normalized LERP toward the sub-module's output: h + α(ĥ* − h).
-            h_a = normalize(self.attn(h, enc))
-            h = normalize(h + self.alpha_a() * (h_a - h))
-            h_m = normalize(self.mlp(h))
-            h = normalize(h + self.alpha_m() * (h_m - h))
-        else:
-            # Gated additive retraction: small step toward the output, re-project.
-            h = normalize(h + self.alpha_a() * self.attn(h, enc))
-            h = normalize(h + self.alpha_m() * self.mlp(h))
+        # Gated additive retraction: small step toward the output, re-project.
+        h = normalize(h + self.alpha * self.attn(h, enc))
+        h = normalize(h + self.alpha * self.mlp(h))
         return h
 
 
@@ -175,11 +144,7 @@ class NGPT(LanguageModel):
     s_z: Scale
 
     def __init__(self, config: ModelConfig, *, key: PRNGKeyArray):
-        log.info("Initializing nGPT (%s) model with config: %s", config.ngpt_variant, config)
-        # nGPT is deliberately dropout-free: the unit-hypersphere constraint is the
-        # regularizer, and threading PRNG keys for dropout complicates the forward.
-        if config.dropout:
-            raise ValueError(f"nGPT does not support dropout; set dropout=0 (got {config.dropout})")
+        log.info("Initializing nGPT model with config: %s", config)
         self.block_size = config.block_size
         self.vocab_size = config.vocab_size
         self.transformer = Transformer(config, key=key)
@@ -194,7 +159,8 @@ class NGPT(LanguageModel):
         log.info("number of parameters: %.2fM", self.get_num_params() / 1e6)
 
     def __call__(self, idx: Int[Array, "B T"], *, key: PRNGKeyArray | None = None):
-        # Token embeddings, projected onto the unit hypersphere.
+        # Token embeddings, projected onto the unit hypersphere. (The key is
+        # unused: nGPT is dropout-free — the hypersphere constraint regularizes.)
         x: Float[Array, "B T C"] = normalize(self.transformer.wte[idx])
 
         # Gradient-checkpoint each block: the backward pass recomputes
@@ -239,16 +205,14 @@ class NGPT(LanguageModel):
         return eqx.tree_at(where, self, replacements(self))
 
     def scale_report(self) -> dict[str, list[float] | float]:
-        """Read back the learned scalar gates and temperatures, per layer.
+        """Read back the learned scalar temperatures, per layer.
 
-        With the crude (scalar) variant these are all single numbers, so we can
-        see exactly what training settled on — e.g. whether the residual gates α
-        land near 1/n_layer. (With 'full' these are per-channel means.)
+        These are all single numbers, so we can see exactly what training
+        settled on. (The residual step size is fixed at 1/n_layer, so it no
+        longer appears here.)
         """
         blocks = self.transformer.blocks
         return {
-            "alpha_a": [float(jnp.mean(b.alpha_a())) for b in blocks],
-            "alpha_m": [float(jnp.mean(b.alpha_m())) for b in blocks],
             "s_qk": [float(jnp.mean(b.attn.s_qk())) for b in blocks],
             "s_u": [float(jnp.mean(b.mlp.s_u())) for b in blocks],
             "s_z": float(jnp.mean(self.s_z())),

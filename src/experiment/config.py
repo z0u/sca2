@@ -1,5 +1,3 @@
-from typing import Literal
-
 from ftfy import ExplanationStep
 from pydantic import BaseModel, NonNegativeFloat, NonNegativeInt, PositiveFloat, PositiveInt
 
@@ -7,13 +5,6 @@ from utils.param_types import IntX8, IntX32, IntX64, ZeroToOne
 
 
 class ModelConfig(BaseModel, validate_assignment=True):
-    architecture: Literal["gpt", "ngpt"] = "gpt"
-    """Which model family to build: baseline 'gpt' or normalized 'ngpt'."""
-
-    ngpt_variant: Literal["crude", "full"] = "crude"
-    """nGPT flavour (ignored unless architecture == 'ngpt'): scalar gains +
-    additive retraction ('crude') or per-channel eigen-LRs + LERP ('full')."""
-
     vocab_size: IntX64
     """Vocabulary size"""
 
@@ -33,10 +24,7 @@ class ModelConfig(BaseModel, validate_assignment=True):
     """MLP dimensions, usually 4 * n_embd"""
 
     n_layer: PositiveInt
-    """Number of transformer blocks"""
-
-    dropout: ZeroToOne
-    """Dropout rate"""
+    """Number of transformer blocks; also sets the residual step size (1/n_layer)"""
 
 
 class DataConfig(BaseModel, validate_assignment=True):
@@ -125,4 +113,4 @@ class TrainingConfig(BaseModel, validate_assignment=True):
     scheduler: SchedulerConfig
 
     seed: NonNegativeInt = 0
-    """Seed for the PRNG keys used in model init, dropout, and batch sampling"""
+    """Seed for the PRNG keys used in model init and batch sampling"""
