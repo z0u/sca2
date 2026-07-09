@@ -32,6 +32,10 @@ The notebooks build on each other, so they read well in order.
 
 <!-- These URLs are rewritten to point to the published notebooks -->
 
+### SCA2 experiments
+
+- [Experiment 2.9.1 redux](./ex-2.9.1/report.py): the M1 headline result (delete *red* from a 5D autoencoder), ported from [ex-preppy](https://github.com/z0u/ex-preppy) to JAX as an end-to-end shakedown of the infrastructure below.
+
 ### Start here
 
 - [Getting started](./getting_started.py): map a function over a sweep from a notebook, and swap local ↔ Modal compute without changing the code.
