@@ -11,6 +11,13 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- Ex-2.9.2 shows fallback control fixes the *redistribution* half of ablation
+  variance, but the residual bad seeds are anchoring failures (non-red colors
+  leaking into axis 0 during training). Reducing that failure rate is a
+  training/selection question — stronger or longer anti-subspace scheduling,
+  or a leakage-aware acceptance test — worth revisiting before the transformer
+  experiments lean on per-seed anchoring quality.
+
 - `test_publish_serves_with_content_type_from_extension` fails: an anonymous
   GET of the *store bucket's* `published/` revision now returns 401 (the
   publish repo `z0u/sca2-pub` still serves 200 anonymously — verified
