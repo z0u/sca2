@@ -40,5 +40,11 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   1/n_layer), checking that converged loss stays flat across the grid — no depth
   penalty, no width-gated instability — so the backbone the color-mixing
   experiments build on actually scales.
+- [Experiment 2.9.2](./ex-2.9.2/report.py): fallback control for deleting
+  *red*. Ex-2.9.1's selectivity varies a lot with the seed; this tests the
+  SCA paper's "optimal ablation" suggestion against a training-time
+  alternative — pin the decoder's response at the reserved anti-anchor
+  direction to mid-gray, then redirect the concept there — and finds the
+  trained fallback collapses the variance to an analytic bound.
 
 More reports will appear here as the M2 experiments land.
