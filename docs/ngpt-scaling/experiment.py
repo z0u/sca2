@@ -1,28 +1,23 @@
-"""nGPT scaling: why the simplified residual fails wide-and-deep, and the fix.
+"""nGPT scaling: does the simplified residual hold across width and depth?
 
-We simplified our nGPT residual to a fixed *additive* step,
-``h ← normalize(h + α·sublayer(h))`` with ``α = 1/n_layer``, on the assumption
-that ``sublayer(h)`` has norm ≈ 1. It doesn't: the MLP up-projects its
-pre-activations by a √n_embd baseline, so ``‖MLP(h)‖ ∝ √n_embd``. The *effective*
-per-layer rotation is therefore ``α·‖sublayer‖``, which grows with width, so the
-fixed step never controlled the geometry it claimed to — the model destabilizes
-at width 128, depth 8–12. nGPT proper avoids this by stepping toward the
-*normalized* output, ``h ← normalize(h + α·(normalize(sublayer) − h))``, making
-``α`` a true interpolation fraction; we had dropped that normalization.
+Our nGPT strips the published recipe down to scalar gains (in place of the
+per-channel eigen learning rates) and a residual step ``α`` *fixed* at
+``1/n_layer`` rather than learned. The residual form we keep is the nGPT LERP
+toward the sub-module's *normalized* output,
+``h ← normalize(h + α·(normalize(sublayer) − h))``: normalizing the target makes
+``α`` a true interpolation fraction, so the per-layer rotation stays ~α and the
+stack's travel holds O(1) regardless of width.
 
-This experiment establishes the failure and the fix over two axes:
+The milestone leans on this transformer actually scaling — if we want to argue
+SCA carries to LLMs, the backbone has to hold up as it grows. So this experiment
+sweeps the model over a width × depth grid (widths {32, 64, 128} × depths
+{4, 8, 12}) and checks that converged loss stays flat: no depth penalty, no
+width-gated instability.
 
-- **Recipe** (at the failing width 128 × depths {4, 8, 12}):
-  ``base`` (the buggy additive step), ``lr3e3`` (same, lower peak LR),
-  ``sqrt`` (additive at ``α = 1/√n_layer``), ``lrn`` (additive, learnable α),
-  and ``norm`` (the normalized-LERP fix — now the model default).
-- **Width** (``base`` and ``norm`` × widths {32, 64, 128} × depths {4, 8, 12}):
-  shows the failure is width-gated (small widths train fine) and the fix is
-  width-flat.
+Everything else is held fixed (batch 16, peak LR 10⁻², 100 epochs, Pride and
+Prejudice).
 
-Everything else is held fixed (batch 16, 100 epochs, Pride and Prejudice).
-
-    bin/mini run docs/ngpt-scaling/experiment.py --app modal --max-containers 27
+    bin/mini run docs/ngpt-scaling/experiment.py --app modal --max-containers 9
     bin/mini status ngpt-scaling
 """
 
@@ -32,18 +27,7 @@ from mini import Ctx, Experiment, get_data_dir
 
 DEPTHS = [4, 8, 12]
 WIDTHS = [32, 64, 128]
-
-# (arm label, peak LR, model-config knobs, widths). The buggy additive residual
-# is now off by default, so the failing arms pin normalize_sublayer=False
-# explicitly; `norm` is the corrected (now-default) recipe. `base` and `norm`
-# sweep width to expose the width-gating; the rest run only at the failing 128.
-ARMS: list[tuple[str, float, dict, list[int]]] = [
-    ("base", 1e-2, dict(normalize_sublayer=False), WIDTHS),
-    ("lr3e3", 3e-3, dict(normalize_sublayer=False), [128]),
-    ("sqrt", 1e-2, dict(normalize_sublayer=False, residual_alpha_exp=0.5), [128]),
-    ("lrn", 1e-2, dict(normalize_sublayer=False, learnable_alpha=True), [128]),
-    ("norm", 1e-2, dict(normalize_sublayer=True), WIDTHS),
-]
+PEAK_LR = 1e-2
 
 CURVES_REF = "reports/ngpt-scaling/curves"
 
@@ -79,7 +63,7 @@ def prepare_data():
     return metadata
 
 
-def _make_config(n_embd: int, n_layer: int, lr: float, knobs: dict, batch_size: int = 16):
+def _make_config(n_embd: int, n_layer: int, batch_size: int = 16):
     """Build one training config (vocab/tokenizer filled in after prep)."""
     from experiment.config import (
         DataConfig,
@@ -99,11 +83,10 @@ def _make_config(n_embd: int, n_layer: int, lr: float, knobs: dict, batch_size: 
             n_head_dim=8,
             n_ff=4 * n_embd,
             n_layer=n_layer,
-            **knobs,
         ),
         tokenizer=TokenizerConfig(vocabulary=[]),
         data=DataConfig(batch_size=batch_size, oversample=2, train_split=0.8, padding_chance=0.1),
-        optimizer=OptimizerConfig(weight_decay=0, learning_rate=lr, betas=(0.9, 0.95)),
+        optimizer=OptimizerConfig(weight_decay=0, learning_rate=PEAK_LR, betas=(0.9, 0.95)),
         scheduler=SchedulerConfig(epochs=100, warmup_epochs=10, min_lr_factor=0.01),
     )
 
@@ -117,13 +100,12 @@ def build_sweep(meta) -> list[tuple]:
     from experiment.utils import align
 
     cells = []
-    for arm, lr, knobs, widths in ARMS:
-        for n_embd in widths:
-            for n_layer in DEPTHS:
-                config = _make_config(n_embd, n_layer, lr, knobs)
-                config.tokenizer = meta.tokenizer_config.model_copy()
-                config.model.vocab_size = align(meta.tokenizer_config.vocab_size, 64)
-                cells.append((config, f"{arm}|d{n_embd}|L{n_layer}"))
+    for n_embd in WIDTHS:
+        for n_layer in DEPTHS:
+            config = _make_config(n_embd, n_layer)
+            config.tokenizer = meta.tokenizer_config.model_copy()
+            config.model.vocab_size = align(meta.tokenizer_config.vocab_size, 64)
+            cells.append((config, f"d{n_embd}|L{n_layer}"))
     return cells
 
 

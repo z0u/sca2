@@ -24,13 +24,10 @@ readable cold without re-deriving code state.
   but key checkpoints by cell label before any experiment resumes from or
   evaluates them.
 
-- The deep-and-wide instability (d128|L8/L12 at peak LR 1e-2) is **resolved**:
-  ngpt-scaling traced it to the additive residual adding the *raw* sub-module
-  output (‖MLP‖ ∝ √n_embd), fixed by stepping toward the *normalized* output
-  (now the model default). Neither a lower LR nor a learnable scalar α rescues
-  the additive form — normalization is the operative change. Follow-up: confirm
-  the fixed scalar gate holds at a genuinely larger size (wider/deeper than
-  128×12, bigger GPU + batch) before leaning on it for M3.
+- ngpt-scaling shows the simplified nGPT (fixed scalar α = 1/n_layer) trains
+  flat across the width × depth grid we can afford. Follow-up: confirm the fixed
+  scalar gate holds at a genuinely larger size (wider/deeper than 128×12, bigger
+  GPU + batch) before leaning on it for M3.
 
 - Remove the remaining mi-ni template *experiments* (`docs/pipeline`,
   `docs/probe`, `docs/acts` — their report notebooks are already gone) once the

@@ -35,11 +35,10 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   (delete *red* from a 5D autoencoder), ported from
   [ex-preppy](https://github.com/z0u/ex-preppy) to JAX as an end-to-end
   shakedown of the M2 infrastructure.
-- [nGPT scaling](./ngpt-scaling/report.py): a character-level sweep of our
-  simplified nGPT that traced a wide-and-deep training failure to a bug in the
-  residual step (it added the *raw*, un-normalized sub-module output, so the
-  fixed step over-rotated the hidden state as width grew), and validated the
-  fix — the nGPT-faithful step toward the *normalized* output — across the
-  width × depth grid before the color-mixing experiments.
+- [nGPT scaling](./ngpt-scaling/report.py): a character-level width × depth
+  sweep of our simplified nGPT (scalar gains, a residual step fixed at
+  1/n_layer), checking that converged loss stays flat across the grid — no depth
+  penalty, no width-gated instability — so the backbone the color-mixing
+  experiments build on actually scales.
 
 More reports will appear here as the M2 experiments land.
