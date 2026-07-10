@@ -45,6 +45,11 @@ cheap, stateless call against durable state:
 2. **Later, poll:** `bin/mini status <exp>` (read-only).
 3. **On failure:** `bin/mini logs <exp> <key>`, fix, `bin/mini retry <exp>`.
 4. **When done:** `bin/mini results <exp>`, or open `report.py`.
+5. **To ship the report:** once it renders the results, `./go publish <report>`.
+   Completion auto-publishes the *results* to the store, but the *report* bundle
+   is a separate, deliberate step — the site build **silently skips** an
+   unpublished report (a warning in CI logs, not an error), so it won't appear
+   until you publish it.
 
 Re-running is cheap: completed steps are memo hits, so a `run` only advances the
 un-run pieces.

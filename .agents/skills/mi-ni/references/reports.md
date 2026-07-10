@@ -65,7 +65,11 @@ survive into a published report saying the opposite of what happened.
 **Publish, then build.** Two halves, split by trigger. `./go publish` (authenticated)
 exports each report to `.mini/exports/<key>/` and mirrors that bundle to the bucket at
 `exports/<key>/` — the heavy half (it runs the notebook, which needs the data + a write
-token). `scripts/build_site.py` (read-only; CI) then *pulls* each synced bundle, resolves
+token). This is a deliberate step, *not* something experiment completion does for you:
+an experiment publishes its **results** to the store, but the **report** bundle ships
+only when you run `./go publish` — and the build **silently skips** a report that was
+never published (a warning, not an error), so the site just quietly lacks it. Publish
+once the report renders the results. `scripts/build_site.py` (read-only; CI) then *pulls* each synced bundle, resolves
 author links against the repo, and inserts one `<base href="…/exports/<key>/">` in the
 `<head>` so the relative `_assets/…` URLs resolve at the bucket — no per-URL rewriting,
 no bucket writes. The same HTML opened locally (after `./go export`, which exports the
