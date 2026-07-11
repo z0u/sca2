@@ -58,4 +58,14 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   LR knob it replaces, and the fallback term already prevents every
   catastrophic failure on its own. A clean negative: the boring fix stands.
 
+### Iteration 1: D2.1, anchoring in a transformer
+
+- [Experiment 2.1.1](./ex-2.1.1/report.py): the color-mixing transformer,
+  un-anchored. Defines the synthetic color-mixing language (named colors and
+  hex codes denoting the same concepts, with exact integer mixing), sweeps the
+  nGPT backbone over width × depth × seed, and builds D2.1's measurement
+  apparatus: exact-match completion accuracy on seen, held-out, and unseen
+  operand pairs, plus per-layer residual-stream probes for operand and result
+  colors. The baseline the anchored runs (ex-2.1.2+) are compared against.
+
 More reports will appear here as the M2 experiments land.

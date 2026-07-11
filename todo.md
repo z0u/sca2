@@ -36,11 +36,12 @@ readable cold without re-deriving code state.
   routed to the publish repo (#38); either point the test at the publish
   tier or drop the anonymous-serving assertion for the bucket.
 
-- Sweep cells all `save_checkpoint` to the same shared `get_data_dir()`, so the
-  checkpoint file is last-writer-wins across a fan-out. Harmless today (the
-  ngpt-scaling cells return their metrics; nothing reads the checkpoints back),
-  but key checkpoints by cell label before any experiment resumes from or
-  evaluates them.
+- ngpt-scaling's sweep cells all `save_checkpoint` to the same shared
+  `get_data_dir()`, so the checkpoint file is last-writer-wins across a fan-out.
+  Harmless there (cells return their metrics; nothing reads the checkpoints
+  back). `train_model` now takes a `checkpoint_dir` for per-cell keying —
+  ex-2.1.1 uses it because its eval step reads checkpoints back — but
+  ngpt-scaling still writes to the shared default.
 
 - ngpt-scaling shows the simplified nGPT (fixed scalar α = 1/n_layer) trains
   flat across the width × depth grid we can afford. Follow-up: confirm the fixed

@@ -130,6 +130,10 @@ class LanguageModel(eqx.Module):
         """Re-project weights onto the unit hypersphere; identity unless overridden."""
         return self
 
+    def residual_stream(self, idx: Int[Array, "B T"]) -> Float[Array, "L1 B T C"]:
+        """The residual stream at every depth (embedding + after each block)."""
+        raise NotImplementedError
+
     def get_num_params(self) -> int:
         """Calculate the number of parameters in the model."""
         return sum(x.size for x in jax.tree.leaves(eqx.filter(self, eqx.is_array)))

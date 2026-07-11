@@ -21,6 +21,7 @@ def train_model(
     config: TrainingConfig,
     data_dir: Path,
     checkpoint_every: int | None = None,
+    checkpoint_dir: Path | None = None,
 ) -> tuple[LanguageModel, list[TrainingMetrics]]:
     """Train a model and return it with per-epoch metrics.
 
@@ -28,7 +29,11 @@ def train_model(
         config: Full training configuration.
         data_dir: Directory for loading data and saving checkpoints.
         checkpoint_every: Save a checkpoint every N epochs. None = only at the end.
+        checkpoint_dir: Where to write checkpoints; defaults to *data_dir*. Sweep
+            cells sharing a volume must each pass their own directory, or the
+            shared checkpoint is last-writer-wins.
     """
+    checkpoint_dir = checkpoint_dir or data_dir
     data, metadata = load_data(data_dir)
     assert metadata.tokenizer_config.vocab_size <= config.model.vocab_size, "Vocab size mismatch"
 
@@ -71,9 +76,9 @@ def train_model(
         all_metrics.append(metrics)
 
         if epoch > 0 and epoch % checkpoint_every == 0:
-            save_checkpoint(model, config, metrics, data_dir)
+            save_checkpoint(model, config, metrics, checkpoint_dir)
 
     if all_metrics:
-        save_checkpoint(model, config, all_metrics[-1], data_dir)
+        save_checkpoint(model, config, all_metrics[-1], checkpoint_dir)
 
     return model, all_metrics
