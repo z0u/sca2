@@ -524,7 +524,7 @@ def _(stat):
       permanent edit (row zeroed, so the information is gone), and it scores
       essentially as well — but its bias must dominate the target's pre-norm
       residual, and on one seed it didn't (red passed through nearly
-      untouched while reflection still moved it). α_rd wants calibration
+      untouched while reflection still moved it). γ wants calibration
       against the model's pre-norm scale rather than a fixed value.
     - The response bound is also a response *ceiling*: trained fallback
       trades the large-but-arbitrary damage of untrained reflection (red
