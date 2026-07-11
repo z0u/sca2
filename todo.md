@@ -56,6 +56,13 @@ readable cold without re-deriving code state.
 
 ## Backlog, grouped by what a single dev session should bundle
 
+**M2 science.**
+
+- [sca2#10](https://github.com/z0u/sca2/issues/10) — D2.1 kickoff: carry-over
+  lessons and hypothesis queue from ex-2.9.3/2.9.4 (schedule ordering, the
+  fallback analog, β calibration, superposition watch-outs). Read before
+  designing the first transformer anchoring experiment.
+
 **Quick wins.** All shipped: #39 and #36 (PR #51), #19 (queued ≠ running,
 PR #54), #47 (per-experiment backend memory for `--app`).
 
