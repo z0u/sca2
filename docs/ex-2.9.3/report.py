@@ -408,8 +408,8 @@ def _(sweep_cell):
     _rc = lambda rs: np.array([r["val_recon"] for r in rs])  # noqa: E731
     _hold_bad = sum(_nbad(sweep_cell(p, False)) for p in PEAK_LRS)
     _hold_rc = np.median(np.concatenate([_rc(sweep_cell(p, False)) for p in PEAK_LRS]))
-    _beta = [r for r in _hot if r["interventions"]["redirect"]["red_pure"] < 0.05 and classify(r) == "clean"]
-    _hot_ok = np.array([r["interventions"]["redirect"]["score"] for r in _hot if r not in _beta])
+    _gamma = [r for r in _hot if r["interventions"]["redirect"]["red_pure"] < 0.05 and classify(r) == "clean"]
+    _hot_ok = np.array([r["interventions"]["redirect"]["score"] for r in _hot if r not in _gamma])
     mo.md(
         f"Three results. First, **peak LR 0.05 with the anneal is the safe cell**: "
         f"{_nbad(_cool)}/32 unhealthy runs (0.10: {_nbad(_hot)}; 0.07: {_nbad(sweep_cell(0.07, True))}), "
@@ -431,11 +431,11 @@ def _(sweep_cell):
         f"the bug; annealing *while the optimizer is still hot* is.\n\n"
         f"Third, a stowaway: the worst hot-cell score ({_rd(_hot).min():.2f}, seed "
         f"{min(_hot, key=lambda r: r['interventions']['redirect']['score'])['seed']}) is not an "
-        f"anchoring failure at all — the run anchored cleanly, but the redirect's fixed β = 1 bias "
+        f"anchoring failure at all — the run anchored cleanly, but the redirect's fixed γ = 1 bias "
         f"failed to dominate that seed's pre-norm scale, so 'deleted' red passed through almost "
         f"untouched (damage to pure red {min(r['interventions']['redirect']['red_pure'] for r in _hot):.3f}). "
-        f"That is ex-2.9.2's β-calibration caveat recurring in 1 run of 256; excluding it, the hot "
-        f"cell's floor is {_hot_ok.min():.2f}. β should be calibrated per model, not fixed."
+        f"That is ex-2.9.2's γ-calibration caveat recurring in 1 run of 256; excluding it, the hot "
+        f"cell's floor is {_hot_ok.min():.2f}. γ should be calibrated per model, not fixed."
     )
     return
 
@@ -491,8 +491,8 @@ def _(arm, sweep_cell):
     - **Keep the fallback term** — for its designed purpose (a predictable
       intervention response), and for its apparent side effect of preventing
       catastrophic training failures.
-    - **Calibrate the redirect's β** against the model's pre-norm activation
-      scale; a fixed β = 1 silently no-ops on ~1 run in 250.
+    - **Calibrate the redirect's γ** against the model's pre-norm activation
+      scale; a fixed γ = 1 silently no-ops on ~1 run in 250.
     - Cheap endpoint screening (leak < 0.1, anchor loss, recon) remains
       worthwhile: even the safe cell only bounds what we measured, and the
       failure mechanism is chaotic.

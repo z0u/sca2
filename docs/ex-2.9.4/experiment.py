@@ -67,7 +67,7 @@ WEIGHT_PROPS = ("separate", "anchor", "anti-anchor", "anti-subspace")
 
 GRAY = 0.5  # fallback target: dec(−e₀) → mid-gray (see ex-2.9.2)
 FALLBACK_WEIGHT = 0.05
-BETA = 1.0  # redirect strength: encoder bias after deletion is −β
+GAMMA = 1.0  # redirect strength (γ): encoder bias after deletion is −γ
 TRAJ_STRIDE = 5
 
 # Controller constants (order: anchor, anti-anchor)
@@ -197,7 +197,7 @@ def edit_axis0(params: Params, *, bias: float) -> Params:
 def score_interventions(params: Params) -> dict:
     """Score zero ablation and the redirect (ex-2.9.2's recommended edit) on the full grid."""
     out = {}
-    for name, bias in (("zero", 0.0), ("redirect", -BETA)):
+    for name, bias in (("zero", 0.0), ("redirect", -GAMMA)):
         edited = edit_axis0(params, bias=bias)
         mse = np.asarray(eval_model(edited, jnp.asarray(GRID_RGB))[0])
         out[name] = {
@@ -294,7 +294,7 @@ def train_one(seed: int, peak_lr: float, ctrl: bool, tau_scale: float, eta_scale
     interventions = score_interventions(params)
 
     buf = io.BytesIO()
-    mse_rd, z_rd = eval_model(edit_axis0(params, bias=-BETA), x_train)
+    mse_rd, z_rd = eval_model(edit_axis0(params, bias=-GAMMA), x_train)
     np.savez_compressed(
         buf,
         rgb=GRID_RGB,

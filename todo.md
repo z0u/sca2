@@ -11,11 +11,11 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- Calibrate the redirect's β against the model's pre-norm activation scale
-  instead of the fixed β = 1. Ex-2.9.3 found the fixed value silently no-ops
+- Calibrate the redirect's γ against the model's pre-norm activation scale
+  instead of the fixed γ = 1. Ex-2.9.3 found the fixed value silently no-ops
   on ~1 run in 250 (the bias fails to dominate that seed's pre-norm residual,
   so "deleted" red passes through nearly untouched); ex-2.9.2 saw the same
-  once. Cheap fix: set β to a multiple of the ablated row's typical pre-norm
+  once. Cheap fix: set γ to a multiple of the ablated row's typical pre-norm
   contribution, measured on the train set after training.
 
 - `mini.temporal` can't drive feedback control. `DynamicProp.set()` retargets
@@ -60,7 +60,7 @@ readable cold without re-deriving code state.
 
 - [sca2#10](https://github.com/z0u/sca2/issues/10) — D2.1 kickoff: carry-over
   lessons and hypothesis queue from ex-2.9.3/2.9.4 (schedule ordering, the
-  fallback analog, β calibration, superposition watch-outs). Read before
+  fallback analog, γ calibration, superposition watch-outs). Read before
   designing the first transformer anchoring experiment.
 
 **Quick wins.** All shipped: #39 and #36 (PR #51), #19 (queued ≠ running,
