@@ -11,12 +11,23 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- Ex-2.9.2 shows fallback control fixes the *redistribution* half of ablation
-  variance, but the residual bad seeds are anchoring failures (non-red colors
-  leaking into axis 0 during training). Reducing that failure rate is a
-  training/selection question — stronger or longer anti-subspace scheduling,
-  or a leakage-aware acceptance test — worth revisiting before the transformer
-  experiments lean on per-seed anchoring quality.
+- Calibrate the redirect's β against the model's pre-norm activation scale
+  instead of the fixed β = 1. Ex-2.9.3 found the fixed value silently no-ops
+  on ~1 run in 250 (the bias fails to dominate that seed's pre-norm residual,
+  so "deleted" red passes through nearly untouched); ex-2.9.2 saw the same
+  once. Cheap fix: set β to a multiple of the ablated row's typical pre-norm
+  contribution, measured on the train set after training.
+
+- `mini.temporal` can't drive feedback control. `DynamicProp.set()` retargets
+  mid-flight from the current (value, velocity) state — exactly what a
+  controller needs — but experiments consume schedules via `realize_timeline`,
+  which bakes the dopesheet into a static per-step array before training, and
+  the dopesheet's own keyframes would fight any runtime `set()` calls on the
+  same prop. Ex-2.9.4's controller therefore lives inside the training loop
+  (duals in the `lax.scan` carry), with the dopesheet still driving the
+  non-controlled props. If feedback-driven weights become standard, consider a
+  Timeline mode where a prop is declared "controlled": keyframes set its
+  *bounds/defaults* and a callback supplies the live value.
 
 - `test_publish_serves_with_content_type_from_extension` fails: an anonymous
   GET of the *store bucket's* `published/` revision now returns 401 (the

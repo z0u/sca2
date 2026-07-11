@@ -46,5 +46,16 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   alternative — pin the decoder's response at the reserved anti-anchor
   direction to mid-gray, then redirect the concept there — and finds the
   trained fallback collapses the variance to an analytic bound.
+- [Experiment 2.9.3](./ex-2.9.3/report.py): why anchoring fails. Per-step
+  trajectories show every failing seed anchors successfully and then breaks
+  during the high-LR plateau; an init × data-stream factorial shows the
+  failures follow the stream, not the seed; and a schedule sweep finds the
+  fix — halve the LR peak, keep the anneal.
+- [Experiment 2.9.4](./ex-2.9.4/report.py): closed-loop regularizer weights.
+  Replaces the timed anneal with feedback (dual ascent with hysteresis on
+  the anchor terms). The mechanism works — no rescue is missed — but it
+  causes as many catastrophes as it prevents, its knobs are sharper than the
+  LR knob it replaces, and the fallback term already prevents every
+  catastrophic failure on its own. A clean negative: the boring fix stands.
 
 More reports will appear here as the M2 experiments land.
