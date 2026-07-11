@@ -25,7 +25,7 @@ model is then scored under five weight-level interventions on latent axis 0:
   the adaptation you'd want for removal (spare bystanders; ignore the target).
 - reflect: negate row 0 + bias, so z₀ → −z₀ pre-norm; red lands on −e₀. Not a
   true deletion (a sign flip restores it) but a clean redirect.
-- redirect: zero row 0, set the bias to −β (β = 1) — a true deletion (the
+- redirect: zero row 0, set the bias to −α_rd (α_rd = 1) — a true deletion (the
   redness computation is gone) plus a constant redirect toward −e₀, felt in
   proportion to how much of an input's pre-norm activation the deletion removed.
 
@@ -62,7 +62,7 @@ WEIGHT_PROPS = ("separate", "anchor", "anti-anchor", "anti-subspace")
 
 GRAY = 0.5  # fallback target: dec(−e₀) → mid-gray, the "know-nothing" color
 FALLBACK_WEIGHT = 0.05  # w_fb for the fallback variant; constant over training
-BETA = 1.0  # redirect strength: encoder bias after deletion is −β
+ALPHA_RD = 1.0  # redirect strength (α_rd): encoder bias after deletion is −α_rd
 OA_GRID = np.linspace(-3.0, 3.0, 121)  # line-search grid for the optimal constant
 INTERVENTIONS = ("zero", "oa", "oa-nontarget", "reflect", "redirect")
 
@@ -175,7 +175,7 @@ def edit_axis0(params: Params, *, bias: float | None = None, negate: bool = Fals
 
     negate=True reflects (z₀ → −z₀ pre-norm). Otherwise row 0 is zeroed — the redness
     computation is deleted — and the bias becomes *bias* (0 = ex-2.9.1's zero ablation,
-    a constant c = optimal ablation, −β = redirect to the fallback direction).
+    a constant c = optimal ablation, −α_rd = redirect to the fallback direction).
     """
     params = [dict(lyr) for lyr in params]
     if negate:
@@ -245,7 +245,7 @@ def train_one(seed: int, w_fb: float, dopesheet_csv: str) -> dict:
         "oa": edit_axis0(params, bias=c_oa),
         "oa-nontarget": edit_axis0(params, bias=c_oa_nt),
         "reflect": edit_axis0(params, negate=True),
-        "redirect": edit_axis0(params, bias=-BETA),
+        "redirect": edit_axis0(params, bias=-ALPHA_RD),
     }
     per_intervention, dumps = {}, {}
     for name, edited in edits.items():
