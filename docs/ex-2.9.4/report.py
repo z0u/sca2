@@ -139,7 +139,7 @@ def _(cond, n_cat, rd):
         f"clean negative with an instructive mechanism. In the fallback-free config the feedback "
         f"loop does its intended job on the seeds the static schedule loses — its {n_cat(_sn)} catastrophic seeds "
         f"({', '.join(map(str, _s_bad))}) train cleanly under control (redirect scores "
-        f"{', '.join(f'{rd([next(r for r in _cn if r['seed'] == s)])[0]:.2f}' for s in _rescued)}) — "
+        f"{', '.join(f'{rd([next(r for r in _cn if r["seed"] == s)])[0]:.2f}' for s in _rescued)}) — "
         f"but the controller *causes* {n_cat(_cn)} new catastrophes on other seeds "
         f"({', '.join(map(str, _c_bad))}), so the failure rate does not improve. With the fallback "
         f"term on (the adopted recipe), no condition has any catastrophic failures and there is "
@@ -324,8 +324,10 @@ def _(cond, n_cat, rd):
                 fontsize=8,
                 alpha=0.8,
             )
-        handles = [plt.Line2D([], [], marker="o", ls="", color=c, label=v) for v, c in
-                   (("static (timed anneal)", gray), ("controller", accent))]
+        handles = [
+            plt.Line2D([], [], marker="o", ls="", color=c, label=v)
+            for v, c in (("static (timed anneal)", gray), ("controller", accent))
+        ]
         axes[0].legend(handles=handles, loc="lower left")
         axes[0].set_title("Fallback-trained cells: feedback adds no headroom, and its knobs cut")
         fig.tight_layout()
@@ -364,9 +366,19 @@ def _(cond, n_cat, rd):
 
 @app.cell(hide_code=True)
 def _(cond, n_cat):
-    _tot_fb = sum(len(cond(c, lr)) for c, lr in
-                  [("static", 0.10), ("static", 0.05), ("ctrl", 0.10), ("ctrl", 0.05),
-                   ("ctrl-tau0.75", 0.10), ("ctrl-tau1.5", 0.10), ("ctrl-eta0.5", 0.10), ("ctrl-eta2", 0.10)])
+    _tot_fb = sum(
+        len(cond(c, lr))
+        for c, lr in [
+            ("static", 0.10),
+            ("static", 0.05),
+            ("ctrl", 0.10),
+            ("ctrl", 0.05),
+            ("ctrl-tau0.75", 0.10),
+            ("ctrl-tau1.5", 0.10),
+            ("ctrl-eta0.5", 0.10),
+            ("ctrl-eta2", 0.10),
+        ]
+    )
     _cat_sens = n_cat(cond("ctrl-tau0.75")) + n_cat(cond("ctrl-eta2")) + n_cat(cond("ctrl-eta0.5"))
     mo.md(f"""
     ## Takeaways

@@ -238,7 +238,9 @@ def _(arm, traj):
 
     _anchored = [_timing(r)[0] for r in _bad]
     _drops = [t for t in (_timing(r)[1] for r in _bad) if t is not None]
-    _w_anchor = realize_timeline(Timeline(Dopesheet.from_csv(io.StringIO(make_dopesheet(0.10, True)))))["anchor"].to_numpy()
+    _w_anchor = realize_timeline(Timeline(Dopesheet.from_csv(io.StringIO(make_dopesheet(0.10, True)))))[
+        "anchor"
+    ].to_numpy()
     mo.md(
         f"All {len(_bad)} failing runs reached z₀(red) > 0.9 — a clean anchor — between steps "
         f"{min(_anchored)} and {max(_anchored)}, right as the LR approaches its peak. The "
@@ -384,8 +386,10 @@ def _(sweep_cell):
         axes[1].text(7.45, 0.1, "degraded", va="bottom", ha="right", fontsize=8, alpha=0.8)
         axes[1].set(ylabel="final leak", yscale="log", xlabel="peak LR × anneal")
         axes[1].set_xticks(range(len(_cells)), [f"{p}\n{'anneal' if a else 'hold'}" for p, a in _cells])
-        handles = [plt.Line2D([], [], marker="o", ls="", color=c, label=lbl) for lbl, c in
-                   (("anneal on", colors[True]), ("anneal off (hold)", colors[False]))]
+        handles = [
+            plt.Line2D([], [], marker="o", ls="", color=c, label=lbl)
+            for lbl, c in (("anneal on", colors[True]), ("anneal off (hold)", colors[False]))
+        ]
         axes[0].legend(handles=handles, loc="lower left")
         axes[0].set_title("Redirect score and leakage across the schedule sweep (32 seeds per cell)")
         fig.tight_layout()
