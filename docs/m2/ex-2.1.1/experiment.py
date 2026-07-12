@@ -32,7 +32,7 @@ un-anchored geometry looks like — where color is decodable, and whether the
 probe directions agree across seeds (they shouldn't; that variability is the
 problem SCA exists to remove).
 
-    bin/mini run docs/ex-2.1.1/experiment.py --app modal --max-containers 9
+    bin/mini run docs/m2/ex-2.1.1/experiment.py --app modal --max-containers 9
     bin/mini status ex-2.1.1
 """
 

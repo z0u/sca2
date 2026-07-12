@@ -60,7 +60,7 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
 
 ### Iteration 1: D2.1, anchoring in a transformer
 
-- [Experiment 2.1.1](./ex-2.1.1/report.py): the color-mixing transformer,
+- [Experiment 2.1.1](./m2/ex-2.1.1/report.py): the color-mixing transformer,
   un-anchored. Defines the synthetic color-mixing language (named colors and
   hex codes denoting the same concepts, with exact integer mixing), sweeps the
   nGPT backbone over width × depth × seed, and builds D2.1's measurement

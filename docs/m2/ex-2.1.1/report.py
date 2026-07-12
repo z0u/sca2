@@ -104,7 +104,7 @@ def _(loaded):
         loaded is None,
         mo.md(
             "No results yet — run the experiment (it publishes metrics and probe weights on completion):\n\n"
-            "```bash\nbin/mini run docs/ex-2.1.1/experiment.py --app modal --max-containers 9\n```"
+            "```bash\nbin/mini run docs/m2/ex-2.1.1/experiment.py --app modal --max-containers 9\n```"
         ),
     )
     metrics, weights = loaded
