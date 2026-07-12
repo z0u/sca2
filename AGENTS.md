@@ -19,8 +19,6 @@ Don't hesitate to disagree or point out potential issues. The human values techn
 
 Be proactive. Fix little things as you go, and create [todos](/todo.md) for larger things.
 
-Pull requests: If the principal (user) is a _collaborator_ on the repository, omit the **Checklist** and **Copyright Dedication** sections from the PR template.
-
 ## Code style & conventions
 
 - Even in Python, prefer JavaScript-style method chaining (newline before the dot, use outer parentheses as necessary).

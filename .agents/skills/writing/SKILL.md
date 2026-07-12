@@ -48,3 +48,20 @@ The text.
 ```
 
 When in doubt about how to phrase something, err on the side of clarity and simplicity. Avoid jargon and complex sentence structures unless they are necessary to convey the technical content accurately.
+
+## Markdown
+
+Use sentence case for headings and descriptive lists.
+
+```patch
+- # Experiment Design
+-
+-   - **Foo Bar:** baz
++ # Experiment design
++
++   - Foo bar: baz
+```
+
+Prefer paragraphs for nuanced or complex explanations; use lists for
+summarizing steps, or when clarity would genuinely benefit from structure —
+and use them sparingly.

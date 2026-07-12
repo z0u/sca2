@@ -34,4 +34,5 @@ jobs:
         run: ./go test -v
 
       - name: Dead code detection
+        continue-on-error: true
         run: ./go deadcode

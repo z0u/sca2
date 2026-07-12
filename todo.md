@@ -35,11 +35,6 @@ readable cold without re-deriving code state.
   (mirroring ex-2.9.2's exemplar plot) or drop the two `set_ref` calls and the
   `worst`/`rescue` computation.
 
-- Dormant infra with no callers, kept on the vulture allowlist for now:
-  `src/utils/lr_finder/`, `src/subline/` (Subline, EntropySeries), and
-  `mini.temporal.vis.group_properties_by_scale`. Delete whatever the first M2
-  transformer experiments don't pick up.
-
 - Sweep cells all `save_checkpoint` to the same shared `get_data_dir()`, so the
   checkpoint file is last-writer-wins across a fan-out. Harmless today (the
   ngpt-scaling cells return their metrics; nothing reads the checkpoints back),
