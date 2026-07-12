@@ -37,7 +37,7 @@ def download_pride_and_prejudice():
     import ftfy
     import pandas as pd
 
-    from experiment.config import DatasetMetadata
+    from sca.config import DatasetMetadata
 
     url = "https://huggingface.co/api/datasets/larenwell/book-gutenberg-train/parquet/default/train/0.parquet"
     df = pd.read_parquet(url, columns=["text"])
@@ -54,8 +54,8 @@ def download_pride_and_prejudice():
 
 def prepare_data():
     """Download, tokenize, and save training data to the volume; return the corpus metadata."""
-    from experiment.compute.data_pipelines import save_data
-    from experiment.data.preparation import tokenize_data
+    from sca.compute.data_pipelines import save_data
+    from sca.data.preparation import tokenize_data
 
     data_dir = get_data_dir()
     data, metadata = tokenize_data([download_pride_and_prejudice()])
@@ -65,7 +65,7 @@ def prepare_data():
 
 def _make_config(n_embd: int, n_layer: int, batch_size: int = 16):
     """Build one training config (vocab/tokenizer filled in after prep)."""
-    from experiment.config import (
+    from sca.config import (
         DataConfig,
         ModelConfig,
         OptimizerConfig,
@@ -97,7 +97,7 @@ def build_sweep(meta) -> list[tuple]:
     Runs every wake (cheap + deterministic), so the memo keys are stable: each
     cell re-runs only if its own config changes.
     """
-    from experiment.utils import align
+    from sca.utils import align
 
     cells = []
     for n_embd in WIDTHS:
@@ -111,7 +111,7 @@ def build_sweep(meta) -> list[tuple]:
 
 def train_one(config, label: str) -> tuple:
     """Train one sweep cell; return its label and per-epoch val losses."""
-    from experiment.compute.training import train_model
+    from sca.compute.training import train_model
 
     _, metrics = train_model(config, get_data_dir())
     return label, [m.val_loss for m in metrics]

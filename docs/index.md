@@ -31,7 +31,7 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
 
 ### Iteration 0: prep
 
-- [Experiment 2.9.1 redux](./ex-2.9.1/report.py): the M1 headline result
+- [Experiment 2.9.1 redux](./m1/ex-2.9.1/report.py): the M1 headline result
   (delete *red* from a 5D autoencoder), ported from
   [ex-preppy](https://github.com/z0u/ex-preppy) to JAX as an end-to-end
   shakedown of the M2 infrastructure.
@@ -40,18 +40,18 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   1/n_layer), checking that converged loss stays flat across the grid — no depth
   penalty, no width-gated instability — so the backbone the color-mixing
   experiments build on actually scales.
-- [Experiment 2.9.2](./ex-2.9.2/report.py): fallback control for deleting
+- [Experiment 2.9.2](./m1/ex-2.9.2/report.py): fallback control for deleting
   *red*. Ex-2.9.1's selectivity varies a lot with the seed; this tests the
   SCA paper's "optimal ablation" suggestion against a training-time
   alternative — pin the decoder's response at the reserved anti-anchor
   direction to mid-gray, then redirect the concept there — and finds the
   trained fallback collapses the variance to an analytic bound.
-- [Experiment 2.9.3](./ex-2.9.3/report.py): why anchoring fails. Per-step
+- [Experiment 2.9.3](./m1/ex-2.9.3/report.py): why anchoring fails. Per-step
   trajectories show every failing seed anchors successfully and then breaks
   during the high-LR plateau; an init × data-stream factorial shows the
   failures follow the stream, not the seed; and a schedule sweep finds the
   fix — halve the LR peak, keep the anneal.
-- [Experiment 2.9.4](./ex-2.9.4/report.py): closed-loop regularizer weights.
+- [Experiment 2.9.4](./m1/ex-2.9.4/report.py): closed-loop regularizer weights.
   Replaces the timed anneal with feedback (dual ascent with hysteresis on
   the anchor terms). The mechanism works — no rescue is missed — but it
   causes as many catastrophes as it prevents, its knobs are sharper than the

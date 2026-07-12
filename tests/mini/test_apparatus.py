@@ -235,7 +235,7 @@ def test_modal_auth_error_has_actionable_message(monkeypatch):
         del args, kwargs
         raise modal.exception.AuthError("not authenticated")
         # pyrefly: ignore [unreachable]
-        yield  # pragma: no cover
+        yield  # pragma: no cover  # noqa: unreachable — the yield makes this an async generator
 
     monkeypatch.setattr(app, "_amap", broken_amap)
 

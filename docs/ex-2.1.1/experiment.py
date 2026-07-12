@@ -6,7 +6,7 @@ baseline. This experiment builds that baseline — the task, the data pipeline,
 and the measurement apparatus the anchored runs (ex-2.1.2+) will be compared
 against.
 
-The task is the color-mixing language (`experiment.data.colors`): a character-
+The task is the color-mixing language (`sca.data.colors`): a character-
 level LM over lines like ``red + blue = purple`` and ``#e26 + #48a = #958``,
 where mixing is the channel-wise round-half-up mean on a 16-level RGB grid —
 exact integer ground truth, no perceptual judgement. Concepts are multi-token
@@ -60,10 +60,10 @@ def prepare_data() -> dict:
     """Generate the corpus, tokenize it onto the volume, and stash the eval/probe sets."""
     import numpy as np
 
-    from experiment.compute.data_pipelines import save_data
-    from experiment.config import CorpusMetadata, DatasetMetadata, TokenizerConfig
-    from experiment.data import colors
-    from experiment.data.tokenizer import CharTokenizer
+    from sca.compute.data_pipelines import save_data
+    from sca.config import CorpusMetadata, DatasetMetadata, TokenizerConfig
+    from sca.data import colors
+    from sca.data.tokenizer import CharTokenizer
     from mini.store import put
 
     train_pairs, holdout = colors.split_named_pairs(CORPUS_SEED, HOLDOUT_FRAC)
@@ -100,7 +100,7 @@ def prepare_data() -> dict:
 
 def _make_config(n_embd: int, n_layer: int, seed: int):
     """One cell's training config; LR and schedule fixed across the sweep."""
-    from experiment.config import (
+    from sca.config import (
         DataConfig,
         ModelConfig,
         OptimizerConfig,
@@ -131,7 +131,7 @@ def build_sweep(meta) -> list[tuple]:
     """Derive (config, label) cells from prep's tokenizer; cheap + deterministic,
     so each cell's memo key is stable and re-runs only if its own config changes.
     """
-    from experiment.utils import align
+    from sca.utils import align
 
     cells = []
     for n_embd in WIDTHS:
@@ -146,7 +146,7 @@ def build_sweep(meta) -> list[tuple]:
 
 def train_one(config, label: str) -> dict:
     """Train one cell; checkpoint into the durable store for the eval step."""
-    from experiment.compute.training import train_model
+    from sca.compute.training import train_model
     from mini.store import put
 
     data_dir = get_data_dir()
@@ -165,10 +165,10 @@ def eval_one(trained: dict, evals, probes) -> dict:
 
     import numpy as np
 
-    from experiment.compute.evaluation import completion_accuracy, probe_residual_stream
-    from experiment.compute.model import load_checkpoint
-    from experiment.data.colors import load_example_sets
-    from experiment.data.tokenizer import CharTokenizer
+    from sca.compute.evaluation import completion_accuracy, probe_residual_stream
+    from sca.compute.model import load_checkpoint
+    from sca.data.colors import load_example_sets
+    from sca.data.tokenizer import CharTokenizer
     from mini.store import get, put
 
     label = trained["label"]
