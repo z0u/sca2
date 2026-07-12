@@ -40,7 +40,7 @@ exist, what does it cost where they don't, and is it knife-edge in its own
 hyperparameters? The testbed (model, grids, loss terms, interventions) is
 `sca.colorcube`.
 
-    bin/mini run docs/ex-2.9.4/experiment.py --app modal --max-containers 16
+    bin/mini run docs/m1/ex-2.9.4/experiment.py --app modal --max-containers 16
 """
 
 from __future__ import annotations

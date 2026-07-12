@@ -26,7 +26,7 @@ second return value, the schedule is an array indexed by step, and a "batch" is
 64 random rows. The testbed itself — grids, model, loss terms, ablation — lives
 in `sca.colorcube`, shared with the later ex-2.9.x experiments.
 
-    bin/mini run docs/ex-2.9.1/experiment.py --app modal --max-containers 8
+    bin/mini run docs/m1/ex-2.9.1/experiment.py --app modal --max-containers 8
 
 The `train` role is CPU-only: the model has ~840 parameters, so a GPU would be
 all overhead.
