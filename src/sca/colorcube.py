@@ -20,6 +20,8 @@ import json
 import tempfile
 from pathlib import Path
 
+from typing import TYPE_CHECKING
+
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -27,6 +29,9 @@ import numpy as np
 from matplotlib import colors as mcolors
 
 from mini.store import project_store
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
 
 K = 5  # bottleneck dim; red is anchored to axis 0
 DIMS = (3, 16, 16, K, 16, 16, 3)  # bottleneck sits after layer 2 (~840 params)
@@ -239,3 +244,23 @@ def classify(r: dict) -> str:
     if r["leak"] > 0.1:
         return "degraded"
     return "clean"
+
+
+def plot_latent_disc(ax: Axes, z: np.ndarray, colors: np.ndarray, *, s: float = 20) -> None:
+    """One latent-space panel, per the repo's figure conventions (see the figure-style skill).
+
+    The unit-hypersphere bound as a background disc, data-colored points at
+    (z₁, z₀) — the anchored axis points up — fixed domain limits, no axes.
+    Titles and annotations stay with the caller.
+    """
+    from matplotlib.patches import Circle
+
+    from mini.vis import light_dark
+
+    ax.add_patch(Circle((0, 0), 1, facecolor=light_dark("#eee", "#111"), zorder=-10))
+    ax.scatter(z[:, 1], z[:, 0], c=colors, s=s, edgecolors=light_dark("#00000033", "#ffffff55"), lw=0.5)
+    ax.add_patch(Circle((0, 0), 1, facecolor="none", edgecolor="#0005", lw=1, zorder=10))
+    ax.set_aspect("equal")
+    ax.set_xlim(-1.1, 1.1)
+    ax.set_ylim(-1.1, 1.1)
+    ax.set_axis_off()

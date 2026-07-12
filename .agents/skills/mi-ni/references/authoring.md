@@ -32,8 +32,24 @@ locally or on Modal without edits.
 
 Split definition from report. The definition is imported by the CLI and the
 remote workers; the report reads persisted results and plots, so it opens
-standalone without re-running the work. See `docs/pipeline/` for a worked,
-runnable example.
+standalone without re-running the work. See `docs/ex-2.9.1/` for a worked,
+runnable example with both halves (`docs/pipeline/` has only the definition).
+
+Two conventions that keep the pairing healthy:
+
+- **Never name a `src/` package after a common docs filename.** Marimo runs a
+  report with its own directory first on `sys.path`, so the sibling
+  `experiment.py` shadows any package named `experiment` — that collision is
+  why the science package is `sca`. Reports import shared code as
+  `from sca... import ...`; if such an import dies with "'X' is not a
+  package", you've recreated the collision.
+- **Extract shared testbed code instead of copying it.** When a new experiment
+  starts by copying a sibling's model/eval helpers, lift them into a shared
+  `src/sca/` module (as `sca.colorcube` does for the color-autoencoder
+  testbed) and import from both the experiment and its report. Memoization
+  evidence tracks project source transitively, so the split doesn't weaken
+  cache correctness — though edits to the shared module re-run dependent
+  tasks on their next invocation, as any code edit does.
 
 CI globs `docs/*/experiment.py` (`tests/mini/test_experiments_e2e.py`): every
 definition is at least *loaded* (import + construct), and the light demos run to

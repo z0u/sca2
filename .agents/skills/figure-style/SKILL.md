@@ -23,7 +23,9 @@ space is the message, so draw the domain rather than the chart furniture:
   bound instead: a background disc behind the data
   (`light_dark('#eee', '#111')`; `#8888` if a theme-neutral value is needed),
   plus a semi-transparent stroke drawn *over* the data (`#0005`, lw 1) so the
-  bound stays legible where points cover it.
+  bound stays legible where points cover it. For 2D latent panels this whole
+  recipe is packaged as `sca.colorcube.plot_latent_disc(ax, z, colors)` —
+  use it instead of re-inlining the disc/scatter/rim block.
 - Equal aspect. For 3D projections: orthographic, viewed top-down, so the
   panel reads as a 2D slice — `ax.view_init(elev=90, azim=-90)`,
   `ax.set_proj_type('ortho')`, and set the view margin to 0.

@@ -126,4 +126,3 @@ class LanguageModel(eqx.Module):
     def get_num_params(self) -> int:
         """Calculate the number of parameters in the model."""
         return sum(x.size for x in jax.tree.leaves(eqx.filter(self, eqx.is_array)))
-

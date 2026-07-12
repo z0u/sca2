@@ -182,9 +182,11 @@ agents, so its escalation flows back to **you**: on an escalation report, spawn
 the **`experiment-doctor` subagent** (Sonnet); bring a genuine redesign to the
 human rather than reshaping the experiment yourself.
 
-For a run too long to watch in one session, set up a **scheduled routine** (the
-`/schedule` skill) at a cadence the user picks — don't assume one. Each wake, the
-routine spawns the monitor (and, on escalation, the doctor, then notifies). It
-**self-removes when the run settles**: when `status` shows a terminal aggregate
-state, find the routine's id via `CronList` (match by name) and `CronDelete` it.
-A recurring cron costs money — confirm with the user before creating it.
+For a run too long to watch in one session, set up a **scheduled routine**
+(`CronCreate`, or the Claude_Code_Remote `create_trigger`/`send_later` tools —
+whichever this session offers) at a cadence the user picks — don't assume one.
+Each wake, the routine spawns the monitor (and, on escalation, the doctor, then
+notifies). It **self-removes when the run settles**: when `status` shows a
+terminal aggregate state, find the routine's id (`CronList` / `list_triggers`,
+match by name) and delete it (`CronDelete` / `delete_trigger`). A recurring
+cron costs money — confirm with the user before creating it.
