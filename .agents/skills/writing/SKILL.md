@@ -15,7 +15,8 @@ Characteristics:
 - American spelling to match the convention in scientific literature.
 - High readability, with a Flesch-Kincaid grade level of around 10-12.
 - Assume an intelligent audience and use precise language. See _Concision_ for more on this.
-- Alt text for all images: aids vision-impaired people and LLMs alike.
+- Alt text for all images: aids vision-impaired people and LLMs alike (see the
+  alt-text skill).
 
 Anti-patterns:
 
@@ -47,3 +48,20 @@ The text.
 ```
 
 When in doubt about how to phrase something, err on the side of clarity and simplicity. Avoid jargon and complex sentence structures unless they are necessary to convey the technical content accurately.
+
+## Markdown
+
+Use sentence case for headings and descriptive lists.
+
+```patch
+- # Experiment Design
+-
+-   - **Foo Bar:** baz
++ # Experiment design
++
++   - Foo bar: baz
+```
+
+Prefer paragraphs for nuanced or complex explanations; use lists for
+summarizing steps, or when clarity would genuinely benefit from structure —
+and use them sparingly.

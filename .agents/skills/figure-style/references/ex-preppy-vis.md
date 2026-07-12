@@ -12,11 +12,11 @@ dark=…)` maps directly onto `mini.vis.light_dark`).
 ## Port when needed
 
 - `plot_latent_slices.py` — the heart of the style. `draw_latent_panel`
-  establishes the geometry-panel conventions (background disc, stroke
-  overlay, axis-off, orthographic top-down view, fixed limits);
-  `draw_circle_3d` is a compact helper that degenerates cleanly to a line
-  when a dimension is projected out. Port these two when M2 draws its first
-  latent grid.
+  establishes the geometry-panel conventions (background disc, stroke overlay,
+  axis-off, orthographic top-down view, fixed limits). The 2D version is ported
+  and is extensible: `sca.colorcube.plot_latent_disc`. `draw_circle_3d`
+  (degenerates cleanly to a line when a dimension is projected out) is still
+  unported; bring it over when M2 draws its first 3D latent grid.
 - `stacked_fig.py` — the composite headline figure (two latent panels over a
   color slice over a loss series). Small, and it is the layout the poster
   and report leads with.

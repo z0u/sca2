@@ -4,9 +4,9 @@ from pathlib import Path
 import equinox as eqx
 import jax.random as jr
 
-from experiment.config import TrainingConfig
-from experiment.model import LanguageModel, build_model
-from experiment.training.metrics import TrainingMetrics
+from sca.config import TrainingConfig
+from sca.model import LanguageModel, build_model
+from sca.training.metrics import TrainingMetrics
 from utils.param_types import validate_call
 
 

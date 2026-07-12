@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 from jaxtyping import Int
 
-from experiment.config import CorpusMetadata
+from sca.config import CorpusMetadata
 from utils.param_types import validate_call
 
 

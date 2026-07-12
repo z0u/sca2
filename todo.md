@@ -29,12 +29,11 @@ readable cold without re-deriving code state.
   Timeline mode where a prop is declared "controlled": keyframes set its
   *bounds/defaults* and a callback supplies the live value.
 
-- `test_publish_serves_with_content_type_from_extension` fails: an anonymous
-  GET of the *store bucket's* `published/` revision now returns 401 (the
-  publish repo `z0u/sca2-pub` still serves 200 anonymously — verified
-  2026-07-09). Looks like a stale test assumption from before exports were
-  routed to the publish repo (#38); either point the test at the publish
-  tier or drop the anonymous-serving assertion for the bucket.
+- ex-2.9.3's `publish_results` publishes `exemplar-hot`/`exemplar-cool` refs
+  (the worst catastrophic run and its cooled-LR rescue) that no report reads.
+  Either add the intended before/after rescue figure to the ex-2.9.3 report
+  (mirroring ex-2.9.2's exemplar plot) or drop the two `set_ref` calls and the
+  `worst`/`rescue` computation.
 
 - Sweep cells all `save_checkpoint` to the same shared `get_data_dir()`, so the
   checkpoint file is last-writer-wins across a fan-out. Harmless today (the
@@ -91,6 +90,6 @@ PR #54), #47 (per-experiment backend memory for `--app`).
 
 - #45 — docs rework. Touches `docs/`, `README.md`, `eng/`, not `src/mini/`.
   Can run in parallel with anything.
-- #57 — CLI DevX: passing a name to `retry`/`run` dies with a raw traceback
-  (tick verbs take a file, read verbs a name). Tier 1 (friendly error + help
-  text on the `path` positional) is a quick win in `src/mini/__main__.py`.
+- #57 — CLI DevX: tier 1 shipped (`_load_experiment_or_hint` gives a friendly
+  error + the `path` positional documents file-vs-NAME). Anything beyond that
+  (e.g. auto-resolving a name to its experiment file) is still open.

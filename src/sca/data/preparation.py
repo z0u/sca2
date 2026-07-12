@@ -3,8 +3,8 @@ import logging
 import numpy as np
 from jaxtyping import Int
 
-from experiment.config import CorpusMetadata, DatasetMetadata, TokenizerConfig
-from experiment.data.tokenizer import CharTokenizer
+from sca.config import CorpusMetadata, DatasetMetadata, TokenizerConfig
+from sca.data.tokenizer import CharTokenizer
 from utils.param_types import validate_call
 
 log = logging.getLogger(__name__)

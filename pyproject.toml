@@ -113,7 +113,7 @@ ignore = [
 "docs/*.py" = [
     "B018",  # Marimo uses last expression as cell output
 ]
-"**/experiment/**/*.py" = [
+"**/sca/**/*.py" = [
     "C416",
     "D203", "D205", "D400", "D401", "D415",
 ]
@@ -138,7 +138,8 @@ ignore_decorators = [
     "@property",
     "@classmethod",
     "@staticmethod",
-    "@model_validator"
+    "@model_validator",
+    "@pytest.fixture"
 ]
 ignore_names = [
     "visit_*",
@@ -146,14 +147,16 @@ ignore_names = [
     "test_*",
     "pytestmark",
     "setUp",
-    "tearDown"
+    "tearDown",
+    "_",  # marimo cell functions
+    "__generated_with"  # marimo file metadata
 ]
 # make_whitelist = true
 min_confidence = 60
 paths = [
     "src/",
     "tests/",
-    ".vulture-cache/",
+    "docs/",
     ".vulture-allowlist.py"
 ]
 sort_by_size = true

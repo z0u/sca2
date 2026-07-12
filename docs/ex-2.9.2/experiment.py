@@ -13,10 +13,11 @@ trained to map the anti-anchor point −e₀ (kept empty by the anti-anchor
 regularizer) to mid-gray, so an intervention can redirect red somewhere with a
 *defined* response.
 
-Two training variants share ex-2.9.1's model, data, and dopesheet:
-`base` (w_fb = 0) is ex-2.9.1's loss unchanged; `fallback` (w_fb = 0.05) adds
-a decoder-only term MSE(dec(−e₀), 0.5). Each trains 32 seeds. Every trained
-model is then scored under five weight-level interventions on latent axis 0:
+Two training variants share ex-2.9.1's model, data, and dopesheet
+(`sca.colorcube` has the testbed): `base` (w_fb = 0) is ex-2.9.1's loss
+unchanged; `fallback` (w_fb = 0.05) adds a decoder-only term
+MSE(dec(−e₀), 0.5). Each trains 32 seeds. Every trained model is then scored
+under five weight-level interventions on latent axis 0:
 
 - zero: zero encoder row 0 + bias (ex-2.9.1's ablation; the baseline).
 - oa: zero row 0, set the bias to the constant minimizing mean reconstruction
@@ -48,22 +49,34 @@ import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
 import optax
-from matplotlib import colors as mcolors
 
+from sca.colorcube import (
+    BATCH,
+    GAMMA,
+    GRID_RGB,
+    NEG_E0,
+    OTHERS,
+    PURE_RED,
+    RED_PROB,
+    REDS,
+    SIM3,
+    VAL_RED,
+    VAL_RGB,
+    WEIGHT_PROPS,
+    decode,
+    edit_axis0,
+    eval_model,
+    init_params,
+    loss_fn,
+    optimal_constant,
+)
 from mini import Ctx, Experiment, emit_metrics, emit_progress
 from mini.store import put, set_ref
 from mini.temporal import Dopesheet, Timeline, realize_timeline
 
-K = 5  # bottleneck dim; red is anchored to axis 0
-DIMS = (3, 16, 16, K, 16, 16, 3)  # bottleneck sits after layer 2 (~840 params)
-BATCH = 64
 SEEDS = list(range(32))
-WEIGHT_PROPS = ("separate", "anchor", "anti-anchor", "anti-subspace")
 
-GRAY = 0.5  # fallback target: dec(−e₀) → mid-gray, the "know-nothing" color
 FALLBACK_WEIGHT = 0.05  # w_fb for the fallback variant; constant over training
-GAMMA = 1.0  # redirect strength (γ): encoder bias after deletion is −γ
-OA_GRID = np.linspace(-3.0, 3.0, 121)  # line-search grid for the optimal constant
 INTERVENTIONS = ("zero", "oa", "oa-nontarget", "reflect", "redirect")
 
 DOPESHEET_CSV = (Path(__file__).parent / "dopesheet.csv").read_text()
@@ -71,129 +84,6 @@ DOPESHEET_CSV = (Path(__file__).parent / "dopesheet.csv").read_text()
 # Store refs the report reads (see report.py).
 METRICS_REF = "reports/ex-2.9.2/metrics"
 EXEMPLAR_REFS = {"base": "reports/ex-2.9.2/exemplar-base", "fallback": "reports/ex-2.9.2/exemplar-fallback"}
-
-type Params = list[dict[str, jax.Array]]
-
-
-def _grid(coords: np.ndarray) -> np.ndarray:
-    """The RGB cube sampled at *coords* along each axis: [len(coords)³, 3]."""
-    r, g, b = np.meshgrid(coords, coords, coords, indexing="ij")
-    return np.stack([r, g, b], axis=-1).reshape(-1, 3).astype(np.float32)
-
-
-def _redness(rgb: np.ndarray) -> np.ndarray:
-    r, g, b = rgb.T
-    return r * (1 - g / 2 - b / 2)
-
-
-def _sim_to_red(rgb: np.ndarray, power: float = 3.0) -> np.ndarray:
-    """Angular HSV similarity to pure red, weighted by vibrancy (as in ex-2.9.1)."""
-    h, s, v = mcolors.rgb_to_hsv(rgb).T
-    angle = 360.0 * np.minimum(h, 1.0 - h)  # hue distance to red, in degrees
-    hue_sim = np.maximum(0.0, (90.0 - angle) / 90.0)
-    vib = (s * v + 1.0) / 2.0  # mean vibrancy of (color, pure red); hue only matters for vibrant colors
-    sim = (vib * hue_sim + 1.0 - vib) * (1.0 - np.abs(s - 1.0)) * (1.0 - np.abs(v - 1.0))
-    return (sim**power).astype(np.float32)
-
-
-GRID_RGB = _grid(np.linspace(0, 1, 8))  # train set and scoring grid: 512 corner points
-RED_PROB = (_redness(GRID_RGB) ** 8 * 0.08).astype(np.float32)  # sparse, noisy label: P(labeled red)
-SIM3 = _sim_to_red(GRID_RGB)
-REDS = SIM3 > 0.5  # "damage to red" group
-OTHERS = SIM3 < 0.01  # "collateral damage" group (404 of 512 grid points)
-VAL_RGB = np.concatenate([_grid(np.linspace(1 / 16, 15 / 16, 7)), _grid(np.array([0.0, 1.0]))])  # centers + corners
-VAL_RED = _redness(VAL_RGB) == 1.0  # exact label: only pure red
-PURE_RED = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
-NEG_E0 = np.zeros((1, K), dtype=np.float32)
-NEG_E0[0, 0] = -1.0
-
-
-def init_params(key: jax.Array) -> Params:
-    """Linear layers as plain dicts, uniform ±1/√fan_in (matching torch/equinox defaults)."""
-
-    def linear(k: jax.Array, n_in: int, n_out: int) -> dict[str, jax.Array]:
-        kw, kb = jr.split(k)
-        lim = 1.0 / np.sqrt(n_in)
-        return {
-            "w": jr.uniform(kw, (n_out, n_in), minval=-lim, maxval=lim),
-            "b": jr.uniform(kb, (n_out,), minval=-lim, maxval=lim),
-        }
-
-    keys = jr.split(key, len(DIMS) - 1)
-    return [linear(k, a, b) for k, a, b in zip(keys, DIMS[:-1], DIMS[1:], strict=True)]
-
-
-def decode(params: Params, z: jax.Array) -> jax.Array:
-    """The decoder half: latent → RGB (no clamping)."""
-    y = z
-    for lyr in params[3:-1]:
-        y = jax.nn.gelu(y @ lyr["w"].T + lyr["b"])
-    return y @ params[-1]["w"].T + params[-1]["b"]
-
-
-def forward(params: Params, x: jax.Array) -> tuple[jax.Array, jax.Array]:
-    """3 → 16 → 16 → [unit 5-sphere] → 16 → 16 → 3, GELU between the linears.
-
-    Returns (reconstruction, unit latent) for a batch.
-    """
-    enc = params[:3]
-    for lyr in enc[:-1]:
-        x = jax.nn.gelu(x @ lyr["w"].T + lyr["b"])
-    z = x @ enc[-1]["w"].T + enc[-1]["b"]
-    z = z / jnp.maximum(jnp.linalg.norm(z, axis=-1, keepdims=True), 1e-12)
-    return decode(params, z), z
-
-
-def loss_fn(params: Params, x: jax.Array, labels: jax.Array, w: jax.Array, w_fb: float) -> tuple[jax.Array, jax.Array]:
-    """Ex-2.9.1's loss (recon + four bottleneck regularizers) plus the fallback term."""
-    y, z = forward(params, x)
-    recon = jnp.mean((y - x) ** 2)
-
-    cos_red = z[:, 0]  # z is unit-norm and RED = e₀, so cos(z, RED) is just z₀
-    anchor = jnp.sum((1.0 - cos_red) * labels) / (jnp.sum(labels) + 1e-8)  # label-affinity-weighted mean
-    anti_anchor = jnp.mean(jnp.maximum(-cos_red, 0.0))  # hemisphere gate: clamp(cos(z, −e₀), min=0)
-    anti_subspace = jnp.mean(cos_red**2)
-
-    cos_pairs = z @ z.T
-    shifted = jnp.where(jnp.isclose(cos_pairs, 1.0), 0.0, (cos_pairs + 1.0) / 2.0)  # null self/duplicate similarity
-    separate = jnp.mean(jnp.sum(shifted**100.0, axis=-1))  # high power: only near-duplicates repel
-
-    fallback = jnp.mean((decode(params, jnp.asarray(NEG_E0)) - GRAY) ** 2)  # decoder-only: dec(−e₀) → gray
-
-    terms = jnp.stack([separate, anchor, anti_anchor, anti_subspace])  # order matches WEIGHT_PROPS
-    return recon + terms @ w + w_fb * fallback, recon
-
-
-def eval_model(params: Params, x: jax.Array) -> tuple[jax.Array, jax.Array]:
-    """Per-point reconstruction MSE (output clamped to [0,1], as at inference) and latents."""
-    y, z = forward(params, x)
-    return jnp.mean((jnp.clip(y, 0.0, 1.0) - x) ** 2, axis=-1), z
-
-
-def edit_axis0(params: Params, *, bias: float | None = None, negate: bool = False) -> Params:
-    """Weight-level interventions on latent axis 0, all edits to the encoder's output layer.
-
-    negate=True reflects (z₀ → −z₀ pre-norm). Otherwise row 0 is zeroed — the redness
-    computation is deleted — and the bias becomes *bias* (0 = ex-2.9.1's zero ablation,
-    a constant c = optimal ablation, −γ = redirect to the fallback direction).
-    """
-    params = [dict(lyr) for lyr in params]
-    if negate:
-        params[2] = {"w": params[2]["w"].at[0].mul(-1.0), "b": params[2]["b"].at[0].mul(-1.0)}
-    else:
-        params[2] = {"w": params[2]["w"].at[0].set(0.0), "b": params[2]["b"].at[0].set(bias or 0.0)}
-    return params
-
-
-def optimal_constant(params: Params, x: jax.Array, subset: np.ndarray | None = None) -> float:
-    """Line-search the post-ablation bias c* that minimizes mean reconstruction error.
-
-    Li & Janson find a* by SGD; in 1D an exact line search is simpler. *subset* masks the
-    distribution the constant is optimized over (None = the full grid, per the paper).
-    """
-    xs = x if subset is None else x[np.flatnonzero(subset)]
-    losses = [float(jnp.mean(eval_model(edit_axis0(params, bias=float(c)), xs)[0])) for c in OA_GRID]
-    return float(OA_GRID[int(np.argmin(losses))])
 
 
 def train_one(seed: int, w_fb: float, dopesheet_csv: str) -> dict:

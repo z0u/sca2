@@ -11,8 +11,8 @@ with app.setup(hide_code=True):
     import marimo as mo  # noqa: F401
     import matplotlib.pyplot as plt
     import numpy as np
-    from matplotlib.patches import Circle
 
+    from sca.colorcube import plot_latent_disc
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
     from mini.temporal import Dopesheet, ParamGroup, Timeline, plot_timeline, realize_timeline
@@ -269,17 +269,9 @@ def _(best_eval):
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 2, figsize=(8.5, 4.6))
-        edge = light_dark("#00000033", "#ffffff55")
         fg = light_dark("#000", "#fff")
         for ax, z, title in zip(axes, (best_eval["z_base"], best_eval["z_abl"]), ("Baseline", "Ablated"), strict=True):
-            # Latent axis 0 (anchored: red) points up; axis 1 is horizontal.
-            ax.add_patch(Circle((0, 0), 1, facecolor=light_dark("#eee", "#111"), zorder=-10))
-            ax.scatter(z[:, 1], z[:, 0], c=best_eval["rgb"], s=22, edgecolors=edge, lw=0.5)
-            ax.add_patch(Circle((0, 0), 1, facecolor="none", edgecolor="#0005", lw=1, zorder=10))
-            ax.set_aspect("equal")
-            ax.set_xlim(-1.1, 1.1)
-            ax.set_ylim(-1.1, 1.1)
-            ax.set_axis_off()
+            plot_latent_disc(ax, z, best_eval["rgb"], s=22)
             ax.set_title(title, y=-0.12)
         axes[0].plot([0], [1.05], marker="v", color=fg, clip_on=False)
         axes[0].annotate(

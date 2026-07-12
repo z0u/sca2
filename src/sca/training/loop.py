@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import optax
 from jaxtyping import Array, Float, Int, PyTree
 
-from experiment.model import LanguageModel
+from sca.model import LanguageModel
 
 
 def cross_entropy(logits: Float[Array, "B T V"], targets: Int[Array, "B T"]) -> Float[Array, ""]:

@@ -1,4 +1,4 @@
-from experiment.config import TokenizerConfig
+from sca.config import TokenizerConfig
 from utils.param_types import validate_call
 
 

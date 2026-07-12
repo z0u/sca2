@@ -19,8 +19,8 @@ import jax.numpy as jnp
 import jax.random as jr
 from jaxtyping import Array, Float, Int, PRNGKeyArray
 
-from experiment.config import ModelConfig
-from experiment.model._shared import (
+from sca.config import ModelConfig
+from sca.model._shared import (
     LanguageModel,
     Linear,
     RotaryEncoding,
