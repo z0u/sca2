@@ -23,7 +23,8 @@ The PyTorch/Lightning original becomes a handful of pure functions and one
 survive the port: the model is a pytree of arrays (task functions ship to
 workers by value, so plain data beats clever classes), activations are just a
 second return value, the schedule is an array indexed by step, and a "batch" is
-64 random rows.
+64 random rows. The testbed itself — grids, model, loss terms, ablation — lives
+in `sca.colorcube`, shared with the later ex-2.9.x experiments.
 
     bin/mini run docs/ex-2.9.1/experiment.py --app modal --max-containers 8
 
@@ -42,116 +43,31 @@ import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
 import optax
-from matplotlib import colors as mcolors
 
+from sca.colorcube import (
+    BATCH,
+    GRID_RGB,
+    RED_PROB,
+    SIM3,
+    VAL_RED,
+    VAL_RGB,
+    WEIGHT_PROPS,
+    ablate,
+    eval_model,
+    init_params,
+    loss_fn,
+)
 from mini import Ctx, Experiment, emit_metrics, emit_progress
 from mini.store import put, set_ref
 from mini.temporal import Dopesheet, Timeline, realize_timeline
 
-K = 5  # bottleneck dim; red is anchored to axis 0
-DIMS = (3, 16, 16, K, 16, 16, 3)  # bottleneck sits after layer 2 (~840 params)
-BATCH = 64
 SEEDS = list(range(16))  # the original swept 60 seeds; 16 is plenty for an infra test
-WEIGHT_PROPS = ("separate", "anchor", "anti-anchor", "anti-subspace")
 
 DOPESHEET_CSV = (Path(__file__).parent / "dopesheet.csv").read_text()
 
 # Store refs the report reads (see report.py).
 METRICS_REF = "reports/ex-2.9.1/metrics"
 BEST_EVAL_REF = "reports/ex-2.9.1/best-eval"
-
-type Params = list[dict[str, jax.Array]]
-
-
-def _grid(coords: np.ndarray) -> np.ndarray:
-    """The RGB cube sampled at *coords* along each axis: [len(coords)³, 3]."""
-    r, g, b = np.meshgrid(coords, coords, coords, indexing="ij")
-    return np.stack([r, g, b], axis=-1).reshape(-1, 3).astype(np.float32)
-
-
-def _redness(rgb: np.ndarray) -> np.ndarray:
-    r, g, b = rgb.T
-    return r * (1 - g / 2 - b / 2)
-
-
-def _sim_to_red(rgb: np.ndarray, power: float = 3.0) -> np.ndarray:
-    """Angular HSV similarity to pure red, weighted by vibrancy (ports ex-preppy's `hsv_similarity`)."""
-    h, s, v = mcolors.rgb_to_hsv(rgb).T
-    angle = 360.0 * np.minimum(h, 1.0 - h)  # hue distance to red, in degrees
-    hue_sim = np.maximum(0.0, (90.0 - angle) / 90.0)
-    vib = (s * v + 1.0) / 2.0  # mean vibrancy of (color, pure red); hue only matters for vibrant colors
-    sim = (vib * hue_sim + 1.0 - vib) * (1.0 - np.abs(s - 1.0)) * (1.0 - np.abs(v - 1.0))
-    return (sim**power).astype(np.float32)
-
-
-GRID_RGB = _grid(np.linspace(0, 1, 8))  # train set and scoring grid: 512 corner points
-RED_PROB = (_redness(GRID_RGB) ** 8 * 0.08).astype(np.float32)  # sparse, noisy label: P(labeled red)
-SIM3 = _sim_to_red(GRID_RGB)
-VAL_RGB = np.concatenate([_grid(np.linspace(1 / 16, 15 / 16, 7)), _grid(np.array([0.0, 1.0]))])  # centers + corners
-VAL_RED = _redness(VAL_RGB) == 1.0  # exact label: only pure red
-
-
-def init_params(key: jax.Array) -> Params:
-    """Linear layers as plain dicts, uniform ±1/√fan_in (matching torch/equinox defaults)."""
-
-    def linear(k: jax.Array, n_in: int, n_out: int) -> dict[str, jax.Array]:
-        kw, kb = jr.split(k)
-        lim = 1.0 / np.sqrt(n_in)
-        return {
-            "w": jr.uniform(kw, (n_out, n_in), minval=-lim, maxval=lim),
-            "b": jr.uniform(kb, (n_out,), minval=-lim, maxval=lim),
-        }
-
-    keys = jr.split(key, len(DIMS) - 1)
-    return [linear(k, a, b) for k, a, b in zip(keys, DIMS[:-1], DIMS[1:], strict=True)]
-
-
-def forward(params: Params, x: jax.Array) -> tuple[jax.Array, jax.Array]:
-    """3 → 16 → 16 → [unit 5-sphere] → 16 → 16 → 3, GELU between the linears.
-
-    Returns (reconstruction, unit latent) for a batch.
-    """
-    enc, dec = params[:3], params[3:]
-    for lyr in enc[:-1]:
-        x = jax.nn.gelu(x @ lyr["w"].T + lyr["b"])
-    z = x @ enc[-1]["w"].T + enc[-1]["b"]
-    z = z / jnp.maximum(jnp.linalg.norm(z, axis=-1, keepdims=True), 1e-12)
-    y = z
-    for lyr in dec[:-1]:
-        y = jax.nn.gelu(y @ lyr["w"].T + lyr["b"])
-    return y @ dec[-1]["w"].T + dec[-1]["b"], z
-
-
-def loss_fn(params: Params, x: jax.Array, labels: jax.Array, w: jax.Array) -> tuple[jax.Array, jax.Array]:
-    """Reconstruction MSE plus the four weighted regularizers on the bottleneck."""
-    y, z = forward(params, x)
-    recon = jnp.mean((y - x) ** 2)
-
-    cos_red = z[:, 0]  # z is unit-norm and RED = e₀, so cos(z, RED) is just z₀
-    anchor = jnp.sum((1.0 - cos_red) * labels) / (jnp.sum(labels) + 1e-8)  # label-affinity-weighted mean
-    anti_anchor = jnp.mean(jnp.maximum(-cos_red, 0.0))  # hemisphere gate: clamp(cos(z, −e₀), min=0)
-    anti_subspace = jnp.mean(cos_red**2)
-
-    cos_pairs = z @ z.T
-    shifted = jnp.where(jnp.isclose(cos_pairs, 1.0), 0.0, (cos_pairs + 1.0) / 2.0)  # null self/duplicate similarity
-    separate = jnp.mean(jnp.sum(shifted**100.0, axis=-1))  # high power: only near-duplicates repel
-
-    terms = jnp.stack([separate, anchor, anti_anchor, anti_subspace])  # order matches WEIGHT_PROPS
-    return recon + terms @ w, recon
-
-
-def eval_model(params: Params, x: jax.Array) -> tuple[jax.Array, jax.Array]:
-    """Per-point reconstruction MSE (output clamped to [0,1], as at inference) and latents."""
-    y, z = forward(params, x)
-    return jnp.mean((jnp.clip(y, 0.0, 1.0) - x) ** 2, axis=-1), z
-
-
-def ablate(params: Params) -> Params:
-    """Delete latent axis 0: zero the encoder's output row 0 (and bias) and the decoder's input column 0."""
-    params = [dict(lyr) for lyr in params]
-    params[2] = {"w": params[2]["w"].at[0].set(0.0), "b": params[2]["b"].at[0].set(0.0)}
-    params[3] = {**params[3], "w": params[3]["w"].at[:, 0].set(0.0)}
-    return params
 
 
 def train_one(seed: int, dopesheet_csv: str) -> dict:

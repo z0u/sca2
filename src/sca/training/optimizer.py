@@ -2,7 +2,7 @@ import equinox as eqx
 import jax
 import optax
 
-from experiment.config import OptimizerConfig
+from sca.config import OptimizerConfig
 
 
 def configure_optimizer(

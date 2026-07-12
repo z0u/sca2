@@ -7,10 +7,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from experiment.compute.data_pipelines import save_data
-from experiment.compute.model import load_checkpoint
-from experiment.compute.training import train_model
-from experiment.config import (
+from sca.compute.data_pipelines import save_data
+from sca.compute.model import load_checkpoint
+from sca.compute.training import train_model
+from sca.config import (
     CorpusMetadata,
     DataConfig,
     ModelConfig,

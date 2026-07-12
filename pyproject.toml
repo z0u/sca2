@@ -113,7 +113,7 @@ ignore = [
 "docs/*.py" = [
     "B018",  # Marimo uses last expression as cell output
 ]
-"**/experiment/**/*.py" = [
+"**/sca/**/*.py" = [
     "C416",
     "D203", "D205", "D400", "D401", "D415",
 ]

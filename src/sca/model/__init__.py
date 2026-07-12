@@ -7,9 +7,9 @@ builds on (and the `LanguageModel` base with the sampling machinery) live in
 
 from jaxtyping import PRNGKeyArray
 
-from experiment.config import ModelConfig
-from experiment.model._shared import Generation, LanguageModel, SingleGeneration
-from experiment.model.ngpt import NGPT
+from sca.config import ModelConfig
+from sca.model._shared import Generation, LanguageModel, SingleGeneration
+from sca.model.ngpt import NGPT
 
 __all__ = ["NGPT", "Generation", "LanguageModel", "SingleGeneration", "build_model"]
 

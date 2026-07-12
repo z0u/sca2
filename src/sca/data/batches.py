@@ -12,7 +12,7 @@ from typing import Iterator
 import numpy as np
 from jaxtyping import Int
 
-from experiment.config import DataConfig, ModelConfig
+from sca.config import DataConfig, ModelConfig
 from utils.param_types import validate_call
 
 

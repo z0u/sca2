@@ -5,15 +5,15 @@ import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
 
-from experiment.compute.data_pipelines import load_data
-from experiment.compute.model import save_checkpoint
-from experiment.config import TrainingConfig
-from experiment.data.batches import batches_per_epoch, sample_batches, split_data
-from experiment.model import LanguageModel, build_model
-from experiment.training.loop import eval_step, make_train_step
-from experiment.training.metrics import TrainingMetrics
-from experiment.training.optimizer import configure_optimizer
-from experiment.training.scheduler import configure_schedule
+from sca.compute.data_pipelines import load_data
+from sca.compute.model import save_checkpoint
+from sca.config import TrainingConfig
+from sca.data.batches import batches_per_epoch, sample_batches, split_data
+from sca.model import LanguageModel, build_model
+from sca.training.loop import eval_step, make_train_step
+from sca.training.metrics import TrainingMetrics
+from sca.training.optimizer import configure_optimizer
+from sca.training.scheduler import configure_schedule
 from mini.progress import emit_progress
 
 

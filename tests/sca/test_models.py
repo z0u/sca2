@@ -8,9 +8,9 @@ import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
 
-from experiment.config import ModelConfig
-from experiment.model import build_model
-from experiment.model._shared import normalize
+from sca.config import ModelConfig
+from sca.model import build_model
+from sca.model._shared import normalize
 
 
 def make_config(**overrides: Any) -> ModelConfig:

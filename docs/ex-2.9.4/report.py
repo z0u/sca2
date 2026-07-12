@@ -4,16 +4,12 @@ __generated_with = "0.23.3"
 app = marimo.App(width="medium", auto_download=["html"])
 
 with app.setup(hide_code=True):
-    import json
-    import tempfile
-    from pathlib import Path
-
     import marimo as mo  # noqa: F401
     import matplotlib.pyplot as plt
     import numpy as np
 
+    from sca.colorcube import TRAJ_STRIDE, classify, load_results
     from mini.reports import report_bundle, use_publisher
-    from mini.store import project_store
     from mini.vis import light_dark, themed
 
     use_publisher(report_bundle(__file__))
@@ -22,28 +18,7 @@ with app.setup(hide_code=True):
     METRICS_REF = "reports/ex-2.9.4/metrics"
     TRAJS_REF = "reports/ex-2.9.4/trajectories"
 
-    TRAJ_STRIDE = 5  # experiment.py records diagnostics every 5 steps
     LAM_CAP = 0.15  # the anchor dual's ceiling
-
-    def load_results() -> tuple[list[dict], dict[str, np.ndarray]] | None:
-        """Resolve per-run metrics and the stacked trajectories from the store, or None if unpublished."""
-        store = project_store()
-        m_art, t_art = store.get_ref(METRICS_REF), store.get_ref(TRAJS_REF)
-        if m_art is None or t_art is None:
-            return None
-        with tempfile.TemporaryDirectory() as d:
-            metrics = json.loads(store.get(m_art, Path(d) / "metrics.json").read_text())
-            with np.load(store.get(t_art, Path(d) / "trajs.npz")) as z:
-                trajs = dict(z)
-        return metrics, trajs
-
-    def classify(r: dict) -> str:
-        """Same buckets as ex-2.9.3: thresholds sit in the gaps of bimodal endpoint metrics."""
-        if r["val_anchor"] > 0.3 or r["val_recon"] > 0.01 or r["leak"] > 0.3:
-            return "catastrophic"
-        if r["leak"] > 0.1:
-            return "degraded"
-        return "clean"
 
 
 @app.cell(hide_code=True)
@@ -96,7 +71,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    loaded = load_results()
+    loaded = load_results(METRICS_REF, TRAJS_REF)
     return (loaded,)
 
 

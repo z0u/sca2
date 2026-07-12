@@ -1,7 +1,7 @@
 import optax
 from pydantic import NonNegativeInt
 
-from experiment.config import SchedulerConfig
+from sca.config import SchedulerConfig
 
 
 def configure_schedule(config: SchedulerConfig, peak_lr: float, epoch_length: NonNegativeInt) -> optax.Schedule:

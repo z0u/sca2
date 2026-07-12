@@ -5,16 +5,13 @@ app = marimo.App(width="medium", auto_download=["html"])
 
 with app.setup(hide_code=True):
     import io
-    import json
-    import tempfile
-    from pathlib import Path
 
     import marimo as mo  # noqa: F401
     import matplotlib.pyplot as plt
     import numpy as np
 
+    from sca.colorcube import TRAJ_STRIDE, classify, load_results, make_dopesheet
     from mini.reports import report_bundle, use_publisher
-    from mini.store import project_store
     from mini.temporal import Dopesheet, Timeline, realize_timeline
     from mini.vis import light_dark, themed
 
@@ -24,46 +21,7 @@ with app.setup(hide_code=True):
     METRICS_REF = "reports/ex-2.9.3/metrics"
     TRAJS_REF = "reports/ex-2.9.3/trajectories"
 
-    TRAJ_STRIDE = 5  # experiment.py records diagnostics every 5 steps
     PEAK_LRS = (0.10, 0.07, 0.05, 0.03)
-
-    def make_dopesheet(peak_lr: float, anneal: bool) -> str:
-        """The swept dopesheet (kept in sync with experiment.py by hand)."""
-        rows = [
-            "STEP,PHASE,ACTION,lr,separate,anchor,anti-anchor,anti-subspace",
-            "0,Train,,1e-8,,0,0,0.25",
-            "+10,,,0.01,,,,",
-            "+0.33,,,,0.01,0.1,0.05,",
-            f"750,,,{peak_lr},0.001,0.1,,0.003",
-            *([f"+0.9,,,{peak_lr},0,0,0,0"] if anneal else []),
-            f"1500,,,{peak_lr / 2},,,,",
-        ]
-        return "\n".join(rows) + "\n"
-
-    def load_results() -> tuple[list[dict], dict[str, np.ndarray]] | None:
-        """Resolve per-run metrics and the stacked trajectories from the store, or None if unpublished."""
-        store = project_store()
-        m_art, t_art = store.get_ref(METRICS_REF), store.get_ref(TRAJS_REF)
-        if m_art is None or t_art is None:
-            return None
-        with tempfile.TemporaryDirectory() as d:
-            metrics = json.loads(store.get(m_art, Path(d) / "metrics.json").read_text())
-            with np.load(store.get(t_art, Path(d) / "trajs.npz")) as z:
-                trajs = dict(z)
-        return metrics, trajs
-
-    def classify(r: dict) -> str:
-        """Bucket a run by its endpoint health.
-
-        Thresholds sit in the gaps of clearly bimodal metrics: healthy runs end with
-        val_anchor ≤ 0.07, leak < 0.1, and val_recon ≤ 0.002; failures sit far beyond
-        (anchor 0.35+, leak 0.34+, recon 0.046+).
-        """
-        if r["val_anchor"] > 0.3 or r["val_recon"] > 0.01 or r["leak"] > 0.3:
-            return "catastrophic"
-        if r["leak"] > 0.1:
-            return "degraded"
-        return "clean"
 
 
 @app.cell(hide_code=True)
@@ -105,7 +63,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    loaded = load_results()
+    loaded = load_results(METRICS_REF, TRAJS_REF)
     return (loaded,)
 
 
