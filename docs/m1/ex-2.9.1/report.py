@@ -63,7 +63,7 @@ def _():
     from the CLI — 16 seeded runs fanned out on Modal CPU containers:
 
     ```bash
-    bin/mini run docs/ex-2.9.1/experiment.py --app modal --max-containers 8
+    bin/mini run docs/m1/ex-2.9.1/experiment.py --app modal --max-containers 8
     ```
 
     The port is deliberately lighter than the original: the PyTorch/Lightning
@@ -87,7 +87,7 @@ def _(loaded):
         loaded is None,
         mo.md(
             "No results yet — run the experiment (it publishes metrics to the store on completion):\n\n"
-            "```bash\nbin/mini run docs/ex-2.9.1/experiment.py --app modal --max-containers 8\n```"
+            "```bash\nbin/mini run docs/m1/ex-2.9.1/experiment.py --app modal --max-containers 8\n```"
         ),
     )
     metrics, best_eval = loaded

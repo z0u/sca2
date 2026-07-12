@@ -32,7 +32,7 @@ locally or on Modal without edits.
 
 Split definition from report. The definition is imported by the CLI and the
 remote workers; the report reads persisted results and plots, so it opens
-standalone without re-running the work. See `docs/ex-2.9.1/` for a worked,
+standalone without re-running the work. See `docs/m1/ex-2.9.1/` for a worked,
 runnable example with both halves.
 
 Two conventions that keep the pairing healthy:
@@ -46,7 +46,7 @@ Two conventions that keep the pairing healthy:
   module (unless you expect heavy churn). Memoization evidence tracks project
   source transitively, so the split doesn't weaken cache correctness.
 
-CI globs `docs/*/experiment.py` (`tests/mini/test_experiments_e2e.py`): every
+CI globs `docs/**/experiment.py` (`tests/mini/test_experiments_e2e.py`): every
 definition is at least *loaded* (import + construct), and the light demos run to
 completion. So a new or renamed experiment gets rot coverage for free — but its
 module top level must stay cheap and side-effect-free (imports of heavy deps

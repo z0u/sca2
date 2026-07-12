@@ -55,7 +55,7 @@ def _():
     The experiment is [`experiment.py`](./experiment.py):
 
     ```bash
-    bin/mini run docs/ex-2.9.3/experiment.py --app modal --max-containers 16
+    bin/mini run docs/m1/ex-2.9.3/experiment.py --app modal --max-containers 16
     ```
     """)
     return
@@ -73,7 +73,7 @@ def _(loaded):
         loaded is None,
         mo.md(
             "No results yet — run the experiment (it publishes metrics to the store on completion):\n\n"
-            "```bash\nbin/mini run docs/ex-2.9.3/experiment.py --app modal --max-containers 16\n```"
+            "```bash\nbin/mini run docs/m1/ex-2.9.3/experiment.py --app modal --max-containers 16\n```"
         ),
     )
     metrics, trajs = loaded

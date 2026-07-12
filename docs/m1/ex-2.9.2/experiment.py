@@ -35,7 +35,7 @@ damage, plus the trained fallback color dec(−e₀) and axis-0 leakage. The
 comparison is distributional across seeds: fallback control should collapse
 the variance of the intervention response, not shift the mean.
 
-    bin/mini run docs/ex-2.9.2/experiment.py --app modal --max-containers 8
+    bin/mini run docs/m1/ex-2.9.2/experiment.py --app modal --max-containers 8
 """
 
 from __future__ import annotations

@@ -31,7 +31,7 @@ The sweep's (0.10, anneal) cell replicates ex-2.9.2's fallback arm; the
 trajectory arm replicates its base arm, so known-bad seeds (22, 27) reproduce.
 The testbed (model, grids, loss terms, interventions) is `sca.colorcube`.
 
-    bin/mini run docs/ex-2.9.3/experiment.py --app modal --max-containers 16
+    bin/mini run docs/m1/ex-2.9.3/experiment.py --app modal --max-containers 16
 """
 
 from __future__ import annotations
