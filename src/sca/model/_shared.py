@@ -2,25 +2,18 @@
 
 The `ngpt` module tells the architecture's story end to end; the supporting
 pieces live here: the last-axis `Linear` layer, positional rotary encoding, the
-learnable `Scale`, head reshaping, the sampling loop, and the `Generation`
-containers it produces.
+learnable `Scale`, and head reshaping.
 
 Models here are Equinox modules: pytrees of arrays transformed by JAX. Forward
 passes are pure functions — randomness (sampling) enters only through explicit
 PRNG keys, and "mutating" weights means building a new model.
 """
 
-import logging
-
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-import numpy as np
 from jaxtyping import Array, Float, Int, PRNGKeyArray
-from pydantic import BaseModel, NonNegativeFloat, PositiveInt, model_validator
-
-log = logging.getLogger(__name__)
 
 
 def normalize(x: Array, axis: int = -1, eps: float = 1e-12) -> Array:
@@ -112,7 +105,7 @@ def merge_heads(x: Float[Array, "B H T D"]) -> Float[Array, "B T C"]:
 
 
 class LanguageModel(eqx.Module):
-    """Base for the model variants: holds the key dimensions and the sampling machinery.
+    """Base for the model variants: holds the key dimensions and shared diagnostics.
 
     Subclasses build `self.transformer` and implement `__call__` mapping token
     indices (B, T) to logits (B, T, vocab). `normalize_weights` returns the model
@@ -134,137 +127,3 @@ class LanguageModel(eqx.Module):
         """Calculate the number of parameters in the model."""
         return sum(x.size for x in jax.tree.leaves(eqx.filter(self, eqx.is_array)))
 
-    def generate(
-        self,
-        tok_idx: Int[Array, "B T"] | Int[np.ndarray, "B T"],
-        max_new_tokens: PositiveInt,
-        temperature: NonNegativeFloat = 1.0,
-        pad_token_id: int = 0,
-        *,
-        key: PRNGKeyArray,
-    ) -> "Generation":
-        model = eqx.nn.inference_mode(self)
-        forward = eqx.filter_jit(model.__call__)
-
-        # Align all metric arrays to input length + max_new_tokens.
-        seq = np.asarray(tok_idx)
-        B, T = seq.shape
-        entropies = np.full((B, T + max_new_tokens), np.nan)
-        surprisals = np.full((B, T + max_new_tokens), np.nan)
-
-        # Padding mask (True for real tokens, False for padding)
-        padding_mask = seq != pad_token_id
-
-        # Calculate metrics for the prompt (except first token)
-        if T > 1:
-            logits = forward(jnp.asarray(seq))
-            log_probs = jax.nn.log_softmax(logits[:, :-1], axis=-1)
-            probs = jnp.exp(log_probs)
-            prompt_entropy = np.asarray(-jnp.sum(probs * log_probs, axis=-1))
-
-            targets = jnp.asarray(seq[:, 1:])
-            losses = np.asarray(-jnp.take_along_axis(log_probs, targets[..., None], axis=-1)[..., 0])
-
-            # Only store metrics for non-padding tokens
-            prompt_mask = padding_mask[:, 1:T]
-            surprisals[:, 1:T][prompt_mask] = losses[prompt_mask]
-            entropies[:, 1:T][prompt_mask] = prompt_entropy[prompt_mask]
-
-        # Generate tokens and track metrics
-        curr_len = T
-        for _ in range(max_new_tokens):
-            # Feed a fixed (B, block_size) window so the jitted forward compiles
-            # once. Right-pad the (≤ block_size) context to full width: causal
-            # masking makes the trailing pad positions inert, and we read logits
-            # at the last real position. Without padding, the growing context
-            # length would retrigger a recompile every step until it fills the block.
-            window = seq[:, -self.block_size :]
-            context_len = window.shape[1]
-            if context_len < self.block_size:
-                pad = np.full((B, self.block_size - context_len), pad_token_id, dtype=window.dtype)
-                window = np.concatenate([window, pad], axis=1)
-            logits = forward(jnp.asarray(window))
-            next_token_logits = logits[:, context_len - 1]
-
-            # Compute raw metrics (before temperature scaling)
-            log_probs = jax.nn.log_softmax(next_token_logits, axis=-1)
-            probs = jnp.exp(log_probs)
-            entropies[:, curr_len] = np.asarray(-jnp.sum(probs * log_probs, axis=-1))
-
-            # Sample next token (temperature applies to sampling only)
-            key, sample_key = jr.split(key)
-            idx_next = jr.categorical(sample_key, next_token_logits / temperature, axis=-1)
-
-            # Surprisal of the generated token (using raw logits for consistency)
-            surprisals[:, curr_len] = np.asarray(-jnp.take_along_axis(log_probs, idx_next[:, None], axis=-1)[:, 0])
-
-            # Append to sequence and increment position
-            seq = np.concatenate([seq, np.asarray(idx_next)[:, None]], axis=1)
-            curr_len += 1
-
-        # Calculate surprise-surprise metric; NaNs propagate through.
-        surprise_surprise = (surprisals - entropies) / np.log(self.vocab_size)
-
-        return Generation(
-            tokens=seq,
-            vocab_size=self.vocab_size,
-            surprisal=surprisals,
-            entropy=entropies,
-            surprise_surprise=surprise_surprise,
-        )
-
-
-class Generation(BaseModel, arbitrary_types_allowed=True):
-    tokens: Int[np.ndarray, "B T"]
-    """Generated token indices"""
-
-    vocab_size: PositiveInt
-    """Vocabulary size"""
-
-    surprisal: Float[np.ndarray, "B T"]
-    """Perplexity of each token in the sequence"""
-
-    entropy: Float[np.ndarray, "B T"]
-    """Entropy of each token in the sequence"""
-
-    surprise_surprise: Float[np.ndarray, "B T"]
-    """The normalized differences between surprisal and entropy (s2)"""
-
-    @model_validator(mode="after")
-    def same_lengths(self):
-        if not (len(self.tokens) == len(self.surprisal) == len(self.entropy) == len(self.surprise_surprise)):
-            raise ValueError("All tensors must be of equal length")
-        return self
-
-    def __getitem__(self, item: int):
-        """Allows indexing into the Generation object"""
-        return SingleGeneration(
-            tokens=self.tokens[item],
-            vocab_size=self.vocab_size,
-            surprisal=self.surprisal[item],
-            entropy=self.entropy[item],
-            surprise_surprise=self.surprise_surprise[item],
-        )
-
-
-class SingleGeneration(BaseModel, arbitrary_types_allowed=True):
-    tokens: Int[np.ndarray, " T"]
-    """Generated token indices"""
-
-    vocab_size: PositiveInt
-    """Vocabulary size"""
-
-    surprisal: Float[np.ndarray, " T"]
-    """Perplexity of each token in the sequence"""
-
-    entropy: Float[np.ndarray, " T"]
-    """Entropy of each token in the sequence"""
-
-    surprise_surprise: Float[np.ndarray, " T"]
-    """The normalized differences between surprisal and entropy (s2)"""
-
-    @model_validator(mode="after")
-    def same_lengths(self):
-        if not (len(self.tokens) == len(self.surprisal) == len(self.entropy) == len(self.surprise_surprise)):
-            raise ValueError("All tensors must be of equal length")
-        return self

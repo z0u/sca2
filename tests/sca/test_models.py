@@ -75,3 +75,33 @@ def test_normalize_weights_projects_onto_sphere():
         unit(block.attn.proj.weight, axis=0)
         unit(block.mlp.fc.weight, axis=1)
         unit(block.mlp.proj.weight, axis=0)
+
+
+def test_learnable_alpha_trains_and_reports():
+    """learnable_alpha turns the residual step into a trained gain, surfaced by scale_report."""
+    config = make_config(n_layer=4, residual_alpha_exp=0.5, learnable_alpha=True)
+    model = build_model(config, key=jr.key(0))
+    idx = jr.randint(jr.key(1), (2, 16), 0, config.vocab_size)
+
+    logits = model(idx)
+    assert jnp.isfinite(logits).all()
+
+    # The gains start at n_layer ** -exp and appear in the diagnostics report.
+    report = model.scale_report()
+    assert report["alpha_attn"] == [0.5] * 4
+    assert report["alpha_mlp"] == [0.5] * 4
+
+    # They are parameters, not constants: a loss step reaches them with nonzero gradients.
+    def loss(m):
+        return jnp.mean(m(idx) ** 2)
+
+    grads = eqx.filter_grad(loss)(model)
+    for block in grads.transformer.blocks:
+        assert block.s_attn is not None and jnp.abs(block.s_attn.weight).max() > 0
+        assert block.s_mlp is not None and jnp.abs(block.s_mlp.weight).max() > 0
+
+
+def test_fixed_alpha_omits_gains_from_report():
+    """Without learnable_alpha, the report has no residual gains to show."""
+    report = build_model(make_config(), key=jr.key(0)).scale_report()
+    assert "alpha_attn" not in report and "alpha_mlp" not in report
