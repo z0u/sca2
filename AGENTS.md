@@ -1,9 +1,9 @@
 We are running experiments to study Sparse Concept Anchoring (SCA): a training-time
-regularizer that guides a concept toward a known location in representation space (rather
-than searching for it post-hoc), so suppressing it later has bounded, analyzable
+technique that guides a concept toward a known location in representation space (rather
+than searching for it post-hoc), so later intervention has bounded, analyzable
 side-effects. M1 established this in autoencoders (done, published). This repo is **M2**:
 does it transfer to transformers? We anchor concepts in the residual stream of a small
-transformer trained on a synthetic color-mixing task (`red + blue = purple`), across four
+transformer, starting with a synthetic color-mixing task, across four
 deliverables D2.1-D2.4. Full context (milestone program, related work) in
 [README.md](/README.md).
 
@@ -18,10 +18,6 @@ references/  Related documents, such as earlier papers and blog posts
 README.md  Details about the project including a list of deliverables, and where this milestone fits within the program of work
 todo.md  Backlog + scratch notes, written to be readable cold — check before starting work that might already be tracked there
 ```
-
-The session-start hook prints a compact orientation map (git state, which resources are
-wired up, the experiment inventory, and pointers into `eng/` and `todo.md`) at the start
-of every session — read the file it points you to rather than re-deriving from scratch.
 
 ## Collaboration style
 
