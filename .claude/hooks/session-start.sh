@@ -50,11 +50,6 @@ log() { echo "session-start: $*" >&2; }
     echo
     echo "Experiments (report.py dirs; annotated status in docs/index.md):"
     git ls-files 'docs/**/report.py' | sed 's#/report.py##; s#^docs/#  #' | paste -sd' '
-    echo
-    echo "eng/ — the *why* behind mini infra (read the one you need; index in eng/README.md):"
-    echo "  artifacts·CAS+refs  storage-backend·HF-bucket  publishing·publish-vs-put  gc·mark-sweep  decisions·non-goals+issues  operations·egress/TLS/CORS"
-    echo
-    echo "todo.md — scratch gotchas + prioritized backlog (M2 science first); read before starting tracked work."
 ) 2>/dev/null
 
 # 0. Put the project venv first on PATH so bare `python` resolves to the
