@@ -56,6 +56,16 @@ Ref names are stringly typed: the experiment `set_ref`s them, the report `get_re
 them, and nothing checks they match — declare each near the top of both files with
 a "kept in sync by hand" note.
 
+**Provenance is automatic.** While the report renders, every `get_ref` it makes is
+recorded by the active publisher into the bundle's `_assets/provenance.json` (ref →
+the producer stamped at `set_ref` time: experiment, task, git state, run time — see
+[storage.md](./storage.md)), and the exporter injects a folded "Data provenance"
+chip (bottom-left, mirroring the nav banner) citing each producing experiment. No
+per-report code; a report whose refs are unstamped (written before provenance
+existed, or outside a task worker) simply gets no chip until the producing step
+re-runs. The chip's content derives only from the store's refs, so re-exporting
+unchanged data yields the same footer — publishing stays idempotent.
+
 Quote numbers in prose as computed values (`mo.md(f"…{best:.2f}…")`), derived in
 the guard cell or below it, so the text can't drift from the data. And compute the
 stats *before* writing any qualitative claim — including figure alt text: a

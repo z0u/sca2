@@ -11,14 +11,18 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- Cross-experiment lineage is currently **explicit**: an experiment declares
-  `Experiment(deps=[...])` and each upstream's provenance is snapshotted into
-  `lineage.upstreams`. The magic-er alternative — auto-detecting the dependency
-  from the shared refs a run *resolves* (`get_ref`) — needs producer identity
-  stamped onto refs at `set_ref` time, but the artifact `Store` is project-shared
-  and decoupled from the per-experiment name, so threading identity through it is
-  invasive. Revisit if declaring `deps` by hand proves to be a footgun (a run
-  that reads an upstream ref but forgets to list it gets no upstream lineage).
+- Cross-experiment lineage is now **auto-detected**: `set_ref` in a task worker
+  stamps producer identity onto the ref (via an ambient `producer_context`, so
+  the project-shared `Store` stays experiment-agnostic), `get_ref` records the
+  resolution on the task record (`upstream_refs`), and the driver rolls both
+  into `lineage.upstreams`. `Experiment(deps=[...])` remains for upstreams a run
+  doesn't read via a ref. Known gaps: refs written by the interactive
+  `Apparatus` (`app.map` in a notebook) or driver-side code are unstamped, and
+  a consumer served entirely from memo hits records nothing new — its
+  previously-recorded `upstream_refs` persist on the old records, which is
+  usually what you want. Pre-existing refs (e.g. the m1 `reports/*` ones) stay
+  unstamped until their publish step re-runs, so their report footers are empty
+  for now.
 
 - Modal `mem_total_gb` in a task's `env` reads the *host* total from
   `/proc/meminfo` (gvisor shows the whole node, ~186–363 GB), not the container's

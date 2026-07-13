@@ -73,9 +73,12 @@ plus a non-PII operator handle — the repo owner from the remote, since the git
 `user.name` is a bot in agent/CI contexts and a real name is PII), the spawning
 environment, and the timeline.
 `bin/mini lineage <exp>` prints the summary (`--diff` dumps the recorded diff),
-including a rollup of what the tasks ran on. An experiment that builds on another
-declares `Experiment(deps=[...])`; each upstream's provenance is snapshotted into
-`lineage.upstreams`, so a report can trace exactly which A produced B's inputs.
+including a rollup of what the tasks ran on. Upstream experiments are captured
+**automatically**: a step that `get_ref`s another experiment's ref records that
+producer, and the driver snapshots each producer's provenance into
+`lineage.upstreams` (shown as `⇐ <producer> … via <ref>`). Declare
+`Experiment(deps=[...])` only to force an upstream the run doesn't read via a
+ref (e.g. served from a memo hit, or handed over via the volume).
 
 On Modal, each run's app-instance ids are recorded for cost attribution.
 `bin/mini cost <exp>` reconciles the run's spend from the billing API with a

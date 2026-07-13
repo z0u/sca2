@@ -355,7 +355,11 @@ def _modal_task_entry(blob: bytes, key: str, gen: str, dict_name: str, volume_na
     # *under* the mounted Volume (committed with the result), per-experiment until
     # #22's project Volume.
     artifacts = store_for(Path(mount_point) / "store", cache_root=WORKER_STORE_CACHE)
-    execute_task(store, key, fn, args, hooks, commit=volume.commit, artifacts=artifacts, gen=gen)
+    # The Volume is named after the experiment (the mount point isn't), so it
+    # carries the experiment identity for ref provenance.
+    execute_task(
+        store, key, fn, args, hooks, commit=volume.commit, artifacts=artifacts, gen=gen, experiment=volume_name
+    )
 
 
 _UNSAFE_NAME = re.compile(r"[^A-Za-z0-9._-]")
