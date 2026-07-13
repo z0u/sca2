@@ -1,14 +1,22 @@
-We are running experiments to study Sparse Concept Anchoring.
+We are running experiments to study Sparse Concept Anchoring (SCA): a training-time
+technique that guides a concept toward a known location in representation space (rather
+than searching for it post-hoc), so later intervention has bounded, analyzable
+side-effects. M1 established this in autoencoders (done, published). This repo is **M2**:
+does it transfer to transformers? We anchor concepts in the residual stream of a small
+transformer, starting with a synthetic color-mixing task, across four
+deliverables D2.1-D2.4. Full context (milestone program, related work) in
+[README.md](/README.md).
 
 ## Repo structure
 
 ```
 src/  Model code, visualization tools, and vendored libraries
-src/mini/  Our library providing infra management, with storage, compute, and orchestration abstractions. Use it to run experiments.
-docs/  Experiments and reports (both in Python)
-eng/  Decision register
+src/mini/  Our library providing infra management, with storage, compute, and orchestration abstractions. Use it to run experiments. See the mi-ni skill.
+docs/  Experiments and reports (both in Python, as Marimo notebooks) — see docs/README.md for file-type/publishing conventions
+eng/  Decision register — the *why* behind mini's storage/artifacts/publishing/gc internals. eng/README.md indexes it by question; check there before re-deriving infrastructure rationale from scratch.
 references/  Related documents, such as earlier papers and blog posts
 README.md  Details about the project including a list of deliverables, and where this milestone fits within the program of work
+todo.md  Backlog + scratch notes, written to be readable cold — check before starting work that might already be tracked there
 ```
 
 ## Collaboration style
