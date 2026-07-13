@@ -15,6 +15,8 @@ agent (or you) can drive, poll, and gather without holding a session open:
     python -m mini results pipeline                            # per-task results
     python -m mini logs   pipeline <key>                       # a failed task's traceback
     python -m mini explain pipeline <key>                      # why this re-ran: evidence + attempt timeline
+    python -m mini lineage pipeline                            # provenance: git, who/what ran it, environment, upstreams
+    python -m mini cost    pipeline                            # reconcile the run's Modal cost (post-run billing)
     python -m mini cancel pipeline                             # stop in-flight tasks
     python -m mini gc     pipeline                             # plan a memo-storage sweep (--apply to delete)
     python -m mini gc     --store                              # plan an artifact-CAS sweep (--apply to delete)
@@ -32,6 +34,7 @@ import argparse
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 from mini.apparatus import Apparatus
 from mini.experiment import Experiment, load_experiment
@@ -293,10 +296,41 @@ def cmd_retry(args: argparse.Namespace) -> None:
     _run(exp, apparatus, args)
 
 
+def _stamp_lineage(exp: Experiment, store: MemoStore, args: argparse.Namespace) -> None:
+    """Capture run-level lineage into meta at each wake (never fails a run).
+
+    The latest capture wins (edits re-run tasks, so the final code state is what
+    produced the current results) while first-run breadcrumbs survive across wakes.
+    Each declared upstream (``Experiment.deps``) is snapshotted from its own stored
+    lineage, so a run records exactly which A its inputs came from.
+    """
+    from mini.lineage import merge_run_lineage, run_lineage, upstream_snapshot
+
+    try:
+        fresh = run_lineage()
+    except Exception:  # lineage is diagnostic — never let it take a run down
+        return
+    upstreams = []
+    for dep in exp.deps or []:
+        try:
+            dep_meta = _store_for(dep, args).meta()
+        except Exception:
+            continue  # an unreachable/never-run upstream just goes unrecorded
+        if dep_meta.get("lineage"):
+            upstreams.append(upstream_snapshot(dep, dep_meta))
+    if upstreams:
+        fresh["upstreams"] = upstreams
+    try:
+        store.set_meta(lineage=merge_run_lineage(store.meta().get("lineage"), fresh))
+    except Exception:
+        pass
+
+
 def _run(exp, apparatus: Apparatus, args: argparse.Namespace) -> None:
     """Drive one wake (or to completion with ``--watch``) and report."""
     store = apparatus.memo_store()
     _arm_budget(store, args)
+    _stamp_lineage(exp, store, args)
     keep_stale = getattr(args, "keep_stale", False)
     if args.watch:
         _watch(exp, apparatus, poll=args.poll, keep_stale=keep_stale)
@@ -432,6 +466,147 @@ def _attempt_delta(prev: dict, cur: dict) -> str:
             continue
         bits.append(f"{name}: {'changed' if name in a and name in b else ('added' if name in b else 'removed')}")
     return ", ".join(bits) or "retried (evidence unchanged)"
+
+
+def _exec_env_summary(store: MemoStore) -> dict[str, Any]:
+    """Aggregate the per-task execution environments a run actually ran on.
+
+    Each settled task carries an ``env`` (see :func:`mini.runs.compute_env`); this
+    rolls the fan-out up into the distinct GPUs / regions / clouds / hosts and the
+    number of Modal containers, plus the summed execution wall time — the "what did
+    this run *on*" companion to the driver-side lineage.
+    """
+    # env field -> the distinct values seen across tasks (each rolled up below).
+    seen: dict[str, set[str]] = {k: set() for k in ("gpu", "region", "cloud", "host", "modal_task_id")}
+    wall = 0.0
+    for rec in store.records():
+        env = rec.get("env") or {}
+        if gpu := env.get("gpu"):
+            env = {**env, "gpu": f"{gpu}×{env['gpu_count']}" if env.get("gpu_count") else gpu}
+        for field, values in seen.items():
+            if val := env.get(field):
+                values.add(val)
+        if (s := rec.get("started_at")) and (f := rec.get("finished_at")):
+            wall += max(0.0, f - s)
+    out: dict[str, Any] = {
+        label: sorted(seen[field])
+        for field, label in (("gpu", "gpus"), ("region", "regions"), ("cloud", "clouds"), ("host", "hosts"))
+        if seen[field]
+    }
+    if seen["modal_task_id"]:
+        out["modal_containers"] = len(seen["modal_task_id"])
+    if wall:
+        out["task_wall_seconds"] = round(wall, 1)
+    return out
+
+
+def _print_git_lineage(git: dict[str, Any], name: str) -> None:
+    """Print the git block of a run's lineage (code state, remotes, dirty diff)."""
+    head = git.get("describe") or git.get("short_sha") or "?"
+    print(f"  code    {head}{'  · dirty' if git.get('dirty') else ''}")
+    if branch := git.get("branch"):
+        print(f"          branch {branch}" + (f" · tags {', '.join(git['tags'])}" if git.get("tags") else ""))
+    for remote, url in (git.get("remotes") or {}).items():
+        print(f"          remote {remote} {url}")
+    if subject := git.get("subject"):
+        print(f"          “{subject}” ({git.get('committed_at', '?')})")
+    if git.get("diff"):
+        trunc = " (truncated)" if git.get("diff_truncated") else ""
+        print(f"          working-tree diff recorded{trunc} — see: python -m mini lineage {name} --diff")
+    if untracked := git.get("untracked"):
+        print(f"          untracked: {', '.join(untracked[:8])}" + (" …" if len(untracked) > 8 else ""))
+
+
+def cmd_lineage(args: argparse.Namespace) -> None:
+    """Print a run's captured provenance — enough to reproduce or forensically trace it.
+
+    Shows the code state (git sha/branch/tags/remote, and whether the tree was
+    dirty), who and what drove it (humans + AI agents), the spawning environment,
+    the timeline, any upstream experiments it built on, and a rollup of what the
+    tasks actually executed on. ``--diff`` dumps the recorded working-tree diff.
+    """
+    store = _store_for(args.name, args)
+    lin = store.meta().get("lineage")
+    if not lin:
+        raise SystemExit(
+            f"no lineage recorded for {args.name!r} — re-run it so this build can capture it "
+            "(or it may have run on a backend this checkout can't read; try --app)"
+        )
+    git = lin.get("git") or {}
+    if args.diff:
+        print(git.get("diff") or "(tree was clean — no diff recorded)")
+        return
+    print(f"{args.name} — lineage")
+    if git:
+        _print_git_lineage(git, args.name)
+    when = f"  when    first {lin.get('first_captured_at', '?')} · last {lin.get('captured_at', '?')}"
+    print(when + (f" · {lin['wakes']} wake(s)" if lin.get("wakes") else ""))
+    if humans := lin.get("humans"):
+        print(f"  humans  {', '.join(h.get('name', '?') for h in humans)}")
+    if agents := lin.get("agents"):
+        print(f"  agents  {', '.join(_fmt_agent(a) for a in agents)}")
+    drv = lin.get("driver") or {}
+    dl = f"  driver  {drv.get('host', '?')} · {drv.get('platform', '?')} · py{drv.get('python', '?')}"
+    if runner := drv.get("runner"):
+        dl += f" · {runner.get('kind', '?')}"
+    print(dl)
+    for up in lin.get("upstreams") or []:
+        ref = up.get("git_describe") or (up.get("git_sha") or "?")[:12]
+        print(f"  ⇐ {up.get('experiment', '?')}  {ref}{'  (dirty)' if up.get('git_dirty') else ''}  {up.get('run_at', '')}")
+    if ids := store.meta().get("modal_app_ids"):
+        print(f"  modal   {len(ids)} app run(s) — cost: python -m mini cost {args.name}")
+    if ran_on := _ran_on_line(store):
+        print(f"  ran on  {ran_on}")
+
+
+def _ran_on_line(store: MemoStore) -> str:
+    """One-line rollup of what a run's tasks actually executed on (or empty)."""
+    s = _exec_env_summary(store)
+    bits = []
+    if s.get("gpus"):
+        bits.append("gpu " + ", ".join(s["gpus"]))
+    if s.get("regions"):
+        bits.append("region " + ", ".join(s["regions"]))
+    if s.get("modal_containers"):
+        bits.append(f"{s['modal_containers']} container(s)")
+    if s.get("task_wall_seconds"):
+        bits.append(f"{s['task_wall_seconds']:g}s task wall")
+    return " · ".join(bits)
+
+
+def _fmt_agent(a: dict[str, str]) -> str:
+    s = a.get("name", "?")
+    if v := a.get("version"):
+        s += f" {v}"
+    extra = [f"{k}={a[k]}" for k in ("entrypoint", "model") if a.get(k)]
+    return s + (f" ({', '.join(extra)})" if extra else "")
+
+
+def cmd_cost(args: argparse.Namespace) -> None:
+    """Reconcile a run's Modal cost from the billing API (post-run; billing lags).
+
+    Sums the cost of every Modal app instance this run launched (recorded in meta at
+    spawn), with a per-resource breakdown (CPU / Memory / each GPU type). Only Modal
+    runs have a cost; billing is at daily resolution and lags the run, so a
+    just-finished run may report nothing yet.
+    """
+    store = _store_for(args.name, args)
+    meta = store.meta()
+    ids = meta.get("modal_app_ids") or []
+    if not ids:
+        raise SystemExit(f"{args.name!r}: no Modal app runs recorded — cost is available for Modal runs only")
+    from mini.modal_apparatus import query_cost
+
+    since = (meta.get("lineage") or {}).get("first_captured_at_epoch")
+    try:
+        rep = query_cost(ids, since_epoch=since)
+    except Exception as e:  # billing API is a network call; a clean message beats a traceback
+        raise SystemExit(f"could not query Modal billing for {args.name!r}: {e}") from e
+    print(f"{args.name} — Modal cost  ${rep['total']:.4f}  ({len(ids)} app run(s), {rep['intervals']} interval(s))")
+    for res, cost in sorted(rep["by_resource"].items(), key=lambda kv: kv[1], reverse=True):
+        print(f"  {res:10} ${cost:.4f}")
+    if rep["intervals"] == 0:
+        print("  (no billing data yet — Modal bills daily and lags the run; check back later)")
 
 
 def cmd_explain(args: argparse.Namespace) -> None:
@@ -679,6 +854,17 @@ def main() -> None:
     p.add_argument("key")
     _add_app_flag(p)
     p.set_defaults(func=cmd_explain)
+
+    p = sub.add_parser("lineage", help="show a run's provenance (git, who/what ran it, environment, upstreams)")
+    p.add_argument("name")
+    p.add_argument("--diff", action="store_true", help="print the recorded working-tree diff instead of the summary")
+    _add_app_flag(p)
+    p.set_defaults(func=cmd_lineage)
+
+    p = sub.add_parser("cost", help="reconcile a run's Modal cost from the billing API (post-run)")
+    p.add_argument("name")
+    _add_app_flag(p)
+    p.set_defaults(func=cmd_cost)
 
     p = sub.add_parser("cancel", help="stop in-flight tasks and mark them cancelled")
     p.add_argument("name")

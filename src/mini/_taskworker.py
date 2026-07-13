@@ -179,8 +179,12 @@ def execute_task(
     sink = _MemoSink(store, key, gen)
     if artifacts is not None and gen is not None:
         artifacts = _FencedStore(artifacts, store, key, gen)
-    # Record what we actually ran on (host/GPU/…), captured here in the worker.
-    if not record(state=RunState.RUNNING, heartbeat_at=time.time(), env=compute_env()):
+    # Record what we actually ran on (host/GPU/…) and when the worker truly began,
+    # captured here in the worker. ``started_at`` (worker's first write) pairs with
+    # ``finished_at`` (below) for a real execution duration — distinct from the
+    # client-side ``created_at`` stamped before the worker was even scheduled.
+    started_at = time.time()
+    if not record(state=RunState.RUNNING, heartbeat_at=started_at, started_at=started_at, env=compute_env()):
         return  # superseded before we even started — nothing here is wanted anymore
     try:
         with (
@@ -199,17 +203,20 @@ def execute_task(
         store.result_path(key, gen).write_bytes(cloudpickle.dumps(result))
         if commit is not None:
             commit()
-        record(state=RunState.DONE, heartbeat_at=time.time())
+        now = time.time()
+        record(state=RunState.DONE, heartbeat_at=now, finished_at=now)
     except Exception as exc:
         tb = traceback.format_exc()
         store.error_path(key, gen).write_text(tb)
         if commit is not None:
             commit()
+        now = time.time()
         record(
             state=RunState.FAILED,
             error=tb.strip().splitlines()[-1],
             exc_type=f"{type(exc).__module__}.{type(exc).__qualname__}",
-            heartbeat_at=time.time(),
+            heartbeat_at=now,
+            finished_at=now,
         )
 
 

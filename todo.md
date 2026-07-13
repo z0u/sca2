@@ -11,6 +11,21 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- Cross-experiment lineage is currently **explicit**: an experiment declares
+  `Experiment(deps=[...])` and each upstream's provenance is snapshotted into
+  `lineage.upstreams`. The magic-er alternative — auto-detecting the dependency
+  from the shared refs a run *resolves* (`get_ref`) — needs producer identity
+  stamped onto refs at `set_ref` time, but the artifact `Store` is project-shared
+  and decoupled from the per-experiment name, so threading identity through it is
+  invasive. Revisit if declaring `deps` by hand proves to be a footgun (a run
+  that reads an upstream ref but forgets to list it gets no upstream lineage).
+
+- Modal `mem_total_gb` in a task's `env` reads the *host* total from
+  `/proc/meminfo` (gvisor shows the whole node, ~186–363 GB), not the container's
+  memory limit. Fine as a coarse "what class of machine" signal; if we ever want
+  the true per-container cap, read the requested `memory=` from the role config
+  instead (or the cgroup limit, if gvisor exposes it).
+
 - Calibrate the redirect's γ against the model's pre-norm activation scale
   instead of the fixed γ = 1. Ex-2.9.3 found the fixed value silently no-ops
   on ~1 run in 250 (the bias fails to dominate that seed's pre-norm residual,
