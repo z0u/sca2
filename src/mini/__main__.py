@@ -552,7 +552,9 @@ def cmd_lineage(args: argparse.Namespace) -> None:
     print(dl)
     for up in lin.get("upstreams") or []:
         ref = up.get("git_describe") or (up.get("git_sha") or "?")[:12]
-        print(f"  ⇐ {up.get('experiment', '?')}  {ref}{'  (dirty)' if up.get('git_dirty') else ''}  {up.get('run_at', '')}")
+        print(
+            f"  ⇐ {up.get('experiment', '?')}  {ref}{'  (dirty)' if up.get('git_dirty') else ''}  {up.get('run_at', '')}"
+        )
     if ids := store.meta().get("modal_app_ids"):
         print(f"  modal   {len(ids)} app run(s) — cost: python -m mini cost {args.name}")
     if ran_on := _ran_on_line(store):

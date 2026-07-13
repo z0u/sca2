@@ -258,6 +258,7 @@ def test_memo_worker_mounts_hf_cache(monkeypatch):
     monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
     secrets_made: list[dict] = []
     monkeypatch.setattr("modal.Secret.from_dict", lambda d: secrets_made.append(d) or ("secret", d))
+
     def train_step(x):
         return x
 

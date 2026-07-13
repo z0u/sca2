@@ -81,7 +81,10 @@ def test_humans_reads_git_name_only(repo: Path):
 
 
 def test_sanitize_url_variants():
-    assert lineage._sanitize_url("http://local_proxy@127.0.0.1:41729/git/z0u/sca2") == "http://127.0.0.1:41729/git/z0u/sca2"
+    assert (
+        lineage._sanitize_url("http://local_proxy@127.0.0.1:41729/git/z0u/sca2")
+        == "http://127.0.0.1:41729/git/z0u/sca2"
+    )
     assert lineage._sanitize_url("https://user:pass@host/path") == "https://host/path"
     assert lineage._sanitize_url("git@github.com:z0u/sca2.git") == "git@github.com:z0u/sca2.git"  # scp-style: no ://
 
@@ -123,7 +126,9 @@ def test_merge_run_lineage_keeps_first_run_and_counts_wakes():
 
 
 def test_merge_run_lineage_preserves_upstreams_across_a_wake():
-    prev = lineage.merge_run_lineage(None, {"captured_at": "T1", "captured_at_epoch": 1.0, "upstreams": [{"experiment": "a"}]})
+    prev = lineage.merge_run_lineage(
+        None, {"captured_at": "T1", "captured_at_epoch": 1.0, "upstreams": [{"experiment": "a"}]}
+    )
     merged = lineage.merge_run_lineage(prev, {"captured_at": "T2", "captured_at_epoch": 2.0})
     assert merged["upstreams"] == [{"experiment": "a"}]  # a wake that didn't re-resolve deps keeps them
 

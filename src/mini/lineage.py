@@ -86,7 +86,7 @@ def _git(root: Path, *args: str) -> str | None:
             text=True,
             timeout=10,
         )
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return None
     return out.stdout.strip() if out.returncode == 0 else None
 

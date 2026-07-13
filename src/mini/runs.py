@@ -66,7 +66,7 @@ def _mem_total_gb() -> float | None:
         for line in Path("/proc/meminfo").read_text().splitlines():
             if line.startswith("MemTotal:"):
                 return round(int(line.split()[1]) / 1024 / 1024, 1)  # kB -> GiB
-    except (OSError, ValueError, IndexError):
+    except OSError, ValueError, IndexError:
         pass
     return None
 
