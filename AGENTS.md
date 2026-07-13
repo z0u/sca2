@@ -19,8 +19,9 @@ README.md  Details about the project including a list of deliverables, and where
 todo.md  Backlog + scratch notes, written to be readable cold — check before starting work that might already be tracked there
 ```
 
-The session-start hook prints git state, `mini ls`, the `eng/` doc index, and the full
-`todo.md` at the start of every session — if it's already in context, don't re-fetch it.
+The session-start hook prints a compact orientation map (git state, which resources are
+wired up, the experiment inventory, and pointers into `eng/` and `todo.md`) at the start
+of every session — read the file it points you to rather than re-deriving from scratch.
 
 ## Collaboration style
 
