@@ -521,7 +521,7 @@ def cmd_lineage(args: argparse.Namespace) -> None:
     """Print a run's captured provenance — enough to reproduce or forensically trace it.
 
     Shows the code state (git sha/branch/tags/remote, and whether the tree was
-    dirty), who and what drove it (humans + AI agents), the spawning environment,
+    dirty), who and what drove it (operator handle + AI agents), the spawning environment,
     the timeline, any upstream experiments it built on, and a rollup of what the
     tasks actually executed on. ``--diff`` dumps the recorded working-tree diff.
     """
@@ -541,8 +541,8 @@ def cmd_lineage(args: argparse.Namespace) -> None:
         _print_git_lineage(git, args.name)
     when = f"  when    first {lin.get('first_captured_at', '?')} · last {lin.get('captured_at', '?')}"
     print(when + (f" · {lin['wakes']} wake(s)" if lin.get("wakes") else ""))
-    if humans := lin.get("humans"):
-        print(f"  humans  {', '.join(h.get('name', '?') for h in humans)}")
+    if ops := lin.get("operators"):
+        print(f"  who     {', '.join(o.get('handle', '?') for o in ops)}")
     if agents := lin.get("agents"):
         print(f"  agents  {', '.join(_fmt_agent(a) for a in agents)}")
     drv = lin.get("driver") or {}

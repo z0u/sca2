@@ -76,8 +76,28 @@ def test_git_lineage_none_outside_a_repo(tmp_path: Path):
     assert lineage.git_lineage(tmp_path) is None
 
 
-def test_humans_reads_git_name_only(repo: Path):
-    assert lineage.humans(repo) == [{"name": "Ada Lovelace"}]  # name, never the email
+def test_operators_uses_repo_owner_handle_not_the_git_name(repo: Path):
+    # An agent/CI committer identity is a bot, and a real name/email is PII — so the
+    # operator is the non-PII repo owner from the remote, never user.name/user.email.
+    _git(repo, "remote", "add", "origin", "https://github.com/z0u/sca2.git")
+    assert lineage.operators(repo) == [{"handle": "z0u", "source": "git-remote"}]
+
+
+def test_operators_empty_without_a_remote(repo: Path):
+    assert lineage.operators(repo) == []  # no remote → no handle to attribute (never the git name)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com/z0u/sca2.git",
+        "git@github.com:z0u/sca2.git",
+        "http://local_proxy@127.0.0.1:41729/git/z0u/sca2",
+    ],
+)
+def test_operators_parses_owner_from_remote_shapes(repo: Path, url: str):
+    _git(repo, "remote", "add", "origin", url)
+    assert lineage.operators(repo) == [{"handle": "z0u", "source": "git-remote"}]
 
 
 def test_sanitize_url_variants():
@@ -151,5 +171,5 @@ def test_upstream_snapshot_pulls_a_compact_trace():
 
 def test_run_lineage_assembles_the_whole_snapshot(repo: Path):
     lin = lineage.run_lineage(repo)
-    assert {"captured_at", "captured_at_epoch", "agents", "humans", "driver", "git"} <= lin.keys()
+    assert {"captured_at", "captured_at_epoch", "agents", "operators", "driver", "git"} <= lin.keys()
     assert lin["git"]["subject"] == "first commit"

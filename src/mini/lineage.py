@@ -8,7 +8,9 @@ what, by whom, and can I recreate it exactly*:
 - the **code state** — git sha, branch, tags pointing at HEAD, remote(s), and the
   working-tree diff when the tree is dirty (so a run off uncommitted code is still
   reconstructable);
-- **who drove it** — human handles and detected AI agents (non-PII);
+- **who drove it** — the AI agent(s) and a non-PII operator handle (the repo owner
+  from the git remote; the git ``user.name`` is a bot in agent/CI contexts and a
+  real name is PII, so it's deliberately not used);
 - the **environment that spawned/managed the work** — this driver process;
 - **when** — captured, and first-captured across wakes.
 
@@ -39,7 +41,7 @@ __all__ = [
     "run_lineage",
     "git_lineage",
     "agents",
-    "humans",
+    "operators",
     "driver_env",
     "merge_run_lineage",
     "upstream_snapshot",
@@ -169,8 +171,8 @@ def agents(env: dict[str, str] | None = None) -> list[dict[str, str]]:
     """Detected AI agents driving the run (non-PII: name + version/entrypoint only).
 
     Keyed off well-known environment markers each tool sets. An unknown agent goes
-    undetected rather than guessed; humans are captured separately by
-    :func:`humans`.
+    undetected rather than guessed; the human operator is captured separately by
+    :func:`operators`.
     """
     env = env if env is not None else dict(os.environ)
     out: list[dict[str, str]] = []
@@ -185,15 +187,31 @@ def agents(env: dict[str, str] | None = None) -> list[dict[str, str]]:
     return out
 
 
-def humans(root: Path | str | None = None) -> list[dict[str, str]]:
-    """The human handle(s) behind the run — the git-configured ``user.name``.
+# The owner/repo tail of a remote URL: ``…/z0u/sca2(.git)`` or scp ``git@host:z0u/sca2``.
+_REMOTE_OWNER = re.compile(r"[:/]([^/:]+)/([^/]+?)(?:\.git)?/?$")
 
-    Name only, no email: the committer's chosen handle is the conventional
-    attribution and is already stamped into every commit, whereas an email is PII we
-    don't need for lineage.
+
+def operators(root: Path | str | None = None) -> list[dict[str, str]]:
+    """Non-PII handle(s) for *who* ran it — the git host owner from the remote(s).
+
+    We deliberately **don't** use the git-configured ``user.name`` / ``user.email``:
+    in an agent or CI context that's a bot identity (e.g. ``Claude
+    <noreply@anthropic.com>``), not the operator, and a real name/email is PII we
+    won't put in a record that may end up in a *published* report. The clean signal
+    that's actually available offline is the repo owner in the remote URL (e.g.
+    ``z0u`` from ``github.com/z0u/sca2``) — a public pseudonym, useful for forensics
+    and safe to persist.
+
+    The true operator identity (the human behind a Claude Code / CI session) lives
+    only in PII-bearing or sensitive env (session email, account/org ids, session
+    tokens), so it's intentionally left uncaptured; resolving a token to its login
+    would need a network call and often returns a bot anyway.
     """
-    name = _git(Path(root) if root else _project_root(), "config", "user.name")
-    return [{"name": name}] if name else []
+    handles: list[str] = []
+    for url in _git_remotes(Path(root) if root else _project_root()).values():
+        if m := _REMOTE_OWNER.search(url):
+            handles.append(m.group(1))
+    return [{"handle": h, "source": "git-remote"} for h in dict.fromkeys(handles)]
 
 
 def _detect_runner(env: dict[str, str]) -> dict[str, str] | None:
@@ -256,7 +274,7 @@ def run_lineage(root: Path | str | None = None) -> dict[str, Any]:
         "captured_at": now.isoformat(),
         "captured_at_epoch": now.timestamp(),
         "agents": agents(),
-        "humans": humans(root),
+        "operators": operators(root),
         "driver": driver_env(),
     }
     if git := git_lineage(root):

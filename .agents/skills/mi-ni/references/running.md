@@ -68,8 +68,10 @@ duration.
 
 A run stamps **lineage** into its meta on every wake — enough to reproduce or
 forensically trace it: the git state (sha, branch, tags, sanitized remote, and
-the working-tree diff when the tree is dirty), who/what drove it (human handles +
-detected AI agents, non-PII), the spawning environment, and the timeline.
+the working-tree diff when the tree is dirty), who/what drove it (the AI agent(s)
+plus a non-PII operator handle — the repo owner from the remote, since the git
+`user.name` is a bot in agent/CI contexts and a real name is PII), the spawning
+environment, and the timeline.
 `bin/mini lineage <exp>` prints the summary (`--diff` dumps the recorded diff),
 including a rollup of what the tasks ran on. An experiment that builds on another
 declares `Experiment(deps=[...])`; each upstream's provenance is snapshotted into
