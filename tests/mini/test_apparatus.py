@@ -258,11 +258,16 @@ def test_memo_worker_mounts_hf_cache(monkeypatch):
     monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
     secrets_made: list[dict] = []
     monkeypatch.setattr("modal.Secret.from_dict", lambda d: secrets_made.append(d) or ("secret", d))
+
+    def train_step(x):
+        return x
+
     app = _make_modal(monkeypatch)
-    app._memo_worker()
+    app._memo_worker(train_step)  # one registered worker per task fn (named after it)
     kwargs = app.app.function_kwargs  # pyrefly: ignore [missing-attribute]  (MockModalApp)
     assert isinstance(kwargs["volumes"][HF_CACHE_MOUNT], MockModalVolume)
     assert {"HF_HOME": HF_CACHE_MOUNT} in secrets_made
+    assert kwargs["name"].startswith("train_step-")  # dashboard shows the task fn, not _modal_task_entry
 
 
 def test_attach_hf_cache_preserves_user_mounts_and_secrets(monkeypatch):

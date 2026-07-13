@@ -17,6 +17,7 @@ import subprocess
 import sys
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 
 __all__ = ["RunState", "SETTLED", "compute_env", "data_root", "is_queued", "spawn_taskworker"]
 
@@ -41,36 +42,74 @@ def data_root() -> Path:
     return cwd / ".mini"
 
 
-def _gpu_name() -> str | None:
-    """Best-effort GPU model, dependency-free. NVIDIA exposes a per-GPU info file
-    on Linux; we don't import torch/jax just to name the card.
+def _gpus() -> tuple[str | None, int]:
+    """Best-effort GPU model + count, dependency-free. NVIDIA exposes a per-GPU
+    info file on Linux; we don't import torch/jax just to name the card.
     """
-    for info in Path("/proc/driver/nvidia/gpus").glob("*/information"):
+    model, count = None, 0
+    for info in sorted(Path("/proc/driver/nvidia/gpus").glob("*/information")):
+        count += 1
+        if model is not None:
+            continue
         try:
             for line in info.read_text().splitlines():
                 if line.startswith("Model:"):
-                    return line.split(":", 1)[1].strip()
+                    model = line.split(":", 1)[1].strip()
         except OSError:
             continue
+    return model, count
+
+
+def _mem_total_gb() -> float | None:
+    """Total RAM visible to the process, in GiB (from ``/proc/meminfo``), or ``None``."""
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemTotal:"):
+                return round(int(line.split()[1]) / 1024 / 1024, 1)  # kB -> GiB
+    except OSError, ValueError, IndexError:
+        pass
     return None
 
 
-def compute_env() -> dict[str, str]:
-    """A small snapshot of *what a task actually ran on*, recorded by the worker.
+# Modal stamps these into every container's env. Safe to record (workspace/region/
+# container ids — the forensic breadcrumb a run needs). Deliberately *excludes*
+# MODAL_IDENTITY_TOKEN / MODAL_TASK_SECRET / MODAL_TOKEN_* — those are credentials
+# and must never enter a record.
+_MODAL_ENV_KEYS = {
+    "MODAL_TASK_ID": "modal_task_id",
+    "MODAL_ENVIRONMENT": "modal_environment",
+    "MODAL_REGION": "region",
+    "MODAL_CLOUD_PROVIDER": "cloud",
+    "MODAL_IMAGE_ID": "modal_image_id",
+}
 
-    Captured inside the worker process (local subprocess or Modal container), so
-    it reflects the real execution environment rather than the requested backend —
-    useful when a sweep fans out across heterogeneous Modal containers. Kept tiny
-    (it rides the hot control-plane record): host, OS/arch, Python, and the GPU
-    model if one is attached.
+
+def compute_env() -> dict[str, Any]:
+    """A snapshot of *what a task actually ran on*, recorded by the worker.
+
+    Captured inside the worker process (local subprocess or Modal container), so it
+    reflects the real execution environment rather than the requested backend —
+    useful when a sweep fans out across heterogeneous Modal containers. Kept small
+    (it rides the hot control-plane record): host, OS/arch, Python, CPU/RAM, the GPU
+    model + count if any, and — on Modal — the container/region/cloud ids (never any
+    token or secret; see ``_MODAL_ENV_KEYS``).
     """
-    env = {
+    env: dict[str, Any] = {
         "host": platform.node(),
         "platform": platform.platform(),
         "python": platform.python_version(),
+        "cpu_count": os.cpu_count(),
     }
-    if gpu := _gpu_name():
+    if (mem := _mem_total_gb()) is not None:
+        env["mem_total_gb"] = mem
+    gpu, gpu_count = _gpus()
+    if gpu:
         env["gpu"] = gpu
+    if gpu_count > 1:
+        env["gpu_count"] = gpu_count
+    for src, dst in _MODAL_ENV_KEYS.items():
+        if val := os.environ.get(src):
+            env[dst] = val
     return env
 
 

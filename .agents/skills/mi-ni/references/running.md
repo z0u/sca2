@@ -58,9 +58,30 @@ Watching a big sweep is cheap too: the watch loops cache settled
 (`DONE`/`FAILED`/`CANCELLED`) records — they're immutable — and re-read only the
 tasks still in flight, so a mostly-done sweep stops paying to poll its settled
 tail (on Modal each record read is a `Dict` round-trip). Each task also records
-**what it actually ran on** (host/OS/Python, and the GPU when one is attached);
+**what it actually ran on** (host/OS/Python, CPU/RAM, the GPU + count when
+attached, and on Modal the container id / region / cloud — never any token);
 `status` shows `on <GPU>` for remote tasks, and the full snapshot is on the
-record under `env`.
+record under `env`, with `started_at`/`finished_at` for a real execution
+duration.
+
+## Provenance & cost
+
+A run stamps **lineage** into its meta on every wake — enough to reproduce or
+forensically trace it: the git state (sha, branch, tags, sanitized remote, and
+the working-tree diff when the tree is dirty), who/what drove it (the AI agent(s)
+plus a non-PII operator handle — the repo owner from the remote, since the git
+`user.name` is a bot in agent/CI contexts and a real name is PII), the spawning
+environment, and the timeline.
+`bin/mini lineage <exp>` prints the summary (`--diff` dumps the recorded diff),
+including a rollup of what the tasks ran on. An experiment that builds on another
+declares `Experiment(deps=[...])`; each upstream's provenance is snapshotted into
+`lineage.upstreams`, so a report can trace exactly which A produced B's inputs.
+
+On Modal, each run's app-instance ids are recorded for cost attribution.
+`bin/mini cost <exp>` reconciles the run's spend from the billing API with a
+per-resource breakdown (CPU / Memory / each GPU type). It's a **post-run** query:
+Modal bills at daily resolution and lags the run, so a just-finished run reports
+nothing yet — check back later.
 
 **Queued ≠ running.** A record reads RUNNING from launch, but the worker writes
 `env` as its first action — so until `env` appears, the task is *launched but

@@ -225,6 +225,58 @@ def test_run_stamps_backend_for_later_reads(tmp_path: Path, monkeypatch, capsys)
     assert "done" in capsys.readouterr().out
 
 
+def test_run_captures_lineage_and_lineage_command_reports_it(tmp_path: Path, monkeypatch, capsys):
+    """A run stamps provenance into meta; ``mini lineage`` reads it back.
+
+    Under ``/tmp`` there's no git repo, so the git block is absent — but the
+    identity/driver/timeline half is always captured, which is what this asserts.
+    """
+    monkeypatch.chdir(tmp_path)
+    exp_file = tmp_path / "prov.py"
+    exp_file.write_text(
+        textwrap.dedent("""
+        from mini import Experiment
+        def work(x):
+            return x
+        experiment = Experiment(name='provexp', main=lambda ctx: ctx.map(work, [1, 2]))
+        """)
+    )
+    from mini.__main__ import cmd_lineage, cmd_run
+
+    cmd_run(argparse.Namespace(path=str(exp_file), watch=True, poll=0.05, app=None, workers=1))
+    capsys.readouterr()
+
+    cmd_lineage(argparse.Namespace(name="provexp", app="local", diff=False))
+    out = capsys.readouterr().out
+    assert "provexp — lineage" in out
+    assert "when" in out and "driver" in out  # timeline + spawning environment always present
+
+
+def test_lineage_snapshots_declared_upstreams(tmp_path: Path, monkeypatch):
+    """An experiment that declares ``deps`` records each upstream's provenance, so a
+    downstream run can trace which A produced its inputs."""
+    monkeypatch.chdir(tmp_path)
+
+    def work(x):
+        return x
+
+    from mini.__main__ import _stamp_lineage
+
+    up = Experiment(name="prep", main=lambda ctx: ctx.map(work, [1]))
+    _drive(up, LocalApparatus("prep"))
+    up_args = argparse.Namespace(name="prep", app="local")
+    _stamp_lineage(up, LocalApparatus("prep").memo_store(), up_args)
+
+    down = Experiment(name="train", main=lambda ctx: ctx.map(work, [2]), deps=["prep"])
+    _drive(down, LocalApparatus("train"))
+    store = LocalApparatus("train").memo_store()
+    _stamp_lineage(down, store, argparse.Namespace(name="train", app="local"))
+
+    upstreams = store.meta()["lineage"]["upstreams"]
+    assert [u["experiment"] for u in upstreams] == ["prep"]
+    assert "run_at" in upstreams[0]  # carries when the upstream first ran
+
+
 def test_empty_read_names_backend_and_hints_at_the_other(tmp_path: Path, monkeypatch):
     """A read that finds nothing must say which backend it looked on and — when
     the run lives on the other one — name the flag to get there (#47)."""
