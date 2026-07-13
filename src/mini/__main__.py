@@ -296,13 +296,30 @@ def cmd_retry(args: argparse.Namespace) -> None:
     _run(exp, apparatus, args)
 
 
+def _detected_upstreams(exp: Experiment, store: MemoStore) -> dict[str, list[str]]:
+    """Upstream experiments detected from the refs this run's tasks resolved.
+
+    Each settled task records the shared refs it read and the experiment stamped
+    on each at ``set_ref`` time (``upstream_refs`` — see ``mini._taskworker``).
+    Rolled up here to producer → the resolved ref names (the evidence), with
+    self-reads dropped (an experiment reading its own refs is not a dependency).
+    """
+    found: dict[str, set[str]] = {}
+    for rec in store.records():
+        for item in rec.get("upstream_refs") or []:
+            if (producer := item.get("experiment")) and producer != exp.name:
+                found.setdefault(producer, set()).add(item["ref"])
+    return {name: sorted(refs) for name, refs in found.items()}
+
+
 def _stamp_lineage(exp: Experiment, store: MemoStore, args: argparse.Namespace) -> None:
     """Capture run-level lineage into meta at each wake (never fails a run).
 
     The latest capture wins (edits re-run tasks, so the final code state is what
     produced the current results) while first-run breadcrumbs survive across wakes.
-    Each declared upstream (``Experiment.deps``) is snapshotted from its own stored
-    lineage, so a run records exactly which A its inputs came from.
+    Upstream experiments are the declared ones (``Experiment.deps``) plus the ones
+    *detected* from the refs this run's tasks resolved; each is snapshotted from
+    its own stored lineage, so a run records exactly which A its inputs came from.
     """
     from mini.lineage import merge_run_lineage, run_lineage, upstream_snapshot
 
@@ -310,14 +327,23 @@ def _stamp_lineage(exp: Experiment, store: MemoStore, args: argparse.Namespace) 
         fresh = run_lineage()
     except Exception:  # lineage is diagnostic — never let it take a run down
         return
+    detected = _detected_upstreams(exp, store)
     upstreams = []
-    for dep in exp.deps or []:
+    for dep in dict.fromkeys([*(exp.deps or []), *sorted(detected)]):
         try:
             dep_meta = _store_for(dep, args).meta()
         except Exception:
-            continue  # an unreachable/never-run upstream just goes unrecorded
+            dep_meta = {}  # an unreachable upstream still gets its minimal record below
+        snap: dict[str, Any]
         if dep_meta.get("lineage"):
-            upstreams.append(upstream_snapshot(dep, dep_meta))
+            snap = upstream_snapshot(dep, dep_meta)
+        elif dep in detected:  # detected from a stamped ref, so the dependency is real
+            snap = {"experiment": dep}
+        else:  # declared but never run (or unreadable) — nothing to record
+            continue
+        if refs := detected.get(dep):
+            snap["refs"] = refs
+        upstreams.append(snap)
     if upstreams:
         fresh["upstreams"] = upstreams
     try:
@@ -334,6 +360,10 @@ def _run(exp, apparatus: Apparatus, args: argparse.Namespace) -> None:
     keep_stale = getattr(args, "keep_stale", False)
     if args.watch:
         _watch(exp, apparatus, poll=args.poll, keep_stale=keep_stale)
+        # Tasks settled *during* the watch, after the stamp above — re-stamp so
+        # the upstreams their records detected land in this same wake's lineage
+        # (a step-per-wake run picks them up at the next wake's stamp instead).
+        _stamp_lineage(exp, store, args)
         return
     if store.budget_expired():  # over budget — settle in-flight work, don't launch a new stage
         cancelled = apparatus.enforce_budget(store)
@@ -550,15 +580,21 @@ def cmd_lineage(args: argparse.Namespace) -> None:
     if runner := drv.get("runner"):
         dl += f" · {runner.get('kind', '?')}"
     print(dl)
-    for up in lin.get("upstreams") or []:
-        ref = up.get("git_describe") or (up.get("git_sha") or "?")[:12]
-        print(
-            f"  ⇐ {up.get('experiment', '?')}  {ref}{'  (dirty)' if up.get('git_dirty') else ''}  {up.get('run_at', '')}"
-        )
+    _print_upstreams(lin)
     if ids := store.meta().get("modal_app_ids"):
         print(f"  modal   {len(ids)} app run(s) — cost: python -m mini cost {args.name}")
     if ran_on := _ran_on_line(store):
         print(f"  ran on  {ran_on}")
+
+
+def _print_upstreams(lin: dict[str, Any]) -> None:
+    """Print each upstream experiment this run built on, with its refs evidence."""
+    for up in lin.get("upstreams") or []:
+        code = up.get("git_describe") or (up.get("git_sha") or "?")[:12]
+        line = f"  ⇐ {up.get('experiment', '?')}  {code}{'  (dirty)' if up.get('git_dirty') else ''}  {up.get('run_at', '')}"
+        if refs := up.get("refs"):  # detected from these resolved refs (vs. declared in deps=)
+            line += f"\n      via {', '.join(refs)}"
+        print(line)
 
 
 def _ran_on_line(store: MemoStore) -> str:

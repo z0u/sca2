@@ -90,3 +90,12 @@ Two further decisions:
   only `MINI_PUBLISH_REPO` — not the (now private) bucket. `store_for` builds a CAS-less
   store from a `publish-repo` alone for exactly this; the single-bucket default still
   serves the build off `MINI_STORE_BUCKET`. Set whichever your store layout uses.
+- **Provenance is injected at export, not build.** The provenance footer (which
+  experiment runs produced the data a report shows) needs the producers stamped on the
+  store's refs — state only the authenticated export half can see, and only *while the
+  notebook runs* (the resolutions happen inside cells). So the render records each
+  `get_ref` into the bundle's `_assets/provenance.json` via the active publisher, and
+  the exporter injects the footer into the HTML before the bundle syncs; the read-only
+  build stays dumb. Everything in the footer derives from the store's refs — no build
+  timestamps — so re-publishing unchanged data produces the same bundle content and
+  publishing stays idempotent.
