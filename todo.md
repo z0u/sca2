@@ -11,6 +11,25 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- Cross-experiment lineage is now **auto-detected**: `set_ref` in a task worker
+  stamps producer identity onto the ref (via an ambient `producer_context`, so
+  the project-shared `Store` stays experiment-agnostic), `get_ref` records the
+  resolution on the task record (`upstream_refs`), and the driver rolls both
+  into `lineage.upstreams`. `Experiment(deps=[...])` remains for upstreams a run
+  doesn't read via a ref. Known gaps: refs written by the interactive
+  `Apparatus` (`app.map` in a notebook) or driver-side code are unstamped, and
+  a consumer served entirely from memo hits records nothing new — its
+  previously-recorded `upstream_refs` persist on the old records, which is
+  usually what you want. Pre-existing refs (e.g. the m1 `reports/*` ones) stay
+  unstamped until their publish step re-runs, so their report footers are empty
+  for now.
+
+- Modal `mem_total_gb` in a task's `env` reads the *host* total from
+  `/proc/meminfo` (gvisor shows the whole node, ~186–363 GB), not the container's
+  memory limit. Fine as a coarse "what class of machine" signal; if we ever want
+  the true per-container cap, read the requested `memory=` from the role config
+  instead (or the cgroup limit, if gvisor exposes it).
+
 - Calibrate the redirect's γ against the model's pre-norm activation scale
   instead of the fixed γ = 1. Ex-2.9.3 found the fixed value silently no-ops
   on ~1 run in 250 (the bias fails to dominate that seed's pre-norm residual,

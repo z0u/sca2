@@ -225,6 +225,108 @@ def test_run_stamps_backend_for_later_reads(tmp_path: Path, monkeypatch, capsys)
     assert "done" in capsys.readouterr().out
 
 
+def test_run_captures_lineage_and_lineage_command_reports_it(tmp_path: Path, monkeypatch, capsys):
+    """A run stamps provenance into meta; ``mini lineage`` reads it back.
+
+    Under ``/tmp`` there's no git repo, so the git block is absent — but the
+    identity/driver/timeline half is always captured, which is what this asserts.
+    """
+    monkeypatch.chdir(tmp_path)
+    exp_file = tmp_path / "prov.py"
+    exp_file.write_text(
+        textwrap.dedent("""
+        from mini import Experiment
+        def work(x):
+            return x
+        experiment = Experiment(name='provexp', main=lambda ctx: ctx.map(work, [1, 2]))
+        """)
+    )
+    from mini.__main__ import cmd_lineage, cmd_run
+
+    cmd_run(argparse.Namespace(path=str(exp_file), watch=True, poll=0.05, app=None, workers=1))
+    capsys.readouterr()
+
+    cmd_lineage(argparse.Namespace(name="provexp", app="local", diff=False))
+    out = capsys.readouterr().out
+    assert "provexp — lineage" in out
+    assert "when" in out and "driver" in out  # timeline + spawning environment always present
+
+
+def test_lineage_snapshots_declared_upstreams(tmp_path: Path, monkeypatch):
+    """An experiment that declares ``deps`` records each upstream's provenance, so a
+    downstream run can trace which A produced its inputs."""
+    monkeypatch.chdir(tmp_path)
+
+    def work(x):
+        return x
+
+    from mini.__main__ import _stamp_lineage
+
+    up = Experiment(name="prep", main=lambda ctx: ctx.map(work, [1]))
+    _drive(up, LocalApparatus("prep"))
+    up_args = argparse.Namespace(name="prep", app="local")
+    _stamp_lineage(up, LocalApparatus("prep").memo_store(), up_args)
+
+    down = Experiment(name="train", main=lambda ctx: ctx.map(work, [2]), deps=["prep"])
+    _drive(down, LocalApparatus("train"))
+    store = LocalApparatus("train").memo_store()
+    _stamp_lineage(down, store, argparse.Namespace(name="train", app="local"))
+
+    upstreams = store.meta()["lineage"]["upstreams"]
+    assert [u["experiment"] for u in upstreams] == ["prep"]
+    assert "run_at" in upstreams[0]  # carries when the upstream first ran
+
+
+def test_lineage_detects_upstreams_from_resolved_refs(tmp_path: Path, monkeypatch, capsys):
+    """A run that reads another experiment's ref records it as an upstream — no
+    ``deps=`` declared. The producer is stamped onto the ref at ``set_ref`` time
+    (in the upstream's worker), the consumer's worker records the resolution on
+    its task record, and the driver rolls it up into ``lineage.upstreams``."""
+    monkeypatch.chdir(tmp_path)
+    # Workers must hit the tmp LocalStore: an ambient bucket would write the test ref
+    # to the real shared store, and a publish-repo alone builds a CAS-less store.
+    monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)
+    monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
+    (tmp_path / "prep.py").write_text(
+        textwrap.dedent("""
+        from mini import Experiment
+        def produce(x):
+            from mini.store import put, set_ref
+            set_ref('shared/thing', put(b'payload', name='thing.bin'))
+            return x
+        experiment = Experiment(name='prep', main=lambda ctx: ctx.map(produce, [1]))
+        """)
+    )
+    (tmp_path / "train.py").write_text(
+        textwrap.dedent("""
+        from mini import Experiment
+        def consume(x):
+            from mini.store import get_ref
+            assert get_ref('shared/thing') is not None
+            return x
+        experiment = Experiment(name='train', main=lambda ctx: ctx.map(consume, [2]))
+        """)
+    )
+    from mini.__main__ import cmd_lineage, cmd_run
+
+    ns = lambda f: argparse.Namespace(path=str(tmp_path / f), watch=True, poll=0.05, app=None, workers=1)  # noqa: E731
+    cmd_run(ns("prep.py"))
+    cmd_run(ns("train.py"))
+    capsys.readouterr()
+
+    store = LocalApparatus("train").memo_store()
+    (rec,) = store.records()
+    assert rec["upstream_refs"] == [{"ref": "shared/thing", "experiment": "prep"}]  # worker-side evidence
+    upstreams = store.meta()["lineage"]["upstreams"]  # driver rollup (stamped at end of the watch)
+    assert [u["experiment"] for u in upstreams] == ["prep"]
+    assert upstreams[0]["refs"] == ["shared/thing"]
+    assert "run_at" in upstreams[0]  # snapshotted from prep's own stored lineage
+
+    cmd_lineage(argparse.Namespace(name="train", app="local", diff=False))
+    out = capsys.readouterr().out
+    assert "⇐ prep" in out and "via shared/thing" in out
+
+
 def test_empty_read_names_backend_and_hints_at_the_other(tmp_path: Path, monkeypatch):
     """A read that finds nothing must say which backend it looked on and — when
     the run lives on the other one — name the flag to get there (#47)."""
