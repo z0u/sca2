@@ -181,11 +181,14 @@ def _(holdout, train_pairs):
             for j, b in enumerate(_vals)
             if (pair := (min(a, b), max(a, b))) in train | held
         }
-        edge = light_dark("#000", "#fff")
+        # A contrasting halo keeps the marks legible on cells near the mark color.
+        mark, halo = light_dark("#000", "#fff"), light_dark("#fffa", "#000a")
         _dots = [(x, y) for (y, x), h in pts.items() if not h]
         _rings = [(x, y) for (y, x), h in pts.items() if h]
-        ax.scatter(*zip(*_dots, strict=True), s=6, color=edge, alpha=0.75)
-        ax.scatter(*zip(*_rings, strict=True), s=80, facecolors="none", edgecolors=edge, lw=1.4)
+        ax.scatter(*zip(*_dots, strict=True), s=22, color=halo)
+        ax.scatter(*zip(*_dots, strict=True), s=6, color=mark)
+        ax.scatter(*zip(*_rings, strict=True), s=80, facecolors="none", edgecolors=halo, lw=3.5)
+        ax.scatter(*zip(*_rings, strict=True), s=80, facecolors="none", edgecolors=mark, lw=1.2)
         ax.set_xticks(range(len(_names)), _names, rotation=90, fontsize=7)
         ax.set_yticks(range(len(_names)), _names, fontsize=7)
         ax.set_title(
