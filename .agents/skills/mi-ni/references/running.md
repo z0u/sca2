@@ -101,6 +101,10 @@ few seconds. That worker is almost certainly dead — most often killed by the
 role's per-task `timeout` (Modal kills the container without the record
 settling, so it reads RUNNING forever; only the budget would eventually reap
 it). Size the timeout for the *largest* cell of a sweep, not the typical one.
+Note that `mini` does **not** set a timeout for you: a role without `timeout=`
+gets Modal's default of 5 minutes — and its default CPU slice (0.125 cores),
+where heavy imports (jax) can alone take minutes. Any role doing real work
+should set `timeout=` (and `cpu=` when CPU-bound).
 Recover deliberately: `cancel` to reap the record, raise the role's `timeout`
 (execution config — DONE cells stay memo hits), then `retry --key <key>`.
 

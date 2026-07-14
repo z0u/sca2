@@ -269,7 +269,7 @@ def main(ctx: Ctx) -> dict:
     n = len(trained)
     evaled = ctx.map(eval_one, trained, [prep["evals"]] * n, [prep["probes"]] * n, role="eval")
     ckpts = [t["checkpoint"] for t in trained]
-    surprisals = ctx.map(surprisal_one, ckpts, [prep["evals"]] * n, labels, role="prep")
+    surprisals = ctx.map(surprisal_one, ckpts, [prep["evals"]] * n, labels, role="surprisal")
     summary = ctx.run(publish_results, evaled, surprisals, role="prep")
     return {
         **summary,
@@ -287,5 +287,8 @@ experiment = Experiment(
         # ~750k-char corpus), so an L4 clears one in a few minutes.
         "train": dict(gpu="L4", timeout=1500),
         "eval": dict(gpu="L4", timeout=900),
+        # CPU, but needs real cores and headroom: importing jax on Modal's
+        # default 0.125-core slice alone can blow the default 5-min timeout.
+        "surprisal": dict(cpu=2, timeout=900),
     },
 )
