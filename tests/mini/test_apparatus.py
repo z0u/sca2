@@ -379,13 +379,11 @@ def test_get_data_dir_available_in_mapped_function(apparatus):
 # ---------------------------------------------------------------------------
 
 
-def test_interactive_local_map_resolves_ambient_store(tmp_path: Path, monkeypatch):
+def test_interactive_local_map_resolves_ambient_store(tmp_path: Path, local_store):
     """A fn mapped via LocalApparatus (not the memo worker) can put/get artifacts;
     the blob lands under the ``store/`` root sibling to the experiment's data dir."""
     from mini.store import get, put
 
-    monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)  # force a LocalStore
-    monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
     app = LocalApparatus("exp", data_dir=tmp_path / "exp")
 
     def fn(x):
@@ -397,15 +395,12 @@ def test_interactive_local_map_resolves_ambient_store(tmp_path: Path, monkeypatc
     assert len(blobs) == 2  # rooted beside the data dir, not under it
 
 
-def test_wrap_for_modal_binds_store_under_data_dir(tmp_path: Path, monkeypatch):
+def test_wrap_for_modal_binds_store_under_data_dir(tmp_path: Path, local_store):
     """The Modal-wrapped fn binds an ambient store rooted at ``data_dir/store`` —
     under the mounted Volume, since the parent isn't shared remotely."""
     from mini.local_queue import LocalQueue
     from mini.modal_apparatus import _wrap_for_modal
     from mini.store import LocalStore, get_store
-
-    monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)  # force a LocalStore
-    monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
 
     def fn():
         store = get_store()
