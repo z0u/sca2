@@ -75,6 +75,12 @@ readable cold without re-deriving code state.
   `sca/compute/evaluation.py` assume the infix `a <op> b = ` frame; keep that
   frame.
 
+- The ex-2.1.1 report refs moved to `reports/m2/ex-2.1.1/*`; the pre-rename
+  `reports/ex-2.1.1/*` refs still sit in the store (there's no ref-delete API).
+  Harmless clutter, but they pin their artifacts through GC's mark-and-sweep.
+  If a ref-delete/rename verb ever lands (eng/gc.md), sweep them. The m1 refs
+  (`reports/ex-2.9.*`) predate milestone nesting and stay flat on purpose.
+
 - Cheap capacity/superposition proxies for the ex-2.1.x eval step: per-layer
   participation ratio of residual-stream activations (eigenspectrum of the
   covariance — how many effective dimensions the model uses) and pairwise |cos|

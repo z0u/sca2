@@ -25,6 +25,8 @@ LM over the corpus, then measure:
 - **Per-layer linear decodability**: ridge probes from the residual stream to
   the operand color (at the operand's last character) and the result color and
   its *redness* (at the pre-answer position), R² on a held-out half.
+- **Per-character surprisal** on a couple of lines per eval set, for the
+  report's subline figure: where along ``a + b = c`` the model is uncertain.
 
 The sweep answers two questions the anchored experiments depend on: which
 backbone size to freeze (the smallest that saturates accuracy), and what the
@@ -43,17 +45,21 @@ from mini import Ctx, Experiment, get_data_dir
 WIDTHS = [16, 32, 64]
 DEPTHS = [2, 4]
 SEEDS = [0, 1, 2]
+# Carried over from ngpt-scaling, which trained stably at this LR across its
+# whole width × depth grid; nGPT's normalization makes the LR forgiving.
 PEAK_LR = 1e-2
 
 CORPUS_SEED = 0
 N_EXAMPLES = 40_000
 HOLDOUT_FRAC = 0.2  # of distinct closed named pairs
-EVAL_K = 256  # per unseen eval set
-PROBE_K = 2048
+N_EVAL = 256  # examples per unseen eval set
+N_PROBE = 2048
+N_SURPRISAL = 2  # examples per eval set in the surprisal capture
 
-# Store refs the report reads (see report.py).
-METRICS_REF = "reports/ex-2.1.1/metrics"
-WEIGHTS_REF = "reports/ex-2.1.1/probe-weights"
+# Store refs, namespaced by milestone (m1's predate the nesting and stay flat).
+# The report imports these, so they can't drift.
+METRICS_REF = "reports/m2/ex-2.1.1/metrics"
+WEIGHTS_REF = "reports/m2/ex-2.1.1/probe-weights"
 
 
 def prepare_data() -> dict:
@@ -86,11 +92,11 @@ def prepare_data() -> dict:
     evals = {
         "named_seen": colors.as_named(train_pairs, seed=1),
         "named_holdout": colors.as_named(holdout, seed=2),
-        "hex_unseen": colors.sample_unseen("hex", EVAL_K, 3, seen),
-        "cross_unseen": colors.sample_unseen("cross", EVAL_K, 4, seen),
+        "hex_unseen": colors.sample_unseen("hex", N_EVAL, 3, seen),
+        "cross_unseen": colors.sample_unseen("cross", N_EVAL, 4, seen),
     }
     # Equations only (no alias lines): the probe positions assume `a + b = `.
-    probes = {"probe": colors.sample_corpus(PROBE_K, 5, train_pairs, {"hex": 0.5, "named": 0.25, "cross": 0.25})}
+    probes = {"probe": colors.sample_corpus(N_PROBE, 5, train_pairs, {"hex": 0.5, "named": 0.25, "cross": 0.25})}
     return {
         "meta": meta,
         "evals": put(colors.dump_example_sets(evals), name="ex-2.1.1-evals.json"),
@@ -194,7 +200,43 @@ def eval_one(trained: dict, evals, probes) -> dict:
     }
 
 
-def publish_results(results: list[dict]) -> dict:
+def surprisal_one(checkpoint, evals, label: str) -> dict:
+    """Per-character surprisal over the first few lines of each eval set.
+
+    A separate step (not folded into `eval_one`) so it can run on CPU — the
+    models are tiny — and so edits here don't invalidate the GPU eval memos.
+    """
+    import equinox as eqx
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+
+    from sca.compute.model import load_checkpoint
+    from sca.data.colors import load_example_sets
+    from sca.data.tokenizer import CharTokenizer
+    from mini.store import get
+
+    workdir = get_data_dir() / "surprisal" / label
+    get(checkpoint, workdir / "model")
+    model, config, _ = load_checkpoint(workdir)
+    model = eqx.nn.inference_mode(model)
+    tokenizer = CharTokenizer(config.tokenizer)
+
+    sets: dict[str, list[dict]] = {}
+    for name, exs in load_example_sets(get(evals, workdir / "evals.json").read_bytes()).items():
+        rows = []
+        for ex in exs[:N_SURPRISAL]:
+            text = ex.prompt + ex.answer
+            ids = np.asarray(tokenizer.encode([text])[0])
+            logp = jax.nn.log_softmax(model(jnp.asarray(ids[None]))[0], axis=-1)
+            nll = np.asarray(-logp[jnp.arange(len(ids) - 1), ids[1:]])
+            # nll[i] is the surprisal of text[i + 1]; text[0] has no prediction.
+            rows.append({"text": text, "answer_start": len(ex.prompt), "nll": [float(v) for v in nll]})
+        sets[name] = rows
+    return {"label": label, "surprisal": sets}
+
+
+def publish_results(results: list[dict], surprisals: list[dict]) -> dict:
     """Publish the metrics (JSON) and the stacked probe weights (npz) for the report."""
     import io
     import json
@@ -203,7 +245,10 @@ def publish_results(results: list[dict]) -> dict:
 
     from mini.store import get, put, set_ref
 
-    metrics = [{k: v for k, v in r.items() if k != "probe_weights"} for r in results]
+    by_label = {s["label"]: s["surprisal"] for s in surprisals}
+    metrics = [
+        {k: v for k, v in r.items() if k != "probe_weights"} | {"surprisal": by_label[r["label"]]} for r in results
+    ]
     set_ref(METRICS_REF, put(json.dumps(metrics, indent=2).encode(), name="ex-2.1.1-metrics.json"))
 
     arrays = {}
@@ -223,7 +268,9 @@ def main(ctx: Ctx) -> dict:
     trained = ctx.map(train_one, configs, labels, role="train")
     n = len(trained)
     evaled = ctx.map(eval_one, trained, [prep["evals"]] * n, [prep["probes"]] * n, role="eval")
-    summary = ctx.run(publish_results, evaled, role="prep")
+    ckpts = [t["checkpoint"] for t in trained]
+    surprisals = ctx.map(surprisal_one, ckpts, [prep["evals"]] * n, labels, role="prep")
+    summary = ctx.run(publish_results, evaled, surprisals, role="prep")
     return {
         **summary,
         "worst_hex_unseen": min(r["accuracy"]["hex_unseen"]["accuracy"] for r in evaled),

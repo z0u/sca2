@@ -192,7 +192,6 @@ def _(cond, steps, traj):
         axes[0, 0].set_title("Anchor progress")
         axes[0, 1].set_title("Leakage")
         fig.suptitle("Without the fallback term: the controller never loses an anchor — and ruins other runs", y=0.99)
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -305,7 +304,6 @@ def _(cond, n_cat, rd):
         ]
         axes[0].legend(handles=handles, loc="lower left")
         axes[0].set_title("Fallback-trained cells: feedback adds no headroom, and its knobs cut")
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
