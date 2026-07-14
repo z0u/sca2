@@ -11,6 +11,26 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Publish-tier exports go stale on rename.** `export_key` derives from the
+  docs-relative path, so moving a notebook orphans its synced bundle: the build
+  looks for the new key, skips with a warning, and the site 404s while
+  `index.md` still links the page. The `docs/m1/` casualties (ex-2.9.1..4,
+  stranded by 31e103e) were moved to their new keys on 2026-07-14;
+  `exports/ngpt-sweep` (notebook renamed to ngpt-scaling) is still there as
+  pure cruft. Prevention: teach `./go publish` (or the build) to list remote
+  export keys and warn on ones with no matching notebook, and/or a `./go
+  publish --move old new` verb. Consider folding orphan cleanup into
+  `mini gc --store`.
+
+- **PR publishes land on the prod publish tier.** `./go publish` from a PR
+  branch writes `exports/<key>/` on the *production* tier — a new report sits
+  there dark until main links it (fine; the PR preview even depends on it),
+  but re-publishing an *existing* key from a branch silently swaps the assets
+  under the live site's stale HTML. If that bites, publish PR exports to a
+  `pr-<n>` git revision of the dataset repo (`upload_folder(revision=...)`,
+  preview `<base>` at `resolve/pr-<n>/`). PR previews themselves shipped
+  2026-07-14 (`pr-preview.yml`; see eng/publishing.md).
+
 - Cross-experiment lineage is now **auto-detected**: `set_ref` in a task worker
   stamps producer identity onto the ref (via an ambient `producer_context`, so
   the project-shared `Store` stays experiment-agnostic), `get_ref` records the
