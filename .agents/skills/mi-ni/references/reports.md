@@ -97,3 +97,31 @@ rendered page, a link to a source file becomes its GitHub source, and anything i
 place is left alone with a warning. Write natural relative links
 (`[experiment](./experiment.py)`); the absolute targets are derived from the git remote
 (override with `MINI_SITE_URL` / `MINI_SOURCE_URL`). Design notes: `eng/publishing.md`.
+
+## Verifying a rendered report from a sandboxed agent session
+
+Don't try to screenshot the exported bundle with headless Chromium: the HTML
+hydrates client-side and pulls the Marimo frontend from a CDN, which the
+sandbox's browser can't reach (it doesn't inherit the agent proxy), so the page
+renders blank — `document.body.scrollHeight` of 0 over both `file://` and a
+localhost server. Verify without a browser instead:
+
+- **Structure:** grep `index.html` — `Traceback|marimo-error` should have zero
+  hits, and a string produced *below* the `mo.stop` guard (a computed number, a
+  section heading) proves the data cells ran. Beware that cell *source* is
+  embedded in the HTML too, so grep for rendered output, not code.
+- **Figures:** `Read` the exported `_assets/<name>-{light,dark}.png` directly —
+  faster and more faithful than a screenshot. Judge the dark variant composited
+  over `#111` (see the figure-style skill).
+- **Inline SVG output** (e.g. subline): extract the `<svg>…</svg>` and rasterize
+  with cairosvg (`uvx --with cairosvg`), first stripping any external
+  `@import url(...)` font rule. Glyph metrics are approximate without the
+  webfont (text drifts relative to per-character marks), but shape and story
+  read fine. Simpler still: regenerate the SVG standalone with the same code
+  and data the report uses — that also exercises the figure code path.
+
+If you must drive Chromium (e.g. for a self-contained page): the executable is
+`/opt/pw-browsers/chromium` (pass `executable_path=`), pages referencing
+external hosts hang `goto` (use `wait_until="domcontentloaded"`), and the
+browser can't read the session scratchpad under `/tmp` — serve from the repo
+tree over localhost.

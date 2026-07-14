@@ -54,6 +54,15 @@ cheap, stateless call against durable state:
 Re-running is cheap: completed steps are memo hits, so a `run` only advances the
 un-run pieces.
 
+**Waiting for a stage to settle** (an agent session that wants one wake-up, not
+a sleep loop): prefer backgrounding `bin/mini watch <exp>` — it polls read-only,
+reaps vanished workers, and *exits* once every current task settles, so its exit
+is the wake signal. If you instead poll `status` and grep, do not grep only for
+terminal states: a dead worker can read `RUNNING` indefinitely (see the trap
+below), so also treat a heartbeat older than a few minutes (`♥ 300s ago` — live
+workers beat every few seconds) as a wake condition. Bound either wait with
+`--budget` so an unattended stall settles itself.
+
 Watching a big sweep is cheap too: the watch loops cache settled
 (`DONE`/`FAILED`/`CANCELLED`) records — they're immutable — and re-read only the
 tasks still in flight, so a mostly-done sweep stops paying to poll its settled
@@ -99,8 +108,10 @@ code.
 and whose heartbeat (♥) has gone stale for minutes while its siblings beat every
 few seconds. That worker is almost certainly dead — most often killed by the
 role's per-task `timeout` (Modal kills the container without the record
-settling, so it reads RUNNING forever; only the budget would eventually reap
-it). Size the timeout for the *largest* cell of a sweep, not the typical one.
+settling, so it reads RUNNING forever; `reap_dead` should catch this but
+currently misses timeout-killed calls — sca2#20 — so until that lands only the
+budget reaps it). Size the timeout for the *largest* cell of a sweep, not the
+typical one.
 Note that `mini` does **not** set a timeout for you: a role without `timeout=`
 gets Modal's default of 5 minutes — and its default CPU slice (0.125 cores),
 where heavy imports (jax) can alone take minutes. Any role doing real work
