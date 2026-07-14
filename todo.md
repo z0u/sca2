@@ -74,11 +74,47 @@ readable cold without re-deriving code state.
   (mirroring ex-2.9.2's exemplar plot) or drop the two `set_ref` calls and the
   `worst`/`rescue` computation.
 
-- Sweep cells all `save_checkpoint` to the same shared `get_data_dir()`, so the
-  checkpoint file is last-writer-wins across a fan-out. Harmless today (the
-  ngpt-scaling cells return their metrics; nothing reads the checkpoints back),
-  but key checkpoints by cell label before any experiment resumes from or
-  evaluates them.
+- ngpt-scaling's sweep cells all `save_checkpoint` to the same shared
+  `get_data_dir()`, so the checkpoint file is last-writer-wins across a fan-out.
+  Harmless there (cells return their metrics; nothing reads the checkpoints
+  back). `train_model` now takes a `checkpoint_dir` for per-cell keying —
+  ex-2.1.1 uses it because its eval step reads checkpoints back — but
+  ngpt-scaling still writes to the shared default.
+
+- The color-mixing grammar (`sca/data/colors.py`) hardcodes one operation:
+  `mix`, spelled `+`. D2.2 anchors *the operation*, which only makes sense once
+  the operation is a variable — with a single op there's nothing for the model
+  to represent. When extending: add an operation table (name, surface form,
+  grid fn with a defined rounding — saturating add/subtract and screen all stay
+  closed on 0..15), thread an `op` field through `Example` and key the
+  seen-pair bookkeeping on `(op, pair)`. Spell operators as *words*
+  (`red mix blue = purple`), not symbols, so the operation concept is
+  multi-token like the colors. No need to keep `+` compatible — each experiment
+  retrains from scratch and carries its own un-anchored control, so grammars
+  may differ across experiments. Probe positions in
+  `sca/compute/evaluation.py` assume the infix `a <op> b = ` frame; keep that
+  frame.
+
+- The ex-2.1.1 report refs moved to `reports/m2/ex-2.1.1/*`; the pre-rename
+  `reports/ex-2.1.1/*` refs still sit in the store (there's no ref-delete API).
+  Harmless clutter, but they pin their artifacts through GC's mark-and-sweep.
+  If a ref-delete/rename verb ever lands (eng/gc.md), sweep them. The m1 refs
+  (`reports/ex-2.9.*`) predate milestone nesting and stay flat on purpose.
+
+- Cheap capacity/superposition proxies for the ex-2.1.x eval step: per-layer
+  participation ratio of residual-stream activations (eigenspectrum of the
+  covariance — how many effective dimensions the model uses) and pairwise |cos|
+  between the fitted probe directions (operand vs result vs redness —
+  interference between concepts). Both fall out of arrays `eval_one` already
+  computes; they'd let the width sweep read as a compression axis. Full
+  superposition accounting (feature dictionary / SAE) is its own experiment,
+  after D2.1.2.
+
+- If anchoring a composed concept fails in D2.1.2, a useful ablation is a
+  word-level tokenizer variant (one token per color name, hex still
+  char-level): it separates "anchoring fails for transformers" from "anchoring
+  fails for concepts that don't coincide with an embedding row". Not the
+  default — the char-level task is the honest version of what M2 claims.
 
 - ngpt-scaling shows the simplified nGPT (fixed scalar α = 1/n_layer) trains
   flat across the width × depth grid we can afford. Follow-up: confirm the fixed

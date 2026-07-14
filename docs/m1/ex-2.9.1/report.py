@@ -179,7 +179,6 @@ def _(best, metrics):
         ax.set(xlabel="seed", ylabel="score (R², error vs. similarity)", ylim=(0, 1.05))
         ax.set_xticks(seeds)
         ax.grid(alpha=0.3)
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -218,7 +217,6 @@ def _(best, best_eval):
         ax.text(0.05, 0.92, f"$R^2$ = {r2:.3f}", transform=ax.transAxes)
         ax.set(xlabel="similarity to red (angular HSV, cubed)", ylabel="reconstruction MSE after ablation")
         ax.grid(alpha=0.3)
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())

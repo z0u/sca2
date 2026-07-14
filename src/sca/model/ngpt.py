@@ -193,6 +193,21 @@ class NGPT(LanguageModel):
         # apply the learnable logit temperature.
         return (x @ self.transformer.wte.T) * self.s_z()
 
+    def residual_stream(self, idx: Int[Array, "B T"]) -> Float[Array, "L1 B T C"]:
+        """The residual stream at every depth: the embedding plus the state after
+        each block (n_layer + 1 slices, all unit-norm).
+
+        The probing/anchoring readout for the M2 experiments. Mirrors
+        ``__call__`` without gradient checkpointing — intended for small eval
+        batches, not the training path.
+        """
+        x = normalize(self.transformer.wte[idx])
+        states = [x]
+        for block in self.transformer.blocks:
+            x = block(x, self.transformer.rotary_enc)
+            states.append(x)
+        return jnp.stack(states)
+
     def normalize_weights(self) -> "NGPT":
         """Project every hidden-dim matrix back onto the unit hypersphere.
 

@@ -141,7 +141,6 @@ def _(curves):
         ax.set_xticks(DEPTHS)
         ax.grid(alpha=0.3)
         ax.legend(fontsize=8)
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -184,7 +183,6 @@ def _(curves):
             ax.grid(alpha=0.3)
         axes[0].set_ylabel("validation loss (nats/char)")
         axes[0].legend(fontsize=8)
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())

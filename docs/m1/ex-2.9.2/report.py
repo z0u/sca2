@@ -219,7 +219,6 @@ def _(stat):
         handles = [plt.Line2D([], [], marker="o", ls="", color=c, label=v) for v, c in colors.items()]
         ax.legend(handles=handles, loc="lower right", title="training")
         ax.set_title("Selectivity by intervention and training variant")
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -304,7 +303,6 @@ def _(stat):
         ax.set(ylabel="reconstruction MSE, pure red")
         ax.grid(alpha=0.3, axis="y")
         ax.set_title("Damage to pure red: spread vs. the analytic bound")
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -371,7 +369,6 @@ def _(exemplars):
             ax.set(xlabel="similarity to red (angular HSV, cubed)", title=f"{v} + {i} (median seed)")
             ax.grid(alpha=0.3)
         axes[0].set(ylabel="reconstruction MSE after intervention")
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())

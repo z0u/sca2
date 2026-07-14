@@ -176,7 +176,6 @@ def _(arm, steps, traj):
             ax.axvspan(750, 1500, color=light_dark("#1a5f8a", "#6ab0d4"), alpha=0.07, lw=0)
             ax.grid(alpha=0.3)
         axes[0].set_title("Every failure anchors first, then breaks during the high-LR plateau")
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -350,7 +349,6 @@ def _(sweep_cell):
         ]
         axes[0].legend(handles=handles, loc="lower left")
         axes[0].set_title("Redirect score and leakage across the schedule sweep (32 seeds per cell)")
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())

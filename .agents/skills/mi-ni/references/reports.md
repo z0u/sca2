@@ -52,9 +52,12 @@ loader's variable directly bypass the guard and crash on `None` in a data-less
 export — so consume the data only through names the guard cell defines (its
 re-export, or stats derived there), never the loader's own output.
 
-Ref names are stringly typed: the experiment `set_ref`s them, the report `get_ref`s
-them, and nothing checks they match — declare each near the top of both files with
-a "kept in sync by hand" note.
+Ref names are stringly typed: the experiment `set_ref`s them and the report
+`get_ref`s them, so declare them once in `experiment.py` and import them from the
+report (`from experiment import METRICS_REF` — Marimo puts the notebook's directory
+on `sys.path`). Sweep constants the report reiterates (widths, seeds) can ride along
+in the same import. Namespace refs by milestone (`reports/m2/ex-2.1.1/metrics`) so
+experiments with similar numbering can't collide across milestones.
 
 **Provenance is automatic.** While the report renders, every `get_ref` it makes is
 recorded by the active publisher into the bundle's `_assets/provenance.json` (ref →

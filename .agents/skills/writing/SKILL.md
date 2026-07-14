@@ -51,6 +51,11 @@ When in doubt about how to phrase something, err on the side of clarity and simp
 
 ## Markdown
 
+Never hard-wrap a line inside an inline code span or math expression. A wrapped
+span can start the next line with block syntax — a hex code like `#f78` at the
+start of a line renders as a heading — and some renderers break the span
+entirely. Rewrap the surrounding prose so the whole span sits on one line.
+
 Use sentence case for headings and descriptive lists.
 
 ```patch

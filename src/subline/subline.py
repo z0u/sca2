@@ -166,7 +166,7 @@ class Subline:
                     --col-series-5: light-dark(#a855f7, #d9b1ff);
                     --col-text: light-dark(#666666, #dddddd);
                     --col-baseline: light-dark(#cccccc, #666666);
-                    --bg-color: light-dark(#fff, #2a2a2a);
+                    --bg-color: light-dark(#fff, #181c1a);
                     --blend-mode: multiply;
                 }
                 @media (prefers-color-scheme: dark) {
@@ -206,5 +206,6 @@ class Subline:
 
         total_width = max(text_width + 2 * self.margin, legend_width + 2 * self.margin)
         svg.set("viewBox", f"0 0 {total_width} {total_height}")
+        svg.set("style", svg.get("style", "") + f"width: {total_width:.1f}px; max-width: 100%; display: inline-block;")
 
         return ET.tostring(svg, encoding="unicode")
