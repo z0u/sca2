@@ -1,4 +1,4 @@
-"""Post-export HTML tidy-ups: the hide-code-by-default flip."""
+"""Post-export HTML tidy-ups: the code-collapsed-by-default shim."""
 
 import importlib.util
 from pathlib import Path
@@ -11,29 +11,33 @@ clean_docs = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(clean_docs)
 
 
-# Marimo embeds the app view config mid-page in a JS wrapper; this is the shape we flip.
-_EXPORT = '<div>… "view": {"showAppCode": true} … "code": "import x"</div>'
+_EXPORT = '<!doctype html><html><head><meta charset="utf-8"></head><body>…</body></html>'
 
 
-def test_flips_show_app_code(tmp_path):
+def test_injects_shim_into_head(tmp_path):
     p = tmp_path / "index.html"
     p.write_text(_EXPORT, "utf-8")
-    assert clean_docs.hide_code_by_default(p) is True
+    assert clean_docs.default_hidden_code(p) is True
     out = p.read_text("utf-8")
-    assert '"showAppCode": false' in out
-    assert '"showAppCode": true' not in out
-    assert "import x" in out  # code stays in the export, so the menu toggle can reveal it
+    # Shim lands inside <head>, before any body content, so it runs before marimo's bundle.
+    assert clean_docs._HIDE_CODE_MARKER in out
+    assert out.index("</head>") > out.index(clean_docs._HIDE_CODE_MARKER)
+    # It seeds the show-code param without clobbering an explicit one.
+    assert 'set("show-code","false")' in out
+    assert 'has("show-code")' in out
 
 
 def test_idempotent(tmp_path):
     p = tmp_path / "index.html"
     p.write_text(_EXPORT, "utf-8")
-    clean_docs.hide_code_by_default(p)
-    assert clean_docs.hide_code_by_default(p) is False  # already flipped — no-op
+    clean_docs.default_hidden_code(p)
+    once = p.read_text("utf-8")
+    assert clean_docs.default_hidden_code(p) is False  # marker already present — no-op
+    assert p.read_text("utf-8") == once  # and not injected twice
 
 
-def test_noop_when_absent(tmp_path):
-    """A marimo format change (or an unrelated file) simply no-ops, never corrupts."""
+def test_noop_when_no_head(tmp_path):
+    """A document without a <head> (or an unexpected format) is left untouched."""
     p = tmp_path / "index.html"
-    p.write_text("<div>no config here</div>", "utf-8")
-    assert clean_docs.hide_code_by_default(p) is False
+    p.write_text("<div>no head here</div>", "utf-8")
+    assert clean_docs.default_hidden_code(p) is False
