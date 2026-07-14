@@ -14,23 +14,22 @@ readable cold without re-deriving code state.
 - **Publish-tier exports go stale on rename.** `export_key` derives from the
   docs-relative path, so moving a notebook orphans its synced bundle: the build
   looks for the new key, skips with a warning, and the site 404s while
-  `index.md` still links the page. Current casualties: `exports/ex-2.9.1..4`
-  (stranded by the `docs/m1/` nesting, 31e103e — fix by *copying* to
-  `exports/m1/ex-2.9.x/` on the publish repo, no re-run needed) and
-  `exports/ngpt-sweep` (notebook renamed to ngpt-scaling; pure cruft).
-  Prevention: teach `./go publish` (or the build) to list remote export keys
-  and warn on ones with no matching notebook, and/or a `./go publish --move
-  old new` verb. Consider folding orphan cleanup into `mini gc --store`.
+  `index.md` still links the page. The `docs/m1/` casualties (ex-2.9.1..4,
+  stranded by 31e103e) were moved to their new keys on 2026-07-14;
+  `exports/ngpt-sweep` (notebook renamed to ngpt-scaling) is still there as
+  pure cruft. Prevention: teach `./go publish` (or the build) to list remote
+  export keys and warn on ones with no matching notebook, and/or a `./go
+  publish --move old new` verb. Consider folding orphan cleanup into
+  `mini gc --store`.
 
-- **No staging for reports; PR publishes land on prod.** `./go publish` from a
-  PR branch writes `exports/<key>/` on the *production* publish tier — new
-  reports sit there dark until main links them (e.g. `m2/ex-2.1.1` is synced
-  now from the unmerged D2.1.1 branch), but re-publishing an *existing* key
-  from a branch silently swaps the assets under the live site's stale HTML.
-  Fix candidates: publish PR exports to a `pr-<n>` git revision of the dataset
-  repo (`upload_folder(revision=...)`, base URL `resolve/pr-<n>/`), plus a PR
-  preview build deployed to a `gh-pages` branch subpath. See the
-  publishing-pipeline-issues thread (2026-07-14) for the options survey.
+- **PR publishes land on the prod publish tier.** `./go publish` from a PR
+  branch writes `exports/<key>/` on the *production* tier — a new report sits
+  there dark until main links it (fine; the PR preview even depends on it),
+  but re-publishing an *existing* key from a branch silently swaps the assets
+  under the live site's stale HTML. If that bites, publish PR exports to a
+  `pr-<n>` git revision of the dataset repo (`upload_folder(revision=...)`,
+  preview `<base>` at `resolve/pr-<n>/`). PR previews themselves shipped
+  2026-07-14 (`pr-preview.yml`; see eng/publishing.md).
 
 - Cross-experiment lineage is now **auto-detected**: `set_ref` in a task worker
   stamps producer identity onto the ref (via an ambient `producer_context`, so
