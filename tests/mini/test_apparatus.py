@@ -456,3 +456,90 @@ def test_modal_write_if_reclaims_reset_record():
     assert store.write_if("k", {"key": "k", "gen": "a"}, None) is True
     assert store.write_if("k", {"key": "k", "gen": "c"}, "b") is False  # fenced: wrong gen
     assert store.write_if("k", {"key": "k", "gen": "c"}, "a") is True  # supersede gen a
+
+
+# ---------------------------------------------------------------------------
+# Modal liveness probe — reap_dead's _is_task_alive. A *settled* failure
+# (function timeout, terminated, init failure) must read dead, or a killed
+# worker's record shows RUNNING forever (sca2#20); ambiguity stays alive
+# (a false "dead" would double-spawn a live GPU task on retry).
+# ---------------------------------------------------------------------------
+
+
+class _FakeFunctionCall:
+    """A ``modal.FunctionCall`` whose probe endpoints we script per-test."""
+
+    object_id = "fc-under-test"
+
+    def __init__(self, get_exc=None, graph=None):
+        self._get_exc, self._graph = get_exc, graph
+
+    def get(self, timeout=None):
+        if self._get_exc is not None:
+            raise self._get_exc
+        return None
+
+    def get_call_graph(self):
+        if isinstance(self._graph, Exception):
+            raise self._graph
+        return self._graph or []
+
+
+def _graph_input(status, function_call_id="fc-under-test"):
+    from modal.call_graph import InputInfo
+
+    return InputInfo("in-1", function_call_id, "ta-1", status, "worker", "mod", [])
+
+
+def _probe(monkeypatch, fake: _FakeFunctionCall) -> bool:
+    monkeypatch.setattr("modal.FunctionCall.from_id", lambda fc_id: fake)
+    return _make_modal(monkeypatch)._is_task_alive({"fc_id": "fc-under-test"})
+
+
+def test_liveness_no_fc_id_is_alive(monkeypatch):
+    """Not launched on Modal yet — nothing to probe, never reap."""
+    assert _make_modal(monkeypatch)._is_task_alive({}) is True
+
+
+def test_liveness_settled_states(monkeypatch):
+    """Direct signals out of ``get(timeout=0)`` map per the probe's contract."""
+    from modal.call_graph import InputStatus
+    from modal.exception import FunctionTimeoutError, InternalFailure, NotFoundError, OutputExpiredError
+    from modal.exception import TimeoutError as ModalTimeout
+
+    cases = [
+        (None, None, True),  # completed and returned — the record settles on its own
+        (TimeoutError(), None, True),  # poll came up empty — the *builtin*, as modal 1.5.1 actually raises
+        (ModalTimeout(), None, True),  # …and modal's own TimeoutError, for good measure
+        (FunctionTimeoutError("timeout"), None, False),  # THE #20 case: killed at the function timeout
+        (InternalFailure("infra"), None, False),  # settled infra failure (invisible to the call graph)
+        (OutputExpiredError(), None, False),
+        (NotFoundError("gone"), None, False),
+        # Ambiguous exception → the call-graph cross-check discriminates:
+        (RuntimeError("deserialized remote failure"), [_graph_input(InputStatus.FAILURE)], False),
+        (RuntimeError("worker terminated"), [_graph_input(InputStatus.TERMINATED)], False),
+        (RuntimeError("transport blip"), [_graph_input(InputStatus.PENDING)], True),
+        (RuntimeError("transport blip"), [_graph_input(InputStatus.SUCCESS)], True),
+        (RuntimeError("transport down"), RuntimeError("graph unreachable too"), True),
+        # Another call's failed input in the graph is not evidence about ours:
+        (RuntimeError("blip"), [_graph_input(InputStatus.FAILURE, function_call_id="fc-other")], True),
+    ]
+    for get_exc, graph, alive in cases:
+        got = _probe(monkeypatch, _FakeFunctionCall(get_exc=get_exc, graph=graph))
+        assert got is alive, f"get={get_exc!r} graph={graph!r}: expected alive={alive}, got {got}"
+
+
+def test_reap_settles_timeout_killed_modal_task(monkeypatch, tmp_path):
+    """End to end: a timeout-killed call's RUNNING record settles FAILED on reap,
+    so ``status``/``watch`` can't read it as running forever (sca2#20)."""
+    from modal.exception import FunctionTimeoutError
+
+    from mini.memo import MemoStore
+
+    store = MemoStore(tmp_path / "exp")
+    store.records_backend.merge("t1", {"key": "t1", "state": "running", "gen": "g1", "fc_id": "fc-under-test"})
+    monkeypatch.setattr("modal.FunctionCall.from_id", lambda fc_id: _FakeFunctionCall(FunctionTimeoutError("t")))
+    app = _make_modal(monkeypatch)
+    assert app.reap_dead(store) == ["t1"]
+    rec = store.record("t1")
+    assert rec["state"] == "failed" and rec["gen"] is None and "vanished" in rec["error"]

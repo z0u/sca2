@@ -10,8 +10,8 @@ agent (or you) can drive, poll, and gather without holding a session open:
     python -m mini run    docs/pipeline/experiment.py --budget 2h  # auto-cancel the run past a wall-clock budget
     python -m mini retry  docs/pipeline/experiment.py          # reset FAILED/CANCELLED, then advance
     python -m mini ls                                          # experiments + task state
-    python -m mini watch  pipeline                             # live bars for a run, read-only (never ticks)
-    python -m mini status pipeline                             # per-task state + metrics, by NAME
+    python -m mini watch  pipeline                             # block until the run settles, read-only (exit 0 iff DONE)
+    python -m mini status pipeline                             # per-task state + metrics, by NAME (--json for scripts)
     python -m mini results pipeline                            # per-task results
     python -m mini logs   pipeline <key>                       # a failed task's traceback
     python -m mini explain pipeline <key>                      # why this re-ran: evidence + attempt timeline
@@ -31,6 +31,7 @@ was launched on (stamped in ``.mini/<name>/.app``), then ``$MINI_APP`` /
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import time
 from pathlib import Path
@@ -42,7 +43,7 @@ from mini.gc import GRACE_DEFAULT
 from mini.local_apparatus import LocalApparatus
 from mini.memo import META_KEY, MemoStore
 from mini.orchestration import BudgetExpired, TaskFailed, retry, tick
-from mini.runs import SETTLED, RunState, data_root, is_queued
+from mini.runs import SETTLED, RunState, data_root, is_queued, stale_heartbeat
 from mini.store import _project_config
 from utils.time import duration
 
@@ -258,6 +259,8 @@ def _memo_line(rec: dict) -> str:
         line += f"  {_fmt_metrics(rec['metrics'])}"
     if state == RunState.RUNNING and rec.get("heartbeat_at"):
         line += f"  ⧖ queued {_age(rec['heartbeat_at'])}" if queued else f"  ♥ {_age(rec['heartbeat_at'])}"
+        if stale_heartbeat(rec):
+            line += "  ⚠ stale — worker may be dead"
     if gpu := rec.get("env", {}).get("gpu"):
         line += f"  on {gpu}"  # what it actually ran on, when not the local CPU
     if rec.get("fc_id"):
@@ -435,13 +438,67 @@ def cmd_status(args: argparse.Namespace) -> None:
     recs = store.records()
     if not recs:
         raise _no_tasks(args.name, args)
-    current, _ = store.split_current(recs)
+    current, stale = store.split_current(recs)
     state = _aggregate_state([_rec_state(r) for r in current])
+    if getattr(args, "json", False):
+        print(json.dumps(_status_json(args.name, args, state, store, current, stale)))
+        return
     header = f"{args.name}  —  {state}  ({len(current)} tasks)"
     if suffix := _budget_suffix(store):
         header += f"  ·  {suffix}"
     print(header)
     _print_records(store, recs)
+
+
+def _status_json(
+    name: str, args: argparse.Namespace, state: RunState, store: MemoStore, current: list[dict], stale: list[dict]
+) -> dict[str, Any]:
+    """The ``status --json`` payload — the agent-facing twin of the human lines.
+
+    One JSON object on stdout, keyed for scripts (``jq -r .state``), with the
+    same read-path semantics as plain ``status`` (reap + budget enforcement have
+    already run). Field names are a stable contract: change additively only.
+    ``state`` aggregates *current* tasks; superseded records ride along flagged,
+    since an orphaned old-code worker may still be burning money.
+    """
+    out: dict[str, Any] = {
+        "experiment": name,
+        "app": _resolve_app(name, args),
+        "state": str(state),
+        "settled": all(_rec_state(r) in SETTLED for r in current),
+        "tasks": [
+            {**_task_json(rec), "superseded": superseded}
+            for recs, superseded in ((current, False), (stale, True))
+            for rec in recs
+        ],
+    }
+    meta = store.meta()
+    if deadline := meta.get("deadline_at"):
+        out["budget"] = {
+            "budget": meta.get("budget"),
+            "deadline_at": deadline,
+            "remaining_s": round(max(0.0, deadline - time.time()), 1),
+        }
+    if kept := meta.get("kept_stale"):
+        out["kept_stale"] = sorted(kept)
+    return out
+
+
+def _task_json(rec: dict) -> dict[str, Any]:
+    """One task record, trimmed to the fields the human line surfaces (plus timestamps)."""
+    out: dict[str, Any] = {
+        "key": rec["key"],
+        "fn": rec.get("fn"),
+        "state": str(_rec_state(rec)),
+        "queued": is_queued(rec),
+    }
+    for f in ("step", "total", "metrics", "error", "exc_type", "fc_id", "env", "started_at", "finished_at"):
+        if (v := rec.get(f)) is not None:
+            out[f] = v
+    if _rec_state(rec) == RunState.RUNNING and (hb := rec.get("heartbeat_at")):
+        out["heartbeat_age_s"] = round(time.time() - hb, 1)
+        out["stale_heartbeat"] = stale_heartbeat(rec)
+    return out
 
 
 def cmd_watch(args: argparse.Namespace) -> None:
@@ -463,6 +520,8 @@ def cmd_watch(args: argparse.Namespace) -> None:
         return
     state = _aggregate_state([_rec_state(r) for r in records])
     print(f"{args.name}  —  {state}  ({len(records)} tasks)")
+    if state != RunState.DONE:  # exit code = settle outcome, so scripts can gate on it
+        raise SystemExit(1)
 
 
 def cmd_results(args: argparse.Namespace) -> None:
@@ -867,10 +926,19 @@ def main() -> None:
 
     p = sub.add_parser("status", help="show per-task state + metrics, by experiment NAME")
     p.add_argument("name")
+    p.add_argument(
+        "--json",
+        action="store_true",
+        help="machine-readable status: one JSON object (stable field names; for scripts/agents)",
+    )
     _add_app_flag(p)
     p.set_defaults(func=cmd_status)
 
-    p = sub.add_parser("watch", help="render live bars for a run by NAME, read-only (never ticks)")
+    p = sub.add_parser(
+        "watch",
+        help="block until a run settles, rendering live bars — read-only (never ticks); "
+        "exits 0 iff it settled DONE, so it doubles as a wake trigger for scripts",
+    )
     p.add_argument("name")
     p.add_argument("--poll", type=float, default=0.5, help="seconds between record polls while watching")
     _add_app_flag(p)

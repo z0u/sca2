@@ -55,13 +55,15 @@ Re-running is cheap: completed steps are memo hits, so a `run` only advances the
 un-run pieces.
 
 **Waiting for a stage to settle** (an agent session that wants one wake-up, not
-a sleep loop): prefer backgrounding `bin/mini watch <exp>` — it polls read-only,
-reaps vanished workers, and *exits* once every current task settles, so its exit
-is the wake signal. If you instead poll `status` and grep, do not grep only for
-terminal states: a dead worker can read `RUNNING` indefinitely (see the trap
-below), so also treat a heartbeat older than a few minutes (`♥ 300s ago` — live
-workers beat every few seconds) as a wake condition. Bound either wait with
-`--budget` so an unattended stall settles itself.
+a sleep loop): background `bin/mini watch <exp>` — it polls read-only, reaps
+vanished workers, *exits* once every current task settles, and its **exit code
+is the outcome** (0 iff the run settled DONE), so the exit is the wake signal
+and the code tells you which branch to take. Piped output degrades cleanly (one
+final render, no live churn). For polling instead, use `bin/mini status <exp>
+--json` — one JSON object with the aggregate `state`, a `settled` boolean, and
+per-task `state` / `queued` / `heartbeat_age_s` / `stale_heartbeat` — rather
+than grepping the human lines. Bound either wait with `--budget` so an
+unattended stall settles itself.
 
 Watching a big sweep is cheap too: the watch loops cache settled
 (`DONE`/`FAILED`/`CANCELLED`) records — they're immutable — and re-read only the
@@ -106,12 +108,13 @@ code.
 
 **Dead ≠ slow.** The inverse failure: a RUNNING task whose progress is frozen
 and whose heartbeat (♥) has gone stale for minutes while its siblings beat every
-few seconds. That worker is almost certainly dead — most often killed by the
-role's per-task `timeout` (Modal kills the container without the record
-settling, so it reads RUNNING forever; `reap_dead` should catch this but
-currently misses timeout-killed calls — sca2#20 — so until that lands only the
-budget reaps it). Size the timeout for the *largest* cell of a sweep, not the
-typical one.
+few seconds. That worker may be dead — most often killed by the role's per-task
+`timeout`. Any `status`/`watch` poll reaps a call Modal reports as settled
+(timeout-killed, terminated, expired — sca2#20) to FAILED; a heartbeat stale
+past ~5 minutes that *hasn't* been reaped gets an advisory badge (`⚠ stale —
+worker may be dead`, `stale_heartbeat` in `--json`) — either a worker in a long
+non-emitting stretch (a heavy import, one big step) or a liveness blind spot.
+Size the timeout for the *largest* cell of a sweep, not the typical one.
 Note that `mini` does **not** set a timeout for you: a role without `timeout=`
 gets Modal's default of 5 minutes — and its default CPU slice (0.125 cores),
 where heavy imports (jax) can alone take minutes. Any role doing real work
