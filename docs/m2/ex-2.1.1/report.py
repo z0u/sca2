@@ -321,11 +321,15 @@ def _(metrics):
     (_cell,) = [r for r in metrics if r["label"] == label(_w, _d, SEEDS[0])]
     _rows = [(es, _cell["surprisal"][es][0]) for es in EVAL_SETS]
     _log_v = np.log(len(colors.alphabet()))
-    _width = min(max(len(r["text"]) for _, r in _rows), 80) + 1
+    _width = min(max(len(r["text"]) for _, r in _rows), 80)
+    # Match the sublines' dark background to this notebook's, rather than subline's
+    # neutral default; light mode already matches. `css` overrides the library's own
+    # `--bg-color` (later rule wins).
+    _css = "svg { --bg-color: light-dark(#fff, #181c1a); }"
 
     def _subline(name: str, row: dict) -> str:
         values = np.concatenate([[np.nan], np.clip(np.array(row["nll"]) / _log_v, 0, 1)])
-        svg = Subline(chars_per_line=_width).plot(row["text"], [Series(raw=values, label=name)])
+        svg = Subline(chars_per_line=_width, css=_css).plot(row["text"], [Series(raw=values, label=name)])
         return f"{svg}"
 
     mo.Html(
