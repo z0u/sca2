@@ -11,6 +11,17 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Exported reports depend on jsDelivr for the marimo runtime.** `marimo export
+  html` points ~200 `<script>`/`<link>`/font URLs at
+  `cdn.jsdelivr.net/npm/@marimo-team/frontend@<version>/dist`, so a published
+  report only renders while that CDN + the pinned version stay up — and it won't
+  render at all in a network-restricted env (the reason reports can't be
+  browser-checked from a sandboxed session). Not worth doing now, but for
+  archival we could self-host `dist/` into each bundle's `_assets/` and rewrite
+  the CDN base to a relative path in `clean_docs`/`export_reports` (same
+  post-export surgery seam as the show-code flip). Cost: ~a few MB of JS/fonts
+  per bundle and a maintenance tie to the marimo version.
+
 - **Publish-tier exports go stale on rename.** `export_key` derives from the
   docs-relative path, so moving a notebook orphans its synced bundle: the build
   looks for the new key, skips with a warning, and the site 404s while

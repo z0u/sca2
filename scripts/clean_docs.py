@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-"""Apply terminal control sequences in Marimo HTML and session JSON output."""
+"""Post-export tidy-ups for Marimo HTML and session JSON: collapse terminal control
+sequences, redact URLs that shouldn't ship, and hide report code by default.
+"""
 
 import json
 import re
@@ -101,6 +103,27 @@ def clean_html(path: Path) -> bool:
     return True
 
 
+# --- Default to hidden code ---
+#
+# marimo's static export hardcodes the app view to *show* code — a global "Show code"
+# toggle in the notebook menu that starts on. Our reports are literate (narrated prose
+# and figures), so they read better with the code out of the way. Flip that initial
+# state off; the toggle and the code both stay in the export, so a reader can still
+# reveal it. Regex rather than a JSON parse because the config is embedded mid-page in
+# a JS wrapper; a marimo format change simply no-ops here instead of corrupting output.
+
+_SHOW_APP_CODE = re.compile(r'("showAppCode":\s*)true')
+
+
+def hide_code_by_default(path: Path) -> bool:
+    content = path.read_text("utf-8")
+    new_content, n = _SHOW_APP_CODE.subn(r"\1false", content)
+    if not n:
+        return False
+    path.write_text(new_content, "utf-8")
+    return True
+
+
 # --- Session JSON cleaning (proper JSON parse/dump) ---
 
 
@@ -139,7 +162,8 @@ def clean_session_json(path: Path) -> bool:
 
 def _clean(path: Path) -> bool:
     if path.suffix == ".html":
-        return clean_html(path)
+        # `|` not `or`: run both, don't short-circuit on the first that changes nothing.
+        return clean_html(path) | hide_code_by_default(path)
     if path.name.endswith(".py.json"):
         return clean_session_json(path)
     return False

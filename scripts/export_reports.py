@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))  # so `import clean_docs` (sibling) works
 
-from clean_docs import clean_html  # noqa: E402
+from clean_docs import clean_html, hide_code_by_default  # noqa: E402
 from mini.reports import (  # noqa: E402
     PROVENANCE_ASSET,
     export_dir,
@@ -62,6 +62,7 @@ def export_one(nb: Path) -> Path:
     print(f"  export {nb.relative_to(ROOT)} -> {out.relative_to(ROOT)}")
     subprocess.run(["marimo", "export", "html", "-f", str(nb), "-o", str(out)], check=True, cwd=ROOT)
     clean_html(out)  # scrub terminal control seqs + redact modal URLs from the published HTML
+    hide_code_by_default(out)  # literate reports open with code hidden; the menu toggle still reveals it
     if sidecar.exists():  # the render read store refs — cite their producers in a footer
         refs = json.loads(sidecar.read_text()).get("refs", {})
         out.write_text(set_provenance(out.read_text("utf-8"), refs), "utf-8")
