@@ -1,6 +1,6 @@
 ---
 name: report-render
-description: Render a marimo report export in a headless browser to verify its real appearance — figures, layout, the show-code toggle, theming. Works offline by repointing the export's jsDelivr CDN refs at marimo's bundled assets, so it runs in a network-restricted sandbox where the report would otherwise never load. Use when you need to *see* or assert on a rendered report, not just trust the source.
+description: Render a report in a headless browser. Works offline by bundling Marimo assets.
 ---
 
 # Rendering a report to check it
