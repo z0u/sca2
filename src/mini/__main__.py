@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,16 @@ _GLYPH = {
 
 
 _APP_ENV = "MINI_APP"
+
+# How to spell this CLI in hints, so they're copy-pasteable as printed. The
+# `bin/mini` wrapper exports MINI_PROG=$0 (it works from any cwd, no venv);
+# otherwise trust argv[0] — the console script when on PATH, else `python -m`.
+PROG = os.environ.get("MINI_PROG") or ("mini" if Path(sys.argv[0]).name == "mini" else "python -m mini")
+
+
+def _app_suffix(args: argparse.Namespace) -> str:
+    """Echo an explicit ``--app`` into a suggested command, so the hint works verbatim."""
+    return f" --app {app}" if (app := getattr(args, "app", None)) else ""
 
 
 def _resolve_app(name: str, args: argparse.Namespace) -> str:
@@ -235,11 +246,18 @@ def _print_records(store: MemoStore, records: list[dict] | None = None) -> tuple
     """
     current, stale = store.split_current(store.records() if records is None else records)
     kept = set(store.meta().get("kept_stale") or ())  # DONE served under old code (--keep-stale-done)
-    for rec in current:
+    for rec in sorted(current, key=_launch_order):
         print(_memo_line(rec) + ("  (stale code — kept)" if rec["key"] in kept else ""))
-    for rec in stale:
+    for rec in sorted(stale, key=_launch_order):
         print(f"{_memo_line(rec)}  (superseded)")
     return current, stale
+
+
+def _launch_order(rec: dict) -> tuple:
+    """Sort records for display: launch order, so a sweep's stages read as stages
+    (store order is hash order — a jumble for a human scanning 50 lines).
+    """
+    return (rec.get("started_at") or float("inf"), rec.get("fn") or "", rec["key"])
 
 
 def _memo_line(rec: dict) -> str:
@@ -383,10 +401,19 @@ def _run(exp, apparatus: Apparatus, args: argparse.Namespace) -> None:
     if done:
         print(f"✓ complete: {payload}")
     elif failed := [r for r in current if _rec_state(r) in (RunState.FAILED, RunState.CANCELLED)]:
-        print(f"✗ {len(failed)} task(s) failed (terminal) — fix, then: python -m mini retry {args.path}")
-        print(f"   see a traceback with:  python -m mini logs {exp.name} <key>")
+        print(f"✗ {len(failed)} task(s) failed (terminal) — fix, then: {PROG} retry {args.path}")
+        _logs_hint(exp.name, [r["key"] for r in failed])
     else:
         print(f"… suspended — {payload} (re-run to advance)")
+
+
+def _logs_hint(name: str, keys: list[str]) -> None:
+    """Point at the traceback with a command that runs as printed — the first
+    failing key filled in, not a ``<key>`` placeholder to go hunting for.
+    """
+    print(f"  see a traceback with:  {PROG} logs {name} {keys[0]}")
+    if rest := keys[1:]:
+        print(f"  (+{len(rest)} more failed key(s) — see: {PROG} status {name})")
 
 
 def _watch(exp, apparatus: Apparatus, poll: float, keep_stale: bool = False) -> None:
@@ -407,7 +434,7 @@ def _watch(exp, apparatus: Apparatus, poll: float, keep_stale: bool = False) -> 
         print(f"✗ {len(failures)} task(s) settled without completing:")
         for tf in failures:
             print(f"  ✗ {tf.key} ({tf.state})")
-        print(f"inspect a traceback with:  python -m mini logs {exp.name} <key>")
+        _logs_hint(exp.name, [tf.key for tf in failures])
         raise SystemExit(1) from e
     print(f"✓ complete: {payload}")
 
@@ -415,7 +442,9 @@ def _watch(exp, apparatus: Apparatus, poll: float, keep_stale: bool = False) -> 
 def cmd_ls(args: argparse.Namespace) -> None:
     names = _known_names()
     if not names:
-        print("no experiments yet (run one with: python -m mini run <path>)")
+        print(f"no experiments in this checkout yet (launch one with: {PROG} run <experiment.py>)")
+        print("  (ls reads local launch state only — a run made elsewhere is reachable by name:")
+        print(f"   {PROG} status <name> --app modal)")
         return
     root = data_root()
     for name in names:
@@ -443,7 +472,7 @@ def cmd_status(args: argparse.Namespace) -> None:
     if getattr(args, "json", False):
         print(json.dumps(_status_json(args.name, args, state, store, current, stale)))
         return
-    header = f"{args.name}  —  {state}  ({len(current)} tasks)"
+    header = f"{args.name}  —  {state}  ({len(current)} tasks{f', +{len(stale)} superseded' if stale else ''})"
     if suffix := _budget_suffix(store):
         header += f"  ·  {suffix}"
     print(header)
@@ -530,7 +559,12 @@ def cmd_results(args: argparse.Namespace) -> None:
     if not recs:
         raise _no_tasks(args.name, args)
     current, stale = store.split_current(recs)
-    for rec in current:
+    if args.key:  # one task's result, without the whole sweep's dump
+        matches = [r for r in [*current, *stale] if r["key"] == args.key]
+        if not matches:
+            raise SystemExit(f"no record for key {args.key!r} in experiment {args.name!r} — keys are listed by: status")
+        current, stale = matches, []
+    for rec in sorted(current, key=_launch_order):
         key = rec["key"]
         if _rec_state(rec) == RunState.DONE:
             print(f"{key}  {store.result(key)}")
@@ -541,7 +575,16 @@ def cmd_results(args: argparse.Namespace) -> None:
 
 
 def cmd_logs(args: argparse.Namespace) -> None:
-    print(_store_for(args.name, args).error(args.key))
+    store = _store_for(args.name, args)
+    err = store.error(args.key)
+    if err != "(no logs)":
+        print(err)
+        return
+    rec = store.record(args.key)
+    if not rec.get("state") and not rec.get("deps"):
+        raise SystemExit(f"no record for key {args.key!r} in experiment {args.name!r} — keys are listed by: status")
+    # A real record with nothing captured: say why, instead of a bare "(no logs)".
+    raise SystemExit(f"no traceback for {args.key!r} — it is {_rec_state(rec)}; logs holds failure tracebacks only")
 
 
 def _attempt_delta(prev: dict, cur: dict) -> str:
@@ -601,7 +644,7 @@ def _print_git_lineage(git: dict[str, Any], name: str) -> None:
         print(f"          “{subject}” ({git.get('committed_at', '?')})")
     if git.get("diff"):
         trunc = " (truncated)" if git.get("diff_truncated") else ""
-        print(f"          working-tree diff recorded{trunc} — see: python -m mini lineage {name} --diff")
+        print(f"          working-tree diff recorded{trunc} — see: {PROG} lineage {name} --diff")
     if untracked := git.get("untracked"):
         print(f"          untracked: {', '.join(untracked[:8])}" + (" …" if len(untracked) > 8 else ""))
 
@@ -641,7 +684,9 @@ def cmd_lineage(args: argparse.Namespace) -> None:
     print(dl)
     _print_upstreams(lin)
     if ids := store.meta().get("modal_app_ids"):
-        print(f"  modal   {len(ids)} app run(s) — cost: python -m mini cost {args.name}")
+        # Echo --app so the suggestion works where this read worked (a fresh
+        # checkout has no .app marker, and a bare `cost` would land on local).
+        print(f"  modal   {len(ids)} app run(s) — cost: {PROG} cost {args.name}{_app_suffix(args)}")
     if ran_on := _ran_on_line(store):
         print(f"  ran on  {ran_on}")
 
@@ -691,7 +736,13 @@ def cmd_cost(args: argparse.Namespace) -> None:
     meta = store.meta()
     ids = meta.get("modal_app_ids") or []
     if not ids:
-        raise SystemExit(f"{args.name!r}: no Modal app runs recorded — cost is available for Modal runs only")
+        backend = _resolve_app(args.name, args)
+        hint = ""  # same cross-backend peek as an empty status: point at the flag, not a dead end
+        if backend != "modal" and (n := _peek(args.name, "modal")):
+            hint = f"\n  found {n} task(s) on modal — try: --app modal"
+        raise SystemExit(
+            f"{args.name!r}: no Modal app runs recorded on {backend} — cost is available for Modal runs only{hint}"
+        )
     from mini.modal_apparatus import query_cost
 
     since = (meta.get("lineage") or {}).get("first_captured_at_epoch")
@@ -868,8 +919,14 @@ def cmd_cancel(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="mini", description="Run and monitor memoized mi-ni experiments.")
+    parser = argparse.ArgumentParser(prog=PROG, description="Run and monitor memoized mi-ni experiments.")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    def _add_name_arg(p: argparse.ArgumentParser) -> None:
+        p.add_argument("name", help="experiment NAME (as listed by: ls)")
+
+    def _add_key_arg(p: argparse.ArgumentParser) -> None:
+        p.add_argument("key", help="task key, e.g. train_one-bba3437c43cf (as listed by: status NAME)")
 
     def _add_app_flag(p: argparse.ArgumentParser) -> None:
         p.add_argument(
@@ -925,7 +982,7 @@ def main() -> None:
     p.set_defaults(func=cmd_ls)
 
     p = sub.add_parser("status", help="show per-task state + metrics, by experiment NAME")
-    p.add_argument("name")
+    _add_name_arg(p)
     p.add_argument(
         "--json",
         action="store_true",
@@ -939,41 +996,42 @@ def main() -> None:
         help="block until a run settles, rendering live bars — read-only (never ticks); "
         "exits 0 iff it settled DONE, so it doubles as a wake trigger for scripts",
     )
-    p.add_argument("name")
+    _add_name_arg(p)
     p.add_argument("--poll", type=float, default=0.5, help="seconds between record polls while watching")
     _add_app_flag(p)
     p.set_defaults(func=cmd_watch)
 
     p = sub.add_parser("results", help="print per-task results, by experiment NAME")
-    p.add_argument("name")
+    _add_name_arg(p)
+    p.add_argument("key", nargs="?", default=None, help="print just this task's result (default: every task)")
     _add_app_flag(p)
     p.set_defaults(func=cmd_results)
 
-    p = sub.add_parser("logs", help="print a task's traceback")
-    p.add_argument("name")
-    p.add_argument("key")
+    p = sub.add_parser("logs", help="print a failed task's traceback")
+    _add_name_arg(p)
+    _add_key_arg(p)
     _add_app_flag(p)
     p.set_defaults(func=cmd_logs)
 
     p = sub.add_parser("explain", help="show a task's identity evidence and attempt timeline (why did this re-run)")
-    p.add_argument("name")
-    p.add_argument("key")
+    _add_name_arg(p)
+    _add_key_arg(p)
     _add_app_flag(p)
     p.set_defaults(func=cmd_explain)
 
     p = sub.add_parser("lineage", help="show a run's provenance (git, who/what ran it, environment, upstreams)")
-    p.add_argument("name")
+    _add_name_arg(p)
     p.add_argument("--diff", action="store_true", help="print the recorded working-tree diff instead of the summary")
     _add_app_flag(p)
     p.set_defaults(func=cmd_lineage)
 
     p = sub.add_parser("cost", help="reconcile a run's Modal cost from the billing API (post-run)")
-    p.add_argument("name")
+    _add_name_arg(p)
     _add_app_flag(p)
     p.set_defaults(func=cmd_cost)
 
     p = sub.add_parser("cancel", help="stop in-flight tasks and mark them cancelled")
-    p.add_argument("name")
+    _add_name_arg(p)
     _add_app_flag(p)
     p.set_defaults(func=cmd_cancel)
 
