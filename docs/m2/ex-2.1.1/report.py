@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.3"
+__generated_with = "0.23.9"
 app = marimo.App(width="medium", auto_download=["html"])
 
 with app.setup(hide_code=True):
@@ -153,7 +153,7 @@ def _():
             ),
         ]
     )
-    return corpus, holdout, train_pairs
+    return holdout, train_pairs
 
 
 @app.cell(hide_code=True)
@@ -321,18 +321,18 @@ def _(metrics):
     (_cell,) = [r for r in metrics if r["label"] == label(_w, _d, SEEDS[0])]
     _rows = [(es, _cell["surprisal"][es][0]) for es in EVAL_SETS]
     _log_v = np.log(len(colors.alphabet()))
-    _width = max(len(r["text"]) for _, r in _rows)
+    _width = min(max(len(r["text"]) for _, r in _rows), 80) + 1
 
     def _subline(name: str, row: dict) -> str:
         values = np.concatenate([[np.nan], np.clip(np.array(row["nll"]) / _log_v, 0, 1)])
         svg = Subline(chars_per_line=_width).plot(row["text"], [Series(raw=values, label=name)])
-        return f'<div style="max-width: 560px">{svg}</div>'
+        return f"{svg}"
 
     mo.Html(
         '<div role="img" aria-label="Four short mixing equations, one per eval set, each with a sparkline '
-        'of per-character surprisal drawn under the text, on a shared 0-to-log-V scale.">'
-        + "".join(_subline(name, row) for name, row in _rows)
-        + "</div>"
+        'of per-character surprisal drawn under the text, on a shared 0-to-log-V scale." '
+        'style="text-wrap: balance"'
+        ">" + "".join(_subline(name, row) for name, row in _rows) + "</div>"
     )
     return
 
