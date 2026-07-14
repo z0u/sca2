@@ -11,6 +11,19 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Two apparatus tests aren't hermetic against a configured bucket.**
+  `test_interactive_local_map_resolves_ambient_store` and
+  `test_wrap_for_modal_binds_store_under_data_dir` only `delenv` the
+  `MINI_STORE_BUCKET`/`MINI_PUBLISH_REPO` vars, but `store_bucket()`/`publish_repo()`
+  fall back to `[tool.mini] store-bucket` in `pyproject.toml` (store.py:502/516).
+  So on any checkout that has both the pyproject default bucket *and* an HF token
+  (i.e. a `./go auth`'d dev box or this CI env), `get_store()` returns an `HFStore`
+  and the `isinstance(..., LocalStore)` assertion fails. Pre-existing, unrelated to
+  the xdist change. Fix: also neutralize the pyproject fallback in those tests
+  (monkeypatch `store_bucket`/`publish_repo` → `None`, or `_project_config` → `{}`);
+  consider hoisting that into the shared conftest fixture so no store test can
+  accidentally reach the network.
+
 - **Publish-tier exports go stale on rename.** `export_key` derives from the
   docs-relative path, so moving a notebook orphans its synced bundle: the build
   looks for the new key, skips with a warning, and the site 404s while
