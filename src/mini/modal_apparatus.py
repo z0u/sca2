@@ -79,6 +79,25 @@ def _modal_auth_error_message() -> str:
     return "Modal authentication failed. Run ./go auth, then try again."
 
 
+def _settled_failure(fc: modal.FunctionCall) -> bool:
+    """Did *fc*'s input settle in a terminal failure state (never to write its record)?
+
+    The discriminator for ``_is_task_alive``'s ambiguous branch: ``get`` re-raised
+    something that is either a deserialized remote failure (settled — dead) or a
+    local client/transport error (the call may be fine). The call graph reports
+    the input's status directly, so no exception-type guessing; unknown statuses
+    and unreachable graphs stay ``False`` (→ alive, the conservative default).
+    """
+    from modal.call_graph import InputStatus
+
+    settled = {InputStatus.FAILURE, InputStatus.INIT_FAILURE, InputStatus.TERMINATED, InputStatus.TIMEOUT}
+    try:
+        graph = fc.get_call_graph()
+    except Exception:
+        return False  # can't tell (transport error again, most likely) — don't reap on a guess
+    return any(inp.status in settled for inp in graph if inp.function_call_id == fc.object_id)
+
+
 def _app_page_url(app: modal.App) -> str | None:
     """Extract the dashboard URL from a running Modal app.
 
@@ -620,28 +639,52 @@ class ModalApparatus(Apparatus[ModalVolume]):
     def _is_task_alive(self, rec: dict[str, Any]) -> bool:
         """Probe the task's ``FunctionCall`` for liveness (for ``reap_dead``).
 
-        ``get(timeout=0)`` polls without waiting: a ``modal.exception.TimeoutError``
-        means the input is still unfinished (running/queued → alive); a normal
-        return means it completed (the record settles on its own → treat as alive).
-        Only the *definitive gone* signals — the output expired, or the call id is
-        unknown — count as dead. We deliberately treat any other error (a remote
-        infra failure, or a transient read-side network blip) as alive: a false
-        "dead" would mark a live GPU task FAILED, and a retry would double-spawn it.
+        ``get(timeout=0)`` polls without waiting. The key invariant: the worker
+        never lets a task exception escape — it writes the record (FAILED) and
+        returns normally (``mini._taskworker.execute_task``). So a *settled*
+        failure raised out of ``get`` means the call died at the infra level
+        and will never settle its record (#20):
+
+        - poll came up empty → running/queued → alive. Modal raises the
+          *builtin* ``TimeoutError`` here (``modal._functions.poll_function``),
+          verified live on modal 1.5.1;
+        - ``FunctionTimeoutError`` → Modal killed the worker at the function
+          timeout → dead;
+        - ``InternalFailure`` → the input settled as an infra failure (a status
+          the call graph can't represent, so it's named here) → dead;
+        - ``OutputExpiredError`` / ``NotFoundError`` → the call is gone → dead;
+        - a normal return → completed; the record settles on its own → alive;
+        - anything else is ambiguous — a settled remote failure re-raised from
+          the output (arbitrary deserialized type), or a client/transport blip.
+          Cross-check the input's status via :func:`_settled_failure` instead
+          of guessing from exception types; when even that can't tell, stay
+          conservative (alive): a false "dead" would mark a live GPU task
+          FAILED, and a retry would double-spawn it.
+
+        Catch order matters: ``FunctionTimeoutError`` and ``OutputExpiredError``
+        both subclass ``modal.exception.TimeoutError``, so the dead arms come
+        before the timeout arm — the pre-#20 probe caught modal's ``TimeoutError``
+        first, which is exactly how settled timeouts read alive forever. (Both
+        timeout bases share one alive arm so a healthy task never pays the
+        cross-check RPC on a routine poll.)
         """
         fc_id = rec.get("fc_id")
         if not fc_id:
             return True  # not launched on Modal yet — nothing to probe
-        from modal.exception import NotFoundError, OutputExpiredError
+        from modal.exception import FunctionTimeoutError, InternalFailure, NotFoundError, OutputExpiredError
         from modal.exception import TimeoutError as ModalTimeout
 
+        fc = modal.FunctionCall.from_id(fc_id)
         try:
-            modal.FunctionCall.from_id(fc_id).get(timeout=0)
-        except ModalTimeout:
-            return True  # output not ready, input still unfinished → running/queued
+            fc.get(timeout=0)
+        except FunctionTimeoutError, InternalFailure:
+            return False  # settled failure at the infra level — the record will never be written
         except OutputExpiredError, NotFoundError:
             return False  # the call is gone — it will never settle the record
+        except TimeoutError, ModalTimeout:  # the builtin (poll-empty on 1.5.1) and modal's own
+            return True  # output not ready, input still unfinished → running/queued
         except Exception:
-            return True  # ambiguous infra/network error — don't risk reaping a live task
+            return not _settled_failure(fc)
         return True  # completed and returned → the record settles on its own
 
     @override

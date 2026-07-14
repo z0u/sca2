@@ -15,11 +15,21 @@ import os
 import platform
 import subprocess
 import sys
+import time
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-__all__ = ["RunState", "SETTLED", "compute_env", "data_root", "is_queued", "spawn_taskworker"]
+__all__ = [
+    "RunState",
+    "SETTLED",
+    "STALE_HEARTBEAT_S",
+    "compute_env",
+    "data_root",
+    "is_queued",
+    "spawn_taskworker",
+    "stale_heartbeat",
+]
 
 # Markers that identify a project root, in priority order.
 _ROOT_MARKERS = ("pyproject.toml", ".git")
@@ -135,6 +145,31 @@ def is_queued(rec: dict) -> bool:
     ``reap_dead``/``enforce_budget``.
     """
     return rec.get("state") == RunState.RUNNING and not rec.get("env")
+
+
+STALE_HEARTBEAT_S = 300.0
+"""Heartbeat age past which a RUNNING task is *advisorily* flagged stale.
+
+Heartbeats ride on progress emissions (there is no fixed cadence), so staleness
+is a hint, not proof: a worker deep in a non-emitting stretch (a heavy import,
+one long step) looks the same as a dead one. Five minutes is comfortably past
+any healthy emission gap we've seen while still catching zombies early.
+"""
+
+
+def stale_heartbeat(rec: dict, now: float | None = None) -> bool:
+    """Is this RUNNING task's heartbeat suspiciously old — worker possibly dead?
+
+    Backend-agnostic and *display-only*: badges in ``status``/``watch`` use it to
+    keep the human/agent-visible signal honest even where a backend liveness
+    probe has a blind spot (#20). Settling stays with ``reap_dead``/
+    ``enforce_budget``; a queued record's heartbeat is just its launch stamp, so
+    queued tasks are never stale (they get the ``⧖`` treatment instead).
+    """
+    if rec.get("state") != RunState.RUNNING or is_queued(rec):
+        return False
+    hb = rec.get("heartbeat_at")
+    return bool(hb) and ((now if now is not None else time.time()) - hb) > STALE_HEARTBEAT_S
 
 
 def _atomic_write(path: Path, text: str) -> None:

@@ -182,6 +182,120 @@ def test_status_shows_queued_distinct_from_running(tmp_path: Path, monkeypatch, 
     assert "▸" in lines["train-live"] and "running" in lines["train-live"] and "♥" in lines["train-live"]
 
 
+def test_status_badges_stale_heartbeat(tmp_path: Path, monkeypatch, capsys):
+    """A RUNNING task whose heartbeat has gone quiet for minutes gets an advisory
+    badge — the honest signal when a backend liveness probe has a blind spot
+    (#20). Queued tasks never badge: their heartbeat is just the launch stamp."""
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import STALE_HEARTBEAT_S, data_root
+
+    store = MemoStore(data_root() / "staleexp")
+    now = time.time()
+    pid = os.getpid()  # a live pid, so reap_dead doesn't settle the records
+    env = {"env": {"host": "worker.test"}}
+    common = {"state": "running", "fn": "train", "pid": pid}
+    store.records_backend.merge("t-fresh", {"key": "t-fresh", "heartbeat_at": now, **env, **common})
+    store.records_backend.merge(
+        "t-stale", {"key": "t-stale", "heartbeat_at": now - STALE_HEARTBEAT_S - 60, **env, **common}
+    )
+    store.records_backend.merge("t-queued", {"key": "t-queued", "heartbeat_at": now - STALE_HEARTBEAT_S - 60, **common})
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="staleexp", app="local"))
+    out = capsys.readouterr().out
+    lines = {line.split()[2]: line for line in out.splitlines() if "t-" in line}
+    assert "⚠ stale — worker may be dead" in lines["t-stale"]
+    assert "stale" not in lines["t-fresh"]
+    assert "stale" not in lines["t-queued"] and "⧖" in lines["t-queued"]
+
+
+def test_status_json_is_machine_readable(tmp_path: Path, monkeypatch, capsys):
+    """``status --json`` emits one stable JSON object — the agent-facing signal
+    (#20): aggregate state, per-task state, and honest liveness hints
+    (queued / heartbeat age / stale), instead of grepping the human lines."""
+    import json
+    from unittest.mock import ANY
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import STALE_HEARTBEAT_S, data_root
+
+    store = MemoStore(data_root() / "jsonexp")
+    now = time.time()
+    store.records_backend.merge("t-done", {"key": "t-done", "state": "done", "fn": "train", "metrics": {"loss": 0.5}})
+    store.records_backend.merge(
+        "t-zombie",
+        {
+            "key": "t-zombie",
+            "state": "running",
+            "fn": "train",
+            "pid": os.getpid(),  # a live pid, so reap_dead doesn't settle it
+            "env": {"host": "worker.test", "gpu": "L4"},
+            "heartbeat_at": now - STALE_HEARTBEAT_S - 60,
+            "step": 3,
+            "total": 10,
+        },
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="jsonexp", app="local", json=True))
+    payload = json.loads(capsys.readouterr().out)
+    payload["tasks"].sort(key=lambda t: t["key"])
+    assert payload == {
+        "experiment": "jsonexp",
+        "app": "local",
+        "state": "running",
+        "settled": False,
+        "tasks": [
+            {
+                "key": "t-done",
+                "fn": "train",
+                "state": "done",
+                "queued": False,
+                "superseded": False,
+                "metrics": {"loss": 0.5},
+            },
+            {
+                "key": "t-zombie",
+                "fn": "train",
+                "state": "running",
+                "queued": False,
+                "superseded": False,
+                "step": 3,
+                "total": 10,
+                "env": {"host": "worker.test", "gpu": "L4"},
+                "heartbeat_age_s": ANY,
+                "stale_heartbeat": True,
+            },
+        ],
+    }
+    assert payload["tasks"][1]["heartbeat_age_s"] > STALE_HEARTBEAT_S
+
+
+def test_watch_exit_code_reflects_settle_outcome(tmp_path: Path, monkeypatch, capsys):
+    """``watch`` is the wake trigger for scripts/agents (#20): it blocks until the
+    run settles and its exit code carries the outcome — 0 iff DONE."""
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    from mini.__main__ import cmd_watch
+
+    store = MemoStore(data_root() / "watchfail")
+    store.records_backend.merge("t1", {"key": "t1", "state": "failed", "error": "boom"})
+    with pytest.raises(SystemExit) as ei:
+        cmd_watch(argparse.Namespace(name="watchfail", app="local", poll=0.01))
+    assert ei.value.code == 1
+
+    store = MemoStore(data_root() / "watchdone")
+    store.records_backend.merge("t1", {"key": "t1", "state": "done"})
+    cmd_watch(argparse.Namespace(name="watchdone", app="local", poll=0.01))  # no raise — exit 0
+    assert "done" in capsys.readouterr().out
+
+
 def test_app_resolution_precedence(tmp_path: Path, monkeypatch):
     """--app flag > launch marker > $MINI_APP > [tool.mini] app > local (#47)."""
     monkeypatch.chdir(tmp_path)
