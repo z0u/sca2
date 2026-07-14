@@ -101,7 +101,7 @@ def test_status_and_ls_report_done_despite_superseded_failure(tmp_path: Path, mo
 
     cmd_status(argparse.Namespace(name="super", app="local"))
     status_out = capsys.readouterr().out
-    assert "—  done  (1 tasks)" in status_out  # aggregate ignores the orphan
+    assert "—  done  (1 tasks, +1 superseded)" in status_out  # aggregate ignores the orphan, but counts it
     assert "(superseded)" in status_out  # …but the orphan stays visible, marked
 
     cmd_ls(argparse.Namespace())

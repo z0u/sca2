@@ -11,6 +11,29 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **CLI usability, remaining gaps** (from the 2026-07-14 cold-exploration
+  session; the copy-pasteable-hints / sorting / help-text tier shipped — see
+  #57 for the running thread):
+  - No way to *delete* an experiment's memo state. `mini gc <name>` sweeps only
+    stale attempt files/superseded records, so a scratch or renamed experiment's
+    DONE records live forever — on Modal too (a `cli-probe` probe experiment now
+    sits there as a permanent example). Wants a `mini rm <name>` with the same
+    dry-run-by-default posture as gc.
+  - `mini ls` reads local launch state only and (alone among the verbs) has no
+    `--app` — there's no way to enumerate experiments that exist on Modal; you
+    must already know the name. The empty-state hint now says so, but listing
+    would be better.
+  - `mini results <name>` prints raw result reprs; a sweep with per-step metric
+    lists dumps ~120 KB of floats. The new optional `key` arg narrows it, but
+    consider truncating long reprs by default and/or `--json`.
+  - `mini logs` holds only failure tracebacks (now stated honestly), and the
+    Modal `fc-…` ids that `status` prints can't be fed back into any `mini`
+    verb — worker stdout/logs need the Modal dashboard.
+  - `tests/mini/test_apparatus.py::test_local_apparatus_concurrent` asserts
+    3 × 0.1 s sleeps finish < 0.25 s; on a loaded 4-CPU remote container the
+    pool takes ~1.9 s, so the test fails on a pristine tree. Loosen the bound
+    or gate it on available CPU.
+
 - **Published reports depend on jsDelivr for the marimo runtime.** `marimo export
   html` points ~200 `<script>`/`<link>`/font URLs at
   `cdn.jsdelivr.net/npm/@marimo-team/frontend@<version>/dist`, so a published

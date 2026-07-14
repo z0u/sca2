@@ -10,6 +10,28 @@ is_marimo_notebook() {
     [[ "${1:-}" == *.py && -f "${1:-}" ]] && grep -q 'marimo\.App(' "$1"
 }
 
+show_usage() {
+    # Important: heredoc indented with tab characters.
+    cat <<-EOF
+		Usage: $0 {install|auth|check|lint|format|types|tests|dead|export|open|publish|build|scrub|serve|help}
+		  install:           install dependencies (uv sync) and git hooks
+		  auth   [--check]:  set up credentials, or --check to just probe & print their status
+		  check  [...args]:  run all checks in parallel (default: --lint --format --typecheck --test; add --fix to autofix)
+		  format [...args]:  format code (ruff format)
+		  lint   [...args]:  run linters (ruff check)
+		  types  [...args]:  check types (ty)
+		  tests  [...args]:  run tests (pytest)
+		  dead   [...args]:  find unused code (vulture)
+		  export <report>:   export a Marimo report to its bundle, or run anything else through uv
+		  open   <file>:     open a Marimo notebook in Marimo, or anything else in \$EDITOR
+		  publish [...nbs]:  export reports and mirror their bundles to the HF bucket
+		  build  [...args]:  build the static site (from synced bundles, or local for offline)
+		  scrub  [...args]:  scrub terminal control sequences / redact Modal URLs from Marimo HTML
+		  serve:             build and serve at http://localhost:8000
+		  (aliases: \`run\`→\`export\`, \`clean\`→\`scrub\` — deprecated)
+		EOF
+}
+
 case "${1:-all}" in
     i|install)
         shift
@@ -51,7 +73,11 @@ case "${1:-all}" in
         # `run` is a deprecated alias: it collides with `mini run` (which executes
         # compute) whereas this only exports a static bundle. Prefer `export`.
         shift
-        if is_marimo_notebook "${1:-}"; then
+        if [[ $# -eq 0 ]]; then
+            echo "export what? pass a Marimo report (e.g. docs/m2/ex-2.1.1/report.py)," 1>&2
+            echo "or a command/script to run through uv (\`uv run ...\`)." 1>&2
+            exit 2
+        elif is_marimo_notebook "${1:-}"; then
             # Export the report to its bundle (.mini/exports/<key>/); preview via ./go build.
             ( set -x; uv run "$SCRIPT_DIR/export_reports.py" "$1" )
         else
@@ -65,10 +91,19 @@ case "${1:-all}" in
         ;;
     o|edit|open)
         shift
-        if is_marimo_notebook "${1:-}"; then
+        if [[ $# -eq 0 ]]; then
+            echo "open what? pass a Marimo notebook (opens in marimo edit)," 1>&2
+            echo "or any other file (opens in \$VISUAL/\$EDITOR)." 1>&2
+            exit 2
+        elif is_marimo_notebook "${1:-}"; then
             uv run marimo edit "$@"
         else
-            "${VISUAL:-${EDITOR:-code}}" "$@"
+            editor="${VISUAL:-${EDITOR:-code}}"
+            if ! command -v "$editor" > /dev/null; then
+                echo "no editor: '$editor' not found — set \$VISUAL or \$EDITOR" 1>&2
+                exit 127
+            fi
+            "$editor" "$@"
         fi
         ;;
     build|site)
@@ -83,27 +118,14 @@ case "${1:-all}" in
         ;;
     s|serve)
         "$SELF" build
-        npx serve -n "$PROJECT_ROOT/_site"
+        npx serve -n -l 8000 "$PROJECT_ROOT/_site"
+        ;;
+    h|help|-h|--help)
+        show_usage
+        exit 0
         ;;
     *)
-        # Important: heredoc indented with tab characters.
-        cat <<-EOF 1>&2
-			Usage: $0 {auth|check|lint|format|types|tests|export|open|publish|build|scrub|serve}
-			  install:           install dependencies (uv sync) and git hooks
-			  auth   [--check]:  set up credentials, or --check to just probe & print their status
-			  check  [...args]:  run all checks in parallel (--lint --format --typecheck --test --fix)
-			  format [...args]:  format code (ruff format)
-			  lint   [...args]:  run linters (ruff check)
-			  types  [...args]:  check types (ty)
-			  tests  [...args]:  run tests (pytest)
-			  export [...args]:  export a Marimo report to its bundle, or run anything else through uv
-			  open   [...args]:  open a Marimo notebook in Marimo, or anything else in \$EDITOR
-			  publish [...nbs]:  export reports and mirror their bundles to the HF bucket
-			  build  [...args]:  build the static site (from synced bundles, or local for offline)
-			  scrub  [...args]:  scrub terminal control sequences / redact Modal URLs from Marimo HTML
-			  serve:             build and serve at http://localhost:8000
-			  (aliases: \`run\`→\`export\`, \`clean\`→\`scrub\` — deprecated)
-			EOF
+        show_usage 1>&2
         exit 1
         ;;
 esac
