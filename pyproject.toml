@@ -66,7 +66,7 @@ pages = [
 # once and shared by every checkout, Modal worker, and CI run — the bucket name
 # is not a secret (the token lives in the env / `hf` cache). Override per-shell
 # with MINI_STORE_BUCKET. Unset → the store stays local (no network).
-# store-bucket = "your-namespace/your-bucket"
+store-bucket = "z0u/sca2-store"
 
 # The public, versioned publish tier: a Hugging Face *dataset repo* that backs
 # `publish()` and report exports. Set this to keep the CAS bucket above private
@@ -74,7 +74,7 @@ pages = [
 # views stay public and gain git history — a citation pins to a commit sha.
 # Unset → publish/exports stay in the bucket (the single-store default). Override
 # per-shell with MINI_PUBLISH_REPO. See eng/publishing.md and issue #38.
-# publish-repo = "your-namespace/your-publish-repo"
+publish-repo = "z0u/sca2-pub"
 
 [tool.uv]
 # Dependency cooldown to mitigate risk of supply chain attacks.
