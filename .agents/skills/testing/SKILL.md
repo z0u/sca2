@@ -10,6 +10,17 @@ This project uses pytest.
 - Use pytest idioms: fixtures, parametrize, assert, approx, ANY.
 - Prefer brevity.
 
+## Tests run in parallel
+
+The suite runs under `pytest-xdist` (`-n auto` by default). New tests must be
+**parallel-safe**: isolate all state via `tmp_path`/`monkeypatch`, never write to
+a shared path or the cwd without `monkeypatch.chdir(tmp_path)`, and give any
+shared external resource a unique per-test prefix (see `test_hf_store.py`'s
+`secrets.token_hex` tags). Don't rely on test execution order. A test that
+genuinely can't be isolated should share an `xdist_group` (e.g.
+`@pytest.mark.xdist_group("name")`) so its group pins to one worker — but prefer
+fixing the isolation. Run serially when debugging with `uv run pytest -n0`.
+
 Prefer specialized testing utilities, and specify tolerances.
 ```diff
 - assert np.allclose(x, y)  # ❌
