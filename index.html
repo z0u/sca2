@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sparse Concept Anchoring in transformers</title>
+<link rel="stylesheet" href="md.css">
+</head>
+<body>
+<h1>Sparse Concept Anchoring in transformers</h1>
+<p>Sparse Concept Anchoring (SCA) is a training-time method for concept control.
+A light geometric regularizer, driven by a small number of noisy labels,
+guides a chosen concept toward a known location in representation space —
+shaping feature geometry during training rather than reverse-engineering it
+afterwards. Because the concept then lives where you put it, suppressing or
+ablating it has side effects you can bound from the geometry before running
+the intervention.</p>
+<p>The first milestone (M1) established the method in autoencoders:
+<a href="https://arxiv.org/abs/2512.12469">paper</a>,
+<a href="https://www.lesswrong.com/posts/sGskzx7LgsDkMLvcv/intervening-on-sparse-anchored-concepts">blog post</a>,
+<a href="https://github.com/z0u/ex-preppy">code</a>. This site holds the experiment
+reports for the second milestone (M2): does SCA transfer to transformers?
+We anchor concepts in the residual stream of a small transformer trained on
+a synthetic color-mixing task (<em>red + blue = purple</em>), where ground truth is
+unambiguous, so a negative result stays interpretable. The plan and
+deliverables are in the <a href="https://github.com/z0u/sca2">project README</a>.</p>
+<p>&nbsp;</p>
+<h2>Experiment reports</h2>
+<p>Each report is a <a href="https://marimo.io">Marimo</a> notebook that reads durable
+results produced by a separately run experiment. Reports are published
+automatically, with their figures served from a Hugging Face dataset; the
+infrastructure is <a href="https://github.com/z0u/mi-ni">mi-ni</a>.</p>
+<!-- These URLs are rewritten to point to the published notebooks -->
+
+<h3>Iteration 0: prep</h3>
+<ul>
+<li><a href="m1/ex-2.9.1/">Experiment 2.9.1 redux</a>: the M1 headline result
+  (delete <em>red</em> from a 5D autoencoder), ported from
+  <a href="https://github.com/z0u/ex-preppy">ex-preppy</a> to JAX as an end-to-end
+  shakedown of the M2 infrastructure.</li>
+<li><a href="ngpt-scaling/">nGPT scaling</a>: a character-level width × depth
+  sweep of our simplified nGPT (scalar gains, a residual step fixed at
+  1/n_layer), checking that converged loss stays flat across the grid — no depth
+  penalty, no width-gated instability — so the backbone the color-mixing
+  experiments build on actually scales.</li>
+<li><a href="m1/ex-2.9.2/">Experiment 2.9.2</a>: fallback control for deleting
+  <em>red</em>. Ex-2.9.1's selectivity varies a lot with the seed; this tests the
+  SCA paper's "optimal ablation" suggestion against a training-time
+  alternative — pin the decoder's response at the reserved anti-anchor
+  direction to mid-gray, then redirect the concept there — and finds the
+  trained fallback collapses the variance to an analytic bound.</li>
+<li><a href="m1/ex-2.9.3/">Experiment 2.9.3</a>: why anchoring fails. Per-step
+  trajectories show every failing seed anchors successfully and then breaks
+  during the high-LR plateau; an init × data-stream factorial shows the
+  failures follow the stream, not the seed; and a schedule sweep finds the
+  fix — halve the LR peak, keep the anneal.</li>
+<li><a href="m1/ex-2.9.4/">Experiment 2.9.4</a>: closed-loop regularizer weights.
+  Replaces the timed anneal with feedback (dual ascent with hysteresis on
+  the anchor terms). The mechanism works — no rescue is missed — but it
+  causes as many catastrophes as it prevents, its knobs are sharper than the
+  LR knob it replaces, and the fallback term already prevents every
+  catastrophic failure on its own. A clean negative: the boring fix stands.</li>
+</ul>
+<p>More reports will appear here as the M2 experiments land.</p>
+</body>
+</html>
