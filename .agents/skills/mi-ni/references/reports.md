@@ -117,7 +117,10 @@ For a quick check you often don't need a browser at all:
 - **Figures:** `Read` the exported `_assets/<name>-{light,dark}.png` directly —
   faster and more faithful than a screenshot when you only care about one figure.
   Judge the dark variant composited over `#111` (see the figure-style skill).
-- **Inline SVG output** (e.g. subline): extract the `<svg>…</svg>` and rasterize
+- **Inline SVG output** (e.g. subline): if the report wraps the chunk in
+  `externalize_html(html, name=…)` (mini.reports), the same markup is also a
+  plain file at `_assets/<name>.html` — `Read` it instead of digging through
+  the session JSON. To *see* it, extract the `<svg>…</svg>` and rasterize
   with cairosvg (`uvx --with cairosvg`), first stripping any external
   `@import url(...)` font rule. Glyph metrics are approximate without the
   webfont (text drifts relative to per-character marks), but shape and story

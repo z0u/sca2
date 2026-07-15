@@ -24,7 +24,7 @@ with app.setup(hide_code=True):
         WEIGHTS_REF,
         WIDTHS,
     )
-    from mini.reports import report_bundle, use_publisher
+    from mini.reports import externalize_html, report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import light_dark, themed
     from sca.data import colors
@@ -330,19 +330,24 @@ def _(metrics):
     # `--bg-color` (later rule wins).
     sub_css = "svg { --bg-color: light-dark(#fff, #181c1a); }"
 
-    def sublines(rows: list[tuple[str, dict]], series, aria_label: str) -> mo.Html:
-        """Lay out one captioned subline per eval set; `series(row)` builds its series list."""
+    def sublines(rows: list[tuple[str, dict]], series, aria_label: str, name: str) -> mo.Html:
+        """Lay out one captioned subline per eval set; `series(row)` builds its series list.
+
+        The block is inlined (so the SVGs share the page's CSS) *and* externalized as
+        `_assets/<name>.html` — a plain file for tooling that can't run the frontend.
+        """
 
         def one(name: str, row: dict) -> str:
             svg = Subline(chars_per_line=sub_width, css=sub_css).plot(row["text"], series(row))
             caption = f'<figcaption style="font-size: 11px; font-family: monospace; opacity: 0.65">{name}</figcaption>'
             return f'<figure style="display: inline-block; margin: 0 1em 0 0">{svg}{caption}</figure>'
 
-        return mo.Html(
+        html = (
             f'<div role="img" aria-label="{aria_label}" style="text-wrap: balance">'
             + "".join(one(name, row) for name, row in rows)
             + "</div>"
         )
+        return mo.Html(externalize_html(html, name=name))
 
     def pad(row: dict, key: str) -> np.ndarray:
         """Scale to fractions of log |V| and align with the text: position 0 has no prediction."""
@@ -367,6 +372,7 @@ def _(pad, rows, sublines):
         "0-to-log-V scale. The two series track each other, spiking at operand starts and "
         "staying near zero across the answers — except named holdout, where surprisal rises "
         "well above entropy on the answer characters.",
+        name="sublines-surprisal",
     )
     return
 
@@ -408,6 +414,7 @@ def _(pad, rows, sublines):
         "than expected); the dashed series shows the negative part flipped above zero (less "
         "surprised than expected). Three sets stay close to the baseline; named holdout shows "
         "tall positive spikes across its answer characters.",
+        name="sublines-surprise-surprise",
     )
     return
 

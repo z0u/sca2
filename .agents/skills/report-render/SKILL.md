@@ -18,12 +18,14 @@ to build the bundle and `Read` the PNGs. No browser, no runtime, no network:
 ls .mini/exports/m2/ex-2.1.1/_assets/*.png           # then Read the ones you want
 ```
 
-This covers the bulk of every current report. Reach for the browser below only for
-figures that *aren't* standalone PNGs — inline SVG (e.g. `subline` sparklines),
-future JS-rendered charts (altair/plotly) — or when you need the **whole page**
-(prose + figures together, layout, the show-code toggle). Those live only inside
-marimo's client-hydrated data island (JSON, unicode-escaped `<svg…`), so
-there's no file to read and the page is blank until the runtime renders it.
+This covers the bulk of every current report. Inline-HTML figures (e.g. `subline`
+sparklines) that the report wraps in `externalize_html(html, name=…)`
+(`mini.reports`) are likewise on disk as `_assets/<name>.html` — plain markup you
+can `Read` (or rasterize, below) without touching the page. Reach for the browser
+only for inline/JS output *without* such a sidecar — those live only inside
+marimo's client-hydrated data island (JSON, unicode-escaped `<svg…`), so there's
+no file to read and the page is blank until the runtime renders it — or when you
+need the **whole page** (prose + figures together, layout, the show-code toggle).
 
 A standalone `.svg` file (no marimo runtime involved) rasterizes to a readable PNG
 without a browser via cairosvg — `libcairo`/`librsvg` are present in this env:

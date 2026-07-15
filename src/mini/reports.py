@@ -52,6 +52,7 @@ __all__ = [
     "PROVENANCE_ASSET",
     "use_publisher",
     "current_publisher",
+    "externalize_html",
     "relative_urls",
     "stray_links",
     "rewrite_links",
@@ -266,6 +267,26 @@ def use_publisher(publisher: Publisher | None) -> Publisher | None:
 def current_publisher() -> Publisher | None:
     """The report-wide default publisher set by :func:`use_publisher` (or ``None``)."""
     return _default_publisher
+
+
+def externalize_html(fragment: str, *, name: str, publish: Publisher | None = None) -> str:
+    """Write *fragment* (an HTML/SVG chunk) out as a named bundle asset, and return it
+    unchanged for inlining.
+
+    The inline copy is the one readers see — an inlined SVG participates in the page's
+    CSS (theming, fonts), which a referenced file can't. But a Marimo export buries
+    that markup in its client-rendered session JSON (HTML-escaped inside JSON inside
+    HTML), so tooling that can't run the frontend can't read it. The sidecar under
+    ``_assets/`` is the escape hatch: the same fragment as a plain file, like the PNGs
+    ``themed`` writes. *name* keeps its extension if it has one (``.svg`` for a bare
+    SVG element), else ``.html``. With no publisher (*publish* or the report default),
+    this is a no-op pass-through.
+    """
+    publish = publish if publish is not None else current_publisher()
+    if publish is not None:
+        leaf = name if PurePosixPath(name).suffix else f"{name}.html"
+        publish.asset_url(fragment.encode(), name=leaf)
+    return fragment
 
 
 # ---------------------------------------------------------------------------
