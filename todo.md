@@ -37,6 +37,21 @@ readable cold without re-deriving code state.
   just the operands' forms — that's the point, but it changes the
   form-determinism note in `sca/data/colors.py`. (The diagnosis is now written
   up in the ex-2.1.1 report, with live checkpoint queries.)
+  A related question (Alex, 2026-07-15): would very long training *grok* the
+  compositional route? A general circuit consistent with the training map does
+  exist — self-pairs (`navy + navy = navy`) supervise rgb→name at all 27
+  palette points — so it's testable, but three things bet against it: we train
+  with weight_decay=0 and nGPT re-projects weights to unit norm every step, so
+  the classic grokking driver (norm decay eroding the memorizer) is absent;
+  the memorization load is tiny (66 entries, ~15% of lines), so by the
+  circuit-efficiency account the lookup table is likely *cheaper* than the
+  general route, not costlier; and the current schedule decays LR to 1% by
+  epoch 100 with val loss flat from ~epoch 25, so "longer" requires a live LR
+  tail, not just more epochs. Cheap test if wanted: backbone arch × 3 seeds,
+  ~20× epochs with a constant LR floor, periodic checkpoints, tracking
+  `named_holdout` accuracy and the named-prompt rgb probe (below) per
+  checkpoint — the probe should show the mix becoming decodable on named
+  prompts before any behavioral flip.
 
 - **Probe every answer position, per channel (ex-2.1.x eval).** The current
   probes read two positions and average R² over RGB channels, which hides the
