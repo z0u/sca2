@@ -17,16 +17,17 @@ show_usage() {
 		New checkout? Start with: $0 install
 
 		  install:             install dependencies (uv sync) and git hooks
-		  auth    [--check]:   set up credentials, or --check to just probe & print their status
-		  check   [...args]:   run all checks in parallel (default: --lint --format --typecheck --test; add --fix to autofix)
-		    (individually: format | lint | types | tests | dead)
+		  auth    [--check]:   set up credentials; --check just probes
+		  check   [--lint] [--format] [--typecheck] [--test] [--fix]:
+		                       run checks in parallel (default: all without --fix)
+		                       individual commands: format | lint | types | tests | dead
 		  open    <file>:      open a Marimo notebook in Marimo, or anything else in \$EDITOR
 		  preview [...nbs] [--no-serve] [--force] [--port N]:
 		                       export stale reports, assemble the site with local assets
 		                       (never touches the network), and serve it
 		  publish <nbs|--all>: export reports and sync their bundles to the publish tier
 		  site:                assemble the public site from *published* bundles into _site/
-		                       (the CI verb: read-only, never runs a notebook)
+		                       (for CI; read-only, never runs a notebook)
 
 		Experiments are run with \`bin/mini\`, not \`$0\` — see \`bin/mini --help\`.
 		EOF
