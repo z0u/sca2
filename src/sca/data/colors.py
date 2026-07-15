@@ -13,16 +13,24 @@ palette lands on familiar values: ``red + blue = purple``, ``white + black =
 gray``, ``red + lime = olive`` (averaging *darkens*; this is pigment-free
 light-averaging, not paint).
 
-Sentences come in four forms, one per line:
+Sentences come in six forms, one per line:
 
-    named   ``red + blue = purple``      only pairs whose mix is itself named
-    hex     ``#e26 + #48a = #958``       any pair on the full grid
-    cross   ``red + #08f = #848``        a hex operand forces a hex result
-    alias   ``red = #f00``               the name ↔ value dictionary
+    named      ``red + blue = purple``   only pairs whose mix is itself named
+    hex        ``#e26 + #48a = #958``    any pair on the full grid
+    cross      ``red + #08f = #848``     a hex operand forces a hex result
+    alias      ``red = #f00``            the name → value dictionary
+    alias_rev  ``#f00 = red``            the dictionary, reversed
+    open       ``red + navy = #804``     named operands, off-palette mix ⇒ hex
 
-The result's surface form is deterministic given the operands (hex unless both
-operands are named and the mix lands on the palette), so greedy completion has
-a single correct answer — the exact-match accuracy in D2.1.x is well-defined.
+The result's surface form is deterministic given the operand *values* (hex
+unless both operands are named and the mix lands on the palette), so greedy
+completion has a single correct answer — the exact-match accuracy in D2.1.x is
+well-defined. In the base grammar (``FORM_WEIGHTS``) the form is determined by
+the operands' surface forms alone, because named equations draw only closed
+pairs; the ``open`` form (an ex-2.1.2 intervention, off by default) makes the
+rule genuinely value-dependent — the model must compute the mix to know
+whether the answer is a name or a hex code. ``alias_rev`` (same experiment)
+supervises the hex → name direction the base grammar leaves untrained.
 
 ``redness`` ports M1's graded concept label (the anchor's noisy supervision
 signal) to this grid, so the anchoring experiments can label sequences the same
@@ -38,7 +46,7 @@ N_LEVELS = 16
 """Levels per channel; one hex digit."""
 
 type Rgb = tuple[int, int, int]
-type Form = Literal["named", "hex", "cross", "alias"]
+type Form = Literal["named", "hex", "cross", "alias", "alias_rev", "open"]
 
 PALETTE: dict[str, Rgb] = {
     "black": (0, 0, 0),
@@ -137,12 +145,16 @@ def make_example(form: Form, a: Rgb, b: Rgb | None, rng: np.random.Generator) ->
     """Render one example; operand order and (for cross) which side is named are random."""
     if form == "alias":
         return Example(f"{NAMES[a]} = ", to_hex(a), a, None, a)
+    if form == "alias_rev":
+        return Example(f"{to_hex(a)} = ", NAMES[a], a, None, a)
     assert b is not None
     result = mix(a, b)
     swap = rng.random() < 0.5
     match form:
         case "named":
             lhs, rhs, ans = NAMES[a], NAMES[b], NAMES[result]
+        case "open":  # named operands whose mix is off-palette: the answer must be hex
+            lhs, rhs, ans = NAMES[a], NAMES[b], to_hex(result)
         case "hex":
             lhs, rhs, ans = to_hex(a), to_hex(b), to_hex(result)
         case "cross":  # `a` is the named operand; `swap` decides which side it takes
@@ -171,6 +183,26 @@ def split_named_pairs(seed: int, holdout_frac: float = 0.2) -> tuple[list[tuple[
     return [p for p in pairs if p not in holdout], sorted(holdout)
 
 
+def open_named_pairs() -> list[tuple[Rgb, Rgb]]:
+    """Unordered palette pairs whose mix falls *off* the palette (the complement
+    of :func:`closed_named_pairs`; self-pairs mix to themselves, so none is open).
+    """
+    colors = list(PALETTE.values())
+    return [(a, b) for i, a in enumerate(colors) for b in colors[i:] if mix(a, b) not in NAMES]
+
+
+def split_open_pairs(seed: int, holdout_frac: float = 0.2) -> tuple[list[tuple[Rgb, Rgb]], list[tuple[Rgb, Rgb]]]:
+    """Split the open pairs into (train, holdout), mirroring :func:`split_named_pairs`.
+
+    Held-out open pairs never appear in training at all, so completing them
+    (with a hex answer) requires mixing *named* operands the arithmetic way.
+    """
+    rng = np.random.default_rng(seed)
+    pairs = open_named_pairs()
+    holdout = {pairs[i] for i in rng.choice(len(pairs), round(len(pairs) * holdout_frac), replace=False)}
+    return [p for p in pairs if p not in holdout], sorted(holdout)
+
+
 def _random_rgb(rng: np.random.Generator) -> Rgb:
     r, g, b = (int(x) for x in rng.integers(0, N_LEVELS, 3))
     return (r, g, b)
@@ -184,23 +216,28 @@ def sample_corpus(
     seed: int,
     named_pairs: list[tuple[Rgb, Rgb]],
     weights: dict[Form, float] = FORM_WEIGHTS,
+    open_pairs: list[tuple[Rgb, Rgb]] | None = None,
 ) -> list[Example]:
     """Sample the training corpus: i.i.d. examples with the given form mix.
 
     Named equations draw only from *named_pairs* (the train side of the split);
     hex and cross operands draw uniformly from the full grid, so pair coverage
     is sparse (~n_examples of the grid's ~8.4M pairs) and held-out pairs test
-    composition, not recall.
+    composition, not recall. ``open`` equations (if weighted) draw from
+    *open_pairs* — pass the train side of :func:`split_open_pairs`.
     """
     rng = np.random.default_rng(seed)
     forms, probs = zip(*weights.items(), strict=True)
     examples = []
     for form in rng.choice(forms, n_examples, p=probs):
         match form:
-            case "alias":
+            case "alias" | "alias_rev":
                 a, b = list(PALETTE.values())[rng.integers(len(PALETTE))], None
             case "named":
                 a, b = named_pairs[rng.integers(len(named_pairs))]
+            case "open":
+                assert open_pairs, "the open form needs open_pairs (see split_open_pairs)"
+                a, b = open_pairs[rng.integers(len(open_pairs))]
             case "cross":
                 a, b = list(PALETTE.values())[rng.integers(len(PALETTE))], _random_rgb(rng)
             case _:
@@ -236,6 +273,12 @@ def as_named(pairs: Iterable[tuple[Rgb, Rgb]], seed: int) -> list[Example]:
     """Render pairs as named equations (for the seen/held-out named eval sets)."""
     rng = np.random.default_rng(seed)
     return [make_example("named", a, b, rng) for a, b in pairs]
+
+
+def as_form(pairs: Iterable[tuple[Rgb, Rgb]], form: Form, seed: int) -> list[Example]:
+    """Render pairs in the given two-operand form (eval/probe sets)."""
+    rng = np.random.default_rng(seed)
+    return [make_example(form, a, b, rng) for a, b in pairs]
 
 
 def dump_example_sets(sets: dict[str, list[Example]]) -> bytes:
