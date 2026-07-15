@@ -85,10 +85,10 @@ never published (a warning, not an error), so the site just quietly lacks it. Pu
 once the report renders the results. `scripts/build_site.py` (read-only; CI) then *pulls* each synced bundle, resolves
 author links against the repo, and inserts one `<base href="…/exports/<key>/">` in the
 `<head>` so the relative `_assets/…` URLs resolve at the bucket — no per-URL rewriting,
-no bucket writes. The same HTML opened locally (after `./go export`, which exports the
-bundle) resolves `_assets/…` to the co-located files (offline; real PNGs), because the
-build *localizes* when there's no bucket. Each report is one independently syncable
-bundle, served at `<key>/`.
+no bucket writes. The same HTML opened locally (after `./go preview`, which exports the
+bundle and reassembles the site) resolves `_assets/…` to the co-located files (offline;
+real PNGs), because the build *localizes* when there's no bucket. Each report is one
+independently syncable bundle, served at `<key>/`.
 
 Because `<base>` repoints *every* relative URL, the rule is **the only relative URLs in
 a report are its assets**. Author-written nav/source links would break against the
@@ -100,19 +100,35 @@ place is left alone with a warning. Write natural relative links
 
 ## Verifying a rendered report from a sandboxed agent session
 
-Don't try to screenshot the exported bundle with headless Chromium: the HTML
-hydrates client-side and pulls the Marimo frontend from a CDN, which the
-sandbox's browser can't reach (it doesn't inherit the agent proxy), so the page
-renders blank — `document.body.scrollHeight` of 0 over both `file://` and a
-localhost server. Verify without a browser instead:
+You *can* screenshot the exported bundle with headless Chromium here — see the
+**report-render skill**. The catch it works around: the HTML hydrates
+client-side and pulls the Marimo frontend (~200 JS/CSS/font URLs) from a CDN the
+sandbox can't reach, so a naive render stays blank. But the *same* pinned `dist/`
+ships inside the marimo pip package under `_static/`; the skill's `render.py`
+repoints the bundle's CDN refs at those local assets, serves the result, and
+drives the pre-installed Chromium — a real, offline render you can `Read`:
+
+```bash
+./go preview --no-serve docs/m2/ex-2.1.1/report.py     # -> .mini/exports/m2/ex-2.1.1/
+uv run --with playwright python .claude/skills/report-render/render.py \
+    .mini/exports/m2/ex-2.1.1 -o /tmp/report.png       # then Read the PNG
+```
+
+Reach for a full-page render to check layout, prose, and how figures sit
+together, or to assert on client-side behavior (the show-code toggle, visibility
+logic) by swapping the screenshot for Playwright DOM queries. The skill covers
+both, plus the gotchas (run through the project env so `_static/` matches the
+bundle's marimo; `--wait-text` instead of a fixed timeout).
+
+For a quick check you often don't need a browser at all:
 
 - **Structure:** grep `index.html` — `Traceback|marimo-error` should have zero
   hits, and a string produced *below* the `mo.stop` guard (a computed number, a
   section heading) proves the data cells ran. Beware that cell *source* is
   embedded in the HTML too, so grep for rendered output, not code.
 - **Figures:** `Read` the exported `_assets/<name>-{light,dark}.png` directly —
-  faster and more faithful than a screenshot. Judge the dark variant composited
-  over `#111` (see the figure-style skill).
+  faster and more faithful than a screenshot when you only care about one figure.
+  Judge the dark variant composited over `#111` (see the figure-style skill).
 - **Inline SVG output** (e.g. subline): extract the `<svg>…</svg>` and rasterize
   with cairosvg (`uvx --with cairosvg`), first stripping any external
   `@import url(...)` font rule. Glyph metrics are approximate without the
@@ -120,8 +136,8 @@ localhost server. Verify without a browser instead:
   read fine. Simpler still: regenerate the SVG standalone with the same code
   and data the report uses — that also exercises the figure code path.
 
-If you must drive Chromium (e.g. for a self-contained page): the executable is
-`/opt/pw-browsers/chromium` (pass `executable_path=`), pages referencing
-external hosts hang `goto` (use `wait_until="domcontentloaded"`), and the
-browser can't read the session scratchpad under `/tmp` — serve from the repo
-tree over localhost.
+Driving Chromium directly (e.g. for a self-contained page outside the skill's
+flow): the executable is `/opt/pw-browsers/chromium` (pass `executable_path=`),
+pages referencing *unrewritten* external hosts hang `goto` (use
+`wait_until="domcontentloaded"`), and the browser can't read the session
+scratchpad under `/tmp` — serve from the repo tree over localhost.
