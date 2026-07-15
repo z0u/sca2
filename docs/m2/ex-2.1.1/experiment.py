@@ -62,6 +62,7 @@ N_SURPRISAL = 2  # examples per eval set in the surprisal capture
 # The report imports these, so they can't drift.
 METRICS_REF = "reports/m2/ex-2.1.1/metrics"
 WEIGHTS_REF = "reports/m2/ex-2.1.1/probe-weights"
+CKPT_REF = "reports/m2/ex-2.1.1/checkpoints"  # + f"/{label}"
 
 
 def prepare_data() -> dict:
@@ -246,8 +247,10 @@ def surprisal_one(checkpoint, evals, label: str) -> dict:
     return {"label": label, "surprisal": sets}
 
 
-def publish_results(results: list[dict], surprisals: list[dict]) -> dict:
-    """Publish the metrics (JSON) and the stacked probe weights (npz) for the report."""
+def publish_results(results: list[dict], surprisals: list[dict], checkpoints: dict) -> dict:
+    """Publish the metrics (JSON), the stacked probe weights (npz), and the
+    per-cell checkpoints, for the report.
+    """
     import io
     import json
 
@@ -260,6 +263,10 @@ def publish_results(results: list[dict], surprisals: list[dict]) -> dict:
         {k: v for k, v in r.items() if k != "probe_weights"} | {"surprisal": by_label[r["label"]]} for r in results
     ]
     set_ref(METRICS_REF, put(json.dumps(metrics, indent=2).encode(), name="ex-2.1.1-metrics.json"))
+    # The report queries trained models directly (they're tiny — CPU inference),
+    # e.g. to contrast completions of the same value pairs across surface forms.
+    for label, ckpt in checkpoints.items():
+        set_ref(f"{CKPT_REF}/{label}", ckpt)
 
     arrays = {}
     for r in results:
@@ -280,7 +287,7 @@ def main(ctx: Ctx) -> dict:
     evaled = ctx.map(eval_one, trained, [prep["evals"]] * n, [prep["probes"]] * n, role="eval")
     ckpts = [t["checkpoint"] for t in trained]
     surprisals = ctx.map(surprisal_one, ckpts, [prep["evals"]] * n, labels, role="surprisal")
-    summary = ctx.run(publish_results, evaled, surprisals, role="prep")
+    summary = ctx.run(publish_results, evaled, surprisals, dict(zip(labels, ckpts, strict=True)), role="prep")
     return {
         **summary,
         "worst_hex_unseen": min(r["accuracy"]["hex_unseen"]["accuracy"] for r in evaled),

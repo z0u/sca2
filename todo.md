@@ -11,6 +11,47 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Why ex-2.1.1 never solves `named_holdout` (diagnosed 2026-07-15).** Not a
+  weak form signal: the model always answers named + named prompts with a
+  *name* (never hex), so a result-type marker in the grammar wouldn't help. On
+  the d64-L4-s0 checkpoint, the same held-out value pairs score 10/10 in cross
+  and hex form but 0/10 named; the wrong names are retrieval-flavored (operand
+  echoes like `olive + lavender = lavender`, or the answer of a nearby seen
+  pair) and largely agree across seeds. Three compounding causes: (1) the
+  named slice is memorizable — 66 train pairs × ~90 repetitions — so there's
+  no training pressure to compose; (2) the rgb→name inverse is never
+  supervised (aliases only go name→hex; `#808 = ` prompts yield garbage) — a
+  reversal-curse analog; (3) hex answers factorize per channel at emission
+  time (result_rgb probe R² ≤ ~0.5 at the pre-answer position in every layer,
+  yet hex accuracy is 1.0), while a name's first character needs all three
+  channels integrated at once. Candidate interventions, roughly in order:
+  reverse alias lines (`#f00 = red`) to train the inverse readout; named
+  operands with off-palette mixes rendered as hex answers
+  (`red + navy = #804`) so name + name prompts must engage the arithmetic
+  circuit instead of the lookup table; more named diversity (a denser named
+  sub-grid) to make memorization expensive. Prediction to test cheaply in an
+  ex-2.1.1 variant: reverse aliases alone lift `named_holdout` off zero only
+  if the mix is already computed on named prompts; adding the off-palette
+  named lines forces that. Note the second intervention makes the answer's
+  surface form depend on the *value* of the mix (named iff on-palette), not
+  just the operands' forms — that's the point, but it changes the
+  form-determinism note in `sca/data/colors.py`. (The diagnosis is now written
+  up in the ex-2.1.1 report, with live checkpoint queries.)
+
+- **Probe every answer position, per channel (ex-2.1.x eval).** The current
+  probes read two positions and average R² over RGB channels, which hides the
+  computation schedule. Prediction from the ex-2.1.1 diagnosis: on hex answers,
+  channel k becomes decodable at (or just before) the position that emits digit
+  k — a stair-step, not a plateau — because nothing requires the whole mix at
+  one position. Caveat for interpretation: under teacher forcing, once digit k
+  is in the context its channel is trivially decodable from the token itself,
+  so the informative quantity is decodability of channel k strictly *before*
+  its digit is emitted. A named-prompt variant (probe the full RGB at the first
+  answer character, seen vs held-out pairs) would also separate "computed but
+  can't name it" from "never computed" more directly than the behavioral
+  evidence. Cheap: `probe_residual_stream` already captures the activations;
+  it's a positions-and-targets change plus a small figure.
+
 - **s₂ (surprise-surprise) as a standard metric for the anchored runs.**
   ex-2.1.1's sublines now record per-character entropy alongside surprisal, and
   s₂ = (i − h)/log|V| cleanly separated *confidently wrong* (named_holdout:
