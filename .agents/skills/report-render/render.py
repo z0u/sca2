@@ -16,7 +16,9 @@ marimo that produced the bundle), adding Playwright just for this call:
 
 Pass a bundle dir (containing index.html + _assets/) or an index.html directly.
 `--suffix '?show-code=true'` appends to the URL; `--wait-text STR` blocks until STR
-appears (or times out). See SKILL.md for driving the DOM instead of screenshotting.
+appears (or times out). `--selector CSS` shoots just the matching element(s) instead
+of the full page — e.g. `--selector '.output svg'` for one figure, numbering the
+output when several match. See SKILL.md for driving the DOM instead of screenshotting.
 """
 
 import argparse
@@ -52,6 +54,11 @@ def _build_serve_root(bundle: Path, root: Path) -> None:
     (root / "index.html").write_text(html, "utf-8")
 
 
+def _out_paths(out: Path, n: int) -> list[Path]:
+    """One path for a single shot, else `out` with a `-<i>` index before its suffix."""
+    return [out] if n == 1 else [out.with_stem(f"{out.stem}-{i}") for i in range(n)]
+
+
 def _serve(root: Path) -> tuple[socketserver.TCPServer, int]:
     handler = lambda *a, **k: http.server.SimpleHTTPRequestHandler(*a, directory=str(root), **k)  # noqa: E731
     httpd = socketserver.TCPServer(("127.0.0.1", 0), handler)
@@ -64,6 +71,7 @@ def main() -> None:
     ap.add_argument("bundle", type=Path, help="export bundle dir (with index.html + _assets/) or an index.html")
     ap.add_argument("-o", "--out", type=Path, default=Path("report.png"), help="screenshot path (PNG)")
     ap.add_argument("--suffix", default="", help="appended to the URL, e.g. '?show-code=true'")
+    ap.add_argument("--selector", default=None, help="CSS: shoot matching element(s), not the full page")
     ap.add_argument("--wait-text", default=None, help="block until this text appears (else fixed timeout)")
     ap.add_argument("--timeout", type=float, default=6.0, help="seconds to wait for the app to settle")
     args = ap.parse_args()
@@ -89,10 +97,23 @@ def main() -> None:
                 page.get_by_text(args.wait_text).first.wait_for(timeout=args.timeout * 1000)
             else:
                 page.wait_for_timeout(args.timeout * 1000)
-            page.screenshot(path=str(args.out), full_page=True)
+            if args.selector:
+                loc = page.locator(args.selector)
+                n = loc.count()
+                if n == 0:
+                    raise SystemExit(f"no elements match {args.selector!r}")
+                outs = _out_paths(args.out, n)
+                for i, out in enumerate(outs):
+                    el = loc.nth(i)
+                    el.scroll_into_view_if_needed()
+                    el.screenshot(path=str(out))
+                shot = f"{n} element(s) matching {args.selector!r} -> " + ", ".join(map(str, outs))
+            else:
+                page.screenshot(path=str(args.out), full_page=True)
+                shot = str(args.out)
             browser.close()
         httpd.shutdown()
-        print(f"rendered {args.bundle} -> {args.out}")
+        print(f"rendered {args.bundle} -> {shot}")
     finally:
         for p in sorted(root.iterdir(), reverse=True):
             p.unlink()

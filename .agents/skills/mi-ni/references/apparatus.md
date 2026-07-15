@@ -48,13 +48,13 @@ app_type = mo.cli_args().get("app", "local")   # a marimo radio in edit mode; a 
 app = ModalApparatus("demo").w(gpu="L4") if app_type == "modal" else LocalApparatus("demo")
 ```
 
-Export it headless with `./go export`, passing notebook options after a `--`:
+Run it headless with `marimo export html`, passing notebook options after a `--`:
 
 ```bash
-./go export docs/my-notebook.py -- --app=modal --arch=ngpt
+uv run marimo export html docs/my-notebook.py -o /dev/null -- --app=modal --arch=ngpt
 ```
 
-The `--` delimits notebook options from `./go`'s own args (and `./go` forwards them to `marimo export`). It's optional — `./go export docs/my-notebook.py --app=modal` also works — but explicit is clearer.
+The `--` delimits notebook options from marimo's own args, which arrive via `mo.cli_args()` — so only a notebook that reads them (like the radio above) responds; a report that just consults the configured store ignores them. (This was `./go export`, now gone; the report-export verbs `./go preview`/`publish` render with defaults and don't forward notebook options.)
 
 **Syntax gotcha:** the options are flags — marimo's `cli_args()` only parses `--key=value` or `--key value`. A bare `key=value` parses to *nothing*, so the notebook silently falls back to its default (here `local`) with no error. Confirm which backend actually ran from the logs — a Modal run prints `Creating Modal image …` then `Running … on Modal`; a local one prints `Running … locally`.
 
