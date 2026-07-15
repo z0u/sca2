@@ -1,9 +1,38 @@
 ---
 name: report-render
-description: Render a report in a headless browser. Works offline by bundling Marimo assets.
+description: View a report's figures. Read the matplotlib PNGs directly, or render inline/JS figures and the full page in a headless browser (offline, by bundling Marimo assets).
 ---
 
 # Rendering a report to check it
+
+## Fast path: read the figure PNGs directly (no browser)
+
+Most report figures are **matplotlib**, and the `report_bundle` publisher
+(`mini.reports` + the `themed`/`light_dark` vis helpers) writes each one to disk as
+a real file — `_assets/<name>-light.png` / `-dark.png` — during the bundle build,
+regardless of the surrounding HTML. So the ergonomic way to *see* those figures is
+to build the bundle and `Read` the PNGs. No browser, no runtime, no network:
+
+```bash
+./go preview --no-serve docs/m2/ex-2.1.1/report.py   # -> .mini/exports/m2/ex-2.1.1/
+ls .mini/exports/m2/ex-2.1.1/_assets/*.png           # then Read the ones you want
+```
+
+This covers the bulk of every current report. Reach for the browser below only for
+figures that *aren't* standalone PNGs — inline SVG (e.g. `subline` sparklines),
+future JS-rendered charts (altair/plotly) — or when you need the **whole page**
+(prose + figures together, layout, the show-code toggle). Those live only inside
+marimo's client-hydrated data island (JSON, unicode-escaped `<svg…`), so
+there's no file to read and the page is blank until the runtime renders it.
+
+A standalone `.svg` file (no marimo runtime involved) rasterizes to a readable PNG
+without a browser via cairosvg — `libcairo`/`librsvg` are present in this env:
+
+```bash
+uv run --with cairosvg python -c "import cairosvg; cairosvg.svg2png(url='x.svg', write_to='x.png', scale=2)"
+```
+
+## Browser path: for inline/JS figures, full page, or DOM assertions
 
 A `marimo export html` bundle loads its frontend runtime (~200 JS/CSS/font URLs)
 from `cdn.jsdelivr.net/npm/@marimo-team/frontend@<version>/dist`. In a
@@ -65,8 +94,20 @@ toggle = page.locator("[data-testid=notebook-action-show-code]").count()
 - Two asset dirs, no collision: the runtime lives under `assets/` (from
   `_static/`), the report's figures under `_assets/` (leading underscore, from the
   bundle). `render.py` symlinks both into the serve root.
-- Chromium is pre-installed at `/opt/pw-browsers/chromium` (override with
-  `PLAYWRIGHT_CHROMIUM`); don't run `playwright install`.
+- **Chromium:** in the Claude-on-web sandbox it's pre-baked at
+  `/opt/pw-browsers/chromium` — `render.py` uses that if present. In VS Code / a
+  fresh dev container it's *not* there (and `/opt/pw-browsers` isn't writable), so
+  `render.py` falls back to Playwright's default resolution. Install it once:
+  ```bash
+  uv run --with playwright playwright install chromium        # -> ~/.cache/ms-playwright
+  uv run --with playwright playwright install-deps chromium   # OS libs (libxkbcommon0, …)
+  ```
+  A candidate for baking into the dev container if this becomes routine; on-demand
+  is fine otherwise (one download, then cached).
+- **Locale:** headless Chromium in a locale-less container reports no
+  `navigator.language`, and marimo's frontend hard-errors on boot ("Incorrect
+  locale information provided") — a blank-ish page with that message, not your
+  report. `render.py` pins `locale="en-US"` on the page to avoid it.
 - A missing favicon/font 404 is cosmetic — the app still renders.
 
 This same repoint-CDN-to-`_static` trick is what a full offline/archival bundle
