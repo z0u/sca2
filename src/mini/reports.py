@@ -61,6 +61,7 @@ __all__ = [
     "rewrite_links",
     "insert_base",
     "set_theme",
+    "set_responsive",
     "set_banner",
     "set_provenance",
 ]
@@ -425,22 +426,58 @@ def set_theme(html: str, theme: str = "system") -> str:
     return html
 
 
-# Marimo's "Static marimo notebook — Run or Edit" banner is rendered *client-side* by
-# its bundle (it's nowhere in the exported HTML — only ``data-testid`` survives at
-# runtime), so we can't rewrite it as markup. We hide it via this rule on that stable
-# testid; if a future Marimo drops the testid the rule simply no-ops (its banner returns,
-# ours still shows) — no hard dependency on its internals.
+# Marimo renders two bits of chrome we don't want on a *published* report — a "Static
+# marimo notebook — Run or Edit" banner and a bottom-right "made with marimo" watermark
+# — *client-side* from its bundle (nowhere in the exported HTML; only a stable
+# ``data-testid`` survives at runtime). So we can't rewrite them as markup — we hide them
+# with CSS keyed on those testids. If a future Marimo drops a testid the rule simply
+# no-ops (that element returns), so there's no hard dependency on its internals. There's
+# no export flag or config key for the watermark, so CSS is the only lever.
 _HIDE_MARIMO_BANNER = '[data-testid="static-notebook-banner"]{display:none!important}'
+_HIDE_MARIMO_WATERMARK = '[data-testid="watermark"]{display:none!important}'
 
-# Our nav is a ``position:fixed`` overlay, deliberately *out of normal flow*: Marimo
-# mounts its app as a full-viewport ``absolute`` layer, so an in-flow bar would both be
-# painted over by it and add its own height below it (a second scrollbar). Fixed + a top
-# z-index floats above that layer and touches nothing in Marimo's DOM. Pinned top-left to
-# clear Marimo's top-right actions (``…``) menu. ``Canvas``/``CanvasText`` are the UA's
+# Marimo hard-codes ``min-width:400px`` on the content column (its ``min-w-[400px]``
+# class) and clips ``#App``'s horizontal overflow (``overflow:hidden``). Below ~400px —
+# any phone — that pins the column wider than the viewport *and* makes the clipped right
+# edge unscrollable. The min-width buys nothing (the column is already ``max-width``-
+# bounded and centred), so we zero it and let the content fit the screen. The selector
+# matches the literal Tailwind class token; the brackets are literal inside the quoted
+# attribute value, so no CSS escaping is needed.
+_FIT_CONTENT_WIDTH = '[class~="min-w-[400px]"]{min-width:0!important}'
+
+
+def set_responsive(html: str) -> str:
+    """Make a published Marimo export fit a phone and drop its "made with marimo" chip.
+
+    Two presentation fixes every report wants, independent of our nav/provenance chips
+    (so they run unconditionally, unlike :func:`set_banner`):
+
+    - **Fit narrow screens.** Marimo pins the content column at ``min-width:400px`` and
+      clips ``#App``'s horizontal overflow, so under ~400px the right edge is cut off and
+      *can't be scrolled to*. Zeroing the min-width lets the column shrink to the viewport.
+    - **Hide the watermark**, the fixed bottom-right "made with marimo" chip Marimo paints
+      on static exports — distracting on a published report, and with no flag/config to
+      turn off (so, like its "Run or Edit" banner, we hide it by CSS on its testid).
+
+    A no-op on a non-Marimo page (the class/testid simply don't match anything). Applied
+    at build time alongside :func:`set_theme`, so it covers every published page.
+    """
+    style = f"<style>{_FIT_CONTENT_WIDTH}\n    {_HIDE_MARIMO_WATERMARK}</style>"
+    return re.sub(r"(</head>)", lambda m: f"    {style}\n{m.group(1)}", html, count=1)
+
+
+# Our nav is *absolutely* positioned, not in normal flow: Marimo mounts its app
+# (``#App``) as an opaque, viewport-filling ``z-index:1`` layer, so an in-flow sibling
+# renders *behind* it (invisible — an easy trap). Absolute + a top z-index floats it
+# above that layer, and — unlike the older ``position:fixed`` — it scrolls away with the
+# document (so it settles at the top of the page as a header rather than shadowing the
+# content the whole way down). Pinned top-left to clear Marimo's top-right actions (``…``)
+# menu; the content column gets matching top padding (:data:`_BANNER_CLEARANCE`) so the
+# report's title isn't tucked under it at the top. ``Canvas``/``CanvasText`` are the UA's
 # theme-aware system colors (the export declares ``color-scheme``, so they track the
-# device theme); a blurred translucent backdrop keeps it legible over content.
+# device theme); a blurred translucent backdrop keeps it legible where it does overlap.
 _BANNER_STYLE = (
-    "position:fixed;top:.5rem;left:.5rem;z-index:2147483647;"
+    "position:absolute;top:.5rem;left:.5rem;z-index:2147483647;"
     "display:flex;gap:.75rem;align-items:center;"
     "padding:.3rem .65rem;font-size:.8125rem;line-height:1.4;"
     "font-family:system-ui,sans-serif;border-radius:.375rem;"
@@ -450,6 +487,12 @@ _BANNER_STYLE = (
 )
 _BANNER_LINK = "color:inherit;text-decoration:underline"
 
+# The nav is out of flow, so it reserves no space; without this the report's first line
+# (its title, code collapsed) would sit under it at the top of the page. A little top
+# padding on the content column drops the whole report clear of the chip. Same class the
+# min-width fix targets — a distinct property, so the two rules coexist.
+_BANNER_CLEARANCE = '[class~="min-w-[400px]"]{padding-top:3rem}'
+
 
 def set_banner(html: str, *, index_url: str | None = None, source_url: str | None = None) -> str:
     """Give a published report a floating nav — back to the index, out to the source.
@@ -457,11 +500,10 @@ def set_banner(html: str, *, index_url: str | None = None, source_url: str | Non
     Marimo's static export shows a "Run or Edit" banner whose only action is a download
     popup; on a published site a back-link to the index and a link to the source notebook
     are more useful. So we hide Marimo's banner (a CSS rule keyed on its ``data-testid``)
-    and inject our own — a small ``position:fixed`` overlay (``← Index`` · ``Source``).
-    It's fixed rather than in-flow because Marimo renders its app as a full-viewport
-    ``absolute`` layer that would otherwise paint over an in-flow bar and leave a second
-    scrollbar below it. Either link is omitted when its URL is ``None``; a no-op if
-    neither is given.
+    and inject our own — a small chip (``← Index`` · ``Source``) pinned top-left. It's
+    absolutely positioned (above Marimo's opaque app layer) and scrolls away with the
+    page; the content column is padded down so the title clears it. Either link is omitted
+    when its URL is ``None``; a no-op if neither is given.
     """
     if index_url is None and source_url is None:
         return html
@@ -475,7 +517,7 @@ def set_banner(html: str, *, index_url: str | None = None, source_url: str | Non
     html = re.sub(
         r"(</head>)",
         lambda m: (
-            f"    <style>{_HIDE_MARIMO_BANNER}\n    @media print{{[data-mini-banner]{{display:none}}}}</style>\n{m.group(1)}"
+            f"    <style>{_HIDE_MARIMO_BANNER}{_BANNER_CLEARANCE}\n    @media print{{[data-mini-banner]{{display:none}}}}</style>\n{m.group(1)}"
         ),
         html,
         count=1,
@@ -483,12 +525,13 @@ def set_banner(html: str, *, index_url: str | None = None, source_url: str | Non
     return re.sub(r"(<body[^>]*>)", lambda m: f"{m.group(1)}\n    {bar}", html, count=1)
 
 
-# The provenance chip mirrors the nav banner's mechanics (fixed overlay above
-# Marimo's full-viewport layer, UA system colors, blurred backdrop) but sits
-# bottom-left and folds away behind a <details> — provenance should be *findable*,
-# not competing with the report's content.
+# The provenance chip mirrors the nav's mechanics (absolute, above Marimo's opaque app
+# layer, UA system colors, blurred backdrop) but sits bottom-left and folds away behind a
+# ``<details>`` — provenance should be *findable*, not competing with the report's
+# content. Absolute (not fixed) so it too scrolls with the page, coming to rest at the
+# foot of the report; the content column's own bottom padding keeps text clear of it.
 _PROVENANCE_STYLE = (
-    "position:fixed;bottom:.5rem;left:.5rem;z-index:2147483647;"
+    "position:absolute;bottom:.5rem;left:.5rem;z-index:2147483647;"
     "max-width:min(30rem,90vw);"
     "padding:.3rem .65rem;font-size:.75rem;line-height:1.5;"
     "font-family:system-ui,sans-serif;border-radius:.375rem;"
@@ -520,9 +563,10 @@ def set_provenance(html: str, refs: dict[str, dict[str, Any] | None]) -> str:
     *refs* is the bundle's provenance sidecar content (ref name → the producer
     stamped at ``set_ref`` time). Each producing experiment gets one line — name,
     code state, run date — with the resolved ref names beneath it, inside a
-    ``<details>`` chip pinned bottom-left. A report whose refs carry no producer
-    (or that read no refs at all) is left untouched. Content is derived only from
-    the store's refs, so re-exporting unchanged data injects the same footer.
+    ``<details>`` chip pinned bottom-left (above Marimo's app layer, scrolling to rest at
+    the foot of the report). A report whose refs carry no producer (or that read no refs
+    at all) is left untouched. Content is derived only from the store's refs, so
+    re-exporting unchanged data injects the same footer.
     """
     entries = _provenance_entries(refs)
     if not entries:
