@@ -66,6 +66,15 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   nGPT backbone over width × depth × seed, and builds D2.1's measurement
   apparatus: exact-match completion accuracy on seen, held-out, and unseen
   operand pairs, plus per-layer residual-stream probes for operand and result
-  colors. The baseline the anchored runs (ex-2.1.2+) are compared against.
+  colors. The baseline the anchored runs are compared against.
+- [Experiment 2.1.2](./m2/ex-2.1.2/report.py): making composition pay.
+  Ex-2.1.1's baseline never solves the held-out named pairs, and its diagnosis
+  blamed the corpus: a memorizable named slice, a one-way alias dictionary,
+  and hex answers that factorize per channel. This experiment tests that
+  diagnosis with a 2 × 2 factorial of grammar interventions (reverse alias
+  lines × off-palette named equations) on the frozen backbone, and builds the
+  graded instruments — answer margins, calibration (s₂), position-resolved
+  probes — that the anchored runs will be read with. Still un-anchored; the
+  winning corpus becomes the anchoring experiments' baseline.
 
 More reports will appear here as the M2 experiments land.

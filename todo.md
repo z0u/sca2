@@ -28,6 +28,17 @@ readable cold without re-deriving code state.
   min-width/scroll wrapper lives — a `themed` option, or a CSS class the author
   opts into. Decide before the anchoring reports reuse these figures.
 
+- **Ex-2.1.1's `named_holdout` diagnosis → being tested in ex-2.1.2
+  (2026-07-15).** The two lead interventions below (reverse aliases,
+  off-palette named-as-hex) are now a 2×2 factorial on the frozen d64-L4
+  backbone in `docs/m2/ex-2.1.2/`, along with the compute-vs-lookup margin
+  (as candidate-answer log-prob margins), the per-position/per-channel probe,
+  and s₂ as a per-set scalar. The third intervention (denser named sub-grid)
+  stayed out of scope: it changes the concept inventory the anchoring
+  experiments will label, not just the supervision. Original diagnosis kept
+  below until the results land, then this whole block can collapse into the
+  ex-2.1.2 report.
+
 - **Why ex-2.1.1 never solves `named_holdout` (diagnosed 2026-07-15).** Not a
   weak form signal: the model always answers named + named prompts with a
   *name* (never hex), so a result-type marker in the grammar wouldn't help. On
@@ -77,7 +88,11 @@ readable cold without re-deriving code state.
   first answer char on named prompts — "computed but outvoted" vs "never
   computed").
 
-- **Probe every answer position, per channel (ex-2.1.x eval).** The current
+- **Probe every answer position, per channel (ex-2.1.x eval).** *Implemented
+  in ex-2.1.2 as `probe_answer_schedule` (strictly-before-emission framing
+  included) and `probe_transfer` (the named-prompt variant, fit on open-pair
+  prompts); keep this entry until the stair-step figure confirms or refutes
+  the prediction.* The current
   probes read two positions and average R² over RGB channels, which hides the
   computation schedule. Prediction from the ex-2.1.1 diagnosis: on hex answers,
   channel k becomes decodable at (or just before) the position that emits digit
@@ -92,6 +107,8 @@ readable cold without re-deriving code state.
   it's a positions-and-targets change plus a small figure.
 
 - **s₂ (surprise-surprise) as a standard metric for the anchored runs.**
+  *Piloted in ex-2.1.2: `answer_calibration` records mean answer nll/entropy/s₂
+  per eval set per cell, with the caveats below in its docstring.*
   ex-2.1.1's sublines now record per-character entropy alongside surprisal, and
   s₂ = (i − h)/log|V| cleanly separated *confidently wrong* (named_holdout:
   low entropy, high surprisal on the answer) from *knows it doesn't know*.
