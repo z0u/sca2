@@ -104,7 +104,7 @@ case "${1:-help}" in
         ( set -x; uv run "$SCRIPT_DIR/export_reports.py" "${export_args[@]}" )
         ( set -x; uv run "$SCRIPT_DIR/build_site.py" --localize )
         if [[ $serve -eq 1 ]]; then
-            npx serve -n -l "$port" "$PROJECT_ROOT/_site"
+            ( set -x; uv run "$SCRIPT_DIR/preview_server.py" "$PROJECT_ROOT/_site" "$port" )
         else
             echo
             echo "Site assembled at _site/ (bundles in .mini/exports/)."
