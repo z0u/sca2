@@ -3,17 +3,26 @@
 
 The HTML lives nowhere in Git: each report is exported (``./go publish``) to a
 self-contained bundle — ``index.html`` + named-keyed ``_assets/`` — and mirrored to
-the bucket under ``exports/<key>/``. This build is the deterministic, read-only half:
-it pulls each synced bundle, resolves author links against the *repo*, inserts one
-``<base>`` pointing at the bucket, and writes ``_site/<key>/index.html``. With no
-bucket it *localizes* instead — reads the bundles from ``.mini/exports/`` (produced by
-``./go export``) and copies their assets beside the HTML so the site works offline.
+the bucket under ``exports/<key>/``. The assembly mode is an explicit choice, never
+inferred from credentials:
+
+``--externalize`` (CI, ``./go site``)
+    The deterministic, read-only half of publishing: pull each *synced* bundle,
+    resolve author links against the repo, insert one ``<base>`` pointing at the
+    bucket, and write only ``_site/<key>/index.html`` (asset bytes stay on the CDN).
+    Requires a configured store; fails loudly without one.
+
+``--localize`` (local preview, ``./go preview``)
+    Read the bundles from ``.mini/exports/`` and copy their ``_assets/`` beside the
+    HTML, so the site works offline. Never touches the network.
 """
 
+import argparse
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -51,16 +60,23 @@ def prepare_dirs():
     SITE_DIR.mkdir()
 
 
-def _resolve_store():
-    """The project store — an HF bucket if configured + authed, else local.
+def _resolve_publish_store():
+    """The HF publish tier for ``--externalize``, or a loud exit if unreachable.
 
-    Drives the two modes: a bucket means *externalize* (pull synced exports + ``<base>``
-    at the bucket); a local store means *localize* (read ``.mini/exports`` and copy
-    assets beside the HTML in ``_site``).
+    Mode is the caller's explicit choice; this only checks the chosen mode is
+    *possible* — it never silently downgrades to localize.
     """
+    from mini.hf_store import HFStore
     from mini.store import store_for
 
-    return store_for(WORKSPACE_ROOT / ".mini" / "store")
+    store = store_for(WORKSPACE_ROOT / ".mini" / "store")
+    if not isinstance(store, HFStore):
+        sys.exit(
+            "--externalize needs the HF publish tier (a read token suffices): "
+            "set [tool.mini] store-bucket/publish-repo and run `./go auth`.\n"
+            "For an offline build from local bundles, use `./go preview` (--localize)."
+        )
+    return store
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +237,7 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
             else:
                 bundle = export_dir(nb)
                 if not (bundle / "index.html").exists():
-                    print(f"  ! {key}: not exported locally — run `./go export {nb_rel}` (skipping)")
+                    print(f"  ! {key}: not exported locally — run `./go preview {nb_rel}` (skipping)")
                     continue
                 base_href = None
 
@@ -362,19 +378,30 @@ def add_nojekyll():
 
 
 def main():
-    from mini.hf_store import HFStore
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    mode = ap.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--externalize",
+        action="store_true",
+        help="assemble from published bundles; assets stay on the CDN behind a <base> (CI)",
+    )
+    mode.add_argument(
+        "--localize", action="store_true", help="assemble from .mini/exports/ with assets copied in; works offline"
+    )
+    args = ap.parse_args()
 
-    links = prepare_dirs_and_resolver()
-    store = _resolve_store()
-    externalizing = isinstance(store, HFStore)
-    if isinstance(store, HFStore):  # the publish tier: its own repo if split off, else the bucket
+    # Resolve the store *before* wiping _site, so a missing token can't destroy a build.
+    if args.externalize:
+        store = _resolve_publish_store()
         print(f"  asset mode: externalize ← {store.publish_repo or store.bucket}")
     else:
-        print("  asset mode: localize (no bucket)")
-    build_reports(links, store, externalizing)
+        store = None
+        print("  asset mode: localize (.mini/exports/)")
+    links = prepare_dirs_and_resolver()
+    build_reports(links, store, args.externalize)
     copy_assets()
     copy_md_stylesheet()
-    convert_markdown(links, externalizing)
+    convert_markdown(links, args.externalize)
     add_nojekyll()
     print(f"\nSite written to {SITE_DIR.relative_to(WORKSPACE_ROOT)}/")
 

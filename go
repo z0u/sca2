@@ -13,26 +13,26 @@ is_marimo_notebook() {
 show_usage() {
     # Important: heredoc indented with tab characters.
     cat <<-EOF
-		Usage: $0 {install|auth|check|lint|format|types|tests|dead|export|open|publish|build|scrub|serve|help}
-		  install:           install dependencies (uv sync) and git hooks
-		  auth   [--check]:  set up credentials, or --check to just probe & print their status
-		  check  [...args]:  run all checks in parallel (default: --lint --format --typecheck --test; add --fix to autofix)
-		  format [...args]:  format code (ruff format)
-		  lint   [...args]:  run linters (ruff check)
-		  types  [...args]:  check types (ty)
-		  tests  [...args]:  run tests (pytest)
-		  dead   [...args]:  find unused code (vulture)
-		  export <report>:   export a Marimo report to its bundle, or run anything else through uv
-		  open   <file>:     open a Marimo notebook in Marimo, or anything else in \$EDITOR
-		  publish [...nbs]:  export reports and mirror their bundles to the HF bucket
-		  build  [...args]:  build the static site (from synced bundles, or local for offline)
-		  scrub  [...args]:  scrub terminal control sequences / redact Modal URLs from Marimo HTML
-		  serve:             build and serve at http://localhost:8000
-		  (aliases: \`run\`→\`export\`, \`clean\`→\`scrub\` — deprecated)
+		Usage: $0 {install|auth|check|open|preview|publish|site|help}
+		New checkout? Start with: $0 install
+
+		  install:             install dependencies (uv sync) and git hooks
+		  auth    [--check]:   set up credentials, or --check to just probe & print their status
+		  check   [...args]:   run all checks in parallel (default: --lint --format --typecheck --test; add --fix to autofix)
+		    (individually: format | lint | types | tests | dead)
+		  open    <file>:      open a Marimo notebook in Marimo, or anything else in \$EDITOR
+		  preview [...nbs] [--no-serve] [--force] [--port N]:
+		                       export stale reports, assemble the site with local assets
+		                       (never touches the network), and serve it
+		  publish <nbs|--all>: export reports and sync their bundles to the publish tier
+		  site:                assemble the public site from *published* bundles into _site/
+		                       (the CI verb: read-only, never runs a notebook)
+
+		Experiments are run with \`bin/mini\`, not \`$0\` — see \`bin/mini --help\`.
 		EOF
 }
 
-case "${1:-all}" in
+case "${1:-help}" in
     i|install)
         shift
         "$SCRIPT_DIR/install.sh" "$@"
@@ -69,26 +69,6 @@ case "${1:-all}" in
             "$SCRIPT_DIR/check.sh" --lint --format --typecheck --test
         fi
         ;;
-    e|export|r|run)
-        # `run` is a deprecated alias: it collides with `mini run` (which executes
-        # compute) whereas this only exports a static bundle. Prefer `export`.
-        shift
-        if [[ $# -eq 0 ]]; then
-            echo "export what? pass a Marimo report (e.g. docs/m2/ex-2.1.1/report.py)," 1>&2
-            echo "or a command/script to run through uv (\`uv run ...\`)." 1>&2
-            exit 2
-        elif is_marimo_notebook "${1:-}"; then
-            # Export the report to its bundle (.mini/exports/<key>/); preview via ./go build.
-            ( set -x; uv run "$SCRIPT_DIR/export_reports.py" "$1" )
-        else
-            ( set -x; uv run "$@" )
-        fi
-        ;;
-    publish)
-        shift
-        # Export each report and mirror its bundle to the HF bucket (needs ./go auth).
-        ( set -x; uv run "$SCRIPT_DIR/export_reports.py" --publish "$@" )
-        ;;
     o|edit|open)
         shift
         if [[ $# -eq 0 ]]; then
@@ -106,19 +86,49 @@ case "${1:-all}" in
             "$editor" "$@"
         fi
         ;;
-    build|site)
+    p|preview)
         shift
-        uv run "$SCRIPT_DIR/build_site.py" "$@"
+        serve=1 port=8000
+        export_args=(--stale-only)
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --no-serve) serve=0 ;;
+                --force) export_args=() ;;
+                --port) port="${2:?--port needs a value}"; shift ;;
+                -*) echo "preview: unknown flag '$1' (flags: --no-serve --force --port N)" 1>&2; exit 2 ;;
+                *) export_args+=("$1") ;;
+            esac
+            shift
+        done
+        ( set -x; uv run "$SCRIPT_DIR/export_reports.py" "${export_args[@]}" )
+        ( set -x; uv run "$SCRIPT_DIR/build_site.py" --localize )
+        if [[ $serve -eq 1 ]]; then
+            npx serve -n -l "$port" "$PROJECT_ROOT/_site"
+        else
+            echo
+            echo "Site assembled at _site/ (bundles in .mini/exports/)."
+            echo "Serve it later with: $0 preview  — or render a bundle headlessly (report-render skill)."
+        fi
         ;;
-    scrub|clean)
-        # `clean` is a deprecated alias: in most build tools it deletes outputs, but
-        # this scrubs terminal control sequences and redacts Modal URLs. Prefer `scrub`.
+    publish)
         shift
-        "$SCRIPT_DIR/clean_docs.py" "$@"
+        # Export each named report and mirror its bundle to the publish tier (needs ./go auth).
+        # Explicit by design: export_reports.py refuses a bare --publish without names or --all.
+        ( set -x; uv run "$SCRIPT_DIR/export_reports.py" --publish "$@" )
         ;;
-    s|serve)
-        "$SELF" build
-        npx serve -n -l 8000 "$PROJECT_ROOT/_site"
+    site)
+        shift
+        uv run "$SCRIPT_DIR/build_site.py" --externalize "$@"
+        ;;
+    e|export|r|run|s|serve|build|scrub|clean)
+        case "$1" in
+            e|export)     echo "'export' is gone — '$0 preview --no-serve' exports stale reports to .mini/exports/" ;;
+            r|run)        echo "'run' is gone — 'bin/mini run <experiment.py>' runs experiments; '$0 preview' renders reports; 'uv run ...' for anything else" ;;
+            s|serve)      echo "'serve' is gone — '$0 preview' exports what's stale, then builds and serves" ;;
+            build)        echo "'build' split in two — '$0 preview' assembles locally; '$0 site' assembles the public site from published bundles (CI)" ;;
+            scrub|clean)  echo "'scrub' is internal now (export applies it) — scripts/clean_docs.py if you really need it" ;;
+        esac 1>&2
+        exit 2
         ;;
     h|help|-h|--help)
         show_usage
