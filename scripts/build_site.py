@@ -38,6 +38,7 @@ from mini.reports import (
     report_notebooks,
     rewrite_links,
     set_banner,
+    set_responsive,
     set_theme,
     stray_links,
 )
@@ -257,6 +258,7 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
             html = (bundle / "index.html").read_text("utf-8")
             html = _resolve_html_links(html, links, from_dir=from_dir, out_dir=key, externalizing=externalizing)
             html = set_theme(html)  # follow the visitor's device, not the exporter's setting
+            html = set_responsive(html)  # fit narrow screens; drop Marimo's watermark
             index_url, source_url = _nav_urls(links, key=key, nb_rel=nb_rel, externalizing=externalizing)
             html = set_banner(html, index_url=index_url, source_url=source_url)
             if base_href:

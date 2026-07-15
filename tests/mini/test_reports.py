@@ -18,6 +18,7 @@ from mini.reports import (
     save_pins,
     set_banner,
     set_provenance,
+    set_responsive,
     set_theme,
     stray_links,
     use_publisher,
@@ -178,6 +179,11 @@ def test_set_banner_injects_nav_and_hides_marimo():
     # Marimo's own (client-rendered) banner is hidden via a rule in <head>.
     assert '[data-testid="static-notebook-banner"]{display:none' in out
     assert out.index("static-notebook-banner") < out.index("</head>")
+    # Absolute, not in-flow: Marimo's app is an opaque z-index layer that paints over an
+    # in-flow sibling, so the chip must float above it (and it scrolls with the page).
+    assert "position:absolute" in out[out.index("<nav data-mini-banner") :][:200]
+    # The content column is padded down so the report title isn't tucked under the chip.
+    assert '[class~="min-w-[400px]"]{padding-top:3rem}' in out
 
 
 def test_set_banner_omits_missing_links():
@@ -227,6 +233,20 @@ def test_asset_url_reserves_the_sidecar_name(tmp_path):
         pub.asset_url(b"{}", name=PROVENANCE_ASSET)
 
 
+def test_set_responsive_fits_narrow_screens_and_hides_watermark():
+    out = set_responsive(_EXPORT_HTML)
+    # The content column's 400px min-width is zeroed so it fits under ~400px…
+    assert '[class~="min-w-[400px]"]{min-width:0!important}' in out
+    # …and Marimo's bottom-right "made with marimo" watermark is hidden.
+    assert '[data-testid="watermark"]{display:none!important}' in out
+    assert out.index("min-w-[400px]") < out.index("</head>")  # both rules land in <head>
+
+
+def test_set_responsive_is_noop_shape_on_a_plain_page():
+    # No <head>/classes to match — the regex simply finds no </head>, returning as-is.
+    assert set_responsive("<html><body>hi</body></html>") == "<html><body>hi</body></html>"
+
+
 def test_set_provenance_injects_a_folded_footer():
     out = set_provenance(_EXPORT_HTML, {"shared/curves": _PRODUCER, "shared/other": {"experiment": "prep"}})
     assert out.index("<body>") < out.index("<details data-mini-provenance") < out.index('<div id="root">')
@@ -234,6 +254,8 @@ def test_set_provenance_injects_a_folded_footer():
     assert "run 2026-07-12" in out
     assert "via shared/curves, shared/other" in out  # both refs fold into one experiment entry
     assert "@media print{[data-mini-provenance]{display:none}}" in out  # hidden in print, like the banner
+    # Absolute like the nav — floats above Marimo's opaque app layer instead of behind it.
+    assert "position:absolute" in out[out.index("<details data-mini-provenance") :][:200]
 
 
 def test_set_provenance_is_noop_without_attributable_producers():
