@@ -91,7 +91,10 @@ def main() -> None:
         exe = os.environ.get("PLAYWRIGHT_CHROMIUM", "/opt/pw-browsers/chromium")
         with sync_playwright() as pw:
             browser = pw.chromium.launch(executable_path=exe if Path(exe).exists() else None)
-            page = browser.new_page(viewport={"width": 1100, "height": 1400})
+            # marimo's frontend validates navigator.language on boot and hard-errors
+            # ("Incorrect locale information provided") if the browser reports none —
+            # which a bare headless Chromium in a locale-less container does. Pin one.
+            page = browser.new_page(viewport={"width": 1100, "height": 1400}, locale="en-US")
             page.goto(f"http://127.0.0.1:{port}/index.html{args.suffix}")
             if args.wait_text:
                 page.get_by_text(args.wait_text).first.wait_for(timeout=args.timeout * 1000)
