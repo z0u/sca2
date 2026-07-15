@@ -51,6 +51,16 @@ def notebooks_to_export(paths: list[str]) -> list[Path]:
     return keep
 
 
+def is_stale(nb: Path) -> bool:
+    """Whether *nb*'s bundle is missing or older than the notebook itself.
+
+    A cheap mtime heuristic: it misses edits to imported ``src/`` modules and to
+    the stored results a report reads, so callers offer ``--force`` (skip the check).
+    """
+    out = export_dir(nb) / "index.html"
+    return not out.exists() or out.stat().st_mtime < nb.stat().st_mtime
+
+
 def export_one(nb: Path) -> Path:
     """Export *nb* to ``.mini/exports/<key>/index.html`` (assets land beside it). Returns the dir."""
     out = export_dir(nb) / "index.html"
@@ -79,18 +89,33 @@ def publish_one(nb: Path, store) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--publish", action="store_true", help="mirror each bundle to the HF bucket after exporting")
+    ap.add_argument("--publish", action="store_true", help="mirror each bundle to the HF publish tier after exporting")
+    ap.add_argument("--all", action="store_true", help="with --publish: explicitly publish every report under docs/")
+    ap.add_argument(
+        "--stale-only",
+        action="store_true",
+        help="skip reports whose bundle is newer than the notebook (mtime heuristic)",
+    )
     ap.add_argument("notebooks", nargs="*", help="report notebooks (default: all under docs/)")
     args = ap.parse_args()
+
+    if args.publish and args.stale_only:
+        ap.error("--stale-only is a preview optimization; publishing always re-exports")
+    if args.publish and not args.notebooks and not args.all:
+        ap.error("refusing to publish every report implicitly — name the notebooks, or pass --all")
 
     nbs = notebooks_to_export(args.notebooks)
     if not nbs:
         sys.exit("No report notebooks found under docs/.")
 
     if not args.publish:
+        if args.stale_only:
+            for nb in (fresh := [nb for nb in nbs if not is_stale(nb)]):
+                print(f"  fresh  {nb.relative_to(ROOT)} (bundle newer than notebook — `--force` re-exports)")
+            nbs = [nb for nb in nbs if nb not in fresh]
         for nb in nbs:
             export_one(nb)
-        print("\nExported locally to .mini/exports/. Preview with `./go build` (localize) or `./go serve`.")
+        print(f"\n{len(nbs)} bundle(s) exported to .mini/exports/." if nbs else "\nNothing stale; bundles untouched.")
         return
 
     from mini.hf_store import HFStore

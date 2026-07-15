@@ -48,7 +48,7 @@ jobs:
           MINI_PUBLISH_REPO: ${{ vars.MINI_PUBLISH_REPO }}
           MINI_STORE_BUCKET: ${{ vars.MINI_STORE_BUCKET }}
           MINI_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr-preview/pr-${{ github.event.number }}/
-        run: ./go build
+        run: ./go site
 
       - name: Deploy preview
         # auto = deploy on open/reopen/synchronize, remove on close. Deploys

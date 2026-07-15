@@ -1,7 +1,8 @@
 # docs/
 
 This directory contains executable experiment notebooks and source files for the
-project site. The site is built by `./go build` into `_site/`.
+project site. The site is built into `_site/` — by `./go preview` locally, or
+`./go site` in CI.
 
 ## File types
 
@@ -12,9 +13,10 @@ HF bucket under `exports/<key>/`, where `<key>` is the notebook's docs-relative 
 without suffix (`docs/overview.py` → `overview`, `docs/foo/bar.py` →
 `foo/bar`) — except a notebook named `report.py` takes its directory as the key
 (`docs/foo/report.py` → `foo`), so a one-report experiment publishes at `foo/` rather
-than the redundant `foo/report/`. `./go build` then assembles `_site/` from the synced
-bundles, serving each report at `_site/<key>/index.html` (URL `<key>/`). With no bucket, the build *localizes*
-from `.mini/exports/` (produced by `./go export`) so it works offline.
+than the redundant `foo/report/`. `./go site` (CI) then assembles `_site/` from the
+synced bundles, serving each report at `_site/<key>/index.html` (URL `<key>/`).
+`./go preview` assembles the same site *locally* — it exports stale reports to
+`.mini/exports/` and copies their assets beside the HTML, so it works offline.
 
 **Markdown files** (`.md`) are converted to HTML and written to `_site/` at the
 same relative path. Links to a report's `.py` are automatically rewritten to its

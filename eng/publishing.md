@@ -93,7 +93,7 @@ Two further decisions:
 - **PR previews ride the same read-only build.** Because `./go publish` runs on the
   agent's branch *before* the PR opens, the bundles are already on the publish tier when
   review starts — a preview needs no compute, just HTML assembled around them.
-  `pr-preview.yml` runs `./go build` on the PR and deploys to `pr-preview/pr-<n>/` on the
+  `pr-preview.yml` runs `./go site` on the PR and deploys to `pr-preview/pr-<n>/` on the
   `gh-pages` branch (torn down on close, linked from a sticky PR comment). That forces
   the production deploy to be branch-based too (`clean-exclude: pr-preview/`): an
   artifact deploy replaces the whole site, so previews couldn't coexist with it. Viewing

@@ -18,7 +18,7 @@ and drive the pre-installed Chromium. No network, real render.
 marimo's `_static/` plus the bundle's CDN-rewritten HTML, serve it, screenshot:
 
 ```bash
-# Get a bundle first if you don't have one: ./go export docs/m2/ex-2.1.1/report.py
+# Get a bundle first if you don't have one: ./go preview --no-serve docs/m2/ex-2.1.1/report.py
 #   -> .mini/exports/m2/ex-2.1.1/  (index.html + _assets/)
 uv run --with playwright python .claude/skills/report-render/render.py \
     .mini/exports/m2/ex-2.1.1 -o /tmp/report.png

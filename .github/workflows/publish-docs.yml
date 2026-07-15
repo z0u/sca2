@@ -55,7 +55,7 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           MINI_PUBLISH_REPO: ${{ vars.MINI_PUBLISH_REPO }}
           MINI_STORE_BUCKET: ${{ vars.MINI_STORE_BUCKET }}
-        run: ./go build
+        run: ./go site
 
       - name: Deploy to gh-pages
         # clean removes pages whose source is gone (a deleted report leaves the
