@@ -7,6 +7,7 @@ from mini.reports import (
     SOURCE_ONLY_MARKER,
     Publisher,
     export_key,
+    externalize_html,
     insert_base,
     is_report_notebook,
     relative_urls,
@@ -258,3 +259,30 @@ def test_report_notebooks_skips_source_only(tmp_path):
     (tmp_path / "plain.py").write_text("x = 1\n")
     found = {p.relative_to(tmp_path).as_posix() for p in report_notebooks(tmp_path)}
     assert found == {"report.py", "sub/nested.py"}
+
+
+def test_externalize_html_writes_sidecar_and_passes_through(tmp_path):
+    pub = Publisher(tmp_path / "_assets")
+    html = '<div role="img"><svg xmlns="http://www.w3.org/2000/svg"></svg></div>'
+    assert externalize_html(html, name="sublines", publish=pub) == html  # inline copy unchanged
+    assert (tmp_path / "_assets" / "sublines.html").read_text() == html  # …and a plain file for tooling
+
+
+def test_externalize_html_keeps_explicit_extension(tmp_path):
+    pub = Publisher(tmp_path / "_assets")
+    externalize_html("<svg xmlns='http://www.w3.org/2000/svg'/>", name="spark.svg", publish=pub)
+    assert (tmp_path / "_assets" / "spark.svg").exists()
+
+
+def test_externalize_html_uses_default_publisher(tmp_path):
+    use_publisher(Publisher(tmp_path / "_assets"))
+    try:
+        externalize_html("<p>hi</p>", name="chunk")
+    finally:
+        use_publisher(None)
+    assert (tmp_path / "_assets" / "chunk.html").exists()
+
+
+def test_externalize_html_without_publisher_is_passthrough():
+    use_publisher(None)
+    assert externalize_html("<p>hi</p>", name="chunk") == "<p>hi</p>"
