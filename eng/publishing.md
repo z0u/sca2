@@ -120,6 +120,16 @@ Further decisions:
   and the dataset repo's history must never be rewritten (`super_squash_history`) —
   pins and citations resolve through old commits. For the same reason `publish()`
   itself now returns commit-pinned URLs, so a published single file is citable as-is.
+
+  **Pinning is repo-only — a note for backports (mi-ni).** A bucket keeps no history,
+  so on the single-bucket default there is nothing to pin: `sync_export` returns no
+  revision, `publish.lock` is never written, and the build serves the mutable
+  `exports/<key>/` with no unpinned warning (the nudge to pin would be misleading
+  there). That's the pre-pin behavior, caveat included: a publish is live the moment
+  it syncs, and a PR preview shares production's assets. So the pin machinery is safe
+  to carry into template projects without making `publish-repo` a requirement — the
+  seam stays opt-in, as #38 chose — but the staging guarantee and PR-preview isolation
+  exist only once a project sets one.
 - **Provenance is injected at export, not build.** The provenance footer (which
   experiment runs produced the data a report shows) needs the producers stamped on the
   store's refs — state only the authenticated export half can see, and only *while the

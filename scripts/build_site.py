@@ -238,7 +238,9 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
         with tempfile.TemporaryDirectory() as tmp:
             if externalizing:
                 revision = pins.get(key)
-                if revision is None:
+                # Only a git-backed publish tier can pin; on the single-bucket default
+                # the mutable head is all there is, so the nudge would be misleading.
+                if revision is None and store.publish_repo is not None:
                     print(f"  ! {key}: not pinned in {PUBLISH_LOCK} — serving the mutable head; `./go publish` to pin")
                 bundle = Path(tmp)
                 if not store.fetch_export(key, bundle, revision=revision):
