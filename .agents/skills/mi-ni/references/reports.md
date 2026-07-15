@@ -86,6 +86,13 @@ once the report renders the results. Publishing also pins the bundle's revision 
 publish-tier commit sha) in `docs/publish.lock` — **commit that file with your
 changes**: the site serves each report at its pinned revision, so the publish deploys
 nothing until the pin lands on main (a PR preview serves the branch's pins meanwhile).
+
+**Publish when you open or update a PR** that touches a report, once you're reasonably
+happy with it — it needn't be perfect. The PR preview serves the branch's pinned
+bundle, so publishing (and committing the bumped `publish.lock`) is what lets a reviewer
+see your change rendered; skip it and the preview shows the *old* report while your diff
+claims otherwise. Re-run `./go publish` and commit the lock bump on each round of report
+edits you push.
 `scripts/build_site.py` (read-only; CI) then *pulls* each synced bundle at its pinned
 revision, resolves author links against the repo, and inserts one
 `<base href="…/exports/<key>/">` in the `<head>` so the relative `_assets/…` URLs

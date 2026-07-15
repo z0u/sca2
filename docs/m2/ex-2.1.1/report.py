@@ -323,7 +323,10 @@ def _(metrics):
 def _(metrics):
     _w, _d = pick_backbone(metrics)
     (_cell,) = [r for r in metrics if r["label"] == label(_w, _d, SEEDS[0])]
-    rows = [(es, _cell["surprisal"][es][0]) for es in EVAL_SETS]
+    # named_holdout's index 1 is `lime + black = green`, the example "Why the
+    # named answers fail" walks through below; index 0 is a same-set spare.
+    _idx = {"named_holdout": 1}
+    rows = [(es, _cell["surprisal"][es][_idx.get(es, 0)]) for es in EVAL_SETS]
     log_v = np.log(len(colors.alphabet()))
     sub_width = min(max(len(r["text"]) for _, r in rows), 80)
     # Match the sublines' dark background to this notebook's, rather than subline's
@@ -437,13 +440,29 @@ def _():
     mo.md(r"""
     ## Why the named answers fail
 
-    Look at where that spike lands. In `lime + black = green` above, the
-    model passes `g` cheaply and gets `r` for free; the surprisal only jumps
-    at the `e` — the first character that separates *green* from *gray*. It
-    is fluently spelling a color name, just the wrong one. So the
-    result-form rule (a named answer exactly when both operands are named)
-    is not the weak link: the model commits to a name every time. The
-    failure is in choosing *which* name.
+    That sparkline is teacher-forced: the model is being *read* the true
+    answer `green`, character by character, and we are watching how much each
+    one surprises it. Two of its own preferred names bleed through. The very
+    first letter already costs something — left to choose, this seed opens
+    `lime + black` with `t`, for *teal*, so the true `g` lands as a mild
+    surprise (the visible bump above, ~0.6 of the uniform-guess ceiling).
+    Forced onto `g`, the model gets `r` for free — *gray* and *green* share
+    the prefix `gr` — and then the true `e` detonates: on the `gr…` branch it
+    is all but certain the word is *gray*, and `e` is the first character
+    that rules *gray* out. The spike is not hedging; it is the model fluently
+    spelling a *different* palette name and being caught out by the truth.
+
+    Left to run free (below), it writes neither `green` nor `gray` but
+    `teal`, a one-channel neighbor of the true mix — and the tall spike on
+    the `a` of `black` hints at why. After `lime + bl` the model is 99.9%
+    sure the second operand is *blue*, and `lime + blue = teal` is an
+    equation it trained on; the `a` is the moment that guess breaks. It fixes
+    the *spelling* to `black` at once, but only half-fixes the *answer*: the
+    correction lifts *green* about 70× (to 13%) yet leaves the trained *teal*
+    still on top. So the result-form rule (a named answer exactly when both
+    operands are named) is not the weak link: the model commits to a name
+    every time. The failure is in choosing *which* name — and a trained
+    neighbor can capture it before the arithmetic finishes.
 
     The experiment publishes its checkpoints alongside the metrics, and
     these models are small enough to query on CPU, so we can ask directly.
