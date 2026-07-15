@@ -302,15 +302,18 @@ def _(metrics):
 
     Accuracy says *whether* a completion is right; per-character surprisal
     says *where* the model is uncertain along the way. Below, one example per
-    eval set for the d{_w}-L{_d} backbone (seed {SEEDS[0]}), with the model's
-    surprisal of each character drawn beneath the text (as a fraction of
-    $\log |V|$, the uniform-guess ceiling). Operands are unpredictable by
-    construction, so surprisal should spike at each operand's first characters
-    and fall as the prefix pins down the rest. Everything after `=` is
-    determined by the operands, so a model that has *computed* the mix glides
-    through the answer at near-zero surprisal — even on operand pairs it has
-    never seen. Where an answer is instead *guessed*, the surprisal stays
-    high across the answer characters.
+    eval set for the d{_w}-L{_d} backbone (seed {SEEDS[0]}), with two series
+    drawn beneath the text (both as fractions of $\log |V|$, the uniform-guess
+    ceiling): the model's surprisal of each character, and the entropy of its
+    predictive distribution — the surprisal it *expected*, before seeing the
+    character. Operands are unpredictable by construction, so both should
+    spike at each operand's first characters and fall as the prefix pins down
+    the rest. Everything after `=` is determined by the operands, so a model
+    that has *computed* the mix glides through the answer at near-zero
+    surprisal — even on operand pairs it has never seen. Where an answer is
+    instead *guessed*, the surprisal stays high across the answer characters.
+    Where the two series track each other, the model knew how uncertain it
+    was; a surprisal spike above the entropy line means it was caught out.
     """)
     return
 
@@ -319,25 +322,106 @@ def _(metrics):
 def _(metrics):
     _w, _d = pick_backbone(metrics)
     (_cell,) = [r for r in metrics if r["label"] == label(_w, _d, SEEDS[0])]
-    _rows = [(es, _cell["surprisal"][es][0]) for es in EVAL_SETS]
-    _log_v = np.log(len(colors.alphabet()))
-    _width = min(max(len(r["text"]) for _, r in _rows), 80)
+    rows = [(es, _cell["surprisal"][es][0]) for es in EVAL_SETS]
+    log_v = np.log(len(colors.alphabet()))
+    sub_width = min(max(len(r["text"]) for _, r in rows), 80)
     # Match the sublines' dark background to this notebook's, rather than subline's
     # neutral default; light mode already matches. `css` overrides the library's own
     # `--bg-color` (later rule wins).
-    _css = "svg { --bg-color: light-dark(#fff, #181c1a); }"
+    sub_css = "svg { --bg-color: light-dark(#fff, #181c1a); }"
 
-    def _subline(name: str, row: dict) -> str:
-        values = np.concatenate([[np.nan], np.clip(np.array(row["nll"]) / _log_v, 0, 1)])
-        svg = Subline(chars_per_line=_width, css=_css).plot(row["text"], [Series(raw=values, label=name)])
-        return f"{svg}"
+    def sublines(rows: list[tuple[str, dict]], series, aria_label: str) -> mo.Html:
+        """Lay out one captioned subline per eval set; `series(row)` builds its series list."""
 
-    mo.Html(
-        '<div role="img" aria-label="Four short mixing equations, one per eval set, each with a sparkline '
-        'of per-character surprisal drawn under the text, on a shared 0-to-log-V scale." '
-        'style="text-wrap: balance"'
-        ">" + "".join(_subline(name, row) for name, row in _rows) + "</div>"
+        def one(name: str, row: dict) -> str:
+            svg = Subline(chars_per_line=sub_width, css=sub_css).plot(row["text"], series(row))
+            caption = f'<figcaption style="font-size: 11px; font-family: monospace; opacity: 0.65">{name}</figcaption>'
+            return f'<figure style="display: inline-block; margin: 0 1em 0 0">{svg}{caption}</figure>'
+
+        return mo.Html(
+            f'<div role="img" aria-label="{aria_label}" style="text-wrap: balance">'
+            + "".join(one(name, row) for name, row in rows)
+            + "</div>"
+        )
+
+    def pad(row: dict, key: str) -> np.ndarray:
+        """Scale to fractions of log |V| and align with the text: position 0 has no prediction."""
+        return np.concatenate([[np.nan], np.asarray(row[key]) / log_v])
+
+    return pad, rows, sublines
+
+
+@app.cell(hide_code=True)
+def _(pad, rows, sublines):
+    def _series(row: dict) -> list[Series]:
+        return [
+            Series(raw=np.clip(pad(row, "nll"), 0, 1), label="surprisal"),
+            Series(raw=np.clip(pad(row, "entropy"), 0, 1), label="entropy", dasharray="3 2"),
+        ]
+
+    sublines(
+        rows,
+        _series,
+        "Four short mixing equations, one per eval set, each with a sparkline of per-character "
+        "surprisal (solid) and predictive entropy (dashed) drawn under the text, on a shared "
+        "0-to-log-V scale. The two series track each other, spiking at operand starts and "
+        "staying near zero across the answers — except named holdout, where surprisal rises "
+        "well above entropy on the answer characters.",
     )
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    The gap between those two series is a signal in its own right:
+    *surprise-surprise*, the surprisal in excess of what the model expected,
+
+    $$s_2 = \frac{i - h}{\log |V|}$$
+
+    where $i$ is the surprisal and $h$ the entropy. It is near zero where the
+    model knew its own uncertainty (confident *and* right, or uncertain and
+    merely unlucky), positive where it was caught out, and negative where the
+    character was more predictable than the model's distribution let on. The
+    sparkline clips at zero, so the negative lobe is drawn as a second,
+    flipped series, $-s_2$: solid marks *caught out*, dashed marks *mundane*.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(pad, rows, sublines):
+    def _s2(row: dict) -> np.ndarray:
+        return pad(row, "nll") - pad(row, "entropy")
+
+    def _series(row: dict) -> list[Series]:
+        return [
+            Series(raw=np.clip(_s2(row), None, 1), label="s₂"),
+            Series(raw=np.clip(-_s2(row), None, 1), label="−s₂", dasharray="3 2"),
+        ]
+
+    sublines(
+        rows,
+        _series,
+        "The same four equations, now with sparklines of surprise-surprise: surprisal minus "
+        "entropy as a fraction of log V. The solid series shows the positive part (more surprised "
+        "than expected); the dashed series shows the negative part flipped above zero (less "
+        "surprised than expected). Three sets stay close to the baseline; named holdout shows "
+        "tall positive spikes across its answer characters.",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    The spike is on `named_holdout` — the one set this sweep never solves
+    (accuracy 0 above). The model does not hedge on those answers: entropy
+    stays low while the true characters arrive as a surprise, so $s_2$ reads
+    *confidently wrong*, not *uncertain*. That is worth keeping an eye on in
+    the anchored runs: if anchoring degrades composition, this is where it
+    should show first.
+    """)
     return
 
 

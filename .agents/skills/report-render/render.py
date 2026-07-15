@@ -44,9 +44,13 @@ def _build_serve_root(bundle: Path, root: Path) -> None:
 
     # marimo runtime lives under assets/ (+ favicon etc.); symlink it all in at root, so a
     # rewritten "/assets/index-*.js" resolves here. The report's figures live under _assets/
-    # (note the leading underscore) — a different dir, so no collision.
+    # (note the leading underscore) — a different dir, so no collision. Skip _static's
+    # index.html: the bundle's own page is written to that name below, and writing through
+    # a symlink would corrupt the marimo package's template in site-packages (and, via
+    # uv's hardlinks, the uv cache) — poisoning every later `marimo export`.
     for entry in static.iterdir():
-        (root / entry.name).symlink_to(entry)
+        if entry.name != "index.html":
+            (root / entry.name).symlink_to(entry)
     if assets.is_dir():
         (root / "_assets").symlink_to(assets)  # wins over any _static/_assets (there is none)
 

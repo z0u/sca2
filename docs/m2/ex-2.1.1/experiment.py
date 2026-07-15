@@ -25,8 +25,10 @@ LM over the corpus, then measure:
 - **Per-layer linear decodability**: ridge probes from the residual stream to
   the operand color (at the operand's last character) and the result color and
   its *redness* (at the pre-answer position), R² on a held-out half.
-- **Per-character surprisal** on a couple of lines per eval set, for the
-  report's subline figure: where along ``a + b = c`` the model is uncertain.
+- **Per-character surprisal and entropy** on a couple of lines per eval set,
+  for the report's subline figures: where along ``a + b = c`` the model is
+  uncertain, and whether it *knew* it would be (entropy) or was caught out
+  (surprisal exceeding entropy).
 
 The sweep answers two questions the anchored experiments depend on: which
 backbone size to freeze (the smallest that saturates accuracy), and what the
@@ -201,7 +203,7 @@ def eval_one(trained: dict, evals, probes) -> dict:
 
 
 def surprisal_one(checkpoint, evals, label: str) -> dict:
-    """Per-character surprisal over the first few lines of each eval set.
+    """Per-character surprisal and predictive entropy over the first few lines of each eval set.
 
     A separate step (not folded into `eval_one`) so it can run on CPU — the
     models are tiny — and so edits here don't invalidate the GPU eval memos.
@@ -228,10 +230,18 @@ def surprisal_one(checkpoint, evals, label: str) -> dict:
         for ex in exs[:N_SURPRISAL]:
             text = ex.prompt + ex.answer
             ids = np.asarray(tokenizer.encode([text])[0])
-            logp = jax.nn.log_softmax(model(jnp.asarray(ids[None]))[0], axis=-1)
+            logp = jax.nn.log_softmax(model(jnp.asarray(ids[None]))[0], axis=-1)[: len(ids) - 1]
             nll = np.asarray(-logp[jnp.arange(len(ids) - 1), ids[1:]])
-            # nll[i] is the surprisal of text[i + 1]; text[0] has no prediction.
-            rows.append({"text": text, "answer_start": len(ex.prompt), "nll": [float(v) for v in nll]})
+            entropy = np.asarray(-(jnp.exp(logp) * logp).sum(axis=-1))
+            # nll[i] / entropy[i] describe the prediction of text[i + 1]; text[0] has none.
+            rows.append(
+                {
+                    "text": text,
+                    "answer_start": len(ex.prompt),
+                    "nll": [float(v) for v in nll],
+                    "entropy": [float(v) for v in entropy],
+                }
+            )
         sets[name] = rows
     return {"label": label, "surprisal": sets}
 
