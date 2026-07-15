@@ -35,7 +35,22 @@ readable cold without re-deriving code state.
   named lines forces that. Note the second intervention makes the answer's
   surface form depend on the *value* of the mix (named iff on-palette), not
   just the operands' forms — that's the point, but it changes the
-  form-determinism note in `sca/data/colors.py`.
+  form-determinism note in `sca/data/colors.py`. (The diagnosis is now written
+  up in the ex-2.1.1 report, with live checkpoint queries.)
+
+- **Probe every answer position, per channel (ex-2.1.x eval).** The current
+  probes read two positions and average R² over RGB channels, which hides the
+  computation schedule. Prediction from the ex-2.1.1 diagnosis: on hex answers,
+  channel k becomes decodable at (or just before) the position that emits digit
+  k — a stair-step, not a plateau — because nothing requires the whole mix at
+  one position. Caveat for interpretation: under teacher forcing, once digit k
+  is in the context its channel is trivially decodable from the token itself,
+  so the informative quantity is decodability of channel k strictly *before*
+  its digit is emitted. A named-prompt variant (probe the full RGB at the first
+  answer character, seen vs held-out pairs) would also separate "computed but
+  can't name it" from "never computed" more directly than the behavioral
+  evidence. Cheap: `probe_residual_stream` already captures the activations;
+  it's a positions-and-targets change plus a small figure.
 
 - **s₂ (surprise-surprise) as a standard metric for the anchored runs.**
   ex-2.1.1's sublines now record per-character entropy alongside surprisal, and

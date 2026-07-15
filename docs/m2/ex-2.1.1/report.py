@@ -15,6 +15,7 @@ with app.setup(hide_code=True):
     # Marimo puts the notebook's directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import (
+        CKPT_REF,
         CORPUS_SEED,
         DEPTHS,
         HOLDOUT_FRAC,
@@ -425,9 +426,167 @@ def _():
     The spike is on `named_holdout` — the one set this sweep never solves
     (accuracy 0 above). The model does not hedge on those answers: entropy
     stays low while the true characters arrive as a surprise, so $s_2$ reads
-    *confidently wrong*, not *uncertain*. That is worth keeping an eye on in
-    the anchored runs: if anchoring degrades composition, this is where it
-    should show first.
+    *confidently wrong*, not *uncertain*. What is it confidently wrong
+    about, exactly?
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ## Why the named answers fail
+
+    Look at where that spike lands. In `lime + black = green` above, the
+    model passes `g` cheaply and gets `r` for free; the surprisal only jumps
+    at the `e` — the first character that separates *green* from *gray*. It
+    is fluently spelling a color name, just the wrong one. So the
+    result-form rule (a named answer exactly when both operands are named)
+    is not the weak link: the model commits to a name every time. The
+    failure is in choosing *which* name.
+
+    The experiment publishes its checkpoints alongside the metrics, and
+    these models are small enough to query on CPU, so we can ask directly.
+    Below, every held-out pair, prompted exactly as in the `named_holdout`
+    eval set, one column per seed of the backbone architecture:
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(metrics):
+    from sca.compute.evaluation import greedy_completions
+    from sca.compute.model import load_checkpoint
+    from sca.data.tokenizer import CharTokenizer
+
+    backbone = pick_backbone(metrics)
+    _store = project_store()
+    _arts = {s: a for s in SEEDS if (a := _store.get_ref(f"{CKPT_REF}/{label(*backbone, s)}")) is not None}
+    mo.stop(
+        len(_arts) < len(SEEDS),
+        mo.md("The checkpoints aren't in the store yet — re-run the experiment to publish them."),
+    )
+    _models = {}
+    with tempfile.TemporaryDirectory() as _tmp:
+        for _s, _art in _arts.items():
+            _store.get(_art, Path(_tmp) / str(_s) / "model")
+            _model, _config, _ = load_checkpoint(Path(_tmp) / str(_s))
+            _models[_s] = (_model, CharTokenizer(_config.tokenizer))
+
+    def complete(seed: int, prompts: list[str]) -> list[str]:
+        """Greedy completions from the backbone cell trained with *seed*."""
+        model, tok = _models[seed]
+        return greedy_completions(model, tok, prompts, 12)
+
+    return backbone, complete
+
+
+@app.cell(hide_code=True)
+def _(backbone, complete, holdout):
+    named_holdout_exs = colors.as_named(holdout, seed=2)  # the eval set, verbatim
+    _by_seed = {s: complete(s, [ex.prompt for ex in named_holdout_exs]) for s in SEEDS}
+
+    def _swatch(text: str) -> str:
+        rgb = colors.PALETTE.get(text)
+        if rgb is None:
+            return f"<code>{text}</code>"
+        return (
+            f'<span aria-hidden="true" style="background: {colors.to_hex(rgb)}; border: 1px solid #8886; '
+            f'border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> {text}'
+        )
+
+    _head = "<tr><th>prompt</th><th>expected</th>" + "".join(f"<th>seed {s}</th>" for s in SEEDS) + "</tr>"
+    _rows = "".join(
+        f"<tr><td><code>{ex.prompt}</code></td><td>{_swatch(ex.answer)}</td>"
+        + "".join(f"<td>{_swatch(_by_seed[s][i])}</td>" for s in SEEDS)
+        + "</tr>"
+        for i, ex in enumerate(named_holdout_exs)
+    )
+    _w, _d = backbone
+    mo.vstack(
+        [
+            mo.Html(f'<table style="font-size: 0.9em">{_head}{_rows}</table>'),
+            mo.md(f"*Greedy completions of the `named_holdout` prompts, d{_w}-L{_d}, all seeds.*"),
+        ]
+    )
+    return (named_holdout_exs,)
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    Two things stand out. The answers are always names, never hex, and they
+    are wrong in suggestive ways: usually a palette neighbor of the true
+    mix, sometimes a bare operand echo (`olive + lavender = lavender`). And
+    the seeds largely agree on the *same* wrong answers, so this is a
+    systematic bias, not decoding noise — it looks like retrieval of the
+    nearest memorized named equation, not a computed mix.
+
+    The mixing arithmetic itself is not the problem, because the very same
+    value pairs are solved whenever the prompt licenses a hex answer:
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(complete, holdout, named_holdout_exs):
+    _rng = np.random.default_rng(9)
+    _sets = {
+        "named": named_holdout_exs,
+        "cross": [colors.make_example("cross", a, b, _rng) for a, b in holdout],
+        "hex": [colors.make_example("hex", a, b, _rng) for a, b in holdout],
+    }
+    _scores = {}
+    for _form, _exs in _sets.items():
+        _got = complete(SEEDS[0], [ex.prompt for ex in _exs])
+        _scores[_form] = sum(g == ex.answer for g, ex in zip(_got, _exs, strict=True))
+    _n = len(named_holdout_exs)
+    _rev_prompts = sorted({f"{colors.to_hex(ex.result)} = " for ex in named_holdout_exs})
+    _rev = complete(SEEDS[0], _rev_prompts)
+    mo.md(
+        f"Seed {SEEDS[0]}, the same held-out value pairs in each surface form: "
+        + ", ".join(f"**{_scores[form]}/{_n}** {form}" for form in _sets)
+        + ". And prompted with the *reverse* of an alias line — a frame that never occurs in training — "
+        "it emits hex-shaped noise where a name should go:\n\n```\n"
+        + "\n".join(f"{p}{g}" for p, g in zip(_rev_prompts, _rev, strict=True))
+        + "\n```"
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(train_pairs):
+    _reps = round(N_EXAMPLES * colors.FORM_WEIGHTS["named"] / len(train_pairs))
+    mo.md(rf"""
+    That last block is the missing piece made visible: the model has no
+    usable hex → name mapping at all. Three properties of the corpus
+    conspire to keep it that way:
+
+    1. **The named slice is memorizable.** Named equations draw from only
+       {len(train_pairs)} distinct pairs, so each is seen ~{_reps} times in
+       training. A lookup table suffices, and the model evidently builds one
+       (`named_seen` ≈ 1); once that slice's loss is zero, nothing pushes it
+       to learn the compositional route instead.
+    2. **The alias dictionary is one-way.** Alias lines always read
+       `name = hex`. The reverse direction is supervised nowhere except
+       through those memorizable named equations — the small-scale analog of
+       the *reversal curse*: training on `A = B` does not produce `B = A`.
+    3. **Hex answers factorize per channel; named answers don't.** A hex
+       answer is emitted digit by digit, and each digit depends on one
+       channel of the operands — nothing ever requires the whole mix at one
+       position. A *name's* first character depends on all three channels
+       and the inverted dictionary simultaneously. The named path needs a
+       readout that the (dominant) hex task never builds. The probe section
+       below is consistent with this: the result's R² plateaus well below
+       the operand's even in cells with perfect hex accuracy.
+
+    The signal, then, is not too weak — it is too easy to satisfy by lookup.
+    Candidate corpus fixes are queued in the repo's todo list: reverse alias
+    lines (`#f00 = red`); named operands whose off-palette mix forces a hex
+    answer (`red + navy = #804`), so that name + name prompts must engage
+    the arithmetic rather than the lookup table; and a denser named palette,
+    to make memorization the expensive strategy. Until one of those lands,
+    `named_holdout` sits at zero for corpus reasons, not capacity ones.
     """)
     return
 
@@ -439,7 +598,15 @@ def _():
 
     Probe R² against residual-stream depth (0 = embedding), one panel per probe
     target, one line per width (deepest models, mean over seeds). Rising R² for
-    the *result* is the model visibly computing the mix before emitting it.
+    the *result* is the mix becoming partially readable before the answer is
+    emitted — but note that it plateaus well below the operand's R², even in
+    cells whose hex accuracy is perfect. The full mix need never sit at any
+    single position: each hex digit can be computed at the position that emits
+    it, so the pre-answer probe sees at most a head start. Probing every
+    answer position, per channel, would map that lazy schedule directly; a
+    follow-up. For the anchoring runs the pre-answer space stays the
+    comparison point, and the contrast across runs matters more than the
+    absolute level.
 
     The probes read the residual stream at two positions, highlighted below:
     the **first operand's last character** (by then the whole operand has been
@@ -579,6 +746,11 @@ def _(metrics):
     measurements. The comparison this report exists for: completion accuracy
     unchanged relative to the numbers above, and the redness probe direction
     landing where we put it instead of somewhere new every seed.
+
+    One caveat travels with the baseline: `named_holdout` sits at zero for
+    corpus reasons (see *Why the named answers fail*), so it offers the
+    anchored runs no headroom as a degradation canary until the corpus
+    grows the fixes queued in the todo list.
     """
     )
     return
