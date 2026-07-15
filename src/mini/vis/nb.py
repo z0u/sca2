@@ -162,6 +162,14 @@ def themed_figure_html(
     (named ``<name>-light.png`` / ``<name>-dark.png`` so a saved file reads sensibly);
     otherwise both inline as ``data:`` URIs. *name* is also surfaced as a
     ``data-asset-name`` attribute on each ``<img>`` for provenance.
+
+    Each ``<img>`` carries explicit ``width``/``height`` attributes: the figure's
+    *physical* size (PNG pixels × 96 CSS px/in ÷ save dpi), not its pixel count.
+    Without them the browser displays 1 image px per CSS px, so the render dpi would
+    leak into layout — a 150 dpi figure would paint half again as large as its
+    figsize, and text sized to match the page would not. Pinning the CSS size makes
+    the extra pixels crispness on high-dpr screens instead of extra inches, and lets
+    the browser reserve the right space before the image loads.
     """
     import base64
     import hashlib
@@ -184,6 +192,15 @@ def themed_figure_html(
     light_png = _png_bytes(light_fig)
     dark_png = _png_bytes(dark_fig)
 
+    def _css_size(png: bytes) -> tuple[int, int]:
+        # PNG pixel dims from the IHDR chunk (fixed offset in every PNG), scaled to
+        # CSS px at the reference 96 px/in. bbox_inches='tight' changes the saved
+        # size, so measure the bytes rather than trusting fig.get_size_inches().
+        w = int.from_bytes(png[16:20], "big")
+        h = int.from_bytes(png[20:24], "big")
+        dpi = float(save_args["dpi"])
+        return round(w * 96 / dpi), round(h * 96 / dpi)
+
     if close_fig:
         plt.close(light_fig)
         plt.close(dark_fig)
@@ -200,7 +217,13 @@ def themed_figure_html(
 
     escaped_name = html.escape(asset_name)
     escaped_alt = html.escape(alt_text or "Plot")
-    style = f"max-width: {max_width};" if max_width is not None else ""
+    # Shrink to fit a narrow viewport (height follows to keep the aspect), but never
+    # grow past the physical size set by the width/height attributes.
+    style = (
+        f"max-width: min(100%, {max_width}); height: auto;"
+        if max_width is not None
+        else "max-width: 100%; height: auto;"
+    )
     escaped_style = html.escape(style)
     # Derived from the asset name (not random) so re-exporting an unchanged report
     # produces byte-identical HTML — a random suffix here would churn the report on
@@ -252,10 +275,12 @@ def themed_figure_html(
         }}
         </style>
         """)
+    light_w, light_h = _css_size(light_png)
+    dark_w, dark_h = _css_size(dark_png)
     figure_html = dedent(f"""
         <figure class="{figure_class}">
-            <img class="mini-themed-img-light" src="{light_uri}" alt="{escaped_alt}" style="{escaped_style}" data-asset-name="{escaped_name}" />
-            <img class="mini-themed-img-dark" src="{dark_uri}" alt="{escaped_alt}" style="{escaped_style}" data-asset-name="{escaped_name}" />
+            <img class="mini-themed-img-light" src="{light_uri}" alt="{escaped_alt}" width="{light_w}" height="{light_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />
+            <img class="mini-themed-img-dark" src="{dark_uri}" alt="{escaped_alt}" width="{dark_w}" height="{dark_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />
         </figure>
         """)
 

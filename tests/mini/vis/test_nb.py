@@ -164,3 +164,23 @@ def test_export_key_top_level_notebook(tmp_path: Path):
     nb.parent.mkdir(parents=True)
     nb.write_text("")
     assert export_key(nb) == "gpt"  # top-level report → bare stem, served at /gpt/
+
+
+def test_img_pins_physical_size_from_dpi():
+    """width/height attrs are PNG px × 96/dpi, so save dpi never leaks into layout."""
+    import base64
+
+    result = themed(_dummy_plot)(1, 2)
+    imgs = re.findall(r'<img[^>]+width="(\d+)" height="(\d+)"', result)
+    assert len(imgs) == 2
+    # Decode the light PNG's pixel dims and check the attribute is the 96/150 scaling.
+    m = re.search(r'src="data:image/png;base64,([^"]+)"', result)
+    assert m is not None
+    png = base64.b64decode(m.group(1))
+    px_w = int.from_bytes(png[16:20], "big")
+    px_h = int.from_bytes(png[20:24], "big")
+    w, h = map(int, imgs[0])
+    assert (w, h) == (round(px_w * 96 / 150), round(px_h * 96 / 150))
+    assert w < px_w  # displayed smaller than its pixel count: the rest is dpr crispness
+    # Responsive: shrinks to the container but never past the physical size.
+    assert result.count("max-width: 100%; height: auto;") == 2
