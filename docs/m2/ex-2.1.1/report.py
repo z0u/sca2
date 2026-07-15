@@ -323,7 +323,10 @@ def _(metrics):
 def _(metrics):
     _w, _d = pick_backbone(metrics)
     (_cell,) = [r for r in metrics if r["label"] == label(_w, _d, SEEDS[0])]
-    rows = [(es, _cell["surprisal"][es][0]) for es in EVAL_SETS]
+    # named_holdout's index 1 is `lime + black = green`, the example "Why the
+    # named answers fail" walks through below; index 0 is a same-set spare.
+    _idx = {"named_holdout": 1}
+    rows = [(es, _cell["surprisal"][es][_idx.get(es, 0)]) for es in EVAL_SETS]
     log_v = np.log(len(colors.alphabet()))
     sub_width = min(max(len(r["text"]) for _, r in rows), 80)
     # Match the sublines' dark background to this notebook's, rather than subline's
