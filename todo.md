@@ -68,15 +68,6 @@ readable cold without re-deriving code state.
   publish --move old new` verb. Consider folding orphan cleanup into
   `mini gc --store`.
 
-- **PR publishes land on the prod publish tier.** `./go publish` from a PR
-  branch writes `exports/<key>/` on the *production* tier — a new report sits
-  there dark until main links it (fine; the PR preview even depends on it),
-  but re-publishing an *existing* key from a branch silently swaps the assets
-  under the live site's stale HTML. If that bites, publish PR exports to a
-  `pr-<n>` git revision of the dataset repo (`upload_folder(revision=...)`,
-  preview `<base>` at `resolve/pr-<n>/`). PR previews themselves shipped
-  2026-07-14 (`pr-preview.yml`; see eng/publishing.md).
-
 - Cross-experiment lineage is now **auto-detected**: `set_ref` in a task worker
   stamps producer identity onto the ref (via an ambient `producer_context`, so
   the project-shared `Store` stays experiment-agnostic), `get_ref` records the

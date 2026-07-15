@@ -13,6 +13,7 @@ Run it with::
 from __future__ import annotations
 
 import os
+import re
 import secrets
 from pathlib import Path
 
@@ -169,7 +170,10 @@ def test_publish_lands_on_the_dataset_repo(hf_repo):
     url = store.publish(art, path)  # copy-through into the public repo
     repo_paths.append(f"published/{path}")
 
-    assert url == f"https://huggingface.co/datasets/{PUBLISH_REPO}/resolve/main/published/{path}"
+    # The URL pins to the commit the upload made — immutable, citable.
+    assert re.fullmatch(
+        f"https://huggingface.co/datasets/{PUBLISH_REPO}/resolve/[0-9a-f]{{40}}/published/{re.escape(path)}", url
+    )
     import requests
 
     r = requests.get(url, timeout=30)
@@ -187,11 +191,42 @@ def test_export_round_trips_over_the_repo(hf_repo, tmp_path: Path):
     (src / "_assets" / "fig.png").write_bytes(b"\x89PNG\r\n\x1a\n" + tag.encode())
 
     assert store.fetch_export(key, tmp_path / "miss") is False  # nothing committed yet
-    store.sync_export(src, key)
+    rev = store.sync_export(src, key)
     repo_paths += [f"exports/{key}/index.html", f"exports/{key}/_assets/fig.png"]
+    assert rev is not None and re.fullmatch("[0-9a-f]{40}", rev)  # the revision a build pins to
 
     dest = tmp_path / "pulled"
     assert store.fetch_export(key, dest) is True
     assert (dest / "index.html").read_text().endswith(tag)
     assert (dest / "_assets" / "fig.png").read_bytes().endswith(tag.encode())
     assert store.export_base(key) == f"https://huggingface.co/datasets/{PUBLISH_REPO}/resolve/main/exports/{key}/"
+    assert (
+        store.export_base(key, revision=rev)
+        == f"https://huggingface.co/datasets/{PUBLISH_REPO}/resolve/{rev}/exports/{key}/"
+    )
+
+
+@repo_publish
+def test_pinned_export_survives_a_republish(hf_repo, tmp_path: Path):
+    """The staging guarantee: overwriting ``exports/<key>/`` can't touch a pinned revision.
+
+    This is what makes a pre-merge publish safe — production HTML is built against the
+    pinned commit, so a branch re-publishing the same key swaps only the mutable head.
+    """
+    store, tag, cas_created, repo_paths = hf_repo
+    key = f"_test/{tag}/report"
+    src = tmp_path / "export"
+    src.mkdir()
+    (src / "index.html").write_text(f"v1 {tag}")
+    rev1 = store.sync_export(src, key)
+    repo_paths.append(f"exports/{key}/index.html")
+
+    (src / "index.html").write_text(f"v2 {tag}")  # a branch re-publishes the same key
+    rev2 = store.sync_export(src, key)
+    assert rev1 != rev2
+
+    pinned, head = tmp_path / "pinned", tmp_path / "head"
+    assert store.fetch_export(key, pinned, revision=rev1) is True
+    assert (pinned / "index.html").read_text() == f"v1 {tag}"  # the pin still serves v1
+    assert store.fetch_export(key, head) is True
+    assert (head / "index.html").read_text() == f"v2 {tag}"  # only the mutable head moved

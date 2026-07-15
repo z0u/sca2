@@ -4,11 +4,12 @@ name: PR Preview
 # new report's figures are reviewable without downloading the build artifact.
 # The build is the same read-only assembly as production: it pulls whatever
 # bundles `./go publish` already synced to the publish tier (an agent publishes
-# from its branch before opening the PR) and writes HTML around them. The
+# from its branch before opening the PR) and writes HTML around them. Each
+# report is fetched and based at the revision pinned in docs/publish.lock *on
+# the PR branch*, so a branch publish shows up here without touching what
+# production serves (main's pins) — merging the PR is what promotes it. The
 # preview is torn down when the PR closes; a sticky comment on the PR carries
-# the link. Caveat: exports are not branch-namespaced, so re-publishing an
-# *existing* report from a branch swaps the assets under the production site
-# too — see todo.md (staging via dataset-repo revisions) for the eventual fix.
+# the link.
 
 on:
   pull_request:

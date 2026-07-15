@@ -73,7 +73,7 @@ introduce. The one caveat: `<base>` also repoints *author-written* relative link
 link to another report becomes its rendered page, a link to a source file its GitHub
 source. **Convention: the only relative URLs in a report are its assets.**
 
-Two further decisions:
+Further decisions:
 
 - **No HTML in Git.** The notebooks (`docs/**/*.py`) are the only source of truth; each
   exports on demand to a bundle synced under `exports/<key>/`. This keeps PRs reviewable
@@ -98,10 +98,28 @@ Two further decisions:
   the production deploy to be branch-based too (`clean-exclude: pr-preview/`): an
   artifact deploy replaces the whole site, so previews couldn't coexist with it. Viewing
   a bundle straight off the dataset repo is *not* an option — HF serves repo HTML as
-  `text/plain` behind a sandbox CSP. Known gap: exports aren't branch-namespaced, so
-  re-publishing an existing key from a branch swaps the assets under the live site's
-  older HTML; if that bites, publish PR exports to a `pr-<n>` git *revision* of the
-  dataset repo and point the preview `<base>` at `resolve/pr-<n>/` (see todo.md).
+  `text/plain` behind a sandbox CSP. Branch scoping comes from the pin manifest (next
+  bullet): the preview serves each report at the revision pinned on the *PR branch*,
+  production at the one pinned on main, off the same mutable `exports/<key>/` names.
+- **A publish is staged until its pin lands on main.** The dataset repo is git-backed,
+  so every `sync_export` is already an immutable commit; the missing half was making
+  the *build* consume one. `./go publish` records each bundle's commit sha in
+  [`docs/publish.lock`](/docs/publish.lock) (export key → revision, committed to Git),
+  and the build fetches *and* bases the report at that revision —
+  `resolve/<sha>/exports/<key>/` — never the mutable head. This is the same
+  identity/evidence split the memo store uses: the dataset repo holds evidence (every
+  bundle ever published, at every revision), while the identity (which revision the
+  site serves) travels with the code. Publishing from a branch therefore deploys
+  nothing: production serves main's pins, the PR preview serves the branch's, and
+  merging the PR is the promotion — no staging prefix, no HF-side branches, and CI
+  keeps its read-only token (the alternative, `pr-<n>` revisions promoted on merge,
+  would have needed a write token in CI). Re-publishing unchanged content mints no
+  commit (huggingface_hub drops no-op operations and returns the current head), so
+  idempotent publishes stay idempotent. Two corollaries: an unpinned report falls back
+  to the head with a build warning (how pre-lock bundles behave until republished),
+  and the dataset repo's history must never be rewritten (`super_squash_history`) —
+  pins and citations resolve through old commits. For the same reason `publish()`
+  itself now returns commit-pinned URLs, so a published single file is citable as-is.
 - **Provenance is injected at export, not build.** The provenance footer (which
   experiment runs produced the data a report shows) needs the producers stamped on the
   store's refs — state only the authenticated export half can see, and only *while the

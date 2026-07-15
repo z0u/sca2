@@ -22,6 +22,14 @@ class _Info:
         self.xet_hash = xet_hash
 
 
+class _Commit:
+    def __init__(self, oid: str):
+        self.oid = oid
+
+
+FAKE_OID = "c0ffee" * 6 + "beef"  # 40 hex chars, like a real commit sha
+
+
 class FakeApi:
     """Records calls; ``present`` toggles whether the CAS claims to hold the blob."""
 
@@ -38,9 +46,11 @@ class FakeApi:
 
     def upload_file(self, **kw):
         self.calls.append(("upload_file", kw))
+        return _Commit(FAKE_OID)
 
     def upload_folder(self, **kw):
         self.calls.append(("upload_folder", kw))
+        return _Commit(FAKE_OID)
 
     def file_exists(self, **kw):
         self.calls.append(("file_exists", kw))
@@ -79,7 +89,8 @@ def test_publish_with_repo_uploads_to_dataset(tmp_path: Path):
     store = _store(tmp_path, publish_repo="ns/pub")
     art = _cache_blob(store, b"\x89PNG")  # in the CAS, so has() is satisfied from the warm cache
     url = store.publish(art, "_x/fig.png")
-    assert url == "https://huggingface.co/datasets/ns/pub/resolve/main/published/_x/fig.png"
+    # Pinned to the commit the upload made, not the branch — the URL can't be swapped later.
+    assert url == f"https://huggingface.co/datasets/ns/pub/resolve/{FAKE_OID}/published/_x/fig.png"
     uploads = [c[1] for c in store._api.calls if c[0] == "upload_file"]
     assert len(uploads) == 1
     kw = uploads[0]
@@ -103,13 +114,40 @@ def test_export_routes_to_dataset_when_repo_set(tmp_path: Path):
     src = tmp_path / "exp"
     src.mkdir()
     (src / "index.html").write_text("x")
-    store.sync_export(src, "k")
+    assert store.sync_export(src, "k") == FAKE_OID  # the revision the caller pins
     folders = [c[1] for c in store._api.calls if c[0] == "upload_folder"]
     assert len(folders) == 1
     assert folders[0]["path_in_repo"] == "exports/k"
     assert folders[0]["delete_patterns"] == "*"  # rsync-like: prune assets the report dropped
 
 
+def test_export_base_pins_to_a_revision(tmp_path: Path):
+    store = _store(tmp_path, publish_repo="ns/pub")
+    assert store.export_base("k", revision=FAKE_OID) == (
+        f"https://huggingface.co/datasets/ns/pub/resolve/{FAKE_OID}/exports/k/"
+    )
+
+
+def test_fetch_export_reads_at_the_pinned_revision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    store = _store(tmp_path, publish_repo="ns/pub")
+    seen: dict = {}
+
+    def fake_snapshot(**kw):
+        seen.update(kw)
+        (tmp_path / "snap" / "exports" / "k").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "snap" / "exports" / "k" / "index.html").write_text("pinned")
+        return str(tmp_path / "snap")
+
+    monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snapshot)
+    assert store.fetch_export("k", tmp_path / "out", revision=FAKE_OID) is True
+    assert (tmp_path / "out" / "index.html").read_text() == "pinned"
+    assert seen["revision"] == FAKE_OID
+    exists = [c[1] for c in store._api.calls if c[0] == "file_exists"]
+    assert exists[0]["revision"] == FAKE_OID  # existence is probed at the same revision it serves
+
+
 def test_export_base_uses_bucket_without_repo(tmp_path: Path):
     store = _store(tmp_path)
     assert store.export_base("k") == "https://huggingface.co/buckets/ns/bkt/resolve/exports/k/"
+    # Buckets keep no history — a revision is meaningless there and ignored.
+    assert store.export_base("k", revision=FAKE_OID) == "https://huggingface.co/buckets/ns/bkt/resolve/exports/k/"
