@@ -38,6 +38,28 @@ readable cold without re-deriving code state.
   form-determinism note in `sca/data/colors.py`. (The diagnosis is now written
   up in the ex-2.1.1 report, with live checkpoint queries.)
 
+  **Update 2026-07-15 — the lookup table wins a race it doesn't have to.** A
+  closer look at `lime + black = green` (d64-L4-s0) shows the wrong `teal`
+  answer is not pure retrieval: it's a *garden path* that the arithmetic
+  half-corrects but too late. After `lime + bl` the model is 99.9% on the
+  operand being *blue* (`lime + blue = teal` is a train pair); the true `a`
+  costs ~8.4 nats. It fixes the spelling to `black` immediately, and that
+  correction *does* propagate to the answer — P(green) at the first answer
+  char jumps ~70× (0.0018 → 0.13) vs the pure `lime + blue` prompt — but not
+  enough to overtake the trained teal (0.84). So on this pair the model is
+  running a real (if losing) computation underneath the lookup, and teal is
+  overdetermined (it's both the blue-path answer *and* green's nearest named
+  neighbor). This reframes the interventions above as *tipping a partial
+  computation over the line* rather than *building a circuit from scratch* —
+  which makes reverse-aliases (#1) and off-palette-named-as-hex (#2) look more
+  likely to bite than a from-zero read would suggest, and is worth a dedicated
+  follow-up: quantify the compute-vs-lookup margin (that ~70× green-boost, per
+  pair, per seed) as the thing an intervention should move, and check whether
+  the margin already predicts which held-out pairs are least wrong. Ties into
+  the per-position/per-channel probe item below (probe the full RGB at the
+  first answer char on named prompts — "computed but outvoted" vs "never
+  computed").
+
 - **Probe every answer position, per channel (ex-2.1.x eval).** The current
   probes read two positions and average R² over RGB channels, which hides the
   computation schedule. Prediction from the ex-2.1.1 diagnosis: on hex answers,

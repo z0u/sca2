@@ -453,10 +453,16 @@ def _():
     spelling a *different* palette name and being caught out by the truth.
 
     Left to run free (below), it writes neither `green` nor `gray` but
-    `teal`, a one-channel neighbor of the true mix. So the result-form rule
-    (a named answer exactly when both operands are named) is not the weak
-    link: the model commits to a name every time. The failure is in choosing
-    *which* name.
+    `teal`, a one-channel neighbor of the true mix — and the tall spike on
+    the `a` of `black` hints at why. After `lime + bl` the model is 99.9%
+    sure the second operand is *blue*, and `lime + blue = teal` is an
+    equation it trained on; the `a` is the moment that guess breaks. It fixes
+    the *spelling* to `black` at once, but only half-fixes the *answer*: the
+    correction lifts *green* about 70× (to 13%) yet leaves the trained *teal*
+    still on top. So the result-form rule (a named answer exactly when both
+    operands are named) is not the weak link: the model commits to a name
+    every time. The failure is in choosing *which* name — and a trained
+    neighbor can capture it before the arithmetic finishes.
 
     The experiment publishes its checkpoints alongside the metrics, and
     these models are small enough to query on CPU, so we can ask directly.
