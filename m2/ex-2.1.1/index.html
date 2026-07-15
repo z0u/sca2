@@ -274,11 +274,13 @@
     });
 </script>
     <style>@media print{[data-mini-provenance]{display:none}}</style>
-    <style>[data-testid="static-notebook-banner"]{display:none!important}
+    <style>[class~="min-w-[400px]"]{min-width:0!important}
+    [data-testid="watermark"]{display:none!important}</style>
+    <style>[data-testid="static-notebook-banner"]{display:none!important}[class~="min-w-[400px]"]{padding-top:3rem}
     @media print{[data-mini-banner]{display:none}}</style>
 </head>
   <body>
-    <nav data-mini-banner style="position:fixed;top:.5rem;left:.5rem;z-index:2147483647;display:flex;gap:.75rem;align-items:center;padding:.3rem .65rem;font-size:.8125rem;line-height:1.4;font-family:system-ui,sans-serif;border-radius:.375rem;background:color-mix(in srgb, Canvas 80%, transparent);border:1px solid color-mix(in srgb, CanvasText 18%, transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);"><a href="https://z0u.github.io/sca2/" style="color:inherit;text-decoration:underline">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.1.1/report.py" style="color:inherit;text-decoration:underline">Source</a></nav>
+    <nav data-mini-banner style="position:absolute;top:.5rem;left:.5rem;z-index:2147483647;display:flex;gap:.75rem;align-items:center;padding:.3rem .65rem;font-size:.8125rem;line-height:1.4;font-family:system-ui,sans-serif;border-radius:.375rem;background:color-mix(in srgb, Canvas 80%, transparent);border:1px solid color-mix(in srgb, CanvasText 18%, transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);"><a href="https://z0u.github.io/sca2/" style="color:inherit;text-decoration:underline">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.1.1/report.py" style="color:inherit;text-decoration:underline">Source</a></nav>
     <script>(function(){var t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.body.classList.add(t,t+"-theme");document.body.dataset.theme=t;})();</script>
     <details data-mini-provenance style="position:fixed;bottom:.5rem;left:.5rem;z-index:2147483647;max-width:min(30rem,90vw);padding:.3rem .65rem;font-size:.75rem;line-height:1.5;font-family:system-ui,sans-serif;border-radius:.375rem;background:color-mix(in srgb, Canvas 85%, transparent);border:1px solid color-mix(in srgb, CanvasText 18%, transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);"><summary style="cursor:pointer;color:color-mix(in srgb, CanvasText 60%, transparent)">Data provenance</summary><div><strong>ex-2.1.1</strong> · <code>5eadc57-dirty</code> (dirty) · run 2026-07-14<div style="color:color-mix(in srgb, CanvasText 60%, transparent)">via reports/m2/ex-2.1.1/checkpoints/d64-L4-s0, reports/m2/ex-2.1.1/checkpoints/d64-L4-s1, reports/m2/ex-2.1.1/checkpoints/d64-L4-s2, reports/m2/ex-2.1.1/metrics, reports/m2/ex-2.1.1/probe-weights</div></div></details>
     <div id="root"></div>
