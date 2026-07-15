@@ -41,7 +41,11 @@ class Handler(SimpleHTTPRequestHandler):
 def main() -> int:
     root = sys.argv[1]
     port = int(sys.argv[2]) if len(sys.argv) > 2 else 8000
-    server = ThreadingHTTPServer(("", port), partial(Handler, directory=root))
+    # Loopback only: SimpleHTTPRequestHandler follows symlinks, and a preview is for
+    # this machine — binding every interface would offer the tree (and whatever a stray
+    # link resolves to) to the whole network. Pass a host explicitly to opt out.
+    host = sys.argv[3] if len(sys.argv) > 3 else "127.0.0.1"
+    server = ThreadingHTTPServer((host, port), partial(Handler, directory=root))
     print(f"Serving {root} at http://localhost:{port}  (Ctrl-C to stop)")
     try:
         server.serve_forever()

@@ -93,7 +93,9 @@ toggle = page.locator("[data-testid=notebook-action-show-code]").count()
   other version and every asset would 404.
 - Two asset dirs, no collision: the runtime lives under `assets/` (from
   `_static/`), the report's figures under `_assets/` (leading underscore, from the
-  bundle). `render.py` symlinks both into the serve root.
+  bundle). `render.py` copies both into the serve root — copies, not symlinks, so
+  a write into the serve root can never reach through a link and mutate the marimo
+  package or the bundle (a symlinked `index.html` once let exactly that happen).
 - **Chromium:** in the Claude-on-web sandbox it's pre-baked at
   `/opt/pw-browsers/chromium` — `render.py` uses that if present. In VS Code / a
   fresh dev container it's *not* there (and `/opt/pw-browsers` isn't writable), so

@@ -25,6 +25,7 @@ import argparse
 import http.server
 import os
 import re
+import shutil
 import socketserver
 import threading
 from pathlib import Path
@@ -37,22 +38,22 @@ _CDN = re.compile(r"https://cdn\.jsdelivr\.net/npm/@marimo-team/frontend@[^/\"']
 
 def _build_serve_root(bundle: Path, root: Path) -> None:
     """Assemble a serve root: marimo's _static assets + the bundle's CDN-rewritten HTML."""
-    # Absolute, so the symlinks below resolve from the serve root, not the bundle's cwd.
+    # Absolute, so the copies below resolve regardless of the bundle's cwd.
     index = (bundle / "index.html" if bundle.is_dir() else bundle).resolve()
     assets = index.parent / "_assets"
     static = Path(marimo.__file__).parent / "_static"
 
-    # marimo runtime lives under assets/ (+ favicon etc.); symlink it all in at root, so a
+    # marimo runtime lives under assets/ (+ favicon etc.); copy it all in at root, so a
     # rewritten "/assets/index-*.js" resolves here. The report's figures live under _assets/
-    # (note the leading underscore) — a different dir, so no collision. Skip _static's
-    # index.html: the bundle's own page is written to that name below, and writing through
-    # a symlink would corrupt the marimo package's template in site-packages (and, via
-    # uv's hardlinks, the uv cache) — poisoning every later `marimo export`.
-    for entry in static.iterdir():
-        if entry.name != "index.html":
-            (root / entry.name).symlink_to(entry)
+    # (note the leading underscore) — a different dir, so no collision. Copies, not
+    # symlinks: a write into the serve root (like index.html below) must never reach
+    # through a link into the marimo package or the bundle — that once corrupted marimo's
+    # export template in site-packages (and, via uv's hardlinks, the uv cache), poisoning
+    # every later `marimo export`. The runtime is a few tens of MB, copied into a
+    # throwaway dir; self-contained beats cheap here.
+    shutil.copytree(static, root, dirs_exist_ok=True)
     if assets.is_dir():
-        (root / "_assets").symlink_to(assets)  # wins over any _static/_assets (there is none)
+        shutil.copytree(assets, root / "_assets")
 
     html = _CDN.sub("", index.read_text("utf-8"))  # ".../dist/assets/x.js" -> "/assets/x.js"
     (root / "index.html").write_text(html, "utf-8")
@@ -82,12 +83,9 @@ def main() -> None:
 
     from playwright.sync_api import sync_playwright  # ty: ignore[unresolved-import]  # runtime-only (uv run --with playwright)
 
-    # A tmp serve root beside the bundle; symlinks make it cheap and it's gitignored under .mini.
+    # A tmp serve root beside the bundle; throwaway copies, gitignored under .mini.
     root = args.bundle.parent / (".render-" + (args.bundle.name or "root"))
-    if root.exists():
-        for p in sorted(root.iterdir(), reverse=True):
-            p.unlink()
-        root.rmdir()
+    shutil.rmtree(root, ignore_errors=True)
     root.mkdir()
     try:
         _build_serve_root(args.bundle, root)
@@ -122,9 +120,7 @@ def main() -> None:
         httpd.shutdown()
         print(f"rendered {args.bundle} -> {shot}")
     finally:
-        for p in sorted(root.iterdir(), reverse=True):
-            p.unlink()
-        root.rmdir()
+        shutil.rmtree(root, ignore_errors=True)
 
 
 if __name__ == "__main__":

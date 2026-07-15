@@ -11,6 +11,18 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **s₂ (surprise-surprise) as a standard metric for the anchored runs.**
+  ex-2.1.1's sublines now record per-character entropy alongside surprisal, and
+  s₂ = (i − h)/log|V| cleanly separated *confidently wrong* (named_holdout:
+  low entropy, high surprisal on the answer) from *knows it doesn't know*.
+  For D2.1.2+, consider a scalar per cell — mean s₂ over answer characters per
+  eval set — as a graded early-warning for anchoring side-effects: accuracy is
+  binary and saturated on three of the four sets, so miscalibration will move
+  before accuracy does. Caveats to carry into the design: s₂ ≈ 0 for a
+  uniformly ignorant model too (it measures calibration, not competence — always
+  pair with accuracy or raw surprisal), and per-token s₂ is noisy (a one-sample
+  draw from the predictive distribution), so aggregate over many positions.
+
 - **CLI usability, remaining gaps** (from the 2026-07-14 cold-exploration
   session; the copy-pasteable-hints / sorting / help-text tier shipped — see
   #57 for the running thread):
