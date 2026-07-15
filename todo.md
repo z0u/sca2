@@ -11,97 +11,40 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- **Ex-2.1.1's `named_holdout` diagnosis → being tested in ex-2.1.2
-  (2026-07-15).** The two lead interventions below (reverse aliases,
-  off-palette named-as-hex) are now a 2×2 factorial on the frozen d64-L4
-  backbone in `docs/m2/ex-2.1.2/`, along with the compute-vs-lookup margin
-  (as candidate-answer log-prob margins), the per-position/per-channel probe,
-  and s₂ as a per-set scalar. The third intervention (denser named sub-grid)
-  stayed out of scope: it changes the concept inventory the anchoring
-  experiments will label, not just the supervision. Original diagnosis kept
-  below until the results land, then this whole block can collapse into the
-  ex-2.1.2 report.
+- **Ex-2.1.2 results (2026-07-15): the `named_holdout` diagnosis was half
+  right, and the interesting half failed.** The 2×2 factorial (reverse
+  aliases × off-palette named-as-hex, frozen d64-L4) supplied both missing
+  ingredients and both *trained* — reverse aliases read out at 1.0 in their
+  own frame, and the arithmetic on name + name prompts generalizes to unseen
+  off-palette pairs at ≈ 0.92 — yet `named_holdout` stays at exactly 0 in
+  every condition. The failure decomposed: in the `open` conditions ~1/3 of
+  held-out answers are the *correct mix value in hex form* (form rule learned
+  per-pair, not per-value), and the rest are still lookup-neighbor names; the
+  name-identity margin (log P(true name) − best other name) sits ≈ −9 nats
+  everywhere, so the value → name translation never engages mid-equation even
+  though the same mapping is perfect in the `#hex = ` frame. Full analysis
+  with figures in `docs/m2/ex-2.1.2/report.py`. Consequences: the anchored
+  runs train on the `both` corpus and use `open_holdout` + s₂ as the graded
+  canaries (`named_holdout` has no headroom to lose); whether `named_holdout`
+  can be made solvable at all in 4 layers is parked — candidates: a denser
+  named sub-grid (value-diverse rgb→name supervision *in-frame*; note it
+  changes the concept inventory the anchors will label), more depth, or a
+  curriculum that interleaves frames. Bonus finding worth carrying into
+  anchor design: the answer-schedule probe shows just-in-time computation
+  *with eviction* — at the final layer, channel k is decodable (R² ≈ 0.97)
+  only at its own emission position, and previously-emitted channels are
+  dropped from the deep residual stream — so a "result" concept never fully
+  exists at any single position, and anchoring one there would fight the
+  model's schedule.
 
-- **Why ex-2.1.1 never solves `named_holdout` (diagnosed 2026-07-15).** Not a
-  weak form signal: the model always answers named + named prompts with a
-  *name* (never hex), so a result-type marker in the grammar wouldn't help. On
-  the d64-L4-s0 checkpoint, the same held-out value pairs score 10/10 in cross
-  and hex form but 0/10 named; the wrong names are retrieval-flavored (operand
-  echoes like `olive + lavender = lavender`, or the answer of a nearby seen
-  pair) and largely agree across seeds. Three compounding causes: (1) the
-  named slice is memorizable — 66 train pairs × ~90 repetitions — so there's
-  no training pressure to compose; (2) the rgb→name inverse is never
-  supervised (aliases only go name→hex; `#808 = ` prompts yield garbage) — a
-  reversal-curse analog; (3) hex answers factorize per channel at emission
-  time (result_rgb probe R² ≤ ~0.5 at the pre-answer position in every layer,
-  yet hex accuracy is 1.0), while a name's first character needs all three
-  channels integrated at once. Candidate interventions, roughly in order:
-  reverse alias lines (`#f00 = red`) to train the inverse readout; named
-  operands with off-palette mixes rendered as hex answers
-  (`red + navy = #804`) so name + name prompts must engage the arithmetic
-  circuit instead of the lookup table; more named diversity (a denser named
-  sub-grid) to make memorization expensive. Prediction to test cheaply in an
-  ex-2.1.1 variant: reverse aliases alone lift `named_holdout` off zero only
-  if the mix is already computed on named prompts; adding the off-palette
-  named lines forces that. Note the second intervention makes the answer's
-  surface form depend on the *value* of the mix (named iff on-palette), not
-  just the operands' forms — that's the point, but it changes the
-  form-determinism note in `sca/data/colors.py`. (The diagnosis is now written
-  up in the ex-2.1.1 report, with live checkpoint queries.)
-
-  **Update 2026-07-15 — the lookup table wins a race it doesn't have to.** A
-  closer look at `lime + black = green` (d64-L4-s0) shows the wrong `teal`
-  answer is not pure retrieval: it's a *garden path* that the arithmetic
-  half-corrects but too late. After `lime + bl` the model is 99.9% on the
-  operand being *blue* (`lime + blue = teal` is a train pair); the true `a`
-  costs ~8.4 nats. It fixes the spelling to `black` immediately, and that
-  correction *does* propagate to the answer — P(green) at the first answer
-  char jumps ~70× (0.0018 → 0.13) vs the pure `lime + blue` prompt — but not
-  enough to overtake the trained teal (0.84). So on this pair the model is
-  running a real (if losing) computation underneath the lookup, and teal is
-  overdetermined (it's both the blue-path answer *and* green's nearest named
-  neighbor). This reframes the interventions above as *tipping a partial
-  computation over the line* rather than *building a circuit from scratch* —
-  which makes reverse-aliases (#1) and off-palette-named-as-hex (#2) look more
-  likely to bite than a from-zero read would suggest, and is worth a dedicated
-  follow-up: quantify the compute-vs-lookup margin (that ~70× green-boost, per
-  pair, per seed) as the thing an intervention should move, and check whether
-  the margin already predicts which held-out pairs are least wrong. Ties into
-  the per-position/per-channel probe item below (probe the full RGB at the
-  first answer char on named prompts — "computed but outvoted" vs "never
-  computed").
-
-- **Probe every answer position, per channel (ex-2.1.x eval).** *Implemented
-  in ex-2.1.2 as `probe_answer_schedule` (strictly-before-emission framing
-  included) and `probe_transfer` (the named-prompt variant, fit on open-pair
-  prompts); keep this entry until the stair-step figure confirms or refutes
-  the prediction.* The current
-  probes read two positions and average R² over RGB channels, which hides the
-  computation schedule. Prediction from the ex-2.1.1 diagnosis: on hex answers,
-  channel k becomes decodable at (or just before) the position that emits digit
-  k — a stair-step, not a plateau — because nothing requires the whole mix at
-  one position. Caveat for interpretation: under teacher forcing, once digit k
-  is in the context its channel is trivially decodable from the token itself,
-  so the informative quantity is decodability of channel k strictly *before*
-  its digit is emitted. A named-prompt variant (probe the full RGB at the first
-  answer character, seen vs held-out pairs) would also separate "computed but
-  can't name it" from "never computed" more directly than the behavioral
-  evidence. Cheap: `probe_residual_stream` already captures the activations;
-  it's a positions-and-targets change plus a small figure.
-
-- **s₂ (surprise-surprise) as a standard metric for the anchored runs.**
-  *Piloted in ex-2.1.2: `answer_calibration` records mean answer nll/entropy/s₂
-  per eval set per cell, with the caveats below in its docstring.*
-  ex-2.1.1's sublines now record per-character entropy alongside surprisal, and
-  s₂ = (i − h)/log|V| cleanly separated *confidently wrong* (named_holdout:
-  low entropy, high surprisal on the answer) from *knows it doesn't know*.
-  For D2.1.2+, consider a scalar per cell — mean s₂ over answer characters per
-  eval set — as a graded early-warning for anchoring side-effects: accuracy is
-  binary and saturated on three of the four sets, so miscalibration will move
-  before accuracy does. Caveats to carry into the design: s₂ ≈ 0 for a
-  uniformly ignorant model too (it measures calibration, not competence — always
-  pair with accuracy or raw surprisal), and per-token s₂ is noisy (a one-sample
-  draw from the predictive distribution), so aggregate over many positions.
+- **s₂ (surprise-surprise) is now a standard metric.** Adopted in ex-2.1.2
+  (`answer_calibration`: mean answer nll/entropy/s₂ per eval set per cell) and
+  it behaved exactly as designed — snaps from ≈ 0.7 (confidently wrong) to ≈ 0
+  in precisely the conditions that train a form, per-set. Caveats live in the
+  docstring: it measures calibration, not competence (uniform ignorance also
+  scores ≈ 0 — pair with accuracy or raw surprisal), and per-token s₂ is a
+  noisy one-sample draw, so aggregate over many positions. Carry into the
+  anchored runs as the early-warning dial.
 
 - **CLI usability, remaining gaps** (from the 2026-07-14 cold-exploration
   session; the copy-pasteable-hints / sorting / help-text tier shipped — see
