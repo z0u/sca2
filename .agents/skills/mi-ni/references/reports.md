@@ -100,25 +100,13 @@ place is left alone with a warning. Write natural relative links
 
 ## Verifying a rendered report from a sandboxed agent session
 
-You *can* screenshot the exported bundle with headless Chromium here — see the
-**report-render skill**. The catch it works around: the HTML hydrates
-client-side and pulls the Marimo frontend (~200 JS/CSS/font URLs) from a CDN the
-sandbox can't reach, so a naive render stays blank. But the *same* pinned `dist/`
-ships inside the marimo pip package under `_static/`; the skill's `render.py`
-repoints the bundle's CDN refs at those local assets, serves the result, and
-drives the pre-installed Chromium — a real, offline render you can `Read`:
-
-```bash
-./go preview --no-serve docs/m2/ex-2.1.1/report.py     # -> .mini/exports/m2/ex-2.1.1/
-uv run --with playwright python .claude/skills/report-render/render.py \
-    .mini/exports/m2/ex-2.1.1 -o /tmp/report.png       # then Read the PNG
-```
-
-Reach for a full-page render to check layout, prose, and how figures sit
-together, or to assert on client-side behavior (the show-code toggle, visibility
-logic) by swapping the screenshot for Playwright DOM queries. The skill covers
-both, plus the gotchas (run through the project env so `_static/` matches the
-bundle's marimo; `--wait-text` instead of a fixed timeout).
+Headless Chromium *does* render an exported bundle here — the **report-render
+skill** is the how. (The one catch it handles: the Marimo frontend loads from a
+CDN the sandbox can't reach, so a naive render stays blank; `render.py` repoints
+those refs at marimo's bundled `_static/` before serving.) Reach for it to
+screenshot a report — layout, prose, figures in situ — or to assert on
+client-side behavior (the show-code toggle, visibility logic) via Playwright DOM
+queries. Commands, DOM-driving, and gotchas live in that skill.
 
 For a quick check you often don't need a browser at all:
 
@@ -134,10 +122,12 @@ For a quick check you often don't need a browser at all:
   `@import url(...)` font rule. Glyph metrics are approximate without the
   webfont (text drifts relative to per-character marks), but shape and story
   read fine. Simpler still: regenerate the SVG standalone with the same code
-  and data the report uses — that also exercises the figure code path.
+  and data the report uses — that also exercises the figure code path. (For a
+  *faithful* shot with webfonts, `render.py --selector '.output svg'` shoots the
+  element straight from the rendered report — see the report-render skill.)
 
-Driving Chromium directly (e.g. for a self-contained page outside the skill's
-flow): the executable is `/opt/pw-browsers/chromium` (pass `executable_path=`),
-pages referencing *unrewritten* external hosts hang `goto` (use
-`wait_until="domcontentloaded"`), and the browser can't read the session
-scratchpad under `/tmp` — serve from the repo tree over localhost.
+Need to drive Chromium for something outside a report bundle (a self-contained
+page)? `render.py` is the reference — copy its serve-root + Playwright setup,
+which already encodes the sandbox specifics (the `/opt/pw-browsers/chromium`
+executable, serving over localhost, `domcontentloaded` for pages that touch
+external hosts).

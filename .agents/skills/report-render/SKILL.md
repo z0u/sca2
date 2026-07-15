@@ -28,6 +28,19 @@ Then `Read` the PNG. `--suffix '?show-code=true'` appends to the URL;
 `--wait-text 'some heading'` blocks until that text renders instead of a fixed
 timeout.
 
+To inspect **one element** instead of the whole page, pass a CSS selector —
+`render.py` shoots each match (numbering `out.png` → `out-0.png`, `out-1.png`, …
+when several match) after scrolling it into view:
+
+```bash
+uv run --with playwright python .claude/skills/report-render/render.py \
+    .mini/exports/m2/ex-2.1.1 --selector '.output svg' -o /tmp/fig.png
+```
+
+`.output` wraps each Marimo cell's rendered output, so `.output svg` targets the
+report's inline figures (`.output img` for rasterized ones, `.output table` for a
+dataframe). Tighter than a full-page shot when you only care about one figure.
+
 ## Asserting on behavior, not just looking
 
 For toggles / visibility / layout logic, drive the DOM instead of screenshotting.

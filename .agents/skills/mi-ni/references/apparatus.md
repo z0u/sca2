@@ -54,7 +54,7 @@ Run it headless with `marimo export html`, passing notebook options after a `--`
 uv run marimo export html docs/my-notebook.py -o /dev/null -- --app=modal --arch=ngpt
 ```
 
-The `--` delimits notebook options from marimo's own args. (`./go preview` and `./go publish` export reports too, but they don't forward notebook options — they render each report with its defaults — so drive `marimo export` directly when you need to select a backend at export time.)
+The `--` delimits notebook options from marimo's own args, which arrive via `mo.cli_args()` — so only a notebook that reads them (like the radio above) responds; a report that just consults the configured store ignores them. (This was `./go export`, now gone; the report-export verbs `./go preview`/`publish` render with defaults and don't forward notebook options.)
 
 **Syntax gotcha:** the options are flags — marimo's `cli_args()` only parses `--key=value` or `--key value`. A bare `key=value` parses to *nothing*, so the notebook silently falls back to its default (here `local`) with no error. Confirm which backend actually ran from the logs — a Modal run prints `Creating Modal image …` then `Running … on Modal`; a local one prints `Running … locally`.
 
