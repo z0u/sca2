@@ -440,13 +440,23 @@ def _():
     mo.md(r"""
     ## Why the named answers fail
 
-    Look at where that spike lands. In `lime + black = green` above, the
-    model passes `g` cheaply and gets `r` for free; the surprisal only jumps
-    at the `e` — the first character that separates *green* from *gray*. It
-    is fluently spelling a color name, just the wrong one. So the
-    result-form rule (a named answer exactly when both operands are named)
-    is not the weak link: the model commits to a name every time. The
-    failure is in choosing *which* name.
+    That sparkline is teacher-forced: the model is being *read* the true
+    answer `green`, character by character, and we are watching how much each
+    one surprises it. Two of its own preferred names bleed through. The very
+    first letter already costs something — left to choose, this seed opens
+    `lime + black` with `t`, for *teal*, so the true `g` lands as a mild
+    surprise (the visible bump above, ~0.6 of the uniform-guess ceiling).
+    Forced onto `g`, the model gets `r` for free — *gray* and *green* share
+    the prefix `gr` — and then the true `e` detonates: on the `gr…` branch it
+    is all but certain the word is *gray*, and `e` is the first character
+    that rules *gray* out. The spike is not hedging; it is the model fluently
+    spelling a *different* palette name and being caught out by the truth.
+
+    Left to run free (below), it writes neither `green` nor `gray` but
+    `teal`, a one-channel neighbor of the true mix. So the result-form rule
+    (a named answer exactly when both operands are named) is not the weak
+    link: the model commits to a name every time. The failure is in choosing
+    *which* name.
 
     The experiment publishes its checkpoints alongside the metrics, and
     these models are small enough to query on CPU, so we can ask directly.
