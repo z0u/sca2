@@ -1,7 +1,12 @@
 import marimo
 
 __generated_with = "0.23.9"
-app = marimo.App(width="medium", auto_download=["html"])
+app = marimo.App(
+    width="medium",
+    app_title="Ex 2.1.2: making composition pay",
+    css_file="../../report.css",
+    auto_download=["html"],
+)
 
 with app.setup(hide_code=True):
     import json
@@ -15,6 +20,7 @@ with app.setup(hide_code=True):
     # Marimo puts the notebook's directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import (
+        CKPT_REF,
         CONDITIONS,
         CORPUS_SEED,
         HOLDOUT_FRAC,
@@ -298,7 +304,6 @@ def _(metrics):
             ax.set_xticks(xs, CONDS, rotation=90, fontsize=7)
             ax.grid(alpha=0.3, axis="y")
         axes[0].set_ylabel("completion accuracy")
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -310,8 +315,149 @@ def _(metrics):
     _a = {cond: float(np.mean([acc(metrics, cond, s, "named_holdout") for s in SEEDS])) for cond in CONDS}
     _interaction = _a["both"] - _a["rev"] - _a["open"] + _a["control"]
     mo.md(
-        f"H1's interaction term — both − rev − open + control on `named_holdout` — comes to "
-        f"**{_interaction:+.2f}** (super-additive if positive)."
+        rf"""
+    **H1 is refuted at face value: `named_holdout` stays at zero in every
+    condition** (so its interaction term is a degenerate {_interaction:+.2f}).
+    But the flanking panels show both interventions *trained*. The `open`
+    conditions answer held-out off-palette pairs at ≈ 0.9 — the mixing
+    arithmetic runs on name + name prompts and generalizes to operand pairs
+    never seen in that surface form. And `alias_rev` reads 1.0 exactly where
+    reverse aliases were trained: the hex → name readout exists and works in
+    the frame it was taught in. Both legs of the diagnosis were supplied, and
+    the composition still never clicks into a *named* answer. The next
+    section shows where the failure actually moved.
+    """
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ## Right value, wrong spelling
+
+    Greedy completions of the held-out named prompts, straight from the
+    published checkpoints. In `control` and `rev` the answers are the
+    familiar retrieval-flavored wrong names. In the `open` conditions
+    something new happens: for a good fraction of pairs the model emits a
+    *hex* answer — and when it does, the value is the **correct mix**.
+    The swatches make it visible: reading down an `open`/`both` column, the
+    hex answers match the expected color exactly, while the name answers
+    are still near-miss neighbors.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(holdout_exs):
+    from sca.compute.evaluation import greedy_completions
+    from sca.compute.model import load_checkpoint
+    from sca.data.tokenizer import CharTokenizer
+
+    _store = project_store()
+    _arts = {
+        (cond, s): a
+        for cond in CONDS
+        for s in SEEDS
+        if (a := _store.get_ref(f"{CKPT_REF}/{label(cond, s)}")) is not None
+    }
+    mo.stop(
+        len(_arts) < len(CONDS) * len(SEEDS),
+        mo.md("The checkpoints aren't in the store yet — re-run the experiment to publish them."),
+    )
+    completions = {}
+    with tempfile.TemporaryDirectory() as _tmp:
+        for (_cond, _s), _art in _arts.items():
+            _store.get(_art, Path(_tmp) / f"{_cond}-{_s}" / "model")
+            _model, _config, _ = load_checkpoint(Path(_tmp) / f"{_cond}-{_s}")
+            completions[_cond, _s] = greedy_completions(
+                _model, CharTokenizer(_config.tokenizer), [ex.prompt for ex in holdout_exs], 12
+            )
+
+    def answer_value(text: str) -> tuple[int, int, int] | None:
+        """The color a completion denotes, in either surface form (None if malformed)."""
+        if text in colors.PALETTE:
+            return colors.PALETTE[text]
+        if len(text) == 4 and text.startswith("#") and all(c in "0123456789abcdef" for c in text[1:]):
+            r, g, b = (int(c, 16) for c in text[1:])
+            return (r, g, b)
+        return None
+
+    return answer_value, completions
+
+
+@app.cell(hide_code=True)
+def _(answer_value, completions, holdout_exs):
+    def _swatch(text: str, want: tuple | None = None) -> str:
+        rgb = answer_value(text)
+        if rgb is None:
+            return f"<code>{text}</code>"
+        mark = "" if want is None else (" ✓" if rgb == want else "")
+        return (
+            f'<span aria-hidden="true" style="background: {colors.to_hex(rgb)}; border: 1px solid #8886; '
+            f'border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> {text}{mark}'
+        )
+
+    _head = "<tr><th>prompt</th><th>expected</th>" + "".join(f"<th>{cond}</th>" for cond in CONDS) + "</tr>"
+    _rows = "".join(
+        f"<tr><td><code>{ex.prompt}</code></td><td>{_swatch(ex.answer)}</td>"
+        + "".join(f"<td>{_swatch(completions[cond, SEEDS[0]][i], ex.result)}</td>" for cond in CONDS)
+        + "</tr>"
+        for i, ex in enumerate(holdout_exs)
+    )
+    mo.vstack(
+        [
+            mo.Html(f'<table style="font-size: 0.9em">{_head}{_rows}</table>'),
+            mo.md(
+                f"*Greedy completions of the `named_holdout` prompts, seed {SEEDS[0]}, one column per "
+                "condition. A ✓ marks answers whose *value* equals the true mix (they are all hex: "
+                "value-correct in the wrong surface form).*"
+            ),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(answer_value, completions, holdout_exs, margins, metrics):
+    _hexed = {cond: [sum(g.startswith("#") for g in completions[cond, s]) for s in SEEDS] for cond in CONDS}
+    _value_ok = {
+        cond: [
+            sum(answer_value(g) == ex.result for g, ex in zip(completions[cond, s], holdout_exs, strict=True))
+            for s in SEEDS
+        ]
+        for cond in CONDS
+    }
+
+    def _form_margin(cond: str) -> float:
+        """Mean log P(correct hex) − log P(true name) on the holdout prompts."""
+        vals = []
+        for s in SEEDS:
+            cands = cell(metrics, cond, s)["margin_candidates"]["named_holdout"]
+            lp = margins[f"{label(cond, s)}/margins/named_holdout"]
+            for i, ex in enumerate(holdout_exs):
+                vals.append(lp[i, cands.index(colors.to_hex(ex.result))] - lp[i, cands.index(ex.answer)])
+        return float(np.mean(vals))
+
+    _n = len(holdout_exs)
+    mo.md(
+        f"""
+    Across all seeds: hex-form answers on the {_n} held-out prompts number
+    {", ".join(f"`{c}` **{sum(_hexed[c])}/{3 * _n}**" for c in CONDS)}, and value-correct answers
+    {", ".join(f"`{c}` **{sum(_value_ok[c])}/{3 * _n}**" for c in CONDS)} — the two counts coincide
+    exactly: every value-correct answer is hex, and every name answer is value-wrong. The form-choice
+    margin (log-probability of the correct hex minus the true name, teacher-forced) tells the same
+    story: {", ".join(f"`{c}` {_form_margin(c):+.1f}" for c in CONDS)} nats.
+
+    So the `open` intervention did what it was designed to do — the mix is computed on name + name
+    prompts — but the *form rule* ("answer named exactly when the mix lands on the palette") did not
+    generalize: the model treats held-out closed pairs like open ones and answers in hex, or falls
+    back to the lookup-neighbor name. And `rev` moved nothing here: its perfect reverse-alias skill
+    stays locked to the `#hex = ` frame it was trained in — supplying the inverse dictionary as a
+    *surface task* does not make it available as an internal *readout* mid-equation. That is a
+    sharper version of the reversal curse than the one diagnosed in ex-2.1.1: even indirect
+    supervision of the inverse direction fails to transfer across frames.
+    """
     )
     return
 
@@ -323,10 +469,11 @@ def _():
 
     Exact-match accuracy on ten pairs is a coarse instrument. The margin —
     log-probability of the true name as a complete answer, minus the best
-    competitor among the other names and the mix's hex rendering — grades
-    each pair continuously: positive means the true answer wins, and the
-    magnitude says by how much. One line per held-out pair, mean over seeds,
-    across conditions; `named_seen` margins shown as the shaded reference.
+    competitor among the *other names* — grades the name-identity question
+    continuously, independent of the hex-vs-name form choice above: positive
+    means the true name wins among names, and the magnitude says by how
+    much. One line per held-out pair, mean over seeds, across conditions;
+    `named_seen` margins shown as the shaded reference.
     """)
     return
 
@@ -334,16 +481,17 @@ def _():
 @app.cell(hide_code=True)
 def _(margins, metrics):
     def margin_rows(eval_set: str, exs: list) -> np.ndarray:
-        """(len(CONDS), n_seeds, n_examples) margin of the true answer over the best competitor."""
+        """(len(CONDS), n_seeds, n_examples) margin of the true name over the best *other name*."""
         out = np.empty((len(CONDS), len(SEEDS), len(exs)))
         for ci, cond in enumerate(CONDS):
             for si, s in enumerate(SEEDS):
                 cands = cell(metrics, cond, s)["margin_candidates"][eval_set]
+                names = [i for i, c in enumerate(cands) if not c.startswith("#")]
                 lp = margins[f"{label(cond, s)}/margins/{eval_set}"]
                 true_idx = np.array([cands.index(ex.answer) for ex in exs])
                 truth = lp[np.arange(len(exs)), true_idx]
-                rival = lp.copy()
-                rival[np.arange(len(exs)), true_idx] = -np.inf
+                rival = lp[:, names].copy()
+                rival[np.arange(len(exs)), [names.index(t) for t in true_idx]] = -np.inf
                 out[ci, si] = truth - rival.max(axis=1)
         return out
 
@@ -380,14 +528,18 @@ def _(holdout_exs, m_hold, m_seen):
         mean = m_hold.mean(axis=1)  # (conds, n_pairs)
         order = np.argsort(mean[0])
         cmap = plt.cm.viridis(np.linspace(0.05, 0.85, mean.shape[1]))
+        # Spread the end-of-line labels vertically so neighbors don't collide.
+        label_y = mean[-1].astype(float).copy()
+        for prev, nxt in zip(np.argsort(label_y)[:-1], np.argsort(label_y)[1:], strict=True):
+            label_y[nxt] = max(label_y[nxt], label_y[prev] + 1.1)
         for rank, p in enumerate(order):
             ex = holdout_exs[p]
             ax.plot(xs, mean[:, p], "o-", color=cmap[rank], lw=1.4, ms=3.5)
             ax.annotate(
                 f"{ex.prompt}{ex.answer}",
                 (xs[-1], mean[-1, p]),
-                xytext=(6, 0),
-                textcoords="offset points",
+                xytext=(xs[-1] + 0.12, label_y[p]),
+                textcoords="data",
                 fontsize=6.5,
                 va="center",
                 color=cmap[rank],
@@ -406,12 +558,23 @@ def _(holdout_exs, m_hold, m_seen):
 
 @app.cell(hide_code=True)
 def _(m_hold):
-    _ctrl, _both = m_hold.mean(axis=1)[0], m_hold.mean(axis=1)[CONDS.index("both")]
+    _mean = m_hold.mean(axis=1)  # (conds, pairs)
+    _ctrl, _both = _mean[0], _mean[CONDS.index("both")]
     _rho = float(np.corrcoef(np.argsort(np.argsort(_ctrl)), np.argsort(np.argsort(_both)))[0, 1])
     _flipped = int((_both > 0).sum())
     mo.md(
-        f"H2's prediction check: the rank correlation between control margins and `both` margins across "
-        f"the ten pairs is **{_rho:.2f}**; {_flipped}/10 pairs end positive under `both`."
+        f"""
+    **H2 mostly fails too.** The distribution barely moves: mean margin
+    {_ctrl.mean():+.1f} nats in `control` and {_both.mean():+.1f} in `both`, with
+    {_flipped}/10 pairs ending positive. The true name never comes close to
+    winning among names — roughly ten nats adrift while `named_seen` sits far
+    above zero — so the value → name translation isn't *almost there* and
+    outvoted at the margin; on these prompts it simply never engages, even in
+    the condition whose greedy answers prove the value has been computed. The
+    rank structure is real but weak (rank correlation {_rho:.2f} between
+    `control` and `both`), so the "least-wrong pairs flip first" reading has
+    nothing to bite on: no pair flips at all.
+    """
     )
     return
 
@@ -429,6 +592,19 @@ def _():
     computation); dotted segments are after it lands (decoding is copying).
     H3 says each channel's solid segment ends with a sharp rise at its own
     emission position — a stair-step, not a plateau.
+
+    That is what the deep layers show, and then some. At the final layer,
+    channel k is near-perfectly decodable exactly at its emission offset
+    (R² ≈ 0.97) and *only* there: one position earlier it is far weaker,
+    and once emission moves on to the next digit the previous channels are
+    not merely stale but largely *evicted* from the deep residual stream —
+    each answer position holds the one channel it is about to emit, on top
+    of a diffuse ≈ 0.5-R² trace of the whole mix that persists from the
+    pre-answer position. The mix is never fully represented at any single
+    position; the "result" the pre-answer probe sees is a head start, not
+    a value. This is just-in-time computation, and it is exactly the
+    regime in which anchoring a *result* concept at one position would be
+    fighting the model's own schedule.
     """)
     return
 
@@ -449,7 +625,10 @@ def _(sched_offsets, sched_r2):
             "Line charts of probe R-squared against position offset around the answer, one panel per "
             "residual-stream depth, three lines per panel for the R, G, and B channels of the result. "
             "Lines are solid before each channel's digit enters the context and dotted after. In the "
-            "deeper layers each channel rises sharply at its own emission position, forming a stair-step."
+            "deeper layers each channel peaks near 1 at its own emission position and falls away on "
+            "either side, so the three channels form a sequence of staggered peaks rather than a "
+            "cumulative plateau; at depth 0 the dotted segments jump to 1 as each digit becomes "
+            "readable from the context."
         ),
     )
     def _plot() -> plt.Figure:
@@ -468,7 +647,6 @@ def _(sched_offsets, sched_r2):
             ax.grid(alpha=0.3)
         axes[0].set_ylabel("probe R² (held-out half)")
         axes[0].legend(fontsize=7)
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -485,6 +663,18 @@ def _():
     condition computes the mix on named prompts, the probe carries over; if
     the mix is never represented there, no probe fit elsewhere can read it
     out. One panel per scored set, R² against depth, one line per condition.
+
+    The reading: partial computation is present *everywhere*, control
+    included — the held-out named prompts carry roughly as much
+    linearly-decodable result as the fit set's own ceiling (≈ 0.6 at the
+    deep layers), which quantifies ex-2.1.1's garden-path anecdote. The
+    `open` conditions raise the mid-depth transfer somewhat, consistent
+    with the arithmetic being made load-bearing on these prompts, and their
+    *final*-layer R² drops on the named sets — the last layer's job there
+    has become committing to a surface form. But the headline is that
+    "computed but outvoted" was already true in `control`, and making the
+    computation stronger (`open`) or the readout available (`rev`) still
+    doesn't connect them.
     """)
     return
 
@@ -513,7 +703,6 @@ def _(metrics):
             ax.grid(alpha=0.3)
         axes[0].set_ylabel("probe R² (result RGB)")
         axes[0].legend(fontsize=8)
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -530,8 +719,13 @@ def _():
     the guess, then only half-corrects the answer — the trained
     `lime + blue = teal` keeps winning. The margin data lets us re-ask that
     question in every condition: does the correction finally overtake the
-    lookup? Sublines below show per-character surprisal and entropy on the
-    same example (teacher-forced), one row per condition.
+    lookup? It does not — the margin stays several nats negative in every
+    condition. One incidental observation: the retrained `control` gives the
+    same *kind* of wrong answer as ex-2.1.1's d64-L4-s0 but not always the
+    same one (this seed now says *gray* rather than *teal* for this pair),
+    a reminder that which neighbor wins is unstable run to run even at a
+    fixed seed. Sublines below show per-character surprisal and entropy on
+    the same example (teacher-forced), one row per condition.
     """)
     return
 
@@ -614,6 +808,12 @@ def _():
     on most sets, so miscalibration should move first. Here it doubles as a
     check on H1: conditions that solve the holdout set should also stop
     being surprised by it.
+
+    It behaves exactly as designed: the `open_*` rows and the `alias_rev`
+    row snap from confidently-wrong (s₂ ≈ 0.7) to calibrated (≈ 0) in
+    precisely the conditions that train those forms, while `named_holdout`
+    stays confidently wrong everywhere — matching its unmoved accuracy.
+    The metric is ready to be the anchored runs' early-warning dial.
     """)
     return
 
@@ -653,7 +853,6 @@ def _(metrics):
         ax.set_xticks(range(len(CONDS)), CONDS)
         ax.set_yticks(range(len(EVAL_SETS)), [es.replace("_", " ") for es in EVAL_SETS], fontsize=8)
         fig.colorbar(im, ax=ax, label="mean s₂ on answers")
-        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
@@ -662,20 +861,36 @@ def _(metrics):
 
 @app.cell(hide_code=True)
 def _(metrics):
-    _hold = {cond: float(np.mean([acc(metrics, cond, s, "named_holdout") for s in SEEDS])) for cond in CONDS}
-    _best = max(_hold, key=lambda c: _hold[c])
+    _oh = float(np.mean([acc(metrics, "both", s, "open_holdout") for s in SEEDS]))
     mo.md(
         f"""
     ## What this settles
 
-    The condition that best solves `named_holdout` while keeping the
-    saturated sets intact — **`{_best}`** on current numbers — becomes the
-    corpus for D2.1's anchored runs, giving them a compositional eval set
-    with real headroom as a degradation canary. The margin, calibration,
-    and position-resolved probe measurements built here carry over as the
-    graded instruments those runs will be read with: anchoring should leave
-    all of them where this experiment puts them, and the redness direction
-    should land where we choose instead of where the seed happens to put it.
+    The diagnosis was half right, and the half that failed is the more
+    interesting result. Supplying both missing ingredients — the inverse
+    dictionary and pressure to compute on named prompts — produced exactly
+    those two skills (reverse aliases at 1.0, off-palette generalization at
+    ≈ {_oh:.2f}) without producing their *composition*: `named_holdout`
+    stays at zero everywhere, with the failure now visibly split into a
+    form-rule error (correct value, hex spelling) and a value → name
+    translation that never engages mid-equation, even when the same mapping
+    is perfectly learned in its own frame. In a four-layer model this looks
+    less like a data gap than a mechanistic one: nothing in training ever
+    requires chaining the two skills inside one forward pass, and the
+    just-in-time answer schedule suggests the model has no habit of holding
+    a full intermediate result anywhere a readout could find it.
+
+    For D2.1 this changes the plan in a useful way. `named_holdout` is not
+    a usable degradation canary — it has no headroom to lose — but the
+    `both` corpus supplies a better one: `open_holdout` is compositional
+    (unseen pairs, form decided by a computed value), sits near but not at
+    ceiling, and comes with graded instruments (margins, s₂, transfer
+    probes) that this experiment validated end to end. The anchored runs
+    should therefore train on the `both` corpus and treat `open_holdout` +
+    calibration as the sensitive dials, with the saturated sets as the
+    coarse ones. Whether `named_holdout` itself can be made solvable (a
+    denser named sub-grid, curricula, or simply more depth) is now a
+    separate question from D2.1's, and stays parked in the todo list.
     """
     )
     return

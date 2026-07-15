@@ -398,7 +398,7 @@ experiment = Experiment(
     roles={
         "prep": {},  # CPU-only: corpus generation + tokenize
         # Same cells as ex-2.1.1's backbone: an L4 clears one in a few minutes.
-        "train": dict(gpu="L4", timeout=1500),
+        "train": dict(gpu="L4", timeout=1800),
         # Eval now also scores margins and two extra probe suites; still small.
         "eval": dict(gpu="L4", timeout=1200),
         "surprisal": dict(cpu=2, timeout=900),
