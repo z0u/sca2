@@ -82,10 +82,14 @@ token). This is a deliberate step, *not* something experiment completion does fo
 an experiment publishes its **results** to the store, but the **report** bundle ships
 only when you run `./go publish` — and the build **silently skips** a report that was
 never published (a warning, not an error), so the site just quietly lacks it. Publish
-once the report renders the results. `scripts/build_site.py` (read-only; CI) then *pulls* each synced bundle, resolves
-author links against the repo, and inserts one `<base href="…/exports/<key>/">` in the
-`<head>` so the relative `_assets/…` URLs resolve at the bucket — no per-URL rewriting,
-no bucket writes. The same HTML opened locally (after `./go preview`, which exports the
+once the report renders the results. Publishing also pins the bundle's revision (a
+publish-tier commit sha) in `docs/publish.lock` — **commit that file with your
+changes**: the site serves each report at its pinned revision, so the publish deploys
+nothing until the pin lands on main (a PR preview serves the branch's pins meanwhile).
+`scripts/build_site.py` (read-only; CI) then *pulls* each synced bundle at its pinned
+revision, resolves author links against the repo, and inserts one
+`<base href="…/exports/<key>/">` in the `<head>` so the relative `_assets/…` URLs
+resolve at the bucket — no per-URL rewriting, no bucket writes. The same HTML opened locally (after `./go preview`, which exports the
 bundle and reassembles the site) resolves `_assets/…` to the co-located files (offline;
 real PNGs), because the build *localizes* when there's no bucket. Each report is one
 independently syncable bundle, served at `<key>/`.

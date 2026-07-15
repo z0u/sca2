@@ -21,10 +21,13 @@ sys.path.insert(0, str(Path(__file__).parent))  # so `import clean_docs` (siblin
 from clean_docs import clean_html, default_hidden_code  # noqa: E402
 from mini.reports import (  # noqa: E402
     PROVENANCE_ASSET,
+    PUBLISH_LOCK,
     export_dir,
     export_key,
     is_report_notebook,
+    load_pins,
     report_notebooks,
+    save_pins,
     set_provenance,
 )
 
@@ -79,12 +82,30 @@ def export_one(nb: Path) -> Path:
     return out.parent
 
 
-def publish_one(nb: Path, store) -> None:
-    """Export *nb* and mirror its bundle to the bucket at ``exports/<key>/``."""
+def publish_one(nb: Path, store) -> str | None:
+    """Export *nb*, mirror its bundle to ``exports/<key>/``, and return its revision.
+
+    The revision (a publish-tier commit sha, ``None`` on a history-less bucket) is what
+    the caller pins in ``docs/publish.lock`` — the site serves the bundle at that exact
+    commit, so this publish changes nothing deployed until the pin lands on main.
+    """
     bundle = export_one(nb)
     key = export_key(nb)
     print(f"  sync   {bundle.relative_to(ROOT)} -> exports/{key}/")
-    store.sync_export(bundle, key)
+    return store.sync_export(bundle, key)
+
+
+def update_pins(new: dict[str, str]) -> None:
+    """Fold this run's pins into ``docs/publish.lock``, pruning keys with no notebook.
+
+    Pruning uses the *full* report set (not just what was published now), so a partial
+    publish never drops other reports' pins, but a deleted notebook's pin doesn't
+    linger. The manifest must be committed for the pins to take effect — it's the
+    identity half of a publish; the upload was only evidence.
+    """
+    live = {export_key(nb) for nb in report_notebooks(DOCS)}
+    pins = {k: v for k, v in (load_pins(ROOT) | new).items() if k in live}
+    save_pins(ROOT, pins)
 
 
 def main() -> None:
@@ -118,19 +139,32 @@ def main() -> None:
         print(f"\n{len(nbs)} bundle(s) exported to .mini/exports/." if nbs else "\nNothing stale; bundles untouched.")
         return
 
+    publish_all(nbs)
+
+
+def publish_all(nbs: list[Path]) -> None:
+    """Publish each notebook's bundle, then pin the revisions in ``docs/publish.lock``."""
     from mini.hf_store import HFStore
     from mini.store import store_for
 
     store = store_for(ROOT / ".mini" / "store")
     if not isinstance(store, HFStore):
         sys.exit("No HF bucket configured — set [tool.mini] store-bucket and run `./go auth`, then retry --publish.")
+    pins = {}
     for nb in nbs:
-        publish_one(nb, store)
+        if (rev := publish_one(nb, store)) is not None:
+            pins[export_key(nb)] = rev
     target = store.publish_repo or store.bucket  # exports route to the repo when a publish tier is set (#38)
-    print(
-        f"\nPublished {len(nbs)} report(s) to {target}. "
-        'Trigger the Pages build to update the site (push to main, or run the "Deploy Docs" workflow).'
-    )
+    print(f"\nPublished {len(nbs)} report(s) to {target}.")
+    if pins:
+        update_pins(pins)
+        print(
+            f"Pinned in {PUBLISH_LOCK}: " + ", ".join(f"{k} @ {v[:12]}" for k, v in sorted(pins.items())) + "\n"
+            "Commit the lock file — the site serves each report at its pinned revision, so\n"
+            "nothing deployed changes until the pin lands on main (PR previews use the branch's)."
+        )
+    else:
+        print('Trigger the Pages build to update the site (push to main, or run the "Deploy Docs" workflow).')
 
 
 if __name__ == "__main__":

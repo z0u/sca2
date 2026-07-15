@@ -13,8 +13,12 @@ HF bucket under `exports/<key>/`, where `<key>` is the notebook's docs-relative 
 without suffix (`docs/overview.py` → `overview`, `docs/foo/bar.py` →
 `foo/bar`) — except a notebook named `report.py` takes its directory as the key
 (`docs/foo/report.py` → `foo`), so a one-report experiment publishes at `foo/` rather
-than the redundant `foo/report/`. `./go site` (CI) then assembles `_site/` from the
-synced bundles, serving each report at `_site/<key>/index.html` (URL `<key>/`).
+than the redundant `foo/report/`. Publishing also records the commit sha the bundle
+landed as into [`publish.lock`](./publish.lock) — commit that file: the site serves
+each report at its pinned revision, so a publish from a branch deploys nothing until
+the pin reaches main (the PR preview serves the branch's pins meanwhile). `./go site`
+(CI) then assembles `_site/` from the pinned bundles, serving each report at
+`_site/<key>/index.html` (URL `<key>/`).
 `./go preview` assembles the same site *locally* — it exports stale reports to
 `.mini/exports/` and copies their assets beside the HTML, so it works offline.
 
@@ -29,6 +33,7 @@ rendered `<key>/` page. This `README.md` is excluded from the build.
 ```
 docs/
 ├── README.md                This file (excluded from build)
+├── publish.lock             Export key → pinned publish-tier revision (written by ./go publish)
 ├── index.md                 Built as _site/index.html
 ├── overview.py              Marimo notebook → exported bundle, served at _site/overview/
 └── ex-9.9/                  An experiment, split into definition + report

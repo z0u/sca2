@@ -4,15 +4,18 @@ import pytest
 
 from mini.reports import (
     PROVENANCE_ASSET,
+    PUBLISH_LOCK,
     SOURCE_ONLY_MARKER,
     Publisher,
     export_key,
     externalize_html,
     insert_base,
     is_report_notebook,
+    load_pins,
     relative_urls,
     report_notebooks,
     rewrite_links,
+    save_pins,
     set_banner,
     set_provenance,
     set_theme,
@@ -149,6 +152,16 @@ def test_export_key_drops_redundant_report_segment(tmp_path):
     # A top-level report.py has no directory to take, so it keeps its stem.
     (docs / "report.py").write_text(_APP)
     assert export_key(docs / "report.py") == "report"
+
+
+def test_pins_round_trip_sorted_and_diffable(tmp_path):
+    (tmp_path / "docs").mkdir()
+    assert load_pins(tmp_path) == {}  # no lock yet — nothing pinned
+    save_pins(tmp_path, {"zeta": "b" * 40, "alpha": "a" * 40})
+    assert load_pins(tmp_path) == {"alpha": "a" * 40, "zeta": "b" * 40}
+    text = (tmp_path / PUBLISH_LOCK).read_text()
+    assert text.index("alpha") < text.index("zeta")  # sorted → stable diffs, trivial merges
+    assert text.endswith("\n")
 
 
 # Marimo renders its banner client-side, so the export only carries an empty shell; our

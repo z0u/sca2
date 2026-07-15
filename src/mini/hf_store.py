@@ -213,14 +213,18 @@ class HFStore(Store):
         if not self.has(art.sha256):
             raise FileNotFoundError(f"{art.sha256[:12]}… is not in the store — put() it before publish()")
         dest = f"published/{path}"
-        self.api.upload_file(
+        info = self.api.upload_file(
             path_or_fileobj=str(self._local_blob(art.sha256)),
             path_in_repo=dest,
             repo_id=self.publish_repo,
             repo_type="dataset",
             commit_message=f"publish {path}",
         )
-        return f"https://huggingface.co/datasets/{self.publish_repo}/resolve/main/{dest}"
+        # Pin the returned URL to the commit, not the branch: the whole point of a
+        # git-backed publish tier is that a published URL can't be swapped out from
+        # under whoever holds it. (An identical re-publish creates no new commit —
+        # huggingface_hub drops no-op operations and returns the current head.)
+        return f"https://huggingface.co/datasets/{self.publish_repo}/resolve/{info.oid}/{dest}"
 
     # -- gc --------------------------------------------------------------------
 
@@ -265,27 +269,43 @@ class HFStore(Store):
     #
     # A report is exported (HTML + named-keyed _assets/) to a self-contained local dir,
     # then mirrored *as-is* to ``exports/<key>/``. The build (CI) reads those back and
-    # assembles the site, pointing a single <base> at ``exports/<key>/``. This keeps the
+    # assembles the site, pointing a single <base> at ``exports/<key>/`` — at the commit
+    # sha the sync returned, when the caller pinned one (docs/publish.lock), so a later
+    # re-publish can't swap assets under already-built HTML. This keeps the
     # heavy/authenticated half (export, which needs the data + a write token) on the
     # agent, and the deterministic half (link resolution, <base>) read-only in CI — no
-    # cas/<sha>, no publish() copy, no accumulation (names overwrite in place).
+    # cas/<sha>, no publish() copy, no accumulation on the head (names overwrite in
+    # place; history holds the pinned revisions).
 
-    def export_base(self, key: str) -> str:
-        """The ``<base href>`` a published report's relative ``_assets/`` resolve against."""
+    def export_base(self, key: str, *, revision: str | None = None) -> str:
+        """The ``<base href>`` a published report's relative ``_assets/`` resolve against.
+
+        With *revision* (a commit sha from :meth:`sync_export`) the base is **immutable**:
+        it serves the bundle exactly as that publish left it, so a later re-publish —
+        from a branch, before its code merges — can't swap assets under HTML already
+        built against it. Without one it tracks the branch head (bucket exports have no
+        history, so there a revision is meaningless and ignored).
+        """
         if self.publish_repo is not None:
-            return f"https://huggingface.co/datasets/{self.publish_repo}/resolve/main/exports/{key}/"
+            return f"https://huggingface.co/datasets/{self.publish_repo}/resolve/{revision or 'main'}/exports/{key}/"
         return f"https://huggingface.co/buckets/{self.bucket}/resolve/exports/{key}/"
 
-    def sync_export(self, local_dir: Path, key: str) -> None:
+    def sync_export(self, local_dir: Path, key: str) -> str | None:
         """Mirror a report's local export dir to ``exports/<key>/`` (delete stale).
 
         rsync-like — a re-export overwrites in place and drops assets the report no
         longer references — with the per-report bundle as the sync unit. On the bucket
         that's ``sync_bucket``; on the dataset repo it's one commit whose
         ``delete_patterns`` prunes the bundle's now-absent files.
+
+        Returns the commit sha the bundle now lives at (repo mode) — the immutable
+        revision a build can pin its ``<base>`` to — or ``None`` on a bucket, which
+        keeps no history. An identical re-publish creates no commit (huggingface_hub
+        drops no-op operations) and returns the current head, so publishing unchanged
+        content never invalidates anything.
         """
         if self.publish_repo is not None:
-            self.api.upload_folder(
+            info = self.api.upload_folder(
                 folder_path=str(local_dir),
                 path_in_repo=f"exports/{key}",
                 repo_id=self.publish_repo,
@@ -293,36 +313,42 @@ class HFStore(Store):
                 delete_patterns="*",
                 commit_message=f"export {key}",
             )
-            return
+            return info.oid
         self.api.sync_bucket(source=str(local_dir), dest=f"hf://buckets/{self.bucket}/exports/{key}", delete=True)
+        return None
 
-    def fetch_export(self, key: str, dest: Path) -> bool:
+    def fetch_export(self, key: str, dest: Path, *, revision: str | None = None) -> bool:
         """Download ``exports/<key>/`` into *dest*; ``False`` if nothing is synced.
 
         The build reads exports back this way — read-only, no notebook execution — so a
-        report missing here just means it hasn't been ``./go publish``ed yet.
+        report missing here just means it hasn't been ``./go publish``ed yet. Pass the
+        *revision* the build will serve (see :meth:`export_base`) so the HTML it
+        assembles matches the assets that revision pins; ``None`` reads the head.
         """
         if self.publish_repo is not None:
-            return self._fetch_export_from_repo(key, dest)
+            return self._fetch_export_from_repo(key, dest, revision)
         if not self._remote_has(f"exports/{key}/index.html"):
             return False
         dest.mkdir(parents=True, exist_ok=True)
         self.api.sync_bucket(source=f"hf://buckets/{self.bucket}/exports/{key}", dest=str(dest))
         return True
 
-    def _fetch_export_from_repo(self, key: str, dest: Path) -> bool:
+    def _fetch_export_from_repo(self, key: str, dest: Path, revision: str | None) -> bool:
         from huggingface_hub import snapshot_download
 
         repo = self.publish_repo
         assert repo is not None  # only reached from fetch_export when the publish tier is a repo
         prefix = f"exports/{key}"
-        if not self.api.file_exists(repo_id=repo, filename=f"{prefix}/index.html", repo_type="dataset"):
+        if not self.api.file_exists(
+            repo_id=repo, filename=f"{prefix}/index.html", repo_type="dataset", revision=revision
+        ):
             return False
         dest.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory() as d:
             snap = snapshot_download(
                 repo_id=repo,
                 repo_type="dataset",
+                revision=revision,
                 allow_patterns=f"{prefix}/*",
                 local_dir=d,
                 token=self._token,

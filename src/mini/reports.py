@@ -46,6 +46,9 @@ __all__ = [
     "report_bundle",
     "export_key",
     "export_dir",
+    "PUBLISH_LOCK",
+    "load_pins",
+    "save_pins",
     "is_report_notebook",
     "report_notebooks",
     "SOURCE_ONLY_MARKER",
@@ -200,6 +203,29 @@ def export_dir(notebook_file: str | Path) -> Path:
     """
     p = Path(notebook_file).resolve()
     return _project_root(p) / ".mini" / "exports" / export_key(p)
+
+
+# The pin manifest: export key → the publish-tier commit sha its bundle was last
+# published as. It lives in Git (not the store) because *that placement is the
+# mechanism*: publishing from a branch mints an immutable revision on the dataset repo
+# but only changes the pin on that branch — production keeps serving main's pins, the
+# PR preview serves the branch's, and merging the PR is what promotes. The identity
+# (which revision a report serves at) travels with the code; the store holds only
+# evidence (the bundles, at every revision ever published).
+PUBLISH_LOCK = Path("docs") / "publish.lock"
+
+
+def load_pins(project_root: str | Path) -> dict[str, str]:
+    """The pin manifest — export key → publish-tier revision — or ``{}`` if none yet."""
+    path = Path(project_root) / PUBLISH_LOCK
+    return json.loads(path.read_text("utf-8")) if path.exists() else {}
+
+
+def save_pins(project_root: str | Path, pins: dict[str, str]) -> Path:
+    """Write the pin manifest (sorted, one key per line — Git merges stay trivial)."""
+    path = Path(project_root) / PUBLISH_LOCK
+    path.write_text(json.dumps(dict(sorted(pins.items())), indent=1) + "\n", "utf-8")
+    return path
 
 
 # A docs notebook carrying this marker is a source-only *example*, not a rendered

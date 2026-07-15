@@ -30,9 +30,11 @@ from pathlib import Path, PurePosixPath
 import markdown as md_lib
 
 from mini.reports import (
+    PUBLISH_LOCK,
     export_dir,
     export_key,
     insert_base,
+    load_pins,
     report_notebooks,
     rewrite_links,
     set_banner,
@@ -219,8 +221,14 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
     HTML into ``_site`` (the bytes stay on the bucket CDN). Localize: read the bundle
     from ``.mini/exports`` and copy its ``_assets/`` beside the HTML so it works offline.
     Author links are resolved to absolute/relative targets either way.
+
+    A report pinned in ``docs/publish.lock`` is fetched *and* based at that revision,
+    so the page serves exactly what its publish uploaded — a later re-publish (e.g.
+    from a branch whose PR hasn't merged) can't swap the assets under this build.
+    An unpinned report falls back to the mutable branch head, with a warning.
     """
     print("Building reports...")
+    pins = load_pins(WORKSPACE_ROOT) if externalizing else {}
     for nb in report_notebooks(DOCS_DIR):
         key = export_key(nb)
         from_dir = nb.parent.relative_to(DOCS_DIR).as_posix()  # where author links resolve
@@ -229,11 +237,14 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
 
         with tempfile.TemporaryDirectory() as tmp:
             if externalizing:
+                revision = pins.get(key)
+                if revision is None:
+                    print(f"  ! {key}: not pinned in {PUBLISH_LOCK} — serving the mutable head; `./go publish` to pin")
                 bundle = Path(tmp)
-                if not store.fetch_export(key, bundle):
+                if not store.fetch_export(key, bundle, revision=revision):
                     print(f"  ! {key}: no synced export on the bucket — run `./go publish` (skipping)")
                     continue
-                base_href = store.export_base(key)
+                base_href = store.export_base(key, revision=revision)
             else:
                 bundle = export_dir(nb)
                 if not (bundle / "index.html").exists():
@@ -292,7 +303,7 @@ def copy_assets():
     skip_dirs = {"__marimo__", "__pycache__"}
     skip_suffixes = {".py", ".md", ".ipynb", ".pyc", ".pyo"}
     for item in sorted(DOCS_DIR.rglob("*")):
-        if not item.is_file():
+        if not item.is_file() or item == WORKSPACE_ROOT / PUBLISH_LOCK:  # the pin manifest is build input, not content
             continue
         parts = item.relative_to(DOCS_DIR).parts
         if any(p in skip_dirs or p.startswith(".") for p in parts):
