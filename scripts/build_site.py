@@ -10,7 +10,9 @@ inferred from credentials:
     The deterministic, read-only half of publishing: pull each *synced* bundle,
     resolve author links against the repo, insert one ``<base>`` pointing at the
     bucket, and write only ``_site/<key>/index.html`` (asset bytes stay on the CDN).
-    Requires a configured store; fails loudly without one.
+    Requires a configured store; fails loudly without one — or if a bundle is
+    missing an asset its page references (an incomplete publish would otherwise
+    deploy as a page with holes).
 
 ``--localize`` (local preview, ``./go preview``)
     Read the bundles from ``.mini/exports/`` and copy their ``_assets/`` beside the
@@ -26,6 +28,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from urllib.parse import unquote
 
 import markdown as md_lib
 
@@ -35,6 +38,7 @@ from mini.reports import (
     export_key,
     insert_base,
     load_pins,
+    relative_urls,
     report_notebooks,
     rewrite_links,
     set_banner,
@@ -220,7 +224,19 @@ def prepare_dirs_and_resolver() -> LinkResolver:
 # ---------------------------------------------------------------------------
 
 
-def build_reports(links: LinkResolver, store, externalizing: bool):
+def missing_assets(html: str, bundle: Path) -> list[str]:
+    """Asset URLs *html* references with no backing file in its *bundle* dir.
+
+    Every ``_assets/…`` src/href in a report must resolve to a file the bundle ships —
+    a miss means the publish (or export) was incomplete, and the page would render
+    with holes where its figures belong. Returned sorted, for reporting.
+    """
+    refs = {u for u in relative_urls(html) if u.startswith(f"{ASSET_LINK}/")}
+    paths = {ref: unquote(ref.partition("#")[0].partition("?")[0]) for ref in refs}
+    return sorted(ref for ref, path in paths.items() if not (bundle / path).is_file())
+
+
+def build_reports(links: LinkResolver, store, externalizing: bool) -> list[str]:
     """Assemble each report bundle into ``_site/<key>/index.html``.
 
     Externalize: pull the synced bundle from the bucket, insert one ``<base>`` at
@@ -233,10 +249,16 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
     so the page serves exactly what its publish uploaded — a later re-publish (e.g.
     from a branch whose PR hasn't merged) can't swap the assets under this build.
     An unpinned report falls back to the mutable branch head, with a warning.
+
+    Returns the pages' missing-asset references (``<key>/_assets/…``): assets a page
+    uses that its bundle doesn't ship, which the ``<base>`` would 404 — incomplete
+    publishes the caller should fail a public build on. (The fetch pulls each bundle
+    in full either way, so the check costs nothing extra.)
     """
     print("Building reports...")
     pins = load_pins(WORKSPACE_ROOT) if externalizing else {}
     report_css = REPORT_CSS.read_text("utf-8") if REPORT_CSS.exists() else ""
+    missing: list[str] = []
     for nb in report_notebooks(DOCS_DIR):
         key = export_key(nb)
         from_dir = nb.parent.relative_to(DOCS_DIR).as_posix()  # where author links resolve
@@ -277,7 +299,12 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
 
             if not externalizing and (bundle / ASSET_LINK).is_dir():
                 shutil.copytree(bundle / ASSET_LINK, dest.parent / ASSET_LINK, dirs_exist_ok=True)
+            holes = missing_assets(html, bundle)
+            for ref in holes:
+                print(f"  ! {key}: references {ref} but the bundle doesn't ship it")
+            missing += [f"{key}/{ref}" for ref in holes]
             print(f"  {key} -> _site/{key}/index.html{' [+base]' if base_href else ''}")
+    return missing
 
 
 def _nav_urls(links: LinkResolver, *, key: str, nb_rel: str, externalizing: bool) -> tuple[str | None, str | None]:
@@ -421,11 +448,17 @@ def main():
         store = None
         print("  asset mode: localize (.mini/exports/)")
     links = prepare_dirs_and_resolver()
-    build_reports(links, store, args.externalize)
+    missing = build_reports(links, store, args.externalize)
     copy_assets()
     copy_md_stylesheet()
     convert_markdown(links, args.externalize)
     add_nojekyll()
+    if missing:
+        listing = "\n".join(f"  {ref}" for ref in missing)
+        message = f"{len(missing)} referenced asset(s) missing from their bundles:\n{listing}"
+        if args.externalize:  # never ship a page with holes where its figures belong
+            sys.exit(f"{message}\nRe-run `./go publish` for the affected reports.")
+        print(f"! {message}")
     print(f"\nSite written to {SITE_DIR.relative_to(WORKSPACE_ROOT)}/")
 
 

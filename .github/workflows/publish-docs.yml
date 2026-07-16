@@ -44,7 +44,9 @@ jobs:
         # inserts one <base href> at exports/<key>/, and writes the HTML into _site. The
         # assets stay on the CDN; the agent did the export+upload (`./go publish`). A
         # read-only HF_TOKEN suffices — this job never writes or runs a notebook. (A
-        # report not yet published is skipped with a warning, not an error.)
+        # report not yet published is skipped with a warning, not an error; a bundle
+        # missing an asset its page references fails the build, so an incomplete
+        # publish can't deploy pages with figure-shaped holes.)
         #
         # Each report is fetched and based at the revision pinned in docs/publish.lock
         # (this checkout, i.e. main), so the deploy is reproducible and a later branch

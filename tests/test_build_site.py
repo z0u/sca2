@@ -162,3 +162,45 @@ def test_missing_bases_degrade_to_unresolved():
     assert r.resolve("../acts/report.py", externalizing=True, **kw) is None
     # …but localize still keeps rendered links relative (no base needed).
     assert r.resolve("../acts/report.py", externalizing=False, **kw) == "../../acts/report/index.html"
+
+
+# ---------------------------------------------------------------------------
+# Asset integrity — every _assets/ reference must have a file in the bundle;
+# a miss is an incomplete publish, which the CI build must refuse to ship.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def bundle(tmp_path) -> Path:
+    (tmp_path / "_assets").mkdir()
+    (tmp_path / "_assets" / "fig.png").write_bytes(b"\x89PNG")
+    return tmp_path
+
+
+def test_complete_bundle_has_no_missing_assets(bundle):
+    assert build_site.missing_assets('<img src="_assets/fig.png">', bundle) == []
+
+
+def test_unreferenced_asset_is_not_flagged(bundle):
+    assert build_site.missing_assets("<p>no figures</p>", bundle) == []
+
+
+def test_missing_asset_is_reported(bundle):
+    html = '<img src="_assets/fig.png"><img src="_assets/gone.png">'
+    assert build_site.missing_assets(html, bundle) == ["_assets/gone.png"]
+
+
+def test_json_escaped_reference_is_checked(bundle):
+    # Marimo buries asset URLs in its session JSON (src=\"_assets/…\").
+    html = '<script>"src=\\"_assets/gone.png\\""</script>'
+    assert build_site.missing_assets(html, bundle) == ["_assets/gone.png"]
+
+
+def test_query_and_fragment_resolve_to_the_file(bundle):
+    html = '<img src="_assets/fig.png?v=2"><a href="_assets/fig.png#top">…</a>'
+    assert build_site.missing_assets(html, bundle) == []
+
+
+def test_non_asset_urls_are_ignored(bundle):
+    html = '<a href="../src/experiment.py">src</a><img src="https://cdn.example/x.js">'
+    assert build_site.missing_assets(html, bundle) == []

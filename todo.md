@@ -11,6 +11,15 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Check the live site once the HF outage clears (noticed 2026-07-16).** All
+  published reports' figures were blank because huggingface.co (Hub + CDN) was
+  in a multi-day outage — the pages hotlink assets through their `<base href>`,
+  a coupling we've kept deliberately (see `eng/publishing.md`). Nothing to
+  regenerate; once HF is back, confirm figures load at e.g.
+  <https://z0u.github.io/sca2/m1/ex-2.9.1/>. If outages like this recur, revisit
+  copying `_assets/` into `_site` (declined for now to keep binaries off the
+  `gh-pages` branch).
+
 - **Why ex-2.1.1 never solves `named_holdout` (diagnosed 2026-07-15).** Not a
   weak form signal: the model always answers named + named prompts with a
   *name* (never hex), so a result-type marker in the grammar wouldn't help. On

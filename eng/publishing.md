@@ -73,6 +73,22 @@ introduce. The one caveat: `<base>` also repoints *author-written* relative link
 link to another report becomes its rendered page, a link to a source file its GitHub
 source. **Convention: the only relative URLs in a report are its assets.**
 
+**Hotlinking couples the site's figures to HF availability — accepted.** The pages live
+on GitHub Pages but every figure resolves through the `<base>` at huggingface.co, so an
+HF outage blanks the site's figures while the prose keeps loading (observed July 2026,
+a multi-day Hub/CDN outage). The alternative — copying each bundle's `_assets/` into
+`_site` so Pages serves everything — was considered and declined: it puts binary assets
+on the `gh-pages` branch, whose history grows with every changed figure. (It would cost
+no extra CI bandwidth, though: `fetch_export` already pulls each bundle in full — a fact
+the build now uses to *verify* bundles instead. See the integrity check below.) Revisit
+if HF outages become frequent enough to matter.
+
+**The build refuses to ship a page with holes.** Since the fetched bundle is on disk
+anyway, `build_site` checks every `_assets/…` URL a page references against the files
+its bundle ships (`missing_assets`); in `--externalize` mode (CI) any miss fails the
+build — an incomplete publish stops the deploy (and shows up red on the PR preview)
+instead of deploying figure-less pages that look exactly like a CDN outage.
+
 Further decisions:
 
 - **No HTML in Git.** The notebooks (`docs/**/*.py`) are the only source of truth; each
