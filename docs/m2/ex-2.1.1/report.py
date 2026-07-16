@@ -158,6 +158,56 @@ def _():
 
 
 @app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### The color space
+
+    Every color is a point on the 16-level-per-channel RGB grid — 16³ = 4096 in
+    all. Rotate the cube onto its black→white diagonal so *value* runs vertically
+    and hue around it, and the grid is the figure below; a front and a back view
+    together show all six faces. The 27 names cover the {0, 8, 15}³ sub-lattice,
+    ringed. Hex and cross equations draw operands from anywhere in this cube;
+    named and alias lines use only the ringed points. Note there is no held-out
+    *color*: every point here is seen in training (hex operands are sampled over
+    the whole grid, and each name appears in aliases). What is held out is
+    operand *pairs* — the split rendered in the matrix below.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    from sca.data import cube
+
+    @themed(
+        name="color-space-cube",
+        alt_text=(
+            "Two orthographic views of the RGB grid, rotated so the black-to-white diagonal is vertical: "
+            "black at the bottom, white at the top, hues fanned around the middle. The left view ('front') "
+            "shows the red, green, and magenta faces; the right ('back') shows the blue, cyan, and yellow "
+            "faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a solid; "
+            "the 27 named colors are marked with small rings at the {0, 8, 15} cubed sub-lattice."
+        ),
+    )
+    def _plot() -> plt.Figure:
+        grid, named = cube.grid(), cube.named()
+        fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.2), sharey=True)
+        halo, ring = light_dark("#fffc", "#000c"), light_dark("#000c", "#fffc")
+        for side, ax in zip(("front", "back"), axes, strict=True):
+            cube.draw_rgb_cube(ax, grid, side=side, s=230)
+            x, y, depth = cube.project(named, side)
+            o = np.argsort(depth)
+            ax.scatter(x[o], y[o], s=330, facecolors="none", edgecolors=halo, lw=3.4, zorder=5)
+            ax.scatter(x[o], y[o], s=330, facecolors="none", edgecolors=ring, lw=1.3, zorder=6)
+            ax.set_title(side)
+        fig.suptitle("The 16³ hex grid; the 27 named colors ringed")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
 def _(holdout, train_pairs):
     _vals = list(colors.PALETTE.values())
     _names = list(colors.PALETTE)
