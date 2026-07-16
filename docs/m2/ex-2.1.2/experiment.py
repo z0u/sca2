@@ -234,6 +234,7 @@ def eval_one(trained: dict, evals, probes) -> dict:
         answer_calibration,
         candidate_logprobs,
         completion_accuracy,
+        greedy_completions,
         probe_answer_schedule,
         probe_residual_stream,
         probe_transfer,
@@ -253,6 +254,11 @@ def eval_one(trained: dict, evals, probes) -> dict:
     eval_sets = load_example_sets(get(evals, workdir / "evals.json").read_bytes())
     accuracy = {name: completion_accuracy(model, tokenizer, exs) for name, exs in eval_sets.items()}
     calibration = {name: answer_calibration(model, tokenizer, exs) for name, exs in eval_sets.items()}
+
+    # Greedy completions of the held-out named prompts — precomputed here, where the
+    # model's already loaded, so the report reads them from metrics instead of pulling
+    # every checkpoint and re-decoding on each edit.
+    holdout_completions = greedy_completions(model, tokenizer, [ex.prompt for ex in eval_sets["named_holdout"]], 12)
 
     # Margins: score every palette name — plus the hex codes this set's true
     # mixes render to — as a complete answer to each prompt.
@@ -286,6 +292,7 @@ def eval_one(trained: dict, evals, probes) -> dict:
         "val_loss": trained["val_loss"],
         "accuracy": accuracy,
         "calibration": calibration,
+        "holdout_completions": holdout_completions,
         "margin_candidates": {name: m["candidates"] for name, m in margins.items()},
         "probe_r2": probe["r2"],
         "schedule_offsets": schedule["offsets"],

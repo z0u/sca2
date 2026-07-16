@@ -20,7 +20,6 @@ with app.setup(hide_code=True):
     # Marimo puts the notebook's directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import (
-        CKPT_REF,
         CONDITIONS,
         CORPUS_SEED,
         HOLDOUT_FRAC,
@@ -349,30 +348,15 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(holdout_exs):
-    from sca.compute.evaluation import greedy_completions
-    from sca.compute.model import load_checkpoint
-    from sca.data.tokenizer import CharTokenizer
-
-    _store = project_store()
-    _arts = {
-        (cond, s): a
-        for cond in CONDS
-        for s in SEEDS
-        if (a := _store.get_ref(f"{CKPT_REF}/{label(cond, s)}")) is not None
-    }
+def _(metrics):
+    # Greedy completions of the named-holdout prompts are precomputed in `eval_one`
+    # (where the model's already loaded) and ride the metrics JSON — so this reads
+    # them from the store rather than pulling 12 checkpoints and re-decoding per edit.
     mo.stop(
-        len(_arts) < len(CONDS) * len(SEEDS),
-        mo.md("The checkpoints aren't in the store yet — re-run the experiment to publish them."),
+        any("holdout_completions" not in cell(metrics, cond, s) for cond in CONDS for s in SEEDS),
+        mo.md("These metrics predate precomputed completions — re-run the experiment to republish."),
     )
-    completions = {}
-    with tempfile.TemporaryDirectory() as _tmp:
-        for (_cond, _s), _art in _arts.items():
-            _store.get(_art, Path(_tmp) / f"{_cond}-{_s}" / "model")
-            _model, _config, _ = load_checkpoint(Path(_tmp) / f"{_cond}-{_s}")
-            completions[_cond, _s] = greedy_completions(
-                _model, CharTokenizer(_config.tokenizer), [ex.prompt for ex in holdout_exs], 12
-            )
+    completions = {(cond, s): cell(metrics, cond, s)["holdout_completions"] for cond in CONDS for s in SEEDS}
 
     def answer_value(text: str) -> tuple[int, int, int] | None:
         """The color a completion denotes, in either surface form (None if malformed)."""
