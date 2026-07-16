@@ -168,8 +168,8 @@ def _():
 
     Every color is a point on the 16-level-per-channel RGB grid — 16³ = 4096 in
     all. Rotate the cube onto its black→white diagonal so *value* runs vertically
-    and hue around it, and the grid is the figure below; a front and a back view
-    together show all six faces. Hex and cross equations draw operands from
+    and hue around it, and the grid is the figure below, viewed front-on onto the
+    red, green, and magenta faces. Hex and cross equations draw operands from
     anywhere in this cube; named and alias lines use only the 27 points of the
     {0, 8, 15}³ sub-lattice, which the next figure singles out. Note there is no
     held-out *color*: every point here is seen in training (hex operands are
@@ -184,19 +184,16 @@ def _():
     @themed(
         name="color-space-cube",
         alt_text=(
-            "Two orthographic views of the RGB grid, rotated so the black-to-white diagonal is vertical: "
-            "black at the bottom, white at the top, hues fanned around the middle. The left view ('front') "
-            "shows the red, green, and magenta faces; the right ('back') shows the blue, cyan, and yellow "
-            "faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a smooth "
-            "solid."
+            "An orthographic front view of the RGB grid, rotated so the black-to-white diagonal is vertical: "
+            "black at the bottom, white at the top, hues fanned around the middle, showing the red, green, and "
+            "magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a "
+            "smooth solid."
         ),
     )
     def _plot() -> plt.Figure:
-        grid = cube.grid()
-        fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.2), sharey=True)
-        for side, ax in zip(("front", "back"), axes, strict=True):
-            cube.draw_rgb_cube(ax, grid, side=side)
-            ax.set_title(side)
+        fig, ax = plt.subplots(figsize=(4.6, 4.4))
+        cube.draw_rgb_cube(ax, cube.grid(), side="front", s=70)
+        ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
         fig.suptitle("The 16³ hex grid")
         return fig
 
@@ -213,37 +210,45 @@ def _(holdout, train_pairs):
     @themed(
         name="named-pair-lattice",
         alt_text=(
-            "Two orthographic views of the 27 named colors as a lattice in the rotated RGB cube, value "
+            "Two orthographic front views of the 27 named colors as a lattice in the rotated RGB cube, value "
             "vertical with black at the bottom and white at the top. Each named color is a small dot in its "
-            "true color. Thin faint lines connect the pairs used as named equations in training; ten bold "
-            "lines, each colored by its mixed result, connect the held-out pairs reserved for the "
-            "named-holdout evaluation. Lines and dots are depth-sorted, so the lattice reads three-"
-            "dimensionally across the two views."
+            "true color. The left panel bolds the pairs used as named equations in training; the right panel "
+            "bolds the held-out pairs reserved for the named-holdout evaluation. In each panel the bold lines "
+            "are colored by their mixed result and the other set is drawn faint for context. The panels have "
+            "no background fill or axes; front-facing edges are drawn heavier than back and interior ones, so "
+            "the lattice reads three-dimensionally."
         ),
     )
     def _plot() -> plt.Figure:
         named = cube.named()
         fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.2), sharey=True)
         faint, vedge = light_dark("#0001", "#fff1"), light_dark("#0006", "#fff7")
-        for side, ax in zip(("front", "back"), axes, strict=True):
-            x, y, depth = cube.project(named, side)
+        # A single front view suffices: the lattice is mostly empty, so nothing hides behind it.
+        x, y, depth = cube.project(named, "front")
+        _dmin, _dspan = depth.min(), depth.max() - depth.min()
 
-            def _edge(pair, side_depth=depth, ax=ax, x=x, y=y, **kw):
-                u, v = _idx[pair[0]], _idx[pair[1]]
-                # Midpoint depth orders each edge against the vertices for occlusion.
-                ax.plot([x[u], x[v]], [y[u], y[v]], zorder=float((side_depth[u] + side_depth[v]) / 2), **kw)
+        def _edge(ax, pair, lw_lo, lw_hi, **kw):
+            u, v = _idx[pair[0]], _idx[pair[1]]
+            mid = (depth[u] + depth[v]) / 2  # orders each edge against the vertices for occlusion
+            # Taper by depth: front-facing edges read heavy, back/interior ones recede.
+            lw = lw_lo + (lw_hi - lw_lo) * (mid - _dmin) / _dspan
+            ax.plot([x[u], x[v]], [y[u], y[v]], lw=lw, zorder=float(mid), solid_capstyle="round", **kw)
 
-            for _p in _train_edges:
-                _edge(_p, color=faint, lw=1.0, solid_capstyle="round")
-            for _p in holdout:
+        # Each panel bolds one set (colored by its mixed result) and greys the other for context.
+        panels = (("train", _train_edges, holdout), ("held out for eval", holdout, _train_edges))
+        for (title, bold, other), ax in zip(panels, axes, strict=True):
+            for _p in other:
+                _edge(ax, _p, 0.4, 2.0, color=faint)
+            for _p in bold:
                 _result = tuple(np.array(colors.mix(*_p)) / (colors.N_LEVELS - 1))
-                _edge(_p, color=_result, lw=2.8, solid_capstyle="round")
+                _edge(ax, _p, 1.4, 3.0, color=_result)
             # Vertices in true color; +ε on zorder so a vertex wins a depth tie with an edge.
             for _i in range(len(_vals)):
                 ax.scatter(x[_i], y[_i], c=[named[_i]], s=60, edgecolors=vedge, lw=0.6, zorder=float(depth[_i]) + 1e-3)
-            cube.style_cube_axes(ax)
-            ax.set_title(side)
-        fig.suptitle("Named pairs on the cube — faint · train, bold (result-colored) · held out for eval")
+            cube.style_cube_axes(ax, labels=False)
+            ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
+            ax.set_title(title)
+        fig.suptitle("Named pairs on the cube")
         return fig
 
     mo.Html(_plot())
@@ -253,6 +258,11 @@ def _(holdout, train_pairs):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    Each panel above shows the same lattice from the front, bolding one set of
+    pairs — colored by the result each mixes to — over the other, drawn faint:
+    **left**, the pairs used as named equations in training; **right**, the ten
+    held out for the `named_holdout` eval.
+
     Only the connected pairs ever appear as *named* equations, with a named
     answer; every other operand pair the model sees is rendered in hex or cross
     form (those draw operands from the full 16³ grid). A held-out edge like
