@@ -12,6 +12,7 @@ authenticated half of publishing (it needs the data the report reads + a write t
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent))  # so `import clean_docs` (siblin
 
 from clean_docs import clean_html, default_hidden_code  # noqa: E402
 from mini.reports import (  # noqa: E402
+    EXPORTING_ENV,
     PROVENANCE_ASSET,
     PUBLISH_LOCK,
     export_dir,
@@ -73,7 +75,11 @@ def export_one(nb: Path) -> Path:
     sidecar = out.parent / "_assets" / PROVENANCE_ASSET
     sidecar.unlink(missing_ok=True)
     print(f"  export {nb.relative_to(ROOT)} -> {out.relative_to(ROOT)}")
-    subprocess.run(["marimo", "export", "html", "-f", str(nb), "-o", str(out)], check=True, cwd=ROOT)
+    # Mark the render as an export so the report's setup cell activates its bundle
+    # publisher (externalize figures to _assets/); under interactive `marimo edit` the
+    # var is absent and figures inline instead — see mini.reports.exporting.
+    env = {**os.environ, EXPORTING_ENV: "1"}
+    subprocess.run(["marimo", "export", "html", "-f", str(nb), "-o", str(out)], check=True, cwd=ROOT, env=env)
     clean_html(out)  # scrub terminal control seqs + redact modal URLs from the published HTML
     default_hidden_code(out)  # literate reports open with code collapsed; the menu toggle still reveals it
     if sidecar.exists():  # the render read store refs — cite their producers in a footer

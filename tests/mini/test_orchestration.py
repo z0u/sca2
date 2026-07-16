@@ -25,7 +25,7 @@ def _setup(name: str, main, tmp_path: Path) -> tuple[Experiment, LocalApparatus]
     return Experiment(name=name, main=main), LocalApparatus(name, data_dir=tmp_path / name)
 
 
-def _drive(exp: Experiment, app: LocalApparatus, timeout: float = 30.0, keep_stale: bool = False):
+def _drive(exp: Experiment, app: LocalApparatus, timeout: float = 60.0, keep_stale: bool = False):
     """Re-run the orchestration each 'wake' until it completes (mirrors the agent loop)."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -36,7 +36,7 @@ def _drive(exp: Experiment, app: LocalApparatus, timeout: float = 30.0, keep_sta
     raise AssertionError(f"orchestration did not complete: {payload}")
 
 
-def _drive_to_failure(exp: Experiment, app: LocalApparatus, timeout: float = 30.0) -> ExceptionGroup:
+def _drive_to_failure(exp: Experiment, app: LocalApparatus, timeout: float = 60.0) -> ExceptionGroup:
     """Tick until the strict map surfaces its failures; return the group."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:

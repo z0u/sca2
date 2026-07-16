@@ -36,6 +36,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -55,6 +56,8 @@ __all__ = [
     "PROVENANCE_ASSET",
     "use_publisher",
     "current_publisher",
+    "exporting",
+    "EXPORTING_ENV",
     "externalize_html",
     "relative_urls",
     "stray_links",
@@ -263,8 +266,29 @@ def report_notebooks(docs: str | Path) -> list[Path]:
     return sorted(p for p in Path(docs).rglob("*.py") if is_report_notebook(p))
 
 
-def report_bundle(notebook_file: str | Path, *, link: str = "_assets") -> Publisher:
-    """A :class:`Publisher` writing assets beside a report's exported HTML.
+# Set by ``scripts/export_reports.py`` in the ``marimo export`` subprocess env — the one
+# context where a report is rendered to a *published* bundle (``index.html`` + a
+# co-located ``_assets/``). It's absent under interactive ``marimo edit``, and both run
+# the notebook in marimo's EDIT *session* mode, so ``mo.app_meta().mode`` can't tell them
+# apart — this env var is what distinguishes the two.
+EXPORTING_ENV = "MINI_EXPORTING"
+
+
+def exporting() -> bool:
+    """Whether this render is a bundle export, not an interactive ``marimo edit`` session.
+
+    Only during an export do externalized ``_assets/<name>`` URLs resolve — they sit
+    beside the exported ``index.html``. Under ``marimo edit`` there is no exported HTML
+    to resolve them against, and marimo's dev server can't serve files out of
+    ``.mini/exports/``, so a report must instead inline its figures as ``data:`` URIs
+    (the documented no-publisher fallback). ``scripts/export_reports.py`` marks its
+    export subprocess with :data:`EXPORTING_ENV`; nothing else sets it.
+    """
+    return os.environ.get(EXPORTING_ENV) == "1"
+
+
+def report_bundle(notebook_file: str | Path, *, link: str = "_assets") -> Publisher | None:
+    """A :class:`Publisher` writing assets beside a report's exported HTML — when exporting.
 
     A report exports to its own self-contained dir :func:`export_dir` (HTML as
     ``index.html``, assets under ``_assets/``); this points the publisher at that dir's
@@ -272,7 +296,15 @@ def report_bundle(notebook_file: str | Path, *, link: str = "_assets") -> Publis
     it from the report's setup cell with ``__file__``::
 
         use_publisher(report_bundle(__file__))
+
+    Returns ``None`` outside an export (:func:`exporting`) — i.e. under interactive
+    ``marimo edit`` — so ``use_publisher(None)`` leaves figures inlining as ``data:``
+    URIs. A relative ``_assets/`` URL would 404 there: the assets live in
+    ``.mini/exports/``, which marimo's dev server doesn't serve. Externalization only
+    pays off for the export (keeping the shipped HTML light), so it's scoped to it.
     """
+    if not exporting():
+        return None
     return Publisher(asset_dir=export_dir(notebook_file) / link, link=link)
 
 

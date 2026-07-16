@@ -142,9 +142,10 @@ def test_asset_url_writes_file_and_returns_relative_url(tmp_path: Path):
     assert (tmp_path / url).read_bytes() == b'{"hello": "world"}'
 
 
-def test_report_bundle_targets_export_dir(tmp_path: Path):
-    from mini.reports import export_dir, export_key
+def test_report_bundle_targets_export_dir(tmp_path: Path, monkeypatch):
+    from mini.reports import EXPORTING_ENV, export_dir, export_key
 
+    monkeypatch.setenv(EXPORTING_ENV, "1")  # a bundle exists only when exporting
     (tmp_path / "pyproject.toml").write_text("")
     nb = tmp_path / "docs" / "gpt-sweep" / "report.py"
     nb.parent.mkdir(parents=True)
@@ -152,8 +153,21 @@ def test_report_bundle_targets_export_dir(tmp_path: Path):
     assert export_key(nb) == "gpt-sweep"  # a directory's report.py collapses to the dir
     assert export_dir(nb) == tmp_path / ".mini" / "exports" / "gpt-sweep"
     pub = report_bundle(nb)
+    assert pub is not None
     assert pub.asset_dir == tmp_path / ".mini" / "exports" / "gpt-sweep" / "_assets"
     assert pub.link == "_assets"
+
+
+def test_report_bundle_is_none_off_export(tmp_path: Path, monkeypatch):
+    """Under `marimo edit` (no EXPORTING_ENV) there's no bundle, so figures inline."""
+    from mini.reports import EXPORTING_ENV
+
+    monkeypatch.delenv(EXPORTING_ENV, raising=False)
+    (tmp_path / "pyproject.toml").write_text("")
+    nb = tmp_path / "docs" / "gpt-sweep" / "report.py"
+    nb.parent.mkdir(parents=True)
+    nb.write_text("")
+    assert report_bundle(nb) is None
 
 
 def test_export_key_top_level_notebook(tmp_path: Path):

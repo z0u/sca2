@@ -1,7 +1,11 @@
 import marimo
 
 __generated_with = "0.23.9"
-app = marimo.App(width="medium", auto_download=["html"], css_file="../../report.css")
+app = marimo.App(
+    width="medium",
+    css_file="../../report.css",
+    auto_download=["html"],
+)
 
 with app.setup(hide_code=True):
     import json
@@ -9,6 +13,7 @@ with app.setup(hide_code=True):
     from pathlib import Path
 
     import marimo as mo  # noqa: F401
+    import matplotlib.patheffects as pe
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -28,7 +33,7 @@ with app.setup(hide_code=True):
     from mini.reports import externalize_html, report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import light_dark, themed
-    from sca.data import colors
+    from sca.data import colors, cube
     from subline.series import Series
     from subline.subline import Subline
 
@@ -158,43 +163,124 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(holdout, train_pairs):
-    _vals = list(colors.PALETTE.values())
-    _names = list(colors.PALETTE)
+def _():
+    mo.md(r"""
+    ### The color space
 
+    Every color is a point on the 16-level-per-channel RGB grid — 16³ = 4096 in
+    all. Rotate the cube onto its black→white diagonal so *value* runs vertically
+    and hue around it, and the grid is the figure below, viewed front-on onto the
+    red, green, and magenta faces. Hex and cross equations draw operands from
+    anywhere in this cube; named and alias lines use only the 27 points of the
+    {0, 8, 15}³ sub-lattice, which the next figure singles out. Note there is no
+    held-out *color*: every point here is seen in training (hex operands are
+    sampled over the whole grid, and each name appears in aliases). What is held
+    out is operand *pairs*.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
     @themed(
-        name="named-pair-matrix",
+        name="color-space-cube",
         alt_text=(
-            "A 27 by 27 grid of color swatches, rows and columns labeled with the palette's color names "
-            "from black to white. Each cell shows the mix of its row and column colors; the diagonal is the "
-            "palette itself. Small dots mark the pairs that appear as named equations in training; open "
-            "rings mark the held-out named pairs, which are reserved for evaluation."
+            "An orthographic front view of the RGB grid, rotated so the black-to-white diagonal is vertical: "
+            "black at the bottom, white at the top, hues fanned around the middle, showing the red, green, and "
+            "magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a "
+            "smooth solid."
         ),
     )
     def _plot() -> plt.Figure:
-        img = np.array([[colors.mix(a, b) for b in _vals] for a in _vals], dtype=float) / (colors.N_LEVELS - 1)
-        fig, ax = plt.subplots(figsize=(7.4, 7.4))
-        ax.imshow(img, interpolation="nearest")
-        train, held = set(train_pairs), set(holdout)
-        pts = {
-            (i, j): pair in held
-            for i, a in enumerate(_vals)
-            for j, b in enumerate(_vals)
-            if (pair := (min(a, b), max(a, b))) in train | held
-        }
-        # A contrasting halo keeps the marks legible on cells near the mark color.
-        mark, halo = light_dark("#000", "#fff"), light_dark("#fffa", "#000a")
-        _dots = [(x, y) for (y, x), h in pts.items() if not h]
-        _rings = [(x, y) for (y, x), h in pts.items() if h]
-        ax.scatter(*zip(*_dots, strict=True), s=22, color=halo)
-        ax.scatter(*zip(*_dots, strict=True), s=6, color=mark)
-        ax.scatter(*zip(*_rings, strict=True), s=80, facecolors="none", edgecolors=halo, lw=3.5)
-        ax.scatter(*zip(*_rings, strict=True), s=80, facecolors="none", edgecolors=mark, lw=1.2)
-        ax.set_xticks(range(len(_names)), _names, rotation=90, fontsize=7)
-        ax.set_yticks(range(len(_names)), _names, fontsize=7)
-        ax.set_title(
-            "mix(a, b) over the palette — pairs rendered as named equations:\n· in training, ○ held out for eval"
-        )
+        fig, ax = plt.subplots(figsize=(4.6, 4.4))
+        cube.draw_rgb_cube(ax, cube.grid(), side="front", s=70)
+        ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
+        fig.suptitle("The 16³ hex grid")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(holdout, train_pairs):
+    _vals = list(colors.PALETTE.values())
+    _idx = {c: i for i, c in enumerate(_vals)}
+    _train_edges = [p for p in train_pairs if p[0] != p[1]]  # self-pairs are just the vertices
+
+    # One example edge per panel, labelled at its endpoints; both sit on the cube's
+    # silhouette so the pair is easy to pick out. The mix is spelled out in the caption.
+    _examples = {"train": ("white", "magenta", "ab"), "held out for eval": ("magenta", "blue", "cd")}
+
+    @themed(
+        name="named-pair-lattice",
+        alt_text=(
+            "Two orthographic front views of the 27 named colors as a lattice in the rotated RGB cube, value "
+            "vertical with black at the bottom and white at the top. Each named color is a small dot in its "
+            "true color. The left panel bolds the pairs used as named equations in training; the right panel "
+            "bolds the held-out pairs reserved for the named-holdout evaluation. In each panel the bold lines "
+            "are colored by their mixed result and the other set is drawn faint for context. One edge per "
+            "panel is picked out on the cube's silhouette with letters at its endpoints — a, b on white and "
+            "magenta (left), c, d on magenta and blue (right) — and the caption below gives the two mixing "
+            "equations, a + b = orchid and c + d = violet. The panels have no background fill or axes; front-facing edges "
+            "are drawn heavier than back and interior ones, so the lattice reads three-dimensionally."
+        ),
+    )
+    def _plot() -> plt.Figure:
+        named = cube.named()
+        fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.2), sharey=True)
+        faint, vedge = light_dark("#0001", "#fff1"), light_dark("#0006", "#fff7")
+        ink, halo = light_dark("#111", "#eee"), light_dark("#fff", "#111")
+        # A single front view suffices: the lattice is mostly empty, so nothing hides behind it.
+        x, y, depth = cube.project(named, "front")
+        _dmin, _dspan = depth.min(), depth.max() - depth.min()
+        _cx, _cy = x.mean(), y.mean()
+
+        def _edge(ax, pair, lw_lo, lw_hi, **kw):
+            u, v = _idx[pair[0]], _idx[pair[1]]
+            mid = (depth[u] + depth[v]) / 2  # orders each edge against the vertices for occlusion
+            # Taper by depth: front-facing edges read heavy, back/interior ones recede.
+            lw = lw_lo + (lw_hi - lw_lo) * (mid - _dmin) / _dspan
+            ax.plot([x[u], x[v]], [y[u], y[v]], lw=lw, zorder=float(mid), solid_capstyle="round", **kw)
+
+        def _letter(ax, name, ch):
+            i = _idx[colors.PALETTE[name]]
+            ang = np.arctan2(y[i] - _cy, x[i] - _cx)  # nudge the tag radially outward, clear of the lattice
+            if name == "white":
+                ang = np.radians(150)  # apex points straight at the title; send it up-left instead
+            ax.annotate(
+                ch,
+                (x[i], y[i]),
+                (x[i] + np.cos(ang) * 0.12, y[i] + np.sin(ang) * 0.12),
+                ha="center",
+                va="center",
+                fontsize=11,
+                fontweight="bold",
+                fontstyle="italic",
+                color=ink,
+                zorder=100,
+                annotation_clip=False,
+                path_effects=[pe.withStroke(linewidth=3, foreground=halo)],
+            )
+
+        # Each panel bolds one set (colored by its mixed result) and greys the other for context.
+        panels = (("train", _train_edges, holdout), ("held out for eval", holdout, _train_edges))
+        for (title, bold, other), ax in zip(panels, axes, strict=True):
+            for _p in other:
+                _edge(ax, _p, 0.4, 2.0, color=faint)
+            for _p in bold:
+                _result = tuple(np.array(colors.mix(*_p)) / (colors.N_LEVELS - 1))
+                _edge(ax, _p, 1.4, 3.0, color=_result)
+            # Vertices in true color; +ε on zorder so a vertex wins a depth tie with an edge.
+            for _i in range(len(_vals)):
+                ax.scatter(x[_i], y[_i], c=[named[_i]], s=60, edgecolors=vedge, lw=0.6, zorder=float(depth[_i]) + 1e-3)
+            _u, _v, _chs = _examples[title]
+            _letter(ax, _u, _chs[0])
+            _letter(ax, _v, _chs[1])
+            cube.style_cube_axes(ax, labels=False)
+            ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
+            ax.set_title(title)
+        fig.suptitle("Named pairs on the cube")
         return fig
 
     mo.Html(_plot())
@@ -203,16 +289,26 @@ def _(holdout, train_pairs):
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(r"""
-    Every cell of the matrix is reachable through hex and cross equations
-    (those draw operands from the full 16³ grid), but only the marked pairs
-    ever appear as *named* equations, with a named answer. A ringed pair like
-    `red + blue` is answerable two ways: recall (impossible — that rendering
-    never occurs in training) or composition — look both names up via the
-    alias lines, mix in hex space, and translate the result back through the
-    dictionary. That is what the `named_holdout` eval set measures. The
-    `hex_unseen` and `cross_unseen` sets are sampled at eval time from the
-    full grid, avoiding every operand pair the corpus used.
+    mo.md(rf"""
+    Each panel above shows the same lattice from the front, bolding one set of
+    pairs — colored by the result each mixes to — over the other, drawn faint:
+    **left**, the pairs used as named equations in training; **right**, the ten
+    held out for the `named_holdout` eval. One edge per panel is picked out on the
+    cube's silhouette, its endpoints lettered, as a worked example — each bold edge
+    takes the colour its two operands mix to:
+
+    - $a$–$b$ (train): {colors.swatch("white")} + {colors.swatch("magenta")} = {colors.swatch("orchid")}
+    - $c$–$d$ (held out): {colors.swatch("magenta")} + {colors.swatch("blue")} = {colors.swatch("violet")}
+
+    Only the connected pairs ever appear as *named* equations, with a named
+    answer; every other operand pair the model sees is rendered in hex or cross
+    form (those draw operands from the full 16³ grid). A held-out edge like
+    `blue + magenta` — mixing to `violet` — is answerable two ways: recall
+    (impossible — that named rendering never occurs in training) or composition:
+    look both names up via the alias lines, mix in hex space, and translate the
+    result back through the dictionary. That is what the `named_holdout` eval set
+    measures. The `hex_unseen` and `cross_unseen` sets are sampled at eval time
+    from the full grid, avoiding every operand pair the corpus used.
     """)
     return
 
