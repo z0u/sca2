@@ -1,7 +1,11 @@
 import marimo
 
 __generated_with = "0.23.9"
-app = marimo.App(width="medium", auto_download=["html"], css_file="../../report.css")
+app = marimo.App(
+    width="medium",
+    css_file="../../report.css",
+    auto_download=["html"],
+)
 
 with app.setup(hide_code=True):
     import json
@@ -28,7 +32,7 @@ with app.setup(hide_code=True):
     from mini.reports import externalize_html, report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import light_dark, themed
-    from sca.data import colors
+    from sca.data import colors, cube
     from subline.series import Series
     from subline.subline import Subline
 
@@ -177,8 +181,6 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    from sca.data import cube
-
     @themed(
         name="color-space-cube",
         alt_text=(
@@ -204,8 +206,6 @@ def _():
 
 @app.cell(hide_code=True)
 def _(holdout, train_pairs):
-    from sca.data import cube
-
     _vals = list(colors.PALETTE.values())
     _idx = {c: i for i, c in enumerate(_vals)}
     _train_edges = [p for p in train_pairs if p[0] != p[1]]  # self-pairs are just the vertices
@@ -224,7 +224,7 @@ def _(holdout, train_pairs):
     def _plot() -> plt.Figure:
         named = cube.named()
         fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.2), sharey=True)
-        faint, vedge = light_dark("#0002", "#fff2"), light_dark("#0006", "#fff7")
+        faint, vedge = light_dark("#0001", "#fff1"), light_dark("#0006", "#fff7")
         for side, ax in zip(("front", "back"), axes, strict=True):
             x, y, depth = cube.project(named, side)
 
