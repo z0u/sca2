@@ -45,7 +45,7 @@ def test_named_are_grid_points():
 def test_draw_hides_axis_furniture():
     fig, ax = plt.subplots()
     pc = cube.draw_rgb_cube(ax, cube.named(), side="front")
-    assert pc.get_offsets().shape == (len(PALETTE), 2)
+    assert np.asarray(pc.get_offsets()).shape == (len(PALETTE), 2)
     assert ax.get_xticks().size == 0 and ax.get_yticks().size == 0
     assert not any(s.get_visible() for s in ax.spines.values())
     plt.close(fig)
