@@ -100,6 +100,23 @@ readable cold without re-deriving code state.
     pool takes ~1.9 s, so the test fails on a pristine tree. Loosen the bound
     or gate it on available CPU.
 
+- **Warm-cache reads bypass HF's Xet layers; blob pulls could be faster.**
+  `HFStore` pulls blobs via `HfApi.download_bucket_files` straight into our own
+  content-addressed warm cache (`store-cache/hf/cas/…`), so a read gets neither
+  Xet chunk-level dedup nor huggingface_hub's shared `HF_HOME` cache — every
+  blob is a full, non-resumable transfer, and we maintain a second cache that
+  misses independently of HF's. The per-op round trip (~2–3s/commit, same on
+  reads) is the real floor. Levers, roughly in priority: (1) parallelize
+  callers that resolve many refs sequentially — the checkpoint-loading loops in
+  reports/`eval` fan out one `store.get` per cell; `Store.get` already threads
+  *tree children* (≤8), but not sibling top-level gets; (2) point the warm cache
+  at `HF_HOME` (or route large reads through `hf_hub_download`) so the Xet chunk
+  cache and resumable/atomic download are in play — the atomic part would also
+  have prevented the Ctrl-C'd-export cache-poisoning bug (fixed in
+  `_local_blob`, 9af9282) for free. Measure before/after — a timing harness over
+  a cold-cache `get` of the ex-2.1.2 checkpoints is the obvious probe. Related:
+  #37 (closed) was about *dedup of identical prep*, not read-path caching.
+
 - **Published reports depend on jsDelivr for the marimo runtime.** `marimo export
   html` points ~200 `<script>`/`<link>`/font URLs at
   `cdn.jsdelivr.net/npm/@marimo-team/frontend@<version>/dist`, so a published
