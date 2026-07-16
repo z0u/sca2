@@ -10,6 +10,20 @@ A report is a **bundle**: one Marimo HTML document plus its heavy assets (figure
 data blobs), exported to a self-contained dir and synced to the bucket as a unit. The
 report notebook (`docs/**/*.py`) is the only thing in Git; the HTML is never committed.
 
+**Set `app_title`.** Marimo's exported `<title>` defaults to the *filename*
+stem — since every report is conventionally named `report.py` (see
+[authoring.md](./authoring.md)), an unset title publishes every report as
+literally "report" (browser tab, bookmark, search result — all indistinguishable).
+Pass a real title in the `App(...)` call, matching the report's H1:
+
+```py
+app = marimo.App(
+    width="medium",
+    app_title="Ex 2.1.1: the color-mixing transformer, un-anchored",
+    css_file="../../report.css",
+)
+```
+
 **Produce.** Set a `Publisher` once in the report's setup cell; every `themed` figure
 then externalizes through it (figure cells are unchanged), and `asset_url` is the
 general verb for any blob a report's JS reads (a large JSON for a data browser, an

@@ -3,6 +3,7 @@ import marimo
 __generated_with = "0.23.9"
 app = marimo.App(
     width="medium",
+    app_title="Ex 2.1.1: the color-mixing transformer, un-anchored",
     css_file="../../report.css",
     auto_download=["html"],
 )
