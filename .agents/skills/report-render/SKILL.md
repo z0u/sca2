@@ -113,6 +113,20 @@ toggle = page.locator("[data-testid=notebook-action-show-code]").count()
   locale information provided") — a blank-ish page with that message, not your
   report. `render.py` pins `locale="en-US"` on the page to avoid it.
 - A missing favicon/font 404 is cosmetic — the app still renders.
+- **Shared report styles** (`docs/report.css` — figure centring, `.sw` swatches,
+  `.report-table`, `.report-subline-row`) ride along two ways: baked into each export
+  via `marimo.App(css_file="…/report.css")`, *and* re-inlined from source at build
+  time by `mini.reports.set_report_styles` (so central edits restyle every report
+  without a re-export). A raw `.mini/exports/<key>/` bundle therefore carries the
+  *baked* copy, so rendering it shows the styles; to preview a **central edit** to
+  `report.css` without re-exporting, rebuild the site (`./go preview`) and render from
+  `_site/<key>/` instead.
+- **Inline SVG cells don't hydrate reliably headless** (sublines, the swatch table):
+  their markup lives in marimo's data island, and a fixed-timeout headless render may
+  never paint them (a DOM query for `.report-subline-row` / `.sw` can read 0 even
+  though the bundle is fine). Verify these from the externalized `_assets/<name>.html`
+  sidecar, or by rendering the fragment standalone with `report.css` applied — not by
+  screenshotting the live page.
 
 This same repoint-CDN-to-`_static` trick is what a full offline/archival bundle
 would do at publish time; here it's just scoped to a throwaway render.

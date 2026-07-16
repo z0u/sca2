@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.23.9"
-app = marimo.App(width="medium", auto_download=["html"])
+app = marimo.App(width="medium", auto_download=["html"], css_file="../../report.css")
 
 with app.setup(hide_code=True):
     import json
@@ -344,10 +344,10 @@ def _(metrics):
         def one(name: str, row: dict) -> str:
             svg = Subline(chars_per_line=sub_width, css=sub_css).plot(row["text"], series(row))
             caption = f'<figcaption style="font-size: 11px; font-family: monospace; opacity: 0.65">{name}</figcaption>'
-            return f'<figure style="display: inline-block; margin: 0 1em 0 0">{svg}{caption}</figure>'
+            return f'<figure style="display: inline-block; margin: 0 .5em">{svg}{caption}</figure>'
 
         html = (
-            f'<div role="img" aria-label="{aria_label}" style="text-wrap: balance">'
+            f'<div role="img" aria-label="{aria_label}" class="report-subline-row" style="text-wrap: balance">'
             + "".join(one(name, row) for name, row in rows)
             + "</div>"
         )
@@ -505,26 +505,17 @@ def _(backbone, complete, holdout):
     named_holdout_exs = colors.as_named(holdout, seed=2)  # the eval set, verbatim
     _by_seed = {s: complete(s, [ex.prompt for ex in named_holdout_exs]) for s in SEEDS}
 
-    def _swatch(text: str) -> str:
-        rgb = colors.PALETTE.get(text)
-        if rgb is None:
-            return f"<code>{text}</code>"
-        return (
-            f'<span aria-hidden="true" style="background: {colors.to_hex(rgb)}; border: 1px solid #8886; '
-            f'border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> {text}'
-        )
-
     _head = "<tr><th>prompt</th><th>expected</th>" + "".join(f"<th>seed {s}</th>" for s in SEEDS) + "</tr>"
     _rows = "".join(
-        f"<tr><td><code>{ex.prompt}</code></td><td>{_swatch(ex.answer)}</td>"
-        + "".join(f"<td>{_swatch(_by_seed[s][i])}</td>" for s in SEEDS)
+        f"<tr><td><code>{ex.prompt}</code></td><td>{colors.swatch(ex.answer)}</td>"
+        + "".join(f"<td>{colors.swatch(_by_seed[s][i])}</td>" for s in SEEDS)
         + "</tr>"
         for i, ex in enumerate(named_holdout_exs)
     )
     _w, _d = backbone
     mo.vstack(
         [
-            mo.Html(f'<table style="font-size: 0.9em">{_head}{_rows}</table>'),
+            mo.Html(f'<table class="report-table" style="font-size: 0.9em">{_head}{_rows}</table>'),
             mo.md(f"*Greedy completions of the `named_holdout` prompts, d{_w}-L{_d}, all seeds.*"),
         ]
     )

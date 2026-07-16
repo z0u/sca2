@@ -38,6 +38,7 @@ from mini.reports import (
     report_notebooks,
     rewrite_links,
     set_banner,
+    set_report_styles,
     set_responsive,
     set_theme,
     stray_links,
@@ -46,6 +47,11 @@ from mini.reports import (
 WORKSPACE_ROOT = Path(__file__).parent.parent.resolve()
 SITE_DIR = WORKSPACE_ROOT / "_site"
 DOCS_DIR = WORKSPACE_ROOT / "docs"
+
+# The shared report stylesheet, re-inlined into every report at build time (see
+# mini.reports.set_report_styles). Read from source each build, so editing it restyles
+# every published report with no notebook re-export.
+REPORT_CSS = DOCS_DIR / "report.css"
 
 # The relative dir, beside each report's index.html, holding its externalized assets
 # (figures, data blobs) written by mini.reports.Publisher.
@@ -230,6 +236,7 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
     """
     print("Building reports...")
     pins = load_pins(WORKSPACE_ROOT) if externalizing else {}
+    report_css = REPORT_CSS.read_text("utf-8") if REPORT_CSS.exists() else ""
     for nb in report_notebooks(DOCS_DIR):
         key = export_key(nb)
         from_dir = nb.parent.relative_to(DOCS_DIR).as_posix()  # where author links resolve
@@ -261,6 +268,7 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
             html = set_responsive(html)  # fit narrow screens; drop Marimo's watermark
             index_url, source_url = _nav_urls(links, key=key, nb_rel=nb_rel, externalizing=externalizing)
             html = set_banner(html, index_url=index_url, source_url=source_url)
+            html = set_report_styles(html, report_css)  # last, so shared report rules win ties
             if base_href:
                 html = insert_base(html, base_href)
             dest = SITE_DIR / key / "index.html"

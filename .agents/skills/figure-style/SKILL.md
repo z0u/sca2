@@ -82,6 +82,20 @@ mode — rather than a heavier stroke.
 Give every figure alt text (see the alt-text skill), and set titles on the
 figure, not in surrounding Markdown, so exported PNGs are self-contained.
 
+Sequential/heatmap palettes must be theme-adaptive too: `@themed` renders a
+light and a dark variant, so pick the colormap itself with `light_dark(...)`
+rather than hard-coding a light-only map like `"Blues"`, whose pale low end
+disappears on a dark background. Build one with
+`LinearSegmentedColormap.from_list` running from a near-background low to a
+theme accent high, e.g.
+`LinearSegmentedColormap.from_list("leak", light_dark(["#eef3f7", "#1a5f8a"], ["#20242a", "#6ab0d4"]))`.
+
+Marks drawn over a variable or heatmap background (text ×, scatter dots)
+need a contrasting halo so they read on any cell, whatever color sits
+underneath: `path_effects=[pe.withStroke(linewidth=2, foreground=light_dark("#ffffff", "#000000"))]`
+(`import matplotlib.patheffects as pe`), or the draw-twice halo technique the
+color-matrix figure uses.
+
 ## Prior art
 
 M1's figure code lives in

@@ -18,6 +18,7 @@ from mini.reports import (
     save_pins,
     set_banner,
     set_provenance,
+    set_report_styles,
     set_responsive,
     set_theme,
     stray_links,
@@ -245,6 +246,21 @@ def test_set_responsive_fits_narrow_screens_and_hides_watermark():
 def test_set_responsive_is_noop_shape_on_a_plain_page():
     # No <head>/classes to match — the regex simply finds no </head>, returning as-is.
     assert set_responsive("<html><body>hi</body></html>") == "<html><body>hi</body></html>"
+
+
+def test_set_report_styles_inlines_the_sheet_last_in_head():
+    css = ".sw { background: var(--sw) }"
+    out = set_report_styles(_EXPORT_HTML, css)
+    assert f"<style>\n{css}" in out  # inlined verbatim, not linked
+    assert out.index(css) < out.index("</head>")  # lands inside <head>…
+    # …and after any earlier <head> content, so it wins specificity ties with Marimo's baked copy.
+    assert out.index('<meta charset="utf-8"') < out.index(css)
+
+
+def test_set_report_styles_is_noop_without_css_or_head():
+    assert set_report_styles(_EXPORT_HTML, "") == _EXPORT_HTML  # empty sheet: nothing to inline
+    assert set_report_styles(_EXPORT_HTML, "   \n  ") == _EXPORT_HTML  # blank-only, too
+    assert set_report_styles("<body>hi</body>", ".sw{}") == "<body>hi</body>"  # no </head> to hook
 
 
 def test_set_provenance_injects_a_folded_footer():

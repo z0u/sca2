@@ -62,6 +62,7 @@ __all__ = [
     "insert_base",
     "set_theme",
     "set_responsive",
+    "set_report_styles",
     "set_banner",
     "set_provenance",
 ]
@@ -463,6 +464,24 @@ def set_responsive(html: str) -> str:
     at build time alongside :func:`set_theme`, so it covers every published page.
     """
     style = f"<style>{_FIT_CONTENT_WIDTH}\n    {_HIDE_MARIMO_WATERMARK}</style>"
+    return re.sub(r"(</head>)", lambda m: f"    {style}\n{m.group(1)}", html, count=1)
+
+
+def set_report_styles(html: str, css: str) -> str:
+    """Inline the shared report stylesheet (*css*) as the last thing in ``<head>``.
+
+    The reports carry the same sheet two ways. ``marimo.App(css_file=…/report.css)``
+    bakes it into each export (so authors see it in edit mode and it ships in the raw
+    bundle); this re-inlines the *current* source at build time, landing after that
+    baked copy — so editing ``docs/report.css`` restyles every published report with no
+    notebook re-export. It's inlined, not ``<link>``ed, because externalize mode inserts
+    a ``<base href>`` at the bucket that would repoint a relative stylesheet URL (and
+    inlining works offline too). A no-op on a non-Marimo page (no ``</head>`` to match)
+    or when *css* is empty. Apply it last, so report rules win any specificity tie.
+    """
+    if not css.strip():
+        return html
+    style = f"<style>\n{css.strip()}\n    </style>"
     return re.sub(r"(</head>)", lambda m: f"    {style}\n{m.group(1)}", html, count=1)
 
 

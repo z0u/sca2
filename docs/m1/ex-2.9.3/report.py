@@ -1,14 +1,16 @@
 import marimo
 
 __generated_with = "0.23.3"
-app = marimo.App(width="medium", auto_download=["html"])
+app = marimo.App(width="medium", auto_download=["html"], css_file="../../report.css")
 
 with app.setup(hide_code=True):
     import io
 
     import marimo as mo  # noqa: F401
+    import matplotlib.patheffects as pe
     import matplotlib.pyplot as plt
     import numpy as np
+    from matplotlib.colors import LinearSegmentedColormap
 
     from sca.colorcube import TRAJ_STRIDE, classify, load_results, make_dopesheet
     from mini.reports import report_bundle, use_publisher
@@ -253,11 +255,21 @@ def _(arm):
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(6.5, 6), layout="constrained")
-        im = ax.imshow(_leak, cmap="Blues", vmin=0, vmax=0.35, aspect="auto")
+        _cmap = LinearSegmentedColormap.from_list("leak", light_dark(["#eef3f7", "#1a5f8a"], ["#20242a", "#6ab0d4"]))
+        im = ax.imshow(_leak, cmap=_cmap, vmin=0, vmax=0.35, aspect="auto")
         for i in range(len(_inits)):
             for j in range(len(_streams)):
                 if _fail[i, j]:
-                    ax.text(j, i, "×", ha="center", va="center", color=light_dark("#d55e00", "#ffb000"), fontsize=13)
+                    ax.text(
+                        j,
+                        i,
+                        "×",
+                        ha="center",
+                        va="center",
+                        color=light_dark("#d55e00", "#ffb000"),
+                        fontsize=13,
+                        path_effects=[pe.withStroke(linewidth=2, foreground=light_dark("#ffffff", "#000000"))],
+                    )
         ax.set_xticks(range(len(_streams)), [str(s) for s in _streams])
         ax.set_yticks(range(len(_inits)), [str(s) for s in _inits])
         ax.set(xlabel="batch/label stream", ylabel="model init")
