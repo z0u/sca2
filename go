@@ -77,14 +77,14 @@ case "${1:-help}" in
             echo "or any other file (opens in \$VISUAL/\$EDITOR)." 1>&2
             exit 2
         elif is_marimo_notebook "${1:-}"; then
-            uv run marimo edit "$@"
+            ( set -x; uv run marimo edit "$@" )
         else
             editor="${VISUAL:-${EDITOR:-code}}"
             if ! command -v "$editor" > /dev/null; then
                 echo "no editor: '$editor' not found — set \$VISUAL or \$EDITOR" 1>&2
                 exit 127
             fi
-            "$editor" "$@"
+            ( set -x; "$editor" "$@" )
         fi
         ;;
     p|preview)
