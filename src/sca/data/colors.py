@@ -84,6 +84,19 @@ def to_hex(c: Rgb) -> str:
     return "#" + "".join(f"{x:x}" for x in c)
 
 
+def swatch(text: str) -> str:
+    """Inline HTML: a colour square for a palette name, followed by the name itself.
+
+    The box is tinted via the ``--sw`` custom property and styled by ``.sw`` in the
+    shared report stylesheet (``docs/report.css``), so each occurrence stays terse.
+    Non-palette text (e.g. a stray hex completion) falls back to ``<code>``.
+    """
+    rgb = PALETTE.get(text)
+    if rgb is None:
+        return f"<code>{text}</code>"
+    return f'<span class="sw" style="--sw: {to_hex(rgb)}" aria-hidden="true"></span> {text}'
+
+
 def redness(c: Rgb) -> float:
     """M1's graded *red* label on the unit cube: r·(1 − g/2 − b/2)."""
     r, g, b = (x / (N_LEVELS - 1) for x in c)

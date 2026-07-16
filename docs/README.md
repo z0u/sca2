@@ -28,11 +28,21 @@ rendered `<key>/` page. This `README.md` is excluded from the build.
 
 **Other assets** (images, SVGs, etc.) are copied as-is into `_site/`.
 
+**Shared report styles** live in [`report.css`](./report.css) — one stylesheet for
+cross-report polish (centring narrow figures, `.sw` colour swatches via
+[`colors.swatch`](../src/sca/data/colors.py), `.report-table` headings,
+`.report-subline-row`). Each report points at it with `marimo.App(css_file="…/report.css")`
+so it shows live in edit mode and bakes into the export; the build *also* re-inlines it
+from source (`mini.reports.set_report_styles`), so editing `report.css` restyles every
+published report with **no notebook re-export**. Keep it small and selector-scoped — it
+layers on top of Marimo's own CSS.
+
 ## Structure
 
 ```
 docs/
 ├── README.md                This file (excluded from build)
+├── report.css               Shared report stylesheet (baked via css_file + re-inlined at build)
 ├── publish.lock             Export key → pinned publish-tier revision (written by ./go publish)
 ├── index.md                 Built as _site/index.html
 ├── overview.py              Marimo notebook → exported bundle, served at _site/overview/
