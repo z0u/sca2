@@ -1,7 +1,12 @@
 import marimo
 
 __generated_with = "0.23.3"
-app = marimo.App(width="medium", auto_download=["html"], css_file="../../report.css")
+app = marimo.App(
+    width="medium",
+    app_title="Experiment 2.9.4: closed-loop regularizer weights",
+    auto_download=["html"],
+    css_file="../../report.css",
+)
 
 with app.setup(hide_code=True):
     import marimo as mo  # noqa: F401

@@ -1,7 +1,12 @@
 import marimo
 
 __generated_with = "0.23.3"
-app = marimo.App(width="medium", auto_download=["html"], css_file="../report.css")
+app = marimo.App(
+    width="medium",
+    app_title="nGPT scaling: flat across the width × depth grid",
+    auto_download=["html"],
+    css_file="../report.css",
+)
 
 with app.setup(hide_code=True):
     import json
