@@ -13,6 +13,7 @@ with app.setup(hide_code=True):
     from pathlib import Path
 
     import marimo as mo  # noqa: F401
+    import matplotlib.patheffects as pe
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -207,6 +208,10 @@ def _(holdout, train_pairs):
     _idx = {c: i for i, c in enumerate(_vals)}
     _train_edges = [p for p in train_pairs if p[0] != p[1]]  # self-pairs are just the vertices
 
+    # One example edge per panel, labelled at its endpoints; both sit on the cube's
+    # silhouette so the pair is easy to pick out. The mix is spelled out in the caption.
+    _examples = {"train": ("white", "magenta", "ab"), "held out for eval": ("magenta", "blue", "cd")}
+
     @themed(
         name="named-pair-lattice",
         alt_text=(
@@ -214,18 +219,22 @@ def _(holdout, train_pairs):
             "vertical with black at the bottom and white at the top. Each named color is a small dot in its "
             "true color. The left panel bolds the pairs used as named equations in training; the right panel "
             "bolds the held-out pairs reserved for the named-holdout evaluation. In each panel the bold lines "
-            "are colored by their mixed result and the other set is drawn faint for context. The panels have "
-            "no background fill or axes; front-facing edges are drawn heavier than back and interior ones, so "
-            "the lattice reads three-dimensionally."
+            "are colored by their mixed result and the other set is drawn faint for context. One edge per "
+            "panel is picked out on the cube's silhouette with letters at its endpoints — a, b on white and "
+            "magenta (left), c, d on magenta and blue (right) — and the caption below gives the two mixing "
+            "equations, a + b = orchid and c + d = violet. The panels have no background fill or axes; front-facing edges "
+            "are drawn heavier than back and interior ones, so the lattice reads three-dimensionally."
         ),
     )
     def _plot() -> plt.Figure:
         named = cube.named()
         fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.2), sharey=True)
         faint, vedge = light_dark("#0001", "#fff1"), light_dark("#0006", "#fff7")
+        ink, halo = light_dark("#111", "#eee"), light_dark("#fff", "#111")
         # A single front view suffices: the lattice is mostly empty, so nothing hides behind it.
         x, y, depth = cube.project(named, "front")
         _dmin, _dspan = depth.min(), depth.max() - depth.min()
+        _cx, _cy = x.mean(), y.mean()
 
         def _edge(ax, pair, lw_lo, lw_hi, **kw):
             u, v = _idx[pair[0]], _idx[pair[1]]
@@ -233,6 +242,26 @@ def _(holdout, train_pairs):
             # Taper by depth: front-facing edges read heavy, back/interior ones recede.
             lw = lw_lo + (lw_hi - lw_lo) * (mid - _dmin) / _dspan
             ax.plot([x[u], x[v]], [y[u], y[v]], lw=lw, zorder=float(mid), solid_capstyle="round", **kw)
+
+        def _letter(ax, name, ch):
+            i = _idx[colors.PALETTE[name]]
+            ang = np.arctan2(y[i] - _cy, x[i] - _cx)  # nudge the tag radially outward, clear of the lattice
+            if name == "white":
+                ang = np.radians(150)  # apex points straight at the title; send it up-left instead
+            ax.annotate(
+                ch,
+                (x[i], y[i]),
+                (x[i] + np.cos(ang) * 0.12, y[i] + np.sin(ang) * 0.12),
+                ha="center",
+                va="center",
+                fontsize=11,
+                fontweight="bold",
+                fontstyle="italic",
+                color=ink,
+                zorder=100,
+                annotation_clip=False,
+                path_effects=[pe.withStroke(linewidth=3, foreground=halo)],
+            )
 
         # Each panel bolds one set (colored by its mixed result) and greys the other for context.
         panels = (("train", _train_edges, holdout), ("held out for eval", holdout, _train_edges))
@@ -245,6 +274,9 @@ def _(holdout, train_pairs):
             # Vertices in true color; +ε on zorder so a vertex wins a depth tie with an edge.
             for _i in range(len(_vals)):
                 ax.scatter(x[_i], y[_i], c=[named[_i]], s=60, edgecolors=vedge, lw=0.6, zorder=float(depth[_i]) + 1e-3)
+            _u, _v, _chs = _examples[title]
+            _letter(ax, _u, _chs[0])
+            _letter(ax, _v, _chs[1])
             cube.style_cube_axes(ax, labels=False)
             ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
             ax.set_title(title)
@@ -257,11 +289,16 @@ def _(holdout, train_pairs):
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(r"""
+    mo.md(rf"""
     Each panel above shows the same lattice from the front, bolding one set of
     pairs — colored by the result each mixes to — over the other, drawn faint:
     **left**, the pairs used as named equations in training; **right**, the ten
-    held out for the `named_holdout` eval.
+    held out for the `named_holdout` eval. One edge per panel is picked out on the
+    cube's silhouette, its endpoints lettered, as a worked example — each bold edge
+    takes the colour its two operands mix to:
+
+    - $a$–$b$ (train): {colors.swatch("white")} + {colors.swatch("magenta")} = {colors.swatch("orchid")}
+    - $c$–$d$ (held out): {colors.swatch("magenta")} + {colors.swatch("blue")} = {colors.swatch("violet")}
 
     Only the connected pairs ever appear as *named* equations, with a named
     answer; every other operand pair the model sees is rendered in hex or cross
