@@ -205,54 +205,54 @@ def _():
 
 @app.cell(hide_code=True)
 def _(holdout, train_pairs):
+    # Split into two independent figures (rather than one two-panel figure) so they reflow
+    # and shrink separately: on a narrow screen the pair stacks instead of shrinking as a
+    # block, keeping each panel legible. The panels used to share a y-axis; now that they
+    # are separate figures we pin the same projection and the same limits by hand, and
+    # render each at the same fixed figsize with a full-figure bbox, so the two images come
+    # out identically sized and the lattice reads at one scale across both.
+    from mini.reports import current_publisher
+    from mini.vis import use_style, use_theme
+    from mini.vis.nb import themed_figure_html
+
     _vals = list(colors.PALETTE.values())
     _idx = {c: i for i, c in enumerate(_vals)}
     _train_edges = [p for p in train_pairs if p[0] != p[1]]  # self-pairs are just the vertices
+    _named = cube.named()
+    # A single front view suffices: the lattice is mostly empty, so nothing hides behind it.
+    _x, _y, _depth = cube.project(_named, "front")
+    _dmin, _dspan = _depth.min(), _depth.max() - _depth.min()
+    _cx, _cy = _x.mean(), _y.mean()
+    # Square limits shared by both panels — enough margin past the lattice to hold the
+    # lettered tags — so the two figures are the same size without a shared axis.
+    _half = max(_x.max() - _x.min(), _y.max() - _y.min()) / 2 + 0.16
+    _xlim, _ylim = (_cx - _half, _cx + _half), (_cy - _half, _cy + _half)
 
     # One example edge per panel, labelled at its endpoints; both sit on the cube's
     # silhouette so the pair is easy to pick out. The mix is spelled out in the caption.
     _examples = {"train": ("white", "magenta", "ab"), "held out for eval": ("magenta", "blue", "cd")}
 
-    @themed(
-        name="named-pair-lattice",
-        alt_text=(
-            "Two orthographic front views of the 27 named colors as a lattice in the rotated RGB cube, value "
-            "vertical with black at the bottom and white at the top. Each named color is a small dot in its "
-            "true color. The left panel bolds the pairs used as named equations in training; the right panel "
-            "bolds the held-out pairs reserved for the named-holdout evaluation. In each panel the bold lines "
-            "are colored by their mixed result and the other set is drawn faint for context. One edge per "
-            "panel is picked out on the cube's silhouette with letters at its endpoints — a, b on white and "
-            "magenta (left), c, d on magenta and blue (right) — and the caption below gives the two mixing "
-            "equations, a + b = orchid and c + d = violet. The panels have no background fill or axes; front-facing edges "
-            "are drawn heavier than back and interior ones, so the lattice reads three-dimensionally."
-        ),
-    )
-    def _plot() -> plt.Figure:
-        named = cube.named()
-        fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.2), sharey=True)
+    def _panel(title: str, bold, other) -> plt.Figure:
+        fig, ax = plt.subplots(figsize=(4.2, 4.4))
         faint, vedge = light_dark("#0001", "#fff1"), light_dark("#0006", "#fff7")
         ink, halo = light_dark("#111", "#eee"), light_dark("#fff", "#111")
-        # A single front view suffices: the lattice is mostly empty, so nothing hides behind it.
-        x, y, depth = cube.project(named, "front")
-        _dmin, _dspan = depth.min(), depth.max() - depth.min()
-        _cx, _cy = x.mean(), y.mean()
 
-        def _edge(ax, pair, lw_lo, lw_hi, **kw):
+        def _edge(pair, lw_lo, lw_hi, **kw):
             u, v = _idx[pair[0]], _idx[pair[1]]
-            mid = (depth[u] + depth[v]) / 2  # orders each edge against the vertices for occlusion
+            mid = (_depth[u] + _depth[v]) / 2  # orders each edge against the vertices for occlusion
             # Taper by depth: front-facing edges read heavy, back/interior ones recede.
             lw = lw_lo + (lw_hi - lw_lo) * (mid - _dmin) / _dspan
-            ax.plot([x[u], x[v]], [y[u], y[v]], lw=lw, zorder=float(mid), solid_capstyle="round", **kw)
+            ax.plot([_x[u], _x[v]], [_y[u], _y[v]], lw=lw, zorder=float(mid), solid_capstyle="round", **kw)
 
-        def _letter(ax, name, ch):
+        def _letter(name, ch):
             i = _idx[colors.PALETTE[name]]
-            ang = np.arctan2(y[i] - _cy, x[i] - _cx)  # nudge the tag radially outward, clear of the lattice
+            ang = np.arctan2(_y[i] - _cy, _x[i] - _cx)  # nudge the tag radially outward, clear of the lattice
             if name == "white":
                 ang = np.radians(150)  # apex points straight at the title; send it up-left instead
             ax.annotate(
                 ch,
-                (x[i], y[i]),
-                (x[i] + np.cos(ang) * 0.12, y[i] + np.sin(ang) * 0.12),
+                (_x[i], _y[i]),
+                (_x[i] + np.cos(ang) * 0.12, _y[i] + np.sin(ang) * 0.12),
                 ha="center",
                 va="center",
                 fontsize=11,
@@ -264,27 +264,58 @@ def _(holdout, train_pairs):
                 path_effects=[pe.withStroke(linewidth=3, foreground=halo)],
             )
 
-        # Each panel bolds one set (colored by its mixed result) and greys the other for context.
-        panels = (("train", _train_edges, holdout), ("held out for eval", holdout, _train_edges))
-        for (title, bold, other), ax in zip(panels, axes, strict=True):
-            for _p in other:
-                _edge(ax, _p, 0.4, 2.0, color=faint)
-            for _p in bold:
-                _result = tuple(np.array(colors.mix(*_p)) / (colors.N_LEVELS - 1))
-                _edge(ax, _p, 1.4, 3.0, color=_result)
-            # Vertices in true color; +ε on zorder so a vertex wins a depth tie with an edge.
-            for _i in range(len(_vals)):
-                ax.scatter(x[_i], y[_i], c=[named[_i]], s=60, edgecolors=vedge, lw=0.6, zorder=float(depth[_i]) + 1e-3)
-            _u, _v, _chs = _examples[title]
-            _letter(ax, _u, _chs[0])
-            _letter(ax, _v, _chs[1])
-            cube.style_cube_axes(ax, labels=False)
-            ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
-            ax.set_title(title)
-        fig.suptitle("Named pairs on the cube")
+        for _p in other:
+            _edge(_p, 0.4, 2.0, color=faint)
+        for _p in bold:
+            _result = tuple(np.array(colors.mix(*_p)) / (colors.N_LEVELS - 1))
+            _edge(_p, 1.4, 3.0, color=_result)
+        # Vertices in true color; +ε on zorder so a vertex wins a depth tie with an edge.
+        for _i in range(len(_vals)):
+            ax.scatter(_x[_i], _y[_i], c=[_named[_i]], s=60, edgecolors=vedge, lw=0.6, zorder=float(_depth[_i]) + 1e-3)
+        _u, _v, _chs = _examples[title]
+        _letter(_u, _chs[0])
+        _letter(_v, _chs[1])
+        cube.style_cube_axes(ax, labels=False)
+        ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
+        ax.set_xlim(*_xlim)
+        ax.set_ylim(*_ylim)
+        fig.suptitle(title)
         return fig
 
-    mo.Html(_plot())
+    def _themed_panel(title: str, bold, other, alt: str, name: str) -> str:
+        # Mirror the light/dark rendering of @themed, but with a full-figure bbox
+        # (bbox_inches=None) instead of "tight": tight cropping would size each image to
+        # its own titles and lettered tags, so the two panels would come out different
+        # widths. A fixed bbox keeps them identical.
+        with use_theme("light"), use_style("base", "light"):
+            light = _panel(title, bold, other)
+        with use_theme("dark"), use_style("base", "dark"):
+            dark = _panel(title, bold, other)
+        return themed_figure_html(light, dark, alt_text=alt, name=name, publish=current_publisher(), bbox_inches=None)
+
+    _train_alt = (
+        "An orthographic front view of the 27 named colors as a lattice in the rotated RGB cube, value "
+        "vertical with black at the bottom and white at the top. Each named color is a small dot in its true "
+        "color. The pairs used as named equations in training are bold and colored by the color their two "
+        "operands mix to; the held-out pairs are drawn faint for context. One training edge is picked out on "
+        "the cube's silhouette with italic letters a and b at its endpoints (white and magenta), the worked "
+        "example a + b = orchid. The panel has no background fill or axes; front-facing edges are heavier than "
+        "back and interior ones, so the lattice reads three-dimensionally. Titled 'train'."
+    )
+    _holdout_alt = (
+        "The same orthographic front view of the 27 named colors in the rotated RGB cube, same orientation and "
+        "styling as the train panel. Here the pairs held out for the named-holdout evaluation are bold and "
+        "colored by their mixed result, with the training pairs drawn faint for context. One held-out edge is "
+        "picked out on the cube's silhouette with italic letters c and d at its endpoints (magenta and blue), "
+        "the worked example c + d = violet. Titled 'held out for eval'."
+    )
+    _left = _themed_panel("train", _train_edges, holdout, _train_alt, "named-pair-lattice-train")
+    _right = _themed_panel("held out for eval", holdout, _train_edges, _holdout_alt, "named-pair-lattice-holdout")
+    mo.Html(
+        '<div class="report-figure-row">'
+        '<div class="report-figure-row-title">Named pairs on the cube</div>'
+        f"{_left}{_right}</div>"
+    )
     return
 
 
@@ -293,8 +324,9 @@ def _():
     mo.md(rf"""
     Each panel above shows the same lattice from the front, bolding one set of
     pairs — colored by the result each mixes to — over the other, drawn faint:
-    **left**, the pairs used as named equations in training; **right**, the ten
-    held out for the `named_holdout` eval. One edge per panel is picked out on the
+    the **train** panel, the pairs used as named equations in training; the
+    **held-out** panel, the ten held out for the `named_holdout` eval (side by
+    side on a wide screen, stacked on a narrow one). One edge per panel is picked out on the
     cube's silhouette, its endpoints lettered, as a worked example — each bold edge
     takes the colour its two operands mix to:
 
@@ -612,7 +644,11 @@ def _(backbone, complete, holdout):
     _w, _d = backbone
     mo.vstack(
         [
-            mo.Html(f'<table class="report-table" style="font-size: 0.9em">{_head}{_rows}</table>'),
+            mo.Html(
+                '<div class="report-table-scroll">'
+                f'<table class="report-table" style="font-size: 0.9em">{_head}{_rows}</table>'
+                "</div>"
+            ),
             mo.md(f"*Greedy completions of the `named_holdout` prompts, d{_w}-L{_d}, all seeds.*"),
         ]
     )
