@@ -58,32 +58,13 @@ def named() -> np.ndarray:
     return np.array(list(PALETTE.values()), dtype=float) / (N_LEVELS - 1)
 
 
-def draw_rgb_cube(
-    ax: Axes,
-    rgb01: np.ndarray,
-    *,
-    side: Side = "front",
-    s: float = 230,
-    edgecolors: str | None = "none",
-    lw: float = 0,
-    alpha: float = 1.0,
-    labels: bool = True,
-    zorder: float = 1,
-) -> PathCollection:
-    """Scatter one orthographic view of *rgb01*, colored by the colors themselves.
+def style_cube_axes(ax: Axes, *, labels: bool = True) -> None:
+    """Apply the geometry-panel conventions: equal aspect, no ticks or spines.
 
-    Points are drawn back-to-front so nearer ones win overlaps; at the default
-    size a full grid overlaps into a gapless solid (points large enough to touch
-    read far better than a dotty scatter). Returns the collection so the caller
-    can tweak it. Call twice on one ``Axes`` — grid then a sparse overlay — to
-    emphasize a sub-lattice.
+    The projection axes carry no meaningful scale, so the labels name the
+    directions instead (see the figure-style skill). Shared by the dense-grid
+    view and any lattice drawn in the same projection.
     """
-    rgb01 = np.asarray(rgb01, dtype=float)
-    x, y, depth = project(rgb01, side)
-    order = np.argsort(depth)  # back (small depth) first, so front points sit on top
-    pc = ax.scatter(
-        x[order], y[order], c=rgb01[order], s=s, edgecolors=edgecolors, linewidths=lw, alpha=alpha, zorder=zorder
-    )
     ax.set_aspect("equal")
     ax.margins(0.06)
     ax.set_xticks([])
@@ -93,4 +74,32 @@ def draw_rgb_cube(
     if labels:
         ax.set_xlabel("Hue (⊥ to value)")
         ax.set_ylabel("Value")
+
+
+def draw_rgb_cube(
+    ax: Axes,
+    rgb01: np.ndarray,
+    *,
+    side: Side = "front",
+    s: float = 195,
+    edgecolors: str | None = "none",
+    lw: float = 0,
+    alpha: float = 1.0,
+    labels: bool = True,
+    zorder: float = 1,
+) -> PathCollection:
+    """Scatter one orthographic view of *rgb01*, colored by the colors themselves.
+
+    Points are drawn back-to-front so nearer ones win overlaps; at the default
+    size a full grid's points just touch — a gapless solid that still shows the
+    grid resolution, which reads far better than a dotty scatter. Returns the
+    collection so the caller can tweak it.
+    """
+    rgb01 = np.asarray(rgb01, dtype=float)
+    x, y, depth = project(rgb01, side)
+    order = np.argsort(depth)  # back (small depth) first, so front points sit on top
+    pc = ax.scatter(
+        x[order], y[order], c=rgb01[order], s=s, edgecolors=edgecolors, linewidths=lw, alpha=alpha, zorder=zorder
+    )
+    style_cube_axes(ax, labels=labels)
     return pc

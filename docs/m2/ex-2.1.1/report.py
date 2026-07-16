@@ -165,12 +165,12 @@ def _():
     Every color is a point on the 16-level-per-channel RGB grid — 16³ = 4096 in
     all. Rotate the cube onto its black→white diagonal so *value* runs vertically
     and hue around it, and the grid is the figure below; a front and a back view
-    together show all six faces. The 27 names cover the {0, 8, 15}³ sub-lattice,
-    ringed. Hex and cross equations draw operands from anywhere in this cube;
-    named and alias lines use only the ringed points. Note there is no held-out
-    *color*: every point here is seen in training (hex operands are sampled over
-    the whole grid, and each name appears in aliases). What is held out is
-    operand *pairs* — the split rendered in the matrix below.
+    together show all six faces. Hex and cross equations draw operands from
+    anywhere in this cube; named and alias lines use only the 27 points of the
+    {0, 8, 15}³ sub-lattice, which the next figure singles out. Note there is no
+    held-out *color*: every point here is seen in training (hex operands are
+    sampled over the whole grid, and each name appears in aliases). What is held
+    out is operand *pairs*.
     """)
     return
 
@@ -185,22 +185,17 @@ def _():
             "Two orthographic views of the RGB grid, rotated so the black-to-white diagonal is vertical: "
             "black at the bottom, white at the top, hues fanned around the middle. The left view ('front') "
             "shows the red, green, and magenta faces; the right ('back') shows the blue, cyan, and yellow "
-            "faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a solid; "
-            "the 27 named colors are marked with small rings at the {0, 8, 15} cubed sub-lattice."
+            "faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a smooth "
+            "solid."
         ),
     )
     def _plot() -> plt.Figure:
-        grid, named = cube.grid(), cube.named()
+        grid = cube.grid()
         fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.2), sharey=True)
-        halo, ring = light_dark("#fffc", "#000c"), light_dark("#000c", "#fffc")
         for side, ax in zip(("front", "back"), axes, strict=True):
-            cube.draw_rgb_cube(ax, grid, side=side, s=230)
-            x, y, depth = cube.project(named, side)
-            o = np.argsort(depth)
-            ax.scatter(x[o], y[o], s=330, facecolors="none", edgecolors=halo, lw=3.4, zorder=5)
-            ax.scatter(x[o], y[o], s=330, facecolors="none", edgecolors=ring, lw=1.3, zorder=6)
+            cube.draw_rgb_cube(ax, grid, side=side)
             ax.set_title(side)
-        fig.suptitle("The 16³ hex grid; the 27 named colors ringed")
+        fig.suptitle("The 16³ hex grid")
         return fig
 
     mo.Html(_plot())
@@ -209,42 +204,46 @@ def _():
 
 @app.cell(hide_code=True)
 def _(holdout, train_pairs):
+    from sca.data import cube
+
     _vals = list(colors.PALETTE.values())
-    _names = list(colors.PALETTE)
+    _idx = {c: i for i, c in enumerate(_vals)}
+    _train_edges = [p for p in train_pairs if p[0] != p[1]]  # self-pairs are just the vertices
 
     @themed(
-        name="named-pair-matrix",
+        name="named-pair-lattice",
         alt_text=(
-            "A 27 by 27 grid of color swatches, rows and columns labeled with the palette's color names "
-            "from black to white. Each cell shows the mix of its row and column colors; the diagonal is the "
-            "palette itself. Small dots mark the pairs that appear as named equations in training; open "
-            "rings mark the held-out named pairs, which are reserved for evaluation."
+            "Two orthographic views of the 27 named colors as a lattice in the rotated RGB cube, value "
+            "vertical with black at the bottom and white at the top. Each named color is a small dot in its "
+            "true color. Thin faint lines connect the pairs used as named equations in training; ten bold "
+            "lines, each colored by its mixed result, connect the held-out pairs reserved for the "
+            "named-holdout evaluation. Lines and dots are depth-sorted, so the lattice reads three-"
+            "dimensionally across the two views."
         ),
     )
     def _plot() -> plt.Figure:
-        img = np.array([[colors.mix(a, b) for b in _vals] for a in _vals], dtype=float) / (colors.N_LEVELS - 1)
-        fig, ax = plt.subplots(figsize=(7.4, 7.4))
-        ax.imshow(img, interpolation="nearest")
-        train, held = set(train_pairs), set(holdout)
-        pts = {
-            (i, j): pair in held
-            for i, a in enumerate(_vals)
-            for j, b in enumerate(_vals)
-            if (pair := (min(a, b), max(a, b))) in train | held
-        }
-        # A contrasting halo keeps the marks legible on cells near the mark color.
-        mark, halo = light_dark("#000", "#fff"), light_dark("#fffa", "#000a")
-        _dots = [(x, y) for (y, x), h in pts.items() if not h]
-        _rings = [(x, y) for (y, x), h in pts.items() if h]
-        ax.scatter(*zip(*_dots, strict=True), s=22, color=halo)
-        ax.scatter(*zip(*_dots, strict=True), s=6, color=mark)
-        ax.scatter(*zip(*_rings, strict=True), s=80, facecolors="none", edgecolors=halo, lw=3.5)
-        ax.scatter(*zip(*_rings, strict=True), s=80, facecolors="none", edgecolors=mark, lw=1.2)
-        ax.set_xticks(range(len(_names)), _names, rotation=90, fontsize=7)
-        ax.set_yticks(range(len(_names)), _names, fontsize=7)
-        ax.set_title(
-            "mix(a, b) over the palette — pairs rendered as named equations:\n· in training, ○ held out for eval"
-        )
+        named = cube.named()
+        fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.2), sharey=True)
+        faint, vedge = light_dark("#0002", "#fff2"), light_dark("#0006", "#fff7")
+        for side, ax in zip(("front", "back"), axes, strict=True):
+            x, y, depth = cube.project(named, side)
+
+            def _edge(pair, side_depth=depth, ax=ax, x=x, y=y, **kw):
+                u, v = _idx[pair[0]], _idx[pair[1]]
+                # Midpoint depth orders each edge against the vertices for occlusion.
+                ax.plot([x[u], x[v]], [y[u], y[v]], zorder=float((side_depth[u] + side_depth[v]) / 2), **kw)
+
+            for _p in _train_edges:
+                _edge(_p, color=faint, lw=1.0, solid_capstyle="round")
+            for _p in holdout:
+                _result = tuple(np.array(colors.mix(*_p)) / (colors.N_LEVELS - 1))
+                _edge(_p, color=_result, lw=2.8, solid_capstyle="round")
+            # Vertices in true color; +ε on zorder so a vertex wins a depth tie with an edge.
+            for _i in range(len(_vals)):
+                ax.scatter(x[_i], y[_i], c=[named[_i]], s=60, edgecolors=vedge, lw=0.6, zorder=float(depth[_i]) + 1e-3)
+            cube.style_cube_axes(ax)
+            ax.set_title(side)
+        fig.suptitle("Named pairs on the cube — faint · train, bold (result-colored) · held out for eval")
         return fig
 
     mo.Html(_plot())
@@ -254,15 +253,15 @@ def _(holdout, train_pairs):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Every cell of the matrix is reachable through hex and cross equations
-    (those draw operands from the full 16³ grid), but only the marked pairs
-    ever appear as *named* equations, with a named answer. A ringed pair like
-    `red + blue` is answerable two ways: recall (impossible — that rendering
-    never occurs in training) or composition — look both names up via the
-    alias lines, mix in hex space, and translate the result back through the
-    dictionary. That is what the `named_holdout` eval set measures. The
-    `hex_unseen` and `cross_unseen` sets are sampled at eval time from the
-    full grid, avoiding every operand pair the corpus used.
+    Only the connected pairs ever appear as *named* equations, with a named
+    answer; every other operand pair the model sees is rendered in hex or cross
+    form (those draw operands from the full 16³ grid). A held-out edge like
+    `blue + magenta` — mixing to `violet` — is answerable two ways: recall
+    (impossible — that named rendering never occurs in training) or composition:
+    look both names up via the alias lines, mix in hex space, and translate the
+    result back through the dictionary. That is what the `named_holdout` eval set
+    measures. The `hex_unseen` and `cross_unseen` sets are sampled at eval time
+    from the full grid, avoiding every operand pair the corpus used.
     """)
     return
 
