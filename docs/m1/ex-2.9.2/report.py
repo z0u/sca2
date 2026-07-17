@@ -64,7 +64,7 @@ def _():
     whether we can make the response reliable *by construction* instead of by
     selection.
 
-    The SCA paper's discussion names the suspect — weight ablation's
+    The SCA paper's discussion names the cause — weight ablation's
     "redistribution is unreliable" — and suggests optimal ablation
     ([Li & Janson 2024](https://arxiv.org/abs/2409.09951)) as a remedy:
     replace the removed component with an optimized constant. We test that

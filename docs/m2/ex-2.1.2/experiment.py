@@ -1,4 +1,4 @@
-"""Experiment 2.1.2: making composition pay — corpus fixes for the named-holdout failure.
+"""Experiment 2.1.2: making composition necessary — corpus fixes for the named-holdout failure.
 
 Ex-2.1.1's baseline never solves ``named_holdout``: the named slice is
 memorizable, the alias dictionary is one-way, and hex answers factorize per
