@@ -69,12 +69,11 @@ def _():
     per-channel *eigen learning rates*, and the residual step `α` is fixed at
     1/n_layer rather than learned (the value the learned gates settled near
     anyway). If we want to argue that SCA carries to LLMs, this simplified
-    backbone has to hold up as it grows.
+    backbone has to hold up as it scales.
 
     So this [experiment](./experiment.py) sweeps the model over a width × depth
-    grid — widths {32, 64, 128} × depths {4, 8, 12}, everything else fixed (batch
-    16, peak LR 10⁻², 100 epochs, *Pride and Prejudice*) — and asks a narrow
-    question: does converged loss stay well-behaved across the grid? Concretely,
+    grid — widths {32, 64, 128} × depths {4, 8, 12} — with everything else fixed
+    (batch 16, peak LR 10⁻², 100 epochs, *Pride and Prejudice*). We hope to see
     **no depth penalty** (deeper is never worse at fixed width) and **no
     width-gated instability** (nothing spikes or fails to train as width grows).
     """)
@@ -118,9 +117,9 @@ def _():
     ## No depth penalty
 
     Converged validation loss (mean of the last 10 epochs) against depth, one
-    line per width. Each line is essentially horizontal — adding layers doesn't
-    cost anything at any width — and the lines stack in width order, so wider is
-    uniformly better. There is no wide-and-deep corner where the loss turns up.
+    line per width. Each line is nearly horizontal: adding layers doesn't cost
+    anything at any width. The lines stack in width order, so wider is uniformly
+    better, and there is no wide-and-deep corner where the loss turns up.
     """)
     return
 
@@ -157,10 +156,10 @@ def _():
     mo.md(r"""
     ## Every cell trains smoothly
 
-    The same result per epoch: one panel per width, one line per depth (darker =
-    deeper). Every cell descends through the LR warmup and settles onto a
-    plateau; within each panel the depth lines sit on top of one another rather
-    than fanning apart. Wider panels simply settle lower.
+    The same result per epoch: one panel per width, one line per depth. Every
+    cell descends through the LR warmup and settles onto a plateau; within each
+    panel the depth lines sit on top of one another rather than fanning apart.
+    Wider panels simply settle lower.
     """)
     return
 
@@ -202,15 +201,15 @@ def _(curves):
     ## Findings
 
     The simplified nGPT trains flat across depth and improves with width over
-    the whole grid we can afford, and no cell destabilizes ({_best:.2f}
-    nats/char at the deepest, widest corner). That's the property we need:
-    the backbone that SCA will anchor concepts in scales without a depth
-    penalty, so any problems we later see at the deep-and-wide corner would
-    be a property of *size*, not of the simplified architecture.
+    the whole tested grid, and no cell destabilizes ({_best:.2f} nats/char at
+    the deepest, widest corner). That's reassuring: the backbone that SCA will
+    anchor concepts in scales without a depth penalty, so problems in later
+    experiments are unlikely to be due to the simplified architecture.
 
-    The grid tops out at 128 × 12 on an L4. The next step is to confirm that
-    the fixed scalar gate still holds at a genuinely larger size — wider and
-    deeper, on a bigger GPU with a bigger batch — before leaning on it for M3.
+    The grid tops out at 128 × 12 on an L4, which is probably fine for M2 (this
+    milestone). In M3 (future), we should confirm that the fixed scalar gate
+    still holds at a genuinely larger size — wider and deeper, on a bigger GPU
+    with a bigger batch.
     """
     )
     return

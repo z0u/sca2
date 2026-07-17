@@ -59,7 +59,7 @@ def _():
     *red* to latent axis 0, zero the axis, and the damage lands on red-like
     colors. It also reproduced the main weakness: the outcome varies a lot
     with the random seed. The original handled that with a 60-seed sweep and
-    Pareto selection, but that won't scale — as models grow, the chance that
+    Pareto selection, but that won't scale: as models grow, the chance that
     any given seed yields a clean intervention response may shrink. This
     experiment asks whether we can make the response reliable *by
     construction* instead of by selection.
@@ -72,32 +72,33 @@ def _():
     control**: teach the decoder, during training, what to output when the
     concept has been removed.
 
-    ## Why zero ablation is noisy
+    ## Why weight ablation is noisy
 
-    The bottleneck is unit-normalized, so zeroing axis 0 renormalizes what's
-    left. For a red-like input the remainder is small and essentially random —
-    whatever residual geometry the seed happened to produce — so ablated red
-    re-emerges as some *other* arbitrary color. In Li & Janson's terms this is
-    "spoofing": the intervention doesn't just delete the concept, it inserts
-    a random claim about the input. Two seeds with identical anchoring quality
-    can then score very differently, purely on where red happens to land.
+    The bottleneck is unit-normalized, so zeroing an encoder axis renormalizes
+    what's left. For a red-like input the remainder is small and essentially
+    random — whatever residual geometry the seed happened to produce — so
+    ablated red re-emerges as some other arbitrary color. In Li & Janson's terms
+    this is "spoofing": the intervention doesn't just delete the concept, it
+    inserts a random claim about the input. Two seeds with identical anchoring
+    quality can then score very differently, purely on where red happens to
+    land.
 
-    Optimal ablation was designed to *measure* importance while minimizing
+    Optimal ablation was designed to measure importance while minimizing
     spoofing: it replaces the component with the constant $a^* = \arg\min_a
     \mathbb{E}[\mathcal{L}]$, the value that hurts expected loss least. Note
     that for *removal*, this objective points the wrong way: the loss it
-    minimizes includes the target's, so $a^*$ is pulled toward whatever
-    constant best *restores* red. We evaluate both the literal method (`oa`)
-    and the removal-appropriate adaptation (`oa-nontarget`, optimizing the
-    constant over non-red colors only).
+    minimizes includes the target's, so $a^*$ is pulled toward whatever constant
+    best *restores* red. We evaluate both the literal method (`oa`) and the
+    removal-appropriate adaptation (`oa-nontarget`, optimizing the constant over
+    non-red colors only).
 
-    Fallback control instead makes the post-removal behavior a trained
-    property. The anti-anchor regularizer already keeps the direction −e₀
-    empty, so we add one decoder-only loss term, MSE(dec(−e₀), mid-gray),
-    pinning that reserved direction to the "know-nothing" output (a model
-    that has genuinely lost the color information should hedge — and the
-    hedge over the RGB cube is mid-gray). An intervention can then *redirect*
-    red to −e₀ and get a defined response, rather than hoping the
+    Fallback control instead makes the post-removal behavior a trained property.
+    The anti-anchor regularizer already keeps the direction −e₀ empty, so we add
+    one decoder-only loss term, MSE(dec(−e₀), mid-gray), pinning that reserved
+    direction to the *null* output that we get to choose. A model that has
+    genuinely lost the color information should hedge — and the hedge over the
+    RGB cube is mid-gray, so we choose mid-gray as *null*. An intervention can
+    then redirect red to −e₀ and get a defined response, rather than hoping the
     redistribution behaves.
 
     ## Conditions
@@ -246,13 +247,13 @@ def _(stat):
         f"`base + zero` excluding failures scores {_bz[_ok].mean():.2f} ± {_bz[_ok].std():.2f}, "
         f"against {_fr.mean():.2f} ± {_fr.std():.2f} for `fallback + reflect` and "
         f"{_frd.mean():.2f} ± {_frd.std():.2f} for `redirect`. By this metric alone, fallback "
-        f"control buys little. But R² only measures whether error is *proportional* to redness; it "
+        f"control gives little benefit. But R² only measures whether error is *proportional* to redness; it "
         f"is blind to whether the size of the response is the same from seed to seed. That is where "
-        f"the change is, and the next section measures it directly. (One wrinkle: plain zeroing "
+        f"the change is, and the next section measures it directly. (However, plain zeroing "
         f"scores a little lower on the fallback variant, median "
         f"{np.median(stat('fallback', 'zero', 'score')):.2f} vs {np.median(_bz):.2f} — presumably "
         f"the fallback term perturbs the decoder that zero-ablated latents still pass through. A "
-        f"trained fallback should be paired with its redirect, not with zeroing.)"
+        f"trained fallback should be paired with its redirect instead of zeroing.)"
     )
     return
 
@@ -260,9 +261,9 @@ def _(stat):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## A predictable response, not just a bigger one
+    ## A predictable response
 
-    SCA's promise is side effects you can bound *before* intervening, so the
+    SCA aims to give side effects you can bound before intervening, so the
     magnitude of the response matters less than knowing it in advance. With
     the decoder pinned to mid-gray at −e₀, redirecting pure red there should
     cost MSE(red, gray) = ¼ exactly. Without fallback training there is no

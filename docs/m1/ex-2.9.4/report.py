@@ -62,10 +62,9 @@ def _():
     Conditions (32 seeds each, scored by ex-2.9.2's `redirect`): {static
     timed-anneal, controller} × peak LR {0.10 hostile, 0.05 benign} with the
     fallback term; the same pair *without* the fallback term at 0.10, since
-    ex-2.9.3 showed that's the config where catastrophic failures actually
-    live; and a sensitivity grid over the controller's own knobs (targets
-    ×0.75, ×1.5; gains ×0.5, ×2). The experiment is
-    [`experiment.py`](./experiment.py):
+    ex-2.9.3 showed that's the config where catastrophic failures actually live;
+    and a sensitivity grid over the controller's own parameters (targets ×0.75,
+    ×1.5; gains ×0.5, ×2). The experiment is [`experiment.py`](./experiment.py):
 
     ```bash
     bin/mini run docs/m1/ex-2.9.4/experiment.py --app modal --max-containers 16
@@ -116,15 +115,15 @@ def _(cond, n_cat, rd):
     mo.md(
         f"**{sum(1 for _ in (r for r in cond('static') + cond('ctrl')))} + "
         f"{len(_sn) + len(_cn)} + 128 runs completed** across ten conditions. The result is a "
-        f"clean negative, with an informative mechanism. In the fallback-free config the feedback "
+        f"clean negative, which is informative. In the fallback-free config the feedback "
         f"loop does its intended job on the seeds the static schedule loses — its {n_cat(_sn)} catastrophic seeds "
         f"({', '.join(map(str, _s_bad))}) train cleanly under control (redirect scores "
         f"{', '.join(f'{rd([next(r for r in _cn if r["seed"] == s)])[0]:.2f}' for s in _rescued)}) — "
         f"but the controller *causes* {n_cat(_cn)} new catastrophes on other seeds "
         f"({', '.join(map(str, _c_bad))}), so the failure rate does not improve. With the fallback "
         f"term on (the adopted recipe), no condition has any catastrophic failures and there is "
-        f"nothing left to rescue, while mis-setting the controller's own knobs by less than the LR "
-        f"knob's safe margin *reintroduces* catastrophes. So we're keeping the static schedule."
+        f"nothing left to rescue, while mis-setting the controller's own parameters by less than the LR "
+        f"setting's safe margin *reintroduces* catastrophes. So we're keeping the static schedule."
     )
     return
 
@@ -240,7 +239,7 @@ def _():
     Ex-2.9.2's fallback term turns out to prevent every catastrophic failure
     on its own (0 in 448 fallback-trained runs across this experiment and
     ex-2.9.3, vs 7 of 224 without it). On top of that recipe, feedback can
-    only add costs and knobs.
+    only add costs and degrees of freedom.
     """)
     return
 
@@ -309,7 +308,7 @@ def _(cond, n_cat, rd):
             for v, c in (("static (timed anneal)", gray), ("controller", accent))
         ]
         axes[0].legend(handles=handles, loc="lower left")
-        axes[0].set_title("Fallback-trained cells: feedback adds no headroom, and its knobs cut")
+        axes[0].set_title("Fallback-trained cells: feedback adds no headroom")
         return fig
 
     mo.Html(_plot())
@@ -360,7 +359,7 @@ def _(cond, n_cat):
     )
     _cat_sens = n_cat(cond("ctrl-tau0.75")) + n_cat(cond("ctrl-eta2")) + n_cat(cond("ctrl-eta0.5"))
     mo.md(f"""
-    ## Takeaways
+    ## Lessons
 
     The proposal was reasonable — protection on demand instead of on a
     timer — and the mechanism works as designed: under feedback, no run
@@ -375,17 +374,14 @@ def _(cond, n_cat):
       instability it was meant to prevent ({n_cat(cond("ctrl-nofb"))} of 32
       fallback-free controlled runs, vs {n_cat(cond("static-nofb"))} static).
     - **Feedback moved the tuning burden; it didn't remove it.** The
-      controller's targets and gains are *sharper* than the LR peak they
+      controller's targets and gains are harder to tune than the LR peak they
       were meant to insulate us from: ±25–100% perturbations produced
-      {_cat_sens} catastrophic runs even with the stabilizing fallback term,
-      out of {_tot_fb} fallback-trained runs that otherwise had none.
+      {_cat_sens} catastrophic runs even with the stabilizing fallback term, out
+      of {_tot_fb} fallback-trained runs that otherwise had none.
 
     The stack that works is simple: a fallback term (which, across two
-    experiments, has eliminated every catastrophic failure) + peak LR
-    0.05 + the original timed anneal + cheap endpoint screening. Adopt
-    that for M2 and revisit feedback only if the transformer setting
-    breaks it.
-
+    experiments, has eliminated every catastrophic failure) + peak LR 0.05 + the
+    original timed anneal + cheap endpoint screening.
 
     One engineering note. `mini.temporal`'s `DynamicProp.set()` can retarget
     mid-flight — exactly what a controller needs — but experiments consume
@@ -395,14 +391,7 @@ def _(cond, n_cat):
     therefore lives inside the training loop (dual state in the `lax.scan`
     carry) with the dopesheet driving the non-controlled props; that
     composition worked well and is worth keeping even though the controller
-    itself is not adopted. A "controlled prop" Timeline mode is sketched in
-    the project todo, contingent on feedback ever earning a place.
-
-    (Comparisons here are distributional across 32-seed cells; training is
-    chaotic, so per-seed pairings across conditions are illustrative only.
-    The fallback-free static cell reproduces ex-2.9.3's failure *pattern* —
-    same two robustly-hazardous seeds, similar rates — though not bit-for-bit,
-    since this experiment's loss is assembled slightly differently.)
+    itself is not adopted.
     """)
     return
 

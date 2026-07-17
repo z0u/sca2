@@ -81,25 +81,24 @@ def _():
     mo.md(r"""
     # Ex 2.1.2: making composition necessary
 
-    [Ex-2.1.1](../ex-2.1.1/) left D2.1 with a healthy baseline and one hole:
-    no model in the sweep ever solves `named_holdout` — named operand pairs
-    whose named rendering is held out of training, so that answering requires
-    *composing* the alias dictionary with the mixing arithmetic. The
-    diagnosis (worked through in that report) was that the corpus never
-    requires composition: the named slice is small enough to memorize, the
-    alias dictionary is supervised in one direction only, and hex answers can
-    be emitted digit by digit without ever holding the whole mix at one
-    position. The failure looked close, though. On `lime + black`, the model
-    *computes* a correction toward the true answer, but the trained lookup
-    still decides the output.
+    [Ex-2.1.1](../ex-2.1.1/) left D2.1 with a healthy baseline and one hole: no
+    model in the sweep ever solves `named_holdout` — named operand pairs whose
+    named rendering is held out of training, so that answering requires
+    *composing* the alias dictionary with the mixing arithmetic. The diagnosis
+    (worked through in that report) was that the corpus never requires
+    composition: the named slice is small enough to memorize, the alias
+    dictionary is supervised in one direction only, and hex answers can be
+    emitted digit by digit without ever holding the whole mix at one position.
+    The failure looked close, though. On `lime + black`, the model appears to
+    compute a correction toward the true answer, but the trained lookup still
+    decides the output.
 
-    This experiment tests that diagnosis by intervening on the corpus. The
-    architecture, split, and training recipe are ex-2.1.1's backbone
-    (d64-L4), frozen. It is still an *un-anchored* experiment: the aim is to
-    give the anchoring runs a baseline whose compositional eval set actually
-    has headroom, and to build the graded measurements (margins, calibration,
-    position-resolved probes) that anchoring side-effects will be read
-    against.
+    This experiment tests that diagnosis by changing the corpus. The
+    architecture, split, and training recipe are ex-2.1.1's backbone (d64-L4),
+    frozen. It is still an *un-anchored* experiment: the aim is to give the
+    anchoring runs a baseline whose compositional eval set actually has
+    headroom, and to build the graded measurements (margins, calibration,
+    position-resolved probes) that anchoring side-effects will be read against.
 
     We apply two grammar interventions, in a 2 × 2 factorial:
 
@@ -112,10 +111,10 @@ def _():
       so a name + name prompt can no longer be settled by lookup alone: the
       model has to compute the mix to know what kind of answer to give.
 
-    Each intervention carves its token share out of the hex slice, which is
-    far past saturation, so the conditions differ in what they *add*, not in
-    what they starve. Everything else — 40k lines, the ten held-out named
-    pairs, seeds, LR — is identical across conditions and to ex-2.1.1.
+    Each intervention carves its token share out of the hex slice, which is far
+    past saturation, so the conditions differ only in what they add over the
+    baseline. Everything else — 40k lines, the ten held-out named pairs, seeds,
+    LR — is identical across conditions and to ex-2.1.1.
     """)
     return
 
@@ -123,7 +122,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## What the model sees
+    ## Training data
 
     The corpus sampler is deterministic given the experiment's constants;
     regenerating the `both` corpus here shows the two new forms in context
@@ -184,9 +183,9 @@ def _():
     path showed the mix is already half-computed on named prompts, and `rev`
     supplies the missing readout for whatever computation is there. `open`
     alone forces the computation, but leaves name emission supervised only
-    through the memorizable named slice. The sharpest prediction is the
-    interaction: the two interventions are complementary, so the `both`
-    effect should exceed the sum of the single-intervention effects.
+    through the memorizable named slice. The two interventions are
+    complementary, so the `both` effect should exceed the sum of the
+    single-intervention effects.
 
     **H2 — margins.** Scoring all 27 names as complete answers gives each
     held-out pair a *margin*: log-probability of the true name minus the
@@ -213,9 +212,8 @@ def _():
     **H5 — no collateral damage.** `named_seen`, `hex_unseen`, and
     `cross_unseen` stay at ex-2.1.1's saturated levels in every condition:
     displacing up to 15% of the hex slice costs nothing measurable. The
-    `alias_rev` eval set reads ≈ 1 wherever reverse aliases are trained
-    (it is memorizable by construction — a supervision check, not a
-    generalization test) and stays garbage elsewhere, as in ex-2.1.1.
+    `alias_rev` eval set reads ≈ 1 wherever reverse aliases are trained (it is
+    memorizable) and stays random elsewhere, as in ex-2.1.1.
 
     If H1's interaction shows up but the single interventions do nothing,
     composition needed both ingredients at once. If `rev` alone saturates the
@@ -271,11 +269,10 @@ def _():
 
     Exact-match accuracy per eval set and condition; dots are seeds, bars are
     means. `named_holdout` is H1's panel; `open_holdout` shows whether the
-    forced computation generalizes to *unseen* off-palette pairs; `alias_rev`
-    is the supervision check. (In `control` and `rev`, the open-form sets ask
-    for a surface form that those corpora never train on a name + name
-    prompt, so a low score there means the grammar is absent, not that the
-    model failed.)
+    forced computation generalizes to *unseen* off-palette pairs; `alias_rev` is
+    the supervision check. In `control` and `rev`, the open-form sets ask for a
+    surface form that those corpora never train on (a name + name prompt), so a
+    low score there means the grammar is absent, not that the model failed.
     """)
     return
 
@@ -316,16 +313,15 @@ def _(metrics):
     _interaction = _a["both"] - _a["rev"] - _a["open"] + _a["control"]
     mo.md(
         rf"""
-    **H1 is refuted: `named_holdout` stays at zero in every condition**
-    (its interaction term is a degenerate {_interaction:+.2f}). But the
-    flanking panels show that both interventions *trained*. The `open`
-    conditions answer held-out off-palette pairs at ≈ 0.9, so the mixing
-    arithmetic runs on name + name prompts and generalizes to operand pairs
-    never seen in that surface form. And `alias_rev` reads 1.0 exactly where
-    reverse aliases were trained: the hex → name readout exists and works in
-    the frame it was taught in. Both missing ingredients were supplied, yet
-    the composition still doesn't appear as a *named* answer. The next
-    section shows where the failure moved.
+    **H1 is refuted: `named_holdout` stays at zero in every condition** (its
+    interaction term is a degenerate {_interaction:+.2f}). But the other panels
+    show that both interventions *trained*. The `open` conditions answer
+    held-out off-palette pairs at ≈ 0.9, so the mixing arithmetic runs on name +
+    name prompts and generalizes to operand pairs never seen in that surface
+    form. And `alias_rev` reads 1.0 exactly where reverse aliases were trained:
+    the hex → name readout exists and works in the frame it was taught in. Both
+    missing ingredients were supplied, yet the composition still doesn't appear
+    as a *named* answer. The next section shows where the failure moved.
     """
     )
     return
@@ -336,8 +332,8 @@ def _():
     mo.md(r"""
     ## Right value, wrong spelling
 
-    Greedy completions of the held-out named prompts, straight from the
-    published checkpoints. In `control` and `rev` the answers are the
+    Below we list greedy completions of the held-out named prompts.
+    In `control` and `rev` the answers are the
     familiar retrieval-flavored wrong names. In the `open` conditions
     something new happens: for a good fraction of pairs the model emits a
     *hex* answer, and when it does, the value is the correct mix. The
@@ -452,7 +448,7 @@ def _(answer_value, completions, holdout_exs, margins, metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Margins: how far from right, pair by pair
+    ## Error margins, pair by pair
 
     Exact-match accuracy on ten pairs is a coarse instrument. The margin —
     log-probability of the true name as a complete answer, minus the best
@@ -570,26 +566,24 @@ def _():
     mo.md(r"""
     ## The answer schedule: when each channel becomes readable
 
-    Ex-2.1.1's probes read one pre-answer position and averaged over RGB,
-    which hides *when* the mix is computed. Here we fit a ridge probe per
-    (position, channel, layer) on hex prompts. Offset 0 is the `#`; digit k sits
-    at offset k + 1 and is emitted from offset k. Solid segments are
-    positions where the digit is not yet in the context (decoding is
-    computation); dotted segments are after it lands (decoding is copying).
-    H3 says each channel's solid segment ends with a sharp rise at its own
-    emission position — a stair-step, not a plateau.
+    Ex-2.1.1's probes read one pre-answer position and averaged over RGB, which
+    hides *when* the mix is computed. Here we fit a ridge probe per (position,
+    channel, layer) on hex prompts. Offset 0 is the `#`; digit k sits at offset
+    k + 1 and is emitted from offset k. Solid segments are positions where the
+    digit is not yet in the context (decoding is computation); dotted segments
+    are after it lands (decoding is copying). H3 says each channel's solid
+    segment ends with a sharp rise at its own emission position.
 
-    The deep layers show exactly that, and more. At the final layer, channel
-    k is near-perfectly decodable exactly at its emission offset (R² ≈ 0.97)
-    and *only* there: one position earlier it is far weaker, and once
-    emission moves on to the next digit the previous channels are largely
-    *evicted* from the deep residual stream. Each answer position holds the
-    one channel it is about to emit, on top of a diffuse ≈ 0.5-R² trace of
-    the whole mix that persists from the pre-answer position. So the mix is
-    never fully represented at any single position; the "result" the
-    pre-answer probe sees is a head start, not a value. This is just-in-time
-    computation, and anchoring a *result* concept at one position would be
-    working against the model's own schedule.
+    The deep layers show exactly that, and more. At the final layer, channel k
+    is near-perfectly decodable exactly at its emission offset (R² ≈ 0.97) and
+    *only* there: one position earlier it is far weaker, and once emission moves
+    on to the next digit the previous channels are largely evicted from the deep
+    residual stream. Each answer position holds the one channel it is about to
+    emit, on top of a diffuse ≈ 0.5-R² trace of the whole mix that persists from
+    the pre-answer position. So the mix is never fully represented at any single
+    position; the "result" the pre-answer probe sees is a head start, not a
+    value. This is just-in-time computation, and anchoring a *result* concept at
+    one position might work against the model's own schedule.
     """)
     return
 
@@ -671,7 +665,11 @@ def _(metrics):
         for ax, name in zip(axes, _sets, strict=True):
             for cond in CONDS:
                 rows = np.array([cell(metrics, cond, s)["transfer_r2"][name] for s in SEEDS])
-                ax.plot(rows.mean(axis=0), "o-", color=shades[cond], label=cond, lw=2)
+                # Skip depth 0: the pre-answer position's raw embedding is a constant
+                # across prompts (attention hasn't run), so its transfer R² only reflects
+                # the fit-vs-eval mean gap — no result is decodable there in any set.
+                depths = np.arange(rows.shape[1])
+                ax.plot(depths[1:], rows.mean(axis=0)[1:], "o-", color=shades[cond], label=cond, lw=2)
             ax.set(title=name.replace("_", " "), xlabel="residual depth", ylim=(-0.05, 1.05))
             ax.grid(alpha=0.3)
         axes[0].set_ylabel("probe R² (result RGB)")
@@ -704,20 +702,24 @@ def _():
     mo.md(r"""
     ## The garden path, revisited
 
-    Ex-2.1.1's walkthrough example: `lime + black = green`, where the model
-    mis-parses the second operand as *blue* until the `a` of `black` breaks
-    the guess, then only half-corrects the answer — the trained
-    `lime + blue = teal` keeps winning. The margin data lets us ask that
-    question again in every condition: does the correction finally overtake
+    Let's look again at Ex-2.1.1's walkthrough example: in `lime + black =
+    green`, the model guesses the second operand as *blue*, updates to *black*
+    when it sees the `a`, but only half-corrects the answer — the trained
+    `lime + blue = teal` keeps winning[^unstable]. The margin data lets us ask
+    that question again in every condition: does the correction finally overtake
     the lookup? It does not; the margin stays several nats negative in every
-    condition. One incidental observation: the retrained `control` gives the
-    same *kind* of wrong answer as ex-2.1.1's d64-L4-s0, but not always the
-    same one (this seed now says *gray* rather than *teal* for this pair).
-    So which neighbor wins is unstable run to run, even at a fixed seed.
-    Sublines below show per-character surprisal and entropy on the same
-    example (teacher-forced), one row per condition.
+    condition. Sublines below show per-character surprisal and entropy on the
+    same example (teacher-forced), one row per condition.
+
+    [^unstable] The retrained `control` gives the same *kind* of wrong answer as
+    ex-2.1.1's d64-L4-s0, but not always the same one (this seed now says *gray*
+    rather than *teal* for this pair). So which neighbor wins is unstable run to
+    run, even at a fixed seed.
     """)
     return
+
+
+# TODO: What's with the instability? That seems sus; I'd like to understand what happened.
 
 
 @app.cell(hide_code=True)
@@ -801,11 +803,9 @@ def _():
     check on H1: conditions that solve the holdout set should also stop
     being surprised by it.
 
-    It behaves as designed: the `open_*` rows and the `alias_rev` row snap
-    from confidently-wrong (s₂ ≈ 0.7) to calibrated (≈ 0) in precisely the
-    conditions that train those forms, while `named_holdout` stays
-    confidently wrong everywhere — matching its unmoved accuracy. The metric
-    is ready to serve as the anchored runs' early-warning dial.
+    It behaves as expected: the `open_*` rows and the `alias_rev` row snap from
+    confidently-wrong (s₂ ≈ 0.7) to calibrated (≈ 0) under the conditions that
+    train those forms, while `named_holdout` stays confidently wrong everywhere.
     """)
     return
 
@@ -858,31 +858,32 @@ def _(metrics):
         f"""
     ## Findings
 
-    The diagnosis was half right, and the half that failed is the more
-    interesting result. Supplying both missing ingredients — the inverse
-    dictionary and pressure to compute on named prompts — produced exactly
-    those two skills (reverse aliases at 1.0, off-palette generalization at
-    ≈ {_oh:.2f}), but not their *composition*: `named_holdout` stays at zero
-    everywhere. The failure is now visibly split into a form-rule error
-    (correct value, hex spelling) and a value → name translation that never
-    engages mid-equation, even though the same mapping is perfectly learned
-    in its own frame. In a four-layer model this looks less like a data gap
-    than a mechanistic one: nothing in training ever requires chaining the
-    two skills inside one forward pass, and the just-in-time answer schedule
-    suggests the model has no habit of holding a full intermediate result
-    anywhere a readout could find it.
+    Extending the corpus to include the inverse dictionary and pressure to
+    compute on named prompts produced exactly those two skills (reverse aliases
+    at 1.0, off-palette generalization at ≈ {_oh:.2f}), but not their
+    composition: `named_holdout` stays at zero everywhere. The failure is split
+    into a form-rule error (correct value, hex spelling) and a value → name
+    translation that never engages mid-equation, even though the mapping is
+    perfectly learned in its own frame. In a four-layer model this looks less
+    like a data gap than a mechanistic one: nothing in training ever requires
+    chaining the two skills inside one forward pass, and the just-in-time answer
+    schedule suggests the model doesn't hold a full intermediate result anywhere
+    as a latent embedding.
 
-    For D2.1 this changes the plan in a useful way. `named_holdout` is not a
-    usable degradation canary — it has no headroom to lose. But the `both`
-    corpus supplies a better one: `open_holdout` is compositional (unseen
-    pairs, form decided by a computed value), sits near but not at ceiling,
-    and comes with graded instruments (margins, s₂, transfer probes) that
-    this experiment validated end to end. The anchored runs should therefore
-    train on the `both` corpus and treat `open_holdout` + calibration as the
-    sensitive dials, with the saturated sets as the coarse ones. Whether
-    `named_holdout` itself can be made solvable (a denser named sub-grid,
-    curricula, or simply more depth) is now a separate question from D2.1's;
-    it stays parked in the todo list.
+    For D2.1, it seems that `named_holdout` is not a usable degradation canary —
+    it has no headroom to lose. But the new corpus supplies a better one:
+    `open_holdout` is compositional (unseen pairs, form decided by a computed
+    value), sits near but not at ceiling, and comes with graded instruments
+    (margins, s₂, transfer probes) that this experiment validated end to end.
+    The anchored runs should therefore train on the `both` corpus and treat
+    `open_holdout` + calibration as the sensitive dials, with the saturated sets
+    as the coarse ones. The `rev` half earns its place not through `alias_rev`
+    (a memorizable lookup) but by putting the hex → name readout into the
+    weights at all — the piece `named_holdout`'s failure is missing — so a later
+    anchored run has something to recruit; on `open` alone that direction is
+    never trained (`alias_rev` accuracy 0.00), and it costs nothing measurable
+    elsewhere. Whether `named_holdout` itself can be made solvable (a denser
+    named sub-grid, curricula, or simply more depth) is now a separate question.
     """
     )
     return

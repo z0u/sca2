@@ -34,11 +34,11 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
 - [Experiment 2.9.1 redux](./m1/ex-2.9.1/report.py): the M1 headline result
   (deleting *red* from a 5D autoencoder), ported from
   [ex-preppy](https://github.com/z0u/ex-preppy) to JAX. We ran it as an
-  end-to-end shakedown of the M2 infrastructure.
+  end-to-end test of the M2 infrastructure.
 - [nGPT scaling](./ngpt-scaling/report.py): a character-level width × depth
   sweep of our simplified nGPT (scalar gains, a residual step fixed at
   1/n_layer). Converged loss stays flat across the grid — no depth penalty,
-  no instability at large widths — so the backbone should be safe to build
+  no instability at large widths — so this architecture should be safe to build
   the color-mixing experiments on.
 - [Experiment 2.9.2](./m1/ex-2.9.2/report.py): fallback control for deleting
   *red*. Ex-2.9.1's selectivity varies a lot with the seed. This experiment
@@ -67,22 +67,16 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   the nGPT backbone over width × depth × seed, and builds D2.1's measurement
   apparatus: exact-match completion accuracy on seen, held-out, and unseen
   operand pairs, plus per-layer residual-stream probes for operand and result
-  colors. This is the baseline that the anchored runs will be compared
+  colors. This is likely the baseline that the anchored runs will be compared
   against.
 - [Experiment 2.1.2](./m2/ex-2.1.2/report.py): making composition necessary.
-  Ex-2.1.1's baseline never solves the held-out named pairs, and its
-  diagnosis pointed to the corpus: a memorizable named slice, a one-way alias
-  dictionary, and hex answers that factorize per channel. A 2 × 2 factorial
-  of grammar interventions (reverse alias lines × off-palette named
-  equations) on the frozen backbone supplies both missing ingredients. Both
-  train, yet their composition never appears: held-out named accuracy stays
-  at zero, with the failure now split into a form-rule error (correct value,
-  hex spelling) and a value → name translation that never engages
-  mid-equation. Position-resolved probes also show the answer is computed
-  just in time, channel by channel, with earlier channels evicted — the mix
-  never fully exists at any one position. Still un-anchored; the anchored
-  runs inherit the richest corpus plus the graded instruments built here
-  (margins, s₂, transfer probes), with the open holdout set as their
-  degradation canary.
+  Ex-2.1.1's baseline never solves the held-out named pairs, and its diagnosis
+  pointed to the corpus: a memorizable named slice, a one-way alias dictionary,
+  and hex answers that factorize per channel. This experiment tests grammar
+  interventions (reverse alias lines and off-palette named equations). Both
+  train, but held-out named accuracy stays at zero, with the failure now split
+  into a form-rule error (correct value, hex spelling) and a value → name
+  translation that never engages mid-equation. Position-resolved probes suggest
+  the mix never fully exists at any one position.
 
 More reports will appear here as the M2 experiments land.

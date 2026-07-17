@@ -252,7 +252,7 @@ def _():
     grays near 0 (pushed off the axis by the anti-subspace term), and warm
     colors in between. Ablation zeroes axis 0, collapsing that direction while
     leaving the arrangement of the other dimensions intact — which is why the
-    damage lands in proportion to redness.
+    intervention is proportional to redness.
     """)
     return
 
