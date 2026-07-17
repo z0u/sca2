@@ -10,7 +10,7 @@ Characteristics:
 
 - Semantically-appropriate punctuation, including colons, semicolons, and the various dashes. Use the Oxford comma. Use double quotation marks for quotes, and single quotation marks for quotes within quotes. Do not use "smart quotes".
 - Use em dashes sparingly (approx. one per page). Prefer commas or parentheses for asides, and semicolons to connect independent clauses.
-- "I think...", "It seems...": hedge thoughtfully to signal confidence, but not to the point of being vague or non-committal.
+- "I think...", "It seems...": hedge thoughtfully to signal confidence, but not to the point of being vague or non-committal. Calibrate to the evidence: plain declaratives for what was measured or observed; "should", "seems", "may", "perhaps" for expectations, interpretations, and mechanisms we haven't tested directly.
 - Varied sentence rhythm.
 - American spelling to match the convention in scientific literature.
 - High readability, with a Flesch-Kincaid grade level of around 10-12.
@@ -27,6 +27,17 @@ Anti-patterns:
 - ~~Excessive use of em dashes~~. Prefer other punctuation.
 - ~~Excessive use of bold and italic text~~. List items should not be bolded. 1-2 callouts (bold) per page or section; italics only for references & borrowed words, or when it's truly unobvious which phrase should be emphasized (usually the reader can infer without it).
 - ~~Contrastive conclusions~~. "is a feature, not a confound", etc. Instead of `A, ~A`, just say `A`.
+- ~~Evocative headings~~. Headings name what the section contains, not what it means: "Training data", "Findings" — not "What the model sees", "What this settles".
+- ~~Coined names~~. Don't mint a cute label for a borrowed concept; describe it plainly and link to the source.
+
+### Pacing and structure
+
+- One move per paragraph. Prefer several short paragraphs over one dense one; don't pack setup, caveat, and implication into a single sentence held together by dashes.
+- Declare intent, then execute. "Let's get a baseline before we anchor anything", "We will measure two things" — say what's coming in plain first-person, rather than framing it nominally after the fact.
+- State results where they first become visible. When introducing a figure whose outcome is known, say the outcome ("...and we find the model fails this task"); don't hold the reveal for a later section.
+- Keep commentary adjacent to what it explains. Introduce a figure with a sentence or two (what's plotted, how to read it), show it, then interpret — splitting a notebook cell is fine if that's what adjacency takes.
+- A small table for enumerable examples the text refers back to; inline numbering for alternatives ("answerable two ways: 1. recall..., or 2. composition...").
+- Cut tangents. A detail that serves another section belongs there or nowhere; use cross-references and forward-references sparingly.
 
 ### Concision and clarity
 
