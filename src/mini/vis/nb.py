@@ -166,10 +166,10 @@ def themed_figure_html(
     Each ``<img>`` carries explicit ``width``/``height`` attributes: the figure's
     *physical* size (PNG pixels × 96 CSS px/in ÷ save dpi), not its pixel count.
     Without them the browser displays 1 image px per CSS px, so the render dpi would
-    leak into layout — a 150 dpi figure would paint half again as large as its
-    figsize, and text sized to match the page would not. Pinning the CSS size makes
-    the extra pixels crispness on high-dpr screens instead of extra inches, and lets
-    the browser reserve the right space before the image loads.
+    leak into layout — a 192 dpi figure would paint at twice its figsize, and text
+    sized to match the page would not. Pinning the CSS size makes the extra pixels
+    crispness on high-dpr screens instead of extra inches, and lets the browser
+    reserve the right space before the image loads.
     """
     import base64
     import hashlib
@@ -180,7 +180,10 @@ def themed_figure_html(
 
     defaults = {
         "bbox_inches": "tight",
-        "dpi": 150,
+        # 96×2: an exact 2:1 device-pixel ratio on retina/high-dpr screens, so the
+        # extra pixels land as crispness rather than a fractional upscale (blurry at
+        # 150, which is only 1.5625× the 96 px/in CSS reference).
+        "dpi": 192,
     }
     save_args = defaults | savefig_kwargs
 
