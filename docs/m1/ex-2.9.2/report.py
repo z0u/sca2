@@ -398,7 +398,6 @@ def _(exemplars):
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 3, figsize=(9.5, 4.4))
-        fig.subplots_adjust(top=0.82, bottom=0.16, left=0.02, right=0.98)
         fg = light_dark("#000", "#fff")
         panels = [("Baseline", _e["z_base"]), ("Reflected", _e["z_reflect"]), ("Redirected", _e["z_redirect"])]
         for ax, (title, z) in zip(axes, panels, strict=True):
