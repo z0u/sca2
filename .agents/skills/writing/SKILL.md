@@ -20,7 +20,8 @@ Characteristics:
 
 Anti-patterns:
 
-- ~~Business jargon and bombast~~. Avoid buzzwords, corporate-speak, and military and baseball metaphors.
+- ~~Business jargon and bombast~~. Avoid buzzwords, corporate-speak, and baseball metaphors.
+- ~~Adversarial framing~~. Don't cast the object of study as an opponent to beat, convict, or punish. No combat metaphors (*casualties*, *fighting back*, *hauled back*, *the fight is not free*), no crime or interrogation framing (*the culprit*, *names the suspect*, *guilty*/*innocent*, *the hypothesis is dead*), no coercion or punishment (*making composition pay*, *make the model pay for*, *punish memorization*). A result can be vivid without being violent — describe what happened, not who won. Prefer plain cause: "the LR peak was the cause" over "the LR peak was the culprit".
 - ~~All the lists~~. Mostly use paragraphs, but use lists sparingly when they are the clearest way to present the information.
 - ~~Heavy-handed transitions~~. Avoid "Furthermore", "In conclusion", "The honest answer is", etc. Just continue the thought.
 - ~~Excessive use of em dashes~~. Prefer other punctuation.

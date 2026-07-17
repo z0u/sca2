@@ -132,18 +132,19 @@ def _(cond, n_cat, rd):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## The fallback-free test: rescues, and new casualties
+    ## The fallback-free test: rescues, and new failures
 
     Ex-2.9.3's base config (no fallback term, peak LR 0.1) is where
     catastrophic failures live, so it's the fair test of a rescue mechanism.
     Below, anchor progress and leakage for all 32 seeds under each variant.
     The static schedule's failures are visible in the anchor panel: the
-    anchor establishes, then collapses late, unopposed. Under the controller
-    the same panel shows the feedback fighting back — runs dip hard
-    mid-plateau and get hauled back to 1 — but the fight is not free and not
-    always won: the leak panel shows runs where sustained pressure drags
-    pinkish-labeled colors onto the axis until the geometry is ruined, and
-    one run loses the anchor outright with the weight pinned at its cap.
+    anchor establishes, then collapses late, with nothing to hold it. Under
+    the controller the same panel shows the feedback responding — runs dip
+    hard mid-plateau and are pulled back to 1 — but the response is neither
+    free nor always successful: the leak panel shows runs where a sustained
+    penalty drags pinkish-labeled colors onto the axis until the geometry is
+    ruined, and one run loses the anchor outright with the weight pinned at
+    its cap.
     """)
     return
 
@@ -164,10 +165,10 @@ def _(cond, steps, traj):
             "reconstruction collapse). Top right, static leak: the colored runs climb to "
             f"{max(r['leak'] for r in cond('static-nofb')):.2f}. Bottom left, controller anchor "
             "progress: colored runs dip sharply mid-plateau — one to about minus 0.25 — and are "
-            "mostly hauled back to 1 by the feedback, but one ends near 0.15: pressure did not "
-            f"save it. Bottom right, controller leak: {_ncat['ctrl-nofb']} colored runs blow up, "
+            "mostly pulled back to 1 by the feedback, but one ends near 0.15: the feedback did not "
+            f"recover it. Bottom right, controller leak: {_ncat['ctrl-nofb']} colored runs blow up, "
             f"the worst reaching {max(r['leak'] for r in cond('ctrl-nofb')):.2f} — over-anchoring "
-            "under sustained maximum pressure."
+            "under a sustained maximum penalty."
         ),
     )
     def _plot() -> plt.Figure:
@@ -217,16 +218,16 @@ def _(cond, traj):
         f"The dual's own trajectory separates the outcomes. In the rescues, λ engages during "
         f"anchor establishment, then releases as the constraint is satisfied — on seed 27 (static's "
         f"worst, still below z₀ = 0.7 at step {_drop}) the controlled run holds z₀ ≈ 1 through the "
-        f"plateau with λ decaying to {_c27['lam_anchor_end']:.2f}. In the casualties the labeled "
+        f"plateau with λ decaying to {_c27['lam_anchor_end']:.2f}. In the failures the labeled "
         f"anchor EMA *never* satisfies its target, so λ saturates at the {LAM_CAP} cap and stays "
         f"there ({_sat_bad} of {len(_bad)} catastrophic runs had mean λ > 0.13, versus {_sat_ok} of "
         f"{_n_ok} clean ones). That is the sensor problem: the anchor term is measured on noisy "
         f"labels, and a pinkish color that is *correctly* placed off-axis is indistinguishable from "
         f"a red that has drifted. On most seeds the EMA settles below target anyway; on some it "
-        f"can't, and sustained maximum pressure produces exactly the over-anchoring (leak "
+        f"can't, and a sustained maximum penalty produces exactly the over-anchoring (leak "
         f"{max(r['leak'] for r in _bad):.2f}) and collapse the controller was meant to prevent. "
-        f"A run even lost its anchor *with the weight pinned at maximum* — pressure on the loss "
-        f"is not the same as stability of the optimum."
+        f"A run even lost its anchor *with the weight pinned at maximum* — a large penalty on the "
+        f"loss is not the same as stability of the optimum."
     )
     return
 
@@ -325,7 +326,7 @@ def _(cond, n_cat, rd):
         f"At the benign peak the two approaches are statistically interchangeable on the score "
         f"(medians {np.median(rd(_c5)):.2f} controlled vs {np.median(rd(_s5)):.2f} static; floors "
         f"{rd(_c5).min():.2f} vs {rd(_s5).min():.2f}). The controller halves *typical* leak "
-        f"({_lk(_c5):.3f} vs {_lk(_s5):.3f}) — sustained low-level pressure does keep the axis "
+        f"({_lk(_c5):.3f} vs {_lk(_s5):.3f}) — a sustained low-level penalty does keep the axis "
         f"cleaner on average — but fattens the tail past the degraded threshold and costs ~2–3× in "
         f"reconstruction ({_rc(_c5):.6f} vs {_rc(_s5):.6f}; both still tiny). At the hostile peak "
         f"the pattern is the same ({n_cat(_c1) + n_cat(_s1)} catastrophes between them, thanks to "
@@ -370,16 +371,16 @@ def _(cond, n_cat):
     - **The sensor is the bottleneck, not the response.** The only honest
       training-time signal for anchor health is the anchor loss on noisy
       labels, and it cannot distinguish a drifting red from a correctly
-      off-axis pink. Runs where that ambiguity binds get sustained maximum
-      pressure, and over-anchoring at the cap is as destructive as the
-      instability being defended against ({n_cat(cond("ctrl-nofb"))} of 32
+      off-axis pink. Runs where that ambiguity binds get a sustained maximum
+      penalty, and over-anchoring at the cap is as destructive as the
+      instability it was meant to prevent ({n_cat(cond("ctrl-nofb"))} of 32
       fallback-free controlled runs, vs {n_cat(cond("static-nofb"))} static).
     - **Feedback moved the tuning burden; it didn't remove it.** The
       controller's targets and gains are *sharper* than the LR peak they
       were meant to insulate us from: ±25–100% perturbations produced
       {_cat_sens} catastrophic runs even with the stabilizing fallback term,
       out of {_tot_fb} fallback-trained runs that otherwise had none.
-    - **The stack that wins is boring**: fallback term (which, across two
+    - **The stack that works is boring**: fallback term (which, across two
       experiments, has eliminated every catastrophic failure) + peak LR
       0.05 + the original timed anneal + cheap endpoint screening. Adopt
       that for M2 and revisit feedback only if the transformer setting
@@ -387,7 +388,7 @@ def _(cond, n_cat):
 
     If feedback returns, aim it differently: the hazard here was the LR,
     so a controller that *cools the optimizer* when constraint EMAs degrade
-    would act on the true cause rather than pressing harder on a noisy
+    would act on the true cause rather than raising the penalty on a noisy
     proxy — and a sensor with a supervised holdout (even a handful of
     trusted labels) would remove the pink/red ambiguity.
 

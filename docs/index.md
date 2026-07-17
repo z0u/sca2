@@ -67,9 +67,9 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   apparatus: exact-match completion accuracy on seen, held-out, and unseen
   operand pairs, plus per-layer residual-stream probes for operand and result
   colors. The baseline the anchored runs are compared against.
-- [Experiment 2.1.2](./m2/ex-2.1.2/report.py): making composition pay.
+- [Experiment 2.1.2](./m2/ex-2.1.2/report.py): making composition necessary.
   Ex-2.1.1's baseline never solves the held-out named pairs, and its diagnosis
-  blamed the corpus: a memorizable named slice, a one-way alias dictionary,
+  pointed to the corpus: a memorizable named slice, a one-way alias dictionary,
   and hex answers that factorize per channel. A 2 × 2 factorial of grammar
   interventions (reverse alias lines × off-palette named equations) on the
   frozen backbone supplies both missing ingredients — and both train, yet

@@ -721,7 +721,7 @@ def _(train_pairs):
     lines (`#f00 = red`); named operands whose off-palette mix forces a hex
     answer (`red + navy = #804`), so that name + name prompts must engage
     the arithmetic rather than the lookup table; and a denser named palette,
-    to make memorization the expensive strategy. Until one of those lands,
+    so that memorization no longer suffices. Until one of those lands,
     `named_holdout` sits at zero for corpus reasons, not capacity ones.
     """)
     return

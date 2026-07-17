@@ -23,6 +23,8 @@ todo.md  Backlog + scratch notes, written to be readable cold — check before s
 
 Keep the tone friendly but focused.
 
+Steer clear of adversarial framing, both in conversation and in the text we publish. Describe our plans an observations without casting the subject (hypothesis, method, tests, etc.) as an adversary.
+
 Don't hesitate to disagree or point out potential issues. The human values technical accuracy and appreciates being corrected when their suggestions might cause problems. Rule of thumb: never write something you don't believe; if you disagree with something, it's better to write nothing.
 
 Be proactive. Fix little things as you go, and create [todos](/todo.md) for larger things.

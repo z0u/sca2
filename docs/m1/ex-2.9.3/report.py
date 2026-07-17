@@ -302,7 +302,7 @@ def _(arm):
         f"(of 128; {len(_cats)} catastrophic) instead scatter across {len(_by_init)} different "
         f"inits, none failing more than {max(_by_init.values())} of 8, with mild clustering by "
         f"stream (stream 6 accounts for {_by_stream.get(6, 0)}). The incompatible-init hypothesis "
-        f"is dead: the same init succeeds or fails depending on which random batches and label "
+        f"is refuted: the same init succeeds or fails depending on which random batches and label "
         f"draws it sees during the hot phase, with a residual interaction that is just chaos. Two "
         f"practical consequences. Sweeping schedules *per seed* would be aiming at noise — a seed "
         f"isn't good or bad, a *(seed, stream, schedule)* triple is. And any fix must make the "
@@ -314,9 +314,9 @@ def _(arm):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## The sweep: the LR peak was the culprit; the anneal was innocent
+    ## The sweep: the LR peak was the cause; the anneal was not
 
-    Going in, the anneal looked guilty — it removes the anchor's protection.
+    Going in, the anneal looked responsible — it removes the anchor's protection.
     But the sweep says otherwise: holding the regularizers on to the end
     (`anneal off`) makes things *worse* at every peak, while simply halving
     the LR peak removes the failures entirely. These runs train with the

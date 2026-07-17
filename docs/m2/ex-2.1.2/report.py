@@ -3,7 +3,7 @@ import marimo
 __generated_with = "0.23.9"
 app = marimo.App(
     width="medium",
-    app_title="Ex 2.1.2: making composition pay",
+    app_title="Ex 2.1.2: making composition necessary",
     css_file="../../report.css",
     auto_download=["html"],
 )
@@ -79,19 +79,19 @@ with app.setup(hide_code=True):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Ex 2.1.2: making composition pay
+    # Ex 2.1.2: making composition necessary
 
     [Ex-2.1.1](../ex-2.1.1/) left D2.1 with a healthy baseline and one hole:
     no model in the sweep ever solves `named_holdout` — named operand pairs
     whose named rendering is held out of training, so that answering requires
     *composing* the alias dictionary with the mixing arithmetic. The
-    diagnosis (worked through in that report) was that the corpus never makes
-    composition pay: the named slice is small enough to memorize, the alias
+    diagnosis (worked through in that report) was that the corpus never
+    requires composition: the named slice is small enough to memorize, the alias
     dictionary is supervised in one direction only, and hex answers can be
     emitted digit-by-digit without ever holding the whole mix at one position.
     The failure is close, though. On `lime + black`, the model *computes* a
-    correction toward the true answer but the trained lookup wins anyway; the
-    arithmetic is running, and losing, underneath the retrieval.
+    correction toward the true answer, but the trained lookup still decides the
+    output; the arithmetic runs underneath the retrieval without changing it.
 
     This experiment tests that diagnosis by intervening on the corpus — the
     architecture, split, and training recipe are ex-2.1.1's backbone
