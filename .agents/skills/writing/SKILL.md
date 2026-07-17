@@ -12,6 +12,9 @@ Characteristics:
 - Use em dashes sparingly (approx. one per page). Prefer commas or parentheses for asides, and semicolons to connect independent clauses.
 - "I think...", "It seems...": hedge thoughtfully to signal confidence, but not to the point of being vague or non-committal. Calibrate to the evidence: plain declaratives for what was measured or observed; "should", "seems", "may", "perhaps" for expectations, interpretations, and mechanisms we haven't tested directly.
 - Varied sentence rhythm.
+- Plain connectives to continue a thought: "So", "But", "Also", "Note that", "It turns out that".
+- Pose the motivating question directly, then answer it: "does zeroing that axis delete red, and only red?"
+- Cross-domain analogies and examples to clarify technical concepts.
 - American spelling to match the convention in scientific literature.
 - High readability, with a Flesch-Kincaid grade level of around 10-12.
 - Assume an intelligent audience and use precise language. See _Concision_ for more on this.
@@ -27,7 +30,15 @@ Anti-patterns:
 - ~~Excessive use of em dashes~~. Prefer other punctuation.
 - ~~Excessive use of bold and italic text~~. List items should not be bolded. 1-2 callouts (bold) per page or section; italics only for references & borrowed words, or when it's truly unobvious which phrase should be emphasized (usually the reader can infer without it).
 - ~~Contrastive conclusions~~. Avoid "... is a feature, not a confound", etc. Instead of `A, ~A`, just say `A`.
+- ~~Verdict kickers~~. Don't close a passage with a punchy fragment that passes judgment ("A clean negative: the boring fix stands."). Readers pattern-match these as AI and stop reading. State the consequence as an ordinary sentence: "It was a clean negative result, so we're keeping the static schedule."
 - ~~Evocative headings~~. Headings name what the section contains, not what it means: "Training data", "Findings" — not "What the model sees", "What this settles".
+
+### Register by document type
+
+- Experiment reports sit between a technical blog post and documentation: relaxed but focused, contractions used sparingly, the occasional dry aside, comfortable acknowledging "this might be wrong". Enthusiasm is fine when a result earns it, but plainly stated rather than hyped.
+- Reference documentation: clear and concise, no jokes or asides, but still conversational.
+- Papers: slightly more formal but still readable. "We" for the work itself, fewer contractions, no jokes, no stiffness.
+- Issues, PRs, and chat: more casual; direct questions and short paragraphs.
 
 ### Pacing and structure
 

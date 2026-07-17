@@ -247,7 +247,7 @@ def _():
     mo.md(r"""
     ## The latent geometry
 
-    The same story, seen in the bottleneck. Before ablation, position along
+    The same result is visible in the bottleneck. Before ablation, position along
     axis 0 tracks similarity to red: pure red sits at 1, blues, greens, and
     grays near 0 (pushed off the axis by the anti-subspace term), and warm
     colors in between. Ablation zeroes axis 0, collapsing that direction while
@@ -295,7 +295,7 @@ def _(best_eval):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## What this validates
+    ## Findings
 
     The result reproduces M1's finding, but the point of this run was the
     plumbing: the same dopesheet driving a JAX training loop through
@@ -303,8 +303,8 @@ def _():
     resumable records; artifacts and refs flowing through the store to this
     report; and `@themed` figures published via the report bundle. Training a
     seed takes about ten seconds, and the runs are bit-identical between local
-    CPU and Modal, so failures here would have been infrastructure failures —
-    there weren't any left by the end.
+    CPU and Modal, so any failures here would have been infrastructure
+    failures. There were none left by the end.
 
     Next: the M2 experiments proper, anchoring concepts in a small transformer's
     residual stream on the color-mixing task (see the [README](../../README.md)).

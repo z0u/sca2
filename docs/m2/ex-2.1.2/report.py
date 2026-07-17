@@ -86,34 +86,34 @@ def _():
     whose named rendering is held out of training, so that answering requires
     *composing* the alias dictionary with the mixing arithmetic. The
     diagnosis (worked through in that report) was that the corpus never
-    requires composition: the named slice is small enough to memorize, the alias
-    dictionary is supervised in one direction only, and hex answers can be
-    emitted digit-by-digit without ever holding the whole mix at one position.
-    The failure is close, though. On `lime + black`, the model *computes* a
-    correction toward the true answer, but the trained lookup still decides the
-    output; the arithmetic runs underneath the retrieval without changing it.
+    requires composition: the named slice is small enough to memorize, the
+    alias dictionary is supervised in one direction only, and hex answers can
+    be emitted digit by digit without ever holding the whole mix at one
+    position. The failure looked close, though. On `lime + black`, the model
+    *computes* a correction toward the true answer, but the trained lookup
+    still decides the output.
 
-    This experiment tests that diagnosis by intervening on the corpus — the
+    This experiment tests that diagnosis by intervening on the corpus. The
     architecture, split, and training recipe are ex-2.1.1's backbone
-    (d64-L4), frozen. It is still an *un-anchored* experiment: the point is
-    to hand the anchoring runs a baseline whose compositional eval set
-    actually has headroom, and to build the graded measurements (margins,
-    calibration, position-resolved probes) that anchoring side-effects will
-    be read against.
+    (d64-L4), frozen. It is still an *un-anchored* experiment: the aim is to
+    give the anchoring runs a baseline whose compositional eval set actually
+    has headroom, and to build the graded measurements (margins, calibration,
+    position-resolved probes) that anchoring side-effects will be read
+    against.
 
-    Two grammar interventions, in a 2 × 2 factorial:
+    We apply two grammar interventions, in a 2 × 2 factorial:
 
-    - **rev** adds reverse alias lines (`#f00 = red`): the hex → name
-      readout, which the base grammar leaves untrained (its absence is a
-      small-scale reversal curse), gets direct supervision.
+    - **rev** adds reverse alias lines (`#f00 = red`). The base grammar
+      leaves the hex → name readout untrained (its absence is a small-scale
+      reversal curse); this gives it direct supervision.
     - **open** adds equations with named operands whose mix falls *off* the
       palette, answered in hex (`red + navy = #804`). The answer's surface
-      form then depends on the mix's *value*, not just the operands' forms —
-      so a name + name prompt can no longer be settled by lookup alone; the
+      form then depends on the mix's *value*, not just the operands' forms,
+      so a name + name prompt can no longer be settled by lookup alone: the
       model has to compute the mix to know what kind of answer to give.
 
     Each intervention carves its token share out of the hex slice, which is
-    far past saturation, so conditions differ in what they *add*, not in
+    far past saturation, so the conditions differ in what they *add*, not in
     what they starve. Everything else — 40k lines, the ten held-out named
     pairs, seeds, LR — is identical across conditions and to ex-2.1.1.
     """)
@@ -180,13 +180,13 @@ def _():
 
     **H1 — accuracy.** `named_holdout` stays at zero in `control` and is
     lifted well off zero by `both`. The single interventions are the
-    diagnostic cells: `rev` alone lifts it *partially* — the garden path
-    showed the mix is already half-computed on named prompts, and `rev`
-    supplies the missing readout for whatever computation is there — while
-    `open` alone forces the computation but leaves name emission supervised
-    only through the memorizable named slice. The sharp prediction is the
-    interaction: the legs are complementary, so the `both` effect exceeds
-    the sum of the single-intervention effects.
+    diagnostic cells. We expect `rev` alone to lift it partially: the garden
+    path showed the mix is already half-computed on named prompts, and `rev`
+    supplies the missing readout for whatever computation is there. `open`
+    alone forces the computation, but leaves name emission supervised only
+    through the memorizable named slice. The sharpest prediction is the
+    interaction: the two interventions are complementary, so the `both`
+    effect should exceed the sum of the single-intervention effects.
 
     **H2 — margins.** Scoring all 27 names as complete answers gives each
     held-out pair a *margin*: log-probability of the true name minus the
@@ -218,11 +218,11 @@ def _():
     generalization test) and stays garbage elsewhere, as in ex-2.1.1.
 
     If H1's interaction shows up but the single interventions do nothing,
-    composition needed both legs at once; if `rev` alone saturates the set,
-    the readout was the only missing piece and the lookup pressure never
-    mattered; if nothing moves, the diagnosis was wrong somewhere upstream
-    of the corpus. Any of these is informative for how hard D2.1's anchored
-    runs should lean on `named_holdout` as a degradation canary.
+    composition needed both ingredients at once. If `rev` alone saturates the
+    set, the readout was the only missing piece and the lookup pressure never
+    mattered. If nothing moves, the diagnosis was wrong somewhere upstream of
+    the corpus. Any of these outcomes tells us how much D2.1's anchored runs
+    can lean on `named_holdout` as a degradation canary.
     """)
     return
 
@@ -273,8 +273,9 @@ def _():
     means. `named_holdout` is H1's panel; `open_holdout` shows whether the
     forced computation generalizes to *unseen* off-palette pairs; `alias_rev`
     is the supervision check. (In `control` and `rev`, the open-form sets ask
-    for a surface form those corpora never train on a name + name prompt, so
-    low scores there read as "grammar not in evidence", not as failure.)
+    for a surface form that those corpora never train on a name + name
+    prompt, so a low score there means the grammar is absent, not that the
+    model failed.)
     """)
     return
 
@@ -315,16 +316,16 @@ def _(metrics):
     _interaction = _a["both"] - _a["rev"] - _a["open"] + _a["control"]
     mo.md(
         rf"""
-    **H1 is refuted at face value: `named_holdout` stays at zero in every
-    condition** (so its interaction term is a degenerate {_interaction:+.2f}).
-    But the flanking panels show both interventions *trained*. The `open`
-    conditions answer held-out off-palette pairs at ≈ 0.9 — the mixing
+    **H1 is refuted: `named_holdout` stays at zero in every condition**
+    (its interaction term is a degenerate {_interaction:+.2f}). But the
+    flanking panels show that both interventions *trained*. The `open`
+    conditions answer held-out off-palette pairs at ≈ 0.9, so the mixing
     arithmetic runs on name + name prompts and generalizes to operand pairs
     never seen in that surface form. And `alias_rev` reads 1.0 exactly where
     reverse aliases were trained: the hex → name readout exists and works in
-    the frame it was taught in. Both legs of the diagnosis were supplied, and
-    the composition still never clicks into a *named* answer. The next
-    section shows where the failure actually moved.
+    the frame it was taught in. Both missing ingredients were supplied, yet
+    the composition still doesn't appear as a *named* answer. The next
+    section shows where the failure moved.
     """
     )
     return
@@ -339,10 +340,10 @@ def _():
     published checkpoints. In `control` and `rev` the answers are the
     familiar retrieval-flavored wrong names. In the `open` conditions
     something new happens: for a good fraction of pairs the model emits a
-    *hex* answer — and when it does, the value is the **correct mix**.
-    The swatches make it visible: reading down an `open`/`both` column, the
-    hex answers match the expected color exactly, while the name answers
-    are still near-miss neighbors.
+    *hex* answer, and when it does, the value is the correct mix. The
+    swatches make it visible: reading down an `open`/`both` column, the hex
+    answers match the expected color exactly, while the name answers are
+    still near-miss neighbors.
     """)
     return
 
@@ -437,14 +438,12 @@ def _(answer_value, completions, holdout_exs, margins, metrics):
     margin (log-probability of the correct hex minus the true name, teacher-forced) tells the same
     story: {", ".join(f"`{c}` {_form_margin(c):+.1f}" for c in CONDS)} nats.
 
-    So the `open` intervention did what it was designed to do — the mix is computed on name + name
-    prompts — but the *form rule* ("answer named exactly when the mix lands on the palette") did not
+    So the `open` intervention did what it was designed to do: the mix is computed on name + name
+    prompts. But the *form rule* ("answer named exactly when the mix lands on the palette") did not
     generalize: the model treats held-out closed pairs like open ones and answers in hex, or falls
-    back to the lookup-neighbor name. And `rev` moved nothing here: its perfect reverse-alias skill
-    stays locked to the `#hex = ` frame it was trained in — supplying the inverse dictionary as a
-    *surface task* does not make it available as an internal *readout* mid-equation. That is a
-    sharper version of the reversal curse than the one diagnosed in ex-2.1.1: even indirect
-    supervision of the inverse direction fails to transfer across frames.
+    back to the lookup-neighbor name. And `rev` moved nothing here. Its perfect reverse-alias skill
+    stays locked to the `#hex = ` frame it was trained in; supplying the inverse dictionary as a
+    *surface task* does not make it available as an internal *readout* mid-equation.
     """
     )
     return
@@ -458,7 +457,7 @@ def _():
     Exact-match accuracy on ten pairs is a coarse instrument. The margin —
     log-probability of the true name as a complete answer, minus the best
     competitor among the *other names* — grades the name-identity question
-    continuously, independent of the hex-vs-name form choice above: positive
+    continuously, independent of the hex-vs-name form choice above. Positive
     means the true name wins among names, and the magnitude says by how
     much. One line per held-out pair, mean over seeds, across conditions;
     `named_seen` margins shown as the shaded reference.
@@ -553,15 +552,14 @@ def _(m_hold):
     mo.md(
         f"""
     **H2 mostly fails too.** The distribution barely moves: mean margin
-    {_ctrl.mean():+.1f} nats in `control` and {_both.mean():+.1f} in `both`, with
-    {_flipped}/10 pairs ending positive. The true name never comes close to
-    winning among names — roughly ten nats adrift while `named_seen` sits far
-    above zero — so the value → name translation isn't *almost there* and
-    outvoted at the margin; on these prompts it simply never engages, even in
-    the condition whose greedy answers prove the value has been computed. The
-    rank structure is real but weak (rank correlation {_rho:.2f} between
-    `control` and `both`), so the "least-wrong pairs flip first" reading has
-    nothing to bite on: no pair flips at all.
+    {_ctrl.mean():+.1f} nats in `control` and {_both.mean():+.1f} in `both`,
+    with {_flipped}/10 pairs ending positive. The true name never comes close
+    to winning among names — it stays roughly ten nats adrift while
+    `named_seen` sits far above zero. So the value → name translation isn't
+    *almost there* and outvoted at the margin; on these prompts it simply
+    never engages, even in the condition whose greedy answers prove the value
+    has been computed. The rank structure is real but weak (rank correlation
+    {_rho:.2f} between `control` and `both`), and no pair flips at all.
     """
     )
     return
@@ -572,27 +570,26 @@ def _():
     mo.md(r"""
     ## The answer schedule: when each channel becomes readable
 
-    Ex-2.1.1's probes read one pre-answer position and averaged over RGB —
-    which hides *when* the mix is computed. Here, on hex prompts, a ridge
-    probe per (position, channel, layer). Offset 0 is the `#`; digit k sits
+    Ex-2.1.1's probes read one pre-answer position and averaged over RGB,
+    which hides *when* the mix is computed. Here we fit a ridge probe per
+    (position, channel, layer) on hex prompts. Offset 0 is the `#`; digit k sits
     at offset k + 1 and is emitted from offset k. Solid segments are
     positions where the digit is not yet in the context (decoding is
     computation); dotted segments are after it lands (decoding is copying).
     H3 says each channel's solid segment ends with a sharp rise at its own
     emission position — a stair-step, not a plateau.
 
-    That is what the deep layers show, and then some. At the final layer,
-    channel k is near-perfectly decodable exactly at its emission offset
-    (R² ≈ 0.97) and *only* there: one position earlier it is far weaker,
-    and once emission moves on to the next digit the previous channels are
-    not merely stale but largely *evicted* from the deep residual stream —
-    each answer position holds the one channel it is about to emit, on top
-    of a diffuse ≈ 0.5-R² trace of the whole mix that persists from the
-    pre-answer position. The mix is never fully represented at any single
-    position; the "result" the pre-answer probe sees is a head start, not
-    a value. This is just-in-time computation, and it is exactly the
-    regime in which anchoring a *result* concept at one position would be
-    fighting the model's own schedule.
+    The deep layers show exactly that, and more. At the final layer, channel
+    k is near-perfectly decodable exactly at its emission offset (R² ≈ 0.97)
+    and *only* there: one position earlier it is far weaker, and once
+    emission moves on to the next digit the previous channels are largely
+    *evicted* from the deep residual stream. Each answer position holds the
+    one channel it is about to emit, on top of a diffuse ≈ 0.5-R² trace of
+    the whole mix that persists from the pre-answer position. So the mix is
+    never fully represented at any single position; the "result" the
+    pre-answer probe sees is a head start, not a value. This is just-in-time
+    computation, and anchoring a *result* concept at one position would be
+    working against the model's own schedule.
     """)
     return
 
@@ -651,18 +648,6 @@ def _():
     condition computes the mix on named prompts, the probe carries over; if
     the mix is never represented there, no probe fit elsewhere can read it
     out. One panel per scored set, R² against depth, one line per condition.
-
-    The reading: partial computation is present *everywhere*, control
-    included — the held-out named prompts carry roughly as much
-    linearly-decodable result as the fit set's own ceiling (≈ 0.6 at the
-    deep layers), which quantifies ex-2.1.1's garden-path anecdote. The
-    `open` conditions raise the mid-depth transfer somewhat, consistent
-    with the arithmetic being made load-bearing on these prompts, and their
-    *final*-layer R² drops on the named sets — the last layer's job there
-    has become committing to a surface form. But the headline is that
-    "computed but outvoted" was already true in `control`, and making the
-    computation stronger (`open`) or the readout available (`rev`) still
-    doesn't connect them.
     """)
     return
 
@@ -700,20 +685,37 @@ def _(metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    Partial computation is present everywhere, `control` included: the
+    held-out named prompts carry roughly as much linearly-decodable result
+    as the fit set's own ceiling (≈ 0.6 at the deep layers). That quantifies
+    ex-2.1.1's garden-path anecdote. The `open` conditions raise the
+    mid-depth transfer somewhat, consistent with the arithmetic being made
+    load-bearing on these prompts, and their *final*-layer R² drops on the
+    named sets — there, the last layer's job has become committing to a
+    surface form. But the main point is that "computed but outvoted" was
+    already true in `control`, and making the computation stronger (`open`)
+    or the readout available (`rev`) still doesn't connect them.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ## The garden path, revisited
 
     Ex-2.1.1's walkthrough example: `lime + black = green`, where the model
     mis-parses the second operand as *blue* until the `a` of `black` breaks
     the guess, then only half-corrects the answer — the trained
-    `lime + blue = teal` keeps winning. The margin data lets us re-ask that
-    question in every condition: does the correction finally overtake the
-    lookup? It does not — the margin stays several nats negative in every
+    `lime + blue = teal` keeps winning. The margin data lets us ask that
+    question again in every condition: does the correction finally overtake
+    the lookup? It does not; the margin stays several nats negative in every
     condition. One incidental observation: the retrained `control` gives the
-    same *kind* of wrong answer as ex-2.1.1's d64-L4-s0 but not always the
-    same one (this seed now says *gray* rather than *teal* for this pair),
-    a reminder that which neighbor wins is unstable run to run even at a
-    fixed seed. Sublines below show per-character surprisal and entropy on
-    the same example (teacher-forced), one row per condition.
+    same *kind* of wrong answer as ex-2.1.1's d64-L4-s0, but not always the
+    same one (this seed now says *gray* rather than *teal* for this pair).
+    So which neighbor wins is unstable run to run, even at a fixed seed.
+    Sublines below show per-character surprisal and entropy on the same
+    example (teacher-forced), one row per condition.
     """)
     return
 
@@ -799,11 +801,11 @@ def _():
     check on H1: conditions that solve the holdout set should also stop
     being surprised by it.
 
-    It behaves exactly as designed: the `open_*` rows and the `alias_rev`
-    row snap from confidently-wrong (s₂ ≈ 0.7) to calibrated (≈ 0) in
-    precisely the conditions that train those forms, while `named_holdout`
-    stays confidently wrong everywhere — matching its unmoved accuracy.
-    The metric is ready to be the anchored runs' early-warning dial.
+    It behaves as designed: the `open_*` rows and the `alias_rev` row snap
+    from confidently-wrong (s₂ ≈ 0.7) to calibrated (≈ 0) in precisely the
+    conditions that train those forms, while `named_holdout` stays
+    confidently wrong everywhere — matching its unmoved accuracy. The metric
+    is ready to serve as the anchored runs' early-warning dial.
     """)
     return
 
@@ -854,33 +856,33 @@ def _(metrics):
     _oh = float(np.mean([acc(metrics, "both", s, "open_holdout") for s in SEEDS]))
     mo.md(
         f"""
-    ## What this settles
+    ## Findings
 
     The diagnosis was half right, and the half that failed is the more
     interesting result. Supplying both missing ingredients — the inverse
     dictionary and pressure to compute on named prompts — produced exactly
     those two skills (reverse aliases at 1.0, off-palette generalization at
-    ≈ {_oh:.2f}) without producing their *composition*: `named_holdout`
-    stays at zero everywhere, with the failure now visibly split into a
-    form-rule error (correct value, hex spelling) and a value → name
-    translation that never engages mid-equation, even when the same mapping
-    is perfectly learned in its own frame. In a four-layer model this looks
-    less like a data gap than a mechanistic one: nothing in training ever
-    requires chaining the two skills inside one forward pass, and the
-    just-in-time answer schedule suggests the model has no habit of holding
-    a full intermediate result anywhere a readout could find it.
+    ≈ {_oh:.2f}), but not their *composition*: `named_holdout` stays at zero
+    everywhere. The failure is now visibly split into a form-rule error
+    (correct value, hex spelling) and a value → name translation that never
+    engages mid-equation, even though the same mapping is perfectly learned
+    in its own frame. In a four-layer model this looks less like a data gap
+    than a mechanistic one: nothing in training ever requires chaining the
+    two skills inside one forward pass, and the just-in-time answer schedule
+    suggests the model has no habit of holding a full intermediate result
+    anywhere a readout could find it.
 
-    For D2.1 this changes the plan in a useful way. `named_holdout` is not
-    a usable degradation canary — it has no headroom to lose — but the
-    `both` corpus supplies a better one: `open_holdout` is compositional
-    (unseen pairs, form decided by a computed value), sits near but not at
-    ceiling, and comes with graded instruments (margins, s₂, transfer
-    probes) that this experiment validated end to end. The anchored runs
-    should therefore train on the `both` corpus and treat `open_holdout` +
-    calibration as the sensitive dials, with the saturated sets as the
-    coarse ones. Whether `named_holdout` itself can be made solvable (a
-    denser named sub-grid, curricula, or simply more depth) is now a
-    separate question from D2.1's, and stays parked in the todo list.
+    For D2.1 this changes the plan in a useful way. `named_holdout` is not a
+    usable degradation canary — it has no headroom to lose. But the `both`
+    corpus supplies a better one: `open_holdout` is compositional (unseen
+    pairs, form decided by a computed value), sits near but not at ceiling,
+    and comes with graded instruments (margins, s₂, transfer probes) that
+    this experiment validated end to end. The anchored runs should therefore
+    train on the `both` corpus and treat `open_holdout` + calibration as the
+    sensitive dials, with the saturated sets as the coarse ones. Whether
+    `named_holdout` itself can be made solvable (a denser named sub-grid,
+    curricula, or simply more depth) is now a separate question from D2.1's;
+    it stays parked in the todo list.
     """
     )
     return

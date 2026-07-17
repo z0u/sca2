@@ -64,12 +64,12 @@ def _():
     # nGPT scaling: flat across the width × depth grid
 
     Our nGPT keeps the published residual form — a LERP toward the sub-module's
-    *normalized* output, `h ← Norm(h + α·(Norm(sub(h)) − h))` — but strips the
-    rest to scalars: one gain per sub-module in place of the per-channel *eigen
-    learning rates*, and the residual step `α` **fixed** at 1/n_layer rather than
-    learned (the value the learned gates settled near anyway). The milestone
-    leans on that simplified backbone actually scaling: if we want to argue SCA
-    carries to LLMs, the transformer underneath has to hold up as it grows.
+    *normalized* output, `h ← Norm(h + α·(Norm(sub(h)) − h))` — but simplifies
+    the rest. Each sub-module has a single learned gain in place of the
+    per-channel *eigen learning rates*, and the residual step `α` is fixed at
+    1/n_layer rather than learned (the value the learned gates settled near
+    anyway). If we want to argue that SCA carries to LLMs, this simplified
+    backbone has to hold up as it grows.
 
     So this [experiment](./experiment.py) sweeps the model over a width × depth
     grid — widths {32, 64, 128} × depths {4, 8, 12}, everything else fixed (batch
@@ -102,12 +102,12 @@ def _(loaded):
         max(plateau(curves, w, d) for d in DEPTHS) - min(plateau(curves, w, d) for d in DEPTHS) for w in WIDTHS
     )
     mo.md(
-        f"**The backbone scales cleanly.** Across the grid, converged loss never rises with depth: at each "
-        f"width the three depths sit within **{depth_spread:.02f}** nats/char of one another — inside the "
-        f"±0.08 per-epoch eval noise, so the depth axis is flat. Width does what added capacity should — loss "
-        f"falls monotonically from **{plateau(curves, 32, 4):.2f}** at 32-dim to **{plateau(curves, 128, 12):.2f}** "
-        f"at 128-dim × 12 layers — and no cell spikes or stalls. Same learning rate (10⁻²) everywhere; a fixed "
-        f"scalar residual gate is enough."
+        f"**The backbone scales cleanly.** Converged loss never rises with depth: at each width the three "
+        f"depths sit within **{depth_spread:.02f}** nats/char of one another, inside the ±0.08 per-epoch "
+        f"eval noise, so the depth axis is flat. Width behaves as added capacity should: loss falls "
+        f"monotonically from **{plateau(curves, 32, 4):.2f}** at 32-dim to **{plateau(curves, 128, 12):.2f}** "
+        f"at 128-dim × 12 layers. No cell spikes or stalls, and the same learning rate (10⁻²) works "
+        f"everywhere. So it seems that a fixed scalar residual gate is enough."
     )
     return (curves,)
 
@@ -199,19 +199,18 @@ def _(curves):
     _best = plateau(curves, 128, 12)
     mo.md(
         f"""
-    ## What this settles
+    ## Findings
 
-    The simplified nGPT — scalar gains, `α` fixed at 1/n_layer — trains flat
-    across depth and improves with width over the whole grid we can afford, with
-    no cell destabilizing ({_best:.2f} nats/char at the deepest, widest corner).
-    That's the property the milestone needs: the backbone SCA will anchor
-    concepts in scales without a depth penalty, so a boundary drawn around the
-    deep-and-wide corner would be a property of *size*, not of the simplified
-    architecture.
+    The simplified nGPT trains flat across depth and improves with width over
+    the whole grid we can afford, and no cell destabilizes ({_best:.2f}
+    nats/char at the deepest, widest corner). That's the property we need:
+    the backbone that SCA will anchor concepts in scales without a depth
+    penalty, so any problems we later see at the deep-and-wide corner would
+    be a property of *size*, not of the simplified architecture.
 
-    The grid tops out at 128 × 12 on an L4. The next step is to confirm the fixed
-    scalar gate still holds at a genuinely larger size — wider and deeper, on a
-    bigger GPU with a bigger batch — before leaning on it for M3.
+    The grid tops out at 128 × 12 on an L4. The next step is to confirm that
+    the fixed scalar gate still holds at a genuinely larger size — wider and
+    deeper, on a bigger GPU with a bigger batch — before leaning on it for M3.
     """
     )
     return
