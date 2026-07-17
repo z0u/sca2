@@ -345,18 +345,13 @@ figure[class*="mini-themed-figure"] img {
   margin-inline: auto;
 }
 
-/* Subline rows: several <figure style="display:inline-block"> laid out side by side.
- * Centring the container centres the inline-block group. */
-.report-subline-row {
-  text-align: center;
-}
-
 /* A figure composed of independent sub-figures — a multi-panel plot split into separate
  * images so each keeps its own size and the row reflows to a stack on a narrow viewport,
  * rather than all panels shrinking together. The group title is the outer <figcaption>. */
 figure:has(> figure) {
   margin-inline: 0;
   text-align: center;
+  text-wrap: balance;
 }
 figure:has(> figure) > figcaption {
   font-weight: 600;
@@ -378,6 +373,10 @@ figure:has(> figure) > figure {
   border: 1px solid #8886;
   background: var(--sw);
 }
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
 
 /* Authored report tables. Headings left-align with their columns by default; annotate
  * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
@@ -387,6 +386,9 @@ figure:has(> figure) > figure {
 .report-table .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+.report-table :is(th,td):not(:first-child) {
+  padding-left: 2ex;
 }
 
 /* Wide tables (e.g. the per-seed completions grid) scroll horizontally inside their own
