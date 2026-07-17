@@ -146,7 +146,7 @@ def _():
     _forms = ["hex", "named", "cross", "alias", "alias_rev", "open"]
     _rows = "".join(
         f"<tr><td><code>{cond}</code></td>"
-        + "".join(f"<td>{_counts[cond].get(f, 0) or '—'}</td>" for f in _forms)
+        + "".join(f'<td class="num">{_counts[cond].get(f, 0) or "—"}</td>' for f in _forms)
         + "</tr>"
         for cond in CONDS
     )
@@ -156,9 +156,9 @@ def _():
         [
             mo.md(f"```\n{_head}```"),
             mo.Html(
-                '<table style="font-size: 0.9em"><tr><th>condition</th>'
-                + "".join(f"<th><code>{f}</code></th>" for f in _forms)
-                + f"</tr>{_rows}</table>"
+                '<div class="report-table-scroll"><table class="report-table"><tr><th>condition</th>'
+                + "".join(f'<th class="num"><code>{f}</code></th>' for f in _forms)
+                + f"</tr>{_rows}</table></div>"
             ),
             mo.md(
                 f"*Lines per form in each condition's {N_EXAMPLES:,}-line corpus. Named equations draw "
@@ -382,7 +382,11 @@ def _(answer_value, completions, holdout_exs):
             f'border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> {text}{mark}'
         )
 
-    _head = "<tr><th>prompt</th><th>expected</th>" + "".join(f"<th>{cond}</th>" for cond in CONDS) + "</tr>"
+    _head = (
+        f"<tr><th>prompt</th><th>{colors.swatch(None)} expected</th>"
+        + "".join(f"<th>{colors.swatch(None)} {cond}</th>" for cond in CONDS)
+        + "</tr>"
+    )
     _rows = "".join(
         f"<tr><td><code>{ex.prompt}</code></td><td>{_swatch(ex.answer)}</td>"
         + "".join(f"<td>{_swatch(completions[cond, SEEDS[0]][i], ex.result)}</td>" for cond in CONDS)
@@ -391,7 +395,7 @@ def _(answer_value, completions, holdout_exs):
     )
     mo.vstack(
         [
-            mo.Html(f'<table style="font-size: 0.9em">{_head}{_rows}</table>'),
+            mo.Html(f'<div class="report-table-scroll"><table class="report-table">{_head}{_rows}</table></div>'),
             mo.md(
                 f"*Greedy completions of the `named_holdout` prompts, seed {SEEDS[0]}, one column per "
                 "condition. A ✓ marks answers whose *value* equals the true mix (they are all hex: "
@@ -721,16 +725,18 @@ def _(holdout_exs, m_hold):
     )
     _rows = "".join(
         f"<tr><td><code>{cond}</code></td>"
-        + "".join(f"<td>{m_hold[ci, si, gp_idx]:+.1f}</td>" for si in range(len(SEEDS)))
-        + f"<td><b>{m_hold[ci, :, gp_idx].mean():+.1f}</b></td></tr>"
+        + "".join(f'<td class="num">{m_hold[ci, si, gp_idx]:+.1f}</td>' for si in range(len(SEEDS)))
+        + f'<td class="num"><b>{m_hold[ci, :, gp_idx].mean():+.1f}</b></td></tr>'
         for ci, cond in enumerate(CONDS)
     )
     mo.vstack(
         [
             mo.Html(
-                '<table style="font-size: 0.9em"><tr><th>condition</th>'
-                + "".join(f"<th>seed {s}</th>" for s in SEEDS)
-                + f"<th>mean</th></tr>{_rows}</table>"
+                '<div class="report-table-scroll">'
+                '<table class="report-table"><tr><th>condition</th>'
+                + "".join(f'<th class="num">seed {s}</th>' for s in SEEDS)
+                + f'<th class="num">mean</th></tr>{_rows}</table>'
+                + "</div>"
             ),
             mo.md(
                 "*Margin of `green` over its best competitor on the `lime + black` prompt, per seed "
@@ -742,7 +748,7 @@ def _(holdout_exs, m_hold):
 
 
 @app.cell(hide_code=True)
-def _(holdout_exs, gp_idx, metrics):
+def _(gp_idx, holdout_exs, metrics):
     _log_v = np.log(len(colors.alphabet()))
     _gp_text = holdout_exs[gp_idx].prompt + holdout_exs[gp_idx].answer
     _rows_by_cond = [
@@ -770,11 +776,11 @@ def _(holdout_exs, gp_idx, metrics):
         return f'<figure style="display: inline-block; margin: 0 1em 0 0">{svg}{cap}</figure>'
 
     _html = (
-        '<div role="img" aria-label="The equation lime plus black equals green, repeated once per '
+        '<figure role="img" aria-label="The equation lime plus black equals green, repeated once per '
         "condition, each with a sparkline of per-character surprisal (solid) and predictive entropy "
-        '(dashed) under the text on a shared 0-to-log-V scale." style="text-wrap: balance">'
+        '(dashed) under the text on a shared 0-to-log-V scale.">'
         + "".join(_one(cond, row) for cond, row in _rows_by_cond)
-        + "</div>"
+        + "</figure>"
     )
     mo.Html(externalize_html(_html, name="sublines-garden-path"))
     return
@@ -821,10 +827,10 @@ def _(metrics):
         )
         fig, ax = plt.subplots(figsize=(5.4, 3.6))
         lim = max(0.2, float(np.abs(s2).max()))
-        im = ax.imshow(s2, cmap="RdBu_r", vmin=-lim, vmax=lim, aspect="auto")
+        im = ax.imshow(s2, cmap=light_dark("RdBu_r", "berlin"), vmin=-lim, vmax=lim, aspect="auto")
         for i in range(s2.shape[0]):
             for j in range(s2.shape[1]):
-                dark_cell = abs(s2[i, j]) > 0.6 * lim
+                low_cell = abs(s2[i, j]) > 0.6 * lim
                 ax.text(
                     j,
                     i,
@@ -832,7 +838,7 @@ def _(metrics):
                     ha="center",
                     va="center",
                     fontsize=7,
-                    color="#fff" if dark_cell else "#000",
+                    color=light_dark("#fff", "#000") if low_cell else light_dark("#000", "#fff"),
                 )
         ax.set_xticks(range(len(CONDS)), CONDS)
         ax.set_yticks(range(len(EVAL_SETS)), [es.replace("_", " ") for es in EVAL_SETS], fontsize=8)

@@ -1,6 +1,6 @@
 ---
 name: figure-style
-description: Figure conventions for experiment reports, carried over from M1 (ex-preppy). Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs, data-colored marks, theming. Use when drawing or revising any figure in a report notebook.
+description: Figure conventions for experiment reports. Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs, data-colored marks, theming, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, or building a results table, in a notebook.
 ---
 
 The M1 reports and the GRaM workshop poster set the house style. Match them:
@@ -71,6 +71,28 @@ edgecolor (or an inset patch, for grids) shows the true input, so damage
 reads as a face/edge mismatch. Loss-vs-hue lines are drawn as segments
 colored by the color at each x (round capstyle to avoid gaps).
 
+The same rule holds in prose and HTML tables: name a palette color with an
+inline swatch, not words alone. `sca.data.colors.swatch(name)` emits a
+`<span class="sw" style="--sw:#rrggbb">` square followed by the name (and
+falls back to `<code>` for non-palette text, e.g. a stray hex completion).
+
+## Result tables and swatches
+
+Authored HTML tables (built by hand and wrapped in `mo.Html`, not marimo's
+`mo.ui.table`) use the shared classes in `docs/report.css` rather than inline
+`style=` — central edits then restyle every report at once:
+
+- `class="report-table"` on the `<table>`. Numeric columns right-align with
+  tabular figures when *both* the `<th>` and its `<td>`s carry `class="num"`;
+  headers are left-aligned otherwise.
+- Wrap a wide grid (e.g. the per-seed completions table) in
+  `<div class="report-table-scroll">` so it scrolls inside its own box
+  instead of wrapping cells. This allows reports to be viewed on small screens,
+  so you'll usually want to use this for tabular data.
+- When a column's cells hold `swatch(...)` squares, give its header a ghost
+  swatch — `swatch(None)`, a transparent `.sw-ghost` placeholder — so the
+  header text starts at the same indent as the swatched values below it.
+
 ## Theming and annotation
 
 Every figure goes through `@themed` (see `mini.vis`); inside the plot
@@ -89,6 +111,12 @@ disappears on a dark background. Build one with
 `LinearSegmentedColormap.from_list` running from a near-background low to a
 theme accent high, e.g.
 `LinearSegmentedColormap.from_list("leak", light_dark(["#eef3f7", "#1a5f8a"], ["#20242a", "#6ab0d4"]))`.
+Diverging maps swap the same way but a named pair usually suffices: `RdBu_r`
+reads well in light mode but its white midpoint and pale ends wash out on a
+dark background, so pair it with a dark-centered perceptually-uniform map —
+`cmap=light_dark("RdBu_r", "berlin")` (`berlin` ships with matplotlib ≥3.11).
+Cell text over such a matrix flips on *both* axes: theme and cell saturation,
+e.g. `color=light_dark("#fff", "#000") if saturated else light_dark("#000", "#fff")`.
 
 Marks drawn over a variable or heatmap background (text ×, scatter dots)
 need a contrasting halo so they read on any cell, whatever color sits

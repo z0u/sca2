@@ -468,11 +468,7 @@ def _(metrics):
             caption = f'<figcaption style="font-size: 11px; font-family: monospace; opacity: 0.65">{name}</figcaption>'
             return f'<figure style="display: inline-block; margin: 0 .5em">{svg}{caption}</figure>'
 
-        html = (
-            f'<div role="img" aria-label="{aria_label}" class="report-subline-row" style="text-wrap: balance">'
-            + "".join(one(name, row) for name, row in rows)
-            + "</div>"
-        )
+        html = f'<figure aria-label="{aria_label}">' + "".join(one(name, row) for name, row in rows) + "</figure>"
         return mo.Html(externalize_html(html, name=name))
 
     def pad(row: dict, key: str) -> np.ndarray:
@@ -627,7 +623,11 @@ def _(backbone, complete, holdout):
     named_holdout_exs = colors.as_named(holdout, seed=2)  # the eval set, verbatim
     _by_seed = {s: complete(s, [ex.prompt for ex in named_holdout_exs]) for s in SEEDS}
 
-    _head = "<tr><th>prompt</th><th>expected</th>" + "".join(f"<th>seed {s}</th>" for s in SEEDS) + "</tr>"
+    _head = (
+        f"<tr><th>prompt</th><th>{colors.swatch(None)} expected</th>"
+        + "".join(f"<th>{colors.swatch(None)} seed {s}</th>" for s in SEEDS)
+        + "</tr>"
+    )
     _rows = "".join(
         f"<tr><td><code>{ex.prompt}</code></td><td>{colors.swatch(ex.answer)}</td>"
         + "".join(f"<td>{colors.swatch(_by_seed[s][i])}</td>" for s in SEEDS)
