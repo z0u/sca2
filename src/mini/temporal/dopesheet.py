@@ -236,7 +236,8 @@ class Dopesheet:
         """
         Convert the dopesheet to a dictionary.
 
-        Some logger frameworks like WandB will call this when storing model config.
+        A serialization hook — handy for storing the schedule alongside a run's
+        config (e.g. in a lineage record or a metrics artifact).
         """
         df = self._df.copy()
         for col in df.columns:

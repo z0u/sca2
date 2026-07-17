@@ -103,18 +103,6 @@ async def check_hf() -> Status:
     return Status("Hugging Face", True, ", ".join(parts))
 
 
-async def check_wandb() -> Status:
-    # `wandb status` reports the settings-file api_key only — it misses the common
-    # case of a netrc- or WANDB_API_KEY-based login. `wandb login` (no key argument,
-    # stdin closed) checks all three sources and exits non-zero with no TTY if none
-    # are set, so it's a more reliable — and still read-only — probe.
-    code, out, err = await _run("wandb", "login")
-    if code != 0:
-        return Status("WandB", False, "no API key — run ./go auth")
-    match = re.search(r"Currently logged in as:\s*(\S+)", out + err)
-    return Status("WandB", True, f"user {match.group(1)}" if match else "authenticated")
-
-
 async def check_github() -> Status:
     code, out, err = await _run("gh", "auth", "status")
     text = out + err
@@ -145,7 +133,7 @@ def _relevant_checks() -> list[Callable[[], Coroutine[Any, Any, Status]]]:
     - Skip the Claude Code check when Claude itself is the caller (``CLAUDECODE``):
       its own auth is irrelevant to the run.
     """
-    checks: list[Callable[[], Coroutine[Any, Any, Status]]] = [check_modal, check_hf, check_wandb]
+    checks: list[Callable[[], Coroutine[Any, Any, Status]]] = [check_modal, check_hf]
     if os.environ.get("CLAUDE_CODE_REMOTE") != "true":
         checks.append(check_github)
     if not os.environ.get("CLAUDECODE"):

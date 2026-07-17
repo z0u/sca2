@@ -86,6 +86,20 @@ readable cold without re-deriving code state.
   pair with accuracy or raw surprisal), and per-token s₂ is noisy (a one-sample
   draw from the predictive distribution), so aggregate over many positions.
 
+- **Reconsider WandB (or a hosted tracker) at M3/M4 planning.** Removed from M2
+  (2026-07-17): it was authenticated and a declared dep but unused — `mini`'s own
+  stack covers everything M2 needs (live `emit_metrics`/`watch`, content-addressed
+  artifact/checkpoint versioning, git-aware lineage, memoized sweeps, Modal cost).
+  The five things a hosted tracker adds and `mini` doesn't — persisted metric
+  *time-series* (mini keeps only the latest value per key), an interactive
+  live-curve dashboard, cross-run/sweep comparison UI, live GPU/system-utilization
+  telemetry, and grouped-hyperparameter views — don't earn their keep on M2's short
+  synthetic-domain runs with publication-curated matplotlib figures. They get more
+  attractive at M3/M4 (small LMs, then LLM fine-tunes): longer, costlier runs and
+  many un-curated runs to compare. Revisit then; if we do, the cheapest first step
+  is per-step time-series persistence in `mini` (extend `emit_metrics` past
+  last-writer-wins), not necessarily WandB.
+
 - **CLI usability, remaining gaps** (from the 2026-07-14 cold-exploration
   session; the copy-pasteable-hints / sorting / help-text tier shipped — see
   #57 for the running thread):

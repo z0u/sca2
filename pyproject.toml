@@ -24,7 +24,6 @@ dependencies = [
     "requests>=2.32.3",
     "rich>=14.3.2",  # pretty terminal output
     "scikit-learn>=1.6.1",
-    "wandb>=0.25.0",  # experiment tracking
 ]
 
 [project.scripts]

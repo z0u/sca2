@@ -46,7 +46,7 @@ log() { echo "session-start: $*" >&2; }
     # verifies the tokens live; this just says what's plausibly wired up.
     on() { [[ -n "${!1:-}" ]] && printf on || printf OFF; }
     echo "Resources (env presence; ./go auth --check for live status):" \
-         "Modal $(on MODAL_TOKEN_ID) · HF $(on HF_TOKEN) · WandB $(on WANDB_API_KEY)"
+         "Modal $(on MODAL_TOKEN_ID) · HF $(on HF_TOKEN)"
     echo
     echo "Experiments (report.py dirs; annotated status in docs/index.md):"
     git ls-files 'docs/**/report.py' | sed 's#/report.py##; s#^docs/#  #' | paste -sd' '

@@ -91,19 +91,6 @@ def test_hf_not_logged_in(monkeypatch):
     assert not status.ok
 
 
-def test_wandb_reads_username_from_login(monkeypatch):
-    err = "wandb: Currently logged in as: acme to https://api.wandb.ai. Use `wandb login --relogin` to force relogin"
-    monkeypatch.setattr(auth_check, "_run", fake_run(0, "", err))
-    status = asyncio.run(auth_check.check_wandb())
-    assert status.ok and status.detail == "user acme"
-
-
-def test_wandb_not_logged_in_is_failure(monkeypatch):
-    monkeypatch.setattr(auth_check, "_run", fake_run(1, "", "Error: No API key configured."))
-    status = asyncio.run(auth_check.check_wandb())
-    assert not status.ok and "no API key" in status.detail
-
-
 def test_github_extracts_account(monkeypatch):
     monkeypatch.setattr(auth_check, "_run", fake_run(0, "", "✓ Logged in to github.com account octocat (keyring)"))
     status = asyncio.run(auth_check.check_github())
@@ -125,7 +112,6 @@ def test_all_checks_run_by_default(monkeypatch):
     assert auth_check._relevant_checks() == [
         auth_check.check_modal,
         auth_check.check_hf,
-        auth_check.check_wandb,
         auth_check.check_github,
         auth_check.check_claude,
     ]
@@ -152,5 +138,4 @@ def test_web_agent_runs_only_service_checks(monkeypatch):
     assert auth_check._relevant_checks() == [
         auth_check.check_modal,
         auth_check.check_hf,
-        auth_check.check_wandb,
     ]
