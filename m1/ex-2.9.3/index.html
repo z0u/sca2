@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/6bf83ef6e8dbc6d955f0ac799be8e850ffe9cc08/exports/m1/ex-2.9.3/" />
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/4cc380097c027399c23b923bcd051b4e5fb4877c/exports/m1/ex-2.9.3/" />
     <meta name="color-scheme" content="light dark" /><script>/* mini:default-hidden-code */(function(){try{var u=new URL(window.location.href);if(!u.searchParams.has("show-code")){u.searchParams.set("show-code","false");window.history.replaceState(null,"",u.toString());}}catch(e){}})();</script>
     <meta charset="utf-8" />
     <link rel="icon" crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.9/dist/favicon.ico" />
@@ -299,6 +299,23 @@ figure[class*="mini-themed-figure"] img {
   text-align: center;
 }
 
+/* A figure composed of independent sub-figures — a multi-panel plot split into separate
+ * images so each keeps its own size and the row reflows to a stack on a narrow viewport,
+ * rather than all panels shrinking together. The group title is the outer <figcaption>. */
+figure:has(> figure) {
+  margin-inline: 0;
+  text-align: center;
+}
+figure:has(> figure) > figcaption {
+  font-weight: 600;
+  margin-bottom: 0.25em;
+}
+figure:has(> figure) > figure {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0 0.5em;
+}
+
 /* Colour swatch: a small square tinted via the `--sw` custom property, so each
  * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See sca.data.colors.swatch. */
 .sw {
@@ -318,6 +335,16 @@ figure[class*="mini-themed-figure"] img {
 .report-table .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Wide tables (e.g. the per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. */
+.report-table-scroll {
+  overflow-x: auto;
+}
+.report-table-scroll .report-table {
+  white-space: nowrap;
 }
 </style>    <style>[class~="min-w-[400px]"]{min-width:0!important}
     [data-testid="watermark"]{display:none!important}</style>
