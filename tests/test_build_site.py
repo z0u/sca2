@@ -35,6 +35,7 @@ def resolver() -> "build_site.LinkResolver":
         render_map={
             "probe/report.py": "probe/report/index.html",
             "acts/report.py": "acts/report/index.html",
+            "acts/report": "acts/report/index.html",  # directory form: one report links another by its canonical URL
             "guide.md": "guide.html",
         },
         source_files=frozenset({"probe/experiment.py", "acts/experiment.py", "probe/report.py"}),
@@ -70,6 +71,19 @@ def test_rendered_link_stays_relative_when_localizing(resolver):
     # to where *this* report renders (probe/report/), not its source dir (probe/).
     got = resolver.resolve("../acts/report.py", from_dir="probe", out_dir="probe/report", externalizing=False)
     assert got == "../../acts/report/index.html"
+
+
+def test_directory_form_link_resolves_like_the_report_file(resolver):
+    # A report links a sibling by its canonical published URL (``../acts/``, the directory),
+    # not the notebook file — both must reach the same rendered page.
+    assert (
+        resolver.resolve("../acts/report/", from_dir="probe", out_dir="probe/report", externalizing=True)
+        == "https://o.github.io/r/acts/report/"
+    )
+    assert (
+        resolver.resolve("../acts/report/", from_dir="probe", out_dir="probe/report", externalizing=False)
+        == "../../acts/report/index.html"
+    )
 
 
 def test_source_file_resolves_to_github(resolver):
