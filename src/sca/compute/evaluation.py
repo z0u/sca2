@@ -15,9 +15,10 @@ Two measurements, both against the domain's exact ground truth:
   should land somewhere different every run.
 """
 
-from typing import Sequence
+from typing import Mapping, Sequence
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Float
@@ -72,11 +73,16 @@ def completion_accuracy(
     return {"accuracy": float(np.mean(hits)), "n": len(examples), "failures": failures[:8]}
 
 
-def _r2(y_pred: Float[np.ndarray, "N K"], y_true: Float[np.ndarray, "N K"]) -> float:
-    """Coefficient of determination, averaged over target columns."""
+def _r2_cols(y_pred: Float[np.ndarray, "N K"], y_true: Float[np.ndarray, "N K"]) -> Float[np.ndarray, " K"]:
+    """Coefficient of determination, per target column."""
     ss_res = ((y_true - y_pred) ** 2).sum(0)
     ss_tot = ((y_true - y_true.mean(0)) ** 2).sum(0)
-    return float(np.mean(1 - ss_res / np.maximum(ss_tot, 1e-12)))
+    return 1 - ss_res / np.maximum(ss_tot, 1e-12)
+
+
+def _r2(y_pred: Float[np.ndarray, "N K"], y_true: Float[np.ndarray, "N K"]) -> float:
+    """Coefficient of determination, averaged over target columns."""
+    return float(_r2_cols(y_pred, y_true).mean())
 
 
 def ridge_probe(
@@ -92,6 +98,150 @@ def ridge_probe(
     w = np.linalg.solve(xc.T @ xc + l2 * np.eye(x.shape[1]), xc.T @ yc)
     b = my - mx @ w
     return w, b, _r2(x_test @ w + b, y_test)
+
+
+def _forced_stats(
+    model: LanguageModel,
+    tokenizer: CharTokenizer,
+    texts: Sequence[str],
+    batch_size: int = 256,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Teacher-forced per-position surprisal and entropy over left-padded *texts*.
+
+    Returns ``(seq, nll, entropy)``: column ``j`` of the (N, T−1) stat arrays
+    describes the prediction of sequence column ``j + 1``.
+    """
+    model = eqx.nn.inference_mode(model)
+    forward = eqx.filter_jit(model.__call__)
+    seq = np.asarray(tokenizer.encode(list(texts)))  # (N, T), left-padded together
+    nll, ent = [], []
+    for i in range(0, len(seq), batch_size):
+        s = jnp.asarray(seq[i : i + batch_size])
+        logp = jax.nn.log_softmax(forward(s), axis=-1)[:, :-1]
+        nll.append(np.asarray(-jnp.take_along_axis(logp, s[:, 1:, None], axis=2)[..., 0]))
+        ent.append(np.asarray(-(jnp.exp(logp) * logp).sum(axis=-1)))
+    return seq, np.concatenate(nll), np.concatenate(ent)
+
+
+def _answer_mask(stats_cols: int, n_answer: np.ndarray) -> np.ndarray:
+    """Mask over stat columns selecting each row's last *n_answer* characters."""
+    cols = np.arange(stats_cols)
+    return cols[None, :] >= stats_cols - n_answer[:, None]
+
+
+def candidate_logprobs(
+    model: LanguageModel,
+    tokenizer: CharTokenizer,
+    prompts: Sequence[str],
+    candidates: Sequence[str],
+    batch_size: int = 256,
+) -> Float[np.ndarray, "N K"]:
+    """Teacher-forced log-probability of each candidate answer after each prompt.
+
+    Scores the *complete* answer (candidate plus terminating newline), so
+    candidates of different lengths are comparable. The margin between the true
+    answer and the best competitor is the compute-vs-lookup measure from the
+    ex-2.1.1 garden-path diagnosis.
+    """
+    texts = [p + c + "\n" for p in prompts for c in candidates]
+    n_ans = np.array([len(c) + 1 for _ in prompts for c in candidates])
+    _, nll, _ = _forced_stats(model, tokenizer, texts, batch_size)
+    mask = _answer_mask(nll.shape[1], n_ans)
+    return -(nll * mask).sum(axis=1).reshape(len(prompts), len(candidates))
+
+
+def answer_calibration(
+    model: LanguageModel,
+    tokenizer: CharTokenizer,
+    examples: Sequence[Example],
+    batch_size: int = 256,
+) -> dict:
+    """Mean surprisal, entropy, and s₂ = (i − h) / log |V| over answer characters.
+
+    s₂ is a graded companion to exact-match accuracy: ≈ 0 when the model knows
+    its own uncertainty, ≫ 0 when it is confidently wrong. It measures
+    calibration, not competence (a uniformly ignorant model also scores ≈ 0),
+    so read it alongside accuracy or raw surprisal.
+    """
+    texts = [ex.prompt + ex.answer for ex in examples]
+    n_ans = np.array([len(ex.answer) for ex in examples])
+    _, nll, ent = _forced_stats(model, tokenizer, texts, batch_size)
+    mask = _answer_mask(nll.shape[1], n_ans)
+    log_v = float(np.log(sum(1 for c in tokenizer.vocabulary if c)))  # excludes the pad token
+    i, h = (float((a * mask).sum() / mask.sum()) for a in (nll, ent))
+    return {"nll": i, "entropy": h, "s2": (i - h) / log_v}
+
+
+def probe_answer_schedule(
+    model: LanguageModel,
+    tokenizer: CharTokenizer,
+    examples: Sequence[Example],
+    offsets: Sequence[int] = tuple(range(-4, 4)),
+    batch_size: int = 256,
+) -> dict:
+    """Per-channel decodability of the result at each position around the answer.
+
+    Teacher-forces ``prompt + answer`` (every example must share both lengths —
+    use a single-form set, e.g. hex) and fits a ridge probe per (offset from
+    the answer start, residual depth, RGB channel). Digit ``k`` of a hex answer
+    sits at offset ``k + 1`` (offset 0 is ``#``) and is emitted *from* offset
+    ``k``, so decodability of channel ``k`` at offsets ≤ ``k`` is computation;
+    from ``k + 1`` on, the digit is in the context and decoding it is trivial.
+
+    Returns ``offsets`` and ``r2`` with shape (len(offsets), depth + 1, 3).
+    """
+    assert len({(len(ex.prompt), len(ex.answer)) for ex in examples}) == 1, "use a single-form example set"
+    start = len(examples[0].prompt)
+    seq = np.asarray(tokenizer.encode([ex.prompt + ex.answer for ex in examples]))
+    stream = eqx.filter_jit(eqx.nn.inference_mode(model).residual_stream)
+    acts = np.concatenate(
+        [np.asarray(stream(jnp.asarray(seq[i : i + batch_size]))) for i in range(0, len(seq), batch_size)],
+        axis=1,
+    )  # (L+1, N, T, C)
+    y = np.array([ex.result for ex in examples], dtype=np.float32) / (N_LEVELS - 1)
+    half = len(examples) // 2
+    r2 = np.empty((len(offsets), acts.shape[0], y.shape[1]))
+    for i, o in enumerate(offsets):
+        x = acts[:, :, start + o]
+        for d in range(acts.shape[0]):
+            w, b, _ = ridge_probe(x[d, :half], y[:half], x[d, half:], y[half:])
+            r2[i, d] = _r2_cols(x[d, half:] @ w + b, y[half:])
+    return {"offsets": list(offsets), "r2": r2}
+
+
+def probe_transfer(
+    model: LanguageModel,
+    tokenizer: CharTokenizer,
+    fit: Sequence[Example],
+    eval_sets: Mapping[str, Sequence[Example]],
+    batch_size: int = 256,
+) -> dict[str, list[float]]:
+    """Result-color probes fit on one prompt set, scored on others.
+
+    Fits per-layer ridge probes from the pre-answer position to the result RGB
+    on half of *fit*, then reports R² on the held-back half (key ``"fit"``, the
+    same-distribution ceiling) and on each eval set. Transfer at the same
+    position separates "the mix was never computed" from "the probe just
+    doesn't carry across prompt sets".
+    """
+    stream = eqx.filter_jit(eqx.nn.inference_mode(model).residual_stream)
+
+    def at_end(exs: Sequence[Example]) -> tuple[np.ndarray, np.ndarray]:
+        seq = np.asarray(tokenizer.encode([ex.prompt for ex in exs]))  # left-padded: prompt ends last
+        acts = np.concatenate(
+            [np.asarray(stream(jnp.asarray(seq[i : i + batch_size]))) for i in range(0, len(seq), batch_size)],
+            axis=1,
+        )
+        return acts[:, :, -1], np.array([ex.result for ex in exs], dtype=np.float32) / (N_LEVELS - 1)
+
+    x_fit, y_fit = at_end(fit)
+    half = len(fit) // 2
+    fitted = [ridge_probe(x_fit[d, :half], y_fit[:half], x_fit[d, half:], y_fit[half:]) for d in range(len(x_fit))]
+    out = {"fit": [r2 for *_, r2 in fitted]}
+    for name, exs in eval_sets.items():
+        x, y = at_end(exs)
+        out[name] = [_r2(x[d] @ w + b, y) for d, (w, b, _) in enumerate(fitted)]
+    return out
 
 
 def probe_residual_stream(

@@ -139,7 +139,16 @@ class HFStore(Store):
         blob = self._cache._blob_path(sha256)
         if not blob.exists():  # pull once into the warm cache, then serve locally
             blob.parent.mkdir(parents=True, exist_ok=True)
-            self.api.download_bucket_files(self._cas, files=[(_cas_key(sha256), str(blob))])
+            # Download to a sibling temp file, then atomically rename in: an interrupted
+            # download must never leave a partial/0-byte file at *blob*, since the only
+            # cache-hit check is ``blob.exists()`` — a truncated file would then be served
+            # forever (and fail to parse downstream) rather than re-pulled.
+            tmp = blob.with_name(f"{sha256}.tmp.{os.getpid()}")
+            try:
+                self.api.download_bucket_files(self._cas, files=[(_cas_key(sha256), str(tmp))])
+                tmp.replace(blob)
+            finally:
+                tmp.unlink(missing_ok=True)
         return blob
 
     def _read_blob(self, sha256: str, dest: Path) -> None:

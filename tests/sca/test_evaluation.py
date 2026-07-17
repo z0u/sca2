@@ -10,9 +10,13 @@ from sca.data import colors
 from sca.data.tokenizer import CharTokenizer
 from sca.model import build_model
 from sca.compute.evaluation import (
+    answer_calibration,
+    candidate_logprobs,
     completion_accuracy,
     greedy_completions,
+    probe_answer_schedule,
     probe_residual_stream,
+    probe_transfer,
     ridge_probe,
 )
 
@@ -65,6 +69,47 @@ def test_probe_residual_stream_shapes():
     assert all(len(r2s) == 3 for r2s in probe["r2"].values())  # embedding + 2 blocks
     assert probe["weights"]["result_rgb"].shape == (3, 16, 3)  # (depth, n_embd, targets)
     assert probe["weights"]["result_redness"].shape == (3, 16, 1)
+
+
+def test_candidate_logprobs_shape_and_consistency():
+    model, tokenizer = make_model(), make_tokenizer()
+    prompts = ["red + blue = ", "lime + black = "]
+    candidates = ["purple", "green", "#804"]
+    lp = candidate_logprobs(model, tokenizer, prompts, candidates)
+    assert lp.shape == (2, 3)
+    assert (lp < 0).all()  # log-probs of multi-character strings
+    # Padding the batch out with another prompt must not change earlier rows.
+    lp2 = candidate_logprobs(model, tokenizer, prompts + ["white + navy = "], candidates)
+    np.testing.assert_allclose(lp, lp2[:2], rtol=0, atol=1e-4)
+
+
+def test_answer_calibration_reports_finite_scalars():
+    model, tokenizer = make_model(), make_tokenizer()
+    stats = answer_calibration(model, tokenizer, examples(16))
+    assert set(stats) == {"nll", "entropy", "s2"}
+    assert all(np.isfinite(v) for v in stats.values())
+    assert stats["nll"] > 0 and stats["entropy"] > 0
+
+
+def test_probe_answer_schedule_goes_trivial_once_digits_land_in_context():
+    model, tokenizer = make_model(), make_tokenizer()
+    hex_exs = [ex for ex in colors.sample_corpus(300, 3, [], {"hex": 1.0}) if ex.rhs is not None][:256]
+    probe = probe_answer_schedule(model, tokenizer, hex_exs, offsets=(-1, 0, 1, 2, 3), batch_size=128)
+    assert probe["r2"].shape == (5, 3, 3)  # (offsets, embedding + 2 blocks, channels)
+    # Once digit k is in the context (offset ≥ k + 1), even an untrained
+    # embedding decodes its channel: the token *is* the channel value.
+    for k, off in [(0, 1), (1, 2), (2, 3)]:
+        assert probe["r2"][probe["offsets"].index(off), 0, k] > 0.95
+
+
+def test_probe_transfer_scores_the_fit_ceiling_and_each_set():
+    model, tokenizer = make_model(), make_tokenizer()
+    open_train, open_holdout = colors.split_open_pairs(0)
+    fit = colors.as_form(open_train[:64], "open", seed=1)
+    evals = {"open_holdout": colors.as_form(open_holdout[:16], "open", seed=2)}
+    r2 = probe_transfer(model, tokenizer, fit, evals, batch_size=64)
+    assert set(r2) == {"fit", "open_holdout"}
+    assert all(len(v) == 3 for v in r2.values())
 
 
 def test_residual_stream_is_unit_norm_and_layered():
