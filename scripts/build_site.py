@@ -157,9 +157,12 @@ class LinkResolver:
             out = f"{export_key(nb)}/index.html"
             stem_rel = nb.relative_to(DOCS_DIR)
             # The report came from this notebook; register every suffix an author might
-            # have linked (``report.py`` → its rendered ``<key>/index.html``).
+            # have linked (``report.py`` → its rendered ``<key>/index.html``), plus the
+            # bare directory (``../ex-2.1.1/``) — the canonical published URL one report
+            # naturally uses to link another.
             for suffix in _RENDERED_SUFFIXES:
                 render_map[stem_rel.with_suffix(suffix).as_posix()] = out
+            render_map[export_key(nb)] = out
 
         source_files = frozenset(p.relative_to(DOCS_DIR).as_posix() for p in DOCS_DIR.rglob("*") if p.is_file())
 
