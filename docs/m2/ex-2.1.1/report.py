@@ -205,16 +205,13 @@ def _():
 
 @app.cell(hide_code=True)
 def _(holdout, train_pairs):
-    # Split into two independent figures (rather than one two-panel figure) so they reflow
-    # and shrink separately: on a narrow screen the pair stacks instead of shrinking as a
-    # block, keeping each panel legible. The panels used to share a y-axis; now that they
-    # are separate figures we pin the same projection and the same limits by hand, and
-    # render each at the same fixed figsize with a full-figure bbox, so the two images come
-    # out identically sized and the lattice reads at one scale across both.
-    from mini.reports import current_publisher
-    from mini.vis import use_style, use_theme
-    from mini.vis.nb import themed_figure_html
-
+    # Split the two-panel lattice into two independent figures so they reflow and shrink
+    # separately: on a narrow screen the pair stacks instead of shrinking as a block,
+    # keeping each panel legible. The panels used to share a y-axis; now that they are
+    # separate figures, an identical figsize and identical data-driven limits give them the
+    # same lattice scale — and, since the tight crop is dominated by that shared axes box,
+    # the same size — without a shared axis. The lettered tags sit just outside those limits
+    # (annotation_clip=False) and are picked up by the crop.
     _vals = list(colors.PALETTE.values())
     _idx = {c: i for i, c in enumerate(_vals)}
     _train_edges = [p for p in train_pairs if p[0] != p[1]]  # self-pairs are just the vertices
@@ -223,9 +220,10 @@ def _(holdout, train_pairs):
     _x, _y, _depth = cube.project(_named, "front")
     _dmin, _dspan = _depth.min(), _depth.max() - _depth.min()
     _cx, _cy = _x.mean(), _y.mean()
-    # Square limits shared by both panels — enough margin past the lattice to hold the
-    # lettered tags — so the two figures are the same size without a shared axis.
-    _half = max(_x.max() - _x.min(), _y.max() - _y.min()) / 2 + 0.16
+    # Square limits from the lattice vertices alone — a small margin, no room reserved for the
+    # lettered tags. Identical across panels (same data), so the two figures come out the same
+    # size; the tags draw just past the edge and the tight crop still lands identically.
+    _half = max(_x.max() - _x.min(), _y.max() - _y.min()) / 2 + 0.12
     _xlim, _ylim = (_cx - _half, _cx + _half), (_cy - _half, _cy + _half)
 
     # One example edge per panel, labelled at its endpoints; both sit on the cube's
@@ -282,17 +280,6 @@ def _(holdout, train_pairs):
         fig.suptitle(title)
         return fig
 
-    def _themed_panel(title: str, bold, other, alt: str, name: str) -> str:
-        # Mirror the light/dark rendering of @themed, but with a full-figure bbox
-        # (bbox_inches=None) instead of "tight": tight cropping would size each image to
-        # its own titles and lettered tags, so the two panels would come out different
-        # widths. A fixed bbox keeps them identical.
-        with use_theme("light"), use_style("base", "light"):
-            light = _panel(title, bold, other)
-        with use_theme("dark"), use_style("base", "dark"):
-            dark = _panel(title, bold, other)
-        return themed_figure_html(light, dark, alt_text=alt, name=name, publish=current_publisher(), bbox_inches=None)
-
     _train_alt = (
         "An orthographic front view of the 27 named colors as a lattice in the rotated RGB cube, value "
         "vertical with black at the bottom and white at the top. Each named color is a small dot in its true "
@@ -309,13 +296,19 @@ def _(holdout, train_pairs):
         "picked out on the cube's silhouette with italic letters c and d at its endpoints (magenta and blue), "
         "the worked example c + d = violet. Titled 'held out for eval'."
     )
-    _left = _themed_panel("train", _train_edges, holdout, _train_alt, "named-pair-lattice-train")
-    _right = _themed_panel("held out for eval", holdout, _train_edges, _holdout_alt, "named-pair-lattice-holdout")
-    mo.Html(
-        '<div class="report-figure-row">'
-        '<div class="report-figure-row-title">Named pairs on the cube</div>'
-        f"{_left}{_right}</div>"
-    )
+    _left = themed(
+        lambda: _panel("train", _train_edges, holdout),
+        name="named-pair-lattice-train",
+        alt_text=_train_alt,
+    )()
+    _right = themed(
+        lambda: _panel("held out for eval", holdout, _train_edges),
+        name="named-pair-lattice-holdout",
+        alt_text=_holdout_alt,
+    )()
+    # A figure of two sub-figures: a nested <figure> with a group <figcaption>, styled by the
+    # `figure:has(> figure)` rule in report.css so the panels reflow on a narrow screen.
+    mo.Html(f"<figure><figcaption>Named pairs on the cube</figcaption>{_left}{_right}</figure>")
     return
 
 

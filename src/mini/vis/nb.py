@@ -154,7 +154,7 @@ def themed_figure_html(
     max_width: str | None = None,
     name: str | None = None,
     publish: Publisher | None = None,
-    **savefig_kwargs: str | int | bool | None,
+    **savefig_kwargs: str | int | bool,
 ) -> str:
     """Render light/dark matplotlib figures as an HTML figure element.
 
@@ -198,7 +198,7 @@ def themed_figure_html(
         # size, so measure the bytes rather than trusting fig.get_size_inches().
         w = int.from_bytes(png[16:20], "big")
         h = int.from_bytes(png[20:24], "big")
-        dpi = float(save_args["dpi"] or 150)
+        dpi = float(save_args["dpi"])
         return round(w * 96 / dpi), round(h * 96 / dpi)
 
     if close_fig:
