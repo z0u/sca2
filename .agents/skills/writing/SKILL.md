@@ -9,8 +9,8 @@ Write with a clear, correct, and understated style: considered but conversationa
 Characteristics:
 
 - Appropriate punctuation, including colons, semicolons. Use the Oxford comma. Use double quotation marks for quotes, and single quotation marks for quotes within quotes. Do not use "smart quotes".
-- Use em dashes sparingly (approx. one per page). Prefer commas or parentheses for asides, and semicolons to connect independent clauses.
-- "I think...", "It seems...": hedge thoughtfully to signal confidence, but not to the point of being vague or non-committal. Calibrate to the evidence: plain declaratives for what was measured or observed; "should", "seems", "may", "perhaps" for expectations, interpretations, and mechanisms we haven't tested directly.
+- Use em dashes sparingly (approx. one per page). Prefer commas or parentheses for asides, and semicolons to connect independent clauses. A pile-up of dashes usually means a sentence is carrying too many ideas. The fix is to split it into separate sentences.
+- "I think...", "It seems...": signal confidence, but not to the point of being vague or non-committal. Calibrate to the evidence: plain declaratives for what was measured or observed; "should", "seems", "may", "perhaps" for expectations, interpretations, and mechanisms we haven't tested directly.
 - Varied sentence rhythm.
 - Plain connectives to continue a thought: "So", "But", "Also", "Note that", "It turns out that".
 - Pose the motivating question directly, then answer it: "does zeroing that axis delete red, and only red?"
@@ -18,8 +18,7 @@ Characteristics:
 - American spelling to match the convention in scientific literature.
 - High readability, with a Flesch-Kincaid grade level of around 10-12.
 - Assume an intelligent audience and use precise language. See _Concision_ for more on this.
-- Alt text for all images: aids vision-impaired people and LLMs alike (see the
-  alt-text skill).
+- Alt text for all images: aids vision-impaired people and LLMs alike (see the alt-text skill).
 
 Anti-patterns:
 
@@ -43,42 +42,23 @@ Anti-patterns:
 ### Pacing and structure
 
 - One move per paragraph. Prefer several short paragraphs over one dense one; don't pack too much into a single sentence held together by dashes.
-- Declare intent, then execute. "Let's get a baseline before we anchor anything", "We will measure two things" — say what's coming in plain first-person, rather than framing it nominally after the fact.
+- Declare intent. "Let's get a baseline before we anchor anything", "We will measure two things" — say what's coming in plain first-person, rather than framing it nominally after the fact.
 - State results where they first become visible. When introducing a figure whose outcome is known, say the outcome ("...and we find the model fails this task").
 - Keep commentary adjacent to what it explains. Introduce a figure with a sentence or two (what's plotted, how to read it), show it, then interpret.
 - A small table for enumerable examples the text refers back to; inline numbering for alternatives ("answerable two ways: 1. recall..., or 2. composition...").
 - Cut tangents. A detail that serves another section belongs there or nowhere; use cross-references and forward-references sparingly.
 
-### Concision and clarity
+### Clarity
 
-We respect the intelligence of our readers, but we also respect their time. We aim for high readability because it improves our chances of conveying complex technical ideas. We accept that writing takes time, and spend that time to make the writing as clear and concise as possible. We spend the effort so our audience doesn't have to.
+Write as though giving an explanation to an intelligent person. Imagine that they have technical skill, but that they are _not_ an expert in machine learning. Aim for very high readability, and spend a significant amount of time revising drafts to be clear and concise. Allow the reader to infer information from figures, context, and a few exemplar results. Draw their attention to key details and to offer real, thoughtful insight.
 
-If you will excuse the irony of belaboring this point: concision is _so_ important. Allow the reader to infer information from figures, context, and a few exemplar results. Our job is to draw their attention to key details and to offer real, thoughtful insight.
+Concision is not density. Cutting words and lowering reader effort are different goals, and sometimes they pull against each other. A sentence may be concise and still hard to read because it stacks several ideas, folds a definition into an appositive, or hides a verb inside a noun phrase.
 
-## Workflow
+So write in plain English, with respect for the reader's intelligence, but also for their time.
 
-Start by planning in your own words. Then, revise the draft to align with this style and tone. Use the characteristics and anti-patterns as a guide. Finally, review the draft for clarity, correctness, and consistency.
-
-First drafts are invariably too verbose, so always edit them down after writing them. You should use tools to help: 1. Write in a file and save it. Include markers if the document has many sections. 2. Count length: `wc -wml file` for the whole file, and `.agents/skills/writing/scripts/block-wc file` for per-block word counts (sorted so the verbose blocks surface first) to see where to cut. 3. Edit the file to reduce length, aiming for > 20% reduction. Stop when you can't remove more without losing load-bearing information. 4. Remove the markers with a tool, then confirm none survived (e.g. `rg 'R:|/R' file` returns nothing).
-
-Example section/block markers:
-
-```md
-<!--R:short-description-->
-
-The text.
-
-<!--/R-->
-```
-
-When in doubt about how to phrase something, err on the side of clarity and simplicity. Avoid jargon and complex sentence structures unless they are necessary to convey the technical content accurately.
+---
 
 ## Markdown
-
-Never hard-wrap a line inside an inline code span or math expression. A wrapped
-span can start the next line with block syntax — a hex code like `#f78` at the
-start of a line renders as a heading — and some renderers break the span
-entirely. Rewrap the surrounding prose so the whole span sits on one line.
 
 Use sentence case for headings and descriptive lists.
 
@@ -94,3 +74,10 @@ Use sentence case for headings and descriptive lists.
 Prefer paragraphs for nuanced or complex explanations; use lists for
 summarizing steps, or when clarity would genuinely benefit from structure —
 and use them sparingly.
+
+Use italics for concepts like _red_. Bold and italics for emphasis is quite distracting to read, so save them for exceptional circumstances.
+
+Don't hard-wrap a line inside an inline code span or math expression. A wrapped
+span can start the next line with block syntax — a hex code like `#f78` at the
+start of a line renders as a heading — and some renderers break the span
+entirely. Rewrap the surrounding prose so the whole span sits on one line.
