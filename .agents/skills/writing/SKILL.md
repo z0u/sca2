@@ -23,14 +23,14 @@ Characteristics:
 Anti-patterns:
 
 - ~~Business jargon and bombast~~. Avoid buzzwords, corporate-speak, and baseball metaphors.
-- ~~Adversarial framing~~. Don't cast the object of study as an opponent to beat, convict, or punish. No combat metaphors (*casualties*, *fighting back*, *hauled back*, *the fight is not free*), no crime or interrogation framing (*the culprit*, *names the suspect*, *guilty*/*innocent*, *the hypothesis is dead*), no coercion or punishment (*making composition pay*, *make the model pay for*, *punish memorization*). A result can be vivid without being violent — describe what happened, not who won. Prefer plain cause: "the LR peak was the cause" over "the LR peak was the culprit".
+- ~~Adversarial framing~~. Don't cast the object of study as an opponent to beat, convict, or punish. No combat metaphors (*casualties*, *fighting back*, *hauled back*, *the fight is not free*), no crime or interrogation framing (*the culprit*, *names the suspect*, *guilty*/*innocent*, *the hypothesis is dead*), no coercion or punishment (*making composition pay*, *make the model pay for*, *punish memorization*). A result can be vivid without being violent; describe what happened, not who won. Prefer plain cause: "the LR peak was the cause" over "the LR peak was the culprit".
 - ~~All the lists~~. Mostly use paragraphs, but use lists sparingly when they are the clearest way to present the information.
 - ~~Heavy-handed transitions~~. Avoid "Furthermore", "In conclusion", "The honest answer is", etc. Just continue the thought.
 - ~~Excessive use of em dashes~~. Prefer other punctuation.
 - ~~Excessive use of bold and italic text~~. List items should not be bolded. 1-2 callouts (bold) per page or section; italics only for references & borrowed words, or when it's truly unobvious which phrase should be emphasized (usually the reader can infer without it).
 - ~~Contrastive conclusions~~. Avoid "... is a feature, not a confound", etc. Instead of `A, ~A`, just say `A`.
 - ~~Verdict kickers~~. Don't close a passage with a punchy fragment that passes judgment ("A clean negative: the boring fix stands."). Readers pattern-match these as AI and stop reading. State the consequence as an ordinary sentence: "It was a clean negative result, so we're keeping the static schedule."
-- ~~Evocative headings~~. Headings name what the section contains, not what it means: "Training data", "Findings" — not "What the model sees", "What this settles".
+- ~~Evocative headings~~. Headings name what the section contains, not what it means. Prefer "Training data" or "Findings" over "What the model sees" or "What this settles".
 
 ### Register by document type
 
@@ -42,7 +42,7 @@ Anti-patterns:
 ### Pacing and structure
 
 - One move per paragraph. Prefer several short paragraphs over one dense one; don't pack too much into a single sentence held together by dashes.
-- Declare intent. "Let's get a baseline before we anchor anything", "We will measure two things" — say what's coming in plain first-person, rather than framing it nominally after the fact.
+- Declare intent: say what's coming in plain first person, rather than framing it nominally after the fact. "Let's get a baseline before we anchor anything." "We will measure two things."
 - State results where they first become visible. When introducing a figure whose outcome is known, say the outcome ("...and we find the model fails this task").
 - Keep commentary adjacent to what it explains. Introduce a figure with a sentence or two (what's plotted, how to read it), show it, then interpret.
 - A small table for enumerable examples the text refers back to; inline numbering for alternatives ("answerable two ways: 1. recall..., or 2. composition...").
