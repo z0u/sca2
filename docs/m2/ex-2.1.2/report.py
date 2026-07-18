@@ -279,12 +279,21 @@ def _():
 def _(metrics):
     @themed(
         name="accuracy-factorial",
-        alt_text=(
-            "Seven bar-and-dot panels of completion accuracy (0 to 1) against condition (control, rev, "
-            "open, both), one panel per eval set: named seen, named holdout, hex unseen, cross unseen, "
-            "open seen, open holdout, and reverse alias. Bars show the mean over three seeds, dots the "
-            "individual seeds."
-        ),
+        alt_text="""
+            Seven bar-and-dot panels of completion accuracy (0 to 1) against condition
+            (control, rev, open, both), one panel per eval set: named seen, named holdout,
+            hex unseen, cross unseen, open seen, open holdout, and reverse alias. Bars show
+            the mean over three seeds, dots the individual seeds.
+        """,
+        caption="""
+            Each panel is one eval set: the bar is the mean over three seeds and the dots
+            are the individual seeds. `named_holdout` is the set H1 is about; `open_holdout`
+            asks whether the forced computation carries over to off-palette pairs never seen
+            in training; `alias_rev` checks the reverse-alias supervision. In `control` and
+            `rev`, the open-form sets ask for a surface form those corpora never train on (a
+            name + name prompt), so a low score there means the grammar is absent, not that
+            the model tried and missed.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, len(EVAL_SETS), figsize=(12.5, 3.0), sharey=True)
@@ -301,21 +310,7 @@ def _(metrics):
         axes[0].set_ylabel("completion accuracy")
         return fig
 
-    mo.vstack(
-        [
-            mo.Html(_plot()),
-            mo.md(
-                "*Each panel is one eval set: the bar is the mean over three seeds and the "
-                "dots are the individual seeds. `named_holdout` is the set H1 is about; "
-                "`open_holdout` asks whether the forced computation carries over to "
-                "off-palette pairs never seen in training; `alias_rev` checks the "
-                "reverse-alias supervision. In `control` and `rev`, the open-form sets ask "
-                "for a surface form those corpora never train on (a name + name prompt), so "
-                "a low score there means the grammar is absent, not that the model tried and "
-                "missed.*"
-            ),
-        ]
-    )
+    mo.Html(_plot())
     return
 
 
@@ -498,12 +493,21 @@ def _(margins, metrics):
 def _(holdout_exs, m_hold, m_seen):
     @themed(
         name="margin-trajectories",
-        alt_text=(
-            "Line chart of the answer margin (log-probability of the true name minus the best competitor) "
-            "against condition (control, rev, open, both), one line per held-out named pair, averaged over "
-            "seeds. A horizontal line marks zero, where the true answer starts to win; a shaded band shows "
-            "the range of margins on the seen named pairs."
-        ),
+        alt_text="""
+            Line chart of the answer margin (log-probability of the true name minus the best
+            competitor) against condition (control, rev, open, both), one line per held-out
+            named pair, averaged over seeds. A horizontal line marks zero, where the true
+            answer starts to win; a shaded band shows the range of margins on the seen named
+            pairs.
+        """,
+        caption="""
+            The margin is the log-probability of the true name as a complete answer, minus
+            that of the best competing name; it sets the hex-versus-name form choice aside,
+            since only names count as candidates. Positive means the true name beats the
+            other names, and the magnitude says by how much. One line per held-out pair,
+            averaged over seeds and traced across the four conditions; the shaded band is
+            the range of `named_seen` margins, for reference.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(7.4, 4.2))
@@ -544,19 +548,7 @@ def _(holdout_exs, m_hold, m_seen):
         ax.legend(fontsize=8, loc="upper left")
         return fig
 
-    mo.vstack(
-        [
-            mo.Html(_plot()),
-            mo.md(
-                "*The margin is the log-probability of the true name as a complete answer, "
-                "minus that of the best competing name; it sets the hex-versus-name form "
-                "choice aside, since only names count as candidates. Positive means the true "
-                "name beats the other names, and the magnitude says by how much. One line per "
-                "held-out pair, averaged over seeds and traced across the four conditions; the "
-                "shaded band is the range of `named_seen` margins, for reference.*"
-            ),
-        ]
-    )
+    mo.Html(_plot())
     return
 
 
@@ -610,15 +602,22 @@ def _(margins, metrics):
 def _(sched_offsets, sched_r2):
     @themed(
         name="answer-schedule",
-        alt_text=(
-            "Line charts of probe R-squared against position offset around the answer, one panel per "
-            "residual-stream depth, three lines per panel for the R, G, and B channels of the result. "
-            "Lines are solid before each channel's digit enters the context and dotted after. In the "
-            "deeper layers each channel peaks near 1 at its own emission position and falls away on "
-            "either side, so the three channels form a sequence of staggered peaks rather than a "
-            "cumulative plateau; at depth 0 the dotted segments jump to 1 as each digit becomes "
-            "readable from the context."
-        ),
+        alt_text="""
+            Line charts of probe R-squared against position offset around the answer, one
+            panel per residual-stream depth, three lines per panel for the R, G, and B
+            channels of the result. Lines are solid before each channel's digit enters the
+            context and dotted after. In the deeper layers each channel peaks near 1 at its
+            own emission position and falls away on either side, so the three channels form a
+            sequence of staggered peaks rather than a cumulative plateau; at depth 0 the
+            dotted segments jump to 1 as each digit becomes readable from the context.
+        """,
+        caption="""
+            One panel per residual-stream depth; three lines per panel for the R, G, and B
+            channels of the result. Offset 0 is the `#`, digit k sits at offset k + 1 and is
+            emitted from offset k. A line is solid where its digit is not yet in the context
+            (so decoding it is computation) and dotted once it has landed (decoding is
+            copying).
+        """,
     )
     def _plot() -> plt.Figure:
         depths = sched_r2.shape[1]
@@ -638,18 +637,7 @@ def _(sched_offsets, sched_r2):
         axes[0].legend(fontsize=7)
         return fig
 
-    mo.vstack(
-        [
-            mo.Html(_plot()),
-            mo.md(
-                "*One panel per residual-stream depth; three lines per panel for the R, G, "
-                "and B channels of the result. Offset 0 is the `#`, digit k sits at offset "
-                "k + 1 and is emitted from offset k. A line is solid where its digit is not "
-                "yet in the context (so decoding it is computation) and dotted once it has "
-                "landed (decoding is copying).*"
-            ),
-        ]
-    )
+    mo.Html(_plot())
     return
 
 
@@ -691,12 +679,18 @@ def _(metrics):
 
     @themed(
         name="transfer-probe",
-        alt_text=(
-            "Four line charts of probe R-squared against residual-stream depth, one panel per prompt set: "
-            "the fit set's held-back half, open holdout, named seen, and named holdout. One line per "
-            "condition (control, rev, open, both; darker means richer corpus). The probes were fit on "
-            "open-pair prompts at the pre-answer position."
-        ),
+        alt_text="""
+            Four line charts of probe R-squared against residual-stream depth, one panel per
+            prompt set: the fit set's held-back half, open holdout, named seen, and named
+            holdout. One line per condition (control, rev, open, both; darker means richer
+            corpus). The probes were fit on open-pair prompts at the pre-answer position.
+        """,
+        caption="""
+            One panel per scored set: the fit set's held-back half, open holdout, named seen,
+            and named holdout. R² against residual depth, one line per condition (darker means
+            a richer corpus). Depth 0 is left out, since the pre-answer embedding is constant
+            across prompts until attention runs.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, len(_sets), figsize=(11.5, 3.0), sharey=True)
@@ -715,17 +709,7 @@ def _(metrics):
         axes[0].legend(fontsize=8)
         return fig
 
-    mo.vstack(
-        [
-            mo.Html(_plot()),
-            mo.md(
-                "*One panel per scored set: the fit set's held-back half, open holdout, named "
-                "seen, and named holdout. R² against residual depth, one line per condition "
-                "(darker means a richer corpus). Depth 0 is left out, since the pre-answer "
-                "embedding is constant across prompts until attention runs.*"
-            ),
-        ]
-    )
+    mo.Html(_plot())
     return
 
 
@@ -859,11 +843,17 @@ def _():
 def _(metrics):
     @themed(
         name="calibration-heatmap",
-        alt_text=(
-            "Heatmap of mean surprise-surprise (surprisal minus entropy over answer characters, as a "
-            "fraction of log V) with eval sets as rows and conditions as columns, annotated with values. "
-            "Warm cells mark confidently-wrong sets; near-zero cells are well calibrated."
-        ),
+        alt_text="""
+            Heatmap of mean surprise-surprise (surprisal minus entropy over answer characters,
+            as a fraction of log V) with eval sets as rows and conditions as columns, annotated
+            with values. Warm cells mark confidently-wrong sets; near-zero cells are well
+            calibrated.
+        """,
+        caption=r"""
+            Mean surprise-surprise over answer characters, $s_2 = (i - h)/\log|V|$, with eval
+            sets as rows and conditions as columns. Warm cells are confidently wrong (s₂ ≫ 0);
+            near-zero cells are well calibrated.
+        """,
     )
     def _plot() -> plt.Figure:
         s2 = np.array(
@@ -892,16 +882,7 @@ def _(metrics):
         fig.colorbar(im, ax=ax, label="mean s₂ on answers")
         return fig
 
-    mo.vstack(
-        [
-            mo.Html(_plot()),
-            mo.md(
-                r"*Mean surprise-surprise over answer characters, $s_2 = (i - h)/\log|V|$, "
-                r"with eval sets as rows and conditions as columns. Warm cells are confidently "
-                r"wrong (s₂ ≫ 0); near-zero cells are well calibrated.*"
-            ),
-        ]
-    )
+    mo.Html(_plot())
     return
 
 

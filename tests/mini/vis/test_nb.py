@@ -58,6 +58,21 @@ def test_alt_text():
     assert 'alt="My plot"' in result
 
 
+def test_alt_text_whitespace_collapses():
+    result = themed(_dummy_plot, alt_text="A plot\n    with   newlines")(1, 2)
+    assert 'alt="A plot with newlines"' in result
+
+
+def test_no_figcaption_without_caption():
+    assert "<figcaption>" not in themed(_dummy_plot)(1, 2)
+
+
+def test_caption_renders_markdown_into_figcaption():
+    result = themed(_dummy_plot, caption="*Emphasised* caption")(1, 2)
+    assert "<figcaption>" in result
+    assert "<em>Emphasised</em>" in result  # Markdown was rendered, not passed verbatim
+
+
 def test_decorator_factory():
     @themed(alt_text="Factory plot")
     def plot(x: int) -> Figure:
