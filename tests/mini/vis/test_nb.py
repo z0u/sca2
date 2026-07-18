@@ -80,14 +80,10 @@ def test_figure_html_caption_and_class():
 
 def test_figure_html_aria_label_collapses_whitespace():
     out = figure_html("<svg/>", aria_label="line one\n    line two")
-    assert 'role="img" aria-label="line one line two"' in out
+    assert 'aria-label="line one line two"' in out
+    # A plain aria-label, not role="img" — the latter would hide sub-figure captions.
+    assert "role=" not in out
     assert "<figcaption>" not in out
-
-
-def test_figure_html_rejects_caption_with_aria_label():
-    # role="img" hides the figcaption from screen readers, so the combination is refused.
-    with pytest.raises(ValueError, match="mutually exclusive"):
-        figure_html("<svg/>", caption="cap", aria_label="label")
 
 
 def test_decorator_factory():

@@ -33,7 +33,7 @@ with app.setup(hide_code=True):
     )
     from mini.reports import externalize_html, report_bundle, use_publisher
     from mini.store import project_store
-    from mini.vis import light_dark, themed
+    from mini.vis import figure_html, light_dark, themed
     from sca.data import colors, cube
     from subline.series import Series
     from subline.subline import Subline
@@ -476,11 +476,11 @@ def _(metrics):
 
         def one(name: str, row: dict) -> str:
             svg = Subline(chars_per_line=sub_width, css=sub_css).plot(row["text"], series(row))
-            caption = f'<figcaption style="font-size: 11px; font-family: monospace; opacity: 0.65">{name}</figcaption>'
-            return f'<figure style="display: inline-block; margin: 0 .5em">{svg}{caption}</figure>'
+            label = f'<span style="font-size: 11px; font-family: monospace; opacity: 0.65">{name}</span>'
+            return figure_html(svg, caption=label, style="display: inline-block; margin: 0 .5em")
 
-        html = f'<figure aria-label="{aria_label}">' + "".join(one(name, row) for name, row in rows) + "</figure>"
-        return mo.Html(externalize_html(html, name=name))
+        strip = "".join(one(name, row) for name, row in rows)
+        return mo.Html(externalize_html(figure_html(strip, aria_label=aria_label), name=name))
 
     def pad(row: dict, key: str) -> np.ndarray:
         """Scale to fractions of log |V| and align with the text: position 0 has no prediction."""
@@ -646,16 +646,13 @@ def _(backbone, complete, holdout):
         for i, ex in enumerate(named_holdout_exs)
     )
     _w, _d = backbone
-    mo.vstack(
-        [
-            mo.Html(
-                '<div class="report-table-scroll">'
-                f'<table class="report-table" style="font-size: 0.9em">{_head}{_rows}</table>'
-                "</div>"
-            ),
-            mo.md(f"*Greedy completions of the `named_holdout` prompts, d{_w}-L{_d}, all seeds.*"),
-        ]
+    _table = (
+        '<div class="report-table-scroll">'
+        f'<table class="report-table" style="font-size: 0.9em">{_head}{_rows}</table>'
+        "</div>"
     )
+    _caption = mo.md(f"Greedy completions of the `named_holdout` prompts, d{_w}-L{_d}, all seeds.").text
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return (named_holdout_exs,)
 
 

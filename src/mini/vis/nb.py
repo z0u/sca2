@@ -183,24 +183,14 @@ def figure_html(
     produced and how they're styled (that is left to CSS or the caller). *caption* is
     an HTML fragment; render Markdown with :func:`marimo.md` first if you have it.
 
-    *aria_label* makes the whole figure a single labelled image (``role="img"``), for
-    when the body is a group of marks that reads as one picture and the inner alt text
-    would otherwise be lost — e.g. a strip of inline SVGs, each its own inner figure.
-
-    *caption* and *aria_label* are mutually exclusive: ``role="img"`` makes the figure's
-    subtree presentational, so a screen reader announces only the label and never reaches
-    a nested ``<figcaption>``. Use *caption* for a visible, announced description (a plain
-    ``<figure>``/``<figcaption>`` is already exposed), or *aria_label* to name an atomic
-    graphic that carries no separate caption.
+    *aria_label* gives the figure an accessible name for when the body is a group of
+    marks that reads as one picture with no text of its own — e.g. a strip of inline
+    SVGs. It is a plain ``aria-label`` (not ``role="img"``): a figure takes its name from
+    the label without becoming atomic, so any sub-figures and their captions stay
+    navigable. (``role="img"`` would make the subtree presentational and hide them — the
+    reason to avoid it for a captioned group.)
     """
     import html
-
-    if caption is not None and aria_label is not None:
-        msg = (
-            'figure_html: caption and aria_label are mutually exclusive — role="img" hides '
-            "the <figcaption> from screen readers. Pass one or the other."
-        )
-        raise ValueError(msg)
 
     attrs = ""
     if class_ is not None:
@@ -209,7 +199,7 @@ def figure_html(
         attrs += f' style="{html.escape(style)}"'
     if aria_label is not None:
         # Collapse whitespace so a triple-quoted label reads as one line in the export.
-        attrs += f' role="img" aria-label="{html.escape(" ".join(aria_label.split()))}"'
+        attrs += f' aria-label="{html.escape(" ".join(aria_label.split()))}"'
     figcaption = f"<figcaption>{caption}</figcaption>" if caption is not None else ""
     return f"<figure{attrs}>{body}{figcaption}</figure>"
 
