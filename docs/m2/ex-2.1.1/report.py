@@ -236,11 +236,7 @@ def _(holdout, train_pairs):
     _half = max(_x.max() - _x.min(), _y.max() - _y.min()) / 2 + 0.12
     _xlim, _ylim = (_cx - _half, _cx + _half), (_cy - _half, _cy + _half)
 
-    # One example edge per panel, labelled at its endpoints; both sit on the cube's
-    # silhouette so the pair is easy to pick out. The mix is spelled out in the caption.
-    _examples = {"train": ("white", "magenta", "ab"), "held out for eval": ("magenta", "blue", "cd")}
-
-    def _panel(title: str, bold, other) -> plt.Figure:
+    def _panel(bold, other, examples) -> plt.Figure:
         fig, ax = plt.subplots(figsize=(4.2, 4.4))
         faint, vedge = light_dark("#0001", "#fff1"), light_dark("#0006", "#fff7")
         ink, halo = light_dark("#111", "#eee"), light_dark("#fff", "#111")
@@ -280,14 +276,13 @@ def _(holdout, train_pairs):
         # Vertices in true color; +ε on zorder so a vertex wins a depth tie with an edge.
         for _i in range(len(_vals)):
             ax.scatter(_x[_i], _y[_i], c=[_named[_i]], s=60, edgecolors=vedge, lw=0.6, zorder=float(_depth[_i]) + 1e-3)
-        _u, _v, _chs = _examples[title]
+        _u, _v, _chs = examples
         _letter(_u, _chs[0])
         _letter(_v, _chs[1])
         cube.style_cube_axes(ax, labels=False)
         ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
         ax.set_xlim(*_xlim)
         ax.set_ylim(*_ylim)
-        fig.suptitle(title)
         return fig
 
     _train_alt = (
@@ -307,14 +302,16 @@ def _(holdout, train_pairs):
         "the worked example c + d = violet. Titled 'held out for eval'."
     )
     _left = themed(
-        lambda: _panel("train", _train_edges, holdout),
+        lambda: _panel(_train_edges, holdout, ("white", "magenta", "ab")),
         name="named-pair-lattice-train",
         alt_text=_train_alt,
+        caption="Train",
     )()
     _right = themed(
-        lambda: _panel("held out for eval", holdout, _train_edges),
+        lambda: _panel(holdout, _train_edges, ("magenta", "blue", "cd")),
         name="named-pair-lattice-holdout",
         alt_text=_holdout_alt,
+        caption="Held out for eval",
     )()
     # Two sub-figures under one caption: figure_html nests the themed panels in a <figure>
     # that the `figure:has(> figure)` rule in report.css reflows to a stack on a narrow screen.
