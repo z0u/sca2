@@ -55,14 +55,14 @@ def _():
     mo.md(r"""
     # Experiment 2.9.2: fallback control for deleting *red*
 
-    [Ex-2.9.1](../ex-2.9.1/report.py) reproduced M1's headline result — anchor
+    [Ex-2.9.1](../ex-2.9.1/report.py) reproduced M1's headline result: anchor
     *red* to latent axis 0, zero the axis, and the damage lands on red-like
-    colors — but also its main weakness: the outcome varies a lot with the
-    random seed. The original handled that with a 60-seed sweep and Pareto
-    selection. That won't scale; as models grow, the chance that any given
-    seed yields a clean intervention response may shrink. This experiment asks
-    whether we can make the response reliable *by construction* instead of by
-    selection.
+    colors. It also reproduced the main weakness: the outcome varies a lot
+    with the random seed. The original handled that with a 60-seed sweep and
+    Pareto selection, but that won't scale: as models grow, the chance that
+    any given seed yields a clean intervention response may shrink. This
+    experiment asks whether we can make the response reliable *by
+    construction* instead of by selection.
 
     The SCA paper's discussion names the cause — weight ablation's
     "redistribution is unreliable" — and suggests optimal ablation
@@ -72,32 +72,33 @@ def _():
     control**: teach the decoder, during training, what to output when the
     concept has been removed.
 
-    ## Why zero ablation is noisy
+    ## Why weight ablation is noisy
 
-    The bottleneck is unit-normalized, so zeroing axis 0 renormalizes what's
-    left. For a red-like input the remainder is small and essentially random —
-    whatever residual geometry the seed happened to produce — so ablated red
-    re-emerges as some *other* arbitrary color. In Li & Janson's terms this is
-    "spoofing": the intervention doesn't just delete the concept, it inserts
-    a random claim about the input. Two seeds with identical anchoring quality
-    can then score very differently, purely on where red happens to land.
+    The bottleneck is unit-normalized, so zeroing an encoder axis renormalizes
+    what's left. For a red-like input the remainder is small and essentially
+    random — whatever residual geometry the seed happened to produce — so
+    ablated red re-emerges as some other arbitrary color. In Li & Janson's terms
+    this is "spoofing": the intervention doesn't just delete the concept, it
+    inserts a random claim about the input. Two seeds with identical anchoring
+    quality can then score very differently, purely on where red happens to
+    land.
 
-    Optimal ablation was designed to *measure* importance while minimizing
+    Optimal ablation was designed to measure importance while minimizing
     spoofing: it replaces the component with the constant $a^* = \arg\min_a
-    \mathbb{E}[\mathcal{L}]$, the value that hurts expected loss least. That
-    objective is worth pausing on, because for *removal* it points the wrong
-    way: the loss it minimizes includes the target's, so $a^*$ is pulled
-    toward whatever constant best *restores* red. We evaluate both the literal
-    method (`oa`) and the removal-appropriate adaptation (`oa-nontarget`,
-    optimizing the constant over non-red colors only).
+    \mathbb{E}[\mathcal{L}]$, the value that hurts expected loss least. Note
+    that for *removal*, this objective points the wrong way: the loss it
+    minimizes includes the target's, so $a^*$ is pulled toward whatever constant
+    best *restores* red. We evaluate both the literal method (`oa`) and the
+    removal-appropriate adaptation (`oa-nontarget`, optimizing the constant over
+    non-red colors only).
 
-    Fallback control instead makes the post-removal behavior a trained
-    property. The anti-anchor regularizer already keeps the direction −e₀
-    empty, so we add one decoder-only loss term, MSE(dec(−e₀), mid-gray),
-    pinning that reserved direction to the "know-nothing" output (a model
-    that has genuinely lost the color information should hedge — and the
-    hedge over the RGB cube is mid-gray). An intervention can then *redirect*
-    red to −e₀ and get a defined response, rather than hoping the
+    Fallback control instead makes the post-removal behavior a trained property.
+    The anti-anchor regularizer already keeps the direction −e₀ empty, so we add
+    one decoder-only loss term, MSE(dec(−e₀), mid-gray), pinning that reserved
+    direction to the *null* output that we get to choose. A model that has
+    genuinely lost the color information should hedge — and the hedge over the
+    RGB cube is mid-gray, so we choose mid-gray as *null*. An intervention can
+    then redirect red to −e₀ and get a defined response, rather than hoping the
     redistribution behaves.
 
     ## Conditions
@@ -163,10 +164,10 @@ def _(loaded):
         f"**{len(metrics)} runs completed** ({n_seeds} seeds × 2 variants). The headline splits in "
         f"two. On the selectivity score, `base + zero` gets {s_bz.mean():.2f} ± {s_bz.std():.2f} "
         f"(min {s_bz.min():.2f}) and `fallback + reflect` gets {s_fr.mean():.2f} ± {s_fr.std():.2f} "
-        f"(min {s_fr.min():.2f}) — better, but most of that gap is two catastrophic base seeds. The "
-        f"unambiguous change is in the *response*: damage to pure red goes from "
+        f"(min {s_fr.min():.2f}). That looks better, but most of the gap is two catastrophic base "
+        f"seeds. The unambiguous change is in the response: damage to pure red goes from "
         f"{rp_bz.mean():.2f} ± {rp_bz.std():.2f} across seeds to {rp_fr.mean():.3f} ± "
-        f"{rp_fr.std():.3f}, pinned just under the analytic ¼ bound — the intervention outcome "
+        f"{rp_fr.std():.3f}, pinned just under the analytic ¼ bound. The intervention outcome "
         f"becomes a designed property instead of a draw."
     )
     return exemplars, metrics, runs, stat
@@ -238,7 +239,7 @@ def _(stat):
     _ok = _bz > 0.1
     mo.md(
         f"The scatter says two separate things. First, the `base` variant has {_n_bad} seeds scoring "
-        f"below 0.1 under *every* intervention; those are anchoring failures (in the worst, red never "
+        f"below 0.1 under *every* intervention. Those are anchoring failures (in the worst, red never "
         f"anchored at all: validation anchor loss 0.61, versus a median of 0.006), and no "
         f"intervention-time trick touches them. The fallback variant happened to produce none in 32 "
         f"seeds — suggestive, but training is chaotic enough that we can't tell one extra loss term "
@@ -246,13 +247,13 @@ def _(stat):
         f"`base + zero` excluding failures scores {_bz[_ok].mean():.2f} ± {_bz[_ok].std():.2f}, "
         f"against {_fr.mean():.2f} ± {_fr.std():.2f} for `fallback + reflect` and "
         f"{_frd.mean():.2f} ± {_frd.std():.2f} for `redirect`. By this metric alone, fallback "
-        f"control buys little — but R² only measures whether error is *proportional* to redness; "
-        f"it is blind to whether the size of the response is the same from seed to seed. That is "
-        f"where the change is, and the next section measures it directly. (One wrinkle: plain "
-        f"zeroing scores a little lower on the fallback variant, median "
+        f"control gives little benefit. But R² only measures whether error is *proportional* to redness; it "
+        f"is blind to whether the size of the response is the same from seed to seed. That is where "
+        f"the change is, and the next section measures it directly. (However, plain zeroing "
+        f"scores a little lower on the fallback variant, median "
         f"{np.median(stat('fallback', 'zero', 'score')):.2f} vs {np.median(_bz):.2f} — presumably "
         f"the fallback term perturbs the decoder that zero-ablated latents still pass through. A "
-        f"trained fallback wants its redirect, not zeroing.)"
+        f"trained fallback should be paired with its redirect instead of zeroing.)"
     )
     return
 
@@ -260,15 +261,15 @@ def _(stat):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## A predictable response, not just a bigger one
+    ## A predictable response
 
-    SCA's promise is side effects you can bound *before* intervening, so the
+    SCA aims to give side effects you can bound before intervening, so the
     magnitude of the response matters less than knowing it in advance. With
     the decoder pinned to mid-gray at −e₀, redirecting pure red there should
     cost MSE(red, gray) = ¼ exactly. Without fallback training there is no
     bound at all: red lands wherever the untrained region happens to decode.
-    Zero ablation's expectation under random redistribution is ⅓, but with
-    seed-to-seed spread that expectation is little comfort.
+    Zero ablation's expectation under random redistribution is ⅓, but the
+    seed-to-seed spread makes that expectation unhelpful.
     """)
     return
 
@@ -452,7 +453,7 @@ def _():
     ## What optimal ablation did (and why that's the wrong tool here)
 
     Optimal ablation performed *worse* than plain zeroing on selectivity, and
-    the reason is instructive rather than a bug. OA's constant minimizes
+    the reason is informative. OA's constant minimizes
     expected loss over the task distribution — including the concept being
     removed. In an anchored model the cheapest way to reduce expected loss is
     to put a little red back: the fitted constants are consistently positive,
@@ -517,8 +518,8 @@ def _(stat):
       permanent edit (row zeroed, so the information is gone), and it scores
       essentially as well — but its bias must dominate the target's pre-norm
       residual, and on one seed it didn't (red passed through nearly
-      untouched while reflection still moved it). γ wants calibration
-      against the model's pre-norm scale rather than a fixed value.
+      untouched while reflection still moved it). γ should be calibrated
+      against the model's pre-norm scale rather than fixed.
     - The response bound is also a response *ceiling*: trained fallback
       trades the large-but-arbitrary damage of untrained reflection (red
       reconstructing as whatever color happens to live at −e₀) for a

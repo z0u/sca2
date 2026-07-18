@@ -89,19 +89,19 @@ case "${1:-help}" in
         ;;
     p|preview)
         shift
-        serve=1 port=8000
-        export_args=(--stale-only)
+        serve=1 port=8000 stale=--stale-only
+        nbs=()
         while [[ $# -gt 0 ]]; do
             case "$1" in
                 --no-serve) serve=0 ;;
-                --force) export_args=() ;;
+                --force) stale= ;;
                 --port) port="${2:?--port needs a value}"; shift ;;
                 -*) echo "preview: unknown flag '$1' (flags: --no-serve --force --port N)" 1>&2; exit 2 ;;
-                *) export_args+=("$1") ;;
+                *) nbs+=("$1") ;;
             esac
             shift
         done
-        ( set -x; uv run "$SCRIPT_DIR/export_reports.py" "${export_args[@]}" )
+        ( set -x; uv run "$SCRIPT_DIR/export_reports.py" ${stale:+"$stale"} "${nbs[@]}" )
         ( set -x; uv run "$SCRIPT_DIR/build_site.py" --localize )
         if [[ $serve -eq 1 ]]; then
             ( set -x; uv run "$SCRIPT_DIR/preview_server.py" "$PROJECT_ROOT/_site" "$port" )

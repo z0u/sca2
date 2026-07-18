@@ -10,7 +10,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from mini.reports import Publisher, report_bundle, use_publisher
-from mini.vis.nb import themed
+from mini.vis.nb import figure_html, themed
 
 matplotlib.use("Agg")
 
@@ -56,6 +56,34 @@ def test_themed_value_is_used():
 def test_alt_text():
     result = themed(_dummy_plot, alt_text="My plot")(1, 2)
     assert 'alt="My plot"' in result
+
+
+def test_alt_text_whitespace_collapses():
+    result = themed(_dummy_plot, alt_text="A plot\n    with   newlines")(1, 2)
+    assert 'alt="A plot with newlines"' in result
+
+
+def test_no_figcaption_without_caption():
+    assert "<figcaption>" not in themed(_dummy_plot)(1, 2)
+
+
+def test_caption_renders_markdown_into_figcaption():
+    result = themed(_dummy_plot, caption="*Emphasised* caption")(1, 2)
+    assert "<figcaption>" in result
+    assert "<em>Emphasised</em>" in result  # Markdown was rendered, not passed verbatim
+
+
+def test_figure_html_caption_and_class():
+    out = figure_html("<table></table>", caption="a caption", class_="report-figure")
+    assert out == '<figure class="report-figure"><table></table><figcaption>a caption</figcaption></figure>'
+
+
+def test_figure_html_aria_label_collapses_whitespace():
+    out = figure_html("<svg/>", aria_label="line one\n    line two")
+    assert 'aria-label="line one line two"' in out
+    # A plain aria-label, not role="img" — the latter would hide sub-figure captions.
+    assert "role=" not in out
+    assert "<figcaption>" not in out
 
 
 def test_decorator_factory():

@@ -44,7 +44,7 @@ from mini.reports import Publisher, current_publisher
 from mini.vis.plt import Stylesheet
 
 
-__all__ = ["themed", "themed_figure_html"]
+__all__ = ["figure_html", "themed", "themed_figure_html"]
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -63,6 +63,7 @@ def themed(
     plot: Callable[P, Figure],
     *,
     alt_text: str | None = ...,
+    caption: str | None = ...,
     max_width: str | None = ...,
     name: str | None = ...,
     publish: Publisher | None = ...,
@@ -76,6 +77,7 @@ def themed(
     plot: None = ...,
     *,
     alt_text: str | None = ...,
+    caption: str | None = ...,
     max_width: str | None = ...,
     name: str | None = ...,
     publish: Publisher | None = ...,
@@ -88,6 +90,7 @@ def themed(
     plot: Callable[P, Figure] | None = None,
     *,
     alt_text: str | None = None,
+    caption: str | None = None,
     max_width: str | None = None,
     name: str | None = None,
     publish: Publisher | None = None,
@@ -115,6 +118,11 @@ def themed(
     :func:`~mini.reports.use_publisher`, or pass ``publish=`` one here. *name* is the
     externalized figure's readable basename (it ends up in the asset filename and the
     download name); it defaults to the plot function's name.
+
+    *caption* is **Markdown** rendered into a ``<figcaption>`` inside the ``<figure>``,
+    so the caption travels with the image instead of riding along in a sibling
+    ``mo.vstack``. Write it as a triple-quoted string — ``mo.md`` dedents, so leading
+    indentation is stripped for you.
     """
 
     def decorator(fn: Callable[P, Figure]) -> Callable[P, str]:
@@ -133,6 +141,7 @@ def themed(
                 light_fig,
                 dark_fig,
                 alt_text=alt_text,
+                caption=_render_caption(caption),
                 max_width=max_width,
                 name=name or getattr(fn, "__name__", "").lstrip("_") or "figure",
                 publish=publish if publish is not None else current_publisher(),
@@ -145,12 +154,63 @@ def themed(
     return decorator
 
 
+def _render_caption(caption: str | None) -> str | None:
+    """Render a Markdown caption to an HTML fragment for a ``<figcaption>``.
+
+    Marimo owns the Markdown pipeline, so we defer to :func:`marimo.md` (and import it
+    lazily — the library core stays marimo-free for callers that never caption). It
+    dedents internally, so a triple-quoted string with indentation renders cleanly.
+    """
+    if caption is None:
+        return None
+    import marimo as mo
+
+    return mo.md(caption).text
+
+
+def figure_html(
+    body: str,
+    *,
+    caption: str | None = None,
+    aria_label: str | None = None,
+    class_: str | None = None,
+    style: str | None = None,
+) -> str:
+    """Wrap an HTML/SVG *body* in a ``<figure>``, optionally with a ``<figcaption>``.
+
+    The shared seam behind themed figures, subline strips, and captioned tables: it
+    only assembles the element, staying agnostic about how *body* and *caption* were
+    produced and how they're styled (that is left to CSS or the caller). *caption* is
+    an HTML fragment; render Markdown with :func:`marimo.md` first if you have it.
+
+    *aria_label* gives the figure an accessible name for when the body is a group of
+    marks that reads as one picture with no text of its own — e.g. a strip of inline
+    SVGs. It is a plain ``aria-label`` (not ``role="img"``): a figure takes its name from
+    the label without becoming atomic, so any sub-figures and their captions stay
+    navigable. (``role="img"`` would make the subtree presentational and hide them — the
+    reason to avoid it for a captioned group.)
+    """
+    import html
+
+    attrs = ""
+    if class_ is not None:
+        attrs += f' class="{html.escape(class_)}"'
+    if style is not None:
+        attrs += f' style="{html.escape(style)}"'
+    if aria_label is not None:
+        # Collapse whitespace so a triple-quoted label reads as one line in the export.
+        attrs += f' aria-label="{html.escape(" ".join(aria_label.split()))}"'
+    figcaption = f"<figcaption>{caption}</figcaption>" if caption is not None else ""
+    return f"<figure{attrs}>{body}{figcaption}</figure>"
+
+
 def themed_figure_html(
     light_fig: Figure,
     dark_fig: Figure,
     *,
     close_fig: bool = True,
     alt_text: str | None = None,
+    caption: str | None = None,
     max_width: str | None = None,
     name: str | None = None,
     publish: Publisher | None = None,
@@ -162,6 +222,10 @@ def themed_figure_html(
     (named ``<name>-light.png`` / ``<name>-dark.png`` so a saved file reads sensibly);
     otherwise both inline as ``data:`` URIs. *name* is also surfaced as a
     ``data-asset-name`` attribute on each ``<img>`` for provenance.
+
+    *caption* is an HTML fragment (not Markdown — this seam is renderer-agnostic)
+    placed in a ``<figcaption>`` inside the ``<figure>``. The :func:`themed` decorator
+    renders its Markdown ``caption`` here for you.
 
     Each ``<img>`` carries explicit ``width``/``height`` attributes: the figure's
     *physical* size (PNG pixels × 96 CSS px/in ÷ save dpi), not its pixel count.
@@ -219,7 +283,9 @@ def themed_figure_html(
     dark_uri = _src(dark_png, "dark")
 
     escaped_name = html.escape(asset_name)
-    escaped_alt = html.escape(alt_text or "Plot")
+    # Collapse whitespace so a triple-quoted, indented alt_text reads as one line (it
+    # would attribute-encode either way; this just keeps the exported HTML tidy).
+    escaped_alt = html.escape(" ".join((alt_text or "Plot").split()))
     # Shrink to fit a narrow viewport (height follows to keep the aspect), but never
     # grow past the physical size set by the width/height attributes.
     style = (
@@ -276,15 +342,21 @@ def themed_figure_html(
                 }}
             }}
         }}
+
+        .{figure_class} > figcaption {{
+            margin-top: 0.6em;
+            font-size: 0.9em;
+            font-style: italic;
+            opacity: 0.75;
+        }}
         </style>
         """)
     light_w, light_h = _css_size(light_png)
     dark_w, dark_h = _css_size(dark_png)
-    figure_html = dedent(f"""
-        <figure class="{figure_class}">
-            <img class="mini-themed-img-light" src="{light_uri}" alt="{escaped_alt}" width="{light_w}" height="{light_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />
-            <img class="mini-themed-img-dark" src="{dark_uri}" alt="{escaped_alt}" width="{dark_w}" height="{dark_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />
-        </figure>
+    imgs = dedent(f"""
+        <img class="mini-themed-img-light" src="{light_uri}" alt="{escaped_alt}" width="{light_w}" height="{light_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />
+        <img class="mini-themed-img-dark" src="{dark_uri}" alt="{escaped_alt}" width="{dark_w}" height="{dark_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />
         """)
+    figure = figure_html(imgs, caption=caption, class_=figure_class)
 
-    return f"{css}{figure_html}"
+    return f"{css}{figure}"

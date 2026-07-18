@@ -33,7 +33,7 @@ with app.setup(hide_code=True):
     )
     from mini.reports import externalize_html, report_bundle, use_publisher
     from mini.store import project_store
-    from mini.vis import light_dark, themed
+    from mini.vis import figure_html, light_dark, themed
     from sca.data import colors, cube
     from subline.series import Series
     from subline.subline import Subline
@@ -189,12 +189,12 @@ def _():
             "magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a "
             "smooth solid."
         ),
+        caption="The 16³ hex grid",
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(4.6, 4.4))
         cube.draw_rgb_cube(ax, cube.grid(), side="front", s=70)
         ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
-        fig.suptitle("The 16³ hex grid")
         return fig
 
     mo.Html(_plot())
@@ -236,11 +236,7 @@ def _(holdout, train_pairs):
     _half = max(_x.max() - _x.min(), _y.max() - _y.min()) / 2 + 0.12
     _xlim, _ylim = (_cx - _half, _cx + _half), (_cy - _half, _cy + _half)
 
-    # One example edge per panel, labelled at its endpoints; both sit on the cube's
-    # silhouette so the pair is easy to pick out. The mix is spelled out in the caption.
-    _examples = {"train": ("white", "magenta", "ab"), "held out for eval": ("magenta", "blue", "cd")}
-
-    def _panel(title: str, bold, other) -> plt.Figure:
+    def _panel(bold, other, examples) -> plt.Figure:
         fig, ax = plt.subplots(figsize=(4.2, 4.4))
         faint, vedge = light_dark("#0001", "#fff1"), light_dark("#0006", "#fff7")
         ink, halo = light_dark("#111", "#eee"), light_dark("#fff", "#111")
@@ -280,14 +276,13 @@ def _(holdout, train_pairs):
         # Vertices in true color; +ε on zorder so a vertex wins a depth tie with an edge.
         for _i in range(len(_vals)):
             ax.scatter(_x[_i], _y[_i], c=[_named[_i]], s=60, edgecolors=vedge, lw=0.6, zorder=float(_depth[_i]) + 1e-3)
-        _u, _v, _chs = _examples[title]
+        _u, _v, _chs = examples
         _letter(_u, _chs[0])
         _letter(_v, _chs[1])
         cube.style_cube_axes(ax, labels=False)
         ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
         ax.set_xlim(*_xlim)
         ax.set_ylim(*_ylim)
-        fig.suptitle(title)
         return fig
 
     _train_alt = (
@@ -307,18 +302,20 @@ def _(holdout, train_pairs):
         "the worked example c + d = violet. Titled 'held out for eval'."
     )
     _left = themed(
-        lambda: _panel("train", _train_edges, holdout),
+        lambda: _panel(_train_edges, holdout, ("white", "magenta", "ab")),
         name="named-pair-lattice-train",
         alt_text=_train_alt,
+        caption="Train",
     )()
     _right = themed(
-        lambda: _panel("held out for eval", holdout, _train_edges),
+        lambda: _panel(holdout, _train_edges, ("magenta", "blue", "cd")),
         name="named-pair-lattice-holdout",
         alt_text=_holdout_alt,
+        caption="Held out for eval",
     )()
-    # A figure of two sub-figures: a nested <figure> with a group <figcaption>, styled by the
-    # `figure:has(> figure)` rule in report.css so the panels reflow on a narrow screen.
-    mo.Html(f"<figure><figcaption>Named pairs on the cube</figcaption>{_left}{_right}</figure>")
+    # Two sub-figures under one caption: figure_html nests the themed panels in a <figure>
+    # that the `figure:has(> figure)` rule in report.css reflows to a stack on a narrow screen.
+    mo.Html(figure_html(f"{_left}{_right}", caption="Named pairs on the cube"))
     return
 
 
@@ -476,11 +473,11 @@ def _(metrics):
 
         def one(name: str, row: dict) -> str:
             svg = Subline(chars_per_line=sub_width, css=sub_css).plot(row["text"], series(row))
-            caption = f'<figcaption style="font-size: 11px; font-family: monospace; opacity: 0.65">{name}</figcaption>'
-            return f'<figure style="display: inline-block; margin: 0 .5em">{svg}{caption}</figure>'
+            label = f'<span style="font-size: 11px; font-family: monospace; opacity: 0.65">{name}</span>'
+            return figure_html(svg, caption=label, style="display: inline-block; margin: 0 .5em")
 
-        html = f'<figure aria-label="{aria_label}">' + "".join(one(name, row) for name, row in rows) + "</figure>"
-        return mo.Html(externalize_html(html, name=name))
+        strip = "".join(one(name, row) for name, row in rows)
+        return mo.Html(externalize_html(figure_html(strip, aria_label=aria_label), name=name))
 
     def pad(row: dict, key: str) -> np.ndarray:
         """Scale to fractions of log |V| and align with the text: position 0 has no prediction."""
@@ -646,16 +643,13 @@ def _(backbone, complete, holdout):
         for i, ex in enumerate(named_holdout_exs)
     )
     _w, _d = backbone
-    mo.vstack(
-        [
-            mo.Html(
-                '<div class="report-table-scroll">'
-                f'<table class="report-table" style="font-size: 0.9em">{_head}{_rows}</table>'
-                "</div>"
-            ),
-            mo.md(f"*Greedy completions of the `named_holdout` prompts, d{_w}-L{_d}, all seeds.*"),
-        ]
+    _table = (
+        '<div class="report-table-scroll">'
+        f'<table class="report-table" style="font-size: 0.9em">{_head}{_rows}</table>'
+        "</div>"
     )
+    _caption = mo.md(f"Greedy completions of the `named_holdout` prompts, d{_w}-L{_d}, all seeds.").text
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return (named_holdout_exs,)
 
 

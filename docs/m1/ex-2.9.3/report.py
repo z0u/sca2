@@ -37,23 +37,23 @@ def _():
     # Experiment 2.9.3: why anchoring fails — timing, attribution, and a schedule fix
 
     [Ex-2.9.2](../ex-2.9.2/report.py) split ablation variance in two and solved
-    the *redistribution* half: fallback control gives the intervention a
-    designed response. The other half — on some seeds the concept never ends
-    up cleanly on its axis — was left open, with the working hypothesis that
-    the regularizer schedule is **incompatible with some initializations**.
-    If that were right, the remedy would be a per-seed or per-init schedule
-    search: expensive, and worse at scale.
+    the redistribution half: fallback control gives the intervention a designed
+    response. The other half — that on some seeds the concept never ends up
+    cleanly on its axis — was left open. The working hypothesis was that the
+    regularizer schedule is **incompatible with some initializations**. If so,
+    the remedy would be a per-seed or per-init schedule search: expensive, and
+    worse at scale.
 
-    This experiment tests that hypothesis directly, and rejects it. Three
+    This experiment tests that hypothesis, and rejects it. Three
     arms, all on ex-2.9.1's tiny color autoencoder:
 
-    - **Trajectories** — retrain ex-2.9.2's base arm (32 seeds, identical
-      RNG), recording anchor progress, leakage, and reconstruction error at
-      every step: *when* do failures happen, relative to the schedule?
+    - **Trajectories** — retrain ex-2.9.2's base arm (same 32 seeds), recording
+      anchor progress, leakage, and reconstruction error at every step: *when*
+      do failures happen, relative to the schedule?
     - **Attribution** — factor the RNG into the model init and the batch/label
       stream (16 inits × 8 streams, including the two known-catastrophic
-      inits). Failures that are a property of the init repeat along its row;
-      accidents scatter.
+      inits). Failures that are a property of the init should repeat along its
+      row, whereas failures due to data ordering should scatter.
     - **Schedule sweep** — peak LR {0.10, 0.07, 0.05, 0.03} × regularizer
       anneal {on, off}, 32 seeds per cell, trained with the fallback term and
       scored by the `redirect` intervention (ex-2.9.2's recipe, so the score
@@ -119,7 +119,7 @@ def _(arm):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Failures happen late, not early
+    ## Failures happen late
 
     Each line below is one seed's training trajectory under the original
     schedule. The top panel tracks anchor progress — z₀ of pure red, which
@@ -212,11 +212,11 @@ def _(arm, traj):
         f"seeds 22 and 8 the moment the LR tops out (reconstruction collapses outright on 22), and "
         f"seeds 15 and 27 only once the anchor weight has annealed low — by step "
         f"{max(_drops)} it is {float(_w_anchor[min(max(_drops), len(_w_anchor) - 1)]):.3f}, "
-        f"too weak to pull red back. So the anchored solution is *metastable* at this LR: the "
-        f"regularizers hold it in place while they're on, and the timed anneal removes that "
-        f"protection while the optimizer is still hot. Nothing about these seeds resisted anchoring; "
-        f"they were unlucky during the plateau. That predicts the failure should follow the "
-        f"*randomness of training*, not the initialization — which the next arm tests directly."
+        f"too weak to pull red back. So the anchored solution seems to be *metastable* at this LR: "
+        f"the regularizers hold it in place while they're on, and the timed anneal removes that "
+        f"protection while the optimizer is still hot. Nothing about these seeds resisted anchoring, and "
+        f"they were just unlucky during the plateau. If that's right, the failure should follow the "
+        f"*randomness of training*, not the initialization. We test that below."
     )
     return
 
@@ -224,7 +224,7 @@ def _(arm, traj):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## It's not the seed (and so there is nothing to sweep against)
+    ## It's not the seed
 
     The attribution arm re-trains 16 inits × 8 batch/label streams under the
     original schedule. Under the incompatible-init hypothesis, the two inits
@@ -303,10 +303,7 @@ def _(arm):
         f"inits, none failing more than {max(_by_init.values())} of 8, with mild clustering by "
         f"stream (stream 6 accounts for {_by_stream.get(6, 0)}). The incompatible-init hypothesis "
         f"is refuted: the same init succeeds or fails depending on which random batches and label "
-        f"draws it sees during the hot phase, with a residual interaction that is just chaos. Two "
-        f"practical consequences. Sweeping schedules *per seed* would be aiming at noise — a seed "
-        f"isn't good or bad, a *(seed, stream, schedule)* triple is. And any fix must make the "
-        f"plateau safe for every trajectory, rather than route around particular inits."
+        f"draws it sees during the hot phase, with a residual interaction that is just chaos."
     )
     return
 
@@ -314,9 +311,9 @@ def _(arm):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## The sweep: the LR peak was the cause; the anneal was not
+    ## Cause: high LR, not regularizer weight annealing
 
-    Going in, the anneal looked responsible — it removes the anchor's protection.
+    Initially, the anneal looked responsible — it removes the anchor's protection.
     But the sweep says otherwise: holding the regularizers on to the end
     (`anneal off`) makes things *worse* at every peak, while simply halving
     the LR peak removes the failures entirely. These runs train with the
@@ -390,8 +387,8 @@ def _(sweep_cell):
         f"(median {np.median(_rc(_cool)):.6f} vs {np.median(_rc(_hot)):.6f}) — the 0.1 peak bought "
         f"nothing but risk. Cooler is not monotonically better: at 0.03 the model undercooks "
         f"({_nbad(_cold)} leaky runs, median score {np.median(_rd(_cold)):.2f}).\n\n"
-        f"Second, **the anneal earns its keep** — just not where we suspected. Holding the "
-        f"regularizers on actually lowers *typical* leak slightly, but it fattens the tail: "
+        f"Second, **the anneal is worth keeping**. Holding "
+        f"the regularizers on actually lowers typical leak slightly, but it fattens the tail: "
         f"{_hold_bad} leaky runs across the four hold cells versus "
         f"{sum(_nbad(sweep_cell(p, True)) for p in PEAK_LRS)} with the anneal, as the live anchor "
         f"term keeps dragging pinkish *labeled* samples onto the axis in unlucky runs. It also "
@@ -401,14 +398,14 @@ def _(sweep_cell):
         f"{np.median([r['interventions']['redirect']['red_pure'] for p in PEAK_LRS for r in sweep_cell(p, False)]):.2f} "
         f"vs {np.median([r['interventions']['redirect']['red_pure'] for p in PEAK_LRS for r in sweep_cell(p, True)]):.2f} "
         f"with the anneal), forfeiting the predictable response ex-2.9.2 bought. The anneal isn't "
-        f"the bug; annealing *while the optimizer is still hot* is.\n\n"
-        f"Third, a stowaway: the worst hot-cell score ({_rd(_hot).min():.2f}, seed "
+        f"the problem; annealing *while the optimizer is still hot* is.\n\n"
+        f"Third, one run is worth singling out: the worst hot-cell score ({_rd(_hot).min():.2f}, seed "
         f"{min(_hot, key=lambda r: r['interventions']['redirect']['score'])['seed']}) is not an "
         f"anchoring failure at all — the run anchored cleanly, but the redirect's fixed γ = 1 bias "
         f"failed to dominate that seed's pre-norm scale, so 'deleted' red passed through almost "
         f"untouched (damage to pure red {min(r['interventions']['redirect']['red_pure'] for r in _hot):.3f}). "
         f"That is ex-2.9.2's γ-calibration caveat recurring in 1 run of 256; excluding it, the hot "
-        f"cell's floor is {_hot_ok.min():.2f}. γ should be calibrated per model, not fixed."
+        f"cell's floor is {_hot_ok.min():.2f}. γ should therefore be calibrated per model."
     )
     return
 
@@ -457,10 +454,10 @@ def _(arm, sweep_cell):
 
     For M2 defaults:
 
-    - **Halve the LR peak to 0.05 and keep the anneal.** That cell had 0/32
+    - **Reduce LR.** That cell had 0/32
       unhealthy runs, scores {_rd.min():.2f}–{_rd.max():.2f} (median
       {np.median(_rd):.2f}), and reconstruction as good as the hot schedule.
-      Don't overshoot: 0.03 undercooks.
+      It may be sufficient to reduce it only during the anneal phase.
     - **Keep the fallback term** — for its designed purpose (a predictable
       intervention response), and for its apparent side effect of preventing
       catastrophic training failures.
@@ -470,15 +467,9 @@ def _(arm, sweep_cell):
       worthwhile: even the safe cell only bounds what we measured, and the
       failure mechanism is chaotic.
 
-    A schedule this tuned still fixes the *symptom* — protection ends on a
-    timer while the hazard (LR) is set by hand. [Ex-2.9.4](../ex-2.9.4/report.py)
+    A tuned schedule fixes the symptom but requires tuning. [Ex-2.9.4](../ex-2.9.4/report.py)
     asks whether the weights can instead respond to the training signals
     themselves, which would remove the timing coupling altogether.
-
-    ({len(_bad_t)} of 32 base-config seeds failed here, so the phenomenon is
-    rare but material; all comparisons in this report are distributional
-    across 32-seed cells, and per-seed pairings across conditions are
-    meaningless — see ex-2.9.2's caveats.)
     """)
     return
 
