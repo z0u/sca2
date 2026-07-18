@@ -36,6 +36,16 @@ figure:has(> figure) > figure {
   margin: 0 0.5em;
 }
 
+/* Authored figure (a table or other HTML/SVG body wrapped by mini.vis.figure_html with
+ * class="report-figure") — its <figcaption> gets the same muted italic look `themed`
+ * bakes into image captions, so all report captions read alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+}
+
 /* Colour swatch: a small square tinted via the `--sw` custom property, so each
  * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See sca.data.colors.swatch. */
 .sw {

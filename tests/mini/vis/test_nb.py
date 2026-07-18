@@ -10,7 +10,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 from mini.reports import Publisher, report_bundle, use_publisher
-from mini.vis.nb import themed
+from mini.vis.nb import figure_html, themed
 
 matplotlib.use("Agg")
 
@@ -71,6 +71,23 @@ def test_caption_renders_markdown_into_figcaption():
     result = themed(_dummy_plot, caption="*Emphasised* caption")(1, 2)
     assert "<figcaption>" in result
     assert "<em>Emphasised</em>" in result  # Markdown was rendered, not passed verbatim
+
+
+def test_figure_html_caption_and_class():
+    out = figure_html("<table></table>", caption="a caption", class_="report-figure")
+    assert out == '<figure class="report-figure"><table></table><figcaption>a caption</figcaption></figure>'
+
+
+def test_figure_html_aria_label_collapses_whitespace():
+    out = figure_html("<svg/>", aria_label="line one\n    line two")
+    assert 'role="img" aria-label="line one line two"' in out
+    assert "<figcaption>" not in out
+
+
+def test_figure_html_rejects_caption_with_aria_label():
+    # role="img" hides the figcaption from screen readers, so the combination is refused.
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        figure_html("<svg/>", caption="cap", aria_label="label")
 
 
 def test_decorator_factory():

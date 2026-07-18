@@ -44,7 +44,7 @@ from mini.reports import Publisher, current_publisher
 from mini.vis.plt import Stylesheet
 
 
-__all__ = ["themed", "themed_figure_html"]
+__all__ = ["figure_html", "themed", "themed_figure_html"]
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -166,6 +166,52 @@ def _render_caption(caption: str | None) -> str | None:
     import marimo as mo
 
     return mo.md(caption).text
+
+
+def figure_html(
+    body: str,
+    *,
+    caption: str | None = None,
+    aria_label: str | None = None,
+    class_: str | None = None,
+    style: str | None = None,
+) -> str:
+    """Wrap an HTML/SVG *body* in a ``<figure>``, optionally with a ``<figcaption>``.
+
+    The shared seam behind themed figures, subline strips, and captioned tables: it
+    only assembles the element, staying agnostic about how *body* and *caption* were
+    produced and how they're styled (that is left to CSS or the caller). *caption* is
+    an HTML fragment; render Markdown with :func:`marimo.md` first if you have it.
+
+    *aria_label* makes the whole figure a single labelled image (``role="img"``), for
+    when the body is a group of marks that reads as one picture and the inner alt text
+    would otherwise be lost — e.g. a strip of inline SVGs, each its own inner figure.
+
+    *caption* and *aria_label* are mutually exclusive: ``role="img"`` makes the figure's
+    subtree presentational, so a screen reader announces only the label and never reaches
+    a nested ``<figcaption>``. Use *caption* for a visible, announced description (a plain
+    ``<figure>``/``<figcaption>`` is already exposed), or *aria_label* to name an atomic
+    graphic that carries no separate caption.
+    """
+    import html
+
+    if caption is not None and aria_label is not None:
+        msg = (
+            'figure_html: caption and aria_label are mutually exclusive — role="img" hides '
+            "the <figcaption> from screen readers. Pass one or the other."
+        )
+        raise ValueError(msg)
+
+    attrs = ""
+    if class_ is not None:
+        attrs += f' class="{html.escape(class_)}"'
+    if style is not None:
+        attrs += f' style="{html.escape(style)}"'
+    if aria_label is not None:
+        # Collapse whitespace so a triple-quoted label reads as one line in the export.
+        attrs += f' role="img" aria-label="{html.escape(" ".join(aria_label.split()))}"'
+    figcaption = f"<figcaption>{caption}</figcaption>" if caption is not None else ""
+    return f"<figure{attrs}>{body}{figcaption}</figure>"
 
 
 def themed_figure_html(
@@ -317,12 +363,10 @@ def themed_figure_html(
         """)
     light_w, light_h = _css_size(light_png)
     dark_w, dark_h = _css_size(dark_png)
-    figcaption = f"\n            <figcaption>{caption}</figcaption>" if caption is not None else ""
-    figure_html = dedent(f"""
-        <figure class="{figure_class}">
-            <img class="mini-themed-img-light" src="{light_uri}" alt="{escaped_alt}" width="{light_w}" height="{light_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />
-            <img class="mini-themed-img-dark" src="{dark_uri}" alt="{escaped_alt}" width="{dark_w}" height="{dark_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />{figcaption}
-        </figure>
+    imgs = dedent(f"""
+        <img class="mini-themed-img-light" src="{light_uri}" alt="{escaped_alt}" width="{light_w}" height="{light_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />
+        <img class="mini-themed-img-dark" src="{dark_uri}" alt="{escaped_alt}" width="{dark_w}" height="{dark_h}" style="{escaped_style}" data-asset-name="{escaped_name}" />
         """)
+    figure = figure_html(imgs, caption=caption, class_=figure_class)
 
-    return f"{css}{figure_html}"
+    return f"{css}{figure}"

@@ -31,7 +31,7 @@ with app.setup(hide_code=True):
     )
     from mini.reports import externalize_html, report_bundle, use_publisher
     from mini.store import project_store
-    from mini.vis import light_dark, themed
+    from mini.vis import figure_html, light_dark, themed
     from sca.data import colors
     from subline.series import Series
     from subline.subline import Subline
@@ -158,20 +158,23 @@ def _():
     )
     _open_train, _open_holdout = colors.split_open_pairs(CORPUS_SEED, OPEN_HOLDOUT_FRAC)
     _named_train, _named_holdout = colors.split_named_pairs(CORPUS_SEED, HOLDOUT_FRAC)
+    _table = (
+        '<div class="report-table-scroll"><table class="report-table"><tr><th>condition</th>'
+        + "".join(f'<th class="num"><code>{f}</code></th>' for f in _forms)
+        + f"</tr>{_rows}</table></div>"
+    )
+    _caption = mo.md(
+        f"""
+        Lines per form in each condition's {N_EXAMPLES:,}-line corpus. Named equations draw
+        from the same {len(_named_train)} train pairs as ex-2.1.1 (the same {len(_named_holdout)}
+        pairs held out); open equations draw from {len(_open_train)} of the 302 off-palette
+        named pairs, with {len(_open_holdout)} held out entirely.
+        """
+    ).text
     mo.vstack(
         [
             mo.md(f"```\n{_head}```"),
-            mo.Html(
-                '<div class="report-table-scroll"><table class="report-table"><tr><th>condition</th>'
-                + "".join(f'<th class="num"><code>{f}</code></th>' for f in _forms)
-                + f"</tr>{_rows}</table></div>"
-            ),
-            mo.md(
-                f"*Lines per form in each condition's {N_EXAMPLES:,}-line corpus. Named equations draw "
-                f"from the same {len(_named_train)} train pairs as ex-2.1.1 (the same {len(_named_holdout)} "
-                f"pairs held out); open equations draw from {len(_open_train)} of the 302 off-palette "
-                f"named pairs, with {len(_open_holdout)} held out entirely.*"
-            ),
+            mo.Html(figure_html(_table, caption=_caption, class_="report-figure")),
         ]
     )
     return
@@ -397,16 +400,15 @@ def _(answer_value, completions, holdout_exs):
         + "</tr>"
         for i, ex in enumerate(holdout_exs)
     )
-    mo.vstack(
-        [
-            mo.Html(f'<div class="report-table-scroll"><table class="report-table">{_head}{_rows}</table></div>'),
-            mo.md(
-                f"*Greedy completions of the `named_holdout` prompts, seed {SEEDS[0]}, one column per "
-                "condition. A ✓ marks answers whose *value* equals the true mix (they are all hex: "
-                "value-correct in the wrong surface form).*"
-            ),
-        ]
-    )
+    _table = f'<div class="report-table-scroll"><table class="report-table">{_head}{_rows}</table></div>'
+    _caption = mo.md(
+        f"""
+        Greedy completions of the `named_holdout` prompts, seed {SEEDS[0]}, one column per
+        condition. A ✓ marks answers whose *value* equals the true mix (they are all hex:
+        value-correct in the wrong surface form).
+        """
+    ).text
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
 
 
@@ -766,21 +768,20 @@ def _(holdout_exs, m_hold):
         + f'<td class="num"><b>{m_hold[ci, :, gp_idx].mean():+.1f}</b></td></tr>'
         for ci, cond in enumerate(CONDS)
     )
-    mo.vstack(
-        [
-            mo.Html(
-                '<div class="report-table-scroll">'
-                '<table class="report-table"><tr><th>condition</th>'
-                + "".join(f'<th class="num">seed {s}</th>' for s in SEEDS)
-                + f'<th class="num">mean</th></tr>{_rows}</table>'
-                + "</div>"
-            ),
-            mo.md(
-                "*Margin of `green` over its best competitor on the `lime + black` prompt, per seed "
-                "and condition (positive: the arithmetic wins).*"
-            ),
-        ]
+    _table = (
+        '<div class="report-table-scroll">'
+        '<table class="report-table"><tr><th>condition</th>'
+        + "".join(f'<th class="num">seed {s}</th>' for s in SEEDS)
+        + f'<th class="num">mean</th></tr>{_rows}</table>'
+        + "</div>"
     )
+    _caption = mo.md(
+        """
+        Margin of `green` over its best competitor on the `lime + black` prompt, per seed
+        and condition (positive: the arithmetic wins).
+        """
+    ).text
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return (gp_idx,)
 
 
@@ -809,15 +810,16 @@ def _(gp_idx, holdout_exs, metrics):
             Series(raw=np.clip(_pad(row, "entropy"), 0, 1), label="entropy", dasharray="3 2"),
         ]
         svg = Subline(chars_per_line=len(row["text"]), css=_sub_css).plot(row["text"], series)
-        cap = f'<figcaption style="font-size: 11px; font-family: monospace; opacity: 0.65">{cond}</figcaption>'
-        return f'<figure style="display: inline-block; margin: 0 1em 0 0">{svg}{cap}</figure>'
+        label = f'<span style="font-size: 11px; font-family: monospace; opacity: 0.65">{cond}</span>'
+        return figure_html(svg, caption=label, style="display: inline-block; margin: 0 1em 0 0")
 
-    _html = (
-        '<figure role="img" aria-label="The equation lime plus black equals green, repeated once per '
-        "condition, each with a sparkline of per-character surprisal (solid) and predictive entropy "
-        '(dashed) under the text on a shared 0-to-log-V scale.">'
-        + "".join(_one(cond, row) for cond, row in _rows_by_cond)
-        + "</figure>"
+    _html = figure_html(
+        "".join(_one(cond, row) for cond, row in _rows_by_cond),
+        aria_label="""
+            The equation lime plus black equals green, repeated once per condition, each with a
+            sparkline of per-character surprisal (solid) and predictive entropy (dashed) under
+            the text on a shared 0-to-log-V scale.
+        """,
     )
     mo.Html(externalize_html(_html, name="sublines-garden-path"))
     return
