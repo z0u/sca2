@@ -268,12 +268,9 @@ def _():
     mo.md(r"""
     ## Completion accuracy across the factorial
 
-    Exact-match accuracy per eval set and condition; dots are seeds, bars are
-    means. `named_holdout` is H1's panel; `open_holdout` shows whether the
-    forced computation generalizes to *unseen* off-palette pairs; `alias_rev` is
-    the supervision check. In `control` and `rev`, the open-form sets ask for a
-    surface form that those corpora never train on (a name + name prompt), so a
-    low score there means the grammar is absent, not that the model failed.
+    Did either intervention move `named_holdout` off zero, and did the two new
+    forms train the way we intended? The figure below shows exact-match accuracy
+    for all seven eval sets in each of the four conditions.
     """)
     return
 
@@ -304,7 +301,21 @@ def _(metrics):
         axes[0].set_ylabel("completion accuracy")
         return fig
 
-    mo.Html(_plot())
+    mo.vstack(
+        [
+            mo.Html(_plot()),
+            mo.md(
+                "*Each panel is one eval set: the bar is the mean over three seeds and the "
+                "dots are the individual seeds. `named_holdout` is the set H1 is about; "
+                "`open_holdout` asks whether the forced computation carries over to "
+                "off-palette pairs never seen in training; `alias_rev` checks the "
+                "reverse-alias supervision. In `control` and `rev`, the open-form sets ask "
+                "for a surface form those corpora never train on (a name + name prompt), so "
+                "a low score there means the grammar is absent, not that the model tried and "
+                "missed.*"
+            ),
+        ]
+    )
     return
 
 
@@ -451,13 +462,10 @@ def _():
     mo.md(r"""
     ## Error margins, pair by pair
 
-    Exact-match accuracy on ten pairs is a coarse instrument. The margin
-    (log-probability of the true name as a complete answer, minus the best
-    competitor among the *other names*) grades the name-identity question
-    continuously, independent of the hex-vs-name form choice above. Positive
-    means the true name wins among names, and the magnitude says by how
-    much. One line per held-out pair, mean over seeds, across conditions;
-    `named_seen` margins shown as the shaded reference.
+    Exact-match accuracy over ten pairs is a coarse instrument: it says whether the
+    true name came out on top, but not whether it was close. So let's grade the
+    name-identity question continuously and ask, pair by pair, whether intervention
+    brings the true name any closer to winning.
     """)
     return
 
@@ -536,7 +544,19 @@ def _(holdout_exs, m_hold, m_seen):
         ax.legend(fontsize=8, loc="upper left")
         return fig
 
-    mo.Html(_plot())
+    mo.vstack(
+        [
+            mo.Html(_plot()),
+            mo.md(
+                "*The margin is the log-probability of the true name as a complete answer, "
+                "minus that of the best competing name; it sets the hex-versus-name form "
+                "choice aside, since only names count as candidates. Positive means the true "
+                "name beats the other names, and the magnitude says by how much. One line per "
+                "held-out pair, averaged over seeds and traced across the four conditions; the "
+                "shaded band is the range of `named_seen` margins, for reference.*"
+            ),
+        ]
+    )
     return
 
 
@@ -567,24 +587,13 @@ def _():
     mo.md(r"""
     ## The answer schedule: when each channel becomes readable
 
-    Ex-2.1.1's probes read one pre-answer position and averaged over RGB, which
-    hides *when* the mix is computed. Here we fit a ridge probe per (position,
-    channel, layer) on hex prompts. Offset 0 is the `#`; digit k sits at offset
-    k + 1 and is emitted from offset k. Solid segments are positions where the
-    digit is not yet in the context (decoding is computation); dotted segments
-    are after it lands (decoding is copying). H3 predicts each channel's solid
-    segment ends with a sharp rise at its own emission position.
+    Ex-2.1.1's probes read a single pre-answer position and averaged over RGB,
+    which hides *when* the mix is computed. So here we fit a separate ridge probe
+    for every (position, channel, layer) on hex prompts, and watch each RGB channel
+    of the result become decodable as the answer is spelled out.
 
-    Indeed, that's what the deep layers show. At the final layer, channel k is
-    near-perfectly decodable exactly at its emission offset (R² ≈ 0.97) and
-    *only* there. One position earlier it is far weaker, and once emission moves
-    on to the next digit the previous channels largely fade from the deep
-    residual stream. Each answer position holds the one channel it is about to
-    emit, on top of a diffuse ≈ 0.5-R² trace of the whole mix that persists from
-    the pre-answer position. So the mix is never fully represented at any single
-    position; the "result" the pre-answer probe sees is a head start, not a
-    value. This is just-in-time computation, and anchoring a *result* concept at
-    one position might work against the model's own schedule.
+    H3 predicts a stair-step: each channel stays low until the position that emits
+    its own digit, then rises sharply.
     """)
     return
 
@@ -629,7 +638,36 @@ def _(sched_offsets, sched_r2):
         axes[0].legend(fontsize=7)
         return fig
 
-    mo.Html(_plot())
+    mo.vstack(
+        [
+            mo.Html(_plot()),
+            mo.md(
+                "*One panel per residual-stream depth; three lines per panel for the R, G, "
+                "and B channels of the result. Offset 0 is the `#`, digit k sits at offset "
+                "k + 1 and is emitted from offset k. A line is solid where its digit is not "
+                "yet in the context (so decoding it is computation) and dotted once it has "
+                "landed (decoding is copying).*"
+            ),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    That is close to what the deep layers show. At the final layer, channel k is
+    near-perfectly decodable exactly at its emission offset (R² ≈ 0.97) and *only*
+    there. One position earlier it is far weaker, and once emission moves on to the
+    next digit the previous channels largely fade from the deep residual stream.
+
+    So each answer position holds just the one channel it is about to emit, riding
+    on a diffuse ≈ 0.5-R² trace of the whole mix that persists from the pre-answer
+    position. The mix is never fully represented at any single position: the
+    "result" the pre-answer probe sees is a head start, not a finished value. This
+    is just-in-time computation, and anchoring a *result* concept at one position
+    might be at odds with the model's own schedule.
+    """)
     return
 
 
@@ -638,11 +676,11 @@ def _():
     mo.md(r"""
     ## Computed but outvoted?
 
-    The transfer probe: fit on open-pair prompts (name + name surface form)
-    at the pre-answer position, scored on the named eval sets. If a
-    condition computes the mix on named prompts, the probe carries over; if
-    the mix is never represented there, no probe fit elsewhere can read it
-    out. One panel per scored set, R² against depth, one line per condition.
+    If the mix really is computed on named prompts, a probe trained to read the
+    result elsewhere should carry over to them. So we fit the probe on open-pair
+    prompts (name + name surface form) at the pre-answer position, then score it on
+    the named eval sets. Where the mix is never represented, no probe fit elsewhere
+    can recover it.
     """)
     return
 
@@ -677,7 +715,17 @@ def _(metrics):
         axes[0].legend(fontsize=8)
         return fig
 
-    mo.Html(_plot())
+    mo.vstack(
+        [
+            mo.Html(_plot()),
+            mo.md(
+                "*One panel per scored set: the fit set's held-back half, open holdout, named "
+                "seen, and named holdout. R² against residual depth, one line per condition "
+                "(darker means a richer corpus). Depth 0 is left out, since the pre-answer "
+                "embedding is constant across prompts until attention runs.*"
+            ),
+        ]
+    )
     return
 
 
@@ -794,19 +842,15 @@ def _(gp_idx, holdout_exs, metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Calibration as an early-warning dial
+    ## Calibration
 
-    Mean surprise-surprise over answer characters, $s_2 = (i - h)/\log|V|$, per
-    eval set and condition. Ex-2.1.1 found `named_holdout` answers were
-    *confidently wrong* (s₂ ≫ 0) while everything else sat near zero. The
-    anchored runs will use this as an indicator of degradation. Accuracy is
-    saturated on most sets, so miscalibration should move first. Here it doubles
-    as a check on H1: conditions that solve the holdout set should also stop
-    being surprised by it.
-
-    It behaves as expected: the `open_*` rows and the `alias_rev` row snap from
-    confidently-wrong (s₂ ≈ 0.7) to calibrated (≈ 0) under the conditions that
-    train those forms, while `named_holdout` stays confidently wrong everywhere.
+    A model can be wrong quietly or wrong loudly, and the anchored runs will lean
+    on that difference as an early warning. Accuracy is saturated on most sets, so
+    if a run starts to degrade, miscalibration should move before accuracy does.
+    Ex-2.1.1 found that `named_holdout` answers were confidently wrong while
+    everything else sat near calibrated. Here the same measure doubles as a check
+    on H1, since a condition that solved the holdout set should also stop being
+    surprised by it.
     """)
     return
 
@@ -848,7 +892,26 @@ def _(metrics):
         fig.colorbar(im, ax=ax, label="mean s₂ on answers")
         return fig
 
-    mo.Html(_plot())
+    mo.vstack(
+        [
+            mo.Html(_plot()),
+            mo.md(
+                r"*Mean surprise-surprise over answer characters, $s_2 = (i - h)/\log|V|$, "
+                r"with eval sets as rows and conditions as columns. Warm cells are confidently "
+                r"wrong (s₂ ≫ 0); near-zero cells are well calibrated.*"
+            ),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    It behaves as expected. The `open_*` rows and the `alias_rev` row snap from
+    confidently wrong (s₂ ≈ 0.7) to calibrated (≈ 0) under the conditions that train
+    those forms, while `named_holdout` stays confidently wrong everywhere.
+    """)
     return
 
 

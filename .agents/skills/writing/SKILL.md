@@ -81,3 +81,15 @@ Don't hard-wrap a line inside an inline code span or math expression. A wrapped
 span can start the next line with block syntax — a hex code like `#f78` at the
 start of a line renders as a heading — and some renderers break the span
 entirely. Rewrap the surrounding prose so the whole span sits on one line.
+
+```patch
+      mo.md(
+-       "Sometimes we write Markdown in Python, e.g. when working in a Marimo notebook. "
+-       "In that case, prefer multiline strings rather than using one string per "
+-       "hard-wrapped line. Use dedent and f-strings as needed."
++       """
++     Sometimes we write Markdown in Python, e.g. when working in a Marimo notebook.
++     In that case, prefer multiline strings rather than using one string per
++     hard-wrapped line. Use dedent and f-strings as needed."""
+      )
+```
