@@ -189,12 +189,12 @@ def _():
             "magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a "
             "smooth solid."
         ),
+        caption="The 16³ hex grid",
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(4.6, 4.4))
         cube.draw_rgb_cube(ax, cube.grid(), side="front", s=70)
         ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
-        fig.suptitle("The 16³ hex grid")
         return fig
 
     mo.Html(_plot())
@@ -316,9 +316,9 @@ def _(holdout, train_pairs):
         name="named-pair-lattice-holdout",
         alt_text=_holdout_alt,
     )()
-    # A figure of two sub-figures: a nested <figure> with a group <figcaption>, styled by the
-    # `figure:has(> figure)` rule in report.css so the panels reflow on a narrow screen.
-    mo.Html(f"<figure><figcaption>Named pairs on the cube</figcaption>{_left}{_right}</figure>")
+    # Two sub-figures under one caption: figure_html nests the themed panels in a <figure>
+    # that the `figure:has(> figure)` rule in report.css reflows to a stack on a narrow screen.
+    mo.Html(figure_html(f"{_left}{_right}", caption="Named pairs on the cube"))
     return
 
 
