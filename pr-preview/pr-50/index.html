@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sparse Concept Anchoring in transformers</title>
+<link rel="stylesheet" href="md.css">
+</head>
+<body>
+<h1>Sparse Concept Anchoring in transformers</h1>
+<p>Sparse Concept Anchoring (SCA) is a training-time method for concept control.
+A light geometric regularizer, driven by a small number of noisy labels,
+guides a chosen concept toward a known location in representation space.
+The geometry is shaped during training, so there is no need to
+reverse-engineer it afterwards: the concept lives where you put it, and the
+side effects of suppressing or ablating it can be bounded before running the
+intervention.</p>
+<p>The first milestone (M1) established the method in autoencoders:
+<a href="https://arxiv.org/abs/2512.12469">paper</a>,
+<a href="https://www.lesswrong.com/posts/sGskzx7LgsDkMLvcv/intervening-on-sparse-anchored-concepts">blog post</a>,
+<a href="https://github.com/z0u/ex-preppy">code</a>. This site holds the experiment
+reports for the second milestone (M2), which asks: does SCA transfer to
+transformers? We anchor concepts in the residual stream of a small transformer
+trained on a synthetic color-mixing task (<em>red + blue = purple</em>), where ground
+truth is unambiguous, so a negative result stays interpretable. The plan and
+deliverables are in the <a href="https://github.com/z0u/sca2">project README</a>.</p>
+<p>&nbsp;</p>
+<h2>Experiment reports</h2>
+<p>Each report is a <a href="https://marimo.io">Marimo</a> notebook that reads durable
+results produced by a separately-run experiment. Reports are published
+automatically, with their figures served from a Hugging Face dataset; the
+infrastructure is <a href="https://github.com/z0u/mi-ni">mi-ni</a>.</p>
+<!-- These URLs are rewritten to point to the published notebooks -->
+
+<h3>Iteration 0: prep</h3>
+<ul>
+<li><a href="m1/ex-2.9.1/">Experiment 2.9.1 redux</a>: the M1 headline result
+  (deleting <em>red</em> from a 5D autoencoder), ported from
+  <a href="https://github.com/z0u/ex-preppy">ex-preppy</a> to JAX. We ran it as an
+  end-to-end test of the M2 infrastructure.</li>
+<li><a href="ngpt-scaling/">nGPT scaling</a>: a character-level width × depth
+  sweep of our simplified nGPT (scalar gains, a residual step fixed at
+  1/n_layer). Converged loss stays flat across the grid — no depth penalty,
+  no instability at large widths — so this architecture should be safe to build
+  the color-mixing experiments on.</li>
+<li><a href="m1/ex-2.9.2/">Experiment 2.9.2</a>: fallback control for deleting
+  <em>red</em>. Ex-2.9.1's selectivity varies a lot with the seed. This experiment
+  tests the SCA paper's "optimal ablation" suggestion against a training-time
+  alternative: pin the decoder's response at the reserved anti-anchor
+  direction to mid-gray, then redirect the concept there. The trained
+  fallback collapses the variance to an analytic bound.</li>
+<li><a href="m1/ex-2.9.3/">Experiment 2.9.3</a>: why anchoring fails. Per-step
+  trajectories show that every failing seed anchors successfully, then breaks
+  during the high-LR plateau. An init × data-stream factorial shows the
+  failures follow the stream, not the seed. A schedule sweep finds the fix:
+  halve the LR peak and keep the anneal.</li>
+<li><a href="m1/ex-2.9.4/">Experiment 2.9.4</a>: closed-loop regularizer weights.
+  Replaces the timed anneal with feedback (dual ascent with hysteresis on
+  the anchor terms). The mechanism works — no rescue is missed — but it
+  causes as many catastrophes as it prevents, and its knobs are sharper than
+  the LR knob it replaces. Meanwhile, the fallback term already prevents
+  every catastrophic failure on its own. It was a clean negative result, so
+  we're keeping the static schedule from ex-2.9.3.</li>
+</ul>
+<h3>Iteration 1: D2.1, anchoring in a transformer</h3>
+<ul>
+<li><a href="m2/ex-2.1.1/">Experiment 2.1.1</a>: the color-mixing transformer,
+  un-anchored. Defines the synthetic color-mixing language (named colors and
+  hex codes denoting the same concepts, with exact integer mixing), sweeps
+  the nGPT backbone over width × depth × seed, and builds D2.1's measurement
+  apparatus: exact-match completion accuracy on seen, held-out, and unseen
+  operand pairs, plus per-layer residual-stream probes for operand and result
+  colors. This is likely the baseline that the anchored runs will be compared
+  against.</li>
+<li><a href="m2/ex-2.1.2/">Experiment 2.1.2</a>: making composition necessary.
+  Ex-2.1.1's baseline never solves the held-out named pairs, and its diagnosis
+  pointed to the corpus: a memorizable named slice, a one-way alias dictionary,
+  and hex answers that factorize per channel. This experiment tests grammar
+  interventions (reverse alias lines and off-palette named equations). Both
+  train, but held-out named accuracy stays at zero, with the failure now split
+  into a form-rule error (correct value, hex spelling) and a value → name
+  translation that never engages mid-equation. Position-resolved probes suggest
+  the mix never fully exists at any one position.</li>
+<li><a href="m2/ex-2.1.3/">Experiment 2.1.3</a>: names all the way down. Removes
+  the hex scaffolding entirely — every color is a single opaque token and the
+  only sentences are named mixing equations — and sweeps the vocabulary from
+  27 to 4096 grid colors. The model infers the color-space geometry from
+  co-occurrence alone: embeddings hold RGB as a decodable linear subspace,
+  mixes are computed in value space at the pre-answer position, and guesses
+  land near the nearest-name floor even for pair types never seen in training.
+  Exact match is non-monotonic in vocabulary size (essentially solved at 216
+  colors; neighbor-level near misses at 4096), which informs the vocabulary
+  design for the anchored runs.</li>
+</ul>
+<p>More reports will appear here as the M2 experiments land.</p>
+</body>
+</html>
