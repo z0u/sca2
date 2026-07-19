@@ -24,7 +24,7 @@ _.critical  # unused method (src/mini/logging.py:77)
 _.trace  # unused method (src/mini/logging.py:102)
 SimpleLoggingConfig  # unused class (src/mini/logging.py:44)
 
-# Dormant infra, kept deliberately (see todo.md): candidates for deletion if the
+# Dormant infra, kept deliberately (see todo-eng.md): candidates for deletion if the
 # first M2 transformer experiments don't pick them up.
 EntropySeries  # unused class (src/subline/series.py:26)
 Subline  # unused class (src/subline/subline.py:11)

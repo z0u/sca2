@@ -16,7 +16,8 @@ docs/  Experiments and reports (both in Python, as Marimo notebooks) — see doc
 eng/  Decision register — the *why* behind mini's storage/artifacts/publishing/gc internals. eng/README.md indexes it by question; check there before re-deriving infrastructure rationale from scratch.
 references/  Related documents, such as earlier papers and blog posts
 README.md  Details about the project including a list of deliverables, and where this milestone fits within the program of work
-todo.md  Backlog + scratch notes, written to be readable cold — check before starting work that might already be tracked there
+todo-eng.md  Infrastructure/tooling backlog + scratch notes; readable cold — check before starting work that might already be tracked there
+todo-science.md  Experiment questions and findings backlog — the science counterpart to todo-eng.md
 ```
 
 ## Collaboration style
@@ -27,7 +28,7 @@ Steer clear of adversarial framing, both in conversation and in the text we publ
 
 Don't hesitate to disagree or point out potential issues. The human values technical accuracy and appreciates being corrected when their suggestions might cause problems. Rule of thumb: never write something you don't believe; if you disagree with something, it's better to write nothing.
 
-Be proactive. Fix little things as you go, and create [todos](/todo.md) for larger things.
+Be proactive. Fix little things as you go, and create todos for larger things — in [todo-eng.md](/todo-eng.md) for infrastructure/tooling, or [todo-science.md](/todo-science.md) for experiment questions and findings.
 
 ## Code style & conventions
 

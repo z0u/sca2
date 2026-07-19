@@ -1,7 +1,10 @@
-# Todo
+# Engineering todo
 
-Scratchpad for deferred work that isn't worth a tracking issue yet. When something
-here grows real, promote it to a GitHub issue and remove it from this list.
+Scratchpad for deferred *infrastructure* work that isn't worth a tracking issue
+yet — tooling, storage, publishing, CLI, and the `mini` library. Science
+questions and experiment findings live in [`todo-science.md`](./todo-science.md).
+When something here grows real, promote it to a GitHub issue and remove it from
+this list.
 
 Scratch items sit under _Scratch_; everything below that is the prioritized
 index into GitHub issues. Durable design rationale and recorded
@@ -27,41 +30,6 @@ readable cold without re-deriving code state.
   (b) is less disruptive and generalizes; the open question is where the
   min-width/scroll wrapper lives — a `themed` option, or a CSS class the author
   opts into. Decide before the anchoring reports reuse these figures.
-
-- **Ex-2.1.2 results (2026-07-15): the `named_holdout` diagnosis was half
-  right, and the interesting half failed.** The 2×2 factorial (reverse
-  aliases × off-palette named-as-hex, frozen d64-L4) supplied both missing
-  ingredients and both *trained* — reverse aliases read out at 1.0 in their
-  own frame, and the arithmetic on name + name prompts generalizes to unseen
-  off-palette pairs at ≈ 0.92 — yet `named_holdout` stays at exactly 0 in
-  every condition. The failure decomposed: in the `open` conditions ~1/3 of
-  held-out answers are the *correct mix value in hex form* (form rule learned
-  per-pair, not per-value), and the rest are still lookup-neighbor names; the
-  name-identity margin (log P(true name) − best other name) sits ≈ −9 nats
-  everywhere, so the value → name translation never engages mid-equation even
-  though the same mapping is perfect in the `#hex = ` frame. Full analysis
-  with figures in `docs/m2/ex-2.1.2/report.py`. Consequences: the anchored
-  runs train on the `both` corpus and use `open_holdout` + s₂ as the graded
-  canaries (`named_holdout` has no headroom to lose); whether `named_holdout`
-  can be made solvable at all in 4 layers is parked — candidates: a denser
-  named sub-grid (value-diverse rgb→name supervision *in-frame*; note it
-  changes the concept inventory the anchors will label), more depth, or a
-  curriculum that interleaves frames. Bonus finding worth carrying into
-  anchor design: the answer-schedule probe shows just-in-time computation
-  *with eviction* — at the final layer, channel k is decodable (R² ≈ 0.97)
-  only at its own emission position, and previously-emitted channels are
-  dropped from the deep residual stream — so a "result" concept never fully
-  exists at any single position, and anchoring one there would fight the
-  model's schedule.
-
-- **s₂ (surprise-surprise) is now a standard metric.** Adopted in ex-2.1.2
-  (`answer_calibration`: mean answer nll/entropy/s₂ per eval set per cell) and
-  it behaved exactly as designed — snaps from ≈ 0.7 (confidently wrong) to ≈ 0
-  in precisely the conditions that train a form, per-set. Caveats live in the
-  docstring: it measures calibration, not competence (uniform ignorance also
-  scores ≈ 0 — pair with accuracy or raw surprisal), and per-token s₂ is a
-  noisy one-sample draw, so aggregate over many positions. Carry into the
-  anchored runs as the early-warning dial.
 
 - **Reconsider WandB (or a hosted tracker) at M3/M4 planning.** Removed from M2
   (2026-07-17): it was authenticated and a declared dep but unused — `mini`'s own
@@ -158,13 +126,6 @@ readable cold without re-deriving code state.
   the true per-container cap, read the requested `memory=` from the role config
   instead (or the cgroup limit, if gvisor exposes it).
 
-- Calibrate the redirect's γ against the model's pre-norm activation scale
-  instead of the fixed γ = 1. Ex-2.9.3 found the fixed value silently no-ops
-  on ~1 run in 250 (the bias fails to dominate that seed's pre-norm residual,
-  so "deleted" red passes through nearly untouched); ex-2.9.2 saw the same
-  once. Cheap fix: set γ to a multiple of the ablated row's typical pre-norm
-  contribution, measured on the train set after training.
-
 - `mini.temporal` can't drive feedback control. `DynamicProp.set()` retargets
   mid-flight from the current (value, velocity) state — exactly what a
   controller needs — but experiments consume schedules via `realize_timeline`,
@@ -189,45 +150,11 @@ readable cold without re-deriving code state.
   ex-2.1.1 uses it because its eval step reads checkpoints back — but
   ngpt-scaling still writes to the shared default.
 
-- The color-mixing grammar (`sca/data/colors.py`) hardcodes one operation:
-  `mix`, spelled `+`. D2.2 anchors *the operation*, which only makes sense once
-  the operation is a variable — with a single op there's nothing for the model
-  to represent. When extending: add an operation table (name, surface form,
-  grid fn with a defined rounding — saturating add/subtract and screen all stay
-  closed on 0..15), thread an `op` field through `Example` and key the
-  seen-pair bookkeeping on `(op, pair)`. Spell operators as *words*
-  (`red mix blue = purple`), not symbols, so the operation concept is
-  multi-token like the colors. No need to keep `+` compatible — each experiment
-  retrains from scratch and carries its own un-anchored control, so grammars
-  may differ across experiments. Probe positions in
-  `sca/compute/evaluation.py` assume the infix `a <op> b = ` frame; keep that
-  frame.
-
 - The ex-2.1.1 report refs moved to `reports/m2/ex-2.1.1/*`; the pre-rename
   `reports/ex-2.1.1/*` refs still sit in the store (there's no ref-delete API).
   Harmless clutter, but they pin their artifacts through GC's mark-and-sweep.
   If a ref-delete/rename verb ever lands (eng/gc.md), sweep them. The m1 refs
   (`reports/ex-2.9.*`) predate milestone nesting and stay flat on purpose.
-
-- Cheap capacity/superposition proxies for the ex-2.1.x eval step: per-layer
-  participation ratio of residual-stream activations (eigenspectrum of the
-  covariance — how many effective dimensions the model uses) and pairwise |cos|
-  between the fitted probe directions (operand vs result vs redness —
-  interference between concepts). Both fall out of arrays `eval_one` already
-  computes; they'd let the width sweep read as a compression axis. Full
-  superposition accounting (feature dictionary / SAE) is its own experiment,
-  after D2.1.2.
-
-- If anchoring a composed concept fails in D2.1.2, a useful ablation is a
-  word-level tokenizer variant (one token per color name, hex still
-  char-level): it separates "anchoring fails for transformers" from "anchoring
-  fails for concepts that don't coincide with an embedding row". Not the
-  default — the char-level task is the honest version of what M2 claims.
-
-- ngpt-scaling shows the simplified nGPT (fixed scalar α = 1/n_layer) trains
-  flat across the width × depth grid we can afford. Follow-up: confirm the fixed
-  scalar gate holds at a genuinely larger size (wider/deeper than 128×12, bigger
-  GPU + batch) before leaning on it for M3.
 
 - Remove the remaining mi-ni template *experiments* (`docs/pipeline`,
   `docs/probe`, `docs/acts` — their report notebooks are already gone) once the
@@ -238,15 +165,8 @@ readable cold without re-deriving code state.
 
 ## Backlog, grouped by what a single dev session should bundle
 
-**M2 science.**
-
-- [sca2#10](https://github.com/z0u/sca2/issues/10) — D2.1 kickoff: carry-over
-  lessons and hypothesis queue from ex-2.9.3/2.9.4 (schedule ordering, the
-  fallback analog, γ calibration, superposition watch-outs). Read before
-  designing the first transformer anchoring experiment.
-
-**Quick wins.** All shipped: #39 and #36 (PR #51), #19 (queued ≠ running,
-PR #54), #47 (per-experiment backend memory for `--app`).
+(M2 *science* backlog, including issue #10, now lives in
+[`todo-science.md`](./todo-science.md).)
 
 **Storage/control-plane design.** These stem from the same list in
 [`eng/decisions.md`](./eng/decisions.md):
