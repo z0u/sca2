@@ -50,6 +50,7 @@ N_EVAL = 256  # cap per eval set (small grids have fewer; we take what exists)
 
 METRICS_REF = "reports/m2/ex-2.1.3/metrics"
 ARRAYS_REF = "reports/m2/ex-2.1.3/arrays"
+EVALS_REF = "reports/m2/ex-2.1.3/evals"  # + f"/{grid}"
 CKPT_REF = "reports/m2/ex-2.1.3/checkpoints"  # + f"/{label}"
 
 
@@ -298,8 +299,8 @@ def eval_one(trained: dict, evals, grid: str) -> dict:
     }
 
 
-def publish_results(results: list[dict], stats: dict, checkpoints: dict) -> dict:
-    """Publish metrics (JSON), stacked per-cell arrays (npz), and checkpoints."""
+def publish_results(results: list[dict], stats: dict, checkpoints: dict, evals: dict) -> dict:
+    """Publish metrics (JSON), stacked per-cell arrays (npz), eval sets, and checkpoints."""
     import io
     import json
 
@@ -310,6 +311,8 @@ def publish_results(results: list[dict], stats: dict, checkpoints: dict) -> dict
     cells = [{k: v for k, v in r.items() if k != "arrays"} for r in results]
     metrics = {"cells": cells, "corpus_stats": stats}
     set_ref(METRICS_REF, put(json.dumps(metrics, indent=2).encode(), name="ex-2.1.3-metrics.json"))
+    for grid, art in evals.items():
+        set_ref(f"{EVALS_REF}/{grid}", art)  # per-example prompts/answers for the report
     for label, ckpt in checkpoints.items():
         set_ref(f"{CKPT_REF}/{label}", ckpt)
 
@@ -335,7 +338,7 @@ def main(ctx: Ctx) -> dict:
     evaled = ctx.map(eval_one, trained, [evals_by_grid[g] for g in cell_grids], cell_grids, role="eval")
     ckpts = dict(zip(labels, [t["checkpoint"] for t in trained], strict=True))
     stats = {p["grid"]: p["stats"] for p in preps}
-    summary = ctx.run(publish_results, evaled, stats, ckpts, role="prep")
+    summary = ctx.run(publish_results, evaled, stats, ckpts, evals_by_grid, role="prep")
 
     def mean_over_seeds(grid: str, key: str) -> float:
         vals = [r["sets"]["named_holdout"][key] for r in evaled if r["grid"] == grid]

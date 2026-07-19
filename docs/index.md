@@ -78,5 +78,15 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   into a form-rule error (correct value, hex spelling) and a value → name
   translation that never engages mid-equation. Position-resolved probes suggest
   the mix never fully exists at any one position.
+- [Experiment 2.1.3](./m2/ex-2.1.3/report.py): names all the way down. Removes
+  the hex scaffolding entirely — every color is a single opaque token and the
+  only sentences are named mixing equations — and sweeps the vocabulary from
+  27 to 4096 grid colors. The model infers the color-space geometry from
+  co-occurrence alone: embeddings hold RGB as a decodable linear subspace,
+  mixes are computed in value space at the pre-answer position, and guesses
+  land near the nearest-name floor even for pair types never seen in training.
+  Exact match is non-monotonic in vocabulary size (essentially solved at 216
+  colors; neighbor-level near misses at 4096), which informs the vocabulary
+  design for the anchored runs.
 
 More reports will appear here as the M2 experiments land.
