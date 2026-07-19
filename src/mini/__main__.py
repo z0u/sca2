@@ -44,7 +44,7 @@ from mini.gc import GRACE_DEFAULT
 from mini.local_apparatus import LocalApparatus
 from mini.memo import META_KEY, MemoStore
 from mini.orchestration import BudgetExpired, TaskFailed, retry, tick
-from mini.runs import SETTLED, RunState, data_root, is_queued, stale_heartbeat
+from mini.runs import SETTLED, RunState, data_root, is_queued, progress_age, stale_heartbeat, stale_progress
 from mini.store import _project_config
 from utils.time import duration
 
@@ -157,8 +157,17 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
     Compute is an execution choice, not part of the experiment definition.
     """
     backend = _resolve_app(name, args)
+    wd_overrides = {
+        k: v
+        for k, v in (
+            ("watchdog", getattr(args, "watchdog", None)),
+            ("watchdog_grace", getattr(args, "watchdog_grace", None)),
+        )
+        if v is not None
+    }
     if backend == "local":
-        return LocalApparatus(name, max_workers=getattr(args, "workers", 1))
+        app: Apparatus = LocalApparatus(name, max_workers=getattr(args, "workers", 1))
+        return app.w(**wd_overrides) if wd_overrides else app
     if backend == "modal":
         from mini.modal_apparatus import ModalApparatus
 
@@ -171,7 +180,7 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
                 ("max_containers", getattr(args, "max_containers", None)),
             )
             if v is not None
-        }
+        } | wd_overrides
         return app.w(**overrides) if overrides else app
     raise SystemExit(
         f'unknown backend {backend!r} — use "local" or "modal" (--app / .app marker / $MINI_APP / [tool.mini] app)'
@@ -273,12 +282,16 @@ def _memo_line(rec: dict) -> str:
     line = f"  {glyph} {rec.get('fn', 'task'):14} {rec['key']:26} {label:9}"
     if rec.get("total"):
         line += f"  {rec.get('step', 0)}/{rec['total']}"
+    if (rate := rec.get("steps_per_min")) is not None and state == RunState.RUNNING:
+        line += f"  ~{rate:g}/min"
     if rec.get("metrics"):
         line += f"  {_fmt_metrics(rec['metrics'])}"
     if state == RunState.RUNNING and rec.get("heartbeat_at"):
         line += f"  ⧖ queued {_age(rec['heartbeat_at'])}" if queued else f"  ♥ {_age(rec['heartbeat_at'])}"
         if stale_heartbeat(rec):
             line += "  ⚠ stale — worker may be dead"
+        elif stale_progress(rec):  # emitting but not advancing: the wedge signature, not a dead worker
+            line += f"  ⚠ no step progress for {progress_age(rec):.0f}s — worker may be wedged"
     if gpu := rec.get("env", {}).get("gpu"):
         line += f"  on {gpu}"  # what it actually ran on, when not the local CPU
     if rec.get("fc_id"):
@@ -521,12 +534,30 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "state": str(_rec_state(rec)),
         "queued": is_queued(rec),
     }
-    for f in ("step", "total", "metrics", "error", "exc_type", "fc_id", "env", "started_at", "finished_at"):
+    for f in (
+        "step",
+        "total",
+        "metrics",
+        "steps_per_min",
+        "error",
+        "exc_type",
+        "fc_id",
+        "env",
+        "started_at",
+        "finished_at",
+        "watchdog_s",
+        "watchdog_grace_s",
+    ):
         if (v := rec.get(f)) is not None:
             out[f] = v
     if _rec_state(rec) == RunState.RUNNING and (hb := rec.get("heartbeat_at")):
         out["heartbeat_age_s"] = round(time.time() - hb, 1)
         out["stale_heartbeat"] = stale_heartbeat(rec)
+    if (age := progress_age(rec)) is not None:
+        # heartbeat liveness ≠ step progress: a wedged worker can keep the former
+        # fresh while the latter freezes — monitors should key on this pair.
+        out["progress_age_s"] = round(age, 1)
+        out["stale_progress"] = stale_progress(rec)
     return out
 
 
@@ -911,9 +942,12 @@ def _gc_store(args: argparse.Namespace) -> None:
 
 def cmd_cancel(args: argparse.Namespace) -> None:
     apparatus = _build_apparatus(args.name, args)
-    cancelled = apparatus.cancel(apparatus.memo_store())
+    keys = [args.key] if args.key else None
+    cancelled = apparatus.cancel(apparatus.memo_store(), keys=keys)
     if cancelled:
         print(f"cancelled {len(cancelled)} task(s): {', '.join(cancelled)}")
+    elif args.key:
+        print(f"nothing to cancel ({args.key!r} is not in flight — keys are listed by: status)")
     else:
         print("nothing to cancel (no in-flight tasks)")
 
@@ -948,6 +982,23 @@ def main() -> None:
         p.add_argument("--workers", type=int, default=1, help="local worker threads / task concurrency")
         p.add_argument("--gpu", default=None, help="Modal GPU type, e.g. L4, A100 (--app modal)")
         p.add_argument("--timeout", type=int, default=None, help="per-task timeout in seconds (--app modal)")
+        p.add_argument(
+            "--watchdog",
+            type=int,
+            default=None,
+            help="abort a task whose step progress stalls this many seconds (worker-side; "
+            "a wedged worker settles FAILED with a stack dump instead of burning its timeout). "
+            "Applies to every role unless the role sets its own watchdog=",
+        )
+        p.add_argument(
+            "--watchdog-grace",
+            type=int,
+            default=None,
+            dest="watchdog_grace",
+            help="looser watchdog threshold until the task's first progress emission, "
+            "covering one-off setup (tokenization, compilation) so --watchdog can stay "
+            "tight (default: --watchdog)",
+        )
         p.add_argument(
             "--keep-stale-done",
             action="store_true",
@@ -1032,6 +1083,12 @@ def main() -> None:
 
     p = sub.add_parser("cancel", help="stop in-flight tasks and mark them cancelled")
     _add_name_arg(p)
+    p.add_argument(
+        "--key",
+        default=None,
+        help="cancel just this task (e.g. a wedged worker), leaving healthy siblings running "
+        "(default: every in-flight task)",
+    )
     _add_app_flag(p)
     p.set_defaults(func=cmd_cancel)
 

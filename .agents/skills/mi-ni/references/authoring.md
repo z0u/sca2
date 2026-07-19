@@ -109,3 +109,15 @@ Each step also picks up that apparatus's `before_each` hooks. The default role
 is the tick's apparatus (set by `--app` / `--workers` on the CLI). In a
 notebook, where you already hold apparatus handles, you can instead pass an
 instance directly: `ctx.run(fn, on=cpu_app)`.
+
+The experiment's `roles=` table binds each label to hardware kwargs, e.g.
+`roles={"gpu": dict(gpu="L4", timeout=2700, watchdog=120, watchdog_grace=900)}`.
+Alongside the backend-native knobs, any role (local or Modal) can set
+`watchdog=` — seconds without *step* progress before the worker aborts itself
+(`FAILED` with a stack dump) instead of wedging silently until the role
+`timeout`. Size it past the longest legitimate gap **between** `emit_progress`
+step advances; one-off setup before the first emission (tokenization,
+compilation) is covered by `watchdog_grace=` instead (default: same as
+`watchdog`), so a slow prep phase doesn't force the watchdog loose. The grace
+ends at the first emission — emit once real step cadence begins, not before.
+Leave `watchdog` unset for steps that never emit step progress.

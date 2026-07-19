@@ -39,8 +39,9 @@ bounded:
 1. **Launch / advance** with `bin/mini run <exp>` (one tick advances a stage).
 2. **Poll** with `bin/mini status <exp> --json` on an interval (every few
    seconds), **not** by re-`run`ning — parse `state` / `settled` /
-   `stale_heartbeat`, don't grep the human lines. Stop when `settled` is true,
-   when you hit your time/poll budget, or when something needs escalation.
+   `stale_heartbeat` / `stale_progress` / `progress_age_s` / `steps_per_min`,
+   don't grep the human lines. Stop when `settled` is true, when you hit your
+   time/poll budget, or when something needs escalation.
 3. To block until a stage settles, prefer the read-only `timeout 180 bin/mini
    watch <exp>` — it exits when every current task settles, 0 iff DONE (never
    ticks, safe to interrupt). `run --watch` (which *drives*) is allowed **only**
@@ -51,22 +52,28 @@ bounded:
    - `!! worker vanished (killed/crashed, no result written)` is a flaky-class
      infra failure, not a code bug: `bin/mini retry <exp> --key <key>` without
      editing anything, and mention the incident in your report.
+   - `WatchdogStall` (exc_type `mini._watchdog.WatchdogStall`) means the
+     worker's own progress watchdog aborted a wedged process — treat it like
+     `worker vanished`: `retry --key <key>`, no edits. If the **same cell**
+     stalls twice, escalate with the stack dump from `logs` instead.
 5. **Dead ≠ slow.** A RUNNING task can be a wedged or dead worker the backend
-   never settled. Two tells, either sufficient: `stale_heartbeat` true, or
-   `step` **frozen** across polls minutes apart while sibling cells of the
-   same fn finished normally (a wedged process — hung device call, deadlock —
-   can keep its heartbeat beating while doing no work; seen in ex-2.1.4:
-   container alive, GPU util 0.3%, progress frozen for the full role
-   timeout). Left alone it burns its whole role `timeout` doing nothing.
+   never settled. Tells, any sufficient: `stale_heartbeat` true;
+   `stale_progress` true (heartbeat fresh but `progress_age_s` far past the
+   cadence siblings show — a wedged process can keep emitting while doing no
+   work; seen in ex-2.1.4: container alive, GPU util 0.3%, progress frozen
+   for the full role timeout); or `step` frozen across polls minutes apart
+   while sibling cells of the same fn finished normally. A collapsed
+   `steps_per_min` (vs. siblings) is the early-warning version. Roles with
+   `watchdog=` self-abort wedges (→ `WatchdogStall`, handled above); the
+   manual path below is for runs without one, or a watchdog that never fired.
    Don't wait it out:
    - Confirm over 2–3 polls ≥ 3 minutes apart (a long non-emitting stretch —
-     a heavy import, one big step — can look frozen briefly).
-   - If **nothing else healthy is in flight**: `bin/mini cancel <exp>` (reaps
-     the record; cancel is experiment-wide, which is why the first condition
-     matters), then `bin/mini retry <exp> --key <key>`.
-   - If healthy workers **are** in flight, don't cancel them; keep polling and
-     recover the dead task the moment the others settle — or report progress
-     with the stuck task's key and timings if you hit budget first.
+     a heavy import, one big step — can look frozen briefly, and
+     `stale_progress` uses a generic threshold when no watchdog is set).
+   - `bin/mini cancel <exp> --key <key>` reaps just the stuck worker —
+     healthy siblings keep running — then `bin/mini retry <exp> --key <key>`.
+     (Plain `cancel` without `--key` stops the whole experiment; use it only
+     when that's what you want.)
 5. **When all DONE**: report the results location (`bin/mini results <exp>` /
    `report.py`).
 6. If you hit the budget before it settles, return a **progress** report (not an

@@ -27,8 +27,10 @@ __all__ = [
     "compute_env",
     "data_root",
     "is_queued",
+    "progress_age",
     "spawn_taskworker",
     "stale_heartbeat",
+    "stale_progress",
 ]
 
 # Markers that identify a project root, in priority order.
@@ -170,6 +172,43 @@ def stale_heartbeat(rec: dict, now: float | None = None) -> bool:
         return False
     hb = rec.get("heartbeat_at")
     return bool(hb) and ((now if now is not None else time.time()) - hb) > STALE_HEARTBEAT_S
+
+
+def progress_age(rec: dict, now: float | None = None) -> float | None:
+    """Seconds since this RUNNING task's step last advanced, or ``None``.
+
+    Anchored on ``progress_at`` (the worker's last ``(step, total)`` advance) and
+    falling back to ``started_at`` for a worker that hasn't emitted yet — so the
+    age is meaningful from the moment the worker truly starts. ``None`` for
+    queued/settled records, where "progress" has no referent.
+    """
+    if rec.get("state") != RunState.RUNNING or is_queued(rec):
+        return None
+    anchor = rec.get("progress_at") or rec.get("started_at")
+    return ((now if now is not None else time.time()) - anchor) if anchor else None
+
+
+def stale_progress(rec: dict, now: float | None = None) -> bool:
+    """Is this RUNNING task's *step* frozen suspiciously long — worker possibly wedged?
+
+    The companion to :func:`stale_heartbeat` for the wedge failure mode: a
+    hung device call or deadlocked thread can leave emissions (heartbeats)
+    flowing while ``step`` never advances, so heartbeat staleness never trips.
+    Display-only, like the heartbeat badge. The threshold is the worker's own
+    watchdog threshold when it stamped one (past it, the watchdog itself has
+    evidently failed to fire — worth flagging loudly), else the generic
+    ``STALE_HEARTBEAT_S``. Before the first emission the watchdog applies its
+    startup grace instead of the tight timeout, so the badge matches: a worker
+    legitimately tokenizing for ten minutes is not "possibly wedged" yet.
+    """
+    age = progress_age(rec, now)
+    if age is None:
+        return False
+    if rec.get("progress_at"):
+        threshold = rec.get("watchdog_s") or STALE_HEARTBEAT_S
+    else:  # still in setup: no emission yet, so the (looser) grace governs
+        threshold = rec.get("watchdog_grace_s") or rec.get("watchdog_s") or STALE_HEARTBEAT_S
+    return age > threshold
 
 
 def _atomic_write(path: Path, text: str) -> None:

@@ -61,9 +61,10 @@ is the outcome** (0 iff the run settled DONE), so the exit is the wake signal
 and the code tells you which branch to take. Piped output degrades cleanly (one
 final render, no live churn). For polling instead, use `bin/mini status <exp>
 --json` — one JSON object with the aggregate `state`, a `settled` boolean, and
-per-task `state` / `queued` / `heartbeat_age_s` / `stale_heartbeat` — rather
-than grepping the human lines. Bound either wait with `--budget` so an
-unattended stall settles itself.
+per-task `state` / `queued` / `heartbeat_age_s` / `stale_heartbeat` /
+`progress_age_s` / `stale_progress` / `steps_per_min` — rather than grepping
+the human lines. Bound either wait with `--budget` so an unattended stall
+settles itself.
 
 Watching a big sweep is cheap too: the watch loops cache settled
 (`DONE`/`FAILED`/`CANCELLED`) records — they're immutable — and re-read only the
@@ -119,8 +120,26 @@ Note that `mini` does **not** set a timeout for you: a role without `timeout=`
 gets Modal's default of 5 minutes — and its default CPU slice (0.125 cores),
 where heavy imports (jax) can alone take minutes. Any role doing real work
 should set `timeout=` (and `cpu=` when CPU-bound).
-Recover deliberately: `cancel` to reap the record, raise the role's `timeout`
+Recover deliberately: `cancel --key <key>` to stop just that worker and reap
+its record (plain `cancel` stops the whole run), raise the role's `timeout`
 (execution config — DONE cells stay memo hits), then `retry --key <key>`.
+
+**Wedged ≠ dead, either.** A worker can also *wedge* — a hung device call or
+deadlocked thread that holds its GPU allocations while making no progress
+(seen in ex-2.1.4: container alive, GPU at 0.3 % utilization for 45 minutes).
+The record tells the two signals apart: `heartbeat_at` advances on *any*
+emission, `progress_at` only when the **step advances** — so `progress_age_s`
+climbing while the heartbeat stays fresh is the wedge signature (`⚠ no step
+progress` in `status`, `stale_progress` in `--json`; `steps_per_min` gives the
+trailing throughput for "slowed down" vs "stopped"). The fix is worker-side:
+give the role a `watchdog=` (seconds without step progress) and a wedged
+worker settles itself FAILED with an all-thread stack dump
+(`WatchdogStall`) and exits — a fast, retryable failure instead of a silent
+burn until `timeout`. Until the first progress emission, `watchdog_grace=`
+applies instead (default: same as `watchdog`), so a long one-off setup phase
+doesn't force the watchdog loose — keep `watchdog` sized to the step cadence
+and let the grace cover the prep. Treat a `WatchdogStall` like a flaky infra
+failure unless it recurs on the same cell: `retry --key <key>`.
 
 ## Recovery
 
