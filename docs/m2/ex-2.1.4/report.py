@@ -462,22 +462,60 @@ def _(metrics):
 
 
 @app.cell(hide_code=True)
-def _(metrics):
+def _(arrays, evals, metrics):
     def _mean(g, es, key):
         return float(np.mean([cell_of(metrics, g, s)["sets"][es][key] for s in SEEDS]))
 
+    def _miss_structure(g: str) -> tuple[int, int, int]:
+        """Pooled over seeds: (misses, one-channel misses, of those off by one level)."""
+        exs = evals[g]["named_holdout"]
+        rgb = np.array(list(PALETTES[g].values()))
+        lvl = {v: i for i, v in enumerate(nc.GRIDS[g])}
+        n_miss = n_1ch = n_1lvl = 0
+        for s in SEEDS:
+            guesses = rgb[arrays[f"{g}-s{s}/logp/named_holdout"].argmax(1)]
+            for ex, gv in zip(exs, guesses, strict=True):
+                diff = [int(a != b) for a, b in zip(gv, ex.result, strict=True)]
+                if sum(diff) == 0:
+                    continue
+                n_miss += 1
+                if sum(diff) == 1:
+                    n_1ch += 1
+                    (chn,) = [i for i, dd in enumerate(diff) if dd]
+                    n_1lvl += abs(lvl[int(gv[chn])] - lvl[ex.result[chn]]) == 1
+        return n_miss, n_1ch, n_1lvl
+
+    _m216 = _miss_structure("v216")
+    _s2_27 = float(np.mean([cell_of(metrics, "v27", s)["sets"]["named_holdout"]["calibration"]["s2"] for s in SEEDS]))
+    _s2_216 = float(np.mean([cell_of(metrics, "v216", s)["sets"]["named_holdout"]["calibration"]["s2"] for s in SEEDS]))
     mo.md(rf"""
-    Seen pairs: `v27` {_mean("v27", "named_seen", "accuracy"):.2f}, `v216`
-    {_mean("v216", "named_seen", "accuracy"):.2f} (greedy). Held out: `v27`
-    {_mean("v27", "named_holdout", "accuracy"):.2f}, `v216`
-    {_mean("v216", "named_holdout", "accuracy"):.2f}, with candidate accuracy
-    at {_mean("v27", "named_holdout", "cand_accuracy"):.2f} and
-    {_mean("v216", "named_holdout", "cand_accuracy"):.2f}. Malformed
-    completions on held-out prompts: {_mean("v27", "named_holdout", "p_malformed"):.1%}
-    and {_mean("v216", "named_holdout", "p_malformed"):.1%}; the probability
-    mass on *some* complete name (summed over all teacher-forced candidates)
-    averages {_mean("v27", "named_holdout", "mass_names"):.2f} and
-    {_mean("v216", "named_holdout", "mass_names"):.2f}.
+    Three of the four bars behave, and one collapses. Seen pairs are perfect on
+    both grids (greedy {_mean("v27", "named_seen", "accuracy"):.2f} /
+    {_mean("v216", "named_seen", "accuracy"):.2f}), and H1's well-formedness
+    prediction holds emphatically: not one malformed completion across every
+    eval set and seed, and the summed probability mass on complete names is
+    {_mean("v216", "named_holdout", "mass_names"):.2f} — spelling is a solved
+    sub-problem, so greedy and candidate accuracy coincide everywhere.
+
+    `v216` held out lands at {_mean("v216", "named_holdout", "accuracy"):.2f},
+    down from the word-level rung's ≈ 0.99 but comfortably where H2 put it.
+    The misses have the same structure as the word-level full grid's: pooled
+    over seeds, {_m216[1]} of {_m216[0]} are wrong in exactly one RGB channel,
+    and {_m216[2]} of those are off by exactly one grid level. The computation
+    is right; the last grid level of precision isn't.
+
+    `v27` held out is the surprise: exactly zero, every seed — *below* the
+    word-level rung's 0.27, and worse than H2 allowed for. And it fails with
+    conviction. The calibration dial reads s₂ = {_s2_27:.2f} on those prompts
+    (confidently wrong; `v216` reads {_s2_216:.2f}, calibrated), and the true
+    answer's candidate NLL is ≈ 13 nats — the model has settled on specific
+    wrong answers, not spread its uncertainty. The failure rows below show
+    what it settles on: nearby names, and strikingly often *one of the
+    operands* — a plausible fallback, since an operand is never far from the
+    mix. So the sparse end of the ladder is where char-level naming genuinely
+    costs: 66 distinct training pairs were enough evidence to pin the geometry
+    at word level (barely), but not to pin it *and* the name-reading machinery
+    at once.
     """)
     return
 
@@ -537,6 +575,31 @@ def _(arrays, evals, metrics):
         return fig
 
     mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(metrics):
+    def _mean(g, es, key):
+        return float(np.mean([cell_of(metrics, g, s)["sets"][es][key] for s in SEEDS]))
+
+    mo.md(rf"""
+    The graded view rescues most of what exact match condemned, exactly as H3
+    predicted. `v216` tracks its floor: held-out guesses land a mean
+    {_mean("v216", "named_holdout", "guess_dist"):.3f} from the true mix, and
+    open-pair guesses {_mean("v216", "open", "guess_dist"):.2f} against a
+    floor of {_mean("v216", "open", "floor_dist"):.2f} and chance of
+    {_mean("v216", "open", "chance_dist"):.2f}, choosing the single nearest
+    name {_mean("v216", "open", "nearest_acc"):.0%} of the time. And `v27` —
+    zero exact match — is far from ignorant: its open-pair guesses average
+    {_mean("v27", "open", "guess_dist"):.2f} (floor
+    {_mean("v27", "open", "floor_dist"):.2f}, chance
+    {_mean("v27", "open", "chance_dist"):.2f}), and its held-out curve shows
+    every guess landing at neighbor distances, roughly one grid step of 0.53
+    away, never at random ones. The geometry survived the tokenizer change on
+    both grids; what `v27` lost is the final act of picking the exactly
+    right name from evidence this sparse.
+    """)
     return
 
 
@@ -625,6 +688,32 @@ def _(arrays, evals):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    The two grids sit on opposite sides of the uniform reference, and the
+    reason is instructive. On `v216` the model's distribution fits the
+    sharpest targets beautifully — KL ≈ 0.3 nats at τ ≈ 0.03 on held-out
+    pairs, an order of magnitude under the uniform line — and the best-fit τ
+    sits near the grid spacing (0.2), as H5 hoped: what little mass leaves the
+    true answer goes to its immediate neighbors.
+
+    `v27` fits *worse than uniform* at every temperature, which at first looks
+    like a refutation of any geometric structure — but the distance curves
+    just showed its guesses are systematically near the mix. The resolution is
+    that `KL(q_τ ‖ p)` is brutal to confident error: the model's answer
+    entropy is under 0.2 nats (it commits fully to one name), so whenever the
+    committed name isn't the target's favorite, the divergence explodes. A
+    hedging model with the same argmax behavior would score far better. So
+    this metric doesn't just measure whether the mass is in geometrically
+    sensible places; it jointly measures that *and* calibration — it is the
+    distributional twin of the s₂ dial, which flagged the same cells. H5
+    splits accordingly: confirmed on `v216`, and on `v27` the failure is
+    overconfidence rather than geometric ignorance.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ## Is the mix computed in value space, and when?
 
     Two probe suites. The per-depth probes ask whether the residual stream at
@@ -676,6 +765,39 @@ def _(metrics):
 
 
 @app.cell(hide_code=True)
+def _(metrics):
+    _op = cell_of(metrics, "v216", 0)["probe_r2"]["operand_rgb"]
+    _res = cell_of(metrics, "v216", 0)["transfer_r2"]
+    mo.md(rf"""
+    The mix does get computed in value space at the pre-answer position, on
+    both grids — but *when* in depth tells a story the word-level rung didn't
+    have. At word level the mix was decodable from depth 1–2 on. Here at
+    `v216` it is essentially absent until the final block — R²
+    {_res["fit"][2]:.2f} at depth 2, {_res["fit"][3]:.2f} at depth 3, then
+    {_res["fit"][4]:.2f} at depth 4 — and the earlier layers are visibly busy
+    with a different job: the *operand* probe climbs
+    {" → ".join(f"{v:.2f}" for v in _op)} across depths, i.e. reading a
+    four-letter name back into a value is itself a multi-layer computation.
+    Reading names ate the depth that word-level models spent on arithmetic.
+    The final-block mix transfers essentially without loss to held-out and
+    open prompts ({_res["named_holdout"][4]:.2f} and {_res["open"][4]:.2f}),
+    so it is a genuine value-space computation, just a late one.
+
+    `v27` inverts the picture in a way that matches its behavioral collapse.
+    Mid-stack, a probe fit on training lines transfers respectably to held-out
+    prompts (R² ≈ 0.6–0.8 at depths 1–2, seed-dependent); by the final layer,
+    transfer *falls* — {cell_of(metrics, "v27", 0)["transfer_r2"]["named_holdout"][4]:.2f}
+    at depth 4 (seed 0) — while the fit set stays at
+    {cell_of(metrics, "v27", 0)["transfer_r2"]["fit"][4]:.2f}. The value the
+    network computed on the way up is real, and then the last block overwrites
+    it with whatever (wrong, confident) answer the readout has committed to.
+    That is the mechanistic face of the s₂ ≈ 0.9 result: computed, then
+    misread — the same gap ex-2.1.3 saw at `v27`, but wider.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _(arrays, metrics):
     _hex = load_sibling(HEX_MARGINS_REF, kind="npz")
 
@@ -723,6 +845,26 @@ def _(arrays, metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    H4's central prediction holds: there is no staircase. In the hex panel
+    each channel has its own bright cell at its own emission offset and fades
+    once the digit is out — the just-in-time-with-eviction schedule ex-2.1.2
+    found. In the name panels the three channel rows are nearly identical at
+    every offset: whatever the stream knows about the mix, it knows about all
+    three channels at once. Holistic names get holistic representations.
+
+    The "stays fully live" half of the prediction needs one honest amendment,
+    though. At `v216` the final-depth R² is high at the pre-answer position
+    and the first answer character (≈ 0.95), *dips* to ≈ 0.55–0.6 across the
+    middle of the name, and returns to ≈ 0.96 at the last character. The
+    positions mid-name attend backwards to finish a spelling that is already
+    determined, and apparently carry a diluted copy of the value while doing
+    it. So: no per-channel eviction, but some whole-value attenuation during
+    emission. An anchor on "the result" would still be best placed at the
+    pre-answer position (or the first answer character), where the value is
+    sharpest. (`v27`'s panel is high everywhere — with 27 colors and near-total
+    memorization, everything is legible at every position — which is why the
+    `v216` panel is the informative one.)
+
     ## What the misses look like
 
     A few concrete completions, chosen as the widest misses (the worst cases,
@@ -785,9 +927,74 @@ def _(completion_rows):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    The rows repeat the aggregates in miniature. `v216`'s worst held-out
+    misses are neighbor colors; its worst open-pair choices hover a step from
+    the floor. `v27`'s misses are the interesting ones: several are an
+    *operand* echoed back as the answer — a defensible guess, since the mix is
+    the operands' midpoint and so never far from either one, but also exactly
+    what a model does when it has the geometry's neighborhood structure
+    without the resolution to name the midpoint itself.
+
     ## Discussion
 
-    (Written after the results; see the hypothesis-by-hypothesis notes above.)
+    The ladder question this experiment was built to answer: is
+    one-token-per-concept load-bearing for geometry inference? The answer
+    splits cleanly by evidence density, and both halves are useful.
+
+    Where the mixing table is rich (`v216`, ~2,500 distinct training pairs),
+    no. The model reads opaque four-letter names, binds them to values across
+    layers 1–3, computes the mix in value space in the final block, and spells
+    the answer holistically — held-out accuracy 0.91 against the word-level
+    0.99, with the shortfall made of one-grid-level precision misses, the same
+    failure the word-level full grid showed. The value subspace, the fixed
+    pre-answer home for the result, and the distance-shaped answer
+    distribution all survive the tokenizer change. For the anchored
+    experiments, that is the green light that mattered: a `v216`-density
+    corpus supports concept-level structure even when concepts are
+    multi-token.
+
+    Where the table is sparse (`v27`, 66 distinct training pairs), yes — and
+    the failure mode is specific. The model still learns the neighborhood
+    structure (open-pair guesses far below chance; every held-out miss a
+    neighbor or an operand), but exact naming collapses to zero and the model
+    is *confident* in its wrong answers: s₂ ≈ 0.9, and the final block
+    overwrites a mid-stack value representation that transferred at R² ≈ 0.7
+    with the committed wrong readout. Word-level `v27` got 0.27 from the same
+    evidence. So multi-token naming has a real cost, and it is paid exactly
+    where evidence is scarce — worth remembering when interpreting the base
+    language's `named_holdout` = 0, whose named sub-grid is this same sparse
+    27-color regime *plus* a hex distraction.
+
+    Three things carry into the anchored runs:
+
+    - Depth budget. Reading names consumed layers 1–3 at `v216`; the mix only
+      exists from the final block. A d64-L4 backbone leaves one layer of
+      residual stream in which the result concept exists at all — thin
+      territory for anchoring it "across the stream". This strengthens the
+      queued deep-and-narrow plan (L8 gives the anchor somewhere to live) and
+      argues for anchoring operand concepts at operand positions, which exist
+      from depth 1–2.
+    - Emission keeps the value whole. No per-channel eviction: the answer's
+      value is represented all-channels-at-once from the pre-answer position
+      through emission (with a mid-name dip). An anchored result direction at
+      the pre-answer position would not be fighting ex-2.1.2's
+      compute-and-evict schedule on this language.
+    - The distributional metric doubles as a calibration probe. KL against
+      distance-shaped targets separated `v216` (fits sharp targets at τ near
+      the grid spacing) from `v27` (worse than uniform, because confidently
+      wrong) — information exact match and mean distance both miss. The
+      queued post-hoc analysis of ex-2.1.3's saved distributions should use
+      the same τ sweep so the rungs are directly comparable.
+
+    Caveats. The corpora match ex-2.1.3's in equations, not tokens — these
+    models took ~3× the gradient steps per epoch, and `v216` still came out
+    *below* its word-level twin, so the regression is not an artifact of
+    budget, but the `v27` comparison inherits the confound in the other
+    direction. The probe suites are fit on in-training lines (transfer to
+    held-out and open prompts is the check, and it passed where it mattered).
+    `v27`'s holdout has ten pairs, so its zero is a zero out of ten, three
+    times. And the mid-emission dip deserves a per-position probe pass before
+    being leaned on; it is one seed's picture at one grid.
     """)
     return
 

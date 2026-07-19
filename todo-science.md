@@ -32,26 +32,24 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   (e.g. softmax of −distance/τ over the vocabulary) and measure cross-entropy /
   KL against it, sweeping τ. Needs no re-run: the eval step saved the full
   log-probability vector over color tokens for every prompt (`arrays`
-  `{label}/logp/{set}`), so this is a report-side analysis. Ex-2.1.4 computes
-  the same thing from candidate scoring; do 2.1.3's for the side-by-side.
-  #[D2.1] #ex-2.1.3 #metrics
+  `{label}/logp/{set}`), so this is a report-side analysis. Ex-2.1.4's report
+  now implements the τ-sweep (KL(q_τ ‖ p) with a uniform reference); reuse its
+  recipe and τ grid so the rungs compare directly. Note from ex-2.1.4: the
+  metric jointly scores geometry *and* calibration — a confidently-wrong model
+  fits worse than uniform — so read it beside s₂. #[D2.1] #ex-2.1.3 #metrics
 
-- [ ] Char-level twin of the name-only language (ex-2.1.4 candidate). Same corpus
-  distribution as ex-2.1.3, only the tokenizer changes: names spelled character by
-  character, so concepts are multi-token again and answers have an emission
-  schedule. Isolates whether one-token-per-concept is load-bearing for geometry
-  inference, and lets ex-2.1.2's answer-schedule probe ask whether just-in-time
-  computation and eviction return with multi-token answers — on data with no hex
-  path and no form rule. Design trap: the synthetic names (`c05f`) spell the value
-  per character, which is hex with a prefix at char level; rebuild them as opaque
-  fixed-length random strings (holistic binding, the true no-scaffolding control).
-  Optional later condition: cipher names (per-position shuffled letters), to
-  separate a compositional surface from a value-spelling one. Scope: v216 + v27,
-  2–3 seeds, d64-L4. A failed holdout here is informative — it would say
-  multi-token naming itself is the bottleneck. Ladder framing: word-level
-  (ex-2.1.3) is the easy rung for anchoring, this is the middle rung, the base
-  language is the M2 claim; divergence between rungs is a result, not a nuisance.
-  #[D2.1] #ex-2.1.3 #vocab #representations #task-grammar
+- [ ] Cipher-name condition for the char-level language (deferred from
+  ex-2.1.4): names whose letters encode the value through a per-position
+  substitution, separating a compositional surface from a value-spelling one.
+  Run only if the anchored experiments need to know *why* multi-token naming
+  costs precision, not just that it does. #[D2.1] #vocab #task-grammar
+
+- [ ] Probe the mid-emission dip (ex-2.1.4): at v216 the final-depth mix R²
+  falls from ≈ 0.95 (pre-answer, first answer char) to ≈ 0.6 mid-name and
+  returns to ≈ 0.96 at the last character. One seed, one grid so far; the
+  all-positions probe item above would cover it. If real, it says the value is
+  diluted (not evicted) while spelling completes — relevant to where an
+  anchored result direction is enforced. #[D2.1] #ex-2.1.4 #representations
 
 - [ ] If anchoring a composed concept fails in D2.1.x, run a word-level tokenizer
   ablation (one token per color name, hex still char-level): it separates "anchoring
@@ -100,6 +98,29 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   afford. #model-arch
 
 ## Findings & notes to carry forward
+
+- **Multi-token naming keeps the geometry where evidence is dense, and costs
+  exactness where it is sparse (ex-2.1.4, 2026-07-19).** Char-level twin of
+  ex-2.1.3: corpora identical line for line, every color an opaque four-letter
+  random name (v27 + v216, frozen d64-L4). At v216, held-out exact match is 0.91
+  (word level: 0.99), misses are one grid level off in one channel (59 of 68,
+  pooled), zero malformed completions anywhere, and s₂ ≈ 0. At v27 exact match
+  collapses to 0/10 on every seed (word level: 0.27) and the model is confidently
+  wrong (s₂ ≈ 0.9): every miss a neighbor or an operand echo, while open-pair
+  guesses still land 0.41 vs chance 0.82 — the neighborhood structure is learned;
+  the exact naming is not. Mechanism: reading names occupies depths 1–3 (operand
+  probe R² 0.11 → 0.98 across layers), the mix crystallizes only in the final
+  block at v216 (pre-answer R² ≈ 0 through depth 2, ≈ 0.96 at depth 4,
+  transferring ≈ 0.95 to held-out and open prompts), and emission is holistic —
+  all three channels stay decodable together with no per-channel eviction, unlike
+  hex's staircase (a mid-name dip to ≈ 0.6 recovers by the last character).
+  Consequences for anchoring: the result concept's home is the pre-answer
+  position, but on a 4-layer stack it exists for only one layer (strengthens the
+  deep-and-narrow plan); operand concepts exist from depth 1–2 and are easier
+  anchor targets; and the base language's `named_holdout` = 0 looks like this
+  v27 regime (sparse named sub-grid) compounded by the hex pathway. Full
+  analysis in `docs/m2/ex-2.1.4/report.py`. #[D2.1] #ex-2.1.4 #vocab
+  #representations #anchoring
 
 - **Color geometry is inferable from names alone; vocabulary density sets exact match
   (ex-2.1.3, 2026-07-19).** Trained the un-anchored backbone on a named-only language
