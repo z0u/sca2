@@ -45,12 +45,14 @@ with app.setup(hide_code=True):
     def load_results() -> tuple[list[dict], dict[str, np.ndarray]] | None:
         """Resolve the metrics and probe weights from the store, or None if unpublished."""
         store = project_store()
-        m_art, w_art = store.get_ref(METRICS_REF), store.get_ref(WEIGHTS_REF)
+        arts = store.get_refs([METRICS_REF, WEIGHTS_REF])
+        m_art, w_art = arts[METRICS_REF], arts[WEIGHTS_REF]
         if m_art is None or w_art is None:
             return None
         with tempfile.TemporaryDirectory() as d:
-            metrics = json.loads(store.get(m_art, Path(d) / "metrics.json").read_text())
-            with np.load(store.get(w_art, Path(d) / "weights.npz")) as z:
+            m_path, w_path = store.get_many([(m_art, Path(d) / "metrics.json"), (w_art, Path(d) / "weights.npz")])
+            metrics = json.loads(m_path.read_text())
+            with np.load(w_path) as z:
                 weights = {k: z[k] for k in z.files}
         return metrics, weights
 
@@ -606,15 +608,17 @@ def _(metrics):
 
     backbone = pick_backbone(metrics)
     _store = project_store()
-    _arts = {s: a for s in SEEDS if (a := _store.get_ref(f"{CKPT_REF}/{label(*backbone, s)}")) is not None}
+    _refs = {s: f"{CKPT_REF}/{label(*backbone, s)}" for s in SEEDS}
+    _resolved = _store.get_refs(_refs.values())
+    _arts = {s: a for s, r in _refs.items() if (a := _resolved[r]) is not None}
     mo.stop(
         len(_arts) < len(SEEDS),
         mo.md("The checkpoints aren't in the store yet — re-run the experiment to publish them."),
     )
     _models = {}
     with tempfile.TemporaryDirectory() as _tmp:
-        for _s, _art in _arts.items():
-            _store.get(_art, Path(_tmp) / str(_s) / "model")
+        _store.get_many([(_art, Path(_tmp) / str(_s) / "model") for _s, _art in _arts.items()])
+        for _s in _arts:
             _model, _config, _ = load_checkpoint(Path(_tmp) / str(_s))
             _models[_s] = (_model, CharTokenizer(_config.tokenizer))
 

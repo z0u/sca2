@@ -40,10 +40,11 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
-from mini.store import Artifact, BlobStat, LocalStore, Store, _cas_key, _hash_file, _tree_sha
+from mini.store import Artifact, BlobStat, LocalStore, Store, _cas_key, _hash_file, _tree_sha, artifact_shas
 
 __all__ = ["HFStore"]
 
@@ -102,16 +103,25 @@ class HFStore(Store):
 
     # -- existence / cache ----------------------------------------------------
 
-    def _remote_has(self, path: str) -> bool:
-        # A missing path is "absent" (return False); an auth/permission/network
-        # failure must *not* masquerade as absent — that would silently trigger a
-        # re-upload (and hide a misconfigured token), so let those propagate.
+    def _paths_info(self, paths: list[str]) -> dict[str, Any]:
+        """Path → ``BucketFile`` for the *paths* that exist, in one batched request.
+
+        A missing path is simply absent from the result; an auth/permission/network
+        failure must *not* masquerade as absent — that would silently trigger a
+        re-upload (and hide a misconfigured token), so only the two not-found
+        errors are caught and everything else propagates.
+        """
         from huggingface_hub.errors import EntryNotFoundError, RepositoryNotFoundError
 
+        if not paths:
+            return {}
         try:
-            return any(True for _ in self.api.get_bucket_paths_info(self._cas, [path]))
+            return {info.path: info for info in self.api.get_bucket_paths_info(self._cas, paths)}
         except EntryNotFoundError, RepositoryNotFoundError:
-            return False
+            return {}
+
+    def _remote_has(self, path: str) -> bool:
+        return bool(self._paths_info([path]))
 
     def has(self, sha256: str) -> bool:
         return self._cache.has(sha256) or self._remote_has(_cas_key(sha256))
@@ -128,28 +138,52 @@ class HFStore(Store):
         self.api.batch_bucket_files(self._cas, add=[(str(src), _cas_key(sha256))])
         self._cache_blob(sha256, src)
 
+    def _pull_blobs(self, sha256s: Iterable[str]) -> None:
+        """Pull every warm-cache-missing blob off the CAS bucket in **one** request.
+
+        The single place bytes come off the bucket. Batching matters as much on
+        reads as on writes: each ``download_bucket_files`` call pays the fixed
+        paths-info + metadata round trips before any bytes move, so pulling *n*
+        blobs one call at a time serializes that floor *n* times over.
+        """
+        missing = [s for s in dict.fromkeys(sha256s) if not self._cache.has(s)]
+        if not missing:
+            return
+        infos = self._paths_info([_cas_key(s) for s in missing])
+        if absent := [s for s in missing if _cas_key(s) not in infos]:
+            raise FileNotFoundError(f"not in the store bucket: {', '.join(s[:12] + '…' for s in absent)}")
+        # Download to sibling temp files, then atomically rename in: an interrupted
+        # download must never leave a partial/0-byte file at the blob path, since the
+        # only cache-hit check is ``blob.exists()`` — a truncated file would then be
+        # served forever (and fail to parse downstream) rather than re-pulled.
+        pulls = []
+        for sha in missing:
+            blob = self._cache._blob_path(sha)
+            blob.parent.mkdir(parents=True, exist_ok=True)
+            pulls.append((blob, blob.with_name(f"{sha}.tmp.{os.getpid()}.{threading.get_ident()}")))
+        try:
+            self.api.download_bucket_files(
+                self._cas, files=[(infos[_cas_key(s)], str(tmp)) for s, (_, tmp) in zip(missing, pulls, strict=True)]
+            )
+            for blob, tmp in pulls:
+                tmp.replace(blob)
+        finally:
+            for _, tmp in pulls:
+                tmp.unlink(missing_ok=True)
+
+    def _prefetch(self, arts: Iterable[Artifact]) -> None:
+        self._pull_blobs(artifact_shas(list(arts)))
+
     def _local_blob(self, sha256: str) -> Path:
         """The blob's path in the warm cache, pulled once from the CAS bucket if absent.
 
-        The single place bytes come off the bucket: :meth:`_read_blob` serves reads
-        from it, and :meth:`publish` needs a local file to hand the (separate) publish
-        repo so Xet can chunk it — the durable copy lives in the CAS, not the publish
-        tier, so publishing pulls-then-uploads rather than moving bytes server-side.
+        :meth:`_read_blob` serves reads from it, and :meth:`publish` needs a local
+        file to hand the (separate) publish repo so Xet can chunk it — the durable
+        copy lives in the CAS, not the publish tier, so publishing pulls-then-uploads
+        rather than moving bytes server-side.
         """
-        blob = self._cache._blob_path(sha256)
-        if not blob.exists():  # pull once into the warm cache, then serve locally
-            blob.parent.mkdir(parents=True, exist_ok=True)
-            # Download to a sibling temp file, then atomically rename in: an interrupted
-            # download must never leave a partial/0-byte file at *blob*, since the only
-            # cache-hit check is ``blob.exists()`` — a truncated file would then be served
-            # forever (and fail to parse downstream) rather than re-pulled.
-            tmp = blob.with_name(f"{sha256}.tmp.{os.getpid()}")
-            try:
-                self.api.download_bucket_files(self._cas, files=[(_cas_key(sha256), str(tmp))])
-                tmp.replace(blob)
-            finally:
-                tmp.unlink(missing_ok=True)
-        return blob
+        self._pull_blobs([sha256])
+        return self._cache._blob_path(sha256)
 
     def _read_blob(self, sha256: str, dest: Path) -> None:
         shutil.copyfile(self._local_blob(sha256), dest)
@@ -179,13 +213,23 @@ class HFStore(Store):
         self.api.batch_bucket_files(self._cas, add=[(payload.encode(), f"refs/{name}.json")])
 
     def _read_ref(self, name: str) -> str | None:
-        path = f"refs/{name}.json"
-        if not self._remote_has(path):
-            return None
+        return self._read_refs([name])[name]
+
+    def _read_refs(self, names: list[str]) -> dict[str, str | None]:
+        # One paths-info request tells present from absent (no per-name existence
+        # probe), and the present ones download in a single batched call — so a
+        # report resolving a dozen refs pays the bucket's round-trip floor once.
+        paths = {f"refs/{n}.json": n for n in names}
+        infos = self._paths_info(list(paths))
+        out: dict[str, str | None] = dict.fromkeys(names)
+        if not infos:
+            return out
         with tempfile.TemporaryDirectory() as d:  # cleaned up, unlike a bare mkdtemp
-            tmp = Path(d) / "ref.json"
-            self.api.download_bucket_files(self._cas, files=[(path, str(tmp))])
-            return tmp.read_text()
+            files = [(info, str(Path(d) / f"{i}.json")) for i, info in enumerate(infos.values())]
+            self.api.download_bucket_files(self._cas, files=files)
+            for path, (_, tmp) in zip(infos, files, strict=True):
+                out[paths[path]] = Path(tmp).read_text()
+        return out
 
     # -- publish --------------------------------------------------------------
 

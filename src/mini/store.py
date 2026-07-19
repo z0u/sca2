@@ -70,9 +70,11 @@ __all__ = [
     "store_context",
     "put",
     "get",
+    "get_many",
     "publish",
     "set_ref",
     "get_ref",
+    "get_refs",
     "producer_context",
     "resolved_refs_context",
     "store_root_for",
@@ -383,11 +385,12 @@ class Store(ABC):
         """Materialize *art* at *dest* and return it.
 
         For a ``file`` artifact *dest* is the destination file; for a ``tree`` it's
-        the destination directory, and the children resolve concurrently (the
-        per-op latency of a remote backend overlaps rather than serializes).
+        the destination directory, and the children are prefetched in one batch
+        (the per-op latency of a remote backend is paid once, not per child).
         """
         dest = Path(dest)
         if art.kind == "tree":
+            self._prefetch([art])
             dest.mkdir(parents=True, exist_ok=True)
             with ThreadPoolExecutor(max_workers=min(8, len(art.children) or 1)) as ex:
                 list(ex.map(lambda c: self.get(c, dest / c.name), art.children))
@@ -395,6 +398,27 @@ class Store(ABC):
         dest.parent.mkdir(parents=True, exist_ok=True)
         self._read_blob(art.sha256, dest)
         return dest
+
+    def get_many(self, items: Iterable[tuple[Artifact, Path]]) -> list[Path]:
+        """Materialize several artifacts, batching the remote pull into one round trip.
+
+        The sibling of :meth:`get`'s per-tree fan-out: a caller resolving *n*
+        top-level artifacts one ``get`` at a time pays a remote backend's per-op
+        latency *n* times over, where one prefetch pays it once. Order follows
+        *items*; local materialization then overlaps in a small thread pool.
+        """
+        pairs = [(a, Path(d)) for a, d in items]
+        self._prefetch(a for a, _ in pairs)
+        with ThreadPoolExecutor(max_workers=min(8, len(pairs) or 1)) as ex:
+            return list(ex.map(lambda p: self.get(*p), pairs))
+
+    def _prefetch(self, arts: Iterable[Artifact]) -> None:  # noqa: B027 — a hook: empty here, non-abstract
+        """Warm whatever cache backs :meth:`_read_blob` for *arts*, in one batch.
+
+        The local backend has nothing to warm (this is a no-op), while a remote
+        one overrides it to pull every missing blob in a single request. Reads
+        must behave identically without it — it only moves latency, never bytes.
+        """
 
     def set_ref(self, name: str, art: Artifact) -> None:
         """Point the mutable name *name* at *art* — the cross-experiment by-name handle.
@@ -421,6 +445,28 @@ class Store(ABC):
         d = json.loads(payload)
         _note_resolution(name, d.get("producer"))
         return Artifact.from_dict(d)
+
+    def get_refs(self, names: Iterable[str]) -> dict[str, Artifact | None]:
+        """Resolve several names at once — one round trip on a remote backend.
+
+        The batch counterpart of :meth:`get_ref` (same resolution announcements,
+        ``None`` for unset names): a report or eval loop that resolves its refs
+        one at a time serializes the backend's per-op latency, where this pays it
+        once for the set.
+        """
+        out: dict[str, Artifact | None] = {}
+        for name, payload in self._read_refs(list(dict.fromkeys(names))).items():
+            if payload is None:
+                out[name] = None
+                continue
+            d = json.loads(payload)
+            _note_resolution(name, d.get("producer"))
+            out[name] = Artifact.from_dict(d)
+        return out
+
+    def _read_refs(self, names: list[str]) -> dict[str, str | None]:
+        """Read several refs (overridable as a single batched request)."""
+        return {n: self._read_ref(n) for n in names}
 
     def ref_producer(self, name: str) -> dict[str, Any] | None:
         """The producer stamped on ref *name* (see :meth:`set_ref`), or ``None``."""
@@ -708,6 +754,11 @@ def get(art: Artifact, dest: Path) -> Path:
     return get_store().get(art, dest)
 
 
+def get_many(items: Iterable[tuple[Artifact, Path]]) -> list[Path]:
+    """Materialize several artifacts in one batched pull. See :meth:`Store.get_many`."""
+    return get_store().get_many(items)
+
+
 def publish(art: Artifact, path: str) -> str:
     """Publish *art* at a named *path* via the ambient store. See :meth:`Store.publish`."""
     return get_store().publish(art, path)
@@ -721,3 +772,8 @@ def set_ref(name: str, art: Artifact) -> None:
 def get_ref(name: str) -> Artifact | None:
     """Resolve a name to its artifact in the ambient store, or ``None``."""
     return get_store().get_ref(name)
+
+
+def get_refs(names: Iterable[str]) -> dict[str, Artifact | None]:
+    """Resolve several names in one batched read. See :meth:`Store.get_refs`."""
+    return get_store().get_refs(names)

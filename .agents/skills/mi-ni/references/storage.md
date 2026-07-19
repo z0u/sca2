@@ -44,8 +44,17 @@ one shard without pulling the set), and the handle carries the manifest. `name`
 is the logical name — carry the extension; it sets the served media type.
 
 `get(art, dest)` materializes a file to `dest`, or a tree into the directory
-`dest` (children resolve concurrently). Reach for a tree when random access or
-partial dedup matters; otherwise a single file is fine.
+`dest` (children pull in one batched request). Reach for a tree when random
+access or partial dedup matters; otherwise a single file is fine.
+
+Resolving *several* artifacts or refs? Use the batch verbs — on the bucket
+backend each remote call pays a fixed round-trip floor, so `n` sequential
+`get_ref`/`get` calls cost `n` floors where one batched call costs one:
+
+```python
+arts = store.get_refs([metrics_ref, arrays_ref])          # one round trip
+paths = store.get_many([(a, dest / a.name) for a in ...])  # one batched pull
+```
 
 ## The store is project-scoped (sharing across experiments)
 
