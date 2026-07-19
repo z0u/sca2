@@ -25,6 +25,23 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   geometry is right and the precision isn't. Candidates: a longer or reshaped
   schedule, weight decay (grokking-style late snap-in). #[D2.1] #ex-2.1.3 #vocab
 
+- [ ] Char-level twin of the name-only language (ex-2.1.4 candidate). Same corpus
+  distribution as ex-2.1.3, only the tokenizer changes: names spelled character by
+  character, so concepts are multi-token again and answers have an emission
+  schedule. Isolates whether one-token-per-concept is load-bearing for geometry
+  inference, and lets ex-2.1.2's answer-schedule probe ask whether just-in-time
+  computation and eviction return with multi-token answers — on data with no hex
+  path and no form rule. Design trap: the synthetic names (`c05f`) spell the value
+  per character, which is hex with a prefix at char level; rebuild them as opaque
+  fixed-length random strings (holistic binding, the true no-scaffolding control).
+  Optional later condition: cipher names (per-position shuffled letters), to
+  separate a compositional surface from a value-spelling one. Scope: v216 + v27,
+  2–3 seeds, d64-L4. A failed holdout here is informative — it would say
+  multi-token naming itself is the bottleneck. Ladder framing: word-level
+  (ex-2.1.3) is the easy rung for anchoring, this is the middle rung, the base
+  language is the M2 claim; divergence between rungs is a result, not a nuisance.
+  #[D2.1] #ex-2.1.3 #vocab #representations #task-grammar
+
 - [ ] If anchoring a composed concept fails in D2.1.x, run a word-level tokenizer
   ablation (one token per color name, hex still char-level): it separates "anchoring
   fails for transformers" from "anchoring fails for concepts that don't coincide
@@ -40,6 +57,20 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   between concepts). Both fall out of arrays `eval_one` already computes; they'd let
   the width sweep read as a compression axis. Full superposition accounting (feature
   dictionary / SAE) is its own experiment, after D2.1.2. #[D2.1] #superposition
+
+- [ ] Narrow the stream to raise superposition pressure — sequenced, not up front.
+  d64 is generous for this task, and SCA's value proposition lives where geometry
+  is contested. Plan: (1) keep d64-L4 for the first anchored runs, so the only
+  change vs the frozen baselines is the anchor; (2) un-anchored width × depth
+  sweep on the chosen testbed (e.g. word-level v216: d16/d32 × L4/L8) to find the
+  narrowest cell that still solves the task — the capacity proxies (item above)
+  then read as a compression axis; (3) re-run the anchored comparison along the
+  width axis down to that frontier. Prefer deep-and-narrow (d16-L8) over wide:
+  width sets per-position capacity, depth adds anchor sites, and ngpt-scaling
+  says the architecture tolerates the aspect ratio. Watch-out: at v216 the
+  softmax's identity separability may fail before value geometry does — which is
+  itself the identity-vs-value competition ex-2.1.3 flagged. #[D2.1]
+  #superposition #model-arch #ex-2.1.3
 
 - [ ] Make the operation a variable before D2.2. `sca/data/colors.py` hardcodes one
   op (`mix`, spelled `+`); anchoring *the operation* only makes sense once there is
