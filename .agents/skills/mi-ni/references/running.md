@@ -135,8 +135,11 @@ trailing throughput for "slowed down" vs "stopped"). The fix is worker-side:
 give the role a `watchdog=` (seconds without step progress) and a wedged
 worker settles itself FAILED with an all-thread stack dump
 (`WatchdogStall`) and exits — a fast, retryable failure instead of a silent
-burn until `timeout`. Treat a `WatchdogStall` like a flaky infra failure
-unless it recurs on the same cell: `retry --key <key>`.
+burn until `timeout`. Until the first progress emission, `watchdog_grace=`
+applies instead (default: same as `watchdog`), so a long one-off setup phase
+doesn't force the watchdog loose — keep `watchdog` sized to the step cadence
+and let the grace cover the prep. Treat a `WatchdogStall` like a flaky infra
+failure unless it recurs on the same cell: `retry --key <key>`.
 
 ## Recovery
 

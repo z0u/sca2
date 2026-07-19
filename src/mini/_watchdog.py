@@ -39,9 +39,17 @@ class Watchdog:
     """Abort the process when step progress stalls for *timeout_s* seconds.
 
     Use as a context manager around the task call; feed it via :meth:`poke`
-    from the progress sink. The clock starts on entry (setup inside the task fn
-    counts against the timeout — size *timeout_s* past the longest legitimate
-    gap between step advances, including data prep before the first emission).
+    from the progress sink.
+
+    Until the first poke, the effective threshold is *grace_s* (defaulting to
+    *timeout_s*): one-off setup — tokenizing a dataset, compiling a model —
+    happens before the first ``emit_progress``, and without a separate grace it
+    would force the whole watchdog loose (a 10-minute prep phase would demand a
+    10-minute timeout even when training steps take seconds). After the first
+    advance the tight *timeout_s* takes over, so size it past the longest
+    legitimate gap *between* step advances only. The grace ends at the first
+    emission — a task that emits step 0 up front and then preps for minutes
+    should hold its first emission until real step cadence begins.
 
     On stall, *on_stall* is called with a diagnosis (summary + all-thread stack
     dump) — it should persist the failure wherever the task records state — and
@@ -54,9 +62,11 @@ class Watchdog:
         self,
         timeout_s: float,
         on_stall: Callable[[str], None],
+        grace_s: float | None = None,
         _exit: Callable[[int], Any] = os._exit,
     ):
         self.timeout_s = timeout_s
+        self.grace_s = grace_s if grace_s is not None else timeout_s
         self._on_stall = on_stall
         self._exit = _exit
         self._last: tuple[int, int] | None = None
@@ -78,11 +88,14 @@ class Watchdog:
     def __exit__(self, *exc: Any) -> None:
         self._stop.set()
 
+    def _threshold(self) -> float:
+        return self.timeout_s if self._last is not None else self.grace_s
+
     def _run(self) -> None:
-        poll = min(self.timeout_s / 4, 15.0)
+        poll = min(self.timeout_s / 4, self.grace_s / 4, 15.0)
         while not self._stop.wait(poll):
             stalled_s = time.monotonic() - self._advanced_at
-            if stalled_s < self.timeout_s or self._stop.is_set():
+            if stalled_s < self._threshold() or self._stop.is_set():
                 continue
             try:
                 self._on_stall(self._diagnosis(stalled_s))
@@ -100,9 +113,12 @@ class Watchdog:
             label = names.get(ident, "?")
             suffix = " (this watchdog)" if ident == threading.get_ident() else ""
             parts.append(f"--- thread {label}{suffix} ---\n{''.join(traceback.format_stack(frame))}")
-        at = f" at step {self._last[0]}/{self._last[1]}" if self._last else " before any progress emission"
+        if self._last:
+            at, limit = f" at step {self._last[0]}/{self._last[1]}", f"watchdog {self.timeout_s:g}s"
+        else:
+            at, limit = " before any progress emission", f"startup grace {self.grace_s:g}s"
         parts.append(
-            f"WatchdogStall: no step progress in {stalled_s:.0f}s (watchdog {self.timeout_s:.0f}s){at}"
+            f"WatchdogStall: no step progress in {stalled_s:.0f}s ({limit}){at}"
             " — worker aborted, releasing its resources; retry when ready"
         )
         return "\n".join(parts)

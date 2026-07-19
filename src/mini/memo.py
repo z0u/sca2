@@ -36,7 +36,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from contextlib import contextmanager
 from pathlib import Path, PurePath
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterator, cast
 
 import cloudpickle
 
@@ -662,16 +662,20 @@ class MemoStore:
         hooks: list[Callable] | None = None,
         gen: str | None = None,
         watchdog_s: float | None = None,
+        watchdog_grace_s: float | None = None,
     ) -> None:
         """Stage the cloudpickled call to disk for a local subprocess worker."""
         self.root.mkdir(parents=True, exist_ok=True)
-        self._call(key).write_bytes(cloudpickle.dumps((fn, args, hooks or [], gen, watchdog_s)))
+        self._call(key).write_bytes(cloudpickle.dumps((fn, args, hooks or [], gen, watchdog_s, watchdog_grace_s)))
 
-    def read_call(self, key: str) -> tuple[Callable, tuple, list[Callable], str | None, float | None]:
+    def read_call(self, key: str) -> tuple[Callable, tuple, list[Callable], str | None, float | None, float | None]:
         parts = cloudpickle.loads(self._call(key).read_bytes())
-        # A pre-watchdog staged call is a 4-tuple; staging is transient (spawn →
-        # worker start), but a worker must still run one staged by an older client.
-        return (*parts, None) if len(parts) == 4 else parts
+        # A staged call from an older client may be a shorter tuple; staging is
+        # transient (spawn → worker start), but a worker must still run it.
+        return cast(
+            "tuple[Callable, tuple, list[Callable], str | None, float | None, float | None]",
+            (*parts, *([None] * (6 - len(parts)))),
+        )
 
 
 class PollCache:

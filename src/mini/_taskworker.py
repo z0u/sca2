@@ -225,6 +225,7 @@ def _attempt_already_settled(store: MemoStore, key: str, gen: str | None) -> boo
 
 def _arm_watchdog(
     watchdog_s: float | None,
+    watchdog_grace_s: float | None,
     store: MemoStore,
     key: str,
     gen: str | None,
@@ -233,12 +234,16 @@ def _arm_watchdog(
 ) -> tuple[Watchdog | None, dict[str, Any]]:
     """Build the progress watchdog (or not) plus the record fields that go with it.
 
-    The ``watchdog_s`` stamp lands on the record so client-side staleness views
-    can match the worker's own threshold.
+    The ``watchdog_s`` / ``watchdog_grace_s`` stamps land on the record so
+    client-side staleness views can match the worker's own thresholds.
     """
     if not watchdog_s:
         return None, {}
-    return Watchdog(watchdog_s, _stall_handler(store, key, gen, commit, record)), {"watchdog_s": watchdog_s}
+    fields: dict[str, Any] = {"watchdog_s": watchdog_s}
+    if watchdog_grace_s:
+        fields["watchdog_grace_s"] = watchdog_grace_s
+    wd = Watchdog(watchdog_s, _stall_handler(store, key, gen, commit, record), grace_s=watchdog_grace_s)
+    return wd, fields
 
 
 def _stall_handler(
@@ -283,6 +288,7 @@ def execute_task(
     gen: str | None = None,
     experiment: str | None = None,
     watchdog_s: float | None = None,
+    watchdog_grace_s: float | None = None,
 ) -> None:
     """Run one memoized call and persist its result/state — backend-agnostic.
 
@@ -319,7 +325,9 @@ def execute_task(
     FAILED (with an all-thread stack dump as the traceback) and hard-exits —
     a silent wedge becomes a fast, retryable failure instead of burning the
     whole role ``timeout`` (see :mod:`mini._watchdog`). It covers the task call
-    only — result upload rides on the role timeout as before.
+    only — result upload rides on the role timeout as before. *watchdog_grace_s*
+    is the looser threshold that applies until the first progress emission, so
+    one-off setup (tokenization, compilation) doesn't force the watchdog loose.
     """
 
     def record(**fields: Any) -> bool:
@@ -333,7 +341,7 @@ def execute_task(
 
     result_dir = store.result_dir(key)
     result_dir.mkdir(parents=True, exist_ok=True)
-    watchdog, wd_fields = _arm_watchdog(watchdog_s, store, key, gen, commit, record)
+    watchdog, wd_fields = _arm_watchdog(watchdog_s, watchdog_grace_s, store, key, gen, commit, record)
     sink = _MemoSink(store, key, gen, watchdog=watchdog)
     if artifacts is not None and gen is not None:
         artifacts = _FencedStore(artifacts, store, key, gen)
@@ -393,14 +401,23 @@ def execute_task(
 def run_task(data_dir: Path, key: str) -> None:
     """Local subprocess entry: read the staged call from disk and run it."""
     store = MemoStore(data_dir)
-    fn, args, hooks, gen, watchdog_s = store.read_call(key)
+    fn, args, hooks, gen, watchdog_s, watchdog_grace_s = store.read_call(key)
     # Project-scoped artifact store sits beside the experiment's data dir (or the
     # shared HF bucket, if MINI_STORE_BUCKET is set), so a blob put here resolves
     # from any experiment in the project (and from reports).
     artifacts = store_for(store_root_for(data_dir))
     # The local data dir is <data_root>/<experiment>, so its leaf names the experiment.
     execute_task(
-        store, key, fn, args, hooks, artifacts=artifacts, gen=gen, experiment=data_dir.name, watchdog_s=watchdog_s
+        store,
+        key,
+        fn,
+        args,
+        hooks,
+        artifacts=artifacts,
+        gen=gen,
+        experiment=data_dir.name,
+        watchdog_s=watchdog_s,
+        watchdog_grace_s=watchdog_grace_s,
     )
 
 

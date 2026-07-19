@@ -157,10 +157,17 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
     Compute is an execution choice, not part of the experiment definition.
     """
     backend = _resolve_app(name, args)
-    watchdog = getattr(args, "watchdog", None)
+    wd_overrides = {
+        k: v
+        for k, v in (
+            ("watchdog", getattr(args, "watchdog", None)),
+            ("watchdog_grace", getattr(args, "watchdog_grace", None)),
+        )
+        if v is not None
+    }
     if backend == "local":
         app: Apparatus = LocalApparatus(name, max_workers=getattr(args, "workers", 1))
-        return app.w(watchdog=watchdog) if watchdog else app
+        return app.w(**wd_overrides) if wd_overrides else app
     if backend == "modal":
         from mini.modal_apparatus import ModalApparatus
 
@@ -171,10 +178,9 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
                 ("gpu", getattr(args, "gpu", None)),
                 ("timeout", getattr(args, "timeout", None)),
                 ("max_containers", getattr(args, "max_containers", None)),
-                ("watchdog", watchdog),
             )
             if v is not None
-        }
+        } | wd_overrides
         return app.w(**overrides) if overrides else app
     raise SystemExit(
         f'unknown backend {backend!r} — use "local" or "modal" (--app / .app marker / $MINI_APP / [tool.mini] app)'
@@ -540,6 +546,7 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "started_at",
         "finished_at",
         "watchdog_s",
+        "watchdog_grace_s",
     ):
         if (v := rec.get(f)) is not None:
             out[f] = v
@@ -982,6 +989,15 @@ def main() -> None:
             help="abort a task whose step progress stalls this many seconds (worker-side; "
             "a wedged worker settles FAILED with a stack dump instead of burning its timeout). "
             "Applies to every role unless the role sets its own watchdog=",
+        )
+        p.add_argument(
+            "--watchdog-grace",
+            type=int,
+            default=None,
+            dest="watchdog_grace",
+            help="looser watchdog threshold until the task's first progress emission, "
+            "covering one-off setup (tokenization, compilation) so --watchdog can stay "
+            "tight (default: --watchdog)",
         )
         p.add_argument(
             "--keep-stale-done",

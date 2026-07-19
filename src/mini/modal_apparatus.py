@@ -357,6 +357,7 @@ def _modal_task_entry(
     volume_name: str,
     mount_point: str,
     watchdog_s: float | None = None,
+    watchdog_grace_s: float | None = None,
 ) -> None:
     """Remote entry: run one memoized call on Modal and persist its result/state.
 
@@ -395,6 +396,7 @@ def _modal_task_entry(
         gen=gen,
         experiment=volume_name,
         watchdog_s=watchdog_s,
+        watchdog_grace_s=watchdog_grace_s,
     )
 
 
@@ -543,10 +545,11 @@ class ModalApparatus(Apparatus[ModalVolume]):
 
         These kwargs are passed to the ``@app.function()`` decorator when
         mapping, and can be used to specify things like GPU requirements or
-        timeouts. Two are intercepted by mini rather than passed to Modal:
-        ``startup_timeout`` (a client-side wait) and ``watchdog`` (seconds
-        without step progress before the worker aborts itself — the
-        backend-agnostic wedge guard, see :mod:`mini._watchdog`).
+        timeouts. A few are intercepted by mini rather than passed to Modal:
+        ``startup_timeout`` (a client-side wait), ``watchdog`` (seconds without
+        step progress before the worker aborts itself — the backend-agnostic
+        wedge guard, see :mod:`mini._watchdog`) and ``watchdog_grace`` (the
+        looser threshold until the first emission, covering one-off setup).
         """
         new_app = self.clone()
         new_app.modal_fn_kwargs = {**self.modal_fn_kwargs, **kwargs}
@@ -600,12 +603,12 @@ class ModalApparatus(Apparatus[ModalVolume]):
         default here — it's unbounded unless the caller sets one
         (``--max-containers`` / ``.w(max_containers=N)``), which now passes through
         to cap concurrency/cost. Only ``startup_timeout`` (a client-side knob, not a
-        ``@function`` kwarg), ``watchdog`` (mini's, rides the spawn args instead)
-        and ``name`` (we set it) are dropped.
+        ``@function`` kwarg), ``watchdog``/``watchdog_grace`` (mini's, ride the
+        spawn args instead) and ``name`` (we set it) are dropped.
         """
         name = _worker_fn_name(fn)
         if name not in self._memo_fns:
-            drop = {"startup_timeout", "watchdog", "name"}
+            drop = {"startup_timeout", "watchdog", "watchdog_grace", "name"}
             fn_kwargs = {k: v for k, v in self.modal_fn_kwargs.items() if k not in drop}
             fn_kwargs["image"] = self._ensure_image()
             if isinstance(self._volume, ModalVolume):
@@ -636,11 +639,14 @@ class ModalApparatus(Apparatus[ModalVolume]):
         fc_ids: dict[str, tuple[str, str]] = {}
         app_id: str | None = None
         watchdog_s = self.modal_fn_kwargs.get("watchdog")
+        watchdog_grace_s = self.modal_fn_kwargs.get("watchdog_grace")
         with self.app.run(detach=True):
             app_id = getattr(self.app, "app_id", None)  # the ephemeral app instance, for cost attribution
             for key, gen, fn, args, hooks in batch:
                 blob = cloudpickle.dumps((fn, args, hooks))
-                fc = workers[key].spawn(blob, key, gen, dict_name, volume_name, mount_point, watchdog_s)
+                fc = workers[key].spawn(
+                    blob, key, gen, dict_name, volume_name, mount_point, watchdog_s, watchdog_grace_s
+                )
                 fc_ids[key] = (gen, fc.object_id)
         now = time.time()
         for key, (gen, fc_id) in fc_ids.items():

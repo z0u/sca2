@@ -58,6 +58,35 @@ def test_watchdog_aborts_on_frozen_step():
     assert "--- thread" in diagnosis  # the stack dump is the wedge's "traceback"
 
 
+def test_grace_covers_setup_then_tight_timeout_applies():
+    stalls: list[str] = []
+    exits: list[int] = []
+    wd = Watchdog(0.2, stalls.append, grace_s=5.0, _exit=exits.append)
+    with wd:
+        time.sleep(0.6)  # "tokenizing": way past the 0.2s timeout, inside the grace
+        assert exits == []
+        wd.poke(1, 10)  # first emission ends the grace; the tight timeout takes over
+        deadline = time.monotonic() + 5.0
+        while not exits and time.monotonic() < deadline:
+            time.sleep(0.05)
+    assert exits == [70]
+    assert "watchdog 0.2s" in stalls[0]  # the tight threshold, not the 5s grace
+
+
+def test_stall_during_grace_names_the_grace():
+    stalls: list[str] = []
+    exits: list[int] = []
+    wd = Watchdog(5.0, stalls.append, grace_s=0.2, _exit=exits.append)
+    with wd:
+        deadline = time.monotonic() + 5.0
+        while not exits and time.monotonic() < deadline:
+            time.sleep(0.05)  # never emits: the grace, not the timeout, is what expires
+    assert exits == [70]
+    (diagnosis,) = stalls
+    assert "startup grace 0.2s" in diagnosis
+    assert "before any progress emission" in diagnosis
+
+
 # ---------------------------------------------------------------------------
 # Record surfacing: progress_at / steps_per_min / staleness views
 # ---------------------------------------------------------------------------
@@ -102,6 +131,18 @@ def test_stale_progress_is_the_wedge_signature():
     assert progress_age({"state": RunState.RUNNING, "heartbeat_at": 901.0}, now=1000.0) is None
 
 
+def test_stale_progress_honors_startup_grace():
+    # In setup (no progress_at yet): the grace governs, mirroring the watchdog.
+    setup = {"state": RunState.RUNNING, "env": {"host": "x"}, "started_at": 400.0, "heartbeat_at": 999.0}
+    thresholds = {"watchdog_s": 120.0, "watchdog_grace_s": 900.0}
+    assert stale_progress(setup | thresholds, now=1000.0) is False  # 600s into a 900s grace
+    assert stale_progress(setup | thresholds, now=1400.0) is True  # grace itself blown
+    assert stale_progress(setup | {"watchdog_s": 120.0}, now=1000.0) is True  # no grace: tight from the start
+    # Once emitting, the tight threshold applies regardless of the grace.
+    running = setup | thresholds | {"progress_at": 700.0}
+    assert stale_progress(running, now=1000.0) is True  # 300s > watchdog 120s, grace irrelevant now
+
+
 # ---------------------------------------------------------------------------
 # End to end: a wedged task aborts fast; healthy siblings are untouched
 # ---------------------------------------------------------------------------
@@ -143,6 +184,34 @@ def test_wedged_worker_settles_failed_with_stack_dump(tmp_path: Path):
     assert "wedge_or_work" in diagnosis  # the stack dump names the wedged frame
     # The healthy sibling finished normally under the same watchdog.
     assert by_state[RunState.DONE].get("exc_type") is None
+
+
+def test_grace_lets_slow_setup_finish_under_a_tight_watchdog(tmp_path: Path):
+    def slow_setup(x: int):
+        from mini import emit_progress
+
+        time.sleep(3.0)  # "tokenizing": longer than the watchdog, inside the grace
+        for step in range(1, 4):
+            emit_progress(step, 3)
+        return x
+
+    def main(ctx):
+        return ctx.run(slow_setup, 1)
+
+    exp = Experiment(name="grace", main=main)
+    app = LocalApparatus("grace", data_dir=tmp_path / "grace").w(watchdog=1, watchdog_grace=30)
+    store = app.memo_store()
+    done, _ = tick(exp, app)
+    assert not done
+
+    deadline = time.monotonic() + 30.0
+    while time.monotonic() < deadline:
+        rec = store.records()[0]
+        if rec.get("state") in (RunState.DONE, RunState.FAILED):
+            break
+        time.sleep(0.2)
+    assert rec["state"] == RunState.DONE  # the 1s watchdog didn't kill the 3s setup
+    assert (rec["watchdog_s"], rec["watchdog_grace_s"]) == (1, 30)
 
 
 def test_backend_rerun_of_settled_attempt_is_a_noop(tmp_path: Path):
