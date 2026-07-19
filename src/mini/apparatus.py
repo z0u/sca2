@@ -217,7 +217,7 @@ class Apparatus(ABC, Generic[V]):
         """
         ...
 
-    def cancel(self, store: MemoStore) -> list[str]:
+    def cancel(self, store: MemoStore, keys: list[str] | None = None) -> list[str]:
         """Stop in-flight tasks, mark them CANCELLED, and return their keys.
 
         Delegates per-task stops to ``_stop_task`` (local SIGTERMs the worker
@@ -226,11 +226,17 @@ class Apparatus(ABC, Generic[V]):
         stop (an ignored SIGTERM): its writes no longer own the record, so it
         can't flip CANCELLED back to DONE and pass a half-cancelled attempt off
         as a current result.
+
+        *keys* bounds the cancellation to those tasks (``mini cancel --key``):
+        one wedged worker can be reaped and retried without stopping its
+        healthy siblings. ``None`` cancels everything in flight.
         """
         from mini.runs import RunState
 
         cancelled: list[str] = []
         for rec in store.records():
+            if keys is not None and rec["key"] not in keys:
+                continue
             state = RunState(rec["state"]) if rec.get("state") else RunState.PENDING
             if state in (RunState.RUNNING, RunState.PENDING):
                 self._stop_task(rec)

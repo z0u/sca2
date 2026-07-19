@@ -51,6 +51,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
     def __init__(self, name: str, max_workers: int = 1, data_dir: Path | str | None = None):
         self.name = name
         self.max_workers = max_workers
+        self.watchdog_s: float | None = None
         self._before_hooks: list[Callable[[], Any]] = []
         self._volume: LocalVolume | None = LocalVolume(Path(data_dir) if data_dir else data_root() / name)
 
@@ -59,8 +60,22 @@ class LocalApparatus(Apparatus[LocalVolume]):
 
     def clone(self) -> LocalApparatus:
         new_app = LocalApparatus(self.name, self.max_workers)
+        new_app.watchdog_s = self.watchdog_s
         new_app._before_hooks = self._before_hooks[:]
         new_app._volume = self._volume
+        return new_app
+
+    @override
+    def w(self, **kwargs: Any) -> LocalApparatus:
+        """Honor the backend-agnostic ``watchdog=`` (seconds without step
+        progress before the worker aborts itself); every other option is a
+        backend-native knob this apparatus has no use for, ignored as before —
+        so a role table written for Modal still loads locally.
+        """
+        if "watchdog" not in kwargs:
+            return self
+        new_app = self.clone()
+        new_app.watchdog_s = kwargs["watchdog"]
         return new_app
 
     @override
@@ -78,7 +93,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
     @override
     def spawn_tasks(self, store: MemoStore, batch: list[tuple[str, str, Callable, tuple, list]]) -> None:
         for key, gen, fn, args, hooks in batch:
-            store.write_call(key, fn, args, hooks, gen)  # stage to disk for the subprocess worker
+            store.write_call(key, fn, args, hooks, gen, self.watchdog_s)  # stage for the subprocess worker
             store.update_if(key, gen, pid=spawn_taskworker(store.data_dir, key))  # pid == pgid, for cancel
 
     @override
