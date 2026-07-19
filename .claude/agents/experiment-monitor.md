@@ -48,6 +48,25 @@ bounded:
    can't block forever. For anything long, prefer launch + bounded polling.
 4. **On a FAILED task**: `bin/mini logs <exp> <key>`, then apply the hotfix
    rules below or escalate.
+   - `!! worker vanished (killed/crashed, no result written)` is a flaky-class
+     infra failure, not a code bug: `bin/mini retry <exp> --key <key>` without
+     editing anything, and mention the incident in your report.
+5. **Dead ≠ slow.** A RUNNING task can be a wedged or dead worker the backend
+   never settled. Two tells, either sufficient: `stale_heartbeat` true, or
+   `step` **frozen** across polls minutes apart while sibling cells of the
+   same fn finished normally (a wedged process — hung device call, deadlock —
+   can keep its heartbeat beating while doing no work; seen in ex-2.1.4:
+   container alive, GPU util 0.3%, progress frozen for the full role
+   timeout). Left alone it burns its whole role `timeout` doing nothing.
+   Don't wait it out:
+   - Confirm over 2–3 polls ≥ 3 minutes apart (a long non-emitting stretch —
+     a heavy import, one big step — can look frozen briefly).
+   - If **nothing else healthy is in flight**: `bin/mini cancel <exp>` (reaps
+     the record; cancel is experiment-wide, which is why the first condition
+     matters), then `bin/mini retry <exp> --key <key>`.
+   - If healthy workers **are** in flight, don't cancel them; keep polling and
+     recover the dead task the moment the others settle — or report progress
+     with the stuck task's key and timings if you hit budget first.
 5. **When all DONE**: report the results location (`bin/mini results <exp>` /
    `report.py`).
 6. If you hit the budget before it settles, return a **progress** report (not an
