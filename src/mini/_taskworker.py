@@ -24,7 +24,7 @@ from mini._queues import EndOfQueue
 from mini._watchdog import Watchdog, WatchdogStall
 from mini.memo import MemoStore
 from mini.progress import progress_context
-from mini.runs import RunState, compute_env
+from mini.runs import SETTLED, RunState, compute_env
 from mini.store import (
     Artifact,
     StaleWriteError,
@@ -207,6 +207,40 @@ def _upstream_refs(resolved: dict[str, dict[str, Any] | None]) -> list[dict[str,
     ]
 
 
+def _attempt_already_settled(store: MemoStore, key: str, gen: str | None) -> bool:
+    """Is this worker a backend re-run of an attempt that already settled?
+
+    Concretely: a watchdog abort exits the process, which Modal sees as a
+    *container crash* and re-schedules the input regardless of ``retries=0`` —
+    the re-run carries the same gen, so without this guard it would flip the
+    settled FAILED back to RUNNING, wedge again, and crash-loop until the role
+    timeout. The record already tells the story; the re-run should run nothing
+    and return cleanly, so the input completes and the loop ends.
+    """
+    if gen is None:
+        return False
+    prior = store.record(key)
+    return prior.get("gen") == gen and prior.get("state") in SETTLED
+
+
+def _arm_watchdog(
+    watchdog_s: float | None,
+    store: MemoStore,
+    key: str,
+    gen: str | None,
+    commit: Callable[[], None] | None,
+    record: Callable[..., bool],
+) -> tuple[Watchdog | None, dict[str, Any]]:
+    """Build the progress watchdog (or not) plus the record fields that go with it.
+
+    The ``watchdog_s`` stamp lands on the record so client-side staleness views
+    can match the worker's own threshold.
+    """
+    if not watchdog_s:
+        return None, {}
+    return Watchdog(watchdog_s, _stall_handler(store, key, gen, commit, record)), {"watchdog_s": watchdog_s}
+
+
 def _stall_handler(
     store: MemoStore, key: str, gen: str | None, commit: Callable[[], None] | None, record: Callable[..., bool]
 ) -> Callable[[str], None]:
@@ -294,9 +328,12 @@ def execute_task(
             return True
         return store.update_if(key, gen, **fields)
 
+    if _attempt_already_settled(store, key, gen):
+        return
+
     result_dir = store.result_dir(key)
     result_dir.mkdir(parents=True, exist_ok=True)
-    watchdog = Watchdog(watchdog_s, _stall_handler(store, key, gen, commit, record)) if watchdog_s else None
+    watchdog, wd_fields = _arm_watchdog(watchdog_s, store, key, gen, commit, record)
     sink = _MemoSink(store, key, gen, watchdog=watchdog)
     if artifacts is not None and gen is not None:
         artifacts = _FencedStore(artifacts, store, key, gen)
@@ -305,10 +342,9 @@ def execute_task(
     # ``finished_at`` (below) for a real execution duration — distinct from the
     # client-side ``created_at`` stamped before the worker was even scheduled.
     started_at = time.time()
-    fields: dict[str, Any] = dict(state=RunState.RUNNING, heartbeat_at=started_at, started_at=started_at)
-    if watchdog_s:  # stamp the threshold so client-side staleness views can match it
-        fields["watchdog_s"] = watchdog_s
-    if not record(**fields, env=compute_env()):
+    if not record(
+        state=RunState.RUNNING, heartbeat_at=started_at, started_at=started_at, **wd_fields, env=compute_env()
+    ):
         return  # superseded before we even started — nothing here is wanted anymore
     producer = _producer_stamp(experiment, store, key)
     resolved: dict[str, dict[str, Any] | None] = {}

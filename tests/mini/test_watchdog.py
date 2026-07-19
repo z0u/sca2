@@ -145,6 +145,27 @@ def test_wedged_worker_settles_failed_with_stack_dump(tmp_path: Path):
     assert by_state[RunState.DONE].get("exc_type") is None
 
 
+def test_backend_rerun_of_settled_attempt_is_a_noop(tmp_path: Path):
+    """After a watchdog abort, Modal sees a container crash and re-schedules the
+    input (regardless of retries=0). The re-run carries the same gen, so it must
+    not flip the settled FAILED back to RUNNING and wedge again — it runs
+    nothing and returns, ending the reschedule loop."""
+    from mini._taskworker import execute_task
+    from mini.memo import task_key_parts
+
+    def boom():  # what the re-run would execute if the guard failed
+        (tmp_path / "ran").touch()
+
+    store = MemoStore(tmp_path / "rerun")
+    key, parts = task_key_parts(boom, ())
+    gen = store.mark_running(boom, key, parts, expect_gen=None)
+    store.update(key, state=RunState.FAILED, error="WatchdogStall: …")  # the abort settled it
+
+    execute_task(store, key, boom, (), [], gen=gen)
+    assert store.record(key)["state"] == RunState.FAILED  # not resurrected to RUNNING
+    assert not (tmp_path / "ran").exists()
+
+
 def test_cancel_by_key_leaves_siblings_running(tmp_path: Path):
     def linger(x):
         time.sleep(30.0)
