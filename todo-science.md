@@ -19,20 +19,36 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   we could show multiple probes per subline (as separate series). #[D2.1] #ex-2.1.1
   #representations
 
-- [ ] Train a variant of the un-anchored color-mixing transformer with only
-  named colors (no hex operands or results). Can the model infer the color space
-  geometry? When it guesses a held-out answer, is the answer close to the actual
-  answer? "Close to" because for many operand pairs, the answer may not have a
-  name. Metrics: accuracy, and cross-entropy across logprobs. If the
-  cross-entropy metric would require one token per color (rather than
-  character-level), so be it. Results should inform the kinds of vocabularies to
-  try in the anchored experiments. #[D2.1] #geometry #vocab #representations
+- [ ] Does more training close the one-level precision gap at the full grid?
+  Ex-2.1.3's v4096 cells plateau at seen 0.85 / holdout 0.65 under the fixed
+  100-epoch schedule, with misses one grid level off in one channel — the
+  geometry is right and the precision isn't. Candidates: a longer or reshaped
+  schedule, weight decay (grokking-style late snap-in). #[D2.1] #ex-2.1.3 #vocab
+
+- [ ] Char-level twin of the name-only language (ex-2.1.4 candidate). Same corpus
+  distribution as ex-2.1.3, only the tokenizer changes: names spelled character by
+  character, so concepts are multi-token again and answers have an emission
+  schedule. Isolates whether one-token-per-concept is load-bearing for geometry
+  inference, and lets ex-2.1.2's answer-schedule probe ask whether just-in-time
+  computation and eviction return with multi-token answers — on data with no hex
+  path and no form rule. Design trap: the synthetic names (`c05f`) spell the value
+  per character, which is hex with a prefix at char level; rebuild them as opaque
+  fixed-length random strings (holistic binding, the true no-scaffolding control).
+  Optional later condition: cipher names (per-position shuffled letters), to
+  separate a compositional surface from a value-spelling one. Scope: v216 + v27,
+  2–3 seeds, d64-L4. A failed holdout here is informative — it would say
+  multi-token naming itself is the bottleneck. Ladder framing: word-level
+  (ex-2.1.3) is the easy rung for anchoring, this is the middle rung, the base
+  language is the M2 claim; divergence between rungs is a result, not a nuisance.
+  #[D2.1] #ex-2.1.3 #vocab #representations #task-grammar
 
 - [ ] If anchoring a composed concept fails in D2.1.x, run a word-level tokenizer
   ablation (one token per color name, hex still char-level): it separates "anchoring
   fails for transformers" from "anchoring fails for concepts that don't coincide
   with an embedding row". Worth testing, but perhaps the char-level task is
-  closer to what M2 claims; need to think on this more. #[D2.1] #anchoring #vocab
+  closer to what M2 claims; need to think on this more. Ex-2.1.3 de-risks the
+  training side: name-only word-level corpora learn the geometry end-to-end.
+  #[D2.1] #anchoring #vocab
 
 - [ ] Cheap capacity/superposition proxies for the ex-2.1.x eval step: per-layer
   participation ratio of residual-stream activations (eigenspectrum of the
@@ -41,6 +57,20 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   between concepts). Both fall out of arrays `eval_one` already computes; they'd let
   the width sweep read as a compression axis. Full superposition accounting (feature
   dictionary / SAE) is its own experiment, after D2.1.2. #[D2.1] #superposition
+
+- [ ] Narrow the stream to raise superposition pressure — sequenced, not up front.
+  d64 is generous for this task, and SCA's value proposition lives where geometry
+  is contested. Plan: (1) keep d64-L4 for the first anchored runs, so the only
+  change vs the frozen baselines is the anchor; (2) un-anchored width × depth
+  sweep on the chosen testbed (e.g. word-level v216: d16/d32 × L4/L8) to find the
+  narrowest cell that still solves the task — the capacity proxies (item above)
+  then read as a compression axis; (3) re-run the anchored comparison along the
+  width axis down to that frontier. Prefer deep-and-narrow (d16-L8) over wide:
+  width sets per-position capacity, depth adds anchor sites, and ngpt-scaling
+  says the architecture tolerates the aspect ratio. Watch-out: at v216 the
+  softmax's identity separability may fail before value geometry does — which is
+  itself the identity-vs-value competition ex-2.1.3 flagged. #[D2.1]
+  #superposition #model-arch #ex-2.1.3
 
 - [ ] Make the operation a variable before D2.2. `sca/data/colors.py` hardcodes one
   op (`mix`, spelled `+`); anchoring *the operation* only makes sense once there is
@@ -59,6 +89,24 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   afford. #model-arch
 
 ## Findings & notes to carry forward
+
+- **Color geometry is inferable from names alone; vocabulary density sets exact match
+  (ex-2.1.3, 2026-07-19).** Trained the un-anchored backbone on a named-only language
+  (one token per color, no hex) over vocabularies of 27/64/216/4096 grid colors. Every
+  size learns the latent cube: embeddings hold RGB as a linear subspace (ridge R² up
+  to ≈ 0.95), the mix is decodable at the pre-answer position (R² ≈ 0.9 from depth 1–2,
+  transferring to held-out and open prompts), and guesses land near the nearest-name
+  floor even for pair types never trained on. Held-out exact match is non-monotonic —
+  0.27 / 0.59 / ≈ 1.0 / 0.65 — and the full grid's misses are one grid level off in
+  one channel (precision, not knowledge; not concentrated at rounding boundaries).
+  Consequences: the base language's `named_holdout` = 0 was a property of its grammar,
+  not of name-only supervision; a ~216-color one-token vocabulary is a sweet spot for
+  anchored runs (task solved, geometry clean, open pairs remain as graded probes); a
+  single-token answer gives the result concept a fixed home position, unlike the
+  just-in-time, evicted hex answer; and embedding variance splits into a small
+  value-geometry subspace plus a large identity/separability remainder — the
+  superposition watch item in miniature. Full analysis in `docs/m2/ex-2.1.3/report.py`.
+  #[D2.1] #ex-2.1.3 #vocab #geometry #representations
 
 - **`named_holdout` is unsolved in 4 layers; value → name translation is the blocker
   (ex-2.1.2, 2026-07-15).** The 2×2 factorial (reverse aliases × off-palette
