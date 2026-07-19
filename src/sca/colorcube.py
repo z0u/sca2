@@ -222,12 +222,14 @@ def score_interventions(params: Params) -> dict:
 def load_results(metrics_ref: str, trajs_ref: str) -> tuple[list[dict], dict[str, np.ndarray]] | None:
     """Resolve per-run metrics and the stacked trajectories from the store, or None if unpublished."""
     store = project_store()
-    m_art, t_art = store.get_ref(metrics_ref), store.get_ref(trajs_ref)
+    arts = store.get_refs([metrics_ref, trajs_ref])
+    m_art, t_art = arts[metrics_ref], arts[trajs_ref]
     if m_art is None or t_art is None:
         return None
     with tempfile.TemporaryDirectory() as d:
-        metrics = json.loads(store.get(m_art, Path(d) / "metrics.json").read_text())
-        with np.load(store.get(t_art, Path(d) / "trajs.npz")) as z:
+        m_path, t_path = store.get_many([(m_art, Path(d) / "metrics.json"), (t_art, Path(d) / "trajs.npz")])
+        metrics = json.loads(m_path.read_text())
+        with np.load(t_path) as z:
             trajs = dict(z)
     return metrics, trajs
 

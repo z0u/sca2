@@ -42,19 +42,23 @@ with app.setup(hide_code=True):
     def load_results() -> tuple[dict, dict[str, np.ndarray], dict[str, dict]] | None:
         """Resolve metrics, arrays, and eval sets from the store, or None if unpublished."""
         store = project_store()
-        m_art, a_art = store.get_ref(METRICS_REF), store.get_ref(ARRAYS_REF)
-        e_arts = {g: store.get_ref(f"{EVALS_REF}/{g}") for g in GRID_NAMES}
+        arts = store.get_refs([METRICS_REF, ARRAYS_REF, *(f"{EVALS_REF}/{g}" for g in GRID_NAMES)])
+        m_art, a_art = arts[METRICS_REF], arts[ARRAYS_REF]
+        e_arts = {g: arts[f"{EVALS_REF}/{g}"] for g in GRID_NAMES}
         if m_art is None or a_art is None or any(v is None for v in e_arts.values()):
             return None
         with tempfile.TemporaryDirectory() as d:
-            metrics = json.loads(store.get(m_art, Path(d) / "metrics.json").read_text())
-            with np.load(store.get(a_art, Path(d) / "arrays.npz")) as z:
+            paths = store.get_many(
+                [
+                    (m_art, Path(d) / "metrics.json"),
+                    (a_art, Path(d) / "arrays.npz"),
+                    *((art, Path(d) / f"{g}.json") for g, art in e_arts.items() if art is not None),
+                ]
+            )
+            metrics = json.loads(paths[0].read_text())
+            with np.load(paths[1]) as z:
                 arrays = {k: z[k] for k in z.files}
-            evals = {
-                g: load_example_sets(store.get(art, Path(d) / f"{g}.json").read_bytes())
-                for g, art in e_arts.items()
-                if art is not None
-            }
+            evals = {p.stem: load_example_sets(p.read_bytes()) for p in paths[2:]}
         return metrics, arrays, evals
 
     def cell_of(metrics: dict, grid: str, s: int) -> dict:

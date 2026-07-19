@@ -79,6 +79,31 @@ def test_put_get_round_trips_over_the_bucket(hf):
     assert out.read_bytes() == data
 
 
+def test_batched_refs_and_gets_round_trip_over_the_bucket(hf, tmp_path: Path):
+    """get_refs + get_many resolve a set in one pull — the report-loading fast path."""
+    store, tag, created = hf
+    arts = {}
+    for i in range(3):
+        art = store.put(f"batched {tag} {i}".encode(), name=f"b{i}.txt")
+        created.append(_cas_key(art.sha256))
+        name = f"_test/{tag}/batch/{i}"
+        store.set_ref(name, art)
+        created.append(f"refs/{name}.json")
+        arts[name] = art
+
+    from mini.hf_store import HFStore
+    from mini.store import LocalStore
+
+    fresh = HFStore(store.bucket, cache=LocalStore(tmp_path / "cold"))  # force real pulls
+    names = [*arts, f"_test/{tag}/batch/missing"]
+    resolved = fresh.get_refs(names)
+    assert resolved == {**arts, f"_test/{tag}/batch/missing": None}
+
+    items = [(art, tmp_path / f"out{i}.txt") for i, art in enumerate(arts.values())]
+    outs = fresh.get_many(items)
+    assert [p.read_bytes() for p in outs] == [f"batched {tag} {i}".encode() for i in range(3)]
+
+
 def test_ref_round_trips_over_the_bucket(hf):
     store, tag, created = hf
     art = store.put(f"ref payload {tag}".encode(), name="r.bin")

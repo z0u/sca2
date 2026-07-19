@@ -33,7 +33,10 @@
   writers at worst duplicate a download. Locally the tier doesn't exist —
   `~/.cache/huggingface` already persists. Note the HF **hub** cache doesn't apply to
   buckets at all (buckets aren't a repo type; `download_bucket_files` streams straight to
-  the destination) — `HFStore` has its own warm cache for that.
+  the destination) — `HFStore` has its own warm cache for that. The **xet** sub-cache
+  *does* cover buckets, though: since `huggingface_hub` ≥ 1.19 bucket transfers go through
+  the shared `hf_xet` session, so chunk-level dedup and the `HF_HOME/xet` chunk cache
+  apply to CAS blobs as well.
 - **The worker's `HFStore` warm cache lives on container-local disk, not the mounted
   Volume** (`WORKER_STORE_CACHE`). Under the mount it was committed alongside results,
   so every bucket artifact grew a second, redundant copy on the per-experiment Volume.

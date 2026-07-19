@@ -52,12 +52,14 @@ with app.setup(hide_code=True):
     def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
         """Resolve the metrics and margin arrays from the store, or None if unpublished."""
         store = project_store()
-        m_art, g_art = store.get_ref(METRICS_REF), store.get_ref(MARGINS_REF)
+        arts = store.get_refs([METRICS_REF, MARGINS_REF])
+        m_art, g_art = arts[METRICS_REF], arts[MARGINS_REF]
         if m_art is None or g_art is None:
             return None
         with tempfile.TemporaryDirectory() as d:
-            metrics = json.loads(store.get(m_art, Path(d) / "metrics.json").read_text())
-            with np.load(store.get(g_art, Path(d) / "margins.npz")) as z:
+            m_path, g_path = store.get_many([(m_art, Path(d) / "metrics.json"), (g_art, Path(d) / "margins.npz")])
+            metrics = json.loads(m_path.read_text())
+            with np.load(g_path) as z:
                 margins = {k: z[k] for k in z.files}
         return metrics, margins
 
