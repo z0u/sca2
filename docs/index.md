@@ -88,5 +88,15 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   Exact match is non-monotonic in vocabulary size (essentially solved at 216
   colors; neighbor-level near misses at 4096), which informs the vocabulary
   design for the anchored runs.
+- [Experiment 2.1.4](./m2/ex-2.1.4/report.py): spelling the names. The
+  char-level twin of ex-2.1.3 — corpora identical line for line, but every
+  color is an opaque four-letter random string, read and written one character
+  at a time. At 216 colors the geometry survives multi-token naming: held-out
+  accuracy 0.91 with neighbor-level misses, the mix computed in value space at
+  the pre-answer position, and no per-channel eviction during emission (unlike
+  hex answers). At 27 colors exact match collapses to zero with confidently
+  wrong neighbor answers, even though the neighborhood structure is learned.
+  Reading names consumes most of the network's depth, which informs where
+  anchors can live.
 
 More reports will appear here as the M2 experiments land.

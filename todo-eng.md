@@ -14,6 +14,31 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Wedged-worker liveness gap (diagnosed 2026-07-19, ex-2.1.4).** One of six
+  identical `train_one` cells froze at step 4079/10500 and sat RUNNING for the
+  full role `timeout` (2700 s) before Modal settled the call and `status`
+  reaped it to FAILED (`!! worker vanished`); a plain `retry` then succeeded.
+  Modal's dashboard showed the failure mode precisely: container alive the
+  whole time, CPU ≈ 0.05 cores, GPU utilization 0.33 % at 29 W idle draw, but
+  17.2 GiB of GPU memory still allocated and host RAM a normal 1.55 GiB. So
+  not OOM, not preemption — the process wedged (hung device call or deadlocked
+  thread) while holding its allocations. Notably a wedge like this can keep
+  the worker's heartbeat thread beating, so `stale_heartbeat` may never trip;
+  frozen `step` progress against finished siblings was the only usable signal.
+  The experiment-monitor agent now carries a "dead ≠ slow" playbook keyed on
+  frozen progress (confirm across polls → `cancel` + `retry --key` when
+  nothing healthy is in flight). Remaining `mini`-side gaps, in rough order of
+  value:
+  - Worker-side progress watchdog: abort the process if no step progress for
+    N minutes (role-configurable), turning a silent 45-minute wedge into a
+    fast, retryable failure with a traceback.
+  - Per-key cancel (`mini cancel --key <key>`): today cancel is
+    experiment-wide, so a single dead worker can't be reaped without stopping
+    healthy siblings — the monitor must wait for them to settle first.
+  - Expose progress staleness in `status --json` (e.g. `progress_age_s`
+    alongside `heartbeat_age_s`): heartbeat liveness and step progress are
+    different signals, and only the former is currently surfaced.
+
 - **Responsive multi-panel figures in reports (opened 2026-07-16).** The
   ex-2.1.1 two-panel *named-pair lattice* was split into two independent
   `themed` figures wrapped in a `.report-figure-row` (inline-block, reflows to
