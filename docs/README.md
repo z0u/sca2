@@ -54,6 +54,20 @@ docs/
 Exported bundles live (gitignored) under `.mini/exports/<key>/` locally; their durable
 home is the bucket. Nothing under `docs/` holds generated HTML.
 
+**Showcases** are occasional collated reports for stakeholders:
+`m2/showcase/<date>.py`, one ordinary report notebook per edition. A showcase
+reads the collated experiments' durable results by ref and draws its own
+summary figures (explanatory register, lighter than the experiment reports),
+so the provenance chip cites every source experiment automatically. Ref names
+are imported from each experiment's `experiment.py` via `importlib` under
+unique module names — the usual `from experiment import ...` only resolves
+beside a single experiment, and the definition modules all share that
+filename. A sibling `layouts/<date>.slides.json` gives the notebook a slides
+layout: `marimo run docs/m2/showcase/<date>.py` presents it as a deck (one
+cell per slide, so keep cells slide-sized), while the static export — and so
+the published page — stays a linear document, because static exports don't
+apply layouts.
+
 Heavier or multi-step experiments live in a subdirectory as an importable
 `experiment.py` (the definition, driven by the `mini` CLI) plus a `report.py`
 notebook (reads durable results and publishes). A plain `.py` that isn't a Marimo

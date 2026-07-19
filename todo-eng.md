@@ -14,6 +14,13 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Showcase handout PDFs (opened 2026-07-19).** The showcase notebooks
+  (`docs/m2/showcase/`) present as slides via `marimo run` thanks to their
+  `layouts/*.slides.json`. Marimo can also render a reveal.js-style PDF deck
+  (`marimo export pdf --as=slides`, needs nbconvert + Playwright) — worth
+  wiring into `./go` if we ever need a file to attach rather than a URL to
+  share. Not needed while the published page + live slides cover both uses.
+
 - **Responsive multi-panel figures in reports (opened 2026-07-16).** The
   ex-2.1.1 two-panel *named-pair lattice* was split into two independent
   `themed` figures wrapped in a `.report-figure-row` (inline-block, reflows to

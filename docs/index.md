@@ -90,3 +90,14 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   design for the anchored runs.
 
 More reports will appear here as the M2 experiments land.
+
+&nbsp;
+
+## Showcases
+
+Occasional collated reports that retell a whole iteration at walking pace,
+written for people following the project rather than working on it.
+
+- [Iteration 1](./m2/showcase/2026-07-19.py) (July 2026): the color-mixing
+  world, the composition failure in the baseline, and the geometry that
+  emerges from co-occurrence alone in the names-only experiment.
