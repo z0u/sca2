@@ -11,7 +11,9 @@ agent (or you) can drive, poll, and gather without holding a session open:
     python -m mini retry  docs/pipeline/experiment.py          # reset FAILED/CANCELLED, then advance
     python -m mini ls                                          # experiments + task state
     python -m mini watch  pipeline                             # block until the run settles, read-only (exit 0 iff DONE)
+    python -m mini watch  pipeline --timeout 10m --json        # bounded wait: exit 0 done / 1 failed / 3 attention / 124 timeout
     python -m mini status pipeline                             # per-task state + metrics, by NAME (--json for scripts)
+    python -m mini status pipeline --brief                     # aggregate + counts + only tasks needing attention
     python -m mini results pipeline                            # per-task results
     python -m mini logs   pipeline <key>                       # a failed task's traceback
     python -m mini explain pipeline <key>                      # why this re-ran: evidence + attempt timeline
@@ -44,7 +46,16 @@ from mini.gc import GRACE_DEFAULT
 from mini.local_apparatus import LocalApparatus
 from mini.memo import META_KEY, MemoStore
 from mini.orchestration import BudgetExpired, TaskFailed, retry, tick
-from mini.runs import SETTLED, RunState, data_root, is_queued, progress_age, stale_heartbeat, stale_progress
+from mini.runs import (
+    SETTLED,
+    STALE_HEARTBEAT_S,
+    RunState,
+    data_root,
+    is_queued,
+    progress_age,
+    stale_heartbeat,
+    stale_progress,
+)
 from mini.store import _project_config
 from utils.time import duration
 
@@ -482,14 +493,98 @@ def cmd_status(args: argparse.Namespace) -> None:
         raise _no_tasks(args.name, args)
     current, stale = store.split_current(recs)
     state = _aggregate_state([_rec_state(r) for r in current])
+    brief = getattr(args, "brief", False)
     if getattr(args, "json", False):
-        print(json.dumps(_status_json(args.name, args, state, store, current, stale)))
+        build = _brief_json if brief else _status_json
+        print(json.dumps(build(args.name, args, state, store, current, stale)))
         return
     header = f"{args.name}  —  {state}  ({len(current)} tasks{f', +{len(stale)} superseded' if stale else ''})"
     if suffix := _budget_suffix(store):
         header += f"  ·  {suffix}"
     print(header)
-    _print_records(store, recs)
+    if brief:
+        print(f"  {_fmt_counts(current)}")
+        for rec in sorted((r for r in current if _needs_attention(r)), key=_launch_order):
+            print(_memo_line(rec))
+    else:
+        _print_records(store, recs)
+
+
+def _counts(current: list[dict]) -> dict[str, int]:
+    """Task tally by state, with queued (launched, no worker yet) split out of running."""
+    counts: dict[str, int] = {}
+    for rec in current:
+        label = "queued" if is_queued(rec) else str(_rec_state(rec))
+        counts[label] = counts.get(label, 0) + 1
+    return counts
+
+
+def _fmt_counts(current: list[dict]) -> str:
+    order = ("done", "running", "queued", "pending", "failed", "cancelled")
+    counts = _counts(current)
+    return " · ".join(f"{counts[label]} {label}" for label in order if counts.get(label)) or "no tasks"
+
+
+def _needs_attention(rec: dict) -> bool:
+    """Does a monitor need to look at this task? Terminal-not-DONE, stale/wedged
+    liveness, or queued past the generic staleness window (Modal capacity starvation).
+    """
+    if _rec_state(rec) in (RunState.FAILED, RunState.CANCELLED):
+        return True
+    if stale_heartbeat(rec) or stale_progress(rec):
+        return True
+    return is_queued(rec) and bool(hb := rec.get("heartbeat_at")) and time.time() - hb > STALE_HEARTBEAT_S
+
+
+def _attention_json(rec: dict) -> dict[str, Any]:
+    """A task entry for the ``attention`` list: the full record trimmed to what
+    acting on it needs — key/state/error/liveness (and ``fc_id`` for Modal log
+    lookup), without the env/metrics/timestamps bulk of the full ``--json``.
+    """
+    out = _task_json(rec)
+    for f in ("env", "metrics", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s", "steps_per_min"):
+        out.pop(f, None)
+    if out.pop("queued", None):
+        out.pop("heartbeat_age_s", None)  # a queued record's heartbeat is just its launch stamp
+        out.pop("stale_heartbeat", None)
+        if hb := rec.get("heartbeat_at"):
+            out["queued_s"] = round(time.time() - hb, 1)
+    return out
+
+
+def _budget_json(meta: dict[str, Any]) -> dict[str, Any] | None:
+    if not (deadline := meta.get("deadline_at")):
+        return None
+    return {
+        "budget": meta.get("budget"),
+        "deadline_at": deadline,
+        "remaining_s": round(max(0.0, deadline - time.time()), 1),
+    }
+
+
+def _brief_json(
+    name: str, args: argparse.Namespace, state: RunState, store: MemoStore, current: list[dict], stale: list[dict]
+) -> dict[str, Any]:
+    """The compact ``--brief`` twin of :func:`_status_json` (also ``watch --json``'s
+    summary): aggregate state, counts by state, and *only* the tasks needing
+    attention — a sweep's healthy lines carry no signal a monitor acts on, and on
+    a big fan-out they dominate the payload. Field names are a stable contract:
+    change additively only.
+    """
+    out: dict[str, Any] = {
+        "experiment": name,
+        "app": _resolve_app(name, args),
+        "state": str(state),
+        "settled": all(_rec_state(r) in SETTLED for r in current),
+        "counts": _counts(current),
+    }
+    if attention := [_attention_json(r) for r in sorted(current, key=_launch_order) if _needs_attention(r)]:
+        out["attention"] = attention
+    if budget := _budget_json(store.meta()):
+        out["budget"] = budget
+    if stale:
+        out["superseded"] = len(stale)
+    return out
 
 
 def _status_json(
@@ -515,12 +610,8 @@ def _status_json(
         ],
     }
     meta = store.meta()
-    if deadline := meta.get("deadline_at"):
-        out["budget"] = {
-            "budget": meta.get("budget"),
-            "deadline_at": deadline,
-            "remaining_s": round(max(0.0, deadline - time.time()), 1),
-        }
+    if budget := _budget_json(meta):
+        out["budget"] = budget
     if kept := meta.get("kept_stale"):
         out["kept_stale"] = sorted(kept)
     return out
@@ -562,26 +653,55 @@ def _task_json(rec: dict) -> dict[str, Any]:
 
 
 def cmd_watch(args: argparse.Namespace) -> None:
-    """Render live bars for a run by NAME until it settles — read-only (never ticks).
+    """Block on a run by NAME until it settles or needs attention — read-only (never ticks).
 
     The read-only twin of ``run --watch``: it renders a run this process didn't
     launch (e.g. a detached/Modal run), polling the durable records without ever
     advancing the DAG. Ctrl-C stops watching; the workers live on.
+
+    The exit code names the branch, so a monitor never parses the output to
+    decide: 0 = settled all-DONE; 1 = settled with FAILED/CANCELLED; 3 = needs
+    attention *now* (a task settled terminally mid-stage — e.g. a watchdog fired
+    — or a worker went stale/wedged); 124 = ``--timeout`` elapsed with work
+    still in flight. ``--json`` swaps the live bars for one compact summary
+    object (the ``status --brief --json`` shape plus ``outcome``/``reason``).
     """
     from mini.monitor import watch
 
     apparatus = _build_apparatus(args.name, args)
-    if not apparatus.memo_store().records():
+    store = apparatus.memo_store()
+    if not store.records():
         raise _no_tasks(args.name, args, " (nothing to watch — launch it with: run)")
+    as_json, timeout = getattr(args, "json", False), getattr(args, "timeout", None)
+    console = None
+    if as_json:  # no live bars — the one-line summary below is the whole output
+        from rich.console import Console
+
+        console = Console(quiet=True)
     try:
-        records = watch(apparatus, poll=args.poll)
+        current, outcome, reason = watch(
+            apparatus, poll=args.poll, console=console, timeout=duration(timeout) if timeout else None
+        )
     except KeyboardInterrupt:
         print("\n… stopped watching; tasks keep running. Re-run to resume.")
         return
-    state = _aggregate_state([_rec_state(r) for r in records])
-    print(f"{args.name}  —  {state}  ({len(records)} tasks)")
-    if state != RunState.DONE:  # exit code = settle outcome, so scripts can gate on it
-        raise SystemExit(1)
+    state = _aggregate_state([_rec_state(r) for r in current])
+    if as_json:
+        _, stale = store.split_current(store.records())
+        payload = _brief_json(args.name, args, state, store, current, stale) | {"outcome": outcome}
+        if reason:
+            payload["reason"] = reason
+        print(json.dumps(payload))
+    else:
+        if outcome == "attention":
+            print(f"⚠ needs attention: {reason}")
+        elif outcome == "timeout":
+            print(f"⏱ {reason}")
+        print(f"{args.name}  —  {state}  ({len(current)} tasks)")
+    # Exit code = the branch to take, so scripts/monitors can gate without parsing.
+    code = {"attention": 3, "timeout": 124}.get(outcome, 0 if state == RunState.DONE else 1)
+    if code:
+        raise SystemExit(code)
 
 
 def cmd_results(args: argparse.Namespace) -> None:
@@ -1039,16 +1159,35 @@ def main() -> None:
         action="store_true",
         help="machine-readable status: one JSON object (stable field names; for scripts/agents)",
     )
+    p.add_argument(
+        "--brief",
+        action="store_true",
+        help="aggregate + counts + only the tasks needing attention (failed/stale/wedged/long-queued) "
+        "— skip the per-task listing of a big sweep",
+    )
     _add_app_flag(p)
     p.set_defaults(func=cmd_status)
 
     p = sub.add_parser(
         "watch",
-        help="block until a run settles, rendering live bars — read-only (never ticks); "
-        "exits 0 iff it settled DONE, so it doubles as a wake trigger for scripts",
+        help="block until a run settles or needs attention — read-only (never ticks); "
+        "the exit code names the branch: 0 settled DONE, 1 settled FAILED/CANCELLED, "
+        "3 attention (new failure or stale/wedged worker), 124 --timeout elapsed",
     )
     _add_name_arg(p)
     p.add_argument("--poll", type=float, default=0.5, help="seconds between record polls while watching")
+    p.add_argument(
+        "--timeout",
+        default=None,
+        help="stop watching after this long (e.g. 90s, 10m) and exit 124 if still in flight — "
+        "bound the wait instead of wrapping in timeout(1)",
+    )
+    p.add_argument(
+        "--json",
+        action="store_true",
+        help="print one compact summary object instead of live bars (the status --brief --json "
+        "shape plus outcome/reason)",
+    )
     _add_app_flag(p)
     p.set_defaults(func=cmd_watch)
 

@@ -275,6 +275,90 @@ def test_status_json_is_machine_readable(tmp_path: Path, monkeypatch, capsys):
     assert payload["tasks"][1]["heartbeat_age_s"] > STALE_HEARTBEAT_S
 
 
+def test_status_brief_is_counts_plus_attention_only(tmp_path: Path, monkeypatch, capsys):
+    """``status --brief`` answers the monitor's question — "anything to act on?" —
+    without one line per task: counts by state, plus only the tasks needing
+    attention (here a failed cell and a long-queued one; the healthy lines are
+    the payload bulk on a big sweep and carry no actionable signal)."""
+    import json
+    from unittest.mock import ANY
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import STALE_HEARTBEAT_S, data_root
+
+    store = MemoStore(data_root() / "briefexp")
+    now = time.time()
+    pid = os.getpid()  # a live pid, so reap_dead doesn't settle the records
+    env = {"env": {"host": "worker.test"}}
+    store.records_backend.merge("t-done", {"key": "t-done", "state": "done", "fn": "train"})
+    store.records_backend.merge(
+        "t-live", {"key": "t-live", "state": "running", "fn": "train", "pid": pid, "heartbeat_at": now, **env}
+    )
+    store.records_backend.merge(
+        "t-failed", {"key": "t-failed", "state": "failed", "fn": "train", "error": "RuntimeError: boom"}
+    )
+    store.records_backend.merge(  # queued (no env) far past the staleness window — capacity starvation
+        "t-parked", {"key": "t-parked", "state": "running", "fn": "train", "pid": pid, "heartbeat_at": now - 400}
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="briefexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    payload["attention"].sort(key=lambda t: t["key"])
+    assert payload == {
+        "experiment": "briefexp",
+        "app": "local",
+        "state": "running",
+        "settled": False,
+        "counts": {"done": 1, "running": 1, "failed": 1, "queued": 1},
+        "attention": [
+            {"key": "t-failed", "fn": "train", "state": "failed", "error": "RuntimeError: boom"},
+            {"key": "t-parked", "fn": "train", "state": "running", "queued_s": ANY},
+        ],
+    }
+    assert payload["attention"][1]["queued_s"] > STALE_HEARTBEAT_S
+
+    cmd_status(argparse.Namespace(name="briefexp", app="local", json=False, brief=True))
+    out = capsys.readouterr().out
+    assert "1 done · 1 running · 1 queued · 1 failed" in out  # the counts line, in fixed order
+    assert "t-failed" in out and "t-parked" in out  # the actionable tasks are listed
+    assert "t-done" not in out and "t-live" not in out  # …healthy ones are not
+
+
+def test_watch_timeout_exits_124_with_brief_summary(tmp_path: Path, monkeypatch, capsys):
+    """A bounded ``watch --timeout`` must come back by itself — exit 124 with a
+    compact JSON summary — so a monitor's wait can't hang past its budget."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "watchto")
+    store.records_backend.merge(
+        "t-slow",
+        {
+            "key": "t-slow",
+            "state": "running",
+            "fn": "train",
+            "pid": os.getpid(),  # a live pid, so reap_dead doesn't settle it
+            "env": {"host": "worker.test"},
+            "heartbeat_at": time.time(),
+        },
+    )
+
+    from mini.__main__ import cmd_watch
+
+    with pytest.raises(SystemExit) as ei:
+        cmd_watch(argparse.Namespace(name="watchto", app="local", poll=0.01, timeout="0.1s", json=True))
+    assert ei.value.code == 124
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["outcome"] == "timeout" and "still in flight" in payload["reason"]
+    assert payload["counts"] == {"running": 1} and payload["settled"] is False
+
+
 def test_watch_exit_code_reflects_settle_outcome(tmp_path: Path, monkeypatch, capsys):
     """``watch`` is the wake trigger for scripts/agents (#20): it blocks until the
     run settles and its exit code carries the outcome — 0 iff DONE."""
