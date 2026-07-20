@@ -13,7 +13,7 @@ Characteristics:
 - "I think...", "It seems...": signal confidence, but not to the point of being vague or non-committal. Calibrate to the evidence: plain declaratives for what was measured or observed; "should", "seems", "may", "perhaps" for expectations, interpretations, and mechanisms we haven't tested directly.
 - Varied sentence rhythm.
 - Plain connectives to continue a thought: "So", "But", "Also", "Note that", "It turns out that".
-- Pose the motivating question directly, then answer it: "does zeroing that axis delete red, and only red?"
+- Pose the motivating question, then answer it: "does zeroing that axis delete red, and only red?"
 - Cross-domain analogies and examples to clarify technical concepts.
 - American spelling to match the convention in scientific literature.
 - High readability, with a Flesch-Kincaid grade level of around 10-12.
@@ -75,7 +75,8 @@ Prefer paragraphs for nuanced or complex explanations; use lists for
 summarizing steps, or when clarity would genuinely benefit from structure —
 and use them sparingly.
 
-Use italics for concepts like _red_. Bold and italics for emphasis is quite distracting to read, so save them for exceptional circumstances.
+Use italics for concepts like _red_. Never use bold and italics for emphasis,
+because they are distracting to read. The user will add them if necessary.
 
 Don't hard-wrap a line inside an inline code span or math expression. A wrapped
 span can start the next line with block syntax — a hex code like `#f78` at the
@@ -93,3 +94,5 @@ entirely. Rewrap the surrounding prose so the whole span sits on one line.
 +     hard-wrapped line. Use dedent and f-strings as needed."""
       )
 ```
+
+Multiline strings are also supported by the `@themed(..., alt_text=..., caption=...)` decorator (see `figure-style`).

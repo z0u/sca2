@@ -1,6 +1,6 @@
 ---
 name: report-render
-description: View a report's figures. Read the matplotlib PNGs directly, or render inline/JS figures and the full page in a headless browser (offline, by bundling Marimo assets).
+description: View a report's figures. Read matplotlib or inline/JS figures and the full page in a headless browser (offline, by bundling Marimo assets).
 ---
 
 # Rendering a report to check it
