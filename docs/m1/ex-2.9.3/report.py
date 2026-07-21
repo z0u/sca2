@@ -36,19 +36,18 @@ def _():
     mo.md(r"""
     # Experiment 2.9.3: why anchoring fails — timing, attribution, and a schedule fix
 
-    [Ex-2.9.2](../ex-2.9.2/report.py) split the variance in our ablation scores
-    into two parts and settled one of them. The redistribution part got a fix:
-    fallback control gives the intervention a response we design ahead of time.
-    The other part stayed open. On some seeds the concept never lands cleanly on
-    its axis, and we did not yet know why.
+    [Ex-2.9.2](../ex-2.9.2/report.py) identified two components to the variance
+    in our ablation scores. The redistribution was fixed: fallback control
+    gives the intervention a response we design ahead of time. The other part
+    stayed open: On some seeds the concept never landed cleanly on its axis.
 
-    Our working guess was that the regularizer schedule is **incompatible with
-    some initializations**: some starting weights simply cannot be anchored by
-    this schedule. If that were true, the remedy would be a schedule search per
-    seed or per init, which is expensive and gets worse as models grow.
+    Our guess was that the regularizer schedule is incompatible with some
+    initializations: some starting weights simply cannot be anchored by this
+    schedule. If that were true, the remedy would be a schedule search per seed
+    or per init, which is expensive and gets worse as models grow.
 
-    This experiment tests that guess, and it does not hold up. There are three
-    arms, all built on ex-2.9.1's small color autoencoder.
+    This experiment tests that, and it doesn't hold up. There are three arms,
+    all built on ex-2.9.1's small color autoencoder.
 
     - Trajectories: retrain ex-2.9.2's base arm (the same 32 seeds), recording
       anchor progress, leakage, and reconstruction error at every step. When do
@@ -61,8 +60,7 @@ def _():
     - Schedule sweep: peak LR {0.10, 0.07, 0.05, 0.03} × regularizer anneal
       {on, off}, 32 seeds per cell, trained with the fallback term and scored by
       the `redirect` intervention (ex-2.9.2's recipe, so the score reflects
-      anchoring quality rather than luck in how the model redistributes what it
-      deletes).
+      anchoring quality).
 
     The experiment is [`experiment.py`](./experiment.py):
 
@@ -109,14 +107,15 @@ def _(arm):
     _bad = [r for r in _t if classify(r) != "clean"]
     _cat = [r for r in _bad if classify(r) == "catastrophic"]
     mo.md(f"""
-    {len(arm("trajectories")) + len(arm("attribution")) + len(arm("sweep"))} runs completed.
-    The trajectory arm reproduces ex-2.9.2's base arm bit for bit: {len(_bad)} of {len(_t)} runs
-    end unhealthy. {len(_cat)} of them failed catastrophically, meaning the anchor was lost or
-    reconstruction collapsed, and {len(_bad) - len(_cat)} finished with non-red colors leaking
-    onto the anchored axis. The per-step traces show what the endpoint metrics hide: **every
-    failing run anchored successfully first**, then broke during the high-LR plateau. The
-    attribution arm confirms the failures are not a property of the initialization, and the sweep
-    finds a plain schedule fix: halve the LR peak and keep the anneal.
+    {len(arm("trajectories")) + len(arm("attribution")) + len(arm("sweep"))}
+    runs completed. The trajectory arm reproduces ex-2.9.2's base arm:
+    {len(_bad)} of {len(_t)} runs end unhealthy. {len(_cat)} of them failed
+    catastrophically, meaning the anchor was lost or reconstruction collapsed,
+    and {len(_bad) - len(_cat)} finished with non-red colors leaking onto the
+    anchored axis. The per-step traces show that every failing run anchored
+    successfully first, then broke during the high-LR plateau. The attribution
+    arm confirms the failures are not a property of the initialization, and the
+    sweep finds a plain schedule fix: halve the LR peak and keep the anneal.
     """)
     return
 
@@ -149,19 +148,19 @@ def _(arm, steps, traj):
 
     @themed(
         name="trajectories",
-        alt_text=(
-            "Three charts stacked on a shared step axis from 0 to 1500. Top: anchor progress, the "
-            f"z0 of pure red, for all 32 seeds. Every line, including the {len(_bad)} failures drawn "
-            "in color, climbs from near 0 to about 1 by step 750. After that the gray healthy lines "
-            "hold at 1 while the colored ones diverge. Seeds 22 and 8 dip briefly as the learning "
-            "rate reaches its peak, and both recover on this metric, though seed 22's reconstruction "
-            "does not. Seed 15 breaks away to about 0.65 from step 900, and seed 27 falls to about "
-            "0.4 after step 1100. Middle: leakage for the same runs. Healthy lines settle near 0.05 "
-            "while the failures climb to 0.1 to 0.6 in the same late window. Bottom: the schedule, "
-            "with the learning rate ramping to 0.1 at step 750 and holding, and the regularizer "
-            "weights annealing to zero by step 1425. A shaded band marks the high-LR plateau, where "
-            "every failure occurs."
-        ),
+        alt_text=f"""
+        Three charts stacked on a shared step axis from 0 to 1500. Top: anchor progress, the
+        z0 of pure red, for all 32 seeds. Every line, including the {len(_bad)} failures drawn
+        in color, climbs from near 0 to about 1 by step 750. After that the gray healthy lines
+        hold at 1 while the colored ones diverge. Seeds 22 and 8 dip briefly as the learning
+        rate reaches its peak, and both recover on this metric, though seed 22's reconstruction
+        does not. Seed 15 breaks away to about 0.65 from step 900, and seed 27 falls to about
+        0.4 after step 1100. Middle: leakage for the same runs. Healthy lines settle near 0.05
+        while the failures climb to 0.1 to 0.6 in the same late window. Bottom: the schedule,
+        with the learning rate ramping to 0.1 at step 750 and holding, and the regularizer
+        weights annealing to zero by step 1425. A shaded band marks the high-LR plateau, where
+        every failure occurs.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(3, 1, figsize=(9.5, 7.5), sharex=True, height_ratios=[3, 2, 1.6])
@@ -219,7 +218,7 @@ def _(arm, traj):
     only once the anchor weight has annealed low: by step {max(_drops)} it is
     {float(_w_anchor[min(max(_drops), len(_w_anchor) - 1)]):.3f}, too weak to pull red back.
 
-    So the anchored solution seems to be *metastable* at this learning rate. The regularizers hold
+    So the anchored solution seems to be metastable at this learning rate. The regularizers hold
     it in place while they are on, and the timed anneal removes that hold while the optimizer is
     still hot. Nothing about these seeds stopped them from anchoring; they were unlucky during the
     plateau. If that is right, whether a run fails should follow the randomness of training rather
@@ -255,14 +254,14 @@ def _(arm):
 
     @themed(
         name="attribution",
-        alt_text=(
-            "Heatmap of final leakage over a 16-by-8 grid. Model inits run down the rows (0 through "
-            "13, then the two earlier catastrophic inits 22 and 27), and batch/label streams run "
-            f"across the columns. Most cells are pale, with leak around {np.median(_leak):.2f}. The "
-            f"{int(_fail.sum())} failed cells are marked with crosses and scatter across the grid: no "
-            f"row has more than {int(_fail.sum(1).max())} of 8, and the rows for inits 22 and 27 are "
-            f"entirely clean. The darkest cell is init 1 under stream 1, with leak {_leak.max():.2f}."
-        ),
+        alt_text=f"""
+        Heatmap of final leakage over a 16-by-8 grid. Model inits run down the rows (0 through
+        13, then the two earlier catastrophic inits 22 and 27), and batch/label streams run
+        across the columns. Most cells are pale, with leak around {np.median(_leak):.2f}. The
+        {int(_fail.sum())} failed cells are marked with crosses and scatter across the grid: no
+        row has more than {int(_fail.sum(1).max())} of 8, and the rows for inits 22 and 27 are
+        entirely clean. The darkest cell is init 1 under stream 1, with leak {_leak.max():.2f}.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(6.5, 6), layout="constrained")
@@ -309,7 +308,7 @@ def _(arm):
     more than {max(_by_init.values())} of 8, with mild clustering by stream (stream 6 accounts for
     {_by_stream.get(6, 0)}). So the incompatible-init hypothesis does not hold: the same init
     succeeds or fails depending on which random batches and label draws it sees during the hot
-    phase. What is left is a small interaction that looks like chance.
+    phase.
     """)
     return
 
@@ -320,10 +319,10 @@ def _():
     ## Learning rate versus regularizer anneal
 
     At first the anneal looked responsible, since it removes the hold the anchor
-    term provides. The sweep points elsewhere. Holding the regularizers on to the
+    term provides. But the sweep says otherwise: holding the regularizers on to the
     end (`anneal off`) makes things worse at every peak, while halving the LR
     peak removes the failures entirely. These runs train with the fallback term
-    and are scored by the redirect intervention, following ex-2.9.2.
+    and are scored by the redirect intervention, as in ex-2.9.2.
     """)
     return
 
@@ -337,16 +336,16 @@ def _(sweep_cell):
 
     @themed(
         name="sweep",
-        alt_text=(
-            "Two strip plots stacked over eight conditions: peak learning rates 0.10, 0.07, 0.05, "
-            "and 0.03, each with the regularizer anneal on (blue) or off (gray), 32 seeds per "
-            "condition. Top: redirect selectivity scores. Medians hover around 0.87 to 0.91 "
-            f"everywhere, but 0.03 with anneal sits lower at {np.median(_scores[(0.03, True)]):.2f}, "
-            f"and one blue outlier at 0.10 falls to {_scores[(0.10, True)].min():.2f}. Bottom: final "
-            "leakage on a log scale, with a dashed line at the 0.1 degraded threshold. With the "
-            "anneal on, leak tightens as the peak drops, and at 0.05 no seed crosses the line. With "
-            "the anneal off, every condition has a tail of 4 to 8 seeds above the line."
-        ),
+        alt_text=f"""
+        Two strip plots stacked over eight conditions: peak learning rates 0.10, 0.07, 0.05,
+        and 0.03, each with the regularizer anneal on (blue) or off (gray), 32 seeds per
+        condition. Top: redirect selectivity scores. Medians hover around 0.87 to 0.91
+        everywhere, but 0.03 with anneal sits lower at {np.median(_scores[(0.03, True)]):.2f},
+        and one blue outlier at 0.10 falls to {_scores[(0.10, True)].min():.2f}. Bottom: final
+        leakage on a log scale, with a dashed line at the 0.1 degraded threshold. With the
+        anneal on, leak tightens as the peak drops, and at 0.05 no seed crosses the line. With
+        the anneal off, every condition has a tail of 4 to 8 seeds above the line.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(2, 1, figsize=(9.5, 6.5), sharex=True, height_ratios=[2, 1.4])
@@ -389,32 +388,26 @@ def _(sweep_cell):
     mo.md(f"""
     Three results come out of the sweep.
 
-    First, **peak LR 0.05 with the anneal is the safe cell**: {_nbad(_cool)}/32 unhealthy runs
+    First, peak LR 0.05 with the anneal is the safe cell: {_nbad(_cool)}/32 unhealthy runs
     (0.10 gives {_nbad(_hot)}; 0.07 gives {_nbad(sweep_cell(0.07, True))}), a median score of
     {np.median(_rd(_cool)):.2f}, and reconstruction as good as the hot cell (median
-    {np.median(_rc(_cool)):.6f} versus {np.median(_rc(_hot)):.6f}). The 0.1 peak added risk without
-    a matching gain. Cooler is not always better, though: at 0.03 the model undercooks, with
-    {_nbad(_cold)} leaky runs and a median score of {np.median(_rd(_cold)):.2f}.
+    {np.median(_rc(_cool)):.6f} versus {np.median(_rc(_hot)):.6f}). On the other
+    hand, at 0.03 the model doesn't train properly, with {_nbad(_cold)} leaky
+    runs and a median score of {np.median(_rd(_cold)):.2f}.
 
-    Second, **the anneal is worth keeping**. Holding the regularizers on lowers typical leak a
+    Second, the anneal should be kept. Holding the regularizers on lowers typical leak a
     little, but it widens the tail: {_hold_bad} leaky runs across the four hold cells versus
     {sum(_nbad(sweep_cell(p, True)) for p in PEAK_LRS)} with the anneal, because the live anchor
-    term keeps pulling pinkish *labeled* samples onto the axis in unlucky runs. Holding on also
+    term keeps pulling pinkish-labeled samples onto the axis in unlucky runs. Holding on also
     costs about 10× in reconstruction (median {_hold_rc:.6f} versus
-    {np.median(np.concatenate([_rc(sweep_cell(p, True)) for p in PEAK_LRS])):.6f}) and pushes the
-    redirect's damage to pure red past the ¼ design bound (median
-    {np.median([r["interventions"]["redirect"]["red_pure"] for p in PEAK_LRS for r in sweep_cell(p, False)]):.2f}
-    versus {np.median([r["interventions"]["redirect"]["red_pure"] for p in PEAK_LRS for r in sweep_cell(p, True)]):.2f}
-    with the anneal), giving up the predictable response ex-2.9.2 secured. So the problem is one of
-    timing: annealing while the optimizer is still hot is what leads to the failures.
+    {np.median(np.concatenate([_rc(sweep_cell(p, True)) for p in PEAK_LRS])):.6f}).
 
-    Third, one run is worth singling out. The worst hot-cell score ({_rd(_hot).min():.2f}, seed
-    {min(_hot, key=lambda r: r["interventions"]["redirect"]["score"])["seed"]}) is not an anchoring
-    failure at all. The run anchored cleanly, but the redirect's fixed γ = 1 bias was too small to
-    dominate that seed's pre-norm scale, so "deleted" red passed through almost untouched (damage to
-    pure red {min(r["interventions"]["redirect"]["red_pure"] for r in _hot):.3f}). That is
-    ex-2.9.2's γ-calibration caveat recurring in 1 run of 256. Excluding it, the hot cell's floor is
-    {_hot_ok.min():.2f}. So γ should be calibrated per model.
+    Third, γ should be calibrated per model. The worst hot-cell score ({_rd(_hot).min():.2f}, seed
+    {min(_hot, key=lambda r: r["interventions"]["redirect"]["score"])["seed"]}) anchored
+    cleanly, but the redirect's fixed γ = 1 bias was too small to dominate that seed's
+    pre-norm scale, so "deleted" red passed through almost untouched (damage to
+    pure red {min(r["interventions"]["redirect"]["red_pure"] for r in _hot):.3f}).
+    Excluding it, the hot cell's floor is {_hot_ok.min():.2f}.
     """)
     return
 
@@ -426,10 +419,10 @@ def _(arm):
     _cat = lambda rs: sum(classify(r) == "catastrophic" for r in rs)  # noqa: E731
     _like = [r for r in _fb if r["peak_lr"] == 0.10 and r["anneal"]]
     mo.md(f"""
-    ## Fallback training and catastrophic failures
+    ## The fallback term looks like a stabilizer
 
-    Catastrophic failures, meaning the anchor was lost, reconstruction
-    collapsed, or leak went beyond 0.3, occurred only in the fallback-free
+    Catastrophic failures — meaning the anchor was lost, reconstruction
+    collapsed, or leak went beyond 0.3 — occurred only in the fallback-free
     arms: {_cat(_base)} of {len(_base)} base-config runs, against **{_cat(_fb)}
     of {len(_fb)}** fallback-trained runs across all eight schedules
     ({_cat(_like)} of {len(_like)} in the like-for-like cell, the same schedule
@@ -441,9 +434,9 @@ def _(arm):
     A mechanism seems plausible. The fallback term pins the decoder's output at
     −e₀, which flattens the loss landscape around the redirect direction and may
     remove the direction along which the instability grows. Only the
-    like-for-like cell is a clean comparison, so the schedule confound keeps
-    this suggestive rather than settled. Still, this is now the second experiment
-    in which fallback training produced zero catastrophes.
+    like-for-like cell is a clean comparison, so the schedule confound prevents
+    this from being conclusive. Still, this is now the second experiment in
+    which fallback training produced zero catastrophes.
     """)
     return
 
@@ -454,7 +447,7 @@ def _(arm, sweep_cell):
     _rd = np.array([r["interventions"]["redirect"]["score"] for r in _cool])
     _bad_t = [r for r in arm("trajectories") if classify(r) != "clean"]
     mo.md(f"""
-    ## Takeaways
+    ## Conclusion
 
     The "schedule incompatible with some seeds" hypothesis does not hold up
     under either test. Failures come late: every failing run anchored first and
@@ -479,7 +472,7 @@ def _(arm, sweep_cell):
       the safe cell only bounds what we measured, and the failure mechanism is
       chaotic.
 
-    A tuned schedule addresses the symptom but still requires tuning.
+    A tuned schedule fixes the symptom but still requires tuning.
     [Ex-2.9.4](../ex-2.9.4/report.py) asks whether the weights can instead
     respond to the training signals themselves, which would remove the timing
     coupling altogether.

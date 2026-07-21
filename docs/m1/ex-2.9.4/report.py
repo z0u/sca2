@@ -32,17 +32,15 @@ def _():
     # Experiment 2.9.4: closed-loop regularizer weights
 
     [Ex-2.9.3](../ex-2.9.3/report.py) traced anchoring failures to an
-    instability late in training. The anchored solution is only metastable
+    instability late in training. The anchored solution is metastable
     during the high learning-rate plateau: the regularizers hold it in place,
     and the timed anneal takes that support away while the optimizer is still
-    moving fast. We fixed it statically, by halving the peak learning rate.
-    That works, but it sets the timing by hand. Protection still ends on a
-    clock, and the clock is tuned against a hazard we also set by hand.
+    hot. We fixed it statically, by halving the peak learning rate. That works,
+    but it sets the timing by hand.
 
-    This experiment tries the dynamic alternative: **let the regularizer
-    weights respond to the training signals themselves**, so a weight climbs
-    while its constraint is being violated and settles back down once the
-    constraint is met.
+    This experiment lets the regularizer weights respond to the training
+    signals, so a weight climbs while its constraint is being violated and
+    settles back down once the constraint is met.
 
     The mechanism is a small feedback controller (dual ascent with
     hysteresis[^dual]) acting on the anchor and anti-anchor weights. It reads
@@ -54,7 +52,7 @@ def _():
       average updates on the ~6% of batches that carry a label.
     - The weight λ rises while its average sits above an engage threshold,
       decays (5× faster) once it falls below a release threshold, and holds
-      steady in the deadband between the two. That gap keeps the ordinary
+      steady in the band between the two. That keeps the ordinary
       early transient from winding the weight up, and lets a healthy run's λ
       return to zero.
     - λ is capped at 0.15, close to the dopesheet's constant 0.1 from earlier
@@ -131,21 +129,20 @@ def _(cond, n_cat, rd):
     _s_bad = sorted(r["seed"] for r in _sn if classify(r) == "catastrophic")
     _c_bad = sorted(r["seed"] for r in _cn if classify(r) == "catastrophic")
     _rescued = [s for s in _s_bad if classify(next(r for r in _cn if r["seed"] == s)) == "clean"]
-    mo.md(
-        f"**{sum(1 for _ in (r for r in cond('static') + cond('ctrl')))} + "
-        f"{len(_sn) + len(_cn)} + 128 runs completed** across ten conditions. This is a "
-        f"negative result, and a clear one. Without the fallback term, the feedback loop does "
-        f"what it was designed to do on the seeds the static schedule loses: its {n_cat(_sn)} "
-        f"catastrophic seeds ({', '.join(map(str, _s_bad))}) train cleanly under control "
-        f"(redirect scores "
-        f"{', '.join(f'{rd([next(r for r in _cn if r["seed"] == s)])[0]:.2f}' for s in _rescued)}). "
-        f"But the controller also introduces {n_cat(_cn)} new catastrophic failures on other "
-        f"seeds ({', '.join(map(str, _c_bad))}), so the overall failure rate does not improve. "
-        f"With the fallback term on (the recipe we adopted), no condition has a single "
-        f"catastrophic failure, so there is nothing left for the controller to rescue; and "
-        f"mis-setting its own parameters by less than the learning rate's safe margin brings "
-        f"catastrophes back. So we're keeping the static schedule."
-    )
+    mo.md(f"""
+    **{sum(1 for _ in (r for r in cond("static") + cond("ctrl")))} +
+    {len(_sn) + len(_cn)} + 128 runs completed** across ten conditions. This is a
+    clear negative result. Without the fallback term, the feedback loop does
+    what it was designed to do on the seeds the static schedule loses: its {n_cat(_sn)}
+    catastrophic seeds ({", ".join(map(str, _s_bad))}) train cleanly under control
+    (redirect scores
+    {", ".join(f"{rd([next(r for r in _cn if r['seed'] == s)])[0]:.2f}" for s in _rescued)}).
+    But the controller introduces {n_cat(_cn)} new failures on other
+    seeds ({", ".join(map(str, _c_bad))}), so the overall failure rate does not improve.
+    With the fallback term on (the recipe we adopted), no condition has a single
+    catastrophic failure, so there is nothing left for the controller to rescue.
+    So we will probably keep the static schedule.
+    """)
     return
 
 
@@ -154,15 +151,15 @@ def _():
     mo.md(r"""
     ## The fallback-free test: rescues and new failures
 
-    Ex-2.9.3 showed that catastrophic failures appear in just one setting: no
-    fallback term, peak LR 0.1. That makes it the fair place to test a rescue
+    Ex-2.9.3 showed that catastrophic failures only appear when there's no
+    fallback term and a high LR. That makes it the fair place to test a rescue
     mechanism. The charts below show anchor progress and leakage for all 32
     seeds under each variant.
 
-    Under the static schedule, the failures sit in the anchor panel: the
-    anchor forms, then falls away late in training, with nothing to hold it.
-    Under the controller, the same panel shows the feedback at work, with runs
-    dipping hard in the middle of the plateau and getting pulled back up to 1.
+    The static schedule failures are in the anchor panel: the anchor forms, then
+    falls away late in training. With the controller, the same panel shows the
+    feedback at work, with runs dipping hard in the middle of the plateau and
+    getting pulled back up to 1.
 
     The response has a cost, though, and it doesn't always succeed. The leak
     panel shows runs where a sustained penalty drags pinkish labeled colors
@@ -179,20 +176,20 @@ def _(cond, steps, traj):
 
     @themed(
         name="nofb-trajectories",
-        alt_text=(
-            "Four charts in a two-by-two grid. Rows are the static schedule and the controller, "
-            "both without the fallback term; columns are anchor progress and leakage, 32 seeds "
-            "each, with catastrophic runs drawn in color over gray healthy ones. Top left, static "
-            f"anchor progress: all runs reach 1 by step 750; of the {_ncat['static-nofb']} colored "
-            "runs, one falls away late to about 0.6 while the other keeps its anchor, failing "
-            "instead by reconstruction collapse. Top right, static leak: the colored runs climb to "
-            f"{max(r['leak'] for r in cond('static-nofb')):.2f}. Bottom left, controller anchor "
-            "progress: colored runs dip sharply in the middle of the plateau, one to about minus "
-            "0.25, and the feedback pulls most of them back to 1; one ends near 0.15, not "
-            f"recovered. Bottom right, controller leak: {_ncat['ctrl-nofb']} colored runs blow up, "
-            f"the worst reaching {max(r['leak'] for r in cond('ctrl-nofb')):.2f}, from "
-            "over-anchoring under a sustained maximum penalty."
-        ),
+        alt_text=f"""
+        Four charts in a two-by-two grid. Rows are the static schedule and the controller,
+        both without the fallback term; columns are anchor progress and leakage, 32 seeds
+        each, with catastrophic runs drawn in color over gray healthy ones. Top left, static
+        anchor progress: all runs reach 1 by step 750; of the {_ncat["static-nofb"]} colored
+        runs, one falls away late to about 0.6 while the other keeps its anchor, failing
+        instead by reconstruction collapse. Top right, static leak: the colored runs climb to
+        {max(r["leak"] for r in cond("static-nofb")):.2f}. Bottom left, controller anchor
+        progress: colored runs dip sharply in the middle of the plateau, one to about minus
+        0.25, and the feedback pulls most of them back to 1; one ends near 0.15, not
+        recovered. Bottom right, controller leak: {_ncat["ctrl-nofb"]} colored runs blow up,
+        the worst reaching {max(r["leak"] for r in cond("ctrl-nofb")):.2f}, from
+        over-anchoring under a sustained maximum penalty.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(2, 2, figsize=(9.5, 6.5), sharex=True, sharey="col")
@@ -237,21 +234,21 @@ def _(cond, traj):
     _r27 = next(r for r in cond("static-nofb") if r["seed"] == 27)
     _c27 = next(r for r in _cn if r["seed"] == 27)
     _drop = int(np.flatnonzero(traj(_r27, "z0_red") < 0.7)[-1]) * TRAJ_STRIDE
-    mo.md(
-        f"The weight's own trajectory separates the two outcomes. In the rescues, λ engages while "
-        f"the anchor is forming, then releases once the constraint is met. On seed 27 (the static "
-        f"schedule's worst, still below z₀ = 0.7 at step {_drop}), the controlled run holds z₀ "
-        f"near 1 through the plateau, with λ decaying to {_c27['lam_anchor_end']:.2f}. In the "
-        f"failures the labeled anchor EMA never reaches its target, so λ climbs to the {LAM_CAP} "
-        f"cap and stays there: {_sat_bad} of {len(_bad)} catastrophic runs had mean λ > 0.13, "
-        f"versus {_sat_ok} of {_n_ok} clean ones. This is the sensor problem. The anchor term is "
-        f"measured on noisy labels, and a pinkish color placed off the axis on purpose looks the "
-        f"same, to that measurement, as a red that has drifted off it. On most seeds the average "
-        f"settles below target anyway; on some it can't, and a sustained maximum penalty produces "
-        f"the very over-anchoring (leak {max(r['leak'] for r in _bad):.2f}) and collapse the "
-        f"controller was meant to head off. One run lost its anchor even with its weight pinned at "
-        f"maximum, a reminder that a large penalty on the loss is not the same as a stable optimum."
-    )
+    mo.md(f"""
+    The weight's trajectory separates the two outcomes. In the rescues, λ engages while
+    the anchor is forming, then releases once the constraint is met. On seed 27 (the static
+    schedule's worst, still below z₀ = 0.7 at step {_drop}), the controlled run holds z₀
+    near 1 through the plateau, with λ decaying to {_c27["lam_anchor_end"]:.2f}. In the
+    failures the labeled anchor EMA never reaches its target, so λ climbs to the {LAM_CAP}
+    cap and stays there: {_sat_bad} of {len(_bad)} catastrophic runs had mean λ > 0.13,
+    versus {_sat_ok} of {_n_ok} clean ones.
+
+    This is a problem with the sensor. The anchor term is measured on noisy
+    labels, and a pinkish color placed off the axis on purpose looks the same,
+    to that measurement, as a red that has drifted off it. On most seeds the
+    average settles below target anyway; on some it can't, and overcorrects. One
+    run lost its anchor even with its weight pinned at maximum.
+    """)
     return
 
 
@@ -262,9 +259,7 @@ def _():
 
     The fallback term from ex-2.9.2 turns out to prevent every catastrophic
     failure on its own: none in 448 fallback-trained runs across this
-    experiment and ex-2.9.3, against 7 of 224 without it. Once that term is in
-    place, the feedback loop has nothing left to rescue, and can only add cost
-    and more knobs to tune.
+    experiment and ex-2.9.3, against 7 of 224 without it.
     """)
     return
 
@@ -287,18 +282,18 @@ def _(cond, n_cat, rd):
 
     @themed(
         name="fallback-cells",
-        alt_text=(
-            "Two stacked strip plots over eight fallback-trained conditions: the static schedule "
-            "and the controller at peak LR 0.10 and 0.05, then four controller variants at 0.10 "
-            "with shifted targets (×0.75, ×1.5) and gains (×0.5, ×2). Top: redirect scores, with "
-            f"medians all between {min(np.median(v) for v in _scores.values()):.2f} and "
-            f"{max(np.median(v) for v in _scores.values()):.2f} and a few scattered outliers below "
-            "0.5. Bottom: final leakage on a log scale, with a dashed line at the 0.1 degraded "
-            "threshold and a dotted line at the 0.3 catastrophic threshold; the number of "
-            "catastrophic runs is printed under each condition. The τ×0.75, η×0.5, and η×2 variants "
-            f"show {_ncats['ctrl\nτ×0.75']}, {_ncats['ctrl\nη×0.5']}, and {_ncats['ctrl\nη×2']} "
-            "catastrophic runs with leak reaching 0.4 to 0.8; every static condition shows zero."
-        ),
+        alt_text=f"""
+        Two stacked strip plots over eight fallback-trained conditions: the static schedule
+        and the controller at peak LR 0.10 and 0.05, then four controller variants at 0.10
+        with shifted targets (×0.75, ×1.5) and gains (×0.5, ×2). Top: redirect scores, with
+        medians all between {min(np.median(v) for v in _scores.values()):.2f} and
+        {max(np.median(v) for v in _scores.values()):.2f} and a few scattered outliers below
+        0.5. Bottom: final leakage on a log scale, with a dashed line at the 0.1 degraded
+        threshold and a dotted line at the 0.3 catastrophic threshold; the number of
+        catastrophic runs is printed under each condition. The τ×0.75, η×0.5, and η×2 variants
+        show {_ncats["ctrl\nτ×0.75"]}, {_ncats["ctrl\nη×0.5"]}, and {_ncats["ctrl\nη×2"]}
+        catastrophic runs with leak reaching 0.4 to 0.8; every static condition shows zero.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(2, 1, figsize=(9.5, 6.5), sharex=True, height_ratios=[2, 1.6])
@@ -346,24 +341,21 @@ def _(cond, n_cat, rd):
     _s1, _c1 = cond("static", 0.10), cond("ctrl", 0.10)
     _rc = lambda rs: np.median([r["val_recon"] for r in rs])  # noqa: E731
     _lk = lambda rs: np.median([r["leak"] for r in rs])  # noqa: E731
-    mo.md(
-        f"At the safe peak the two approaches are interchangeable on the score (medians "
-        f"{np.median(rd(_c5)):.2f} for the controller vs {np.median(rd(_s5)):.2f} static; floors "
-        f"{rd(_c5).min():.2f} vs {rd(_s5).min():.2f}). The controller halves the typical leak "
-        f"({_lk(_c5):.3f} vs {_lk(_s5):.3f}), since a steady low-level penalty does keep the axis "
-        f"cleaner on average, but it fattens the tail past the degraded threshold and costs about "
-        f"2–3× in reconstruction ({_rc(_c5):.6f} vs {_rc(_s5):.6f}, both still tiny). At the risky "
-        f"peak the pattern is the same, with {n_cat(_c1) + n_cat(_s1)} catastrophes between the two "
-        f"conditions, thanks to the fallback term.\n\n"
-        f"The sensitivity grid is the clearest part of this. Tightening the targets by 25% "
-        f"(τ×0.75) or doubling the gain (η×2), with the fallback term still on, produces "
-        f"{n_cat(cond('ctrl-tau0.75'))} and {n_cat(cond('ctrl-eta2'))} catastrophic runs "
-        f"respectively, and halving the gain leaves {n_cat(cond('ctrl-eta0.5'))}. Loosening the "
-        f"targets (τ×1.5) is safe ({n_cat(cond('ctrl-tau1.5'))}). Set that against the hazard the "
-        f"controller was meant to replace: the LR peak tolerated a 2× change (0.10 → 0.05) in "
-        f"either direction before anything catastrophic happened, and even then it lost fewer than "
-        f"10% of seeds. The controller trades one well-understood knob for four more sensitive ones."
-    )
+    mo.md(f"""
+    At the safe peak the two approaches are interchangeable on the score (medians
+    {np.median(rd(_c5)):.2f} for the controller vs {np.median(rd(_s5)):.2f} static; floors
+    {rd(_c5).min():.2f} vs {rd(_s5).min():.2f}). The controller halves the typical leak
+    ({_lk(_c5):.3f} vs {_lk(_s5):.3f}), since a steady low-level penalty does keep the axis
+    cleaner on average, but it worsens the tail past the degraded threshold and costs about
+    2–3× in reconstruction ({_rc(_c5):.6f} vs {_rc(_s5):.6f}, both still tiny). At the risky
+    peak the pattern is the same, with {n_cat(_c1) + n_cat(_s1)} catastrophes between the two
+    conditions, thanks to the fallback term.\n\
+    The sensitivity grid is fairly clear: Tightening the targets by 25%
+    (τ×0.75) or doubling the gain (η×2), with the fallback term still on, produces
+    {n_cat(cond("ctrl-tau0.75"))} and {n_cat(cond("ctrl-eta2"))} catastrophic runs
+    respectively, and halving the gain leaves {n_cat(cond("ctrl-eta0.5"))}. Loosening the
+    targets (τ×1.5) is safe ({n_cat(cond("ctrl-tau1.5"))}).
+    """)
     return
 
 
@@ -383,28 +375,14 @@ def _(cond, n_cat):
         ]
     )
     _cat_sens = n_cat(cond("ctrl-tau0.75")) + n_cat(cond("ctrl-eta2")) + n_cat(cond("ctrl-eta0.5"))
-    mo.md(f"""
+    mo.md("""
     ## Lessons
 
-    The idea was a reasonable one: protection on demand instead of on a timer.
-    And the mechanism works as designed. Under feedback, no run ever loses an
-    anchor once it has formed, including the seeds the static schedule loses.
-    It just doesn't make training more robust overall.
-
+    The idea seemed reasonable: protection on demand instead of on a timer.
     The controller's response is fine; the measurement it relies on is the
-    problem. The only training-time signal we have for anchor health is the
-    anchor loss on noisy labels, and that signal can't tell a drifting red
-    apart from a pink that sits off the axis on purpose. On runs where that
-    ambiguity bites, the weight goes to its maximum and stays there, and
-    over-anchoring at the cap does as much damage as the instability it was
-    meant to prevent ({n_cat(cond("ctrl-nofb"))} of 32 fallback-free controlled
-    runs, versus {n_cat(cond("static-nofb"))} under the static schedule).
-
-    Feedback also moved the tuning burden around; it did not make it go away.
-    The controller's targets and gains are harder to set than the learning-rate
-    peak they were meant to insulate us from. Perturbations of ±25–100% produced
-    {_cat_sens} catastrophic runs even with the stabilizing fallback term
-    present, out of {_tot_fb} fallback-trained runs that otherwise had none.
+    problem. The training-time signal for anchor health was the
+    anchor loss on noisy labels, and in this experiment, that signal couldn't tell a drifting red
+    from a pink that should be off-axis.
 
     So the stack we keep is the plain one: the fallback term (which, across two
     experiments, has removed every catastrophic failure), peak LR 0.05, the
