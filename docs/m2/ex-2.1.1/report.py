@@ -35,6 +35,7 @@ with app.setup(hide_code=True):
     from mini.store import project_store
     from mini.vis import figure_html, light_dark, themed
     from sca.data import colors, cube
+    from sca.vis import CUBE_VIEWS, draw_cube_bound, grid_diameter, plot_rgb_cube, project_cube
     from subline.series import Series
     from subline.subline import Subline
 
@@ -209,8 +210,9 @@ def _():
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(4.6, 4.4))
-        cube.draw_rgb_cube(ax, cube.grid(), side="front", s=85)
-        ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
+        # The grid fills its own silhouette, so the hexagon bound would only trace what the
+        # data already draws; `grid_diameter` sizes the dots to tile it exactly.
+        plot_rgb_cube(ax, cube.grid(), diameter=grid_diameter(colors.N_LEVELS), bound=False)
         return fig
 
     mo.Html(_plot())
@@ -234,7 +236,7 @@ def _(holdout, train_pairs):
     # Split the two-panel lattice into two independent figures so they reflow and shrink
     # separately: on a narrow screen the pair stacks instead of shrinking as a block,
     # keeping each panel legible. The panels used to share a y-axis; now that they are
-    # separate figures, an identical figsize and identical data-driven limits give them the
+    # separate figures, an identical figsize and the cube panel's fixed limits give them the
     # same lattice scale — and, since the tight crop is dominated by that shared axes box,
     # the same size — without a shared axis. The lettered tags sit just outside those limits
     # (annotation_clip=False) and are picked up by the crop.
@@ -243,14 +245,13 @@ def _(holdout, train_pairs):
     _train_edges = [p for p in train_pairs if p[0] != p[1]]  # self-pairs are just the vertices
     _named = cube.named()
     # A single front view suffices: the lattice is mostly empty, so nothing hides behind it.
-    _x, _y, _depth = cube.project(_named, "front")
+    # Drawn by hand rather than through `plot_rgb_cube`, because the edges and lettered tags
+    # need the projected coordinates and the per-vertex depth to order themselves.
+    _xy = project_cube(_named)
+    _x, _y = _xy[:, 0], _xy[:, 1]
+    _depth = _named @ CUBE_VIEWS["solid"].toward
     _dmin, _dspan = _depth.min(), _depth.max() - _depth.min()
     _cx, _cy = _x.mean(), _y.mean()
-    # Square limits from the lattice vertices alone — a small margin, no room reserved for the
-    # lettered tags. Identical across panels (same data), so the two figures come out the same
-    # size; the tags draw just past the edge and the tight crop still lands identically.
-    _half = max(_x.max() - _x.min(), _y.max() - _y.min()) / 2 + 0.12
-    _xlim, _ylim = (_cx - _half, _cx + _half), (_cy - _half, _cy + _half)
 
     def _panel(bold, other, examples) -> plt.Figure:
         fig, ax = plt.subplots(figsize=(4.2, 4.4))
@@ -272,7 +273,7 @@ def _(holdout, train_pairs):
             ax.annotate(
                 ch,
                 (_x[i], _y[i]),
-                (_x[i] + np.cos(ang) * 0.12, _y[i] + np.sin(ang) * 0.12),
+                (_x[i] + np.cos(ang) * 0.14, _y[i] + np.sin(ang) * 0.14),
                 ha="center",
                 va="center",
                 fontsize=11,
@@ -295,10 +296,7 @@ def _(holdout, train_pairs):
         _u, _v, _chs = examples
         _letter(_u, _chs[0])
         _letter(_v, _chs[1])
-        cube.style_cube_axes(ax, labels=False)
-        ax.set_facecolor("none")  # drop the panel fill — it only adds clutter here
-        ax.set_xlim(*_xlim)
-        ax.set_ylim(*_ylim)
+        draw_cube_bound(ax)
         return fig
 
     _train_alt = (
