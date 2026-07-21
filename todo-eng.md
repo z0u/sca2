@@ -14,6 +14,21 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Document subline.** Describe subline in a skill: what it is, why we might
+  use it instead of a token heatmap, and how to use it.
+
+- **Document s_2.** Describe surprise-surprise in a skill: what it is, why we
+  might use it instead of surprisal, and how to calculate it. The mean s_2 over
+  a sequence would be analogous to perplexity. It's probably more informative
+  than perplexity alone, since it would capture the _per-token_ difference from
+  what the model anticipated. Note that negative values of s_2 are rare and
+  probably uninformative; they suggest the model finds the token to be
+  unsurprising.
+
+- **GPU determinism.** Configure GPU runs to use deterministic computation when
+  we care about reproducibility (e.g. when we want to refer to a stable
+  measurement from a particular seed).
+
 - **Responsive multi-panel figures in reports (opened 2026-07-16).** The
   ex-2.1.1 two-panel *named-pair lattice* was split into two independent
   `themed` figures wrapped in a `.report-figure-row` (inline-block, reflows to

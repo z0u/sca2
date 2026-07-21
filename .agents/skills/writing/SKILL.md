@@ -30,6 +30,7 @@ Anti-patterns:
 - ~~Excessive use of bold and italic text~~. List items should not be bolded. 1-2 callouts (bold) per page or section; italics only for references & borrowed words, or when it's truly unobvious which phrase should be emphasized (usually the reader can infer without it).
 - ~~Contrastive conclusions~~. Avoid "... is a feature, not a confound", etc. Instead of `A, ~A`, just say `A`.
 - ~~Verdict kickers~~. Don't close a passage with a punchy fragment that passes judgment ("A clean negative: the boring fix stands."). Readers pattern-match these as AI and stop reading. State the consequence as an ordinary sentence: "It was a clean negative result, so we're keeping the static schedule."
+- ~~Committing to unplanned future work~~. Don't state plans we haven't made as if they are settled. "The next experiment will test X", "the anchored runs will use Y as an early warning" — written in the present indicative, these read as established facts, when usually the follow-up isn't scheduled and the property isn't demonstrated. Prefer to say what *this* report shows and stop there. If a follow-up genuinely belongs in the text, mark it as a possibility, not a promise ("this could be tested by..."), and keep the claim to what we actually know. When in doubt, say nothing about what comes next.
 - ~~Evocative headings~~. Headings name what the section contains, not what it means. Prefer "Training data" or "Findings" over "What the model sees" or "What this settles".
 
 ### Register by document type

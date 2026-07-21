@@ -163,14 +163,6 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   concept never fully exists at any single position, and anchoring one there would fight
   the model's schedule. Carry into anchor design. #[D2.1] #ex-2.1.2 #representations
 
-- **s₂ (surprise-surprise) is now a standard metric.** Adopted in ex-2.1.2
-  (`answer_calibration`: mean answer nll/entropy/s₂ per eval set per cell) and it behaved
-  exactly as designed — snaps from ≈ 0.7 (confidently wrong) to ≈ 0 in precisely the
-  conditions that train a form, per-set. Caveats live in the docstring: it measures
-  calibration, not competence (uniform ignorance also scores ≈ 0 — pair with accuracy or
-  raw surprisal), and per-token s₂ is a noisy one-sample draw, so aggregate over many
-  positions. Carry into the anchored runs as the early-warning dial. #metrics #[D2.1]
-
 - **Calibrate the redirect's γ against the model's pre-norm activation scale** instead of
   the fixed γ = 1. Ex-2.9.3 found the fixed value silently no-ops on ~1 run in 250 (the
   bias fails to dominate that seed's pre-norm residual, so "deleted" red passes through
