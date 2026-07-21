@@ -79,7 +79,7 @@ def _():
     which is about where the learned version settled anyway.
 
     For the claim that SCA (the concept-anchoring method this project studies)
-    carries over to language models, this pared-down backbone needs to stay
+    carries over to language models, this pared-down architecture needs to stay
     well-behaved as it scales. So the [experiment](./experiment.py) trains it
     across a grid: three widths (how many numbers are in that state vector)
     crossed with three depths (how many layers), {32, 64, 128} × {4, 8, 12}, with
@@ -114,7 +114,7 @@ def _(loaded):
     )
     mo.md(
         f"""
-    **The backbone scales cleanly.** We score each run by its converged loss: the
+    **The architecture scales cleanly.** We score each run by its converged loss: the
     model's average error at predicting the next character once training has
     settled, measured in *nats per character* (natural-log units, where lower is
     better). That loss never rises as we add layers. At each width, the three
@@ -226,7 +226,7 @@ def _(curves):
 
     Across the whole grid, the simplified nGPT trains flat across depth and keeps
     improving with width, and no cell destabilizes ({_best:.2f} nats/char at the
-    deepest, widest corner). That is what we were hoping for. The backbone that SCA
+    deepest, widest corner). That is what we were hoping for. The architecture that SCA
     will anchor concepts in scales without a depth penalty, so if a later
     experiment runs into trouble, the simplified architecture is unlikely to be the
     reason.

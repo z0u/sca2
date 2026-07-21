@@ -91,7 +91,7 @@ def _():
 
     That report looked into why the models never learn to combine them. In this
     experiment, we keep everything from ex-2.1.1 fixed, including the
-    architecture, the split, and the training recipe of the d64-L4 backbone, and
+    d64-L4 architecture, the split, and the training recipe, and
     add two new kinds of sequence:
 
     - Reverse alias lines (`#f00 = red`). The base grammar never trained

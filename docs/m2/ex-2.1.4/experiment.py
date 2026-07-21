@@ -20,7 +20,7 @@ the name is fully spelled, so the schedule probe becomes a test of holistic
 vs per-channel emission.
 
 Grids v27 and v216 (the memorizable extreme and the solved-at-word-level sweet
-spot), three seeds each, on the frozen d64-L4 backbone. Per cell:
+spot), three seeds each, on the fixed d64-L4 architecture. Per cell:
 
 - **Exact match** two ways: greedy decode (with well-formedness accounting)
   and argmax over teacher-forced candidate names — plus the full candidate
@@ -41,7 +41,7 @@ from __future__ import annotations
 
 from mini import Ctx, Experiment, get_data_dir
 
-# The frozen backbone; the tokenizer is tiny (30 chars) so the whole model is shared.
+# The d64-L4 architecture; the tokenizer is tiny (30 chars) so both grids share one config.
 WIDTH, DEPTH = 64, 4
 SEEDS = [0, 1, 2]
 PEAK_LR = 1e-2
@@ -125,7 +125,7 @@ def prepare_corpus(grid: str, levels: tuple) -> dict:
 
 
 def _make_config(vocab_size: int, seed: int):
-    """The frozen d64-L4 backbone, verbatim from the siblings."""
+    """The d64-L4 config, verbatim from the siblings."""
     from sca.config import (
         DataConfig,
         ModelConfig,
@@ -344,7 +344,7 @@ experiment = Experiment(
     roles={
         # Corpus re-rendering + a 1.9M-char tokenize: plain CPU work.
         "prep": dict(cpu=2, timeout=900),
-        # Same backbone as the siblings, but ~3× their token count per epoch.
+        # Same architecture as the siblings, but ~3× their token count per epoch.
         "train": dict(gpu="L4", timeout=2700),
         # Candidate scoring is the big item: |prompts| × |names| forced sequences.
         "eval": dict(gpu="L4", timeout=1200),

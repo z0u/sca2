@@ -142,7 +142,7 @@ def _():
     falls between grid cells are "open": they never appear in training, since
     there is no name to write on the right-hand side, and we use them only as
     probes of graded generalization. The corpus is {N_EXAMPLES:,} with lines
-    drawn at random. The model architecture is the frozen d64-L4 nGPT cell from
+    drawn at random. The model architecture is the d64-L4 nGPT cell from
     ex-2.1.1, with {len(SEEDS)} seeds per grid.
 
     Here are a few lines from two of the corpora.

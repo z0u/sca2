@@ -9,7 +9,7 @@ toward the sub-module's *normalized* output,
 stack's travel holds O(1) regardless of width.
 
 The milestone leans on this transformer actually scaling — if we want to argue
-SCA carries to LLMs, the backbone has to hold up as it grows. So this experiment
+SCA carries to LLMs, the architecture has to hold up as it grows. So this experiment
 sweeps the model over a width × depth grid (widths {32, 64, 128} × depths
 {4, 8, 12}) and checks that converged loss stays flat: no depth penalty, no
 width-gated instability.

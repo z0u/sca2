@@ -68,7 +68,7 @@ with app.setup(hide_code=True):
         stops = light_dark([0.7, 0.45, 0.12], [0.8, 0.55, 0.28])
         return dict(zip(WIDTHS, plt.cm.viridis(stops), strict=True))
 
-    def pick_backbone(metrics: list[dict]) -> tuple[int, int]:
+    def pick_arch(metrics: list[dict]) -> tuple[int, int]:
         """The smallest cell (by params ∝ width²·depth) that saturates the unseen-pair sets."""
 
         def unseen(w: int, d: int) -> float:
@@ -454,7 +454,7 @@ def _(metrics):
 
 @app.cell(hide_code=True)
 def _(metrics):
-    _w, _d = pick_backbone(metrics)
+    _w, _d = pick_arch(metrics)
     mo.md(rf"""
     ## Watching it answer, character by character
 
@@ -480,7 +480,7 @@ def _(metrics):
 
 @app.cell(hide_code=True)
 def _(metrics):
-    _w, _d = pick_backbone(metrics)
+    _w, _d = pick_arch(metrics)
     (_cell,) = [r for r in metrics if r["label"] == label(_w, _d, SEEDS[0])]
     # named_holdout's index 1 is `lime + black = green`, the example "Why the
     # named answers fail" walks through below; index 0 is a same-set spare.
@@ -611,7 +611,7 @@ def _():
     name, and a trained neighbor seems to overrule.
 
     Below is every held-out pair, prompted exactly as in the
-    `named_holdout` eval set, with one column per seed of the backbone
+    `named_holdout` eval set, with one column per seed of the chosen
     architecture.
     """)
     return
@@ -623,9 +623,9 @@ def _(metrics):
     from sca.compute.model import load_checkpoint
     from sca.data.tokenizer import CharTokenizer
 
-    backbone = pick_backbone(metrics)
+    arch = pick_arch(metrics)
     _store = project_store()
-    _refs = {s: f"{CKPT_REF}/{label(*backbone, s)}" for s in SEEDS}
+    _refs = {s: f"{CKPT_REF}/{label(*arch, s)}" for s in SEEDS}
     _resolved = _store.get_refs(_refs.values())
     _arts = {s: a for s, r in _refs.items() if (a := _resolved[r]) is not None}
     mo.stop(
@@ -640,15 +640,15 @@ def _(metrics):
             _models[_s] = (_model, CharTokenizer(_config.tokenizer))
 
     def complete(seed: int, prompts: list[str]) -> list[str]:
-        """Greedy completions from the backbone cell trained with *seed*."""
+        """Greedy completions from the chosen cell trained with *seed*."""
         model, tok = _models[seed]
         return greedy_completions(model, tok, prompts, 12)
 
-    return backbone, complete
+    return arch, complete
 
 
 @app.cell(hide_code=True)
-def _(backbone, complete, holdout):
+def _(arch, complete, holdout):
     named_holdout_exs = colors.as_named(holdout, seed=2)  # the eval set, verbatim
     _by_seed = {s: complete(s, [ex.prompt for ex in named_holdout_exs]) for s in SEEDS}
 
@@ -663,7 +663,7 @@ def _(backbone, complete, holdout):
         + "</tr>"
         for i, ex in enumerate(named_holdout_exs)
     )
-    _w, _d = backbone
+    _w, _d = arch
     _table = (
         '<div class="report-table-scroll">'
         f'<table class="report-table" style="font-size: 0.9em">{_head}{_rows}</table>'
@@ -730,7 +730,7 @@ def _(train_pairs):
 
 @app.cell(hide_code=True)
 def _(metrics):
-    _, _d = pick_backbone(metrics)
+    _, _d = pick_arch(metrics)
     mo.md(rf"""
     ## Where color is represented
 
@@ -885,7 +885,7 @@ def _(weights):
 
 @app.cell(hide_code=True)
 def _(metrics):
-    _best = pick_backbone(metrics)
+    _best = pick_arch(metrics)
     mo.md(
         f"""
     ## Findings

@@ -7,7 +7,7 @@ walkthrough showed the failure is *close*, though — on ``lime + black`` the
 arithmetic half-corrects the answer but loses to a trained lookup — so the
 diagnosis predicts that small corpus changes tip the computation over the line.
 This experiment tests that prediction with a 2 × 2 factorial over two grammar
-interventions, holding the ex-2.1.1 backbone (d64-L4) and named-pair holdout
+interventions, holding the ex-2.1.1 architecture (d64-L4) and named-pair holdout
 split fixed:
 
 - **rev** — reverse alias lines (``#f00 = red``): supervise the hex → name
@@ -42,7 +42,7 @@ from __future__ import annotations
 
 from mini import Ctx, Experiment, get_data_dir
 
-# The ex-2.1.1 backbone: the smallest cell that saturated the unseen-pair sets.
+# The ex-2.1.1 architecture: the smallest cell that saturated the unseen-pair sets.
 WIDTH, DEPTH = 64, 4
 SEEDS = [0, 1, 2]
 PEAK_LR = 1e-2  # carried over unchanged
@@ -167,7 +167,7 @@ def prepare_eval_sets() -> dict:
 
 
 def _make_config(seed: int):
-    """The frozen d64-L4 backbone; identical to ex-2.1.1's cell."""
+    """The d64-L4 config, identical to ex-2.1.1's cell."""
     from sca.config import (
         DataConfig,
         ModelConfig,
@@ -404,7 +404,7 @@ experiment = Experiment(
     main=main,
     roles={
         "prep": {},  # CPU-only: corpus generation + tokenize
-        # Same cells as ex-2.1.1's backbone: an L4 clears one in a few minutes.
+        # Same cells as ex-2.1.1: an L4 clears one in a few minutes.
         "train": dict(gpu="L4", timeout=1800),
         # Eval now also scores margins and two extra probe suites; still small.
         "eval": dict(gpu="L4", timeout=1200),

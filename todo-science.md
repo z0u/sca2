@@ -101,7 +101,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 - [ ] Narrow the stream to raise superposition pressure — sequenced, not up front.
   d64 is generous for this task, and SCA's value proposition lives where geometry
   is contested. Plan: (1) keep d64-L4 for the first anchored runs, so the only
-  change vs the frozen baselines is the anchor; (2) un-anchored width × depth
+  change vs the existing baselines is the anchor; (2) un-anchored width × depth
   sweep on the chosen testbed (e.g. word-level v216: d16/d32 × L4/L8) to find the
   narrowest cell that still solves the task — the capacity proxies (item above)
   then read as a compression axis; (3) re-run the anchored comparison along the
@@ -133,7 +133,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 - **Multi-token naming keeps the geometry where evidence is dense, and costs
   exactness where it is sparse (ex-2.1.4, 2026-07-19).** Char-level twin of
   ex-2.1.3: corpora identical line for line, every color an opaque four-letter
-  random name (v27 + v216, frozen d64-L4). At v216, held-out exact match is 0.91
+  random name (v27 + v216, d64-L4). At v216, held-out exact match is 0.91
   (word level: 0.99), misses are one grid level off in one channel (59 of 68,
   pooled), zero malformed completions anywhere, and s₂ ≈ 0. At v27 exact match
   collapses to 0/10 on every seed (word level: 0.27) and the model is confidently
@@ -154,7 +154,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   #representations #anchoring
 
 - **Color geometry is inferable from names alone; vocabulary density sets exact match
-  (ex-2.1.3, 2026-07-19).** Trained the un-anchored backbone on a named-only language
+  (ex-2.1.3, 2026-07-19).** Trained the un-anchored d64-L4 transformer on a named-only language
   (one token per color, no hex) over vocabularies of 27/64/216/4096 grid colors. Every
   size learns the latent cube: embeddings hold RGB as a linear subspace (ridge R² up
   to ≈ 0.95), the mix is decodable at the pre-answer position (R² ≈ 0.9 from depth 1–2,
@@ -173,7 +173,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 - **`named_holdout` is unsolved in 4 layers; value → name translation is the blocker
   (ex-2.1.2, 2026-07-15).** The 2×2 factorial (reverse aliases × off-palette
-  named-as-hex, frozen d64-L4) trained both missing ingredients — reverse aliases read
+  named-as-hex, d64-L4) trained both missing ingredients — reverse aliases read
   out at 1.0 in their own frame, and name + name arithmetic generalizes to unseen
   off-palette pairs at ≈ 0.92 — yet `named_holdout` stays at exactly 0 in every cell.
   Decomposition: in the `open` cells ~1/3 of held-out answers are the correct mix value

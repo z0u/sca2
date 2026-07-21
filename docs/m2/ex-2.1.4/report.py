@@ -1013,7 +1013,7 @@ def _():
     Three findings carry into the anchored runs:
 
     - Depth budget. Reading names took up layers 1–3 at `v216`, and the mix only
-      exists from the final block. A d64-L4 backbone leaves one layer of residual
+      exists from the final block. A d64-L4 model leaves one layer of residual
       stream in which the result concept exists at all, thin ground for anchoring
       it "across the stream". This strengthens the queued deep-and-narrow plan (L8
       gives the anchor somewhere to live) and argues for anchoring operand
