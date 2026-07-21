@@ -30,8 +30,10 @@ with app.setup(hide_code=True):
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import figure_html, light_dark, themed
+    from sca.compute.evaluation import ridge_probe, ridge_probe_loo
     from sca.data import named_colors as nc
     from sca.data.colors import N_LEVELS, load_example_sets, to_hex
+    from sca.vis import plot_rgb_cube
 
     use_publisher(report_bundle(__file__))
 
@@ -521,7 +523,8 @@ def _(metrics):
     low. `v27` is coarse-grained, with few names and big gaps, so any leftover
     imprecision costs the top-1 answer; `v4096` asks for neighbor-level
     precision; and `v216` seems to match the model's achievable precision to its
-    grid spacing.
+    grid spacing. The embedding geometry below puts a number on that last
+    phrase, and it turns out "achievable precision" is not one fixed quantity.
     """)
     return
 
@@ -540,8 +543,52 @@ def _():
     measures how true that is, and a PCA projection (principal component
     analysis, which finds the few directions along which the vectors vary most)
     gives an unsupervised look at the table's dominant structure.
+
+    We'll look twice: first with PCA, which is unsupervised and so answers "what
+    is this table mostly doing?", then with the probe's own weights, which
+    answer the narrower question.
     """)
     return
+
+
+@app.cell(hide_code=True)
+def _(arrays):
+    def _geometry(g: str, s: int) -> dict:
+        """Where a grid's color tokens sit, read through a probe rather than through variance."""
+        emb, rgb = arrays[f"{g}-s{s}/embeddings"], VOCAB_RGB[g]
+        centered = emb - emb.mean(0)
+        # Leave-one-out, so no token helps place itself and there is no split to draw:
+        # a vocabulary of 27 is small enough that which fold a token lands in would
+        # otherwise move the answer.
+        pred = ridge_probe_loo(emb, rgb)
+        ss_res = ((pred - rgb) ** 2).sum(0) / ((rgb - rgb.mean(0)) ** 2).sum(0)
+        # How much of the table's variation the probe's 3-d read-out subspace holds, against
+        # the most any three directions could. PCA can only find the cube when this is near
+        # 1, whatever the probe says. Descriptive rather than predictive — it asks where the
+        # full table's variance sits, so it uses the full fit.
+        w, *_ = ridge_probe(emb, rgb, emb, rgb)
+        q, _ = np.linalg.qr(w)
+        top3 = (np.linalg.svd(centered, compute_uv=False)[:3] ** 2).sum()
+        # R² is scale-free, which hides whether the leftover error is small *for this grid*.
+        # Measuring it in grid cells asks that directly: under 1 cell means the nearest name
+        # is usually still the right one.
+        err = np.linalg.norm(pred - rgb, axis=1).mean()
+        cell = float(np.mean(np.diff(nc.GRIDS[g]))) / (N_LEVELS - 1)
+        return {
+            "r2": float((1 - ss_res).mean()),
+            "pred": pred,
+            "share": float(((centered @ q) ** 2).sum() / top3),
+            "err_rgb": float(err),
+            "err_cells": float(err / cell),
+        }
+
+    geometry = {(g, s): _geometry(g, s) for g in GRID_NAMES for s in SEEDS}
+
+    def geom(g: str, key: str) -> float:
+        """One grid's geometry number, averaged over seeds."""
+        return float(np.mean([geometry[(g, s)][key] for s in SEEDS]))
+
+    return geom, geometry
 
 
 @app.cell(hide_code=True)
@@ -558,12 +605,10 @@ def _(arrays, metrics):
         """,
         caption="""
             The embedding table, projected onto its own first two principal components
-            (seed 0), with each token drawn in the color it names. No axis means
-            anything on its own; what matters is whether nearby points carry nearby
-            colors. By `v4096` the leading components form a recognizable hue wheel. The
-            number on each panel is the ridge-probe R² from the full 64-d embedding to
-            RGB (mean over seeds), the quantitative version of the question "is this a
-            color cube?".
+            (seed 0), with each token drawn in the color it names. Only `v4096` shows the
+            hue wheel we thought we might find. The percentage is how much of the table's
+            variance its leading *three* components hold — the most any three directions
+            could — of which the panel draws the leading two.
         """,
     )
     def _plot() -> plt.Figure:
@@ -576,8 +621,8 @@ def _(arrays, metrics):
             z /= np.abs(z).max() + 1e-9
             n = len(emb)
             ax.scatter(z[:, 0], z[:, 1], c=VOCAB_RGB[g], s=float(np.clip(6_000 / n, 4, 50)), lw=0)
-            r2 = np.mean([cell_of(metrics, g, s)["emb_r2"] for s in SEEDS])
-            ax.set_title(f"{g}   (R² {r2:.2f})", fontsize=10)
+            evr3 = np.mean([cell_of(metrics, g, s)["emb_evr3"] for s in SEEDS])
+            ax.set_title(f"{g}   (top 3: {evr3:.0%})", fontsize=10)
             ax.set_aspect("equal")
             ax.set_xlim(-1.1, 1.1)
             ax.set_ylim(-1.1, 1.1)
@@ -589,30 +634,122 @@ def _(arrays, metrics):
 
 
 @app.cell(hide_code=True)
-def _(metrics):
-    _r2 = {g: float(np.mean([cell_of(metrics, g, s)["emb_r2"] for s in SEEDS])) for g in GRID_NAMES}
-    _evr = {g: float(np.mean([cell_of(metrics, g, s)["emb_evr3"] for s in SEEDS])) for g in GRID_NAMES}
+def _(geom):
     mo.md(rf"""
-    The probe's held-out R² rises with grid size ({_r2["v27"]:.2f},
-    {_r2["v64"]:.2f}, {_r2["v216"]:.2f}, {_r2["v4096"]:.2f}), so from `v64` up,
-    RGB is close to a linear function of the embedding. The `v27` number is fit
-    on only 13 points in 64 dimensions, so we read it as present but hard to
-    certify.
-
-    H4 needs one refinement, though. The hypothesis expected the embedding table
-    itself to turn low-dimensional, and it doesn't. The top three principal
-    components carry only {_evr["v27"]:.0%} of the variance at `v27`, falling to
-    {_evr["v4096"]:.0%} at `v4096`, which is why the PCA panels above look
-    organized without looking like a flat cube. (At `v4096` the leading
-    components pick out hue, laid out as a wheel, and the rest of the value
-    information sits in later components.) The cube is in there as a subspace the
-    probe reads off cleanly, yet most of the embedding variance is doing
-    something else.
-
+    The PCA plots give the impression the cube arrives late — somewhere between
+    `v216` and `v4096` — but it doesn't. PCA keeps the directions along which the
+    table varies most, and apparently color is not what the table mostly does.
     These embeddings are also the tied language model head for predicting the
     next token, so perhaps two adjacent colors need well-separated directions
     for the softmax to keep them apart, even when their color values are nearly
     identical.
+
+    A cube needs three directions. A couple of natural ways to pick them are:
+
+    - PCA: Pick the three directions the table varies most along. The amount of
+      the total variance captured by those directions is shown as the
+      percentages on the panels above.
+    - Probe: Fit to predict RGB and indifferent to how much the table varies
+      along them.
+
+    How well do they agree in this case? If representing color is what the table
+    mostly does, the probe should be reading close to the top-variance
+    directions and the two should capture similar amounts. They don't, at least
+    not until the vocabulary gets large. The probe's directions hold
+    {geom("v27", "share"):.0%} as much variance as the best three at `v27` and
+    {geom("v64", "share"):.0%} at `v64`, then {geom("v216", "share"):.0%} at
+    `v216` and {geom("v4096", "share"):.0%} at `v4096`. So it is only at the
+    dense end that the color directions and the high-variance directions are
+    nearly the same thing — and only there that PCA stumbles onto the cube.
+
+    Let's see what the probe found. Its weights are a map from the
+    64-dimensional embedding onto RGB, so we can use it to decode the color
+    tokens. If the table holds a color cube, the decoded values should be
+    similar to the source data. To keep this from being a statement about the
+    probe's memory rather than the model's geometry, every token is placed by a
+    probe fit on every *other* token in the vocabulary.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(geom, geometry):
+    @themed(
+        name="embedding-probe-cube",
+        alt_text="""
+            Four hexagonal panels, one per vocabulary grid, showing where the probe places
+            each color token in the RGB cube, viewed down the cube's grey diagonal so hue
+            runs around the panel and the six chromatic corners sit on the rim. Filled dots
+            are where a token landed, open rings its true position, joined by a short stub.
+            At v27 many dots sit well away from their rings; v64 is closer; v216 has dots
+            almost on top of their rings, forming an even hue wheel; v4096 is a dense wheel
+            shown without rings.
+        """,
+        caption="""
+            The same embedding tables (seed 0), now read through the probe instead of
+            through variance: each token is placed at the RGB the probe predicts for it,
+            and drawn in the color it actually names. Open rings mark where a token should
+            sit, so the displacement (lines) show the error. `R²` is the same fit as a
+            single number, averaged over seeds. Rings are left off at `v4096`, where 4096
+            of them would bury the colors.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, len(GRID_NAMES), figsize=(11.5, 3.1))
+        for ax, g in zip(axes, GRID_NAMES, strict=True):
+            rgb = VOCAB_RGB[g]
+            n = len(rgb)
+            plot_rgb_cube(
+                ax,
+                geometry[(g, 0)]["pred"],
+                rgb,
+                view="wheel",
+                truth=rgb if n <= 216 else None,
+                s=float(np.clip(6_000 / n, 3, 24)),
+            )
+            ax.set_title(f"{g}   (R² {geom(g, 'r2'):.2f})", fontsize=10)
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(geom, metrics):
+    def _cell_mean(g: str, key: str) -> float:
+        return float(np.mean([cell_of(metrics, g, s)[key] for s in SEEDS]))
+
+    _evr = {g: _cell_mean(g, "emb_evr3") for g in GRID_NAMES}
+    mo.md(rf"""
+    So the cube geometry is in the embedding table, even in the smallest model.
+    `v216` is the clearest case: held-out tokens land almost exactly on their
+    own lattice sites, a hue wheel with greys in the middle, from a table whose
+    principal components showed only a smear. `v64` is recognizably the same
+    shape with visible slop, and even `v27` has most of its colors in the right
+    neighborhood.
+
+    Probe R² quantifies how well it fit: {geom("v27", "r2"):.2f},
+    {geom("v64", "r2"):.2f}, {geom("v216", "r2"):.2f}, {geom("v4096", "r2"):.2f}
+    across the four grids.[^folds] From `v64` up, RGB is close to a linear
+    function of the embedding.
+
+    The displacements are better read as a fraction of cell size. Probe-decoded
+    tokens sit {geom("v27", "err_cells"):.2f} cells from where they belong at
+    `v27`, {geom("v64", "err_cells"):.2f} at `v64` and
+    {geom("v216", "err_cells"):.2f} at `v216`, so the nearest name to where a
+    token lands is usually still its own name.
+
+    H4 expected the embedding table itself to turn low-dimensional, and the PCA
+    says it doesn't: even the best three directions hold only {_evr["v27"]:.0%}
+    of the variance at `v27`, and that falls to {_evr["v4096"]:.0%} at `v4096`.
+    The cube is in there as a subspace the probe can read, but most of the
+    embedding variance is doing something else.
+
+    [^folds]: Probes fit per-color with leave-one-out, which matters most at the
+    small grids. A single half/half split leaves `v27`'s probe fitting a 64→3
+    map from 13 points, and scores it {_cell_mean("v27", "emb_r2"):.2f} against
+    {geom("v27", "r2"):.2f} here; `v4096` is unmoved either way
+    ({_cell_mean("v4096", "emb_r2"):.2f} against {geom("v4096", "r2"):.2f}).
     """)
     return
 
