@@ -41,6 +41,7 @@ figure.report-figure > figcaption {
   font-size: 0.9em;
   font-style: italic;
   opacity: 0.75;
+  text-wrap: balance;
 }
 
 /* Colour swatch: a small square tinted via the `--sw` custom property, so each
