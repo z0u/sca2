@@ -750,13 +750,18 @@ def _():
 
     [^unstable]: The retrained `control` gives the same *kind* of wrong answer as
     ex-2.1.1's d64-L4-s0, but not always the same one (this seed now says *gray*
-    rather than *teal* for this pair). So which neighbor wins is unstable run to
-    run, even at a fixed seed.
+    rather than *teal* for this pair). The training code is bit-for-bit
+    deterministic on CPU at a fixed seed, so this is not an unseeded RNG in our
+    code: it is GPU floating-point non-associativity — reductions such as the
+    tied embedding's scatter-add gradient sum in a hardware-dependent order, and
+    we set no XLA determinism flag (the one in `sca/__init__.py` is CPU-only).
+    That only surfaces as a *changed answer* because this prompt is a knife-edge:
+    the true name loses by ~10 nats and the winner is decided by a small gap
+    among wrong neighbors, so a bit-level perturbation is enough to flip it. The
+    instability is a symptom of the underdetermination this section is about, not
+    a separate defect.
     """)
     return
-
-
-# TODO: What's with the instability? That seems sus; I'd like to understand what happened.
 
 
 @app.cell(hide_code=True)
