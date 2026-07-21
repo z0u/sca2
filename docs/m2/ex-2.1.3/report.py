@@ -86,47 +86,28 @@ with app.setup(hide_code=True):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Ex 2.1.3: names all the way down
+    # Ex 2.1.3: named colors only
 
-    Every experiment so far has taught the model colors two ways at once: as
-    names (`red`) and as hex codes (`#f00`), with alias lines tying the two
-    together. The hex form does the model a favor. It spells a color out one
-    channel at a time, so the geometry of color space is legible right there in
-    the text. And [ex-2.1.2](../ex-2.1.2/) found that the models lean on that
-    hard: name-plus-name arithmetic works as long as the answer can be written
-    in hex, and the one step that never gets trained is the translation from a
-    value back to a name.
+    Every experiment so far has taught the model colors two ways: as names
+    (`red`) and as hex codes (`#f00`), with alias lines tying the two together.
+    The hex form spells a color one channel at a time, so the geometry of color
+    space is legible in the text.
 
-    That suggests a control worth running: take the hex away entirely. In this
-    experiment's language, a color is a single opaque token, and every sentence
-    is a mixing equation between named colors whose mix is also named. No
-    aliases, no digits, no characters. Nothing in the token stream says that
-    colors live on a 3D grid, that `purple` sits midway between `red` and
-    `blue`, or that colors are values at all. The only structure left is the
-    co-occurrence statistics of the mixing table: which colors show up together,
-    and how often.
+    In this experiment's language, each color is a single opaque token, and
+    every sentence is a mixing equation between named colors whose mix is also
+    named. Nothing about the tokens says that colors live on a 3D grid, that
+    `purple` sits midway between `red` and `blue`, or that colors are values at
+    all. The only structure left is the co-occurrence statistics of the mixing
+    table.
 
-    So the question, from the [science todo](https://github.com/z0u/sca2/blob/main/todo-science.md),
-    is whether the model can infer the color-space geometry from that alone. The
-    task is a matrix-completion problem[^mc] dressed up as language modeling. The
-    mixing table is a large symmetric grid whose entries follow one small hidden
-    rule: each color is a point in a 3D cube, and mixing is the channel-wise
-    mean. A model that discovers the rule can fill in cells of the table it has
-    never seen; a model that memorizes the table cell by cell cannot. Held-out
-    pairs tell the two apart.
+    The main question is whether the model can infer the color-space geometry
+    from that alone. A model that discovers it should be able to fill in cells
+    of the table it has never seen.
 
-    There is a second, softer question. Many operand pairs mix to a color that
-    has no name in the vocabulary, so an exact answer is impossible there. A
-    model that holds the geometry should still guess a nearby name. Measuring how
-    close the guesses land gives a graded score where exact-match accuracy would
-    only record a miss, and that graded score is the one that matters for the
-    anchored experiments to come. An anchor needs the model's representation to
-    be organized by geometry, whether or not the top guess comes out right.
-
-    [^mc]: Matrix completion is the problem of filling in the missing entries of
-        a partly observed table when the full table has some simple underlying
-        structure. A streaming service predicting the ratings you haven't given
-        from the ones you have is the same shape of problem.
+    Many operand pairs mix to a color that has no name in the vocabulary, so an
+    exact answer is impossible there. A model that holds the geometry should
+    still guess a nearby name. Measuring how close the guesses land gives a
+    graded score where exact-match accuracy would only record a miss.
     """)
     return
 
@@ -136,14 +117,13 @@ def _():
     mo.md(rf"""
     ## The language and a vocabulary-size sweep
 
-    A vocabulary here is a sub-grid of the 16-level RGB cube:
-    pick a set of levels, then give a name to every point of levels³. We sweep
-    four such grids. The 3-level grid is the familiar 27-color palette from the
-    base language, names and all. The denser grids use synthetic names that
-    encode the value (`c05f` is the color `#05f`), which helps us read through
-    failures later on. Each name is still a single token, so the model sees an
-    opaque id and has to learn what it means from usage, the same way it would
-    for `red`.
+    A vocabulary here is a sub-grid of the 16-level RGB cube: pick a set of
+    levels, then give a name to every point on that sub-grid. We sweep four such
+    grids. The 3-level grid is the familiar 27-color palette from the base
+    language, with proper names. The denser grids use synthetic names that encode
+    the value (`c05f` is the color `#05f`), which helps us read through failures
+    later on. Each name is still a single token, so the model sees an opaque id
+    and has to learn what it means from usage.
 
     | grid | levels per channel | colors | example |
     |------|--------------------|-------:|---------|
@@ -154,14 +134,14 @@ def _():
 
     Every training line reads `a + b = mix(a, b)`, six tokens including the
     newline, with both operands and the mix drawn from the vocabulary. Mixing is
-    the same channel-wise round-half-up mean we have used throughout. A pair
-    whose mix lands on the vocabulary is *closed*; {HOLDOUT_FRAC:.0%} of the
+    the same channel-wise round-half-up mean used in earlier experiments. A pair
+    whose mix lands on the vocabulary is "closed"; {HOLDOUT_FRAC:.0%} of the
     distinct closed pairs are held out of training entirely. Pairs whose mix
-    falls off the vocabulary are *open*: they never appear in training, since
+    falls between grid cells are "open": they never appear in training, since
     there is no name to write on the right-hand side, and we use them only as
-    probes of graded generalization. The corpus is {N_EXAMPLES:,} lines drawn
-    independently at random from the train-side closed pairs. The backbone is the
-    frozen d64-L4 nGPT cell from ex-2.1.1, with {len(SEEDS)} seeds per grid.
+    probes of graded generalization. The corpus is {N_EXAMPLES:,} with lines
+    drawn at random. The model architecture is the frozen d64-L4 nGPT cell from
+    ex-2.1.1, with {len(SEEDS)} seeds per grid.
 
     Here are a few lines from two of the corpora.
     """)
@@ -183,75 +163,57 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    The sweep moves two things at once, on purpose. A denser grid means more
-    colors to name, which is a harder vocabulary, but it also means many more
-    closed pairs constraining each color, which is richer evidence about how
-    colors relate. At the far end, the full 16-level grid has 4096 colors and
-    8.4 million distinct closed pairs, of which a 100k-line corpus can visit only
-    about 1%. There, memorizing the table stops being an option, and the model
-    either finds the rule or fails. The small grids sit at the opposite extreme:
-    49 distinct closed pairs at `v27`, so the table is easy to memorize, and the
+    A denser grid means more colors to name, which is a harder vocabulary, but
+    it also means many more closed pairs constraining each color, which is
+    richer evidence about how colors relate. At the far end, the full 16-level
+    grid has 4096 colors and 8.4 million distinct closed pairs, of which a
+    100k-line corpus can visit only about 1%. The smallest grid is tiny: 49
+    distinct closed pairs at `v27`, so the table is easy to memorize, and the
     held-out fifth of it asks the model to infer answers from very little
     evidence.
 
-    ## What we measure
+    ## Measurements
 
-    Answers are single tokens, so one forward pass per prompt gives us the whole
-    picture. From the next-token distribution at the `=` position we read off
-    several numbers. There is exact-match accuracy, and the cross-entropy[^xent]
-    of the true answer on closed pairs, where a true answer exists. There is the
-    RGB distance from the model's highest-probability color to the true mix, on
-    any pair, which is the graded score. And there are two reference distances
-    per prompt to compare against: the *floor* (the distance from the true mix to
-    the nearest vocabulary color, which is zero for closed pairs) and *chance*
-    (the mean distance over the whole vocabulary, what a guesser with no
-    knowledge would score on average).
+    From the next-token distribution at the `=` position we compute exact-match
+    accuracy, and the cross-entropy of the true answer on closed pairs
+    (where a single answer exists).
 
-    Then two geometry probes. A ridge probe[^ridge] from the color-token
-    embeddings to RGB asks whether the embedding table itself turned into a color
-    cube. The second probe works on the residual stream (the running vector each
-    token carries through the layers) at the pre-answer position: per-layer
-    probes to the mix's RGB ask whether the answer gets computed in value space
-    on the way out, the way it does in the hex-trained models.
+    For all pairs (including open pairs), we also find the graded score as the
+    RGB distance from the model's highest-probability color to the true mix.
+    There are two reference distances per prompt to compare against: the *floor*
+    (the distance from the true mix to the nearest vocabulary color, which is
+    zero for closed pairs) and *chance* (the mean distance over the whole
+    vocabulary, what a guesser with no knowledge would score on average).
 
-    [^xent]: Cross-entropy here measures how much probability the model placed on
-        the correct token. Lower is better, and zero would mean full confidence
-        in the right answer.
-
-    [^ridge]: A ridge probe is a linear regression with a mild penalty on large
-        weights, fit here to predict RGB from an embedding vector. When it fits
-        well, the target is close to a linear readout of the input. We report the
-        fit as R², the fraction of variance explained, where 1.0 is perfect.
+    We also fit probes on the residual stream to inspect the shape of the
+    latent embeddings.
 
     ## Hypotheses
 
-    Written down before looking at any results.
+    Written before looking at any results.
 
     **H1.** Seen pairs are answered almost perfectly on every grid; the corpus
     gives each seen pair many effective repetitions, even at `v4096`.
 
     **H2.** Held-out accuracy rises with grid size. `v27` stays near zero, since
-    39 training pairs constrain 27 colors only weakly, echoing the base
-    language's unsolved `named_holdout` (there the sticking point was the missing
-    translation step; here it would be a shortage of evidence). At the other end,
+    39 training pairs constrain 27 colors only weakly. At the other end,
     `v4096` can barely memorize even its seen pairs, so if it learns them at all
     it must be generalizing, and its held-out accuracy should come close to its
-    seen accuracy. The interesting territory is the middle.
+    seen accuracy.
 
     **H3.** Where held-out accuracy is high, guessed colors on open pairs land
     near the floor distance, well below chance; where it is low, guesses sit
     at or near chance.
 
-    **H4.** Embedding geometry tracks behavior. The embedding-to-RGB probe's R²
-    and the low-dimensionality of the embedding table (top-3 explained variance)
-    rise with grid size, and a PCA of the embeddings shows the color cube where,
-    and only where, held-out performance is good.
+    **H4.** The embedding-to-RGB probe's R² and the low-dimensionality of the
+    embedding table (top-3 explained variance) rise with grid size, and a PCA of
+    the embeddings shows the color cube where, and only where, held-out
+    performance is good.
 
     **H5.** Less certain, so a watch item: at `v4096` the fixed 100-epoch budget
-    may not be enough for the rule to settle. Late, sudden generalization
-    (grokking, as it is known for small algorithmic tasks) is a documented
-    failure mode. If that happens, seen accuracy will be middling too, and the
-    run would be telling us "undertrained" rather than "impossible".
+    may not be enough for the rule to settle. If that happens, seen accuracy
+    will be middling too, and the run would be telling us "undertrained" rather
+    than "impossible".
     """)
     return
 
@@ -332,14 +294,10 @@ def _():
     mo.md(r"""
     ## Training
 
-    All twelve cells train stably, and the loss curves below are unremarkable,
-    which is worth a sentence in itself. Each grid settles within the 100-epoch
+    All twelve cells train stably. Each grid settles within the 100-epoch
     budget, `v4096` included, whose curve is flat over its last twenty epochs. So
     the results that follow reflect what this budget and schedule produce at
-    convergence, rather than a run caught partway through its descent. (Whether a
-    longer or differently shaped schedule would keep improving `v4096` is a
-    follow-up question this run can't settle; late, sudden generalization on
-    small algorithmic tasks is well documented.)
+    convergence.
     """)
     return
 
@@ -381,9 +339,7 @@ def _():
     mo.md(r"""
     ## Exact-match accuracy
 
-    The first question has a yes-or-no answer: can the model answer equations it
-    has never seen? Seen pairs are the sanity check, and held-out pairs are the
-    real test.
+    Can the model answer equations it has never seen?
     """)
     return
 
@@ -401,13 +357,12 @@ def _(metrics):
             accuracy is 1.0 everywhere except v4096 (0.85). Held-out accuracy is
             non-monotonic: 0.27, 0.59, essentially 1.0 at v216, then 0.65 at v4096.
         """,
-        caption="""
-            Exact-match accuracy by grid. The bar is the mean over three seeds, and the
-            dots are the individual seeds. Seen pairs show whether training worked at
-            all; held-out pairs show generalization, since the only way to answer them
-            is to infer the hidden geometry, their equations never having appeared in
-            training.
-        """,
+        caption=mo.md("""
+            Exact-match accuracy by grid. Bars show the mean over three seeds;
+            dots are individual seeds. **Left:** Seen pairs show whether
+            training worked at all; **Right:** held-out pairs show
+            generalization.
+        """).text,
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, len(_sets), figsize=(8.4, 3.2), sharey=True)
@@ -417,7 +372,7 @@ def _(metrics):
             per_seed = np.array([[cell_of(metrics, g, s)["sets"][es]["accuracy"] for s in SEEDS] for g in GRID_NAMES])
             ax.bar(xs, per_seed.mean(axis=1), color=[shades[g] for g in GRID_NAMES], width=0.62)
             for i in range(len(GRID_NAMES)):
-                ax.plot([xs[i]] * len(SEEDS), per_seed[i], "o", color="#0008", ms=3, zorder=3)
+                ax.plot([xs[i]] * len(SEEDS), per_seed[i], "o", color=light_dark("#000", "#fff"), ms=3, zorder=3)
             ax.set(title=es.replace("_", " "), ylim=(-0.03, 1.03))
             ax.set_xticks(xs, GRID_NAMES)
             ax.grid(alpha=0.3, axis="y")
@@ -464,24 +419,19 @@ def _(arrays, evals, metrics):
     {_acc("v216", "named_holdout"):.2f} at `v216`, near enough to solved, and
     back down to {_acc("v4096", "named_holdout"):.2f} at `v4096`.
 
-    Two of these numbers are worth a closer look before we get to the graded
-    metrics.
-
     The `v27` result is already a shift from the base language. There,
     `named_holdout` sat at zero through every intervention ex-2.1.2 tried. Here,
-    with the same 27 colors and the same ten held-out pairs, but one-token names
-    and no hex anywhere, the model gets a few of them right. So that earlier zero
-    wasn't evidence that geometry can't be inferred from names. Take the
-    translation step away, and a weak form of the inference shows up right away.
+    the same expressions but with one-token names and no hex, the model gets a
+    few of them right. So that earlier zero didn't mean the geometry can't be
+    inferred from names.
 
     The `v4096` misses are not scattered, either. Pooled over seeds, {_m4096[1]}
     of {_m4096[0]} held-out misses differ from the true mix in a single RGB
     channel, and {_m4096[2]} of those are off by one grid level (`v64`:
-    {_m64[2]}/{_m64[0]}; `v216`: {_m216[2]}/{_m216[0]}). The model runs the right
-    computation and lands in the house next door. We checked whether these misses
-    pile up on rounding cases, meaning channels where the operand sum is odd so
-    the mean has to round, and they don't: about half of the one-channel misses
-    are rounding cases, which matches the ~50% base rate.
+    {_m64[2]}/{_m64[0]}; `v216`: {_m216[2]}/{_m216[0]}). We checked whether
+    these misses are more likely on rounding cases, meaning channels where the
+    operand sum is odd so the mean has to round, and they don't: about half of
+    the one-channel misses are rounding cases, which matches chance.
     """)
     return
 
@@ -489,23 +439,18 @@ def _(arrays, evals, metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## How close the guesses land
+    ## Closeness
 
-    Exact match is a harsh score for a task that is really about geometry, so
-    let's switch to the graded view. For every prompt we take the model's
-    highest-probability color and measure its RGB distance to the true mix.
-    Plotting the cumulative distribution of that distance puts a grid's whole
-    behavior on one curve: for each distance x, the curve shows the fraction of
-    prompts that landed within x of the answer. The two reference distances say
-    what to compare against: the *floor*, which is the nearest name that exists
-    and so the best any answer could do, and *chance*, the average distance over
-    the vocabulary.
+    Let's switch to the graded view. For every prompt we take the model's
+    highest-probability color and measure its RGB distance to the true mix, and
+    plot the cumulative distribution. For each distance x, the curve shows the
+    fraction of prompts that landed within x of the answer.
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(evals, arrays, metrics):
+def _(arrays, evals, metrics):
     _panels = [("named_holdout", "held-out pairs"), ("open", "open pairs")]
 
     @themed(
@@ -563,22 +508,20 @@ def _(metrics):
         return float(np.mean([cell_of(metrics, g, s)["sets"][es][key] for s in SEEDS]))
 
     mo.md(rf"""
-    Here the sweep's story gets simple. Guesses land near the floor everywhere.
+    Guesses are close (i.e. near the floor) everywhere.
     Even `v27`, whose exact-match score looks poor, guesses within
     {_mean("v27", "open", "guess_dist"):.2f} of the true mix on open pairs,
     against a floor of {_mean("v27", "open", "floor_dist"):.2f} and chance of
-    {_mean("v27", "open", "chance_dist"):.2f}. Its guesses come close to the best
-    any name could manage, for pair types it never saw a single example of.
+    {_mean("v27", "open", "chance_dist"):.2f}.
     `v216` tracks its floor very closely, and `v4096`'s held-out curve reaches
     nearly 1 within a couple of grid levels of distance.
 
     H3 predicted near-floor guessing only where exact-match accuracy was high,
     but the geometry turns out to be present even where exact-match accuracy is
-    low. Exact match and geometric knowledge behave like nearly independent axes
-    in this task. `v27` is coarse-grained, with few names and big gaps, so any
-    leftover imprecision costs the top-1 answer; `v4096` asks for neighbor-level
-    precision; and `v216` happens to match the model's achievable precision to
-    its grid spacing.
+    low. `v27` is coarse-grained, with few names and big gaps, so any leftover
+    imprecision costs the top-1 answer; `v4096` asks for neighbor-level
+    precision; and `v216` seems to match the model's achievable precision to its
+    grid spacing.
     """)
     return
 
@@ -586,19 +529,17 @@ def _(metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## The geometry the model built
+    ## Embedding geometry
 
-    The behavior suggests the model acts as if it knows where every color sits in
-    the cube. We can also look at that knowledge itself. Colors are single
-    tokens, so everything the model knows about a color's identity has to live in
-    that token's embedding, the vector the model looks up when it reads the
-    token. If the model really did infer the hidden space, the embedding table
-    should hold a color cube: some linear view of the 64-dimensional embeddings
-    under which the tokens arrange themselves by their RGB values. A ridge probe
-    from embeddings to RGB measures how well that holds, and a PCA projection
-    (principal component analysis, which finds the few directions along which the
-    vectors vary most and lets us plot them in 2D) gives an unsupervised look at
-    the table's dominant structure.
+    The behavior suggests the model knows where the colors are in the cube.
+    Since colors are single tokens, everything the model knows about a color's
+    identity must live in that token's embedding. If the model inferred
+    the hidden space, the embedding table should hold a color cube: some linear
+    view of the 64-dimensional embeddings under which the tokens arrange
+    themselves by their RGB values. A ridge probe from embeddings to RGB
+    measures how true that is, and a PCA projection (principal component
+    analysis, which finds the few directions along which the vectors vary most)
+    gives an unsupervised look at the table's dominant structure.
     """)
     return
 
@@ -655,8 +596,8 @@ def _(metrics):
     The probe's held-out R² rises with grid size ({_r2["v27"]:.2f},
     {_r2["v64"]:.2f}, {_r2["v216"]:.2f}, {_r2["v4096"]:.2f}), so from `v64` up,
     RGB is close to a linear function of the embedding. The `v27` number is fit
-    on only 13 points in 64 dimensions, so I read it as present but hard to
-    certify, which fits with its near-floor guessing.
+    on only 13 points in 64 dimensions, so we read it as present but hard to
+    certify.
 
     H4 needs one refinement, though. The hypothesis expected the embedding table
     itself to turn low-dimensional, and it doesn't. The top three principal
@@ -668,14 +609,10 @@ def _(metrics):
     probe reads off cleanly, yet most of the embedding variance is doing
     something else.
 
-    That something else is probably needed. These embeddings are also the tied
-    language-model head, the same vectors the model uses to score each possible
-    next token, so two adjacent colors need well-separated directions for the
-    softmax to keep them apart, even when their *values* are nearly identical.
-    Value geometry and token identity share the same vectors. This is the
-    superposition question (more features packed into a space than it has
-    dimensions to spare) that D2.1's anchored runs will have to live with, here
-    in miniature.
+    These embeddings are also the tied language model head for predicting the
+    next token, so perhaps two adjacent colors need well-separated directions
+    for the softmax to keep them apart, even when their color values are nearly
+    identical.
     """)
     return
 
@@ -683,15 +620,13 @@ def _(metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Computing the mix in value space
+    ## Mixing in value space
 
     The embeddings hold the geometry of individual colors; the last question is
-    about the computation that combines them. At the pre-answer position, the
-    token `=`, does the residual stream already contain the mix's value before
-    the answer is emitted? We fit ridge probes at each depth on seen prompts and
-    then apply them to held-out and open prompts. That transfer is what separates
-    a real value-space computation from a probe that has simply memorized its fit
-    set.
+    about the computation that combines them. At the pre-answer position (`=`),
+    does the residual stream already contain the mix's value before the answer
+    is emitted? We'll check with probes fit at each depth on seen prompts and
+    then apply them to held-out and open prompts.
     """)
     return
 
@@ -707,11 +642,11 @@ def _(metrics):
             set), held-out pairs, and open pairs.
         """,
         caption="""
-            Is the answer computed in value space before it is emitted? Ridge probes
-            from the pre-answer residual stream to the true mix's RGB, one per depth
-            (0 = embeddings, 4 = final layer), fit on half the seen prompts (seed 0).
-            Transfer to held-out and open prompts tells a genuine value-space
-            computation apart from a probe that memorized its fit set.
+            Ridge probes from the pre-answer residual stream to the true mix's
+            RGB, one per depth (0 = embeddings, 4 = final layer), fit on half
+            the seen prompts (seed 0). Transfer to held-out and open prompts
+            tells a genuine value-space computation apart from a probe that
+            memorized its fit set.
         """,
     )
     def _plot() -> plt.Figure:
@@ -736,35 +671,31 @@ def _(metrics):
 def _(metrics):
     _mid = {g: max(cell_of(metrics, g, 0)["probe_r2"]["named_holdout"]) for g in GRID_NAMES}
     mo.md(rf"""
-    It is, and the probes transfer well. Peak held-out R² is {_mid["v27"]:.2f} at
-    `v27`, {_mid["v64"]:.2f} at `v64`, {_mid["v216"]:.2f} at `v216`, and
-    {_mid["v4096"]:.2f} at `v4096` (seed 0), with most of the value present from
-    depth 1 or 2 onward. This is a change from the base language. There, ex-2.1.2
-    found that the answer's channels are computed just in time and cleared away
-    after emission, so a full "result" concept never sat at any single position
-    all at once. With one-token answers there is no schedule to spread the work
-    over, so the whole mix has to be present at the pre-answer position, and it
-    is. For anchoring, that gives a word-level result concept a natural home: one
-    position, one direction per channel, high R², at every depth past the first
-    block.
+    Is the answer computed in value space before it is emitted?
+    Apparently so, and the probes transfer well. Peak held-out R² is
+    {_mid["v27"]:.2f} at `v27`, {_mid["v64"]:.2f} at `v64`, {_mid["v216"]:.2f}
+    at `v216`, and {_mid["v4096"]:.2f} at `v4096` (seed 0), with most of the
+    value present from depth 1 or 2 onward. This quite different from the base
+    language. There, ex-2.1.2 found that the answer's channels are computed just
+    in time and cleared away after emission (for hex answers), so a full
+    "result" concept wasn't readable at any single position. But now with
+    one-token answers there is no schedule to spread the work over, so the whole
+    mix must be present at the pre-answer position.
 
     Even `v27`'s held-out prompts probe at about 0.9 mid-stack while their
     exact-match accuracy is 0.2 to 0.3. The model computes roughly the right
-    value, and then the readout picks a neighboring name. It is the same
-    computed-but-misread gap we saw in ex-2.1.2, in a much milder form, since
-    there the readout was a whole untrained translation.
+    value, and then the readout picks a neighboring name.
 
     ## Example completions
 
-    Here are a few concrete completions, chosen as the widest misses, so these
-    are the hardest cases rather than typical ones.
+    Here are a few concrete completions (we picked the widest misses).
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(evals, arrays):
-    def completion_rows(grid: str, es: str, k: int = 6) -> str:
+def _(arrays, evals):
+    def completion_rows(grid: str, es: str, k: int = 4) -> str:
         exs = evals[grid][es]
         lp = arrays[f"{grid}-s0/logp/{es}"]
         names = list(PALETTES[grid])
@@ -798,76 +729,40 @@ def _(completion_rows):
     _tables = []
     for _g, _es in [("v27", "named_holdout"), ("v216", "open"), ("v4096", "named_holdout")]:
         _tables.append(
-            mo.Html(
-                figure_html(
-                    f'<div class="report-table-scroll"><table class="report-table">{_head}'
-                    f"{completion_rows(_g, _es)}</table></div>",
-                    caption=f"`{_g}` · {_es.replace('_', ' ')}: the six widest misses (seed 0).",
-                    class_="report-figure",
-                )
+            figure_html(
+                f'<div class="report-table-scroll"><table class="report-table">{_head}'
+                f"{completion_rows(_g, _es)}</table></div>",
+                caption=mo.md(f"`{_g}` · {_es.replace('_', ' ')}: the six widest misses (seed 0).").text,
+                class_="report-figure",
             )
         )
-    mo.vstack(_tables)
+    mo.Html("\n".join(_tables))
     return
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    The tables show in individual rows what the metrics showed in aggregate.
     `v27`'s misses are neighbor names (`violet` guessed as `purple`, `maroon` as
     `olive`); `v216`'s open-pair guesses sit a step away from the floor; and
     `v4096`'s worst held-out misses still agree with the true mix on two of the
     three channels.
+    """)
+    return
 
-    ## Discussion
 
-    The todo item asked two questions. First, can the model infer the
-    color-space geometry with no hex scaffolding? Yes. From mixing co-occurrences
-    alone it builds embeddings that are linear color cubes, computes mixes in
-    value space at the pre-answer position, and generalizes to held-out pairs.
-    Second, when it guesses a held-out answer, is the guess close? Very. Guesses
-    sit near the nearest-name floor at every vocabulary size, including the open
-    pairs, whose pair type never occurs in training at all.
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ## Findings
 
-    The way performance varies with vocabulary size is more interesting than any
-    single trend. Exact match is non-monotonic, running 0.27, 0.59, 1.00, 0.65
-    across 27 to 4096 colors, while geometric closeness improves monotonically. I read
-    the exact-match dip at `v4096` as a limit on precision rather than on
-    knowledge: its misses are one grid level off in one channel, its seen-pair
-    accuracy shows the same gap, and its training loss had already leveled off.
-    Whether more training, or a different schedule, would buy back that last level
-    of precision is an open question. This run can't tell "converged short of the
-    grid spacing" apart from "would eventually snap into place".
-
-    Three things carry forward to the anchored experiments.
-
-    - Vocabulary design. The base language's `named_holdout` = 0 came from its
-      grammar, the untrained value-to-name translation, rather than from
-      name-only supervision. One token per color makes the whole name-arithmetic
-      pipeline learnable, and a grid around `v216` density is a sweet spot: the
-      task is solved, the geometry is clean, and open pairs are still available
-      as graded probes. This also lowers the risk on the word-level tokenizer
-      ablation already queued in the todo list.
-    - A result concept with a fixed home. The base language computed its answer
-      channels just in time and cleared them afterward; the single-token answer
-      instead forces the full mix to exist at the pre-answer position, where it
-      is linearly decodable (R² ≈ 0.9) from depth 1 to 2 onward. That is a
-      friendlier target to anchor than a value that never fully exists in one
-      place.
-    - Geometry and identity share the embedding. The color cube is a decodable
-      subspace, yet most embedding variance is doing something else, probably the
-      separation the tied softmax head needs to keep neighboring colors apart. An
-      anchor placed on the value subspace would leave the identity component
-      unconstrained. Whether that turns out to help or to cause trouble is the
-      capacity and superposition question queued for the eval step of the
-      anchored runs.
-
-    A few caveats. The sweep moves vocabulary size, pair coverage, and closure
-    fraction together, so "vocab size" here stands for the whole regime rather
-    than one isolated variable. The `v27` holdout has only ten pairs, so its
-    accuracy comes in steps of a tenth. And everything rests on one backbone
-    (d64-L4) at one token budget.
+    1. The model infers the color-space geometry better without hex scaffolding.
+       From mixing co-occurrences alone it builds embeddings that are linear
+       color cubes, computes mixes in value space at the pre-answer position,
+       and generalizes to held-out pairs. When it guesses a held-out answer, the
+       guess is very close.
+    2. Performance varies with vocabulary size. Exact match is non-monotonic,
+       while geometric closeness improves monotonically.
     """)
     return
 

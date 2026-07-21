@@ -25,6 +25,21 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   geometry is right and the precision isn't. Candidates: a longer or reshaped
   schedule, weight decay (grokking-style late snap-in). #[D2.1] #ex-2.1.3 #vocab
 
+- [ ] Supervised projection of the embedding table, and a fairer `emb_r2`. Two
+  findings from a scratch pass over ex-2.1.3's stored embeddings, both cheap to
+  fold in. (a) The probe weights already locate the cube: orthonormalize `w`
+  (64×3), project the embeddings onto that subspace, then
+  `sca.vis.plot_rgb_cube(..., view="wheel", truth=rgb)` with coordinates from
+  `align_to_cube`. v216 lands on its lattice with residual 0.02 — the cube PCA
+  can't see is unmistakable. Complementary
+  number: the share of the top-3 PC variance budget the color subspace occupies
+  (0.48 / 0.46 / 0.64 / 0.82 across v27→v4096), which is *why* PCA only finds it
+  at the dense end. (b) `emb_r2` uses a half/half split, so at v27 it fits a
+  64→3 map from 13 points and understates: 5-fold gives 0.65 vs the reported
+  0.48. v64 0.81→0.85, v216 0.95→0.96, v4096 unchanged. Both extend to the
+  per-depth probes, which is the transferable part. #[D2.1] #ex-2.1.3
+  #representations #metrics
+
 - [ ] Distance-shaped answer targets for ex-2.1.3, post-hoc. We scored answers
   against the one-hot truth (NLL of the true name); the sharper question is
   whether the model's whole answer *distribution* is shaped like the geometry —
