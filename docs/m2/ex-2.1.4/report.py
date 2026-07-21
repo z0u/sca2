@@ -31,7 +31,7 @@ with app.setup(hide_code=True):
     )
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
-    from mini.vis import figure_html, light_dark, themed
+    from mini.vis import figure_html, light_dark, smooth_step, themed
     from sca.data import char_names as ch
     from sca.data import named_colors as nc
     from sca.data.colors import N_LEVELS, load_example_sets, to_hex
@@ -849,38 +849,58 @@ def _(arrays, metrics):
     @themed(
         name="answer-schedule",
         alt_text="""
-            Heatmap panels of probe R-squared for the three RGB channels (rows) at each
-            position around the answer (columns, offsets −4 to 3), read from the final
-            residual layer. Left panels show this experiment's opaque names (v27, v216).
-            The right panel, if available, shows ex-2.1.2's hex answers, which form a
-            diagonal staircase, each channel decodable only around its own emission
-            position.
+            Line panels of probe R-squared against position around the answer (offsets −4
+            to 3), read from the final residual layer, with one line per RGB channel drawn
+            in its own color. Left panels show this experiment's opaque names (v27, v216),
+            where the three channel lines run together at every offset. The right panel, if
+            available, shows ex-2.1.2's hex answers, where the three separate into a
+            staircase, each channel high only around its own emission position.
         """,
         caption="""
-            The answer-emission schedule at the final residual depth (seed 0). Each cell
-            is R² for one RGB channel at one offset from the answer's first character;
-            the answer sits at offsets 0–3, and the prompt's last characters are the
-            negative offsets. Hex answers (right, from ex-2.1.2's base-grammar cells)
-            spell one channel per digit, and the probe found each channel computed just
-            in time and dropped once emitted. Opaque names cannot be written that way,
-            and H4 predicts all three channels stay decodable across the window.
+            The answer-emission schedule at the final residual depth (seed 0). Each line is
+            R² for one RGB channel across offsets from the answer's first character; the
+            answer sits at offsets 0–3, and the prompt's last characters are the negative
+            offsets. Lines are drawn as steps because each offset is a separate character
+            position, with the value held across the position and ramping between; line
+            width tapers R → G → B so an offset where all three agree reads as nested bands
+            rather than as whichever channel drew last. Hex answers (right, from ex-2.1.2's
+            base-grammar cells) spell one channel per digit, and the probe found each
+            channel computed just in time and dropped once emitted. Opaque names cannot be
+            written that way, and H4 predicts all three channels stay decodable across the
+            window.
         """,
     )
     def _plot() -> plt.Figure:
         panels: list[tuple[str, np.ndarray, list[int]]] = []
         for g in GRID_NAMES:
             r2 = arrays[f"{g}-s0/schedule/r2"]  # (offsets, depth+1, 3)
-            panels.append((f"{g} (names)", r2[:, -1].T, cell_of(metrics, g, 0)["schedule_offsets"]))
+            panels.append((f"{g} (names)", r2[:, -1], cell_of(metrics, g, 0)["schedule_offsets"]))
         if _hex is not None and "control-s0/schedule/r2" in _hex:
-            panels.append(("hex (ex-2.1.2)", _hex["control-s0/schedule/r2"][:, -1].T, list(range(-4, 4))))
-        fig, axes = plt.subplots(1, len(panels), figsize=(2.9 * len(panels) + 1.2, 2.6), sharey=True)
-        cmap = light_dark("viridis", "viridis")
-        for ax, (title, m, offsets) in zip(np.atleast_1d(axes), panels, strict=True):
-            im = ax.imshow(np.clip(m, 0, 1), vmin=0, vmax=1, cmap=cmap, aspect="auto")
-            ax.set_xticks(range(len(offsets)), offsets, fontsize=8)
-            ax.set_yticks(range(3), ["R", "G", "B"])
-            ax.set(title=title, xlabel="offset from answer start")
-        fig.colorbar(im, ax=np.atleast_1d(axes).tolist(), label="probe R²", fraction=0.03)
+            panels.append(("hex (ex-2.1.2)", _hex["control-s0/schedule/r2"][:, -1], list(range(-4, 4))))
+
+        # Color is data: each channel's line is drawn in that channel's own hue.
+        cols = light_dark(["#d1495b", "#2a9d5c", "#3b6fd4"], ["#ff6b7d", "#4fd07a", "#6ea3ff"])
+        # The finding at v27/v216 is that all three channels agree, so the lines coincide
+        # almost exactly. Tapering the widths keeps every channel visible where they do.
+        lws = (2.6, 1.7, 1.0)
+
+        fig, axes = plt.subplots(1, len(panels), figsize=(3.2 * len(panels), 2.8), sharey=True)
+        axes = np.atleast_1d(axes)
+        for ax, (title, m, offsets) in zip(axes, panels, strict=True):
+            ax.axvline(0, color="grey", alpha=0.5, linestyle="--")
+            for c in range(3):
+                smooth_step(ax, offsets, np.clip(m[:, c], 0, 1), color=cols[c], lw=lws[c], ramp=0.5)
+            ax.set(title=title, xlabel="offset from answer start", ylim=(-0.05, 1.05))
+            ax.set_xlim(offsets[0] - 0.5, offsets[-1] + 0.5)
+            ax.set_xticks(offsets)
+            ax.grid(alpha=0.1)
+        axes[0].set_ylabel("probe R² (mix RGB)")
+        axes[0].legend(
+            handles=[plt.Line2D([], [], color=cols[c], lw=lws[c], label=n) for c, n in enumerate("RGB")],
+            fontsize=7,
+            loc="lower left",
+            ncols=3,
+        )
         return fig
 
     mo.Html(_plot())
@@ -890,13 +910,13 @@ def _(arrays, metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    H4's main prediction holds: there is no staircase. In the hex panel, each
-    channel has its own bright cell at its own emission offset and fades once the
-    digit is out, the just-in-time schedule with eviction that ex-2.1.2 found. In
-    the name panels the three channel rows look nearly identical at every offset:
-    whatever the stream knows about the mix, it knows for all three channels at
-    once. A name that does not factorize into channels gets a representation that
-    does not either.
+    H4's main prediction holds: there is no staircase. In the hex panel the three
+    channel lines separate, each peaking at its own emission offset and falling once
+    the digit is out, the just-in-time schedule with eviction that ex-2.1.2 found. In
+    the name panels the three lines run together at every offset, close enough that
+    they read as one banded line: whatever the stream knows about the mix, it knows
+    for all three channels at once. A name that does not factorize into channels gets
+    a representation that does not either.
 
     The "stays fully live" half of the prediction needs a small amendment. At
     `v216` the final-depth R² is high at the pre-answer position and the first
