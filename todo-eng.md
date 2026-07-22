@@ -14,6 +14,17 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **First-run Modal image build can eat a small `--budget` (observed
+  2026-07-20).** In a fresh Modal environment the first launch spends minutes
+  building the container image while the task sits `queued`; a `--budget 10m`
+  expired during the build and the watch's opportunistic enforcement settled
+  the run CANCELLED before any work ran. Harmless-but-confusing: the image is
+  cached, so a `retry --budget …` succeeds immediately (that's what happened).
+  Options if it bites again: exclude time-in-queue from the budget clock (risky
+  — queue time is exactly what the budget guards on a capacity-starved run), or
+  just document "size the first run's budget for the image build" in
+  running.md. Leaning documentation-only.
+
 - **Document subline.** Describe subline in a skill: what it is, why we might
   use it instead of a token heatmap, and how to use it.
 

@@ -31,7 +31,7 @@ from mini.apparatus import Apparatus
 from mini.experiment import Experiment
 from mini.memo import PollCache
 from mini.orchestration import BudgetExpired, tick
-from mini.runs import SETTLED, RunState, is_queued, stale_heartbeat, stale_progress
+from mini.runs import SETTLED, RunState, is_queued, progress_age, stale_heartbeat, stale_progress
 
 __all__ = ["drive_and_watch", "watch"]
 
@@ -100,24 +100,50 @@ def _rec_state(rec: dict[str, Any]) -> RunState:
     return RunState(rec["state"]) if rec.get("state") else RunState.PENDING
 
 
+def _stale_reason(rec: dict[str, Any]) -> str | None:
+    """The liveness worry on a RUNNING record, if any (both are display-only hints)."""
+    if stale_heartbeat(rec):
+        return "heartbeat stale — worker may be dead"
+    if stale_progress(rec):  # emitting but not advancing: the wedge signature
+        return f"no step progress for {progress_age(rec):.0f}s — worker may be wedged"
+    return None
+
+
 def watch(
     apparatus: Apparatus,
     *,
     poll: float = 0.5,
     console: Console | None = None,
-) -> list[dict[str, Any]]:
-    """Render a live bar for a run this process did *not* launch, until it settles.
+    timeout: float | None = None,
+) -> tuple[list[dict[str, Any]], str, str | None]:
+    """Watch a run this process did *not* launch, until it settles or needs a hand.
 
     The read-only twin of ``drive_and_watch``: it polls the durable records and
     reaps vanished workers, but never ``tick``s — so it never launches work. Use
     it to watch a detached/Modal run from another process (``mini watch <name>``);
     contrast ``run --watch``, which also drives the DAG forward.
 
-    Returns the final records once every task has settled. Lets
-    ``KeyboardInterrupt`` propagate (the caller reports; workers live on).
+    Returns ``(current_records, outcome, reason)`` where *outcome* is:
+
+    - ``"settled"`` — every current task settled (*reason* is ``None``);
+    - ``"attention"`` — something *happened* that a monitor should act on now,
+      rather than waiting for the rest of the stage: a task settled
+      FAILED/CANCELLED that wasn't terminal when the watch began (e.g. a
+      watchdog fired, or a vanished worker was reaped), or a RUNNING task's
+      liveness went stale (stale heartbeat / frozen step, held across two
+      consecutive polls — the thresholds themselves are the debounce);
+    - ``"timeout"`` — *timeout* seconds elapsed with work still in flight.
+
+    Terminal tasks from *before* the watch never trigger attention (a run
+    deliberately advanced past a failed cell would otherwise wake every watcher
+    immediately). Lets ``KeyboardInterrupt`` propagate (the caller reports;
+    workers live on).
     """
     store = apparatus.memo_store()
     cache = PollCache()  # serve the settled tail from memory; poll only what's in flight
+    deadline = time.monotonic() + timeout if timeout else None
+    baseline: set[str] | None = None  # keys already terminal at the first poll
+    stale_polls: dict[str, int] = {}  # consecutive polls a key has looked stale
     with _progress(console) as progress:
         bars: dict[str, TaskID] = {}
         while True:
@@ -130,8 +156,22 @@ def watch(
             # record would watch forever. Split each poll — another process may
             # tick (and re-key) while we watch.
             current, _ = store.split_current(records)
+            terminal = {
+                r["key"]: _rec_state(r) for r in current if _rec_state(r) in (RunState.FAILED, RunState.CANCELLED)
+            }
+            if baseline is None:
+                baseline = set(terminal)
             if current and all(_rec_state(r) in SETTLED for r in current):
-                return current
+                return current, "settled", None
+            if fresh := sorted(terminal.keys() - baseline):
+                return current, "attention", f"{fresh[0]} settled {terminal[fresh[0]]}"
+            for rec in current:
+                key = rec["key"]
+                stale_polls[key] = stale_polls.get(key, 0) + 1 if (why := _stale_reason(rec)) else 0
+                if why and stale_polls[key] >= 2:  # held across polls — not a read racing an update
+                    return current, "attention", f"{key}: {why}"
+            if deadline is not None and time.monotonic() >= deadline:
+                return current, "timeout", f"still in flight after {timeout:.0f}s"
             time.sleep(poll)
 
 

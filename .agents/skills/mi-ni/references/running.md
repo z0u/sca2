@@ -55,16 +55,32 @@ Re-running is cheap: completed steps are memo hits, so a `run` only advances the
 un-run pieces.
 
 **Waiting for a stage to settle** (an agent session that wants one wake-up, not
-a sleep loop): background `bin/mini watch <exp>` — it polls read-only, reaps
-vanished workers, *exits* once every current task settles, and its **exit code
-is the outcome** (0 iff the run settled DONE), so the exit is the wake signal
-and the code tells you which branch to take. Piped output degrades cleanly (one
-final render, no live churn). For polling instead, use `bin/mini status <exp>
---json` — one JSON object with the aggregate `state`, a `settled` boolean, and
-per-task `state` / `queued` / `heartbeat_age_s` / `stale_heartbeat` /
-`progress_age_s` / `stale_progress` / `steps_per_min` — rather than grepping
-the human lines. Bound either wait with `--budget` so an unattended stall
-settles itself.
+a sleep loop): `bin/mini watch <exp> --timeout 10m --json` — it polls
+read-only, reaps vanished workers, and *exits the moment there's something to
+act on*. The **exit code names the branch**, so no output parsing is needed to
+decide:
+
+- `0` — current tasks all settled DONE → `run` again to advance the DAG (the
+  tick prints `✓ complete` when nothing is left).
+- `1` — settled with FAILED/CANCELLED → `logs` / `retry`.
+- `3` — **attention**: a task settled terminally *mid-stage* (a watchdog fired,
+  a vanished worker was reaped) or a RUNNING task's liveness went stale
+  (stale heartbeat / frozen step) → act now instead of waiting out the
+  siblings. Pre-existing terminal tasks don't trigger this — only events that
+  happen during the watch.
+- `124` — `--timeout` elapsed with work still in flight → re-watch, or report
+  progress.
+
+With `--json` the live bars are replaced by one compact summary object
+(`outcome`, `reason`, `counts`, and an `attention` list). So the whole wait is
+one command — **never hand-roll a `while`/`sleep` polling loop, and never
+`grep` the human lines.** For a one-shot snapshot, `bin/mini status <exp>
+--json --brief` gives the aggregate `state`/`settled`, counts by state, and
+*only* the tasks needing attention (failed / stale / wedged / long-queued) —
+token-cheap on a big sweep. Full `status --json` (per-task `state` / `queued` /
+`heartbeat_age_s` / `stale_heartbeat` / `progress_age_s` / `stale_progress` /
+`steps_per_min`) is for digging into one task. Bound any wait with `--budget`
+so an unattended stall settles itself.
 
 Watching a big sweep is cheap too: the watch loops cache settled
 (`DONE`/`FAILED`/`CANCELLED`) records — they're immutable — and re-read only the

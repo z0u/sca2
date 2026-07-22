@@ -25,7 +25,8 @@ Why the synthetic domain first, rather than language models straight away? A toy
 
 ## Working in this repo
 
-Two entrypoints, split by what they touch: `./go` for the repo (deps, checks, reports, the site) and `bin/mini` for experiments (compute, durable results). Both print usage when run bare.
+Use `./go` for the repo (deps, checks, reports, the site) and `mini` for
+experiments (compute, durable results).
 
 A full pass over one experiment looks like this:
 
@@ -34,9 +35,9 @@ A full pass over one experiment looks like this:
 ./go auth --check                              # confirm Modal + HF credentials
 
 # Science loop — experiments run under mini (memoized: re-runs only what changed)
-bin/mini run docs/m2/ex-2.1.2/experiment.py --app modal --budget 2h
-bin/mini status ex-2.1.2                       # read-only; also: watch, logs, results
-bin/mini retry docs/m2/ex-2.1.2/experiment.py  # after a fix — finished tasks are reused
+mini run docs/m2/ex-2.1.2/experiment.py --app modal --budget 2h
+mini status ex-2.1.2                           # read-only; also: watch, logs, results
+mini retry docs/m2/ex-2.1.2/experiment.py      # after a fix — finished tasks are reused
 
 # Report loop — reports read stored results; they never re-run the experiment
 ./go open docs/m2/ex-2.1.2/report.py           # edit live in marimo
@@ -48,9 +49,67 @@ bin/mini retry docs/m2/ex-2.1.2/experiment.py  # after a fix — finished tasks 
 git push                                       # open a PR; merging to main deploys the site
 ```
 
-CI uses the same verbs: the checks from `./go check` (split per step in `lint-check.yml`), and `./go site` (`pr-preview.yml`, `publish-docs.yml`), which assembles the public site from *published* bundles — read-only, never runs a notebook, assets stay on the CDN. `./go preview` is its local sibling: the same site, but built from local exports with assets copied beside the HTML, so it works offline (`--no-serve` to just build). The two are separate verbs on purpose — preview answers "what does my work look like?", site answers "what will the internet see?".
+<details>
+<summary><b>Launch &amp; advance</b> — <code>mini run</code></summary>
 
-Conventions for the site live in [docs/README.md](docs/README.md); the *why* behind the publishing pipeline in [eng/](eng/README.md); experiment authoring in the `mi-ni` skill.
+`mini run` launches the next stage and returns at once. Each call advances the DAG by one wake; finished tasks are memo hits, so re-running only does what's left.
+
+```console
+$ bin/mini run docs/demo/experiment.py --app modal --budget 2h
+demo:
+  ◌ train_one  train_one-5b23f9ed87eb  queued  ⧖ queued 1s ago  [fc-01KXYEE4WJ…]
+  ◌ train_one  train_one-dbf269543ed8  queued  ⧖ queued 1s ago  [fc-01KXYEE503…]
+… suspended — 2 task(s) in flight (re-run to advance)
+```
+
+`◌ queued` is launched-but-not-yet-running; `--budget` caps the run's wall-clock.
+</details>
+
+<details>
+<summary><b>Wait for the next event</b> — <code>mini watch</code></summary>
+
+`mini watch` blocks until the run settles or something needs your attention. It never advances the DAG, so interrupting it leaves the workers running.
+
+```console
+$ bin/mini watch demo --timeout 10m
+⚠ needs attention: train_one-dbf269543ed8 settled failed
+demo  —  running  (3 tasks)
+```
+
+Exit codes: `0`: settled all-done, `1`: settled with a failure, `3`: needs attention, `124`: timed out with work still in flight.
+</details>
+
+<details>
+<summary><b>Check in</b> — <code>mini status --brief</code></summary>
+
+`mini status` is like `watch`, but designed for polling. `--brief` prints the aggregate state, a count by state, and the tasks that need attention (failed / stale / wedged / long-queued):
+
+```console
+$ bin/mini status demo --brief
+demo  —  failed  (3 tasks)
+  2 done · 1 failed
+  ✗ train_one  train_one-dbf269543ed8  failed  !! RuntimeError: synthetic mid-stage failure
+```
+
+Identical failures collapse to one counted line. A failed task drops off this list once it's re-run (or the function is edited).
+
+Plain `mini status` lists every task with its metrics and heartbeat.
+</details>
+
+<details>
+<summary><b>Recover</b> — <code>mini logs</code>, <code>mini retry</code></summary>
+
+`FAILED` and `CANCELLED` are terminal: a plain `mini run` won't relaunch them. After fixing the problem `retry` re-runs just the failed tasks (finished ones stay memo hits):
+
+```console
+$ bin/mini logs demo train_one-dbf269543ed8
+…
+RuntimeError: synthetic mid-stage failure
+
+$ bin/mini retry docs/demo/experiment.py --app modal
+retrying 1 task(s): train_one-dbf269543ed8
+```
+</details>
 
 ## Related work
 

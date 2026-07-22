@@ -275,6 +275,158 @@ def test_status_json_is_machine_readable(tmp_path: Path, monkeypatch, capsys):
     assert payload["tasks"][1]["heartbeat_age_s"] > STALE_HEARTBEAT_S
 
 
+def test_status_brief_is_counts_plus_attention_only(tmp_path: Path, monkeypatch, capsys):
+    """``status --brief`` answers the monitor's question — "anything to act on?" —
+    without one line per task: counts by state, plus only the tasks needing
+    attention (here a failed cell and a long-queued one; the healthy lines are
+    the payload bulk on a big sweep and carry no actionable signal)."""
+    import json
+    from unittest.mock import ANY
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import STALE_HEARTBEAT_S, data_root
+
+    store = MemoStore(data_root() / "briefexp")
+    now = time.time()
+    pid = os.getpid()  # a live pid, so reap_dead doesn't settle the records
+    env = {"env": {"host": "worker.test"}}
+    store.records_backend.merge("t-done", {"key": "t-done", "state": "done", "fn": "train"})
+    store.records_backend.merge(
+        "t-live", {"key": "t-live", "state": "running", "fn": "train", "pid": pid, "heartbeat_at": now, **env}
+    )
+    store.records_backend.merge(
+        "t-failed", {"key": "t-failed", "state": "failed", "fn": "train", "error": "RuntimeError: boom"}
+    )
+    store.records_backend.merge(  # queued (no env) far past the staleness window — capacity starvation
+        "t-parked", {"key": "t-parked", "state": "running", "fn": "train", "pid": pid, "heartbeat_at": now - 400}
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="briefexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    payload["attention"].sort(key=lambda t: t["key"])
+    assert payload == {
+        "experiment": "briefexp",
+        "app": "local",
+        "state": "running",
+        "settled": False,
+        "counts": {"done": 1, "running": 1, "failed": 1, "queued": 1},
+        "attention": [
+            {"key": "t-failed", "fn": "train", "state": "failed", "error": "RuntimeError: boom"},
+            {"key": "t-parked", "fn": "train", "state": "running", "queued_s": ANY},
+        ],
+        "attention_total": 2,
+        "attention_summary": [  # two distinct causes, one task each (launch order)
+            {"fn": "train", "state": "failed", "cause": "RuntimeError: boom", "count": 1},
+            {"fn": "train", "state": "queued", "cause": "queued too long", "count": 1},
+        ],
+    }
+    assert payload["attention"][1]["queued_s"] > STALE_HEARTBEAT_S
+
+    cmd_status(argparse.Namespace(name="briefexp", app="local", json=False, brief=True))
+    out = capsys.readouterr().out
+    assert "1 done · 1 running · 1 queued · 1 failed" in out  # the counts line, in fixed order
+    assert "t-failed" in out and "t-parked" in out  # the actionable tasks are listed
+    assert "t-done" not in out and "t-live" not in out  # …healthy ones are not
+
+
+def test_status_brief_collapses_a_mass_failure(tmp_path: Path, monkeypatch, capsys):
+    """The 30-containers-all-die case: identical failures must collapse to one
+    counted line (and a bounded JSON list + cause rollup), not N near-identical
+    lines — the difference between noise and a diagnosis, and the whole point of
+    --brief on a wide fan-out."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "massexp")
+    for i in range(8):  # one fan-out, one shared cause
+        key = f"train_one-{i:04d}"
+        store.records_backend.merge(
+            key, {"key": key, "state": "failed", "fn": "train_one", "error": "RuntimeError: CUDA OOM"}
+        )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="massexp", app="local", json=False, brief=True))
+    out = capsys.readouterr().out
+    assert "8 failed" in out  # counts line
+    assert "8× train_one" in out and "RuntimeError: CUDA OOM" in out  # one collapsed line…
+    assert out.count("train_one-") == 1  # …not eight — only the sample key ("— e.g. …") survives
+
+    cmd_status(argparse.Namespace(name="massexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    assert len(payload["attention"]) == 6  # capped list of representative records
+    assert payload["attention_total"] == 8
+    assert payload["attention_summary"] == [
+        {"fn": "train_one", "state": "failed", "cause": "RuntimeError: CUDA OOM", "count": 8}
+    ]
+
+
+def test_status_brief_caps_many_distinct_causes(tmp_path: Path, monkeypatch, capsys):
+    """When the causes really are distinct, the per-task listing is bounded with a
+    ``+N more`` rollup (mirroring the failed-task hint), so the payload can't blow
+    up however wide the fan-out — while the summary still names every cause."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "distinctexp")
+    for i in range(8):  # eight different failures → eight singleton groups
+        key = f"train_one-{i:04d}"
+        store.records_backend.merge(key, {"key": key, "state": "failed", "fn": "train_one", "error": f"Err{i}"})
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="distinctexp", app="local", json=False, brief=True))
+    out = capsys.readouterr().out
+    assert out.count("train_one-") == 6  # first six shown in full (with their keys)…
+    assert "… +2 more cause(s), 2 task(s)" in out  # …the rest rolled up
+
+    cmd_status(argparse.Namespace(name="distinctexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    assert len(payload["attention"]) == 6 and payload["attention_total"] == 8
+    assert len(payload["attention_summary"]) == 8  # every distinct cause still named
+
+
+def test_watch_timeout_exits_124_with_brief_summary(tmp_path: Path, monkeypatch, capsys):
+    """A bounded ``watch --timeout`` must come back by itself — exit 124 with a
+    compact JSON summary — so a monitor's wait can't hang past its budget."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "watchto")
+    store.records_backend.merge(
+        "t-slow",
+        {
+            "key": "t-slow",
+            "state": "running",
+            "fn": "train",
+            "pid": os.getpid(),  # a live pid, so reap_dead doesn't settle it
+            "env": {"host": "worker.test"},
+            "heartbeat_at": time.time(),
+        },
+    )
+
+    from mini.__main__ import cmd_watch
+
+    with pytest.raises(SystemExit) as ei:
+        cmd_watch(argparse.Namespace(name="watchto", app="local", poll=0.01, timeout="0.1s", json=True))
+    assert ei.value.code == 124
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["outcome"] == "timeout" and "still in flight" in payload["reason"]
+    assert payload["counts"] == {"running": 1} and payload["settled"] is False
+
+
 def test_watch_exit_code_reflects_settle_outcome(tmp_path: Path, monkeypatch, capsys):
     """``watch`` is the wake trigger for scripts/agents (#20): it blocks until the
     run settles and its exit code carries the outcome — 0 iff DONE."""
