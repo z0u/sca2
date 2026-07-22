@@ -59,7 +59,7 @@ Use `T | None` instead of `Optional[T]`.
 
 ## Notebooks
 
-Iterate on both the code (Python) and the prose (Markdown). Aim for a literate programming style in which we narrate our experiments.
+Iterate on both the code (Python) and the prose (Markdown). Aim for a literate programming style.
 
 ## Environment
 

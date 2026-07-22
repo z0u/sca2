@@ -34,6 +34,7 @@ with app.setup(hide_code=True):
     from mini.reports import externalize_html, report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import figure_html, light_dark, themed
+    from sca import baselines as bl
     from sca.data import colors, cube
     from sca.vis import CUBE_VIEWS, draw_cube_bound, grid_diameter, plot_rgb_cube, project_cube
     from subline.series import Series
@@ -588,37 +589,55 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
+def _(name_prob):
+    def _p(prompt: str, word: str) -> float:
+        return name_prob(SEEDS[0], prompt, word)
+
+    _p_blue = name_prob(SEEDS[0], "lime + bl", "u")
+
+    mo.md(rf"""
     ## Why the named answers fail
 
-    The sparklines above are teacher-forced: the model is shown the true answer from the
-    validation set, and we watch how much each one surprises
-    it. `lime + black = green` is an interesting case.
+    The sparklines above are teacher-forced: the model is shown the true answer
+    from the validation set, and we watch how much each one surprises it.
+    `lime + black = green` is an interesting case.
 
-    Left to choose, this seed opens `lime + black` with `t`, for *teal*, so the true `g` is mildly surprising.
-    Once it is forced onto `g`, the model guesses `r` correctly, since *gray* and
-    *green* share the prefix `gr`. Then the true `e` is very surprising: on
-    the `gr…` branch the model is all but sure the word is *gray*, but `e` rules that out. The spike is the model fluently
+    Left to choose, this seed opens `lime + black` with `t`, for *teal*, so the
+    true `g` is mildly surprising. Once it is forced onto `g`, the model guesses
+    `r` correctly, since *gray* and *green* share the prefix `gr`. Then the true
+    `e` is very surprising: on the `gr…` branch the model is all but sure the
+    word is *gray*, but `e` rules that out. The spike is the model fluently
     spelling a different palette name, then being surprised when the truth
     arrives.
 
-    *Teal* is a one-channel neighbor of the true mix, and the tall spike on the `a`
-    of `black` hints at why. After `lime + bl` the model is 99.9% sure the second
-    operand is *blue*, and `lime + blue = teal` is an equation it trained on. When it realizes the second operand is different, it only half-fixes the answer: the correction lifts *green* about 70×
-    (to 13%), but this still leaves the trained *teal* on top. The model does learn the result-form rule, which
-    says a named answer appears iff both operands are named. The difficulty is choosing which
-    name, and a trained neighbor seems to overrule.
+    *Teal* is a one-channel neighbor of the true mix, and the tall spike on the
+    `a` of `black` hints at why. After `lime + bl` the model puts
+    {_p_blue:.1%} on `u`, so it is all but certain the second operand is *blue*,
+    and `lime + blue = teal` is an equation it trained on.
 
-    Below is every held-out pair, prompted exactly as in the
-    `named_holdout` eval set, with one column per seed of the chosen
-    architecture.
+    When it sees that the operand is different, the correction barely reaches the
+    answer. Going from the `lime + blue = ` prompt to `lime + black = ` lifts
+    *gray* by a factor of {_p("lime + black = ", "gray") / _p("lime + blue = ", "gray"):.0f},
+    from {_p("lime + blue = ", "gray"):.1%} to {_p("lime + black = ", "gray"):.0%}.
+    The true answer *green* moves by a similar factor and stays negligible, from
+    {_p("lime + blue = ", "green"):.0e} to {_p("lime + black = ", "green"):.0e},
+    while the trained *teal* keeps the top spot at {_p("lime + black = ", "teal"):.0%}.
+    So the operand correction redistributes mass among wrong names rather than
+    finding the arithmetic. The model does learn the result-form rule, which says
+    a named answer appears iff both operands are named. The difficulty is choosing
+    which name, and a trained neighbor seems to overrule.
+
+    Below is every held-out pair, prompted exactly as in the `named_holdout`
+    eval set, with one column per seed of the chosen architecture.
     """)
     return
 
 
 @app.cell(hide_code=True)
 def _(metrics):
+    import jax
+    import jax.numpy as jnp
+
     from sca.compute.evaluation import greedy_completions
     from sca.compute.model import load_checkpoint
     from sca.data.tokenizer import CharTokenizer
@@ -644,7 +663,17 @@ def _(metrics):
         model, tok = _models[seed]
         return greedy_completions(model, tok, prompts, 12)
 
-    return arch, complete
+    def name_prob(seed: int, prompt: str, word: str) -> float:
+        """P(word | prompt), the product of its per-character probabilities."""
+        model, tok = _models[seed]
+        p = 1.0
+        for i, ch in enumerate(word):
+            logits = model(jnp.array(tok.encode([prompt + word[:i]])[0])[None])[0, -1]
+            q = jax.nn.softmax(logits)
+            p *= float(q[tok.stoi[ch]])
+        return p
+
+    return arch, complete, name_prob
 
 
 @app.cell(hide_code=True)
@@ -687,12 +716,32 @@ def _(complete, holdout, named_holdout_exs):
         _got = complete(SEEDS[0], [ex.prompt for ex in _exs])
         _scores[_form] = sum(g == ex.answer for g, ex in zip(_got, _exs, strict=True))
     _n = len(named_holdout_exs)
+
+    # "A neighbor of the mix" is only interesting against how many neighbors there
+    # are: the 27-color palette gives each mix four to six, out of 27 names.
+    _pal = np.array(list(colors.PALETTE.values()))
+    _shell = bl.shell_mask((0, 8, 15), _pal, [ex.result for ex in named_holdout_exs])
+    _null = float(_shell.mean())
+    _hits = _tot = _agree = 0
+    for _i, _ex in enumerate(named_holdout_exs):
+        _guesses = [complete(_s, [_ex.prompt])[0] for _s in SEEDS]
+        _agree += len(set(_guesses)) == 1 and _guesses[0] != _ex.answer
+        for _g in _guesses:
+            _tot += 1
+            _hits += _g in colors.PALETTE and _shell[_i][list(colors.PALETTE).index(_g)]
+
     mo.md(rf"""
-    The model never answers these in hex. It always reaches for a name: usually
-    a palette neighbor of the true mix, sometimes an echo of one operand
-    (`olive + lavender = lavender`). The seeds mostly agree on the same wrong
-    answers, which suggests a systematic bias; perhaps retrieval of the nearest
-    memorized named equation.
+    The model never answers these in hex. It always reaches for a name, and
+    usually one adjacent to the true mix: {_hits} of {_tot} guesses land in the
+    mix's one-step neighborhood, against {_null:.0%} for a name drawn uniformly
+    from the palette. Sometimes the name is an echo of one operand
+    (`olive + lavender = lavender`), though on this palette an operand is often a
+    neighbor anyway, so that part is weaker evidence than it looks.
+
+    The seeds mostly agree: {_agree} of the {_n} pairs draw the same wrong answer
+    from all three. Independent guessing inside the neighborhood would produce
+    well under one such pair, so the bias is systematic; perhaps retrieval of the
+    nearest memorized named equation.
 
     The mixing arithmetic itself is fine. Prompted with the same held-out value
     pairs, seed {SEEDS[0]} solves **{_scores["hex"]}/{_n}** in hex form and

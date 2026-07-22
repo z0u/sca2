@@ -30,6 +30,7 @@ with app.setup(hide_code=True):
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import figure_html, light_dark, themed
+    from sca import baselines as bl
     from sca.compute.evaluation import ridge_probe, ridge_probe_loo
     from sca.data import named_colors as nc
     from sca.data.colors import N_LEVELS, load_example_sets, to_hex
@@ -83,6 +84,27 @@ with app.setup(hide_code=True):
         result = np.array([ex.result for ex in exs], dtype=np.float32) / (N_LEVELS - 1)
         d = np.linalg.norm(VOCAB_RGB[grid][None] - result[:, None], axis=2)
         return d[np.arange(len(exs)), logp.argmax(axis=1)], d.min(axis=1)
+
+    def raw_rgb(grid: str) -> np.ndarray:
+        """(V, 3) raw 0..15 channel values, which `sca.baselines` works in."""
+        return np.array(list(PALETTES[grid].values()))
+
+    def dist_matrix(grid: str, exs: list) -> np.ndarray:
+        """(N, V) distance from every vocabulary color to each example's true mix."""
+        return bl.distances(raw_rgb(grid), [ex.result for ex in exs])
+
+    def exact_null(grid: str, evals: dict) -> float:
+        """Exact-match rate for a guesser that knows only the answer's neighborhood.
+
+        On a coarse grid this is well above zero, so held-out accuracy has to clear
+        it before it shows the model can name the mix rather than only locate it.
+        """
+        exs = evals[grid]["named_holdout"]
+        return bl.neighborhood_exact_null(bl.shell_mask(nc.GRIDS[grid], raw_rgb(grid), [ex.result for ex in exs]))
+
+    def blind_for(grid: str, evals: dict) -> int:
+        """The name a prompt-blind model would always answer, fit on the training pairs."""
+        return bl.blind_index(dist_matrix(grid, evals[grid]["named_seen"]))
 
 
 @app.cell(hide_code=True)
@@ -241,21 +263,25 @@ def _(loaded):
 
 
 @app.cell(hide_code=True)
-def _(metrics):
+def _(evals, metrics):
     def _mean(g, es, key):
         return float(np.mean([cell_of(metrics, g, s)["sets"][es][key] for s in SEEDS]))
 
     _hold = {g: _mean(g, "named_holdout", "accuracy") for g in GRID_NAMES}
-    mo.md(
-        "**Headline numbers.** Mean held-out accuracy by grid: "
-        + ", ".join(f"`{g}` **{v:.2f}**" for g, v in _hold.items())
-        + f". So yes, the model infers the geometry. The telling part is the way "
-        f"it misses where it does miss: at `v4096` the misses land a mean distance "
-        f"of just {_mean('v4096', 'named_holdout', 'guess_dist'):.3f} from the true mix "
-        f"(chance is {_mean('v4096', 'named_holdout', 'chance_dist'):.2f}). "
-        "The sections below build that picture up piece by piece, starting with the "
-        "pair accounting the corpus sampler actually produced."
-    )
+    _null = {g: exact_null(g, evals) for g in GRID_NAMES}
+    mo.md(f"""
+        **Headline numbers.** Mean held-out accuracy by grid:
+        {", ".join(f"`{g}` **{v:.2f}**" for g, v in _hold.items())}.
+        On every grid but the smallest, that is far above what a model knowing
+        only the answer's neighborhood would score
+        ({", ".join(f"`{g}` {v:.2f}" for g, v in _null.items())}), so the model
+        does infer the geometry (except `v27`, which is discussed below). Misses are
+        interesting: at `v4096` they land a mean distance of just
+        {_mean("v4096", "named_holdout", "guess_dist"):.3f} from the true mix
+        (chance is {_mean("v4096", "named_holdout", "chance_dist"):.2f}). The
+        sections below build that picture up piece by piece, starting with the
+        pairs the corpus sampler actually produced.
+    """)
     return
 
 
@@ -386,9 +412,27 @@ def _(metrics):
 
 
 @app.cell(hide_code=True)
-def _(arrays, evals, metrics):
+def _(arrays, evals, geom, metrics):
     def _acc(g, es):
         return float(np.mean([cell_of(metrics, g, s)["sets"][es]["accuracy"] for s in SEEDS]))
+
+    def _z(g: str) -> float:
+        """Held-out accuracy above the neighborhood null, in standard errors.
+
+        Pooling seeds treats repeat runs on the same pairs as independent draws, so
+        this flatters the small grids; `v27`'s ten pairs are the binding limit.
+        """
+        null, n = exact_null(g, evals), len(evals[g]["named_holdout"]) * len(SEEDS)
+        return (_acc(g, "named_holdout") - null) / ((null * (1 - null) / n) ** 0.5)
+
+    _null27 = exact_null("v27", evals)
+    _shell27 = (
+        bl.shell_mask(nc.GRIDS["v27"], raw_rgb("v27"), [ex.result for ex in evals["v27"]["named_holdout"]])
+        .sum(axis=1)
+        .mean()
+    )
+    _z27, _z64, _z216, _z4096 = (_z(g) for g in GRID_NAMES)
+    _r2_27 = geom("v27", "r2")
 
     def _miss_structure(g: str) -> tuple[int, int, int]:
         """Pooled over seeds: (misses, one-channel misses, of those off by one level)."""
@@ -421,11 +465,21 @@ def _(arrays, evals, metrics):
     {_acc("v216", "named_holdout"):.2f} at `v216`, near enough to solved, and
     back down to {_acc("v4096", "named_holdout"):.2f} at `v4096`.
 
-    The `v27` result is already a shift from the base language. There,
-    `named_holdout` sat at zero through every intervention ex-2.1.2 tried. Here,
-    the same expressions but with one-token names and no hex, the model gets a
-    few of them right. So that earlier zero didn't mean the geometry can't be
-    inferred from names.
+    Only three of those four numbers mean much. On a 27-color grid the true mix
+    has just {_shell27:.1f} one-step neighbors on average, so a model that has
+    located the answer's neighborhood and picks within it scores
+    {_null27:.2f} without being able to name anything. `v27`'s
+    {_acc("v27", "named_holdout"):.2f} sits {_z27:.1f} std above
+    that, over ten distinct pairs, which is not a difference worth reading. The
+    denser grids clear the same bar easily: {_z64:.0f} std at `v64`,
+    {_z216:.0f} at `v216` and {_z4096:.0f} at `v4096`.
+
+    So `v27`'s score is not evidence on its own. It is tempting to read it as a
+    shift from the base language, where `named_holdout` sat at zero through
+    every intervention ex-2.1.2 tried, but two of ten pairs on a grid this
+    coarse cannot carry that. The case that the geometry is inferable from names
+    rests on the denser grids here, and on the embedding probes further down,
+    which reach R² ≈ {_r2_27:.2f} even at `v27`.
 
     The `v4096` misses are not scattered, either. Pooled over seeds, {_m4096[1]}
     of {_m4096[0]} held-out misses differ from the true mix in a single RGB
@@ -461,10 +515,10 @@ def _(arrays, evals, metrics):
             Two panels of cumulative distributions of the RGB distance from the model's
             guessed color to the true mix, pooled over three seeds, one panel for
             held-out pairs and one for open pairs. One line per vocabulary grid. A dashed
-            line shows the nearest-name floor on open pairs. Vertical ticks on the x-axis
-            mark each grid's chance distance. Every grid's curve stays close to its floor
-            and well to the left of chance; v216 and v4096 rise to 1 within a fraction of
-            the chance distance.
+            line shows the nearest-name floor on open pairs. Triangles under the x-axis
+            mark the prompt-blind constant baseline. Every grid's curve stays close to its
+            floor and well to the left of the reference; v216 and v4096 rise to 1 within a
+            fraction of the chance distance.
         """,
         caption="""
             How close do guesses land? Each line is the cumulative distribution of the
@@ -472,9 +526,9 @@ def _(arrays, evals, metrics):
             seeds); higher and further to the left is better. On held-out pairs an exact
             answer exists, so the height at distance 0 is the exact-match accuracy. On
             open pairs no name is quite right, so the dashed line shows the best
-            achievable (nearest-name) distance there. The tick under each axis marks a
-            grid's chance distance, where guesses would land if the model knew nothing
-            about the operands.
+            achievable (nearest-name) distance there. The triangles under the x-axis are
+            the prompt-blind constant, the score for always answering the center of the
+            training answers.
         """,
     )
     def _plot() -> plt.Figure:
@@ -492,8 +546,8 @@ def _(arrays, evals, metrics):
                 if es == "open":
                     xf = np.sort(fl)
                     ax.plot(xf, np.arange(1, len(xf) + 1) / len(xf), color=shades[g], lw=1.0, ls="--", alpha=0.7)
-                chance = np.mean([cell_of(metrics, g, s)["sets"][es]["chance_dist"] for s in SEEDS])
-                ax.plot([chance], [-0.02], marker="|", ms=8, color=shades[g], clip_on=False)
+                blind = bl.blind_stats(dist_matrix(g, exs), blind_for(g, evals))["dist"]
+                ax.plot([blind], [-0.02], marker="^", ms=4, color=shades[g], clip_on=False)
             ax.set(title=title, xlabel="distance to true mix", xlim=(-0.02, 1.0), ylim=(-0.03, 1.03))
             ax.grid(alpha=0.3)
         axes[0].set_ylabel("fraction of prompts ≤ x")
@@ -505,26 +559,66 @@ def _(arrays, evals, metrics):
 
 
 @app.cell(hide_code=True)
-def _(metrics):
+def _(arrays, evals, metrics):
     def _mean(g, es, key):
         return float(np.mean([cell_of(metrics, g, s)["sets"][es][key] for s in SEEDS]))
 
+    _open = [g for g in GRID_NAMES if evals[g].get("open")]
+
+    def _row(g):
+        exs = evals[g]["open"]
+        d = dist_matrix(g, exs)
+        gd = np.mean([d[np.arange(len(exs)), arrays[f"{g}-s{s}/logp/open"].argmax(1)].mean() for s in SEEDS])
+        two, blind = bl.k_nearest_stats(d, 2), bl.blind_stats(d, blind_for(g, evals))
+        cells = [
+            f"`{g}`",
+            f"{gd:.3f}",
+            f"{d.min(axis=1).mean():.3f}",
+            f"{two['dist']:.3f}",
+            f"{blind['dist']:.3f}",
+            f"{d.mean():.3f}",
+        ]
+        return "<tr>" + "".join(f'<td class="num">{c}</td>' for c in cells) + "</tr>"
+
+    _head = (
+        '<tr><th>grid</th><th class="num">model</th><th class="num">floor</th>'
+        '<th class="num">2 nearest</th><th class="num">prompt-blind</th>'
+        '<th class="num">chance</th></tr>'
+    )
+    _table = figure_html(
+        f'<div class="report-table-scroll"><table class="report-table">{_head}'
+        + "".join(_row(g) for g in _open)
+        + "</table></div>",
+        caption="Mean distance to the true mix on open pairs, against four references.",
+        class_="report-figure",
+    )
+
     mo.md(rf"""
-    Guesses are close (i.e. near the floor) everywhere.
-    Even `v27`, whose exact-match score looks poor, guesses within
-    {_mean("v27", "open", "guess_dist"):.2f} of the true mix on open pairs,
-    against a floor of {_mean("v27", "open", "floor_dist"):.2f} and chance of
-    {_mean("v27", "open", "chance_dist"):.2f}.
-    `v216` tracks its floor very closely, and `v4096`'s held-out curve reaches
-    nearly 1 within a couple of grid levels of distance.
+    Guesses are better than chance everywhere, and comfortably inside the
+    prompt-blind constant, which is stricter: mixes are midpoints,
+    so they cluster centrally, and always answering the middle name scores
+    {bl.blind_stats(dist_matrix("v27", evals["v27"]["open"]), blind_for("v27", evals))["dist"]:.2f}
+    on `v27` open pairs where chance is {_mean("v27", "open", "chance_dist"):.2f}.
+    That much supports H3's picture.
+
+    {_table}
+
+    The floor is a harder reference than it looks, though, because it asks the
+    model to break a tie it may have no way to break. An open mix falls between
+    grid points, so two names bracket it, often at the same distance. A model
+    that has located the answer but picks between those two at random is the
+    "2 nearest" column, and every grid sits behind it: `v27` guesses
+    {_mean("v27", "open", "guess_dist"):.3f} against that baseline's
+    {bl.k_nearest_stats(dist_matrix("v27", evals["v27"]["open"]), 2)["dist"]:.3f}.
+    On the nearest-name rate the gap is wider, {_mean("v27", "open", "nearest_acc"):.2f}
+    against {bl.k_nearest_stats(dist_matrix("v27", evals["v27"]["open"]), 2)["nearest"]:.2f}.
+    So the guesses are near the true
+    mix, but not as near as a model with the same positional knowledge and a
+    coin could get.
 
     H3 predicted near-floor guessing only where exact-match accuracy was high,
-    but the geometry turns out to be present even where exact-match accuracy is
-    low. `v27` is coarse-grained, with few names and big gaps, so any leftover
-    imprecision costs the top-1 answer; `v4096` asks for neighbor-level
-    precision; and `v216` seems to match the model's achievable precision to its
-    grid spacing. The embedding geometry below puts a number on that last
-    phrase, and it turns out "achievable precision" is not one fixed quantity.
+    but the graded signal does turn out to be present even where exact-match
+    accuracy is low.
     """)
     return
 
@@ -570,8 +664,7 @@ def _(arrays):
         q, _ = np.linalg.qr(w)
         top3 = (np.linalg.svd(centered, compute_uv=False)[:3] ** 2).sum()
         # R² is scale-free, which hides whether the leftover error is small *for this grid*.
-        # Measuring it in grid cells asks that directly: under 1 cell means the nearest name
-        # is usually still the right one.
+        # Measuring it in grid cells asks that directly.
         err = np.linalg.norm(pred - rgb, axis=1).mean()
         cell = float(np.mean(np.diff(nc.GRIDS[g]))) / (N_LEVELS - 1)
         return {
@@ -580,6 +673,10 @@ def _(arrays):
             "share": float(((centered @ q) ** 2).sum() / top3),
             "err_rgb": float(err),
             "err_cells": float(err / cell),
+            # A mean under one cell does not imply a token decodes to its own name: a
+            # Voronoi cell reaches only half a step, and the mean hides the tail. Ask
+            # directly instead.
+            "self_nearest": bl.self_nearest_rate(raw_rgb(g), pred),
         }
 
     geometry = {(g, s): _geometry(g, s) for g in GRID_NAMES for s in SEEDS}
@@ -733,11 +830,20 @@ def _(geom, metrics):
     across the four grids.[^folds] From `v64` up, RGB is close to a linear
     function of the embedding.
 
-    The displacements are better read as a fraction of cell size. Probe-decoded
-    tokens sit {geom("v27", "err_cells"):.2f} cells from where they belong at
-    `v27`, {geom("v64", "err_cells"):.2f} at `v64` and
-    {geom("v216", "err_cells"):.2f} at `v216`, so the nearest name to where a
-    token lands is usually still its own name.
+    Does a probe-decoded token land nearer its own name than any other?
+
+    | grid | nearest name is its own |
+    | --- | --- |
+    | `v27` | {geom("v27", "self_nearest"):.0%} |
+    | `v64` | {geom("v64", "self_nearest"):.0%} |
+    | `v216` | {geom("v216", "self_nearest"):.0%} |
+    | `v4096` | {geom("v4096", "self_nearest"):.0%} |
+
+    At `v27` the answer is a coin flip. `v4096` makes the same point from the
+    other end: its R² of {geom("v4096", "r2"):.2f} is respectable, but sixteen
+    levels per channel pack the names so tightly that a decoded token is almost
+    never nearest its own. So the probe finds the cube, but it does not decode
+    individual tokens well enough to name them at any of these grid sizes.
 
     H4 expected the embedding table itself to turn low-dimensional, and the PCA
     says it doesn't: even the best three directions hold only {_evr["v27"]:.0%}
@@ -863,13 +969,14 @@ def _(completion_rows):
         "<tr><th>a</th><th>b</th><th>true mix</th><th>model's guess</th>"
         '<th class="num">distance</th><th class="num">floor</th></tr>'
     )
+    _k = 5
     _tables = []
     for _g, _es in [("v27", "named_holdout"), ("v216", "open"), ("v4096", "named_holdout")]:
         _tables.append(
             figure_html(
                 f'<div class="report-table-scroll"><table class="report-table">{_head}'
-                f"{completion_rows(_g, _es)}</table></div>",
-                caption=mo.md(f"`{_g}` · {_es.replace('_', ' ')}: the six widest misses (seed 0).").text,
+                f"{completion_rows(_g, _es, _k)}</table></div>",
+                caption=mo.md(f"`{_g}` · {_es.replace('_', ' ')}: the {_k} widest misses (seed 0).").text,
                 class_="report-figure",
             )
         )
@@ -878,12 +985,30 @@ def _(completion_rows):
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    `v27`'s misses are neighbor names (`violet` guessed as `purple`, `maroon` as
-    `olive`); `v216`'s open-pair guesses sit a step away from the floor; and
+def _(arrays, evals):
+    _exs = evals["v27"]["named_holdout"]
+    _rgb = raw_rgb("v27")
+    _null = bl.operand_shell_null(
+        bl.shell_mask(nc.GRIDS["v27"], _rgb, [ex.result for ex in _exs]),
+        _rgb,
+        [(ex.lhs, ex.rhs) for ex in _exs],
+    )
+    _n = _k = 0
+    for _s in SEEDS:
+        for _ex, _gv in zip(_exs, _rgb[arrays[f"v27-s{_s}/logp/named_holdout"].argmax(1)], strict=True):
+            _n += 1
+            _k += tuple(_gv) in (tuple(_ex.lhs), tuple(_ex.rhs))
+
+    mo.md(rf"""
+    `v27`'s misses are neighbor names (`violet` guessed as `blue`, `maroon` as
+    `red`); `v216`'s open-pair guesses sit a step away from the floor; and
     `v4096`'s worst held-out misses still agree with the true mix on two of the
     three channels.
+
+    Several of `v27`'s rows return one of the operands, may or may not be an echo.
+    Returning an operand and returning a neighbor are close to the same thing here.
+    {_k} of {_n} guesses are operands, against {_null:.0%} for a guess drawn
+    uniformly from the neighbors.
     """)
     return
 

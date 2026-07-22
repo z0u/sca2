@@ -434,8 +434,11 @@ def _(answer_value, completions, holdout_exs, margins, metrics):
     So the `open` intervention worked, in that the mix is computed on name +
     name prompts. But the *form rule* ("answer with a name exactly when the mix
     lands on the palette") did not carry over: the model treats a held-out
-    closed pair like an open one and answers in hex, or else falls back on the
-    nearest lookup neighbor's name. The reverse mapping `rev` didn't help.
+    closed pair like an open one and answers in hex, or else falls back on a
+    name near the mix. Whether that name is the answer of the closest memorized
+    equation is a further claim we haven't tested here.
+
+    So the reverse mapping `rev` didn't help.
 
     [^form]: "Form choice margin": the log-probability of the correct hex minus
     that of the true name under teacher forcing.
@@ -716,20 +719,31 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
+def _(metrics):
+    def _gp_guess(cond: str, s: int) -> str:
+        """What the model actually completes `lime + black = ` with."""
+        fails = cell(metrics, cond, s)["accuracy"]["named_holdout"]["failures"]
+        return next((g for p, _, g in fails if p.startswith("lime + black")), "green")
+
+    _seed0 = ", ".join(f"`{c}` {_gp_guess(c, SEEDS[0])}" for c in CONDS)
+
+    mo.md(rf"""
     ## The garden path, revisited
 
     Let's return to the walkthrough example from ex-2.1.1. A garden-path sentence
     is one that leads you into a wrong reading until a later word forces a
-    correction, and that's what happens here. On `lime + black = green`,
-    the model guesses the second operand as *blue*, revises to *black* when it sees
-    the `a`, and then only half-corrects the answer, so the trained
-    `lime + blue = teal` still comes out ahead.
+    correction, and that's what happens here. On `lime + black = green`, the
+    model guesses the second operand as *blue*, revises to *black* when it sees
+    the `a`, and then only half-corrects the answer, so a memorized neighbor of
+    the mix comes out ahead.
 
-    With the new corpora, does the correction finally overtake
-    the lookup? It does not: the margin stays several nats negative.
-    The sublines below trace per-character surprisal and entropy.
+    Which neighbor varies. At seed {SEEDS[0]} the completions are {_seed0}, and
+    across the other seeds `control` also gives olive and teal. The competitor is
+    not one fixed wrong answer.
+
+    With the new corpora, does the correction finally overtake the lookup? It
+    does not: the margin stays several nats negative. The sublines below trace
+    per-character surprisal and entropy for seed {SEEDS[0]}.
     """)
     return
 
@@ -803,11 +817,20 @@ def _(gp_idx, holdout_exs, metrics):
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    Every set the model fails, it fails confidently (mean s₂ between 0.5 and 0.7
-    on all zero-accuracy cells), rather than hedging, which is what the
-    garden-path sublines show up close.
+def _(metrics):
+    _s2 = sorted(
+        c["calibration"][es]["s2"]
+        for cond in CONDS
+        for s in SEEDS
+        for c in [cell(metrics, cond, s)]
+        for es, a in c["accuracy"].items()
+        if es in c["calibration"] and a["accuracy"] == 0.0
+    )
+    mo.md(rf"""
+    Every set the model fails, it fails confidently rather than hedging, which is
+    what the garden-path sublines illustrate. Across the {len(_s2)} cell and
+    eval-set pairs at zero accuracy, s₂ averages {np.mean(_s2):.2f} and spans
+    {_s2[0]:.2f} to {_s2[-1]:.2f}.
     """)
     return
 

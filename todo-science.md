@@ -130,16 +130,29 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Findings & notes to carry forward
 
-- **Multi-token naming keeps the geometry where evidence is dense, and costs
-  exactness where it is sparse (ex-2.1.4, 2026-07-19).** Char-level twin of
+- **Multi-token naming keeps the geometry where evidence is dense; `v27` cannot
+  say anything either way (ex-2.1.4, 2026-07-19; revised 2026-07-22).** Char-level twin of
   ex-2.1.3: corpora identical line for line, every color an opaque four-letter
   random name (v27 + v216, d64-L4). At v216, held-out exact match is 0.91
   (word level: 0.99), misses are one grid level off in one channel (59 of 68,
   pooled), zero malformed completions anywhere, and s₂ ≈ 0. At v27 exact match
   collapses to 0/10 on every seed (word level: 0.27) and the model is confidently
-  wrong (s₂ ≈ 0.9): every miss a neighbor or an operand echo, while open-pair
-  guesses still land 0.41 vs chance 0.82 — the neighborhood structure is learned;
-  the exact naming is not. Mechanism: reading names occupies depths 1–3 (operand
+  wrong (s₂ ≈ 0.9): 26 of 30 held-out guesses are one-step neighbors, and open-pair
+  guesses land 0.41 against a floor of 0.29 — the neighborhood structure is learned;
+  the exact naming is not. But v27 grades nothing: its closed-pair universe is
+  76 equations in total (66 train / 10 holdout), 27 of the training pairs are
+  `a + a = a`, three names never appear in a mix at all, and one held-out pair
+  is made entirely of those three — unanswerable from the corpus. On those ten
+  pairs a shell-confined guesser scores 0.18 exact and the prompt-blind constant
+  0.10, so word level's 0.27 and this experiment's 0.0 sit in the same band. Read
+  the v27 cells as absent evidence rather than as a cost of multi-token naming,
+  and prefer v216 or denser for rungs that have to carry a comparison.
+  Two null checks keep that honest on so coarse a grid
+  (see the methodology note below): the model hands back an operand 53% of the
+  time against a 40% neighbor-shell null (≈1.5 SE, 10 distinct pairs — no operand
+  echo), and its open-pair distance beats a prompt-blind constant of 0.48, not just
+  chance at 0.82. What separates it from prompt-blind is the counts, not the
+  distance means: nearest-name 33% vs 18%. Mechanism: reading names occupies depths 1–3 (operand
   probe R² 0.11 → 0.98 across layers), the mix crystallizes only in the final
   block at v216 (pre-answer R² ≈ 0 through depth 2, ≈ 0.96 at depth 4,
   transferring ≈ 0.95 to held-out and open prompts), and emission is holistic —
@@ -160,7 +173,9 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   to ≈ 0.95), the mix is decodable at the pre-answer position (R² ≈ 0.9 from depth 1–2,
   transferring to held-out and open prompts), and guesses land near the nearest-name
   floor even for pair types never trained on. Held-out exact match is non-monotonic —
-  0.27 / 0.59 / ≈ 1.0 / 0.65 — and the full grid's misses are one grid level off in
+  0.27 / 0.59 / ≈ 1.0 / 0.65 (v27's 0.27 is inside the null band, per the ex-2.1.4
+  note above — that cell measures the split more than the model) — and the full
+  grid's misses are one grid level off in
   one channel (precision, not knowledge; not concentrated at rounding boundaries).
   Consequences: the base language's `named_holdout` = 0 was a property of its grammar,
   not of name-only supervision; a ~216-color one-token vocabulary is a sweet spot for
@@ -200,6 +215,50 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   nearly untouched); ex-2.9.2 saw the same once. Cheap fix: set γ to a multiple of the
   ablated row's typical pre-norm contribution, measured on the train set after training.
   #anchoring #ex-2.9.3
+
+- **On coarse grids, state the null before reading a pattern as behavior
+  (methodology, 2026-07-21).** Two overclaims found in ex-2.1.4's `v27` analysis and
+  corrected, both from a reference that was too weak for a 27-name vocabulary.
+  (1) "The model often hands back an operand" read as an operand echo. But closure
+  forces each channel of a training pair to agree or to hold both end levels, so an
+  operand is one grid level from the mix by construction — a member of the mix's
+  one-step shell, and that shell holds only 4–6 names. Uniform choice within it
+  returns an operand 40% of the time against 53% observed. (2) "Guesses are far from
+  random" measured against `chance_dist`, a uniform-random name. Mixes cluster toward
+  the cube's centre, so a prompt-blind model that always answers the training
+  answers' centroid scores 0.48 on v27 open pairs where chance is 0.82 and the floor
+  is 0.29 — it eats most of the apparent headroom, and on v27 held-out pairs it
+  matches the model outright (0.57 vs 0.55). Rules of thumb for the anchored runs:
+  a mean-distance metric needs the prompt-blind constant beside it, not just chance;
+  prompt-dependent counts (nearest-name rate, shell membership) separate model from
+  baseline where distance means cannot; and check whether a "striking" coincidence is
+  forced by the grid's combinatorics before attributing it to the model. The
+  references now live in `src/sca/baselines.py` (`blind_index`, `shell_mask`,
+  `neighborhood_exact_null`, `operand_shell_null`, `k_nearest_stats`,
+  `self_nearest_rate`), so all four D2.1 reports compute them the same way.
+  #metrics #task-grammar #ex-2.1.4
+
+- **Retcon sweep of ex-2.1.1 to ex-2.1.4 for unsupported claims (2026-07-22).** Applied
+  the null discipline above to the three earlier reports; all are rebuilt and their
+  numbers are now computed in-cell rather than asserted. What changed. ex-2.1.3: its
+  `v27` held-out accuracy of 0.27 is only 1.2 SE over the 0.18 neighborhood null on ten
+  pairs, so the "geometry is inferable from names" conclusion now rests on the denser
+  grids (14–65 SE) and the embedding probes; "guesses track the floor" was measured
+  against too weak a bracket, and every grid in fact sits behind a coin flip between the
+  two names bracketing an open mix (`v27` 0.326 vs 0.302, nearest-name 0.50 vs 0.82);
+  the "under 1 cell of probe error, so the nearest name is its own" inference is false
+  (a Voronoi cell reaches half a step, and the real self-nearest rate is 0.51 at `v27`,
+  0.61 at `v64`, 0.76 at `v216`); two cited example misses did not exist in the data;
+  a caption said six rows where the code rendered four. ex-2.1.2: the stated s₂ range
+  on zero-accuracy cells (0.5–0.7) is really 0.41–0.85, mean 0.61; the garden-path
+  retelling pinned `lime + black` to `teal`, which is seed-dependent (`control` gives
+  gray, olive, teal across seeds); "falls back on the nearest lookup neighbor" was
+  asserted but never tested, and is now marked as untested. ex-2.1.1: "the correction
+  lifts *green* about 70× (to 13%)" was really *gray*'s numbers — green moves 96× but
+  only from 2e-08 to 2e-06, while teal holds 84%, which strengthens the report's point
+  that the operand correction never reaches the arithmetic. Its neighbor and
+  seed-agreement claims did clear their nulls (25/30 in the one-step shell against 17%;
+  4 of 10 pairs unanimous) and now say so. #metrics #ex-2.1.1 #ex-2.1.2 #ex-2.1.3
 
 ## Queued issues
 
