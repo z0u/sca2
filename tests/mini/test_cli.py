@@ -317,6 +317,11 @@ def test_status_brief_is_counts_plus_attention_only(tmp_path: Path, monkeypatch,
             {"key": "t-failed", "fn": "train", "state": "failed", "error": "RuntimeError: boom"},
             {"key": "t-parked", "fn": "train", "state": "running", "queued_s": ANY},
         ],
+        "attention_total": 2,
+        "attention_summary": [  # two distinct causes, one task each (launch order)
+            {"fn": "train", "state": "failed", "cause": "RuntimeError: boom", "count": 1},
+            {"fn": "train", "state": "queued", "cause": "queued too long", "count": 1},
+        ],
     }
     assert payload["attention"][1]["queued_s"] > STALE_HEARTBEAT_S
 
@@ -325,6 +330,69 @@ def test_status_brief_is_counts_plus_attention_only(tmp_path: Path, monkeypatch,
     assert "1 done · 1 running · 1 queued · 1 failed" in out  # the counts line, in fixed order
     assert "t-failed" in out and "t-parked" in out  # the actionable tasks are listed
     assert "t-done" not in out and "t-live" not in out  # …healthy ones are not
+
+
+def test_status_brief_collapses_a_mass_failure(tmp_path: Path, monkeypatch, capsys):
+    """The 30-containers-all-die case: identical failures must collapse to one
+    counted line (and a bounded JSON list + cause rollup), not N near-identical
+    lines — the difference between noise and a diagnosis, and the whole point of
+    --brief on a wide fan-out."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "massexp")
+    for i in range(8):  # one fan-out, one shared cause
+        key = f"train_one-{i:04d}"
+        store.records_backend.merge(
+            key, {"key": key, "state": "failed", "fn": "train_one", "error": "RuntimeError: CUDA OOM"}
+        )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="massexp", app="local", json=False, brief=True))
+    out = capsys.readouterr().out
+    assert "8 failed" in out  # counts line
+    assert "8× train_one" in out and "RuntimeError: CUDA OOM" in out  # one collapsed line…
+    assert out.count("train_one-") == 1  # …not eight — only the sample key ("— e.g. …") survives
+
+    cmd_status(argparse.Namespace(name="massexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    assert len(payload["attention"]) == 6  # capped list of representative records
+    assert payload["attention_total"] == 8
+    assert payload["attention_summary"] == [
+        {"fn": "train_one", "state": "failed", "cause": "RuntimeError: CUDA OOM", "count": 8}
+    ]
+
+
+def test_status_brief_caps_many_distinct_causes(tmp_path: Path, monkeypatch, capsys):
+    """When the causes really are distinct, the per-task listing is bounded with a
+    ``+N more`` rollup (mirroring the failed-task hint), so the payload can't blow
+    up however wide the fan-out — while the summary still names every cause."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "distinctexp")
+    for i in range(8):  # eight different failures → eight singleton groups
+        key = f"train_one-{i:04d}"
+        store.records_backend.merge(key, {"key": key, "state": "failed", "fn": "train_one", "error": f"Err{i}"})
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="distinctexp", app="local", json=False, brief=True))
+    out = capsys.readouterr().out
+    assert out.count("train_one-") == 6  # first six shown in full (with their keys)…
+    assert "… +2 more cause(s), 2 task(s)" in out  # …the rest rolled up
+
+    cmd_status(argparse.Namespace(name="distinctexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    assert len(payload["attention"]) == 6 and payload["attention_total"] == 8
+    assert len(payload["attention_summary"]) == 8  # every distinct cause still named
 
 
 def test_watch_timeout_exits_124_with_brief_summary(tmp_path: Path, monkeypatch, capsys):

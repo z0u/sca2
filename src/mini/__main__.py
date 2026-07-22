@@ -504,17 +504,33 @@ def cmd_status(args: argparse.Namespace) -> None:
     print(header)
     if brief:
         print(f"  {_fmt_counts(current)}")
-        for rec in sorted((r for r in current if _needs_attention(r)), key=_launch_order):
-            print(_memo_line(rec))
+        groups = _attention_groups(current)
+        for g in groups[:_ATTENTION_CAP]:
+            # A one-off keeps its full line (key, fc_id — the actionable detail);
+            # a homogeneous mass collapses to one counted line.
+            print(_memo_line(g["sample"]) if len(g["keys"]) == 1 else _grouped_attention_line(g))
+        if (extra := len(groups) - _ATTENTION_CAP) > 0:
+            tasks = sum(len(g["keys"]) for g in groups[_ATTENTION_CAP:])
+            print(f"  … +{extra} more cause(s), {tasks} task(s) — see: {PROG} status {args.name}")
     else:
         _print_records(store, recs)
+
+
+_ATTENTION_CAP = 6  # attention groups listed before an "+N more" rollup (mirrors gc's sample cap)
+
+
+def _display_state(rec: dict) -> str:
+    """The state a human reads: ``queued`` for a launched-but-unstarted RUNNING
+    record (no worker yet), else the raw state — so counts and groupings line up.
+    """
+    return "queued" if is_queued(rec) else str(_rec_state(rec))
 
 
 def _counts(current: list[dict]) -> dict[str, int]:
     """Task tally by state, with queued (launched, no worker yet) split out of running."""
     counts: dict[str, int] = {}
     for rec in current:
-        label = "queued" if is_queued(rec) else str(_rec_state(rec))
+        label = _display_state(rec)
         counts[label] = counts.get(label, 0) + 1
     return counts
 
@@ -534,6 +550,54 @@ def _needs_attention(rec: dict) -> bool:
     if stale_heartbeat(rec) or stale_progress(rec):
         return True
     return is_queued(rec) and bool(hb := rec.get("heartbeat_at")) and time.time() - hb > STALE_HEARTBEAT_S
+
+
+def _attention_cause(rec: dict) -> str:
+    """Why this task needs a look — the label that collapses a homogeneous mass
+    failure (30 identical OOMs → one line) and keeps distinct causes apart.
+    """
+    if _rec_state(rec) in (RunState.FAILED, RunState.CANCELLED):
+        return rec.get("error") or str(_rec_state(rec))
+    if stale_heartbeat(rec):
+        return "heartbeat stale — worker may be dead"
+    if stale_progress(rec):
+        return "no step progress — worker may be wedged"
+    return "queued too long"  # long-queued (capacity starvation)
+
+
+def _attention_groups(current: list[dict]) -> list[dict[str, Any]]:
+    """Attention tasks grouped by ``(fn, state, cause)``, launch-ordered by first member.
+
+    Collapsing identical failures is what keeps a wide fan-out's mass failure
+    legible — one ``30× train_one failed`` line instead of 30 near-identical
+    ones, the difference between noise and a diagnosis. Each group keeps its
+    first record (``sample``) and every key, so the caller can render a one-off
+    in full (with its key) and a mass as a counted line.
+    """
+    groups: dict[tuple, dict[str, Any]] = {}
+    keys: dict[tuple, list[str]] = {}
+    for rec in sorted((r for r in current if _needs_attention(r)), key=_launch_order):
+        sig = (rec.get("fn"), _display_state(rec), _attention_cause(rec))
+        if sig not in groups:
+            groups[sig] = {"fn": rec.get("fn"), "state": sig[1], "cause": sig[2], "sample": rec}
+            keys[sig] = []
+        keys[sig].append(rec["key"])
+    return [{**g, "keys": keys[sig]} for sig, g in groups.items()]
+
+
+def _grouped_attention_line(g: dict[str, Any]) -> str:
+    """One collapsed line for a multi-task attention group, keeping a sample key
+    so a human can still pull a traceback (``logs <exp> <key>``).
+    """
+    state = g["state"]
+    glyph = "◌" if state == "queued" else _GLYPH.get(RunState(state), "?")
+    line = f"  {glyph} {len(g['keys'])}× {g['fn'] or 'task':13} {state:9}"
+    if _rec_state(g["sample"]) in (RunState.FAILED, RunState.CANCELLED):
+        if g["sample"].get("error"):
+            line += f"  !! {g['cause']}"
+    else:
+        line += f"  ⚠ {g['cause']}"
+    return f"{line}  — e.g. {g['keys'][0]}"
 
 
 def _attention_json(rec: dict) -> dict[str, Any]:
@@ -578,8 +642,17 @@ def _brief_json(
         "settled": all(_rec_state(r) in SETTLED for r in current),
         "counts": _counts(current),
     }
-    if attention := [_attention_json(r) for r in sorted(current, key=_launch_order) if _needs_attention(r)]:
-        out["attention"] = attention
+    attention = [r for r in sorted(current, key=_launch_order) if _needs_attention(r)]
+    if attention:
+        # A capped list of representative task records (keys/fc_ids to act on),
+        # plus a full cause→count rollup so a wide mass failure reads as its few
+        # distinct causes, not N near-identical lines.
+        out["attention"] = [_attention_json(r) for r in attention[:_ATTENTION_CAP]]
+        out["attention_total"] = len(attention)
+        out["attention_summary"] = [
+            {"fn": g["fn"], "state": g["state"], "cause": g["cause"], "count": len(g["keys"])}
+            for g in _attention_groups(current)
+        ]
     if budget := _budget_json(store.meta()):
         out["budget"] = budget
     if stale:

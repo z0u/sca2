@@ -103,7 +103,7 @@ demo  —  failed  (3 tasks)
   ✗ train_one  train_one-dbf269543ed8  failed  !! RuntimeError: synthetic mid-stage failure
 ```
 
-Plain `status` lists every task with its metrics and heartbeat; add `--json` (with or without `--brief`) for the machine-readable form.
+When a whole fan-out dies the same way, the identical failures collapse to one counted line — `✗ 30× train_one  failed  !! RuntimeError: CUDA out of memory  — e.g. …` — so a mass failure reads as its cause, not its length. A failed task drops off this list once it's re-run (or the fn is edited); it isn't sticky. Plain `status` lists every task with its metrics and heartbeat; add `--json` (with or without `--brief`) for the machine-readable form (a capped `attention` list plus a `cause → count` summary).
 </details>
 
 <details>
