@@ -31,7 +31,7 @@ LM over the corpus, then measure:
   (surprisal exceeding entropy).
 
 The sweep answers two questions the anchored experiments depend on: which
-backbone size to freeze (the smallest that saturates accuracy), and what the
+architecture to carry forward (the smallest that saturates accuracy), and what the
 un-anchored geometry looks like — where color is decodable, and whether the
 probe directions agree across seeds (they shouldn't; that variability is the
 problem SCA exists to remove).

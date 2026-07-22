@@ -348,6 +348,7 @@ def themed_figure_html(
             font-size: 0.9em;
             font-style: italic;
             opacity: 0.75;
+            text-wrap: balance;
         }}
         </style>
         """)

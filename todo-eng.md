@@ -14,6 +14,54 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Document subline.** Describe subline in a skill: what it is, why we might
+  use it instead of a token heatmap, and how to use it.
+
+- **Document s_2.** Describe surprise-surprise in a skill: what it is, why we
+  might use it instead of surprisal, and how to calculate it. The mean s_2 over
+  a sequence would be analogous to perplexity. It's probably more informative
+  than perplexity alone, since it would capture the _per-token_ difference from
+  what the model anticipated. Note that negative values of s_2 are rare and
+  probably uninformative; they suggest the model finds the token to be
+  unsurprising.
+
+- **Dark-mode rim on `plot_latent_disc` (opened 2026-07-21).** The disc's
+  over-the-data rim is a hard-coded `#0005`, which over the `#111` dark fill is
+  effectively invisible — it only reads where data covers it. The new
+  `sca.vis.plot_rgb_cube` uses `light_dark("#0005", "#fff4")` instead, so the
+  two bounds are now drawn differently. Worth unifying, but changing
+  `plot_latent_disc` restyles the published ex-2.9.x figures, so it wants a
+  deliberate pass over those rather than a drive-by edit.
+
+- **Blend modes in matplotlib figures (opened 2026-07-21).** matplotlib has no
+  `mix-blend-mode` — no compositing operators on artists at all. Where several
+  series coincide (e.g. the RGB channels in ex-2.1.4's answer-schedule), the last
+  one drawn wins and the rest are hidden. `mini.vis.smooth_step` sidesteps it with
+  tapered line widths, which works but encodes an arbitrary draw order in the
+  widths. A real multiply/screen is possible: render each series to its own RGBA
+  buffer and composite in numpy. Two things to get right if we build it — the
+  chrome (axes, grid, text) must be a separate layer that is *not* blended, or
+  labels over- and under-expose; and each layer's empty pixels must contribute the
+  mode's identity (1 for multiply, 0 for screen) rather than the background color,
+  or the background gets blended in once per layer. That second one only shows up
+  in dark mode, since empty-over-white happens to equal multiply's identity.
+  Subline gets all of this free because SVG has the property natively
+  ([`subline.py`](src/subline/subline.py) sets `--blend-mode` and applies it to
+  the series paths only) — worth revisiting if a second figure wants it.
+
+- **Slope-capped sublines (opened 2026-07-21).** `Sparkline._create_path_data`
+  takes its curve knots from glyph ink bounds, so a ramp is always one inter-glyph
+  gap wide however big the jump is. A large step in surprisal therefore renders
+  near-vertical, which reads as a discontinuity and gives up the rate-of-change
+  cue the smooth step exists for. Deriving the ramp width from the jump height
+  instead (cap the on-screen angle, then shrink adjacent ramps so a plateau
+  survives) fixes it, but it restyles the published ex-2.1.1/2.1.2 figures, so it
+  wants an opt-in parameter and a deliberate pass rather than a drive-by edit.
+
+- **GPU determinism.** Configure GPU runs to use deterministic computation when
+  we care about reproducibility (e.g. when we want to refer to a stable
+  measurement from a particular seed).
+
 - **Responsive multi-panel figures in reports (opened 2026-07-16).** The
   ex-2.1.1 two-panel *named-pair lattice* was split into two independent
   `themed` figures wrapped in a `.report-figure-row` (inline-block, reflows to

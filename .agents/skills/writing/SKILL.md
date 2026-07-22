@@ -13,7 +13,7 @@ Characteristics:
 - "I think...", "It seems...": signal confidence, but not to the point of being vague or non-committal. Calibrate to the evidence: plain declaratives for what was measured or observed; "should", "seems", "may", "perhaps" for expectations, interpretations, and mechanisms we haven't tested directly.
 - Varied sentence rhythm.
 - Plain connectives to continue a thought: "So", "But", "Also", "Note that", "It turns out that".
-- Pose the motivating question directly, then answer it: "does zeroing that axis delete red, and only red?"
+- Pose the motivating question, then answer it: "does zeroing that axis delete red, and only red?"
 - Cross-domain analogies and examples to clarify technical concepts.
 - American spelling to match the convention in scientific literature.
 - High readability, with a Flesch-Kincaid grade level of around 10-12.
@@ -26,10 +26,12 @@ Anti-patterns:
 - ~~Adversarial framing~~. Don't cast the object of study as an opponent to beat, convict, or punish. No combat metaphors (*casualties*, *fighting back*, *hauled back*, *the fight is not free*), no crime or interrogation framing (*the culprit*, *names the suspect*, *guilty*/*innocent*, *the hypothesis is dead*), no coercion or punishment (*making composition pay*, *make the model pay for*, *punish memorization*). A result can be vivid without being violent; describe what happened, not who won. Prefer plain cause: "the LR peak was the cause" over "the LR peak was the culprit".
 - ~~All the lists~~. Mostly use paragraphs, but use lists sparingly when they are the clearest way to present the information.
 - ~~Heavy-handed transitions~~. Avoid "Furthermore", "In conclusion", "The honest answer is", etc. Just continue the thought.
+- ~~Narrated paragraph openers~~. Don't spend a sentence announcing what the paragraph will do ("The answer-schedule probe is worth a word of motivation.", "That distribution feeds a new measurement.", "Then the probes."). That move suits verbal teaching but is heavy in text; start with the content and let its role be apparent. Declaring intent for a whole section is still fine.
 - ~~Excessive use of em dashes~~. Prefer other punctuation.
 - ~~Excessive use of bold and italic text~~. List items should not be bolded. 1-2 callouts (bold) per page or section; italics only for references & borrowed words, or when it's truly unobvious which phrase should be emphasized (usually the reader can infer without it).
 - ~~Contrastive conclusions~~. Avoid "... is a feature, not a confound", etc. Instead of `A, ~A`, just say `A`.
 - ~~Verdict kickers~~. Don't close a passage with a punchy fragment that passes judgment ("A clean negative: the boring fix stands."). Readers pattern-match these as AI and stop reading. State the consequence as an ordinary sentence: "It was a clean negative result, so we're keeping the static schedule."
+- ~~Committing to unplanned future work~~. Don't state plans we haven't made as if they are settled. "The next experiment will test X", "the anchored runs will use Y as an early warning" — written in the present indicative, these read as established facts, when usually the follow-up isn't scheduled and the property isn't demonstrated. Prefer to say what *this* report shows and stop there. If a follow-up genuinely belongs in the text, mark it as a possibility, not a promise ("this could be tested by..."), and keep the claim to what we actually know. When in doubt, say nothing about what comes next.
 - ~~Evocative headings~~. Headings name what the section contains, not what it means. Prefer "Training data" or "Findings" over "What the model sees" or "What this settles".
 
 ### Register by document type
@@ -75,7 +77,8 @@ Prefer paragraphs for nuanced or complex explanations; use lists for
 summarizing steps, or when clarity would genuinely benefit from structure —
 and use them sparingly.
 
-Use italics for concepts like _red_. Bold and italics for emphasis is quite distracting to read, so save them for exceptional circumstances.
+Use italics for concepts like _red_. Never use bold and italics for emphasis,
+because they are distracting to read. The user will add them if necessary.
 
 Don't hard-wrap a line inside an inline code span or math expression. A wrapped
 span can start the next line with block syntax — a hex code like `#f78` at the
@@ -93,3 +96,5 @@ entirely. Rewrap the surrounding prose so the whole span sits on one line.
 +     hard-wrapped line. Use dedent and f-strings as needed."""
       )
 ```
+
+Multiline strings are also supported by the `@themed(..., alt_text=..., caption=...)` decorator (see `figure-style`).

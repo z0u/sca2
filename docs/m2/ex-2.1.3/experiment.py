@@ -14,7 +14,7 @@ We sweep the vocabulary size over level sub-grids of the 16-level RGB cube
 (`sca.data.named_colors.GRIDS`): 27, 64, 216, and 4096 colors. Small grids
 have few closed pairs (49 distinct at 27 colors) so the table is memorizable;
 the full grid's 8.4M pairs can only be covered ~1%, so the task is
-generalization or nothing. Per cell (grid × seed, frozen d64-L4 backbone):
+generalization or nothing. Per cell (grid × seed, the fixed d64-L4 architecture):
 
 - **Exact-match accuracy and answer NLL** on seen and held-out closed pairs
   (single-token answers, so cross-entropy over the vocabulary is exact).
@@ -37,7 +37,7 @@ from __future__ import annotations
 
 from mini import Ctx, Experiment, get_data_dir
 
-# The ex-2.1.1/2.1.2 backbone, unchanged. The embedding table grows with the
+# The ex-2.1.1/2.1.2 architecture, unchanged. The embedding table grows with the
 # vocabulary (4160 × 64 at the full grid) but the stack stays fixed.
 WIDTH, DEPTH = 64, 4
 SEEDS = [0, 1, 2]
@@ -126,7 +126,7 @@ def prepare_corpus(grid: str, levels: tuple) -> dict:
 
 
 def _make_config(vocab_size: int, seed: int):
-    """The frozen d64-L4 backbone; only the (tied) embedding table scales."""
+    """The d64-L4 config from the siblings; only the (tied) embedding table scales."""
     from sca.config import (
         DataConfig,
         ModelConfig,
@@ -357,7 +357,7 @@ experiment = Experiment(
     roles={
         # Corpus sampling is a plain-numpy loop: give it real cores + headroom.
         "prep": dict(cpu=2, timeout=900),
-        # Same backbone as the siblings; the full-grid cells are barely bigger.
+        # Same architecture as the siblings; the full-grid cells are barely bigger.
         "train": dict(gpu="L4", timeout=1800),
         "eval": dict(gpu="L4", timeout=900),
     },

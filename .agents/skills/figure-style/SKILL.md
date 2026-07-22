@@ -1,6 +1,6 @@
 ---
 name: figure-style
-description: Figure conventions for experiment reports. Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs, data-colored marks, theming, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, or building a results table, in a notebook.
+description: Figure conventions for experiment reports. Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs and RGB-cube bounds as hexagons, data-colored marks, theming, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, or building a results table, in a notebook.
 ---
 
 The M1 reports and the GRaM workshop poster set the house style. Match them:
@@ -26,6 +26,44 @@ space is the message, so draw the domain rather than the chart furniture:
   bound stays legible where points cover it. For 2D latent panels this whole
   recipe is packaged as `sca.colorcube.plot_latent_disc(ax, z, colors)` —
   use it instead of re-inlining the disc/scatter/rim block.
+- The RGB cube gets the same treatment with a hexagon in place of the disc:
+  `sca.vis.plot_rgb_cube(ax, rgb, colors)`, at the same (-1.1, 1.1) limits.
+  Any flat view of a solid collapses one direction, so there are two, and
+  they differ in which one they give up. The default `view='solid'` stands
+  the cube on its black corner — white up, black down, red toward the reader
+  — so lightness runs up the panel and the silhouette reads as the familiar
+  color solid. Use it whenever colors are the data: a grid, a dataset, a
+  palette. It deliberately looks unlike the hypersphere disc, so readers
+  don't take one for the other. `view='wheel'` looks down the grey diagonal
+  instead, putting the six chromatic corners on a regular hexagon with red
+  up and collapsing lightness. Prefer it for analysis panels — a probe
+  projection, a recovered cube — where hiding a hue axis would occlude the
+  errors the panel exists to show.
+  A panel that draws its own marks — a lattice with edges between vertices,
+  where the caller has to interleave zorders — calls
+  `sca.vis.draw_cube_bound(ax, view)` for the silhouette and the panel
+  conventions, then draws on top. The silhouette sits at zorder −10 and its
+  rim at +10, so hand-placed marks are framed wherever they land.
+- Size marks in points (`s=`) for a scatter of arbitrary points, so an
+  embedding projection doesn't grow its dots when the vocabulary does. Size
+  them in panel units (`diameter=`) when the marks stand for grid cells:
+  they then hold their size relative to the cube through any resize, and
+  `sca.vis.grid_diameter(levels, view)` gives the value at which a full grid
+  tiles with no gaps — no trial and error. Marks sized this way carry no
+  edge, since at tiling density the edges become a mesh over the solid.
+- Data marks and rim annotations draw with `clip_on=False`, as the disc
+  panels' rim markers do. The limits describe the domain, not the ink: a
+  mark centered on the silhouette overhangs it by half its width, and
+  cropping that turns a circle into a flat-sided blob. Overhang into a
+  neighbouring panel is the lesser problem.
+- Pass `truth=` (the same points' true RGB) to draw each target as an open
+  ring with a stub to where the point actually landed, which is how
+  positional error should read on a cube panel. `sca.vis.align_to_cube`
+  supplies the coordinates for a recovered cube: it Procrustes-fits a
+  rotation, uniform scale and shift onto the true positions and returns the
+  leftover residual. Keep that fit rigid — a free linear map absorbs shape
+  mismatch into a shear, and then the residual stops being comparable across
+  grids, seeds and layers.
 - Equal aspect. For 3D projections: orthographic, viewed top-down, so the
   panel reads as a 2D slice — `ax.view_init(elev=90, azim=-90)`,
   `ax.set_proj_type('ortho')`, and set the view margin to 0.

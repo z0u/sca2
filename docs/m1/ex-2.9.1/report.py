@@ -49,33 +49,46 @@ def _():
     # Experiment 2.9.1 redux: deleting *red*, now in JAX
 
     This is a port of [ex-preppy](https://github.com/z0u/ex-preppy) experiment
-    2.9.1 (M1, autoencoders), run as an end-to-end shakedown of this repo's
-    infrastructure before the M2 transformer experiments. The question it
-    re-answers is M1's: if Sparse Concept Anchoring pins *red* to one latent
-    axis during training, does zeroing that axis delete red — and only red?
+    2.9.1 (M1, autoencoders), run as an end-to-end test of this repo's
+    infrastructure before the M2 transformer experiments. It re-answers M1's
+    question: if Sparse Concept Anchoring pins *red* to one latent axis during
+    training, does zeroing that axis delete red, and only red?
 
-    A 5D-bottleneck RGB autoencoder trains with four regularizers on the
-    unit-normalized bottleneck: anchor (pull red-labeled samples toward e₀),
-    anti-anchor (repel everything from −e₀), separate (angular repulsion within
-    a batch), and anti-subspace (repel everything from axis 0). The label is
-    sparse and noisy: even pure red is labeled with probability 0.08 per draw.
-    After training, axis 0 is ablated (zeroed), and the run is scored by how
-    tightly post-ablation reconstruction error tracks each color's HSV
-    similarity to red — R² near 1 means the deletion was clean.
+    The model is a small autoencoder: it compresses each RGB color down to a
+    5-dimensional vector (the bottleneck) and reconstructs the color from that
+    vector alone. Training adds four regularizers[^regularizer] on the
+    bottleneck, which is unit-normalized so every latent vector lands on the
+    surface of a hypersphere: anchor pulls red-labeled samples toward one fixed
+    axis (e₀), anti-anchor pushes everything away from the opposite point
+    (−e₀), separate spreads samples within a batch apart from each other, and
+    anti-subspace pushes everything away from axis 0 in general. The red label
+    itself is sparse and noisy: even a pure red sample only gets labeled "red"
+    with probability 0.08 per draw.
 
-    This is a **report**: it reads results the experiment already produced. The
-    experiment is [`experiment.py`](./experiment.py), a `main(ctx)` DAG driven
-    from the CLI — 16 seeded runs fanned out on Modal CPU containers:
+    After training, we ablate (zero out) axis 0 and reconstruct every color,
+    then score the run by how tightly each color's post-ablation
+    reconstruction error tracks its HSV similarity to red. The score is R²,
+    which runs from 0 (no relationship) to 1 (a perfect linear fit): a value
+    near 1 means the deletion was clean, with error scaling with redness and
+    colors unlike red left untouched.
+
+    This is a report: it reads results the experiment already produced. The
+    experiment itself is [`experiment.py`](./experiment.py), a `main(ctx)` DAG
+    driven from the CLI — 16 seeded runs fanned out on Modal CPU containers:
 
     ```bash
     bin/mini run docs/m1/ex-2.9.1/experiment.py --app modal --max-containers 8
     ```
 
-    The port is deliberately lighter than the original: the PyTorch/Lightning
-    machinery becomes a pytree and one `lax.scan`; 16 seeds instead of 60;
-    validation only at the end; ablation only (no pruning or suppression
-    conditions). The dopesheet is byte-identical to the original — the same
-    `mini.temporal` machinery interprets it.
+    The port is lighter than the original: the PyTorch/Lightning machinery
+    becomes a pytree and one `lax.scan`, 16 seeds replace 60, validation
+    happens only at the end, and we test ablation only (no pruning or
+    suppression conditions). The dopesheet is identical to the original, so
+    the same `mini.temporal` machinery interprets it unchanged.
+
+    [^regularizer]: An extra term added to the training loss, alongside the
+    main reconstruction objective, that shapes the geometry of the latent
+    space without changing what the model is fundamentally trying to do.
     """)
     return
 
@@ -98,12 +111,12 @@ def _(loaded):
     metrics, best_eval = loaded
     best = max(metrics, key=lambda m: m["score"])
     scores = [m["score"] for m in metrics]
-    mo.md(
-        f"**{len(metrics)} runs completed.** Scores range {min(scores):.2f}–{max(scores):.2f} "
-        f"(median {np.median(scores):.2f}) — anchoring quality is seed-dependent, as in the original. "
-        f"The best run is seed {best['seed']} with score **{best['score']:.3f}**, in line with the "
-        f"original's best of 0.985 over 60 seeds."
-    )
+    mo.md(f"""
+    {len(metrics)} runs completed. Scores range {min(scores):.2f}–{max(scores):.2f}
+    (median {np.median(scores):.2f}): anchoring quality depends on the seed, as it did in
+    the original. The best run is seed {best["seed"]} with score **{best["score"]:.3f}**, in
+    line with the original's best of 0.985 over 60 seeds.
+    """)
     return best, best_eval, metrics
 
 
@@ -112,10 +125,12 @@ def _():
     mo.md(r"""
     ## The schedule
 
-    Training is choreographed by a [dopesheet](./dopesheet.csv): regularizer
-    weights and the learning rate are keyframed, and `mini.temporal` interpolates
-    between keyframes with a minimum-jerk curve. Everything ramps to zero by step
-    1425, leaving the last 75 steps as pure reconstruction fine-tuning.
+    Training uses a [dopesheet](./dopesheet.csv): a table of keyframes for
+    the regularizer weights and the learning rate, much like an animator's
+    keyframe track. `mini.temporal` interpolates between keyframes with a
+    minimum-jerk curve, which eases values in and out. Everything ramps to
+    zero by step 1425, leaving the last 75 steps as pure reconstruction
+    fine-tuning.
     """)
     return
 
@@ -127,12 +142,12 @@ def _():
 
     @themed(
         name="schedule",
-        alt_text=(
-            "Two stacked line charts of hyperparameter values against training step. Top: the four "
-            "regularizer weights — anti-subspace starts high at 0.25 and eases down; anchor and "
-            "anti-anchor ramp up over the first 250 steps; all four reach zero by step 1425. Bottom: "
-            "the learning rate ramps from near zero to 0.1 by step 750, holds, then anneals to 0.05."
-        ),
+        alt_text="""
+            Two stacked line charts of hyperparameter values against training step. Top: the four
+            regularizer weights — anti-subspace starts high at 0.25 and eases down; anchor and
+            anti-anchor ramp up over the first 250 steps; all four reach zero by step 1425. Bottom:
+            the learning rate ramps from near zero to 0.1 by step 750, holds, then anneals to 0.05.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, _ = plot_timeline(
@@ -157,10 +172,12 @@ def _():
     mo.md(r"""
     ## Scores across seeds
 
-    Each run trains from a different seed on the same schedule. As in the
-    original, outcomes vary substantially with initialization; the original
-    handled this with a 60-seed sweep and Pareto selection, and we keep the
-    same shape at smaller scale: sweep, then pick the best scorer.
+    Each run trains from the same schedule but a different seed, and outcomes
+    vary substantially with the starting point. That matches the original,
+    which handled the variance with a 60-seed sweep and selection along a
+    Pareto frontier (the best trade-offs across several objectives). We keep
+    the same shape at smaller scale: sweep the seeds, then take the best
+    scorer.
     """)
     return
 
@@ -169,10 +186,10 @@ def _():
 def _(best, metrics):
     @themed(
         name="scores",
-        alt_text=(
-            "Dot plot of ablation score by seed for 16 runs. Most seeds score between 0.7 and 1.0, "
-            "a few fall lower, and the best seed is circled at the top of the range."
-        ),
+        alt_text="""
+            Dot plot of ablation score by seed for 16 runs. Most seeds score between 0.7 and 1.0,
+            a few fall lower, and the best seed is circled at the top of the range.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(7, 3))
@@ -207,12 +224,12 @@ def _():
 def _(best, best_eval):
     @themed(
         name="error-vs-similarity",
-        alt_text=(
-            "Scatter plot of post-ablation reconstruction error against cubed HSV similarity to red, "
-            "one point per grid color, each drawn in its own color. Points fall close to a straight "
-            "line from the origin: gray, blue, and green points cluster at zero error, while red and "
-            "red-adjacent points climb to the highest errors."
-        ),
+        alt_text="""
+            Scatter plot of post-ablation reconstruction error against cubed HSV similarity to red,
+            one point per grid color, each drawn in its own color. Points fall close to a straight
+            line from the origin: gray, blue, and green points cluster at zero error, while red and
+            red-adjacent points climb to the highest errors.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(7, 4))
@@ -233,12 +250,12 @@ def _(best_eval):
     _mse_base, _mse_abl = best_eval["mse_base"], best_eval["mse_abl"]
     _sim = best_eval["sim3"]
     _reds, _others = _sim > 0.5, _sim < 0.01
-    mo.md(
-        f"Baseline reconstruction is near-perfect (mean MSE {_mse_base.mean():.2e}). After ablation, "
-        f"red-like colors (similarity³ > 0.5) take a mean error of {_mse_abl[_reds].mean():.3f}, while "
-        f"colors unlike red (similarity³ < 0.01, {int(_others.sum())} of {len(_sim)} grid points) sit at "
-        f"{_mse_abl[_others].mean():.2e} — deleting red cost them almost nothing."
-    )
+    mo.md(f"""
+    Baseline reconstruction is near-perfect (mean MSE {_mse_base.mean():.2e}). After ablation,
+    red-like colors (similarity³ > 0.5) have a mean error of {_mse_abl[_reds].mean():.3f}, while
+    colors unlike red (similarity³ < 0.01, {int(_others.sum())} of {len(_sim)} grid points) sit
+    at {_mse_abl[_others].mean():.2e}: deleting red barely affects them.
+    """)
     return
 
 
@@ -247,12 +264,13 @@ def _():
     mo.md(r"""
     ## The latent geometry
 
-    The same result is visible in the bottleneck. Before ablation, position along
-    axis 0 tracks similarity to red: pure red sits at 1, blues, greens, and
-    grays near 0 (pushed off the axis by the anti-subspace term), and warm
-    colors in between. Ablation zeroes axis 0, collapsing that direction while
-    leaving the arrangement of the other dimensions intact — which is why the
-    intervention is proportional to redness.
+    The same result shows up in the bottleneck geometry. Before
+    ablation, position along axis 0 tracks similarity to red: pure red sits
+    at 1, blues, greens, and grays sit near 0 (pushed off the axis by the
+    anti-subspace term), and warm colors fall in between. Ablation zeroes
+    axis 0, which collapses that one direction but leaves the arrangement of
+    the other dimensions intact. That's why the effect on reconstruction is
+    proportional to redness.
     """)
     return
 
@@ -261,14 +279,14 @@ def _():
 def _(best_eval):
     @themed(
         name="latents",
-        alt_text=(
-            "Two disc-shaped scatter plots of bottleneck latents, one point per grid color, each drawn "
-            "in its own color, inside a circle marking the unit hypersphere bound. The anchored axis "
-            "points up, labeled (1, 0, 0, 0, 0). Left, baseline: blues, greens, and grays hug the "
-            "horizontal diameter, warm colors spread upward, and pure reds reach the top of the circle. "
-            "Right, ablated: every point sits exactly on the horizontal diameter, the reds folded in "
-            "among the other colors."
-        ),
+        alt_text="""
+            Two disc-shaped scatter plots of bottleneck latents, one point per grid color, each drawn
+            in its own color, inside a circle marking the unit hypersphere bound. The anchored axis
+            points up, labeled (1, 0, 0, 0, 0). Left, baseline: blues, greens, and grays hug the
+            horizontal diameter, warm colors spread upward, and pure reds reach the top of the circle.
+            Right, ablated: every point sits exactly on the horizontal diameter, the reds folded in
+            among the other colors.
+        """,
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 2, figsize=(8.5, 4.6))
@@ -302,9 +320,8 @@ def _():
     `mini.temporal`; a 16-way `ctx.map` fan-out on Modal with memoized,
     resumable records; artifacts and refs flowing through the store to this
     report; and `@themed` figures published via the report bundle. Training a
-    seed takes about ten seconds, and the runs are bit-identical between local
-    CPU and Modal, so any failures here would have been infrastructure
-    failures. There were none left by the end.
+    single seed takes about ten seconds, and the runs are bit-identical
+    between local CPU and Modal. So, the infrastructure seems to work.
 
     Next: the M2 experiments proper, anchoring concepts in a small transformer's
     residual stream on the color-mixing task (see the [README](../../README.md)).

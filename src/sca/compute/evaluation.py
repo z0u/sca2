@@ -100,6 +100,36 @@ def ridge_probe(
     return w, b, _r2(x_test @ w + b, y_test)
 
 
+def ridge_probe_loo(
+    x: Float[np.ndarray, "N C"],
+    y: Float[np.ndarray, "N K"],
+    l2: float = 1e-2,
+) -> Float[np.ndarray, "N K"]:
+    """Leave-one-out predictions: row ``i`` comes from a probe fit on every other row.
+
+    The estimator to reach for when N is small, as it is for a color vocabulary.
+    A k-fold split both trains on fewer rows and makes the answer depend on
+    which split was drawn — at N = 27 that choice moves R² by a few hundredths —
+    whereas this has no split to choose and so no seed.
+
+    Exact, and roughly the cost of one fit rather than N: each fold's centered
+    Gram matrices come from a rank-1 downdate of the full ones, since dropping
+    row ``i`` subtracts its outer product and shifts the mean by a known amount.
+    """
+    x64, y64 = np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64)
+    n, c = x64.shape
+    sum_x, sum_y = x64.sum(0), y64.sum(0)
+    gram_xx, gram_xy = x64.T @ x64, x64.T @ y64
+    penalty = l2 * np.eye(c)
+    pred = np.empty_like(y64)
+    for i in range(n):
+        mx, my = (sum_x - x64[i]) / (n - 1), (sum_y - y64[i]) / (n - 1)
+        xx = gram_xx - np.outer(x64[i], x64[i]) - (n - 1) * np.outer(mx, mx)
+        xy = gram_xy - np.outer(x64[i], y64[i]) - (n - 1) * np.outer(mx, my)
+        pred[i] = (x64[i] - mx) @ np.linalg.solve(xx + penalty, xy) + my
+    return pred.astype(np.asarray(y).dtype)
+
+
 def _forced_stats(
     model: LanguageModel,
     tokenizer: CharTokenizer,

@@ -18,6 +18,7 @@ from sca.compute.evaluation import (
     probe_residual_stream,
     probe_transfer,
     ridge_probe,
+    ridge_probe_loo,
 )
 
 
@@ -60,6 +61,25 @@ def test_ridge_probe_recovers_a_planted_linear_map():
     np.testing.assert_allclose(w, w_true, rtol=0, atol=1e-3)
     np.testing.assert_allclose(b, [2.0, 2.0, 2.0], rtol=0, atol=1e-3)
     assert r2 > 0.999
+
+
+def test_ridge_probe_loo_matches_refitting_one_row_at_a_time():
+    """The rank-1 downdate is an optimization; it has to agree with the obvious loop."""
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((40, 6))
+    y = x @ rng.standard_normal((6, 3)) + 2.0 + rng.standard_normal((40, 3)) * 0.1
+    naive = np.stack(
+        [x[i] @ (fit := ridge_probe(np.delete(x, i, 0), np.delete(y, i, 0), x, y))[0] + fit[1] for i in range(len(x))]
+    )
+    np.testing.assert_allclose(ridge_probe_loo(x, y), naive, rtol=0, atol=1e-9)
+
+
+def test_ridge_probe_loo_is_honest_about_an_unlearnable_target():
+    """Held-out predictions of pure noise must not beat predicting the mean."""
+    rng = np.random.default_rng(1)
+    x, y = rng.standard_normal((30, 40)), rng.standard_normal((30, 2))
+    pred = ridge_probe_loo(x, y)
+    assert ((pred - y) ** 2).sum() > ((y.mean(0) - y) ** 2).sum()
 
 
 def test_probe_residual_stream_shapes():
