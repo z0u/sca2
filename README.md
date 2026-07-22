@@ -48,6 +48,79 @@ bin/mini retry docs/m2/ex-2.1.2/experiment.py  # after a fix — finished tasks 
 git push                                       # open a PR; merging to main deploys the site
 ```
 
+Here's what the experiment side of that loop looks like in practice, by intent. _(Outputs are illustrative — a small two-stage `demo` run: a `prep` step, then a `train_one` fan-out.)_
+
+<details>
+<summary><b>Launch &amp; advance</b> — <code>run</code> (the only verb that spends money)</summary>
+
+`run` launches the next stage and returns at once — it doesn't block. Each call advances the DAG by one wake; finished tasks are memo hits, so re-running only does what's left.
+
+```console
+$ bin/mini run docs/demo/experiment.py --app modal --budget 2h
+demo:
+  ◌ train_one  train_one-5b23f9ed87eb  queued  ⧖ queued 1s ago  [fc-01KXYEE4WJ…]
+  ◌ train_one  train_one-dbf269543ed8  queued  ⧖ queued 1s ago  [fc-01KXYEE503…]
+… suspended — 2 task(s) in flight (re-run to advance)
+```
+
+`◌ queued` is launched-but-not-yet-running; `--budget` caps the run's wall-clock, so a forgotten or wedged job tears itself down instead of burning money.
+</details>
+
+<details>
+<summary><b>Wait for the next event</b> — <code>watch</code> (read-only; Ctrl-C is safe)</summary>
+
+`watch` blocks until the run settles _or_ something needs you — a task fails mid-stage, a worker goes stale or wedged — then returns. It never ticks the DAG, so watching costs nothing and interrupting it leaves the workers running.
+
+```console
+$ bin/mini watch demo --timeout 10m
+⚠ needs attention: train_one-dbf269543ed8 settled failed
+demo  —  running  (3 tasks)
+```
+
+The **exit code** names what happened — `0` settled all-done, `1` settled with a failure, `3` needs attention now, `124` timed out with work still in flight — so a script (or the babysitting agent) branches without reading the text. `--json` swaps the live progress bars for one compact summary object:
+
+```console
+$ bin/mini watch demo --timeout 10m --json
+{"experiment": "demo", "app": "local", "state": "running", "settled": false,
+ "counts": {"done": 1, "running": 1, "failed": 1},
+ "attention": [{"key": "train_one-dbf269543ed8", "fn": "train_one",
+                "state": "failed", "error": "RuntimeError: …"}],
+ "outcome": "attention", "reason": "train_one-dbf269543ed8 settled failed"}
+```
+
+The full monitor loop — which exit code does what — lives in the `mi-ni` skill's `running.md`.
+</details>
+
+<details>
+<summary><b>Check in</b> — <code>status --brief</code></summary>
+
+`status` is read-only. `--brief` prints the aggregate state, a count by state, and _only_ the tasks that need a look (failed / stale / wedged / long-queued), so a fifty-task sweep doesn't scroll off the screen:
+
+```console
+$ bin/mini status demo --brief
+demo  —  failed  (3 tasks)
+  2 done · 1 failed
+  ✗ train_one  train_one-dbf269543ed8  failed  !! RuntimeError: synthetic mid-stage failure
+```
+
+Plain `status` lists every task with its metrics and heartbeat; add `--json` (with or without `--brief`) for the machine-readable form.
+</details>
+
+<details>
+<summary><b>Recover</b> — <code>logs</code>, then <code>retry</code></summary>
+
+`FAILED` and `CANCELLED` are terminal by design — a plain `run` won't relaunch them. Read the traceback, fix, then `retry` re-runs just the failed tasks (finished ones stay memo hits):
+
+```console
+$ bin/mini logs demo train_one-dbf269543ed8
+…
+RuntimeError: synthetic mid-stage failure
+
+$ bin/mini retry docs/demo/experiment.py --app modal
+retrying 1 task(s): train_one-dbf269543ed8
+```
+</details>
+
 CI uses the same verbs: the checks from `./go check` (split per step in `lint-check.yml`), and `./go site` (`pr-preview.yml`, `publish-docs.yml`), which assembles the public site from *published* bundles — read-only, never runs a notebook, assets stay on the CDN. `./go preview` is its local sibling: the same site, but built from local exports with assets copied beside the HTML, so it works offline (`--no-serve` to just build). The two are separate verbs on purpose — preview answers "what does my work look like?", site answers "what will the internet see?".
 
 Conventions for the site live in [docs/README.md](docs/README.md); the *why* behind the publishing pipeline in [eng/](eng/README.md); experiment authoring in the `mi-ni` skill.
