@@ -54,8 +54,8 @@ def _():
 
     /// note | How to read this draft
     This report was preregistered (drafted before the experiment ran).
-    Blockquotes marked 🔮 are placeholders: each states what its figure or table
-    should show and the pattern we expect. As results land, placeholders are
+    Admonitions marked TODO are placeholders: each states what its figure or
+    table should show and the pattern we expect. As results land, placeholders are
     replaced with observations. The hypotheses section is frozen except for
     immaterial changes; any analysis invented after seeing data goes under
     "Exploratory analyses" and is marked as post hoc.
@@ -104,8 +104,9 @@ def _():
     any point on the hex grid.
 
     To prepare training data, we pick two operands from one sublanguage (names
-    or hex) and compute the result. Mixing happens in the full cube, but the
-    method differs a little based on precision:
+    or hex) and compute the result. The mix is the channel-wise round-half-up
+    mean, always computed in the full cube; the two forms differ only in how
+    values enter and leave it:
     - Named colors already sit in the full cube, but the answer must be snapped
       to the nearest named color. Distance ties break by a coin flip seeded from
       the mix value.
@@ -127,10 +128,10 @@ def _():
     changes which vocabulary the answer uses.
 
     /// admonition | TODO
-    Figure: the palettes, both using sca.vis.plot_rgb_cube. One subfigure
-    per set as separate plots as nested figures; see 2.1.1. One or two labelled
-    points per figure, with name in caption like "a: `ultramarine`", "b:
-    `#48a`". Expected: fairly uniform spread through the cube.
+    Figure: the palettes, drawn with `sca.vis.plot_rgb_cube` — one subfigure
+    per operand set, nested as in ex-2.1.1. One or two labelled points per
+    subfigure, named in the caption ("a: `ultramarine`; b: `#48a`").
+    Expected: fairly uniform spread through the cube.
     ///
 
     /// admonition | TODO
@@ -163,12 +164,23 @@ def _():
     hand-picked probe sites of earlier reports with a map, so the alignment
     measures below don't depend on us choosing the right position in advance.
 
+    One subtlety: token positions don't line up across lines — names vary in
+    length, and hex lines are shorter than named ones. Positions are therefore
+    indexed by grammar landmarks (the last character of each operand, the
+    operator, the pre-answer position, and answer characters counted from the
+    answer's start and end), and the cross-form measures compare only at
+    landmarks the two forms share.
+
     Alignment between the two forms is scored two ways:
 
-    - Transfer ratio $\rho$ = zero-shot cross-form $R^2$ divided by
-      within-form $R^2$, at the same layer and position. Zero-shot means the
-      probe is fitted on one form's activations and applied unchanged to the
-      other's.
+    - Transfer ratio $\rho$: zero-shot cross-form $R^2$ divided by within-form
+      $R^2$, at the same layer and landmark. Zero-shot means the probe is
+      fitted on one form's activations and applied unchanged to the other's.
+      Two guards keep the ratio well-behaved: $\rho$ is reported only where
+      the within-form $R^2 \ge 0.5$, since below that the site isn't measuring
+      geometry and a small denominator makes the ratio erratic; and negative
+      cross-form $R^2$ clips to zero, so $\rho \in [0, 1]$ with 0 meaning no
+      transfer.
     - Principal angles between the row-spaces of the two forms' fitted probes:
       a graded measure of whether the two decoders use the same directions of
       the residual stream.
@@ -198,8 +210,10 @@ def _():
     - **H4.** Narrowing the stream aligns the forms: $\rho$ and subspace
       overlap rise monotonically over d64 → d32 → d16, with d16-L8 the most
       aligned cell.
-    - **H5.** Adding the cross form produces alignment at every width:
-      $\rho > 0.8$.
+    - **H5.** Adding the cross form produces alignment: the bridge cell (d64)
+      reaches $\rho > 0.8$. The star design tests this at one width only;
+      bridge × width cells are candidates for a follow-up round if H4 shows
+      width matters.
     - **H6.** At L8, name+name accuracy improves at fixed width and the mix
       crystallizes before the last layer.
     """)
@@ -229,6 +243,14 @@ def _():
     | hex-dense   | 140   | 2048    | none   | 64    | 4     |
     | palette-250 | 250   | 216     | none   | 64    | 4     |
     | bridge      | 140   | 216     | cross  | 64    | 4     |
+
+    Each arm has a reading. L8, the width cells, and d16-L8 score H4 and H6;
+    the bridge cell scores H5. The two density arms attach to H1: *hex-dense*
+    checks that hex accuracy and geometry aren't artifacts of the 216-point
+    operand subset (expected: little change — ex-2.1.1's hex arithmetic
+    generalized from far sparser coverage), and *palette-250* extends the
+    density axis of ex-2.1.3 to the irregular palette (expected: named
+    held-out accuracy holds or improves, with misses staying neighbor-level).
 
     Attention is held at 8 heads × 8 dims in every cell; only the residual
     stream and the MLP scale with width. The ngpt-scaling sweep validated
@@ -275,6 +297,13 @@ def _():
     palette $k$-NN terms, per form. Expected: named misses concentrated on
     nearest neighbors of the true answer; hex misses one grid level off in
     one channel, as in earlier experiments.
+    ///
+
+    /// admonition | TODO
+    Table: the density arms beside the center cell. Expected: hex accuracy
+    insensitive to the operand-subset size (hex-dense), and named accuracy at
+    250 names holding or improving on 140 (palette-250), continuing the
+    density trend of ex-2.1.3.
     ///
     """)
     return
@@ -333,8 +362,8 @@ def _():
     maximum-$\rho$ site as a second series. The primary site is chosen
     independently of $\rho$: a per-cell maximum of a noisy map rises with
     the noise, which could manufacture a width trend on its own. Expected: a
-    monotonic
-    rise in sharing as the stream narrows, with d16-L8 the most aligned. A
+    monotonic rise in sharing as the stream narrows, with d16-L8 the most
+    aligned. A
     flat line at low $\rho$ would say capacity pressure alone doesn't merge
     the forms at these scales; alignment already present at d64 would say
     the merge is a bias of training, and H3 falls.
@@ -349,9 +378,9 @@ def _():
     ## Alignment with a bridge (H5)
 
     /// admonition | TODO
-    Figure/table: the bridge cell's $\rho$ beside the center cell's.
-    Expected: cross-form equations lift $\rho$ above 0.8, i.e. a small
-    amount of shared supervision places both forms in the same subspace.
+    Figure/table: the bridge cell's $\rho$ beside the center cell's, at d64.
+    Expected: cross-form equations lift $\rho$ above 0.8, i.e. a small amount
+    of shared supervision places both forms in the same subspace.
     ///
     """)
     return
