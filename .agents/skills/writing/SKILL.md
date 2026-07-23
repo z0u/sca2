@@ -36,7 +36,7 @@ Anti-patterns:
 
 ### Register by document type
 
-- Experiment reports sit between a technical blog post and documentation: relaxed but focused, contractions used sparingly, the occasional dry aside, comfortable acknowledging "this might be wrong". Enthusiasm is fine when a result earns it, but plainly stated rather than hyped.
+- Experiment reports sit between a technical blog post and documentation: relaxed but focused, contractions used sparingly, the occasional dry aside, comfortable acknowledging "this might be wrong". Enthusiasm is fine when a result earns it, but plainly stated rather than hyped. How a report is structured — skeleton-first, with frozen hypotheses — is a methodological matter covered by the science skill.
 - Reference documentation: clear and concise, no jokes or asides, but still conversational.
 - Papers: slightly more formal but still readable. "We" for the work itself, fewer contractions, no jokes, no stiffness.
 - Issues, PRs, and chat: more casual; direct questions and short paragraphs.

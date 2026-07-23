@@ -2,46 +2,9 @@
 
 A report is a Marimo notebook (`docs/**/*.py`) that reads an experiment's durable
 results and renders them for the web. Its life has two halves: fixing what the
-report will claim *before* the experiment runs (the preregistration discipline
-below), and publishing it as a self-contained bundle once results land.
-
-## Preregistered reports
-
-Experiments should be designed with the human. Draft the report skeleton before the experiment code:
-intro, data/method, measurements, hypotheses with decision thresholds, then one
-section per hypothesis, "Exploratory analyses", and discussion. Conventions:
-
-- Placeholders are admonitions marked `TODO`. Each states what its figure or table
-  will show (axes, panels), the hypothesis it scores, the expected pattern, and
-  what a contrary result would look like. The marker is greppable, so no
-  placeholder survives to publication; results replace placeholders in place,
-  so review reads as a prediction → observation diff.
-- A "How to read this draft" note in the report explains the discipline to
-  readers. Hypotheses freeze once the skeleton is agreed (immaterial edits
-  aside); analyses conceived after seeing data go under "Exploratory analyses",
-  marked as post hoc.
-- Hypotheses are falsifiable: state the measurement, the threshold, and which
-  outcomes count as partial.
-- Iterate on the skeleton with the human in a PR before any experiment code;
-  fill mechanical sections after results land, but pause for discussion before
-  writing prose on the sections where interpretation lives.
-- Avoid over-claiming anything in the analysis and discussion. An experiment may _inform_ the next, but committing to an interpretation may blind us when we run future experiments.
-
-Example:
-
-```md
-## Hypotheses
-
-- **H1.** Describe what we're testing (no title).
-
-<!-- Then in the results/analysis section further down... -->
-
-## Short name for H1 (H1)
-
-/// admonition | TODO
-Describe what is needed (figure, table, expectations).
-///
-```
+report will claim *before* the experiment runs — the preregistration discipline,
+a methodological concern that lives in the science skill — and publishing it as a
+self-contained bundle once results land. This file covers the publishing half.
 
 ## Report bundles
 
