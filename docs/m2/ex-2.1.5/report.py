@@ -9,11 +9,44 @@ app = marimo.App(
 )
 
 with app.setup(hide_code=True):
-    import marimo as mo
+    import json
+    import tempfile
+    from pathlib import Path
 
-    # Experiment imports (refs, sweep constants, palette helpers) land with the
-    # experiment code. The skeleton is prose-only by design: see the note under
-    # "How to read this draft".
+    import marimo as mo
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.colors import LinearSegmentedColormap
+
+    # Marimo puts the notebook's directory on sys.path, so the experiment
+    # definition is importable — refs and sweep constants can't drift.
+    from experiment import ARMS, ARRAYS_REF, METRICS_REF, SEEDS
+    from mini.reports import report_bundle, use_publisher
+    from mini.store import project_store
+    from mini.vis import light_dark, themed
+    from sca import vis as sv
+    from sca.data import mixed_vocab as mv
+    from sca.data.mixed_vocab import LANDMARKS
+
+    use_publisher(report_bundle(__file__))
+
+    def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
+        """Resolve metrics and stacked per-cell arrays from the store, or None if unpublished."""
+        store = project_store()
+        arts = store.get_refs([METRICS_REF, ARRAYS_REF])
+        m_art, a_art = arts[METRICS_REF], arts[ARRAYS_REF]
+        if m_art is None or a_art is None:
+            return None
+        with tempfile.TemporaryDirectory() as d:
+            m_path, a_path = store.get_many([(m_art, Path(d) / "metrics.json"), (a_art, Path(d) / "arrays.npz")])
+            metrics = json.loads(m_path.read_text())
+            with np.load(a_path) as z:
+                arrays = {k: z[k] for k in z.files}
+        return metrics, arrays
+
+    def seq_cmap() -> LinearSegmentedColormap:
+        """Theme-adaptive sequential map for R² heatmaps (near-background → accent)."""
+        return LinearSegmentedColormap.from_list("r2", light_dark(["#eef3f7", "#1a5f8a"], ["#20242a", "#6ab0d4"]))
 
 
 @app.cell(hide_code=True)
@@ -64,6 +97,22 @@ def _():
     [M1/Ex-1.7]: https://z0u.github.io/ex-preppy/m1-color-mlp/ex-1.7-sparse-labels.html#Labelling
     """)
     return
+
+
+@app.cell(hide_code=True)
+def _():
+    _res = load_results()
+    mo.stop(_res is None, mo.md("_Results are not published yet; the analysis cells below render once they are._"))
+    assert _res is not None
+    metrics, arrays = _res
+    cells = {c["label"]: c for c in metrics["cells"]}
+    stats = metrics["corpus_stats"]
+
+    def seed_mean(arm: str, set_name: str, key: str) -> float:
+        vals = [cells[f"{arm}-s{s}"]["sets"][set_name][key] for s in SEEDS]
+        return float(np.mean([v for v in vals if v is not None]))
+
+    return arrays, cells, seed_mean, stats
 
 
 @app.cell(hide_code=True)
@@ -127,20 +176,80 @@ def _():
     form is determined by the prompt form; nothing about the result value
     changes which vocabulary the answer uses.
 
-    /// admonition | TODO
-    Figure: the palettes, drawn with `sca.vis.plot_rgb_cube` — one subfigure
-    per operand set, nested as in ex-2.1.1. One or two labelled points per
-    subfigure, named in the caption ("a: `ultramarine`; b: `#48a`").
-    Expected: fairly uniform spread through the cube.
-    ///
-
-    /// admonition | TODO
-    Figure/table: corpus statistics. Line counts per form, the answer-name
-    frequency distribution (the design study measured perplexity ≈ 87 over
-    140 names under uniform pair sampling, with 139 of 140 names reachable as
-    answers), and sequence lengths against the block size.
-    ///
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(stats):
+    _st = stats["n140-h216"]
+    _pal = np.array(list(_st["palette"].values()), dtype=float) / 255
+    _ops = np.array([mv.lift((int(h[1], 16), int(h[2], 16), int(h[3], 16))) for h in _st["hex_ops"]], dtype=float) / 255
+
+    @themed(
+        name="palettes",
+        alt_text="""
+            Two color-cube panels, each a hexagonal silhouette of the RGB cube
+            standing on its black corner, with data-colored dots. Left: the 140
+            farthest-point xkcd names, spread evenly through the whole solid.
+            Right: the 216 randomly sampled hex operands, also covering the
+            solid with no obvious clusters or holes.
+        """,
+        caption="""
+            The two operand sets in the RGB cube (center corpus). Left: the 140
+            named colors; right: the 216 hex operands. Both spread through the
+            full solid — the names by farthest-point construction, the hex
+            subset by uniform sampling of the 4,096-point grid.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, _axes = plt.subplots(1, 2, figsize=(7.6, 4.0))
+        for _ax, _pts, _title in [(_axes[0], _pal, "names (140)"), (_axes[1], _ops, "hex operands (216)")]:
+            sv.plot_rgb_cube(_ax, _pts)
+            _ax.set_title(_title)
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(stats):
+    _cols = ["corpus", "named", "hex", "cross", "held-out named", "held-out hex", "max line", "answer ppl", "reachable"]
+
+    def _row(key: str) -> str:
+        _s = stats[key]
+        _vals = [
+            f"{_s['n_lines']['named']:,}",
+            f"{_s['n_lines']['hex']:,}",
+            f"{_s['n_lines']['cross']:,}",
+            f"{_s['n_holdout']['named']:,}",
+            f"{_s['n_holdout']['hex']:,}",
+            f"{max(v['max'] for v in _s['line_length'].values())}",
+            f"{_s['answer_perplexity']:.0f}",
+            f"{_s['answers_reachable']}",
+        ]
+        return f"<tr><td>{key}</td>" + "".join(f'<td class="num">{v}</td>' for v in _vals) + "</tr>"
+
+    _thead = f"<tr><th>{_cols[0]}</th>" + "".join(f'<th class="num">{h}</th>' for h in _cols[1:]) + "</tr>"
+    mo.vstack(
+        [
+            mo.md("""
+            Corpus statistics, one row per corpus (cells that share
+            names × hex × bridge share a corpus). The design study's numbers
+            held up: answer perplexity is 86 over 140 names with every name
+            reachable as an answer (the 250-name palette reaches 248), and
+            the longest line is 85 characters, inside the block size of 128.
+            Line counts are the training corpus's 100,000 lines split by form.
+            """),
+            mo.Html(
+                '<div class="report-table-scroll"><table class="report-table">'
+                + _thead
+                + "".join(_row(k) for k in sorted(stats))
+                + "</table></div>"
+            ),
+        ]
+    )
     return
 
 
@@ -258,10 +367,33 @@ def _():
     tested range. If the d16 cells train poorly, that is an architecture
     effect to report, and the width trend in H4 rests on d64 → d32.
 
-    /// admonition | TODO
-    Table: parameter counts and training cost per cell.
-    ///
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(cells):
+    _thead = "<tr><th>cell</th>" + "".join(f'<th class="num">{h}</th>' for h in ("width", "depth", "params")) + "</tr>"
+    _rows = "".join(
+        f"<tr><td>{_a}</td>"
+        + f'<td class="num">{ARMS[_a]["width"]}</td>'
+        + f'<td class="num">{ARMS[_a]["depth"]}</td>'
+        + f'<td class="num">{cells[f"{_a}-s0"]["n_params"]:,}</td>'
+        + "</tr>"
+        for _a in ARMS
+    )
+    mo.vstack(
+        [
+            mo.md("""
+            Parameter counts per cell (seeds share a count). The full sweep —
+            4 corpora, 24 training cells, 24 evals — ran in about 2.5 hours
+            of wall time on five L4 containers.
+            """),
+            mo.Html(
+                '<div class="report-table-scroll"><table class="report-table">' + _thead + _rows + "</table></div>"
+            ),
+        ]
+    )
     return
 
 
@@ -270,12 +402,46 @@ def _():
     mo.md(r"""
     ## Training
 
-    /// admonition | TODO
-    Figure: loss curves per cell (train and validation). Expected: flat,
-    stable convergence everywhere, as in ngpt-scaling; the d16 cells are the
-    ones to watch for width-gated instability.
-    ///
+    All 24 cells converge smoothly under the shared 100-epoch schedule —
+    including the d16 cells, which sit one step below ngpt-scaling's
+    validated width range. No width-gated instability appeared.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(cells):
+    @themed(
+        name="loss-curves",
+        alt_text="""
+            Eight small panels of loss versus epoch, one per sweep cell, each
+            with three validation curves (one per seed) and three fainter
+            training curves. Every curve descends smoothly and flattens within
+            the 100-epoch budget; no panel shows divergence or oscillation.
+        """,
+        caption="""
+            Loss per epoch for every cell: validation solid, training faint,
+            one line per seed. All cells share the character vocabulary, so
+            per-token losses are comparable across panels.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, _axes = plt.subplots(2, 4, figsize=(9.0, 4.4), sharex=True, sharey=True)
+        _c = light_dark("#1a5f8a", "#6ab0d4")
+        for _ax, _arm in zip(_axes.flat, ARMS, strict=True):
+            for _s in SEEDS:
+                _cell = cells[f"{_arm}-s{_s}"]
+                _ax.plot([v for v in _cell["train_loss"] if v is not None], color=_c, lw=0.8, alpha=0.35)
+                _ax.plot([v for v in _cell["val_loss"] if v is not None], color=_c, lw=1.0)
+            _ax.set_title(_arm, fontsize=9)
+            _ax.grid(alpha=0.3)
+        for _ax in _axes[-1]:
+            _ax.set_xlabel("epoch")
+        for _ax in _axes[:, 0]:
+            _ax.set_ylabel("loss")
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -284,28 +450,128 @@ def _():
     mo.md(r"""
     ## Exact-match accuracy (H1)
 
-    /// admonition | TODO
-    Table: exact match per form on seen and held-out pairs at the center
-    cell, beside the nulls (prompt-blind centroid, $k$-NN neighborhood,
-    shell-confined guesser). Expected: hex accuracy comparable to
-    ex-2.1.1's hex levels; named held-out accuracy above the nulls by a
-    margin the 140-name pair count can actually resolve, unlike v27.
-    ///
-
-    /// admonition | TODO
-    Figure: where the misses land. Distance from guess to true mix in
-    palette $k$-NN terms, per form. Expected: named misses concentrated on
-    nearest neighbors of the true answer; hex misses one grid level off in
-    one channel, as in earlier experiments.
-    ///
-
-    /// admonition | TODO
-    Table: the density arms beside the center cell. Expected: hex accuracy
-    insensitive to the operand-subset size (hex-dense), and named accuracy at
-    250 names holding or improving on 140 (palette-250), continuing the
-    density trend of ex-2.1.3.
-    ///
+    The center cell answers held-out hex equations almost perfectly (0.996
+    exact) and held-out named equations at 0.667, with zero malformed
+    completions in any eval set. The named score sits far above the
+    prompt-blind centroid (0.043). One null simplified itself: in this
+    language the true answer *is* the candidate nearest the mix, so the
+    $k$-NN neighborhood null is exactly $1/k$ — the strongest version is a
+    coin flip between the two nearest candidates at 0.5, and the model
+    clears that too, by a margin the 1,946 held-out named pairs can resolve.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(seed_mean, stats):
+    _nulls = stats["n140-h216"]["nulls"]
+    _cols = ["eval set", "exact", "guess dist", "floor dist", "blind null", "2-NN null"]
+
+    def _row(_set: str) -> str:
+        _vals = [
+            f"{seed_mean('center', _set, 'accuracy'):.3f}",
+            f"{seed_mean('center', _set, 'guess_dist'):.3f}",
+            f"{seed_mean('center', _set, 'floor_dist'):.3f}",
+            f"{_nulls[_set]['blind']['acc']:.3f}",
+            f"{_nulls[_set]['knn']['k2']['acc']:.3f}",
+        ]
+        return f"<tr><td>{_set.replace('_', ' ')}</td>" + "".join(f'<td class="num">{v}</td>' for v in _vals) + "</tr>"
+
+    _thead = f"<tr><th>{_cols[0]}</th>" + "".join(f'<th class="num">{h}</th>' for h in _cols[1:]) + "</tr>"
+    mo.vstack(
+        [
+            mo.Html(
+                '<div class="report-table-scroll"><table class="report-table">'
+                + _thead
+                + "".join(_row(s) for s in ("named_seen", "named_holdout", "hex_seen", "hex_holdout"))
+                + "</table></div>"
+            ),
+            mo.md("""
+            Center cell, mean over three seeds. Distances are Euclidean in the
+            unit cube: *guess dist* from the emitted answer to the exact mix,
+            *floor dist* from the true (snapped) answer to the exact mix — the
+            quantization floor. The guesses sit near the floor even where
+            exact match misses.
+            """),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays):
+    @themed(
+        name="miss-ranks",
+        alt_text="""
+            Two bar panels of guess rank, pooled over three seeds of the center
+            cell. Rank 0 means the emitted answer is the candidate nearest the
+            true mix, i.e. correct. For named held-out prompts, about two
+            thirds of the mass is at rank 0 and most of the rest at ranks 1 and
+            2, with a small tail beyond 6. For hex held-out prompts virtually
+            all mass is at rank 0.
+        """,
+        caption="""
+            Where the guesses land, center cell, pooled over seeds: the rank of
+            the emitted answer among the form's candidate vocabulary, ordered
+            by distance to the true mix. Rank 0 is the correct answer; rank 1
+            is its nearest competitor. Malformed completions would be excluded,
+            but there are none.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, _axes = plt.subplots(1, 2, figsize=(8.0, 3.2), sharey=True)
+        _cap = 6
+        for _ax, _set, _title in [
+            (_axes[0], "named_holdout", "named held-out"),
+            (_axes[1], "hex_holdout", "hex held-out"),
+        ]:
+            _r = np.concatenate([arrays[f"center-s{_s}/evals/{_set}/rank"] for _s in SEEDS])
+            _r = _r[_r >= 0]
+            _counts = np.bincount(np.minimum(_r, _cap), minlength=_cap + 1) / len(_r)
+            _ax.bar(range(_cap + 1), _counts, color=light_dark("#1a5f8a", "#6ab0d4"))
+            _ax.set_xticks(range(_cap + 1), [*map(str, range(_cap)), f"{_cap}+"])
+            _ax.set_title(_title)
+            _ax.set_xlabel("guess rank (0 = correct)")
+            _ax.grid(alpha=0.3, axis="y")
+        _axes[0].set_ylabel("fraction of prompts")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(seed_mean, stats):
+    _corpus_of = {"center": "n140-h216", "hex-dense": "n140-h2048", "palette-250": "n250-h216"}
+    _thead = (
+        "<tr><th>cell</th>"
+        + "".join(f'<th class="num">{h}</th>' for h in ("named held-out", "hex held-out", "answer ppl"))
+        + "</tr>"
+    )
+    _rows = "".join(
+        f"<tr><td>{_a}</td>"
+        + f'<td class="num">{seed_mean(_a, "named_holdout", "accuracy"):.3f}</td>'
+        + f'<td class="num">{seed_mean(_a, "hex_holdout", "accuracy"):.3f}</td>'
+        + f'<td class="num">{stats[_k]["answer_perplexity"]:.0f}</td>'
+        + "</tr>"
+        for _a, _k in _corpus_of.items()
+    )
+    mo.vstack(
+        [
+            mo.Html(
+                '<div class="report-table-scroll"><table class="report-table">' + _thead + _rows + "</table></div>"
+            ),
+            mo.md("""
+            The density arms. Hex accuracy is insensitive to the operand-subset
+            size, as expected. Named held-out accuracy dips in *both* density
+            arms — at 250 names the answer perplexity is 153 against 86, so
+            some drop was expected there, but the dip under denser hex
+            operands (0.582, same named corpus as the center) was not
+            predicted. Both stay far above their nulls. The hex-density
+            interaction is taken up in the discussion.
+            """),
+        ]
+    )
     return
 
 
@@ -314,16 +580,64 @@ def _():
     mo.md(r"""
     ## Within-form geometry (H2)
 
-    /// admonition | TODO
-    Figure: probe $R^2$ maps over layer × position for operand and mix
-    values, one panel per form, center cell. Expected: names show operand
-    readout building over layers 1–3 and the mix crystallizing at the
-    pre-answer position in the last layer ($R^2 \approx 0.9$); hex shows the
-    just-in-time channel staircase with low pre-answer full-mix $R^2$. If
-    the hex panel instead shows a holistic pre-answer mix, that is coupling,
-    and the alignment section is where to look next.
-    ///
+    The maps below plot leave-one-out probe $R^2$ at every depth × landmark,
+    for the two operands and the mix, per form (center cell, seed-averaged;
+    depth 0 is the embedding layer). The named form matches the prediction,
+    with one refinement: operand readout builds over the early layers, and
+    the mix is decodable at $R^2 \approx 0.97$ in the last layer — but the
+    peak sits at the `=` landmark, a character before the predicted
+    pre-answer position. The hex form never assembles the full mix at one
+    site: its best full-mix $R^2$ is 0.62, mid-answer, consistent with
+    ex-2.1.2's just-in-time channel staircase. Nothing in the hex panels
+    looks like a holistic pre-answer mix, so the coupling tell that H2
+    reserved judgment on did not appear.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays):
+    @themed(
+        name="probe-maps",
+        alt_text="""
+            Six heatmaps of probe R² over depth (vertical, embedding plus four
+            layers) by grammar landmark (horizontal, operand and answer
+            characters), arranged as two rows of three: named form on top, hex
+            form below, with columns for operand 1, operand 2, and the mix. In
+            the named row, operand panels saturate from depth 1 onward around
+            their own landmarks, and the mix panel is dark until depth 3, where
+            it saturates from the equals sign onward. In the hex row, operand
+            panels also read out strongly, but the mix panel stays pale
+            everywhere, peaking mid-answer at about 0.6.
+        """,
+        caption="""
+            Leave-one-out probe R² at every depth × landmark, center cell,
+            mean over seeds. Rows: named and hex forms; columns: operand 1,
+            operand 2, and the mix. Landmarks run through operand 1, the plus,
+            operand 2, the equals sign, the pre-answer space, and the answer's
+            first and last characters.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        _targets = ("op1", "op2", "mix")
+        fig, _axes = plt.subplots(2, 3, figsize=(9.6, 4.8), sharex=True, sharey=True)
+        _cmap = seq_cmap()
+        _im = None
+        for _i, _form in enumerate(("named", "hex")):
+            for _j, _t in enumerate(_targets):
+                _m = np.mean([arrays[f"center-s{_s}/probes/{_form}/{_t}/r2"] for _s in SEEDS], axis=0)
+                _ax = _axes[_i, _j]
+                _im = _ax.imshow(_m, vmin=0, vmax=1, cmap=_cmap, aspect="auto", origin="lower")
+                _ax.set_title(f"{_form} · {_t}", fontsize=9)
+        for _ax in _axes[1]:
+            _ax.set_xticks(range(len(LANDMARKS)), LANDMARKS, rotation=90, fontsize=7)
+        for _ax in _axes[:, 0]:
+            _ax.set_ylabel("depth")
+        assert _im is not None
+        fig.colorbar(_im, ax=_axes, shrink=0.8, label="probe R²")
+        return fig
+
+    mo.Html(_plot())
     return
 
 
