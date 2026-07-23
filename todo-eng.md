@@ -14,6 +14,10 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Science skill.** We have a fledgeling `science` skill that describes how to
+  collaborate on experiment design. There may be old descisions in
+  todo-science.md that could be moved there and polished.
+
 - **First-run Modal image build can eat a small `--budget` (observed
   2026-07-20).** In a fresh Modal environment the first launch spends minutes
   building the container image while the task sits `queued`; a `--budget 10m`
