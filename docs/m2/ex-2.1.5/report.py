@@ -3,7 +3,7 @@ import marimo
 __generated_with = "0.23.9"
 app = marimo.App(
     width="medium",
-    app_title="Ex 2.1.5: disjoint vocabularies",
+    app_title="Ex 2.1.5: disjoint vocabularies and more named colors",
     css_file="../../report.css",
     auto_download=["html"],
 )
@@ -19,25 +19,33 @@ with app.setup(hide_code=True):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Ex 2.1.5: disjoint vocabularies
+    # Ex 2.1.5: disjoint vocabularies and more named colors
 
-    **Do two surface languages for the same domain converge on one internal
-    geometry?** The corpus for this experiment holds two sublanguages that never
-    share a line: color-mixing equations written with names (`melon +
-    ultramarine = …`), and the same arithmetic written as hex codes (`#e26 +
-    #48a = #958`). Nothing in the data ties a name to a hex value; there are no
-    alias lines and no mixed-form equations. So if the model places both
-    vocabularies in the same value geometry anyway, the cause is pressure
-    internal to the network, and we can ask what kind: capacity (does sharing
-    appear only when the residual stream is narrow?) or bias (does it appear
-    even when there is plenty of room to keep the two apart?).
+    Do two surface languages for the same domain converge on one internal
+    geometry?
 
-    The answer sets up the anchoring experiments. An anchor is supervised
-    through labeled sequences, and in a mixed-vocabulary corpus those labels
-    will mostly touch one surface form. If the forms share their geometry, an
-    anchor placed through hex sequences should constrain named ones too; if
-    they live apart, anchoring one form says nothing about the other. This
-    experiment measures which world we are in, before any anchoring.
+    The corpus for this experiment holds two sublanguages that are never seen
+    together: color-mixing equations written with names, and the same arithmetic
+    written as hex codes. For example:
+
+    ```
+    melon + ultramarine = …
+    #e26 + #48a = #958
+    ```
+
+    Nothing directly ties a name to a hex value; there are no alias lines and no
+    mixed-form equations. So if the model places both vocabularies in the same
+    latent geometry, the cause is pressure internal to the network, e.g.
+    capacity constraints.
+
+    The answer sets up the anchoring experiments. The graded concept labels are
+    computed from color values, so they attach to either form with equal ease;
+    the question is whether they land on one shared geometry or two. If the
+    forms share their geometry, a concept like *red* has a single home and one
+    anchor covers both vocabularies; if they live apart, an anchor is a
+    per-form object. And if this experiment finds the forms apart, a later one
+    could test whether anchoring the same concept in both forms pulls the
+    geometries together, and whether more shared anchors pull harder.
 
     Lineage: the base language (ex-2.1.1, 2.1.2) bridged names and hex with
     alias and cross lines, and its 27-name sub-grid turned out too sparse to
