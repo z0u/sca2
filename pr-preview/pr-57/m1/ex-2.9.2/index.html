@@ -431,7 +431,7 @@ figure.report-figure > figcaption {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.report-table :is(th,td):not(:first-child) {
+.report-table :is(th, td):not(:first-child) {
   padding-left: 2ex;
 }
 
@@ -443,6 +443,39 @@ figure.report-figure > figcaption {
 }
 .report-table-scroll .report-table {
   white-space: nowrap;
+}
+
+/* Make details elements usable. My default they are styled as admonitions, which are
+ * designed to be eye-catching and is the opposite of what a details element should do.
+ */
+.markdown details {
+  border-width: 0;
+  border-radius: 0;
+  box-shadow: 4px 0px 0px 0px color-mix(in srgb, var(--border), transparent 0%) inset;
+  transition: 0.3s;
+
+  summary {
+    transition: 0.3s;
+    &:before {
+      border-color: currentColor;
+    }
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+}
+.markdown details:not(:open) {
+  background: transparent;
+  box-shadow: 4px 0px 0px 0px transparent inset;
+
+  summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
 }
     </style>
 </head>
