@@ -58,6 +58,33 @@ Concision is not density. Cutting words and lowering reader effort are different
 
 So write in plain English, with respect for the reader's intelligence, but also for their time.
 
+### Preregistered reports
+
+For experiments where predictions should be on record before results exist
+(first used in ex-2.1.5), draft the report skeleton before the experiment code:
+intro, data/method, measurements, hypotheses with decision thresholds, one
+section per hypothesis, "Exploratory analyses", and discussion. Conventions:
+
+- Placeholders are blockquotes marked 🔮. Each states what its figure or table
+  will show (axes, panels), the hypothesis it scores, the expected pattern, and
+  what a contrary result would look like. The marker is greppable, so no
+  placeholder survives to publication; results replace placeholders in place,
+  so review reads as a prediction → observation diff.
+- A "How to read this draft" note in the report explains the discipline to
+  readers. Hypotheses freeze once the skeleton is agreed (immaterial edits
+  aside); analyses conceived after seeing data go under "Exploratory analyses",
+  marked as post hoc.
+- Hypotheses are falsifiable: state the measurement, the threshold, and which
+  outcomes count as partial ("$0.2 < \rho < 0.8$ reads as partial sharing and
+  falsifies the crisp version of both H3 and H5").
+- Where a hypothesis needs a measurement site (a probe position, a layer),
+  choose it by a criterion independent of the statistic being judged, and
+  report the statistic's own best site beside it as an explicit bound —
+  choosing the site by the reported statistic is a selection effect.
+- Iterate on the skeleton with the human in a PR before any experiment code;
+  fill mechanical sections after results land, but pause for discussion before
+  writing prose on the sections where interpretation lives.
+
 ---
 
 ## Markdown

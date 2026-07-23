@@ -224,6 +224,16 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   ablated row's typical pre-norm contribution, measured on the train set after training.
   #anchoring #ex-2.9.3
 
+- **Choose measurement sites independently of the statistic being judged
+  (methodology, 2026-07-23).** From ex-2.1.5 drafting: when a comparison needs a
+  probe site (a layer × position cell), picking the site that maximizes the
+  reported statistic is a selection effect — the maximum of a noisy map rises
+  with the noise, which can manufacture a trend (e.g. across widths) on its own.
+  Pick the primary site by an independent criterion (e.g. strongest within-form
+  probe R² when judging cross-form transfer), and report the statistic's own
+  best site beside it as an explicit upper bound. Also banked in the writing
+  skill's preregistration section. #metrics #ex-2.1.5
+
 - **On coarse grids, state the null before reading a pattern as behavior
   (methodology, 2026-07-21).** Two overclaims found in ex-2.1.4's `v27` analysis and
   corrected, both from a reference that was too weak for a 27-name vocabulary.

@@ -107,10 +107,13 @@ def _():
     or hex) and compute the result. Mixing happens in the full cube, but the
     method differs a little based on precision:
     - Named colors already sit in the full cube, but the answer must be snapped
-      to the nearest named color (ties break toward the lexicographically first
-      name).
-    - Hex operands are lifted to it by digit repetition (`#f80` → `#ff8800`) and
-      the answer is snapped back to the hex grid
+      to the nearest named color. Distance ties (≈ 0.7% of name pairs) break by
+      a coin flip seeded from the mix value, so mix → name stays a
+      deterministic function and every equation has a single correct answer;
+      an alphabetical rule would instead couple tie outcomes to spelling, the
+      surface channel under study.
+    - Hex operands are lifted to it by digit repetition (`#f80` → `#ff8800`)
+      and the answer is snapped back to the hex grid.
 
     Two forms appear in every cell of the sweep, and a third only in the
     _bridge_ arm:
@@ -132,9 +135,9 @@ def _():
     > `#48a`". Expected: fairly uniform spread through the cube.
 
     > 🔮 Figure/table: corpus statistics. Line counts per form, the answer-name
-    > frequency distribution (the design study measured perplexity ≈ 83 over 139
-    > names under uniform pair sampling), and sequence lengths against the block
-    > size.
+    > frequency distribution (the design study measured perplexity ≈ 87 over
+    > 140 names under uniform pair sampling, with 139 of 140 names reachable as
+    > answers), and sequence lengths against the block size.
     """)
     return
 
@@ -206,6 +209,12 @@ def _():
 def _():
     mo.md(r"""
     ## The sweep
+
+    <!-- Run plan (ops, not report content): 8 cells × 3 seeds = 24 runs. The
+    GPU container cap is 10; run with max 5 containers so each handles ~5
+    cells and the per-container startup time amortizes. Block size must be
+    ≥ ~96 (lines reach ~86 chars with the multi-word names); earlier
+    experiments used 64. -->
 
     A star design around one center cell, three seeds per cell:
 
