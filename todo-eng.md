@@ -35,7 +35,12 @@ readable cold without re-deriving code state.
   throughput-outlier flag (steps_per_min under ~⅓ of the sibling median for
   the same fn joins the attention list). Not a wedge: progress heartbeats
   stayed fresh throughout, as the watchdog's stale-progress flag is designed
-  to check.
+  to check. Knock-on cost: the train role's 1.5 h timeout was sized for
+  full-speed cells, so the slowdown turned it into a kill switch — the
+  asia-northeast3 cell was killed at step 7,895 of 7,900 and retrained from
+  scratch (a fast container redid it in 5 min). Timeouts sized to a multiple
+  of expected duration only work if throughput is observable and roughly
+  uniform; the background-emit fix restores that assumption.
 
 - **Science skill.** We have a fledgeling `science` skill that describes how to
   collaborate on experiment design. There may be old descisions in
