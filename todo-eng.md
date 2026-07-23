@@ -14,6 +14,23 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Monitoring should compare against expectations, and the tools should do
+  the comparing (2026-07-23, ex-2.1.5).** The haiku experiment-monitor
+  reported "progressing normally" while 3 of 5 containers ran 15–30× slow:
+  its playbook covered settled/failed/wedged but not deviation-from-expected.
+  Agent-side fix applied (anomaly-scan section in
+  `.claude/agents/experiment-monitor.md`: sibling throughput comparison,
+  finish-time-vs-timeout projection, metric trends, "healthy ≠ nothing
+  failed"). Tooling half still open, so a small model reads verdicts instead
+  of computing them: (a) `train_model` passes loss in the progress *message
+  string*, not the `ProgressMessage.metrics` dict, so status shows
+  `"metrics": {}` and no tool can check trends — one-line fix in
+  `sca/compute/training.py`, but it's memoization evidence, so bundle with
+  the next change that re-runs cells; (b) `status --brief` attention flags
+  for throughput outliers (vs sibling median) and projected timeout
+  overruns, complementing the existing queued-too-long and stale-progress
+  flags; (c) a loss-trend flag once (a) lands. #monitoring
+
 - **Synchronous progress emission serializes training on cross-region queue
   puts (diagnosed 2026-07-23, ex-2.1.5).** Containers outside us-east-1 ran
   identical train cells 15–30× slower (92–220 steps/min vs 2,500–3,500), in
