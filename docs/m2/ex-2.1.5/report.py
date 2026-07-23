@@ -107,11 +107,8 @@ def _():
     or hex) and compute the result. Mixing happens in the full cube, but the
     method differs a little based on precision:
     - Named colors already sit in the full cube, but the answer must be snapped
-      to the nearest named color. Distance ties (≈ 0.7% of name pairs) break by
-      a coin flip seeded from the mix value, so mix → name stays a
-      deterministic function and every equation has a single correct answer;
-      an alphabetical rule would instead couple tie outcomes to spelling, the
-      surface channel under study.
+      to the nearest named color. Distance ties break by a coin flip seeded from
+      the mix value.
     - Hex operands are lifted to it by digit repetition (`#f80` → `#ff8800`)
       and the answer is snapped back to the hex grid.
 
@@ -129,15 +126,19 @@ def _():
     form is determined by the prompt form; nothing about the result value
     changes which vocabulary the answer uses.
 
-    > 🔮 Figure: the palettes, both using sca.vis.plot_rgb_cube. One subfigure
-    > per set as separate plots as nested figures; see 2.1.1. One or two labelled
-    > points per figure, with name in caption like "a: `ultramarine`", "b:
-    > `#48a`". Expected: fairly uniform spread through the cube.
+    /// admonition | TODO
+    Figure: the palettes, both using sca.vis.plot_rgb_cube. One subfigure
+    per set as separate plots as nested figures; see 2.1.1. One or two labelled
+    points per figure, with name in caption like "a: `ultramarine`", "b:
+    `#48a`". Expected: fairly uniform spread through the cube.
+    ///
 
-    > 🔮 Figure/table: corpus statistics. Line counts per form, the answer-name
-    > frequency distribution (the design study measured perplexity ≈ 87 over
-    > 140 names under uniform pair sampling, with 139 of 140 names reachable as
-    > answers), and sequence lengths against the block size.
+    /// admonition | TODO
+    Figure/table: corpus statistics. Line counts per form, the answer-name
+    frequency distribution (the design study measured perplexity ≈ 87 over
+    140 names under uniform pair sampling, with 139 of 140 names reachable as
+    answers), and sequence lengths against the block size.
+    ///
     """)
     return
 
@@ -235,7 +236,9 @@ def _():
     tested range. If the d16 cells train poorly, that is an architecture
     effect to report, and the width trend in H4 rests on d64 → d32.
 
-    > 🔮 Table: parameter counts and training cost per cell.
+    /// admonition | TODO
+    Table: parameter counts and training cost per cell.
+    ///
     """)
     return
 
@@ -245,9 +248,11 @@ def _():
     mo.md(r"""
     ## Training
 
-    > 🔮 Figure: loss curves per cell (train and validation). Expected: flat,
-    > stable convergence everywhere, as in ngpt-scaling; the d16 cells are the
-    > ones to watch for width-gated instability.
+    /// admonition | TODO
+    Figure: loss curves per cell (train and validation). Expected: flat,
+    stable convergence everywhere, as in ngpt-scaling; the d16 cells are the
+    ones to watch for width-gated instability.
+    ///
     """)
     return
 
@@ -257,16 +262,20 @@ def _():
     mo.md(r"""
     ## Exact-match accuracy (H1)
 
-    > 🔮 Table: exact match per form on seen and held-out pairs at the center
-    > cell, beside the nulls (prompt-blind centroid, $k$-NN neighborhood,
-    > shell-confined guesser). Expected: hex accuracy comparable to
-    > ex-2.1.1's hex levels; named held-out accuracy above the nulls by a
-    > margin the 140-name pair count can actually resolve, unlike v27.
+    /// admonition | TODO
+    Table: exact match per form on seen and held-out pairs at the center
+    cell, beside the nulls (prompt-blind centroid, $k$-NN neighborhood,
+    shell-confined guesser). Expected: hex accuracy comparable to
+    ex-2.1.1's hex levels; named held-out accuracy above the nulls by a
+    margin the 140-name pair count can actually resolve, unlike v27.
+    ///
 
-    > 🔮 Figure: where the misses land. Distance from guess to true mix in
-    > palette $k$-NN terms, per form. Expected: named misses concentrated on
-    > nearest neighbors of the true answer; hex misses one grid level off in
-    > one channel, as in earlier experiments.
+    /// admonition | TODO
+    Figure: where the misses land. Distance from guess to true mix in
+    palette $k$-NN terms, per form. Expected: named misses concentrated on
+    nearest neighbors of the true answer; hex misses one grid level off in
+    one channel, as in earlier experiments.
+    ///
     """)
     return
 
@@ -276,13 +285,15 @@ def _():
     mo.md(r"""
     ## Within-form geometry (H2)
 
-    > 🔮 Figure: probe $R^2$ maps over layer × position for operand and mix
-    > values, one panel per form, center cell. Expected: names show operand
-    > readout building over layers 1–3 and the mix crystallizing at the
-    > pre-answer position in the last layer ($R^2 \approx 0.9$); hex shows the
-    > just-in-time channel staircase with low pre-answer full-mix $R^2$. If
-    > the hex panel instead shows a holistic pre-answer mix, that is coupling,
-    > and the alignment section is where to look next.
+    /// admonition | TODO
+    Figure: probe $R^2$ maps over layer × position for operand and mix
+    values, one panel per form, center cell. Expected: names show operand
+    readout building over layers 1–3 and the mix crystallizing at the
+    pre-answer position in the last layer ($R^2 \approx 0.9$); hex shows the
+    just-in-time channel staircase with low pre-answer full-mix $R^2$. If
+    the hex panel instead shows a holistic pre-answer mix, that is coupling,
+    and the alignment section is where to look next.
+    ///
     """)
     return
 
@@ -292,17 +303,21 @@ def _():
     mo.md(r"""
     ## Cross-form geometry separation (H3)
 
-    > 🔮 Figure: transfer-ratio $\rho$ maps over layer × position, both
-    > directions (hex→name, name→hex), center cell. Expected: $\rho < 0.2$
-    > everywhere the within-form probes are strong.
+    /// admonition | TODO
+    Figure: transfer-ratio $\rho$ maps over layer × position, both
+    directions (hex→name, name→hex), center cell. Expected: $\rho < 0.2$
+    everywhere the within-form probes are strong.
+    ///
 
-    > 🔮 Figure: principal angles between the two probes' row-spaces. The
-    > primary site is where within-form $R^2$ is strongest, chosen without
-    > reference to $\rho$ so the verdict isn't shaped by the quantity being
-    > judged; the maximum-$\rho$ site is reported beside it as an upper bound
-    > on sharing ("even at its most aligned site…"). Expected: angles near
-    > 90° at the primary site, i.e. the decoders use different directions of
-    > the stream.
+    /// admonition | TODO
+    Figure: principal angles between the two probes' row-spaces. The
+    primary site is where within-form $R^2$ is strongest, chosen without
+    reference to $\rho$ so the verdict isn't shaped by the quantity being
+    judged; the maximum-$\rho$ site is reported beside it as an upper bound
+    on sharing ("even at its most aligned site…"). Expected: angles near
+    90° at the primary site, i.e. the decoders use different directions of
+    the stream.
+    ///
     """)
     return
 
@@ -312,16 +327,18 @@ def _():
     mo.md(r"""
     ## Alignment under compression (H4)
 
-    > 🔮 Figure: $\rho$ and principal angles versus width (d64, d32, d16, plus
-    > the d16-L8 cell), at each cell's strongest within-form site, with the
-    > maximum-$\rho$ site as a second series. The primary site is chosen
-    > independently of $\rho$: a per-cell maximum of a noisy map rises with
-    > the noise, which could manufacture a width trend on its own. Expected: a
-    > monotonic
-    > rise in sharing as the stream narrows, with d16-L8 the most aligned. A
-    > flat line at low $\rho$ would say capacity pressure alone doesn't merge
-    > the forms at these scales; alignment already present at d64 would say
-    > the merge is a bias of training, and H3 falls.
+    /// admonition | TODO
+    Figure: $\rho$ and principal angles versus width (d64, d32, d16, plus
+    the d16-L8 cell), at each cell's strongest within-form site, with the
+    maximum-$\rho$ site as a second series. The primary site is chosen
+    independently of $\rho$: a per-cell maximum of a noisy map rises with
+    the noise, which could manufacture a width trend on its own. Expected: a
+    monotonic
+    rise in sharing as the stream narrows, with d16-L8 the most aligned. A
+    flat line at low $\rho$ would say capacity pressure alone doesn't merge
+    the forms at these scales; alignment already present at d64 would say
+    the merge is a bias of training, and H3 falls.
+    ///
     """)
     return
 
@@ -331,9 +348,11 @@ def _():
     mo.md(r"""
     ## Alignment with a bridge (H5)
 
-    > 🔮 Figure/table: the bridge cell's $\rho$ beside the center cell's.
-    > Expected: cross-form equations lift $\rho$ above 0.8, i.e. a small
-    > amount of shared supervision places both forms in the same subspace.
+    /// admonition | TODO
+    Figure/table: the bridge cell's $\rho$ beside the center cell's.
+    Expected: cross-form equations lift $\rho$ above 0.8, i.e. a small
+    amount of shared supervision places both forms in the same subspace.
+    ///
     """)
     return
 
@@ -343,13 +362,15 @@ def _():
     mo.md(r"""
     ## Depth (H6)
 
-    > 🔮 Figure: name-form accuracy and the mix-crystallization map at L8
-    > versus L4. Expected: held-out named accuracy rises, and the layer ×
-    > position probe map shows the mix decodable before the final layer,
-    > giving the result concept more than one layer of existence. A live
-    > counter-expectation: nothing in the loss rewards computing early, so the
-    > mix may instead stay pressed against the answer and build gradually —
-    > that outcome would refute this clause of H6.
+    /// admonition | TODO
+    Figure: name-form accuracy and the mix-crystallization map at L8
+    versus L4. Expected: held-out named accuracy rises, and the layer ×
+    position probe map shows the mix decodable before the final layer,
+    giving the result concept more than one layer of existence. A live
+    counter-expectation: nothing in the loss rewards computing early, so the
+    mix may instead stay pressed against the answer and build gradually —
+    that outcome would refute this clause of H6.
+    ///
     """)
     return
 
@@ -370,17 +391,21 @@ def _():
     mo.md(r"""
     ## Discussion
 
-    > 🔮 Verdict table for H1–H6 (supported / partial / unsupported), with a
-    > pointer to the figure/analysis section that decides each.
+    /// admonition | TODO
+    Verdict table for H1–H6 (supported / partial / unsupported), with a
+    pointer to the figure/analysis section that decides each.
+    ///
 
-    > 🔮 What the outcome suggests for anchoring across surface forms: if
-    > alignment requires a bridge or compression, anchored runs on a
-    > mixed-vocabulary corpus need their labels to touch both forms (or need
-    > the bridge); if alignment is free, one form's labels may suffice. Especially
-    > for these suggestions, the verdicts above should be read with wide error
-    > bars: we're working with one synthetic task, small models, and there are
-    > many variables we haven't tested. The outcomes inform the design of the
-    > anchored runs; they don't settle the general question.
+    /// admonition | TODO
+    What the outcome suggests for anchoring across surface forms: if
+    alignment requires a bridge or compression, anchored runs on a
+    mixed-vocabulary corpus need their labels to touch both forms (or need
+    the bridge); if alignment is free, one form's labels may suffice. Especially
+    for these suggestions, the verdicts above should be read with wide error
+    bars: we're working with one synthetic task, small models, and there are
+    many variables we haven't tested. The outcomes inform the design of the
+    anchored runs; they don't settle the general question.
+    ///
     """)
     return
 
