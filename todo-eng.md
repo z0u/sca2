@@ -14,22 +14,28 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- **Per-container throughput varies 15–30× on identical work; mini can't see
-  why (observed 2026-07-23, ex-2.1.5).** All train cells requested `gpu="L4"`,
-  yet two us-east-1 containers ran every cell at ~2,500–3,500 steps/min while
-  three containers (us-west1, asia-northeast3, eu-south-2) ran at 92–220 — a
-  gap too large for L4-to-L4 variance, consistent with a silent JAX CPU
-  fallback. Not a wedge (progress heartbeats stayed fresh; the watchdog's
-  stale-progress flag is the wedge detector and it worked). Three candidate
-  fixes, in priority order: (1) capture accelerator identity in the task `env`
-  (JAX backend + device name beside cpu/mem/region), so status can show it;
-  (2) optional per-role platform assert at task start — GPU requested but JAX
-  backend is CPU → raise, turning a silent 20× slowdown into a retryable
-  failure; (3) `status --brief` throughput-outlier flag: steps_per_min under
-  ~⅓ of the sibling median for the same fn joins the attention list beside
-  queued-too-long and stale-progress. Speculative requeue of tail cells
-  (memoization makes duplicates safe) is a bigger hammer; only if slow
-  containers recur.
+- **Synchronous progress emission serializes training on cross-region queue
+  puts (diagnosed 2026-07-23, ex-2.1.5).** Containers outside us-east-1 ran
+  identical train cells 15–30× slower (92–220 steps/min vs 2,500–3,500), in
+  order of distance from us-east — initially misread as a possible CPU
+  fallback; AF's I/O hypothesis was right. Mechanism: `train_model` calls
+  `emit_progress` every step; `Debouncer`'s leading edge runs the Modal Queue
+  `put` synchronously on the training thread (`mini/progress.py` `_do_emit`,
+  `mini/_debounce.py`); and once put latency exceeds `emission_interval`
+  (`max_containers / 10` = 0.5 s this run), every step re-triggers the leading
+  edge, so the loop degrades to one blocking put per step. Implied put
+  latencies from steps/min: ~0.28 s us-west1, ~0.38 s eu-south-2, ~0.65 s
+  asia-northeast3 — a few RTTs each, i.e. HTTPS without connection reuse.
+  Fixes, in order: (1) emit from a background thread with a single-slot
+  latest-wins buffer so the training thread never blocks on the network —
+  removes the cliff outright; (2) adaptive interval (≥ k × observed put
+  latency) as a cheap guard; (3) optionally region-pin workers to the queue's
+  home region for locality. Still worth doing for observability regardless:
+  accelerator identity in task `env`, and a `status --brief`
+  throughput-outlier flag (steps_per_min under ~⅓ of the sibling median for
+  the same fn joins the attention list). Not a wedge: progress heartbeats
+  stayed fresh throughout, as the watchdog's stale-progress flag is designed
+  to check.
 
 - **Science skill.** We have a fledgeling `science` skill that describes how to
   collaborate on experiment design. There may be old descisions in
