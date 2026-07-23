@@ -191,10 +191,8 @@ def _():
       aligned cell.
     - **H5.** Adding the cross form produces alignment at every width:
       $\rho > 0.8$.
-    - **H6.** At L8, name+name accuracy improves at fixed width. Where the mix
-      becomes decodable is measured without a committed direction: the freed-up
-      depth could let it crystallize earlier, but nothing in the loss rewards
-      computing early, so it may stay pressed against the answer.
+    - **H6.** At L8, name+name accuracy improves at fixed width and the mix
+      crystallizes before the last layer.
     """)
     return
 
@@ -332,11 +330,12 @@ def _():
     ## Depth (H6)
 
     > 🔮 Figure: name-form accuracy and the mix-crystallization map at L8
-    > versus L4. Expected: held-out named accuracy rises. For where the mix
-    > appears, two expectations are live: reading finishes around layer 3, so
-    > the mix could crystallize any time after; or, with nothing in the loss
-    > rewarding early computation, it stays in the last layer and only builds
-    > gradually on approach.
+    > versus L4. Expected: held-out named accuracy rises, and the layer ×
+    > position probe map shows the mix decodable before the final layer,
+    > giving the result concept more than one layer of existence. A live
+    > counter-expectation: nothing in the loss rewards computing early, so the
+    > mix may instead stay pressed against the answer and build gradually —
+    > that outcome would refute this clause of H6.
     """)
     return
 
