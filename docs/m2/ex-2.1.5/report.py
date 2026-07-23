@@ -73,35 +73,39 @@ def _():
 
     First, let's define two RGB grids (cubes):
 
-    <!-- The symbols (C_{16}) are arbitrary; I'm not super happy with them -->
-
-    | Symbol | Levels | Hex digits | Example ("cyan") | Precision | Colors |
+    | Space | Levels | Hex digits | Example ("cyan") | Precision | Colors |
     |---|---|---|---|---|---|
-    | $C_{16}$ | 16 | 3 | `#0ff` | 4-bit | 4,096 |
-    | $C_{256}$ | 256 | 6 | `#00ffff` | 8-bit | 16,777,216 |
+    | the *hex grid* | 16 | 3 | `#0ff` | 4-bit | 4,096 |
+    | the *full cube* | 256 | 6 | `#00ffff` | 8-bit | 16,777,216 |
 
-    <!-- I wonder about the single-word rule. Although it's avoiding a prefix bias, it's adding another one. I feel like it might be better to only sort by farthest-point selection and take the top N. We could do a separate analysis of common substrings, if we suspect a skew. -->
-
-    **Names.** The named palette comes from the [xkcd color survey][xkcd]. Of
-    its 949 names, 250 are single words, and we order those by farthest-point
-    selection so that the first $N$ form the most uniform palette available at
-    that size. The center cell uses $N = 140$. At that size the minimum and
-    median nearest-neighbor distances are ≈ 28 and ≈ 37 (8-bit Euclidean),
-    against 4 and 27 for the CSS keyword list, which is why we prefer the xkcd
-    set. These names map to points on $C_{256}$.
+    **Names.** The named palette comes from the [xkcd color survey][xkcd]: all
+    949 names, ordered by farthest-point selection so that the first $N$ form
+    the most uniform palette available at that size. The center cell uses
+    $N = 140$; at that size the minimum and median nearest-neighbor distances
+    are ≈ 41 and ≈ 46 (8-bit Euclidean), against 4 and 27 for the CSS keyword
+    list. An earlier draft kept single-word names only, to avoid modifier words
+    like *light* that spell out part of the value; but that filter swapped one
+    selection bias for another and cost uniformity (28/37 at the same size), so
+    the selection rule is now distance alone. Most selected names are
+    multi-word, and the longest at $N = 140$ is `blue with a hint of purple`,
+    so lines run to ≈ 86 characters and the block size grows accordingly. If
+    spelled modifiers look like they shortcut the name geometry, a substring
+    analysis goes under "Exploratory analyses". Names map to points on the full
+    cube.
 
     [xkcd]: https://xkcd.com/color/rgb/
 
-    **Hex.** Hex operands are drawn from a fixed random subset of $C_{16}$,
+    **Hex.** Hex operands are drawn from a fixed random subset of the hex grid,
     sampled point-by-point rather than as a regular sub-grid. The subset
     constrains operands only: the correct completion of a hex equation may be
-    any grid point in $C_{16}$.
+    any point on the hex grid.
 
     To prepare training data, we pick two operands from one sublanguage (names
-    or hex) and compute the result. Mixing happens in $C_{256}$ (8-bit RGB); hex
-    operands are mapped to $C_{256}$ before mixing and the answer is snapped
-    back to $C_{16}$. Named colors are already in $C_{256}$, but the answer must
-    be snapped to the nearest named color.
+    or hex) and compute the result. Mixing happens in the full cube; hex
+    operands are lifted to it by digit repetition (`#f80` → `#ff8800`) and the
+    answer is snapped back to the hex grid. Named colors already sit in the
+    full cube, but the answer must be snapped to the nearest named color (ties
+    break toward the lexicographically first name).
 
     Two forms appear in every cell of the sweep, and a third only in the
     _bridge_ arm:
@@ -135,12 +139,14 @@ def _():
     mo.md(r"""
     ## Measurements
 
-    <!-- Can this be stated more plainly? The "nulls" part is very dense. -->
-
     Exact-match accuracy is scored per form on seen and held-out operand
-    pairs, next to nulls adapted for an irregular palette: the prompt-blind
-    centroid guesser carries over unchanged, and the grid-based one-step-shell
-    nulls generalize to $k$-nearest-neighbor sets around the true mix.
+    pairs. On a small palette, raw accuracy can flatter a weak strategy, so
+    each number sits beside two reference guessers. One never reads the
+    prompt: it always answers with the centroid of the training answers. The
+    other is handed the answer's neighborhood for free: it guesses uniformly
+    among the $k$ palette entries nearest the true mix (the irregular-palette
+    version of the one-step-shell null in earlier reports). The model has
+    learned something only where it beats both.
 
     Geometry is read with ridge probes (leave-one-out, as in
     `ridge_probe_loo`) fitted for operand and mix values at every layer and
@@ -185,8 +191,10 @@ def _():
       aligned cell.
     - **H5.** Adding the cross form produces alignment at every width:
       $\rho > 0.8$.
-    - **H6.** At L8, name+name accuracy improves at fixed width and the mix
-      crystallizes before the last layer.
+    - **H6.** At L8, name+name accuracy improves at fixed width. Where the mix
+      becomes decodable is measured without a committed direction: the freed-up
+      depth could let it crystallize earlier, but nothing in the loss rewards
+      computing early, so it may stay pressed against the answer.
     """)
     return
 
@@ -276,11 +284,13 @@ def _():
     > directions (hex→name, name→hex), center cell. Expected: $\rho < 0.2$
     > everywhere the within-form probes are strong.
 
-    <!-- "where each form's geometry is strongest" - might we want to use the probes with strongest $\rho$ instead? -->
-
-    > 🔮 Figure: principal angles between the two probes' row-spaces at the
-    > positions where each form's geometry is strongest. Expected: angles
-    > near 90°, i.e. the decoders use different directions of the stream.
+    > 🔮 Figure: principal angles between the two probes' row-spaces. The
+    > primary site is where within-form $R^2$ is strongest, chosen without
+    > reference to $\rho$ so the verdict isn't shaped by the quantity being
+    > judged; the maximum-$\rho$ site is reported beside it as an upper bound
+    > on sharing ("even at its most aligned site…"). Expected: angles near
+    > 90° at the primary site, i.e. the decoders use different directions of
+    > the stream.
     """)
     return
 
@@ -290,10 +300,12 @@ def _():
     mo.md(r"""
     ## Alignment under compression (H4)
 
-    <!-- "where each form's geometry is strongest" - might we want to use the probes with strongest $\rho$ instead? -->
-
     > 🔮 Figure: $\rho$ and principal angles versus width (d64, d32, d16, plus
-    > the d16-L8 cell), at each cell's best probe site. Expected: a monotonic
+    > the d16-L8 cell), at each cell's strongest within-form site, with the
+    > maximum-$\rho$ site as a second series. The primary site is chosen
+    > independently of $\rho$: a per-cell maximum of a noisy map rises with
+    > the noise, which could manufacture a width trend on its own. Expected: a
+    > monotonic
     > rise in sharing as the stream narrows, with d16-L8 the most aligned. A
     > flat line at low $\rho$ would say capacity pressure alone doesn't merge
     > the forms at these scales; alignment already present at d64 would say
@@ -319,12 +331,12 @@ def _():
     mo.md(r"""
     ## Depth (H6)
 
-    <!-- This will be interesting. I actually think the mix might only increase gradually as it approaches the final layer, because there is perhaps no pressure to represent it earlier. If we were instruction-tuning the model, we might see operands decodable around the middle and results decodable around the head. But that's a future experiment. -->
-
-    > 🔮 Figure: name-form accuracy and mix-crystallization depth at L8 versus
-    > L4. Expected: held-out named accuracy rises, and the layer × position
-    > probe map shows the mix decodable before the final layer, giving the
-    > result concept more than one layer of existence.
+    > 🔮 Figure: name-form accuracy and the mix-crystallization map at L8
+    > versus L4. Expected: held-out named accuracy rises. For where the mix
+    > appears, two expectations are live: reading finishes around layer 3, so
+    > the mix could crystallize any time after; or, with nothing in the loss
+    > rewarding early computation, it stays in the last layer and only builds
+    > gradually on approach.
     """)
     return
 
@@ -346,14 +358,16 @@ def _():
     ## Discussion
 
     > 🔮 Verdict table for H1–H6 (supported / partial / unsupported), with a
-    > pointer to the figure that decides each.
+    > pointer to the figure that decides each. The verdicts are read with wide
+    > error bars: one synthetic task, small models, three seeds per cell, and
+    > variables we haven't tested (schedule, tokenizer, operand distribution).
+    > The outcomes inform the design of the anchored runs; they don't settle
+    > the general question.
 
-    <!-- Let's display great uncertainty here. There are many variables we haven't accounted for or tested, so the results inform future experiments but I think it's very unlikely to be conclusive.  -->
-
-    > 🔮 What the outcome means for anchoring across surface forms: if
+    > 🔮 What the outcome suggests for anchoring across surface forms: if
     > alignment requires a bridge or compression, anchored runs on a
     > mixed-vocabulary corpus need their labels to touch both forms (or need
-    > the bridge); if alignment is free, one form's labels suffice.
+    > the bridge); if alignment is free, one form's labels may suffice.
     """)
     return
 

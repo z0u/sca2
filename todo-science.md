@@ -123,6 +123,14 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   `sca/compute/evaluation.py` assume the infix `a <op> b = ` frame; keep that frame.
   #[D2.2] #task-grammar
 
+- [ ] Does tuning move the mix computation earlier in depth? Conjecture from
+  ex-2.1.5 drafting: pretraining has no pressure to compute the result before
+  the answer position, so the mix stays pressed against the last layer (ex-2.1.4
+  saw exactly this at L4); an instruction-tuned variant might instead show
+  operands decodable mid-stack and results near the head. Relevant to anchoring
+  because it changes how many layers a result-concept anchor can act on.
+  #[D2.1] #representations #ex-2.1.5
+
 - [ ] Confirm the simplified nGPT gate holds at a genuinely larger size (wider/deeper
   than 128×12, bigger GPU + batch) before leaning on it for M3. ngpt-scaling shows
   the fixed scalar α = 1/n_layer trains flat across the width × depth grid we can
