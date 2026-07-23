@@ -14,6 +14,23 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Per-container throughput varies 15–30× on identical work; mini can't see
+  why (observed 2026-07-23, ex-2.1.5).** All train cells requested `gpu="L4"`,
+  yet two us-east-1 containers ran every cell at ~2,500–3,500 steps/min while
+  three containers (us-west1, asia-northeast3, eu-south-2) ran at 92–220 — a
+  gap too large for L4-to-L4 variance, consistent with a silent JAX CPU
+  fallback. Not a wedge (progress heartbeats stayed fresh; the watchdog's
+  stale-progress flag is the wedge detector and it worked). Three candidate
+  fixes, in priority order: (1) capture accelerator identity in the task `env`
+  (JAX backend + device name beside cpu/mem/region), so status can show it;
+  (2) optional per-role platform assert at task start — GPU requested but JAX
+  backend is CPU → raise, turning a silent 20× slowdown into a retryable
+  failure; (3) `status --brief` throughput-outlier flag: steps_per_min under
+  ~⅓ of the sibling median for the same fn joins the attention list beside
+  queued-too-long and stale-progress. Speculative requeue of tail cells
+  (memoization makes duplicates safe) is a bigger hammer; only if slow
+  containers recur.
+
 - **Science skill.** We have a fledgeling `science` skill that describes how to
   collaborate on experiment design. There may be old descisions in
   todo-science.md that could be moved there and polished.
