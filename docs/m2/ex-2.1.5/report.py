@@ -75,23 +75,26 @@ def _():
 
     | Space | Levels | Hex digits | Example ("cyan") | Precision | Colors |
     |---|---|---|---|---|---|
-    | the *hex grid* | 16 | 3 | `#0ff` | 4-bit | 4,096 |
-    | the *full cube* | 256 | 6 | `#00ffff` | 8-bit | 16,777,216 |
+    | *hex grid* | 16 | 3 | `#0ff` | 4-bit | 4,096 |
+    | *full cube* | 256 | 6 | `#00ffff` | 8-bit | 16,777,216 |
 
     **Names.** The named palette comes from the [xkcd color survey][xkcd]: all
     949 names, ordered by farthest-point selection so that the first $N$ form
     the most uniform palette available at that size. The center cell uses
     $N = 140$; at that size the minimum and median nearest-neighbor distances
     are ≈ 41 and ≈ 46 (8-bit Euclidean), against 4 and 27 for the CSS keyword
-    list. An earlier draft kept single-word names only, to avoid modifier words
-    like *light* that spell out part of the value; but that filter swapped one
+    list. Names map to points on the full cube.
+
+    /// details | On not filtering by name
+    An earlier draft kept single-word names only, to avoid modifier words like
+    `light` that spell out part of the value; but that filter swapped one
     selection bias for another and cost uniformity (28/37 at the same size), so
     the selection rule is now distance alone. Most selected names are
-    multi-word, and the longest at $N = 140$ is `blue with a hint of purple`,
-    so lines run to ≈ 86 characters and the block size grows accordingly. If
-    spelled modifiers look like they shortcut the name geometry, a substring
-    analysis goes under "Exploratory analyses". Names map to points on the full
-    cube.
+    multi-word, and the longest at $N = 140$ is `blue with a hint of purple`, so
+    lines run to ≈ 86 characters and the block size grows accordingly. If
+    spelled modifiers look like they shortcut the name geometry, we could do a
+    separate analysis of common substrings.
+    ///
 
     [xkcd]: https://xkcd.com/color/rgb/
 
@@ -101,11 +104,13 @@ def _():
     any point on the hex grid.
 
     To prepare training data, we pick two operands from one sublanguage (names
-    or hex) and compute the result. Mixing happens in the full cube; hex
-    operands are lifted to it by digit repetition (`#f80` → `#ff8800`) and the
-    answer is snapped back to the hex grid. Named colors already sit in the
-    full cube, but the answer must be snapped to the nearest named color (ties
-    break toward the lexicographically first name).
+    or hex) and compute the result. Mixing happens in the full cube, but the
+    method differs a little based on precision:
+    - Named colors already sit in the full cube, but the answer must be snapped
+      to the nearest named color (ties break toward the lexicographically first
+      name).
+    - Hex operands are lifted to it by digit repetition (`#f80` → `#ff8800`) and
+      the answer is snapped back to the hex grid
 
     Two forms appear in every cell of the sweep, and a third only in the
     _bridge_ arm:
@@ -357,16 +362,16 @@ def _():
     ## Discussion
 
     > 🔮 Verdict table for H1–H6 (supported / partial / unsupported), with a
-    > pointer to the figure that decides each. The verdicts are read with wide
-    > error bars: one synthetic task, small models, three seeds per cell, and
-    > variables we haven't tested (schedule, tokenizer, operand distribution).
-    > The outcomes inform the design of the anchored runs; they don't settle
-    > the general question.
+    > pointer to the figure/analysis section that decides each.
 
     > 🔮 What the outcome suggests for anchoring across surface forms: if
     > alignment requires a bridge or compression, anchored runs on a
     > mixed-vocabulary corpus need their labels to touch both forms (or need
-    > the bridge); if alignment is free, one form's labels may suffice.
+    > the bridge); if alignment is free, one form's labels may suffice. Especially
+    > for these suggestions, the verdicts above should be read with wide error
+    > bars: we're working with one synthetic task, small models, and there are
+    > many variables we haven't tested. The outcomes inform the design of the
+    > anchored runs; they don't settle the general question.
     """)
     return
 
