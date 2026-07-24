@@ -32,7 +32,7 @@ keys invalidate.
   the caller gave; if a recovery's blast radius looks large, confirm before
   ticking.
 
-## When to hand back to the human / Opus
+## When to hand back to the supervisor
 
 Diagnose and fix what you're confident about. For a genuine **redesign** — the
 experiment's approach is wrong, results are suspect, or the right fix changes

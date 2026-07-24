@@ -1,4 +1,12 @@
-# Report bundles
+# Reports
+
+A report is a Marimo notebook (`docs/**/*.py`) that reads an experiment's durable
+results and renders them for the web. Its life has two halves: fixing what the
+report will claim *before* the experiment runs — the preregistration discipline,
+a methodological concern that lives in the science skill — and publishing it as a
+self-contained bundle once results land. This file covers the publishing half.
+
+## Report bundles
 
 Externalizing a report's figures and data so the exported HTML stays light and
 publishes off Git LFS. This is the report author's side of storage; the `publish`
