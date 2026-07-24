@@ -611,15 +611,20 @@ def _():
 
     The maps below plot leave-one-out probe $R^2$ at every depth × landmark,
     for the two operands and the mix, per form (center cell, seed-averaged;
-    depth 0 is the embedding layer). The named form matches the prediction,
-    with one refinement: operand readout builds over the early layers, and
-    the mix is decodable at $R^2 \approx 0.97$ in the last layer — but the
-    peak sits at the `=` landmark, a character before the predicted
-    pre-answer position. The hex form never assembles the full mix at one
-    site: its best full-mix $R^2$ is 0.62, mid-answer, consistent with
-    ex-2.1.2's just-in-time channel staircase. Nothing in the hex panels
-    looks like a holistic pre-answer mix, so the coupling tell that H2
-    reserved judgment on did not appear.
+    depth 0 is the embedding layer). The named form matches the prediction:
+    operand readout builds over the early layers, and the mix is decodable at
+    $R^2 \approx 0.94$ at the pre-answer position in the last layer — all
+    three seeds land there (0.93, 0.95, 0.95), so this is the robust home of
+    the result concept. Where the mix *first* appears is less settled: one
+    seed already reads it at $R^2 \approx 0.97$ a landmark earlier, at the
+    `=` sign by the second-to-last layer, while the other two stay near 0.3
+    there and only reach the mix at the pre-answer space. So the earliest
+    decodable site varies by seed; the pre-answer, last-layer location does
+    not. The hex form never assembles the full mix at one site: its best
+    full-mix $R^2$ is 0.62, mid-answer, consistent with ex-2.1.2's
+    just-in-time channel staircase. Nothing in the hex panels looks like a
+    holistic pre-answer mix, so the coupling tell that H2 reserved judgment
+    on did not appear.
     """)
     return
 
@@ -634,10 +639,12 @@ def _(arrays):
             characters), arranged as two rows of three: named form on top, hex
             form below, with columns for operand 1, operand 2, and the mix. In
             the named row, operand panels saturate from depth 1 onward around
-            their own landmarks, and the mix panel is dark until depth 3, where
-            it saturates from the equals sign onward. In the hex row, operand
-            panels also read out strongly, but the mix panel stays pale
-            everywhere, peaking mid-answer at about 0.6.
+            their own landmarks, and the mix panel stays dark through the early
+            layers, brightening at the pre-answer and answer positions in the
+            last layer; the equals column is only partly filled because the
+            seeds disagree on whether the mix is decodable that early. In the
+            hex row, operand panels also read out strongly, but the mix panel
+            stays pale everywhere, peaking mid-answer at about 0.6.
         """,
         caption="""
             Leave-one-out probe R² at every depth × landmark, center cell,
@@ -786,8 +793,9 @@ def _(arrays):
         ),
         "op2": "**Operand 2.** The same picture, shifted one operand along to the $b$ characters.",
         "mix": (
-            "**The mix.** Named brings all three channels high together at and after the "
-            "equals sign; hex never does, which is why its averaged map stayed pale."
+            "**The mix.** Named brings all three channels high together from the pre-answer "
+            "position onward in the last layer; hex never does, which is why its averaged map "
+            "stayed pale."
         ),
     }
     _target_alt = {
@@ -814,9 +822,9 @@ def _(arrays):
             The same five-by-two grid of step-line panels for the mix probe: rows are depth,
             columns are the named and hex forms, one line per RGB channel plus a dashed mean.
             In the named column the three channels run together and climb with depth, rising
-            together at the equals landmark in the upper rows. In the hex column the three
-            channels separate and none reaches the top of the panel, so their mean stays low
-            across every landmark.
+            together around the equals and pre-answer landmarks in the last row. In the hex
+            column the three channels separate and none reaches the top of the panel, so their
+            mean stays low across every landmark.
         """,
     }
     _subfigs = "".join(
