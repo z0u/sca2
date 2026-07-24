@@ -14,6 +14,15 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Single region.** By default, the Modal container region is unspecified.
+  Within a single sweep, containers may be placed anywhere in the world, and
+  disparate containers have high latency to the shared Volume, Queue, and Dict.
+  This can significantly impact training runs and waste GPU time. It's possible
+  to specify the region when launching a function; see
+  https://modal.com/docs/guide/region-selection.md. Note that doing so increases
+  the cost, so analysis of the trade-off is required; perhaps we can change the
+  way we do I/O to avoid the need most of the time.
+
 - **Monitoring should compare against expectations, and the tools should do
   the comparing (2026-07-23, ex-2.1.5).** The haiku experiment-monitor
   reported "progressing normally" while 3 of 5 containers ran 15–30× slow:
@@ -58,6 +67,13 @@ readable cold without re-deriving code state.
   scratch (a fast container redid it in 5 min). Timeouts sized to a multiple
   of expected duration only work if throughput is observable and roughly
   uniform; the background-emit fix restores that assumption.
+
+  Also, should we even be using a Queue? It's useful when calling Apparatus.run
+  directly, but when polling/ticking the DAG, it may not be the right container.
+  We also have a Dict and maybe that's enough; consider whether it makes sense
+  to prevent Queue use when using the `mini.orchestration` path, and maybe even
+  remove the Queue altogether (it has other hazards, e.g. it may fill up if
+  there's no consumer).
 
 - **Science skill.** We have a fledgeling `science` skill that describes how to
   collaborate on experiment design. There may be old descisions in
