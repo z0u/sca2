@@ -258,16 +258,17 @@ LANDMARKS = (
     "plus",
     "o2s0", "o2s1", "o2e1", "o2e0",  # operand 2
     "eq", "pre",  # '=' and the pre-answer space
-    "as0", "as1", "as2",  # answer chars from its start
+    "as0", "as1",  # answer chars from its start
     "ae1", "ae0",  # answer chars from its end
 )  # fmt: skip
 """Grammar landmarks: positions that correspond across the two surface forms.
 
 Raw offsets don't line up across lines — names vary in length and hex lines
 are shorter — so probe maps index positions by these landmarks instead.
-Every landmark exists in every line (the shortest operand or answer is 3
-characters), though on short words some landmarks coincide (e.g. ``as2`` and
-``ae0`` on a 3-character answer).
+The answer is sampled like an operand — two chars from each end (``as0, as1,
+ae1, ae0``) — so both mirror the ``s0, s1, e1, e0`` shape. Every landmark exists
+in every line (the shortest operand or answer is 3 characters), though on short
+words some landmarks coincide (e.g. ``as1`` and ``ae1`` on a 3-character answer).
 """
 OPERATORS = ("plus", "eq", "pre")
 """The subset of LANDMARKS that are operators (not operands or results)"""
@@ -287,7 +288,7 @@ def _span_risers() -> frozenset[int]:
 SPAN_RISERS = _span_risers()
 """Indices *i* where landmark *i*→*i+1* jumps from a start-anchored to an end-anchored
 position of the same token — across a word's variable-length, unsampled middle (``o1s1``
-→``o1e1``, ``o2s1``→``o2e1``, ``as2``→``ae1``). On fixed-width forms (hex) these land on
+→``o1e1``, ``o2s1``→``o2e1``, ``as1``→``ae1``). On fixed-width forms (hex) these land on
 adjacent characters, so a plot draws them as discrete steps; on named ones they cover an
 unmeasured interior, better drawn as a smooth slide."""
 
@@ -304,6 +305,6 @@ def landmark_indices(ex: Example) -> dict[str, int]:
         "plus": o1e + 2,
         "o2s0": o2s, "o2s1": o2s + 1, "o2e1": o2e - 1, "o2e0": o2e,
         "eq": o2e + 2, "pre": o2e + 3,
-        "as0": ans, "as1": ans + 1, "as2": ans + 2,
+        "as0": ans, "as1": ans + 1,
         "ae1": ane - 1, "ae0": ane,
     }  # fmt: skip

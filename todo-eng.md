@@ -14,6 +14,21 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Function-local imports hide a task's real dependencies from the evidence
+  fingerprint (2026-07-24, ex-2.1.5).** Dropping the `as2` landmark should have
+  re-run the 24 probe cells, but they memo-hit and served stale 16-column arrays.
+  Cause: `eval_one` imports `collect_activations`/`probe_maps`/etc. *inside the
+  function* (to keep `main` and the CLI light — they pull jax), and the
+  fingerprinter only traces module-level references — so `sca.compute.geometry`,
+  and the `LANDMARKS` it reads, never enter `eval_one`'s evidence (`mini explain`
+  lists only the experiment-module helpers). Any change to geometry code or the
+  landmark scheme is then a silent stale hit. Workaround in place: the eval map is
+  tagged `version="lm-<sha1(LANDMARKS)>"`, so a scheme change re-runs the probes.
+  Worth considering: (a) trace function-local imports of *project* modules, or at
+  least warn when a task body imports untracked project code; (b) a convention to
+  fold such deferred-import deps into `version=`/inputs. General hazard — it hits
+  any task that defers heavy imports this way.
+
 - **`mini run` can settle a run as `done` while a downstream task still needs a
   later wake — and an expired budget silently reaps it (2026-07-24, ex-2.1.5).**
   Adding `r2_ch` to `eval_one` correctly re-ran all 24 eval cells and (because an

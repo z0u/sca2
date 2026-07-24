@@ -469,6 +469,15 @@ def publish_results(results: list[dict], stats: dict, checkpoints: dict, evals: 
 
 
 def main(ctx: Ctx) -> dict:
+    # eval_one imports the geometry helpers locally, so the evidence fingerprint can't
+    # reach LANDMARKS through them. Tag the eval map with the landmark scheme, so probes
+    # (which index activations by landmark) re-run when it changes. See todo-eng.
+    import hashlib
+
+    from sca.data.mixed_vocab import LANDMARKS
+
+    lm_tag = "lm-" + hashlib.sha1(repr(LANDMARKS).encode()).hexdigest()[:8]
+
     corpora = sorted({corpus_key(arm) for arm in ARMS.values()})
     specs = {corpus_key(arm): arm for arm in ARMS.values()}
     preps = ctx.map(
@@ -491,6 +500,7 @@ def main(ctx: Ctx) -> dict:
         arms,
         labels,
         role="eval",
+        version=lm_tag,
     )
     stats = {p["key"]: p["stats"] for p in preps}
     ckpts = dict(zip(labels, [t["checkpoint"] for t in trained], strict=True))

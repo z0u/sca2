@@ -700,11 +700,11 @@ def _(arrays):
         _n_depth = next(iter(_stacks.values())).shape[0]
         _x = range(len(LANDMARKS))
         _minor_landmarks = [_l for _l in LANDMARKS if _l not in OPERATORS]
-        # Where two adjacent landmarks alias onto one character (hex answers are a
-        # fixed `#xyz`, so as2 and ae1 are both the green digit), the probe measures
-        # them once and the columns come out bit-identical. Break the line there so a
-        # riser doesn't span zero real distance and inflate the plateau. Named answers
-        # vary in length, so no column pair coincides for every sample — no breaks.
+        # Guard: if two adjacent landmarks ever alias onto one character, the probe
+        # measures them once and the columns come out bit-identical — break the line
+        # there so a riser doesn't span zero real distance and inflate the plateau.
+        # The current scheme has no such pair (the answer is sampled like an operand),
+        # so this is empty; it stays as a safety net for a scheme that reintroduces one.
         _breaks = {
             _f: {_i for _i in range(len(LANDMARKS) - 1) if np.array_equal(_s[:, _i], _s[:, _i + 1])}
             for _f, _s in _stacks.items()
