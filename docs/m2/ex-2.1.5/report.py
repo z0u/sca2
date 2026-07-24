@@ -11,22 +11,24 @@ app = marimo.App(
 with app.setup(hide_code=True):
     import json
     import tempfile
+    from typing import cast
     from pathlib import Path
 
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
     from matplotlib.colors import LinearSegmentedColormap
+    from matplotlib.layout_engine import ConstrainedLayoutEngine
 
     # Marimo puts the notebook's directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import ARMS, ARRAYS_REF, METRICS_REF, SEEDS
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
-    from mini.vis import light_dark, themed
+    from mini.vis import light_dark, smooth_step, themed
     from sca import vis as sv
     from sca.data import mixed_vocab as mv
-    from sca.data.mixed_vocab import LANDMARKS
+    from sca.data.mixed_vocab import LANDMARKS, OPERATORS, SPAN_RISERS
 
     use_publisher(report_bundle(__file__))
 
@@ -175,7 +177,6 @@ def _():
     always answer with a name, and hex equations with a hex code, so the answer
     form is determined by the prompt form; nothing about the result value
     changes which vocabulary the answer uses.
-
     """)
     return
 
@@ -366,7 +367,6 @@ def _():
     widths {32, 64, 128} under this scheme, so d16 sits one step below the
     tested range. If the d16 cells train poorly, that is an architecture
     effect to report, and the width trend in H4 rests on d64 → d32.
-
     """)
     return
 
@@ -382,18 +382,17 @@ def _(cells):
         + "</tr>"
         for _a in ARMS
     )
-    mo.vstack(
-        [
-            mo.md("""
-            Parameter counts per cell (seeds share a count). The full sweep —
-            4 corpora, 24 training cells, 24 evals — ran in about 2.5 hours
-            of wall time on five L4 containers.
-            """),
-            mo.Html(
-                '<div class="report-table-scroll"><table class="report-table">' + _thead + _rows + "</table></div>"
-            ),
-        ]
-    )
+
+    mo.md(f"""
+    Parameter counts per cell (seeds share a count). The full sweep —
+    4 corpora, 24 training cells, 24 evals.
+
+    /// details | Runtime
+    The sweep ran in about 2.5 hours of wall time on five L4 containers. It would have been faster, but there were cross-region I/O issues.
+    ///
+
+    <div class="report-table-scroll"><table class="report-table">{_thead}{_rows}</table></div>
+    """)
     return
 
 
@@ -499,6 +498,16 @@ def _(seed_mean, stats):
 
 
 @app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    /// warning | Exact-match accuracy (H1)
+    Interesting that named seen accuracy is significantly less than 1. So, the model hasn't properly learnt the geometry? But in 2.1.3 with one token per color (and no hex), it learnt it very well with 215 colors.
+    ///
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _(arrays):
     @themed(
         name="miss-ranks",
@@ -578,6 +587,16 @@ def _(seed_mean, stats):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    /// warning | More data -> lower named accuracy
+    Yeah this is odd. This was at d64, right? So unlikely to be a capacity constraint (64 _sounds_ like plenty?)
+    ///
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ## Within-form geometry (H2)
 
     The maps below plot leave-one-out probe $R^2$ at every depth × landmark,
@@ -635,6 +654,113 @@ def _(arrays):
             _ax.set_ylabel("depth")
         assert _im is not None
         fig.colorbar(_im, ax=_axes, shrink=0.8, label="probe R²")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays):
+    @themed(
+        name="probe-channels",
+        alt_text="""
+            A five-by-two grid of small line panels. Rows are residual depth, embedding at
+            the bottom rising to the last layer at the top; columns are the two surface
+            forms, named on the left and hex on the right. Each panel plots leave-one-out
+            probe R² for the mix color across the grammar landmarks on the x-axis (the
+            sixteen operand and answer character positions),
+            with one step-line per RGB channel drawn in its own hue and a dashed grey line
+            for their mean — the value the heatmap above shows. In the named column the
+            three channel lines run together and climb with depth, rising together at the
+            equals landmark in the upper rows. In the hex column the three channels
+            separate and none reaches the top of the panel, so their mean stays low across
+            every landmark.
+        """,
+        caption="""
+            Per-channel leave-one-out probe R² for the mix, center cell, seed-averaged —
+            the RGB mean of the three lines in a panel is one column of the heatmap above.
+            Rows are depth (embedding at the bottom); columns are the named and hex forms.
+            Each panel runs across the grammar landmarks, one step-line per channel (R, G,
+            B) plus their mean (dashed). Steps, because each landmark is a discrete
+            character position; widths taper R → G → B so a landmark where the channels
+            agree reads as nested bands rather than as whichever channel drew last. Where
+            the named form assembles the mix — the upper rows, at and after the equals
+            sign — the three channels rise together; the hex form never brings all three
+            high at one site, which is why its averaged map stayed pale.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        _forms = ("named", "hex")
+        # (depth+1, landmark, 3) per form, seed-averaged. r2_ch is the per-channel
+        # companion the heatmap collapses: its mean over the channel axis is a column above.
+        _stacks = {
+            _f: np.mean([arrays[f"center-s{_s}/probes/{_f}/mix/r2_ch"] for _s in SEEDS], axis=0) for _f in _forms
+        }
+        _n_depth = next(iter(_stacks.values())).shape[0]
+        _x = range(len(LANDMARKS))
+        _minor_landmarks = [_l for _l in LANDMARKS if _l not in OPERATORS]
+        # Where two adjacent landmarks alias onto one character (hex answers are a
+        # fixed `#xyz`, so as2 and ae1 are both the green digit), the probe measures
+        # them once and the columns come out bit-identical. Break the line there so a
+        # riser doesn't span zero real distance and inflate the plateau. Named answers
+        # vary in length, so no column pair coincides for every sample — no breaks.
+        _breaks = {
+            _f: {_i for _i in range(len(LANDMARKS) - 1) if np.array_equal(_s[:, _i], _s[:, _i + 1])}
+            for _f, _s in _stacks.items()
+        }
+        # Ramp per riser: wider plateaus (0.25) keep the discrete tokens legible. For named,
+        # the start→end span risers jump each word's unsampled middle, so draw them as a full
+        # smooth slide (1) rather than a step. Hex tokens are a fixed `#xyz` — its span risers
+        # land on adjacent digits, so it keeps the uniform plateau.
+        _ramps = {_f: np.full(len(LANDMARKS) - 1, 0.25) for _f in _forms}
+        _ramps["named"][list(SPAN_RISERS)] = 1.0
+
+        # Color is data: each channel's line in its own hue; the dashed line is the mean
+        # (the heatmap value). Widths taper R → G → B so agreeing channels stay visible.
+        _cols = light_dark(["#d1495bbb", "#2a9d5c", "#3b6fd4"], ["#ff6b7daa", "#4fd07ac8", "#6ea3ff"])
+        _lws = (2.6, 1.7, 1.0)
+        _mean_col = light_dark("#555", "#aaa")
+
+        fig, _axes = plt.subplots(
+            _n_depth, len(_forms), figsize=(8, 0.6 * _n_depth), sharex=True, sharey=True, squeeze=False
+        )
+        cast(ConstrainedLayoutEngine, fig.get_layout_engine()).set(hspace=0, h_pad=0, wspace=0)
+        for _j, _f in enumerate(_forms):
+            _axes[0, _j].set_title(_f, fontsize=9)
+            for _r in range(_n_depth):
+                _d = _n_depth - 1 - _r  # embedding (depth 0) at the bottom, as in the heatmap
+                _ax = cast(plt.Axes, _axes[_r, _j])
+                _ax.vlines([LANDMARKS.index(_o) for _o in OPERATORS], -1, 2, "#8881", lw=6)
+                _m = np.clip(_stacks[_f][_d], 0, 1)  # (landmark, 3)
+                # Mean under the channels: hidden behind them where they agree, between them where they don't.
+                smooth_step(
+                    _ax,
+                    _x,
+                    _m.mean(1),
+                    color=_mean_col,
+                    lw=0.5,
+                    linestyle=":",
+                    ramp=_ramps[_f],
+                    zorder=1,
+                    breaks=_breaks[_f],
+                )
+                for _c in range(3):
+                    smooth_step(
+                        _ax, _x, _m[:, _c], color=_cols[_c], lw=_lws[_c], ramp=_ramps[_f], zorder=2, breaks=_breaks[_f]
+                    )
+                _ax.set(ylim=(-0.2, 1.2), xlim=(-0.5, len(LANDMARKS) - 0.5))
+                if _j == 0:
+                    _ax.set_ylabel(f"{_d}", fontsize=8)
+                _ax.tick_params(axis="x", top=True, direction="inout")
+                _ax.tick_params(axis="y", left=True, right=True, direction="in")
+                _ax.set_yticks([0, 1], "")
+                _ax.spines[:].set_visible(False)
+        for _ax in _axes[-1]:
+            _ax = cast(plt.Axes, _ax)
+            _ax.set_xticks([LANDMARKS.index(_o) for _o in OPERATORS], OPERATORS, minor=False, fontsize="x-small")
+            _ax.set_xticks([LANDMARKS.index(_o) for _o in _minor_landmarks], [], minor=True)
+        fig.supylabel("probe R² (mix RGB) per depth", fontsize=9)
         return fig
 
     mo.Html(_plot())

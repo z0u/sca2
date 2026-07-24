@@ -18,7 +18,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Float
 
-from sca.compute.evaluation import _r2, ridge_probe_loo
+from sca.compute.evaluation import _r2, _r2_cols, ridge_probe_loo
 from sca.data.colors import Example
 from sca.data.mixed_vocab import LANDMARKS, landmark_indices
 from sca.data.tokenizer import CharTokenizer
@@ -69,6 +69,8 @@ def probe_maps(
     Returns, keyed by target name:
 
     - ``r2``: (L+1, M) leave-one-out R² — the within-form map;
+    - ``r2_ch``: (L+1, M, K) the same, per target channel (``r2`` is its mean
+      over the last axis) — the map the heatmap collapses;
     - ``weights``: (L+1, M, C, K) and ``bias``: (L+1, M, K) — full-data fits,
       for zero-shot transfer and subspace comparison.
     """
@@ -77,14 +79,16 @@ def probe_maps(
     out: dict[str, dict[str, np.ndarray]] = {name: {} for name in targets}
     for name, y in targets.items():
         r2 = np.empty((n_depth, lm.shape[1]))
+        r2_ch = np.empty((n_depth, lm.shape[1], y.shape[1]))
         ws = np.empty((n_depth, lm.shape[1], acts.shape[3], y.shape[1]))
         bs = np.empty((n_depth, lm.shape[1], y.shape[1]))
         for d in range(n_depth):
             for m in range(lm.shape[1]):
                 x = at_lm[d, :, m]
-                r2[d, m] = _r2(ridge_probe_loo(x, y, l2), y)
+                r2_ch[d, m] = _r2_cols(ridge_probe_loo(x, y, l2), y)
+                r2[d, m] = r2_ch[d, m].mean()
                 ws[d, m], bs[d, m] = _fit(x, y, l2)
-        out[name] = {"r2": r2, "weights": ws, "bias": bs}
+        out[name] = {"r2": r2, "r2_ch": r2_ch, "weights": ws, "bias": bs}
     return out
 
 

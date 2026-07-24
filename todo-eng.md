@@ -14,6 +14,24 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **`mini run` can settle a run as `done` while a downstream task still needs a
+  later wake — and an expired budget silently reaps it (2026-07-24, ex-2.1.5).**
+  Adding `r2_ch` to `eval_one` correctly re-ran all 24 eval cells and (because an
+  `Artifact` keys by content, so publish's `input_fp` moved) correctly gave
+  `publish_results` a new key — but it took several `mini run` invocations before
+  publish actually executed and `ARRAYS_REF` picked up the new stack. Two traps
+  compounded, and cost a long misdiagnosis (I first, wrongly, blamed a publish
+  memo-hit — `Artifact` content-addressing already handles this):
+  (a) the very first re-run was reaped by an *expired* wall-clock deadline stamped
+  by a prior invocation ("budget elapsed — settled CANCELLED", 0 launched); a
+  plain `run` past an expired budget does nothing until you re-arm with
+  `--budget`. (b) publish only becomes runnable after all 24 evals finish, so an
+  earlier wake that launched the eval batch exited before advancing to publish,
+  yet `status` still read `done` (of the *prior* settled DAG). Worth a
+  `status`/`explain` hint that distinguishes "nothing stale" from "stale but
+  reaped by expired budget", and a clearer signal when `done` reflects a
+  superseded DAG rather than the current one.
+
 - **Single region.** By default, the Modal container region is unspecified.
   Within a single sweep, containers may be placed anywhere in the world, and
   disparate containers have high latency to the shared Volume, Queue, and Dict.

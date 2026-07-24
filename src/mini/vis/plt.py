@@ -13,6 +13,8 @@ from matplotlib.patches import PathPatch
 from matplotlib.path import Path as MplPath
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from matplotlib.axes import Axes
     from numpy.typing import ArrayLike
 
@@ -37,7 +39,15 @@ def use_style(*styles: Stylesheet):
         yield
 
 
-def smooth_step(ax: "Axes", x: "ArrayLike", y: "ArrayLike", *, ramp: float = 1.0, **kwargs) -> PathPatch:
+def smooth_step(
+    ax: "Axes",
+    x: "ArrayLike",
+    y: "ArrayLike",
+    *,
+    ramp: "float | ArrayLike" = 1.0,
+    breaks: "Iterable[int] | None" = None,
+    **kwargs,
+) -> PathPatch:
     """Draw a step plot whose risers are S-curves rather than vertical jumps.
 
     Each riser is a cubic whose control points both sit at its midpoint, level with
@@ -54,18 +64,37 @@ def smooth_step(ax: "Axes", x: "ArrayLike", y: "ArrayLike", *, ramp: float = 1.0
     Use it for point measurements on a regular ordinal axis — character positions,
     epochs, layer depths — where a straight line between samples would wrongly suggest
     the value passes through the intermediate values. *x* must be evenly spaced.
+
+    *ramp* may be a scalar or one value per riser (length ``len(x) - 1``), so individual
+    transitions flatten or square off independently: 1 is a pure ramp with no rest, 0 is a
+    vertical step. Use a per-riser ramp when neighbours differ in kind — draw the jump
+    across a run of unsampled positions as a smooth slide (→1) while keeping genuine
+    neighbours as discrete plateaus (< 1). Any two adjacent ramps must sum to ≤ 2, which
+    holds for values in [0, 1].
+
+    *breaks* holds indices *i* after which to leave a gap instead of a riser: sample
+    *i*'s plateau ends at its right shoulder and sample *i+1*'s begins at its left one,
+    with nothing between. Use it where consecutive samples are the same underlying point
+    (e.g. two ordinal slots that alias onto one character) so the connecting riser would
+    span zero real distance. The gap is the riser's footprint, so it's widest when the
+    plateaus are narrow — pair breaks with *ramp* < 1 to keep a visible flat on each side.
     """
     x, y = np.asarray(x, float), np.asarray(y, float)
     if len(x) < 2:
         raise ValueError("smooth_step needs at least two samples")
+    brk = set(breaks or ())
     dx = (x[-1] - x[0]) / (len(x) - 1)
-    h = ramp * dx / 2
+    hs = np.broadcast_to(ramp, len(x) - 1) * dx / 2  # riser half-widths (one per gap)
 
     verts, codes = [(x[0] - dx / 2, y[0])], [MplPath.MOVETO]
     for i in range(len(x) - 1):
-        m = (x[i] + x[i + 1]) / 2
-        verts += [(m - h, y[i]), (m, y[i]), (m, y[i + 1]), (m + h, y[i + 1])]
-        codes += [MplPath.LINETO, *[MplPath.CURVE4] * 3]
+        m, h = (x[i] + x[i + 1]) / 2, hs[i]
+        if i in brk:  # close this plateau at its right shoulder, restart at the next's left — a gap, no riser
+            verts += [(m - h, y[i]), (m + h, y[i + 1])]
+            codes += [MplPath.LINETO, MplPath.MOVETO]
+        else:
+            verts += [(m - h, y[i]), (m, y[i]), (m, y[i + 1]), (m + h, y[i + 1])]
+            codes += [MplPath.LINETO, *[MplPath.CURVE4] * 3]
     verts.append((x[-1] + dx / 2, y[-1]))
     codes.append(MplPath.LINETO)
 

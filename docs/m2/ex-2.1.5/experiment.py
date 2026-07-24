@@ -361,6 +361,7 @@ def eval_one(trained: dict, evals, n_names: int, arm: str, label: str) -> dict:
         acts_lm[form] = (form_acts, form_lm)
         for t, maps in fitted[form].items():
             arrays[f"probes/{form}/{t}/r2"] = maps["r2"].astype(np.float32)
+            arrays[f"probes/{form}/{t}/r2_ch"] = maps["r2_ch"].astype(np.float32)
             arrays[f"probes/{form}/{t}/weights"] = maps["weights"].astype(np.float32)
 
     acts_n, lm_n = acts_lm["named"]
