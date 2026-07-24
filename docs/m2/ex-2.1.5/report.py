@@ -17,7 +17,6 @@ with app.setup(hide_code=True):
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
-    import matplotlib.patheffects as pe
     from matplotlib.colors import LinearSegmentedColormap
     from matplotlib.layout_engine import ConstrainedLayoutEngine
 
@@ -461,8 +460,8 @@ def _():
     ## Exact-match accuracy (H1)
 
     The center cell answers held-out hex equations almost perfectly (0.996
-    exact) and held-out named equations at 0.667, with zero malformed
-    completions in any eval set. The named score sits far above the
+    exact) and held-out named equations at 0.667, with no malformed
+    completions in any of its eval sets. The named score sits far above the
     prompt-blind centroid (0.043). One null simplified itself: in this
     language the true answer *is* the candidate nearest the mix, so the
     $k$-NN neighborhood null is exactly $1/k$ — the strongest version is a
@@ -582,13 +581,16 @@ def _(seed_mean, stats):
                 '<div class="report-table-scroll"><table class="report-table">' + _thead + _rows + "</table></div>"
             ),
             mo.md("""
-            The density arms. Hex accuracy is insensitive to the operand-subset
-            size, as expected. Named held-out accuracy dips in *both* density
-            arms — at 250 names the answer perplexity is 153 against 86, so
-            some drop was expected there, but the dip under denser hex
-            operands (0.582, same named corpus as the center) was not
-            predicted. Both stay far above their nulls. The hex-density
-            interaction is taken up in the discussion.
+            The density arms, both far above their nulls. Hex accuracy is
+            insensitive to the operand-subset size, as expected. At 250 names
+            the mean named held-out accuracy drops to 0.564, in the predicted
+            direction — the answer perplexity is 153 against 86 — though the
+            three seeds run 0.47 to 0.66, so the effect is soft. The hex-dense
+            mean of 0.582 looked at first like an unpredicted dip under denser
+            hex operands, but it rests on one seed (0.39 against 0.67 and 0.69);
+            the other two match the center cell, so there is little evidence of
+            a real hex-density effect on named accuracy. Three seeds is thin
+            for a difference this size.
             """),
         ]
     )
@@ -622,10 +624,10 @@ def _():
     there and only reach the mix at the pre-answer space. So the earliest
     decodable site varies by seed; the pre-answer, last-layer location does
     not. The hex form never assembles the full mix at one site: its best
-    full-mix $R^2$ is 0.62, mid-answer, consistent with ex-2.1.2's
-    just-in-time channel staircase. Nothing in the hex panels looks like a
-    holistic pre-answer mix, so the coupling tell that H2 reserved judgment
-    on did not appear.
+    full-mix $R^2$ is 0.66, mid-answer, and all three seeds peak at the same
+    landmark, consistent with ex-2.1.2's just-in-time channel staircase.
+    Nothing in the hex panels looks like a holistic pre-answer mix, so the
+    coupling tell that H2 reserved judgment on did not appear.
     """)
     return
 
@@ -645,8 +647,7 @@ def _(arrays):
             last layer; the equals column is only partly filled because the
             seeds disagree on whether the mix is decodable that early. In the
             hex row, operand panels also read out strongly, but the mix panel
-            stays pale everywhere, peaking mid-answer at about 0.6. Each panel
-            has a small open square marking its single brightest cell.
+            stays pale everywhere, peaking mid-answer at about 0.6.
         """,
         caption="""
             Leave-one-out probe R² at every depth × landmark, center cell,
@@ -655,8 +656,7 @@ def _(arrays):
             operand 2, the equals sign, the pre-answer space, and the answer's
             first and last characters. Every cell is fit and scored on its own,
             leaving out one probe line at a time, so no cell borrows from
-            another; the open square marks each panel's peak, the strongest
-            site for that concept.
+            another.
         """,
     )
     def _plot() -> plt.Figure:
@@ -670,20 +670,6 @@ def _(arrays):
                 _ax = _axes[_i, _j]
                 _im = _ax.imshow(_m, vmin=0, vmax=1, cmap=_cmap, aspect="auto", origin="lower")
                 _ax.set_title(f"{_form} · {_t}", fontsize=9)
-                # Mark the peak cell of the seed-averaged map — the strongest probe
-                # site for this concept. Each cell is its own leave-one-out estimate,
-                # so this is a readout of the map, not a probe chosen over the others.
-                _pd, _pl = np.unravel_index(np.nanargmax(_m), _m.shape)
-                _ax.plot(
-                    _pl,
-                    _pd,
-                    marker="s",
-                    mfc="none",
-                    mec=light_dark("#111", "#fff"),
-                    mew=1.4,
-                    ms=9,
-                    path_effects=[pe.withStroke(linewidth=2.5, foreground=light_dark("#fff", "#111"))],
-                )
         for _ax in _axes[1]:
             _ax.set_xticks(range(len(LANDMARKS)), LANDMARKS, rotation=90, fontsize=7)
         for _ax in _axes[:, 0]:
