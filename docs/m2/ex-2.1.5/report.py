@@ -28,7 +28,7 @@ with app.setup(hide_code=True):
     from mini.vis import light_dark, smooth_step, themed
     from sca import vis as sv
     from sca.data import mixed_vocab as mv
-    from sca.data.mixed_vocab import LANDMARKS, OPERATORS, SPAN_RISERS
+    from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, OPERATORS, SPAN_RISERS
 
     use_publisher(report_bundle(__file__))
 
@@ -177,6 +177,16 @@ def _():
     always answer with a name, and hex equations with a hex code, so the answer
     form is determined by the prompt form; nothing about the result value
     changes which vocabulary the answer uses.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    /// warning | Data (the language)
+    I notice the hex operands are clustered. They do look properly random, but it doesn't look uniform (it may be globally, but not locally). Maybe this biases training in some way? Clearly the models learnt the hex equations just fine, but this may have some effect on probe transfer between sublanguages.
+    ///
     """)
     return
 
@@ -662,6 +672,34 @@ def _(arrays):
 
 @app.cell(hide_code=True)
 def _(arrays):
+    _landmark_labels = {
+        "o1s0": "$a_{1}$",
+        "o1s1": "$a_{2}$",
+        "o1e1": "$a_{n-1}$",
+        "o1e0": "$a_{n}$",
+        #
+        "o2s0": "$b_{1}$",
+        "o2s1": "$b_{2}$",
+        "o2e1": "$b_{n-1}$",
+        "o2e0": "$b_{n}$",
+        #
+        "as0": "$r_{1}$",
+        "as1": "$r_{2}$",
+        "ae1": "$r_{n-1}$",
+        "ae0": "$r_{n}$",
+        #
+        "plus": "+",
+        "eq": "=",
+        "pre": " ",
+    }
+    _major_landmarks = [_l for _l in LANDMARKS if _l in OPERATORS]
+    _x_major = [LANDMARKS.index(_l) for _l in _major_landmarks]
+    _x_labels_major = [_landmark_labels.get(_l, _l) for _l in _major_landmarks]
+
+    _minor_landmarks = [_l for _l in LANDMARKS if _l not in OPERATORS]
+    _x_minor = [LANDMARKS.index(_l) for _l in _minor_landmarks]
+    _x_labels_minor = [_landmark_labels.get(_l, _l) for _l in _minor_landmarks]
+
     @themed(
         name="probe-channels",
         alt_text="""
@@ -699,7 +737,6 @@ def _(arrays):
         }
         _n_depth = next(iter(_stacks.values())).shape[0]
         _x = range(len(LANDMARKS))
-        _minor_landmarks = [_l for _l in LANDMARKS if _l not in OPERATORS]
         # Guard: if two adjacent landmarks ever alias onto one character, the probe
         # measures them once and the columns come out bit-identical — break the line
         # there so a riser doesn't span zero real distance and inflate the plateau.
@@ -709,12 +746,15 @@ def _(arrays):
             _f: {_i for _i in range(len(LANDMARKS) - 1) if np.array_equal(_s[:, _i], _s[:, _i + 1])}
             for _f, _s in _stacks.items()
         }
-        # Ramp per riser: wider plateaus (0.25) keep the discrete tokens legible. For named,
-        # the start→end span risers jump each word's unsampled middle, so draw them as a full
-        # smooth slide (1) rather than a step. Hex tokens are a fixed `#xyz` — its span risers
-        # land on adjacent digits, so it keeps the uniform plateau.
+        # Ramp per riser: wider plateaus (0.25) keep the discrete tokens legible; a riser
+        # that crosses an unprobed stretch is drawn as a full smooth slide (1) instead, so it
+        # doesn't read as a step between adjacent measurements. Word middles (SPAN_RISERS) are
+        # named-only — hex's are adjacent digits. Operator spaces (GAP_RISERS) exist in the
+        # fixed grammar of both forms.
         _ramps = {_f: np.full(len(LANDMARKS) - 1, 0.25) for _f in _forms}
         _ramps["named"][list(SPAN_RISERS)] = 1.0
+        for _f in _forms:
+            _ramps[_f][list(GAP_RISERS)] = 1.0
 
         # Color is data: each channel's line in its own hue; the dashed line is the mean
         # (the heatmap value). Widths taper R → G → B so agreeing channels stay visible.
@@ -731,7 +771,7 @@ def _(arrays):
             for _r in range(_n_depth):
                 _d = _n_depth - 1 - _r  # embedding (depth 0) at the bottom, as in the heatmap
                 _ax = cast(plt.Axes, _axes[_r, _j])
-                _ax.vlines([LANDMARKS.index(_o) for _o in OPERATORS], -1, 2, "#8881", lw=6)
+                _ax.vlines(_x_major, -1, 2, "#8881", lw=6)
                 _m = np.clip(_stacks[_f][_d], 0, 1)  # (landmark, 3)
                 # Mean under the channels: hidden behind them where they agree, between them where they don't.
                 smooth_step(
@@ -758,8 +798,8 @@ def _(arrays):
                 _ax.spines[:].set_visible(False)
         for _ax in _axes[-1]:
             _ax = cast(plt.Axes, _ax)
-            _ax.set_xticks([LANDMARKS.index(_o) for _o in OPERATORS], OPERATORS, minor=False, fontsize="x-small")
-            _ax.set_xticks([LANDMARKS.index(_o) for _o in _minor_landmarks], [], minor=True)
+            _ax.set_xticks(_x_major, _x_labels_major, minor=False, fontsize="x-small")
+            _ax.set_xticks(_x_minor, _x_labels_minor, minor=True, fontsize="xx-small")
         fig.supylabel("probe R² (mix RGB) per depth", fontsize=9)
         return fig
 
