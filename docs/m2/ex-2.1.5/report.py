@@ -17,6 +17,7 @@ with app.setup(hide_code=True):
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
+    import matplotlib.patheffects as pe
     from matplotlib.colors import LinearSegmentedColormap
     from matplotlib.layout_engine import ConstrainedLayoutEngine
 
@@ -644,14 +645,18 @@ def _(arrays):
             last layer; the equals column is only partly filled because the
             seeds disagree on whether the mix is decodable that early. In the
             hex row, operand panels also read out strongly, but the mix panel
-            stays pale everywhere, peaking mid-answer at about 0.6.
+            stays pale everywhere, peaking mid-answer at about 0.6. Each panel
+            has a small open square marking its single brightest cell.
         """,
         caption="""
             Leave-one-out probe R² at every depth × landmark, center cell,
             mean over seeds. Rows: named and hex forms; columns: operand 1,
             operand 2, and the mix. Landmarks run through operand 1, the plus,
             operand 2, the equals sign, the pre-answer space, and the answer's
-            first and last characters.
+            first and last characters. Every cell is fit and scored on its own,
+            leaving out one probe line at a time, so no cell borrows from
+            another; the open square marks each panel's peak, the strongest
+            site for that concept.
         """,
     )
     def _plot() -> plt.Figure:
@@ -665,6 +670,20 @@ def _(arrays):
                 _ax = _axes[_i, _j]
                 _im = _ax.imshow(_m, vmin=0, vmax=1, cmap=_cmap, aspect="auto", origin="lower")
                 _ax.set_title(f"{_form} · {_t}", fontsize=9)
+                # Mark the peak cell of the seed-averaged map — the strongest probe
+                # site for this concept. Each cell is its own leave-one-out estimate,
+                # so this is a readout of the map, not a probe chosen over the others.
+                _pd, _pl = np.unravel_index(np.nanargmax(_m), _m.shape)
+                _ax.plot(
+                    _pl,
+                    _pd,
+                    marker="s",
+                    mfc="none",
+                    mec=light_dark("#111", "#fff"),
+                    mew=1.4,
+                    ms=9,
+                    path_effects=[pe.withStroke(linewidth=2.5, foreground=light_dark("#fff", "#111"))],
+                )
         for _ax in _axes[1]:
             _ax.set_xticks(range(len(LANDMARKS)), LANDMARKS, rotation=90, fontsize=7)
         for _ax in _axes[:, 0]:
