@@ -39,6 +39,23 @@ def use_style(*styles: Stylesheet):
         yield
 
 
+def _step_path(x: np.ndarray, y: np.ndarray, half_widths: np.ndarray, breaks: set[int]) -> MplPath:
+    """Plateau-and-riser path through *(x, y)*, each riser a cubic of the given half-width."""
+    dx = (x[-1] - x[0]) / (len(x) - 1)
+    verts, codes = [(x[0] - dx / 2, y[0])], [MplPath.MOVETO]
+    for i in range(len(x) - 1):
+        m, h = (x[i] + x[i + 1]) / 2, half_widths[i]
+        if i in breaks:  # close this plateau at its right shoulder, restart at the next's left — a gap, no riser
+            verts += [(m - h, y[i]), (m + h, y[i + 1])]
+            codes += [MplPath.LINETO, MplPath.MOVETO]
+        else:
+            verts += [(m - h, y[i]), (m, y[i]), (m, y[i + 1]), (m + h, y[i + 1])]
+            codes += [MplPath.LINETO, *[MplPath.CURVE4] * 3]
+    verts.append((x[-1] + dx / 2, y[-1]))
+    codes.append(MplPath.LINETO)
+    return MplPath(np.array(verts), codes)
+
+
 def smooth_step(
     ax: "Axes",
     x: "ArrayLike",
@@ -46,6 +63,8 @@ def smooth_step(
     *,
     ramp: "float | ArrayLike" = 1.0,
     breaks: "Iterable[int] | None" = None,
+    elide: "Iterable[int] | None" = None,
+    fade: float = 0.3,
     **kwargs,
 ) -> PathPatch:
     """Draw a step plot whose risers are S-curves rather than vertical jumps.
@@ -78,26 +97,27 @@ def smooth_step(
     (e.g. two ordinal slots that alias onto one character) so the connecting riser would
     span zero real distance. The gap is the riser's footprint, so it's widest when the
     plateaus are narrow — pair breaks with *ramp* < 1 to keep a visible flat on each side.
+
+    *elide* holds indices *i* whose riser spans ground the samples never covered — a run
+    of unmeasured positions between two measured ones. Those risers are drawn at *fade*
+    times the line's opacity, so interpolated stretches carry visibly less ink than the
+    measurements they join, and the eye stops reading them as another step. The faded
+    riser is a second, lighter artist beneath the returned one (which is broken at those
+    gaps), so the effect is real transparency: it needs no opaque mask matched to the
+    background, and survives a transparent figure over any page color. Where *breaks* and
+    *elide* name the same riser, the break wins and nothing is drawn.
     """
     x, y = np.asarray(x, float), np.asarray(y, float)
     if len(x) < 2:
         raise ValueError("smooth_step needs at least two samples")
-    brk = set(breaks or ())
+    brk, eli = set(breaks or ()), set(elide or ())
     dx = (x[-1] - x[0]) / (len(x) - 1)
     hs = np.broadcast_to(ramp, len(x) - 1) * dx / 2  # riser half-widths (one per gap)
+    style = dict(fill=False, capstyle="round", joinstyle="round") | kwargs
 
-    verts, codes = [(x[0] - dx / 2, y[0])], [MplPath.MOVETO]
-    for i in range(len(x) - 1):
-        m, h = (x[i] + x[i + 1]) / 2, hs[i]
-        if i in brk:  # close this plateau at its right shoulder, restart at the next's left — a gap, no riser
-            verts += [(m - h, y[i]), (m + h, y[i + 1])]
-            codes += [MplPath.LINETO, MplPath.MOVETO]
-        else:
-            verts += [(m - h, y[i]), (m, y[i]), (m, y[i + 1]), (m + h, y[i + 1])]
-            codes += [MplPath.LINETO, *[MplPath.CURVE4] * 3]
-    verts.append((x[-1] + dx / 2, y[-1]))
-    codes.append(MplPath.LINETO)
-
-    patch = PathPatch(MplPath(np.array(verts), codes), fill=False, capstyle="round", joinstyle="round", **kwargs)
+    if eli - brk:
+        ghost = _step_path(x, y, hs, brk)  # keeps the elided risers; the solid path drops them
+        ax.add_patch(PathPatch(ghost, **style | {"alpha": fade * (kwargs.get("alpha") or 1.0)}))
+    patch = PathPatch(_step_path(x, y, hs, brk | eli), **style)
     ax.add_patch(patch)
     return patch

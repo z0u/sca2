@@ -11,24 +11,23 @@ app = marimo.App(
 with app.setup(hide_code=True):
     import json
     import tempfile
-    from typing import cast
     from pathlib import Path
 
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
     from matplotlib.colors import LinearSegmentedColormap
-    from matplotlib.layout_engine import ConstrainedLayoutEngine
 
     # Marimo puts the notebook's directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import ARMS, ARRAYS_REF, METRICS_REF, SEEDS
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
-    from mini.vis import figure_html, light_dark, smooth_step, themed
+    from mini.vis import light_dark, themed
     from sca import vis as sv
+    from sca import vis_probes as vp
     from sca.data import mixed_vocab as mv
-    from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, OPERATORS, SPAN_RISERS
+    from sca.data.mixed_vocab import LANDMARKS
 
     use_publisher(report_bundle(__file__))
 
@@ -683,176 +682,68 @@ def _(arrays):
 
 
 @app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    Per channel, the two forms differ in kind. Named reads each operand
+    holistically — the three channels ride together over its characters —
+    while hex resolves it digit by digit, each channel stepping up at its own
+    hex position. At the mix, named brings all three channels high together
+    from the pre-answer position onward in the last layer; hex never does,
+    which is why its averaged map stayed pale.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _(arrays):
-    _landmark_labels = {
-        "o1s0": "$a_{1}$",
-        "o1s1": "$a_{2}$",
-        "o1e1": "$a_{n-1}$",
-        "o1e0": "$a_{n}$",
-        #
-        "o2s0": "$b_{1}$",
-        "o2s1": "$b_{2}$",
-        "o2e1": "$b_{n-1}$",
-        "o2e0": "$b_{n}$",
-        #
-        "as0": "$r_{1}$",
-        "as1": "$r_{2}$",
-        "ae1": "$r_{n-1}$",
-        "ae0": "$r_{n}$",
-        #
-        "plus": "+",
-        "eq": "=",
-        "pre": " ",
-    }
-    _major_landmarks = [_l for _l in LANDMARKS if _l in OPERATORS]
-    _x_major = [LANDMARKS.index(_l) for _l in _major_landmarks]
-    _x_labels_major = [_landmark_labels.get(_l, _l) for _l in _major_landmarks]
-
-    _minor_landmarks = [_l for _l in LANDMARKS if _l not in OPERATORS]
-    _x_minor = [LANDMARKS.index(_l) for _l in _minor_landmarks]
-    _x_labels_minor = [_landmark_labels.get(_l, _l) for _l in _minor_landmarks]
-
-    def _plot(_t: str) -> plt.Figure:
-        _forms = ("named", "hex")
-        # (depth+1, landmark, 3) per form, seed-averaged. r2_ch is the per-channel
-        # companion the heatmap collapses: its mean over the channel axis is a column above.
+    @themed(
+        name="probe-channels",
+        alt_text="""
+            A two-by-three grid of blocks laid out like the heatmaps above: rows
+            are the surface forms, named on top and hex below; columns are the
+            operand-1, operand-2 and mix probes. Each block is a stack of five
+            small line panels, one per residual depth, embedding at the bottom
+            and the last layer at the top, sharing an x axis of grammar
+            landmarks. Every panel carries three step-lines, one per RGB
+            channel. In the named row the three channels rise and fall together
+            over whichever operand the probe targets, a single shared plateau
+            that fades elsewhere; in the hex row they resolve at different
+            characters, red, green and blue each stepping up at its own hex
+            digit, so they separate into an offset staircase over the operand
+            and again over the answer. The mix column completes the contrast:
+            in its top panel named lifts all three channels together from the
+            equals sign onward, at full height by the pre-answer landmark,
+            while in hex they stay separated and none reaches the top of a
+            panel.
+        """,
+        caption="""
+            Per-channel leave-one-out probe $R^2$, center cell, seed-averaged —
+            the RGB mean of a panel's three lines is the matching cell of the
+            heatmap above, and the grid matches that layout: rows are the two
+            forms, columns are operand 1, operand 2 and the mix. Within a
+            block, rows are depth (embedding at the bottom) and the x axis runs
+            across the grammar landmarks, one step-line per channel. Steps,
+            because each landmark is a discrete character position and a
+            straight line between two of them would claim measurements that
+            were never made. Risers that cross characters no landmark measures
+            — the spaces flanking `+` and `=` in both forms, and the
+            variable-length middles of named words — are drawn in lighter ink,
+            so an interpolation doesn't read as another measured step. Only the
+            first and last character of each token is labelled; all four
+            sampled positions are drawn.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        # (depth+1, landmark, 3) per form and target, seed-averaged. r2_ch is the per-channel
+        # companion the heatmap collapses: its mean over the channel axis is a cell above.
         _stacks = {
-            _f: np.mean([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2_ch"] for _s in SEEDS], axis=0) for _f in _forms
+            (_f, _t): np.mean([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2_ch"] for _s in SEEDS], axis=0)
+            for _f in vp.FORMS
+            for _t in vp.TARGETS
         }
-        _n_depth = next(iter(_stacks.values())).shape[0]
-        _x = range(len(LANDMARKS))
-        # Guard: if two adjacent landmarks ever alias onto one character, the probe
-        # measures them once and the columns come out bit-identical — break the line
-        # there so a riser doesn't span zero real distance and inflate the plateau.
-        # The current scheme has no such pair (the answer is sampled like an operand),
-        # so this is empty; it stays as a safety net for a scheme that reintroduces one.
-        _breaks = {
-            _f: {_i for _i in range(len(LANDMARKS) - 1) if np.array_equal(_s[:, _i], _s[:, _i + 1])}
-            for _f, _s in _stacks.items()
-        }
-        # Ramp per riser: wider plateaus (0.25) keep the discrete tokens legible; a riser
-        # that crosses an unprobed stretch is drawn as a full smooth slide (1) instead, so it
-        # doesn't read as a step between adjacent measurements. Word middles (SPAN_RISERS) are
-        # named-only — hex's are adjacent digits. Operator spaces (GAP_RISERS) exist in the
-        # fixed grammar of both forms.
-        _ramps = {_f: np.full(len(LANDMARKS) - 1, 0.25) for _f in _forms}
-        _ramps["named"][list(SPAN_RISERS)] = 1.0
-        for _f in _forms:
-            _ramps[_f][list(GAP_RISERS)] = 1.0
+        return vp.probe_trace_grid(_stacks, form_axis="row", panel_height=0.45, ylabel="probe R² per depth")
 
-        # Color is data: each channel's line in its own hue; the dashed line is the mean
-        # (the heatmap value). Widths taper R → G → B so agreeing channels stay visible.
-        _cols = light_dark(["#d1495bbb", "#2a9d5c", "#3b6fd4"], ["#ff6b7daa", "#4fd07ac8", "#6ea3ff"])
-        _lws = (2.6, 1.7, 1.0)
-        _mean_col = light_dark("#555", "#aaa")
-
-        fig, _axes = plt.subplots(
-            _n_depth, len(_forms), figsize=(8, 0.6 * _n_depth), sharex=True, sharey=True, squeeze=False
-        )
-        cast(ConstrainedLayoutEngine, fig.get_layout_engine()).set(hspace=0, h_pad=0, wspace=0)
-        for _j, _f in enumerate(_forms):
-            _axes[0, _j].set_title(_f, fontsize=9)
-            for _r in range(_n_depth):
-                _d = _n_depth - 1 - _r  # embedding (depth 0) at the bottom, as in the heatmap
-                _ax = cast(plt.Axes, _axes[_r, _j])
-                _ax.vlines(_x_major, -1, 2, "#8881", lw=6)
-                _m = np.clip(_stacks[_f][_d], 0, 1)  # (landmark, 3)
-                # Mean under the channels: hidden behind them where they agree, between them where they don't.
-                smooth_step(
-                    _ax,
-                    _x,
-                    _m.mean(1),
-                    color=_mean_col,
-                    lw=0.5,
-                    linestyle=":",
-                    ramp=_ramps[_f],
-                    zorder=1,
-                    breaks=_breaks[_f],
-                )
-                for _c in range(3):
-                    smooth_step(
-                        _ax, _x, _m[:, _c], color=_cols[_c], lw=_lws[_c], ramp=_ramps[_f], zorder=2, breaks=_breaks[_f]
-                    )
-                _ax.set(ylim=(-0.2, 1.2), xlim=(-0.5, len(LANDMARKS) - 0.5))
-                if _j == 0:
-                    _ax.set_ylabel(f"{_d}", fontsize=8)
-                _ax.tick_params(axis="x", top=True, direction="inout")
-                _ax.tick_params(axis="y", left=True, right=True, direction="in")
-                _ax.set_yticks([0, 1], "")
-                _ax.spines[:].set_visible(False)
-        for _ax in _axes[-1]:
-            _ax = cast(plt.Axes, _ax)
-            _ax.set_xticks(_x_major, _x_labels_major, minor=False, fontsize="x-small")
-            _ax.set_xticks(_x_minor, _x_labels_minor, minor=True, fontsize="xx-small")
-        fig.supylabel(f"probe R² ({_t} RGB) per depth", fontsize=9)
-        return fig
-
-    # Same panel per probe target, rendered as separate figures so each keeps its full
-    # width; the CSS in report.css lays a `<figure>` of `<figure>`s out as a reflowing
-    # subfigure row. Columns match the heatmap above: operand 1, operand 2, the mix.
-    _target_captions = {
-        "op1": (
-            "**Operand 1.** Named reads it holistically — the three channels ride together "
-            "over its characters; hex resolves it digit by digit, each channel stepping up "
-            "at its own hex position."
-        ),
-        "op2": "**Operand 2.** The same picture, shifted one operand along to the $b$ characters.",
-        "mix": (
-            "**The mix.** Named brings all three channels high together from the pre-answer "
-            "position onward in the last layer; hex never does, which is why its averaged map "
-            "stayed pale."
-        ),
-    }
-    _target_alt = {
-        "op1": """
-            A five-by-two grid of small step-line panels for the operand-1 probe. Rows are
-            residual depth, embedding at the bottom rising to the last layer at the top;
-            columns are the two surface forms, named on the left and hex on the right. Each
-            panel plots leave-one-out probe R² for operand 1's RGB across the grammar
-            landmarks, one line per channel plus a dashed grey mean. In the named column the
-            three channels rise and fall together over operand 1's own characters, a single
-            shared plateau there that fades elsewhere. In the hex column they instead resolve
-            at different characters — red, green and blue each stepping up at its own hex
-            digit — so they separate into an offset staircase over the operand, and read out
-            channel by channel again at the answer positions.
-        """,
-        "op2": """
-            The same five-by-two grid of step-line panels for the operand-2 probe: rows are
-            depth, columns are the named and hex forms, one line per RGB channel plus a
-            dashed mean. It repeats the operand-1 reading one operand group to the right —
-            named holds the three channels together over operand 2's characters, hex splits
-            them across its digits into the same offset staircase.
-        """,
-        "mix": """
-            The same five-by-two grid of step-line panels for the mix probe: rows are depth,
-            columns are the named and hex forms, one line per RGB channel plus a dashed mean.
-            In the named column the three channels run together and climb with depth, rising
-            together around the equals and pre-answer landmarks in the last row. In the hex
-            column the three channels separate and none reaches the top of the panel, so their
-            mean stays low across every landmark.
-        """,
-    }
-    _subfigs = "".join(
-        themed(_plot, name=f"probe-channels-{_t}", alt_text=_target_alt[_t], caption=_target_captions[_t])(_t)
-        for _t in ("op1", "op2", "mix")
-    )
-    mo.Html(
-        figure_html(
-            _subfigs,
-            aria_label="Per-channel leave-one-out probe R² by depth for operand 1, operand 2, and the mix.",
-            caption=mo.md("""
-                Per-channel leave-one-out probe R², center cell, seed-averaged — the RGB mean
-                of a panel's three lines is the matching form-and-target cell of the heatmap
-                above. The three subfigures are the heatmap's three columns (operand 1, operand
-                2, the mix); within each, rows are depth (embedding at the bottom) and columns
-                are the named and hex forms. Each panel runs across the grammar landmarks, one
-                step-line per channel (R, G, B) plus their mean (dashed). Steps, because each
-                landmark is a discrete character position; widths taper R → G → B so a landmark
-                where the channels agree reads as nested bands rather than as whichever channel
-                drew last.
-            """).text,
-        )
-    )
+    mo.Html(_plot())
     return
 
 
