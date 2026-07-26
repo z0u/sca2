@@ -27,6 +27,19 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   cross-form ρ and principal angles (full-data fits, so unaffected mechanically)
   should be gated on the stricter R². #metrics #ex-2.1.5 #representations
 
+  Riding along in the same re-run: add the three operand-closing spaces to
+  `LANDMARKS` (see the delimiter finding below). That makes a hex line fully
+  measured — its operand middles are zero characters, so every position is a
+  landmark — and leaves elision meaning one thing only, a name span too variable
+  to align. Decided against dropping the second-to-last landmark to avoid short-name
+  aliasing: for hex it is the green digit's own position, dropping it would break
+  the shared-landmark cross-form comparison, and the aliasing it would fix affects
+  0/768 lines at the centre cell (the 140-name palette's shortest name is 4
+  characters) and 5/768 in `palette-250`, whose only 3-letter name is `ice`. A
+  footnote covers it. The caption should instead say that the elided span is 0–22
+  characters wide depending on the line (median 6), since that averaging is the
+  real approximation and it applies to every named panel.
+
 - [ ] Probe all positions in a sample of sequences. So far we have only probed
   specific locations, e.g. last token of first operand; last token before answer.
   How do the other tokens compare? Visualize probe response as sublines; note that
