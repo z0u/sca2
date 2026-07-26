@@ -605,6 +605,18 @@ def _():
     mo.md(r"""
     ## Within-form geometry (H2)
 
+    /// admonition | TODO
+    Refit pending. The probe holds out one *equation* at a time, so a colour or
+    a hex digit sits in both the fit and the held-out row and an identity →
+    value table is memorizable. A refit of all three centre seeds holding out
+    the value instead leaves the H2 prediction untouched (named mix at the
+    pre-answer site: 0.944 → 0.941) and overturns two claims made below: the
+    named operand bundle falls to ~0, so it is name recognition rather than
+    value geometry, and hex's earlier channels are *not* retained by value into
+    later digits (0.82 → −0.27). The paragraphs below still read the
+    per-equation numbers and need rewriting once the protocol is settled.
+    ///
+
     The figure below plots leave-one-out probe $R^2$ at every depth ×
     landmark, for the two operands and the mix, per form (center cell; depth
     0 is the embedding layer), one line per RGB channel with the three-seed

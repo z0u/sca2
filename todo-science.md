@@ -265,9 +265,30 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   placement for a mixed-vocabulary corpus. #anchoring #ex-2.1.5 #representations
 
 - **Per-equation leave-one-out lets probes memorize identity → value; per-value
-  holdout separates memory from geometry (ex-2.1.5, 2026-07-26).** One-cell prototype
-  on `center-s0`, refitting with a leave-one-*value*-out group instead. Four different
-  outcomes, which is why it matters:
+  holdout separates memory from geometry (ex-2.1.5, 2026-07-26).** Refit of all three
+  centre seeds, locally from published checkpoints — no Modal needed, and the grouped
+  fit is cheaper than the shipped one because it shares a Gram matrix across groups.
+  Three protocols: *equation* (shipped), *value* (hold out rows whose scored channel
+  carries the value), *strict* (hold out rows where the value appears in **any** slot —
+  operand 1, operand 2 or the answer — which closes the path where the same hex digit,
+  or the same colour in the other operand slot, teaches its own direction from a slot
+  the value holdout left alone). Refit *equation* reproduces the shipped arrays to
+  4e-4, so the pipeline is faithful. Headline cells, seed-averaged:
+
+  | site | equation | value | strict |
+  |---|---|---|---|
+  | hex op2, own digit, embedding | 1.000 | 0.416 | 0.416 |
+  | hex op2, own digit, last layer | 0.982 | 0.781 | 0.781 |
+  | hex op2, red retained at the green digit, L4 | 0.821 | −0.285 | −0.269 |
+  | hex mix, pre-answer, L4 | 0.376 | 0.325 | 0.196 |
+  | named op1 / op2, last operand char, L4 | 0.750 / 0.716 | −0.046 / 0.006 | −0.047 / 0.001 |
+  | named mix, pre-answer, L4 | 0.944 | 0.943 | **0.941** |
+
+  Cross-slot leak (value → strict) is exactly zero at the embedding, where no attention
+  has run — the control behaving as theory demands. It stays negligible for named
+  (mean +0.003 on op2) and concentrates in the hex mix (mean +0.10, +0.13 at
+  pre-answer), because the 16 digits are shared across all three channel slots.
+  Four outcomes, which is why the protocol matters:
   (1) hex digit cells at the embedding collapse 1.00 → 0.44, but land well above zero,
   so the digit tokens do carry a real (partial) magnitude axis rather than an arbitrary
   lookup;
@@ -282,6 +303,20 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   (deepening with depth), named only in the computed mix. That, rather than token
   binding, is what a cross-form anchor would have to bridge. #metrics #ex-2.1.5
   #anchoring #representations
+
+- **Retention and value-geometry are different questions, and ex-2.1.2's eviction
+  finding may have measured the first (2026-07-26).** In ex-2.1.5, hex operand 2's red
+  channel read at the *green* digit in the last layer scores 0.821 per-equation and
+  −0.27 under a strict holdout. Both are true of different things: red's identity is
+  still recoverable there (causal attention reaches back to its digit), but it is no
+  longer placed by value. So "the earlier channel persists into later digits" is an
+  identity claim, not a geometric one — and the report sentence that read it as depth
+  accumulating a value representation is wrong and needs replacing. The same question
+  applies upstream: ex-2.1.2's just-in-time-*with-eviction* result (R² ≈ 0.97 at a
+  channel's own emission position, dropped afterwards) was measured on a small
+  vocabulary with the same per-equation holdout, so its "dropped" may mean "no longer
+  recoverable" or "no longer value-organized". Worth a re-check before anchor design
+  leans on it. #representations #ex-2.1.2 #ex-2.1.5 #metrics
 
 - **Use the embedding row as a surface-text control for any probe read at an answer
   position (methodology, 2026-07-26).** Under teacher forcing the answer tokens are in
