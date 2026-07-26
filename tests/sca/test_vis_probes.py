@@ -7,6 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from matplotlib.colors import to_rgb
 
 from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, SPAN_RISERS
 from sca.vis_probes import (
@@ -17,6 +18,7 @@ from sca.vis_probes import (
     MINOR_LANDMARKS,
     TARGETS,
     aliased_risers,
+    mean_color,
     probe_trace_grid,
 )
 
@@ -70,32 +72,37 @@ def test_only_the_bottom_row_of_blocks_is_labelled(stacks):
     plt.close(fig)
 
 
-def test_a_seed_axis_turns_into_terrain_without_changing_the_layout(stacks):
+def test_a_seed_axis_adds_the_envelope_without_changing_the_layout(stacks):
     per_seed = {k: np.stack([v, v * 0.5, v * 0.8]) for k, v in stacks.items()}
     plain = probe_trace_grid(stacks, form_axis="row")
     shaded = probe_trace_grid(per_seed, form_axis="row")
     assert len(shaded.get_axes()) == len(plain.get_axes())
-    # Same panels, two extra patches each: the areas under the seed minimum and maximum.
+    # Same panels, six extra patches each: the fill's outline and the two envelope hairlines,
+    # each with the faded companion that carries its elided risers (both forms elide some).
     counts = [len(a.patches) for a in plain.get_axes()], [len(a.patches) for a in shaded.get_axes()]
-    assert all(s == p + 2 for p, s in zip(*counts, strict=True))
+    assert all(s == p + 6 for p, s in zip(*counts, strict=True))
     plt.close(plain)
     plt.close(shaded)
 
 
-def test_spread_shades_as_stacked_contours_so_opacity_only_falls_off_with_height():
-    """A ribbon over a fill would make their overlap the darkest part of the panel."""
+def test_the_summary_outranks_the_envelope_it_sits_inside():
+    """Ink follows the hierarchy: the fill's own silhouette reads first, the spread second."""
     values = np.linspace(0.2, 0.8, len(LANDMARKS))[:, None] * np.ones(3)
     per_seed = np.stack([values * 0.75, values, values * 1.1])[:, None]  # one depth
-    fig = probe_trace_grid({(f, "mix"): per_seed for f in FORMS}, targets=("mix",))
+    # Nothing elided, so each shading line is a single patch rather than a solid-plus-ghost pair.
+    fig = probe_trace_grid({(f, "mix"): per_seed for f in FORMS}, targets=("mix",), elided={})
     ax = fig.get_axes()[0]
-    areas = [p for p in ax.patches if p.get_fill()]
-    assert len(areas) == 3
-    # Every area starts at the floor, so a point is covered by each contour above it.
-    assert all(np.isclose(p.get_path().vertices[:, 1].min(), 0.0) for p in areas)
-    # Seed minimum, seed mean (what the lines plot), seed maximum — of the highest landmark.
-    tops = sorted(p.get_path().vertices[:, 1].max() for p in areas)
-    assert np.allclose(tops, [0.8 * f for f in (0.75, (0.75 + 1 + 1.1) / 3, 1.1)])
-    assert len({p.get_alpha() for p in areas}) == 1  # equal ink; the overlaps do the shading
+    grey = [p for p in ax.patches if p.get_edgecolor()[:3] == to_rgb(mean_color())]
+    fills = [p for p in grey if p.get_fill()]
+    assert len(fills) == 1 and np.isclose(fills[0].get_path().vertices[:, 1].min(), 0.0)
+    # Seed minimum, seed mean (what the fill and the lines plot), seed maximum, at the top landmark.
+    edges = sorted((p for p in grey if not p.get_fill()), key=lambda p: p.get_path().vertices[:, 1].max())
+    assert np.allclose(
+        [p.get_path().vertices[:, 1].max() for p in edges],
+        [0.8 * f for f in (0.75, (0.75 + 1 + 1.1) / 3, 1.1)],
+    )
+    lo, summary, hi = (p.get_alpha() for p in edges)
+    assert summary > hi and summary > lo and lo == hi  # the envelope is a matched, quieter pair
     plt.close(fig)
 
 

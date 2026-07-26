@@ -98,6 +98,7 @@ def draw_traces(
     fade: float = 0.3,
     fill: Literal["mean", "channel"] | None = "mean",
     fill_alpha: float | None = None,
+    edge_alpha: float = 0.55,
     spread: np.ndarray | None = None,
 ) -> None:
     """Draw one panel: a step-line per channel of *values*, shaped ``(landmark, channel)``.
@@ -116,20 +117,21 @@ def draw_traces(
 
     *spread* holds the replicates *values* summarises, shaped ``(replicate, landmark,
     channel)`` — the per-seed maps behind a seed mean. It turns "and the other seeds agree"
-    from a claim in the prose into something the reader can see, and it shades as *terrain*
-    rather than as a separate band: an area under the replicate minimum, one under the
-    summary, one under the maximum, all from the same floor. Where the layers overlap the
-    shading builds up, so opacity falls off monotonically with height — solid up to the
-    minimum, one step lighter to the summary, lightest out to the maximum. A min–max ribbon
-    laid over a summary fill instead makes the *overlap* the darkest part of the panel, and
-    a reader sees a dark stripe floating between two lighter ones with nothing in the data
-    to match it.
+    from a claim in the prose into something the reader can see: the fill gets an outline at
+    *edge_alpha*, and the replicate minimum and maximum are drawn as fainter hairlines. Where
+    the replicates agree all three coincide, so the panel reads as a crisply outlined area;
+    where they part, two hairlines drift off a silhouette that stays where the summary is.
 
-    *fill_alpha* is the opacity of the deepest layer, where every contour has stacked up, so
-    a panel whose replicates agree looks the same whether or not *spread* was passed; the
-    per-layer value is derived from it. It defaults per theme: a pale fill lightens a white
-    page but has to lighten a near-black one by more to travel the same visual distance, so
-    the dark figure needs a stronger value to read as the same shade of quiet.
+    That hierarchy is the point of drawing the spread as lines rather than as more shading.
+    Three stacked tones (under the minimum, the summary, the maximum) put only a few points
+    of opacity between neighbouring levels, which is below what a 0.45in panel can show; and
+    the more obvious arrangement — a min–max ribbon over a summary fill — makes their
+    *overlap* the darkest part of the panel, so a reader sees a dark stripe floating between
+    two lighter ones with nothing in the data to match it.
+
+    *fill_alpha* defaults per theme. A pale fill lightens a white page but has to lighten a
+    near-black one by more to travel the same visual distance, so the dark figure needs a
+    stronger value to read as the same shade of quiet.
     """
     fill_alpha = light_dark(0.18, 0.22) if fill_alpha is None else fill_alpha
     colors = colors or channel_colors()
@@ -137,17 +139,27 @@ def draw_traces(
     breaks, elide = set(breaks), set(elide)
     x = range(len(values))
 
-    def terrain(summary: np.ndarray, replicates: np.ndarray | None, color: str) -> None:
-        contours = (summary,) if replicates is None else (replicates.min(0), summary, replicates.max(0))
-        alpha = 1 - (1 - fill_alpha) ** (1 / len(contours))  # n of these composite to fill_alpha
-        for y in contours:
-            smooth_step_area(ax, x, y, ramp=ramp, breaks=breaks, color=color, alpha=alpha)
+    def shade(summary: np.ndarray, replicates: np.ndarray | None, color: str) -> None:
+        def edge(y: np.ndarray, alpha: float) -> None:
+            # Elided like the traces: a summary line that crossed an unprobed stretch solidly
+            # would claim the neighbourhood the measurements it summarises decline to claim.
+            smooth_step(
+                ax, x, y,
+                ramp=ramp, breaks=breaks, elide=elide, fade=fade, color=color, alpha=alpha, lw=0.5,
+            )  # fmt: skip
+
+        smooth_step_area(ax, x, summary, ramp=ramp, breaks=breaks, color=color, alpha=fill_alpha)
+        if replicates is None:
+            return
+        edge(summary, edge_alpha)  # the summary keeps the firm silhouette...
+        edge(replicates.min(0), edge_alpha * 0.55)  # ...and the envelope stays subordinate to it
+        edge(replicates.max(0), edge_alpha * 0.55)
 
     if fill == "mean":
-        terrain(values.mean(1), None if spread is None else spread.mean(2), mean_color())
+        shade(values.mean(1), None if spread is None else spread.mean(2), mean_color())
     for c in range(values.shape[1]):
         if fill == "channel":
-            terrain(values[:, c], None if spread is None else spread[:, :, c], colors[c])
+            shade(values[:, c], None if spread is None else spread[:, :, c], colors[c])
         smooth_step(
             ax, x, values[:, c],
             ramp=ramp, breaks=breaks, elide=elide, fade=fade, color=colors[c], lw=lws[c],
