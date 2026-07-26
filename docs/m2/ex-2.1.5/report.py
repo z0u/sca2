@@ -736,10 +736,11 @@ def _(arrays):
     )
     def _plot() -> plt.Figure:
         # (seed, depth+1, landmark, 3) per form and target — unaggregated, so the figure can
-        # draw both the seed mean and the seed spread. r2_ch is the per-channel companion of
-        # the scalar r2: its mean over the channel axis is the aggregate probe score.
+        # draw both the seed mean and the seed spread. The strict per-channel map: every row
+        # carrying a value leaves the fit with it, so a plateau here is geometry rather than
+        # a recovered identity. Its per-equation twin is in the exploratory section.
         _stacks = {
-            (_f, _t): np.stack([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2_ch"] for _s in SEEDS])
+            (_f, _t): np.stack([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2_strict_ch"] for _s in SEEDS])
             for _f in vp.FORMS
             for _t in vp.TARGETS
         }
