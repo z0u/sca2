@@ -140,16 +140,24 @@ def draw_traces(
     x = range(len(values))
 
     def shade(summary: np.ndarray, replicates: np.ndarray | None, color: str) -> None:
-        def edge(y: np.ndarray, weight: float) -> None:
-            # Opaque, not translucent: these three lines coincide wherever the replicates
-            # agree, which is most of the panel, and stacked translucent copies would put
-            # the heaviest ink exactly where the least is happening. Elided like the traces,
-            # since a summary line that crossed an unprobed stretch solidly would claim a
-            # neighbourhood the measurements it summarises decline to claim.
-            ink = mix(page_color(), color, weight)
+        # Opaque, not translucent: these three lines coincide wherever the replicates agree,
+        # which is most of the panel, and stacked translucent copies would put the heaviest
+        # ink exactly where the least is happening. The price of pre-computing a color is
+        # having to say what it sits on, and the three lines sit on different things — the
+        # fill runs from the floor to the summary, so the minimum is always inside it, the
+        # maximum always above it, and the summary rides its edge with half of the stroke
+        # either side. Tint each against its own surround or a line that fades toward the
+        # page reads as a pale streak scratched across the fill.
+        page = page_color()
+        floor = mix(page, color, fill_alpha)  # the shade the fill paints, once composited
+
+        def edge(y: np.ndarray, weight: float, over: str) -> None:
+            # Elided like the traces: a summary line that crossed an unprobed stretch solidly
+            # would claim a neighbourhood the measurements it summarises decline to claim.
+            ink = mix(over, color, weight)
             smooth_step(
                 ax, x, y,
-                ramp=ramp, breaks=breaks, elide=elide, fade=mix(page_color(), ink, fade),
+                ramp=ramp, breaks=breaks, elide=elide, fade=mix(over, ink, fade),
                 color=ink, lw=0.5,
             )  # fmt: skip
 
@@ -157,9 +165,9 @@ def draw_traces(
         if replicates is None:
             return
         # Envelope first, so where the three coincide the summary's own edge is what survives.
-        edge(replicates.min(0), edge_alpha * 0.55)
-        edge(replicates.max(0), edge_alpha * 0.55)
-        edge(summary, edge_alpha)
+        edge(replicates.min(0), edge_alpha * 0.55, floor)
+        edge(replicates.max(0), edge_alpha * 0.55, page)
+        edge(summary, edge_alpha, mix(page, floor, 0.5))
 
     if fill == "mean":
         shade(values.mean(1), None if spread is None else spread.mean(2), mean_color())

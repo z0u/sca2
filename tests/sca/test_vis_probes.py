@@ -7,8 +7,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
-from matplotlib.colors import to_hex
+from matplotlib.colors import to_hex, to_rgb
 
+from mini.vis import mix, page_color
 from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, SPAN_RISERS
 from sca.vis_probes import (
     ELIDED_RISERS,
@@ -18,6 +19,7 @@ from sca.vis_probes import (
     MINOR_LANDMARKS,
     TARGETS,
     aliased_risers,
+    mean_color,
     probe_trace_grid,
 )
 
@@ -116,8 +118,25 @@ def test_the_summary_outranks_the_envelope_it_sits_inside():
         [0.8 * f for f in (0.75, (0.75 + 1 + 1.1) / 3, 1.1)],
     )
     lo, summary, hi = edges
-    grey = lambda p: p.get_edgecolor()[0]  # noqa: E731 — one channel is enough; they are neutral
-    assert grey(summary) < grey(lo) == grey(hi)  # the envelope is a matched, quieter pair
+    page = to_rgb(page_color())[0]  # one channel is enough; the shading is neutral
+    strength = lambda p: abs(p.get_edgecolor()[0] - page)  # noqa: E731 — how far the ink carries
+    assert strength(summary) > strength(lo) and strength(summary) > strength(hi)
+    plt.close(fig)
+
+
+def test_lines_over_the_fill_are_tinted_against_it_rather_than_against_the_page():
+    """Fading toward the page inside the fill reads as a pale streak scratched across it."""
+    values = np.linspace(0.2, 0.8, len(LANDMARKS))[:, None] * np.ones(3)
+    per_seed = np.stack([values * 0.75, values, values * 1.1])[:, None]  # one depth
+    fig = probe_trace_grid({(f, "mix"): per_seed for f in FORMS}, targets=("mix",))
+    ax = fig.get_axes()[0]
+    (area,) = (p for p in shading(ax) if p.get_fill())
+    face = area.get_facecolor()
+    fill = to_rgb(mix(page_color(), to_hex(face), face[3]))[0]  # the shade the fill composites to
+    ink = to_rgb(mean_color())[0]
+    # The two lowest lines are the minimum's stroke and the faded companion carrying its risers.
+    lines = sorted((p for p in shading(ax) if not p.get_fill()), key=lambda p: p.get_path().vertices[:, 1].max())
+    assert all(min(fill, ink) < p.get_edgecolor()[0] < max(fill, ink) for p in lines[:2])
     plt.close(fig)
 
 
@@ -128,8 +147,10 @@ def test_shading_lines_are_opaque_so_agreeing_replicates_dont_read_as_emphasis()
     ax = fig.get_axes()[0]
     lines = [p for p in shading(ax) if not p.get_fill()]
     assert len(lines) == 6 and all(p.get_alpha() is None for p in lines)
-    # Summary and envelope, each with the paler companion carrying its elided risers.
-    assert len({to_hex(p.get_edgecolor()) for p in lines}) == 4
+    # Minimum, summary and maximum, each tinted against its own surround, and each with the
+    # paler companion that carries its elided risers: six colors mixed once, none of them mixed
+    # again at draw time.
+    assert len({to_hex(p.get_edgecolor()) for p in lines}) == 6
     plt.close(fig)
 
 
