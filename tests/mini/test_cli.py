@@ -766,3 +766,22 @@ def test_throughput_outlier_needs_a_fleet_to_compare_against(tmp_path: Path, mon
 
     cmd_status(argparse.Namespace(name="lonelyexp", app="local", json=True, brief=True))
     assert "attention" not in json.loads(capsys.readouterr().out)
+
+
+def test_region_defaults_from_the_project_config(tmp_path: Path, monkeypatch):
+    """Placement is usually a property of where the run's storage lives, not of one
+    experiment, so it has a project-wide default — with the explicit flag winning,
+    and a role's own ``region=`` winning over both (roles are applied on top)."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.mini]\nregion = "us-east"\n')
+
+    from mini.__main__ import _build_apparatus
+
+    def ns(region: str | None = None) -> argparse.Namespace:
+        return argparse.Namespace(app="modal", gpu=None, timeout=None, max_containers=None, region=region)
+
+    pytest.importorskip("modal")
+    assert _build_apparatus("regionexp", ns()).modal_fn_kwargs["region"] == "us-east"
+    assert _build_apparatus("regionexp", ns(region="eu-west")).modal_fn_kwargs["region"] == "eu-west"
+    role = _build_apparatus("regionexp", ns()).w(region="asia-northeast3")
+    assert role.modal_fn_kwargs["region"] == "asia-northeast3"

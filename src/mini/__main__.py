@@ -190,6 +190,10 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
                 ("gpu", getattr(args, "gpu", None)),
                 ("timeout", getattr(args, "timeout", None)),
                 ("max_containers", getattr(args, "max_containers", None)),
+                # A project-wide default, since placement is usually a property of
+                # where the run's *storage* lives rather than of one experiment. A
+                # role's own region= still wins (roles are applied over this).
+                ("region", getattr(args, "region", None) or _project_config().get("region")),
             )
             if v is not None
         } | wd_overrides
@@ -1344,6 +1348,14 @@ def main() -> None:
             default=None,
             dest="max_containers",
             help="cap concurrent Modal containers (--app modal; default: unbounded)",
+        )
+        p.add_argument(
+            "--region",
+            default=None,
+            help="pin Modal containers to a region, e.g. us-east (--app modal; default: "
+            "[tool.mini] region, else Modal's choice — which may place a sweep's cells "
+            "on different continents, far from the shared Volume/Dict). Costs a region "
+            "premium; a role's own region= wins over this",
         )
 
     p = sub.add_parser("run", help="advance a (multi-step) memoized orchestration")

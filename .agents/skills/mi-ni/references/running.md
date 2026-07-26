@@ -115,6 +115,34 @@ attached, and on Modal the container id / region / cloud — never any token);
 record under `env`, with `started_at`/`finished_at` for a real execution
 duration.
 
+## Where the containers land (`--region`)
+
+Left unspecified, Modal places containers wherever it has capacity — which for
+one sweep can mean several continents. The shared Volume, control-plane `Dict`
+and artifact bucket live in one place, so a distant cell pays a few hundred
+milliseconds per round-trip to them.
+
+How much that matters depends on how often a task talks to them. Ex-2.1.5's
+training cells outside `us-east` ran 15–30× slow, but the mechanism was a
+*per-step* progress emission blocking on the network; emission now runs off the
+task's thread, so that particular cliff is gone. What remains is per-checkpoint
+and per-artifact latency — real, but paid a few times an epoch rather than a few
+thousand times.
+
+Pin it with `--region us-east` (or `[tool.mini] region` for a project-wide
+default, or `region=` on a role, which wins over both). The trade-off goes the
+other way too: pinning costs a per-region premium and narrows the capacity pool,
+so a pinned sweep can sit queued where an unpinned one would have started.
+Rules of thumb:
+
+- Roles that move real bytes to storage (checkpoints, large artifacts) — pin
+  them, next to the storage.
+- Compute-bound roles that read and write little — leave them free and let them
+  find capacity.
+- Suspecting placement is the problem? `env.region` is on every task record
+  (`status --json`), and a cell far behind its siblings' throughput is flagged
+  for you.
+
 ## Provenance & cost
 
 A run stamps **lineage** into its meta on every wake — enough to reproduce or
