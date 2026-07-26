@@ -245,7 +245,11 @@ readable cold without re-deriving code state.
   pure cruft. Prevention: teach `./go publish` (or the build) to list remote
   export keys and warn on ones with no matching notebook, and/or a `./go
   publish --move old new` verb. Consider folding orphan cleanup into
-  `mini gc --store`.
+  `mini gc --store`. Same shape one level down: deleting a figure from a
+  notebook leaves its `_assets/<name>-{light,dark}.png` behind, since re-export
+  writes into the existing bundle dir without pruning. Harmless locally (the
+  HTML stops referencing them) but it ships dead bytes on publish — a prune of
+  assets not referenced by the fresh `index.html` would cover both.
 
 - Cross-experiment lineage is now **auto-detected**: `set_ref` in a task worker
   stamps producer identity onto the ref (via an ambient `producer_context`, so

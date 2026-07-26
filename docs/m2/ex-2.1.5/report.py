@@ -16,7 +16,6 @@ with app.setup(hide_code=True):
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
-    from matplotlib.colors import LinearSegmentedColormap
 
     # Marimo puts the notebook's directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
@@ -27,7 +26,6 @@ with app.setup(hide_code=True):
     from sca import vis as sv
     from sca import vis_probes as vp
     from sca.data import mixed_vocab as mv
-    from sca.data.mixed_vocab import LANDMARKS
 
     use_publisher(report_bundle(__file__))
 
@@ -44,10 +42,6 @@ with app.setup(hide_code=True):
             with np.load(a_path) as z:
                 arrays = {k: z[k] for k in z.files}
         return metrics, arrays
-
-    def seq_cmap() -> LinearSegmentedColormap:
-        """Theme-adaptive sequential map for R² heatmaps (near-background → accent)."""
-        return LinearSegmentedColormap.from_list("r2", light_dark(["#eef3f7", "#1a5f8a"], ["#20242a", "#6ab0d4"]))
 
 
 @app.cell(hide_code=True)
@@ -611,85 +605,32 @@ def _():
     mo.md(r"""
     ## Within-form geometry (H2)
 
-    The maps below plot leave-one-out probe $R^2$ at every depth × landmark,
-    for the two operands and the mix, per form (center cell, seed-averaged;
-    depth 0 is the embedding layer). The named form matches the prediction:
-    operand readout builds over the early layers, and the mix is decodable at
-    $R^2 \approx 0.94$ at the pre-answer position in the last layer — all
-    three seeds land there (0.93, 0.95, 0.95), so this is the robust home of
-    the result concept. Where the mix *first* appears is less settled: one
-    seed already reads it at $R^2 \approx 0.97$ a landmark earlier, at the
-    `=` sign by the second-to-last layer, while the other two stay near 0.3
-    there and only reach the mix at the pre-answer space. So the earliest
-    decodable site varies by seed; the pre-answer, last-layer location does
-    not. The hex form never assembles the full mix at one site: its best
-    full-mix $R^2$ is 0.66, mid-answer, and all three seeds peak at the same
-    landmark, consistent with ex-2.1.2's just-in-time channel staircase.
-    Nothing in the hex panels looks like a holistic pre-answer mix, so the
-    coupling tell that H2 reserved judgment on did not appear.
-    """)
-    return
+    The figure below plots leave-one-out probe $R^2$ at every depth ×
+    landmark, for the two operands and the mix, per form (center cell; depth
+    0 is the embedding layer), one line per RGB channel with the three-seed
+    spread behind it. The named form matches the prediction: operand readout
+    builds over the early layers, and the mix is decodable at $R^2 \approx
+    0.94$ at the pre-answer position in the last layer — all three seeds land
+    there (0.93, 0.95, 0.95), so this is the robust home of the result
+    concept. Where the mix *first* appears is less settled: one seed already
+    reads it at $R^2 \approx 0.97$ a landmark earlier, at the `=` sign by the
+    second-to-last layer, while the other two stay near 0.3 there and only
+    reach the mix at the pre-answer space. That disagreement is visible as
+    the upper hairline lifting away from the outline at `=` in the upper
+    layers of the named panels. So the earliest decodable site varies by
+    seed; the pre-answer, last-layer location does not. The hex form never
+    assembles the full mix at one site: its best full-mix $R^2$ is 0.66,
+    mid-answer, and all three seeds peak at the same landmark, consistent
+    with ex-2.1.2's just-in-time channel staircase. Nothing in the hex panels
+    looks like a holistic pre-answer mix, so the coupling tell that H2
+    reserved judgment on did not appear.
 
-
-@app.cell(hide_code=True)
-def _(arrays):
-    @themed(
-        name="probe-maps",
-        alt_text="""
-            Six heatmaps of probe R² over depth (vertical, embedding plus four
-            layers) by grammar landmark (horizontal, operand and answer
-            characters), arranged as two rows of three: named form on top, hex
-            form below, with columns for operand 1, operand 2, and the mix. In
-            the named row, operand panels saturate from depth 1 onward around
-            their own landmarks, and the mix panel stays dark through the early
-            layers, brightening at the pre-answer and answer positions in the
-            last layer; the equals column is only partly filled because the
-            seeds disagree on whether the mix is decodable that early. In the
-            hex row, operand panels also read out strongly, but the mix panel
-            stays pale everywhere, peaking mid-answer at about 0.6.
-        """,
-        caption="""
-            Leave-one-out probe R² at every depth × landmark, center cell,
-            mean over seeds. Rows: named and hex forms; columns: operand 1,
-            operand 2, and the mix. Landmarks run through operand 1, the plus,
-            operand 2, the equals sign, the pre-answer space, and the answer's
-            first and last characters. Every cell is fit and scored on its own,
-            leaving out one probe line at a time, so no cell borrows from
-            another.
-        """,
-    )
-    def _plot() -> plt.Figure:
-        _targets = ("op1", "op2", "mix")
-        fig, _axes = plt.subplots(2, 3, figsize=(9.6, 4.8), sharex=True, sharey=True)
-        _cmap = seq_cmap()
-        _im = None
-        for _i, _form in enumerate(("named", "hex")):
-            for _j, _t in enumerate(_targets):
-                _m = np.mean([arrays[f"center-s{_s}/probes/{_form}/{_t}/r2"] for _s in SEEDS], axis=0)
-                _ax = _axes[_i, _j]
-                _im = _ax.imshow(_m, vmin=0, vmax=1, cmap=_cmap, aspect="auto", origin="lower")
-                _ax.set_title(f"{_form} · {_t}", fontsize=9)
-        for _ax in _axes[1]:
-            _ax.set_xticks(range(len(LANDMARKS)), LANDMARKS, rotation=90, fontsize=7)
-        for _ax in _axes[:, 0]:
-            _ax.set_ylabel("depth")
-        assert _im is not None
-        fig.colorbar(_im, ax=_axes, shrink=0.8, label="probe R²")
-        return fig
-
-    mo.Html(_plot())
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
     Per channel, the two forms differ in kind. Named reads each operand
     holistically — the three channels ride together over its characters —
     while hex resolves it digit by digit, each channel stepping up at its own
     hex position. At the mix, named brings all three channels high together
-    from the pre-answer position onward in the last layer; hex never does,
-    which is why its averaged map stayed pale.
+    from the pre-answer position onward in the last layer; hex never does, so
+    no site there carries the whole color.
     """)
     return
 
@@ -699,60 +640,33 @@ def _(arrays):
     @themed(
         name="probe-channels",
         alt_text="""
-            A two-by-three grid of blocks laid out like the heatmaps above: rows
-            are the surface forms, named on top and hex below; columns are the
-            operand-1, operand-2 and mix probes. Each block is a stack of five
-            small line panels, one per residual depth, embedding at the bottom
-            and the last layer at the top, sharing an x axis of grammar
-            landmarks. Every panel carries three step-lines, one per RGB
-            channel, over a pale grey area whose outlined height is their mean
-            across the three seeds, with a fainter grey hairline above and below
-            it at the highest and lowest of the three. In the named row
-            the three channels rise and fall together
-            over whichever operand the probe targets, a single shared plateau
-            that fades elsewhere; in the hex row they resolve at different
-            characters, red, green and blue each stepping up at its own hex
-            digit, so they separate into an offset staircase over the operand
-            and again over the answer. The mix column completes the contrast:
-            in its top panel named lifts all three channels together from the
-            equals sign onward, at full height by the pre-answer landmark,
-            while in hex they stay separated and none reaches the top of a
-            panel. The two hairlines sit on the outline nearly everywhere, so
-            most panels read as a single crisp silhouette. They separate sharply
-            in the upper layers of all three named panels at the equals
-            landmark, where the upper hairline climbs to most of the panel's
-            height while the outline stays near the floor; in the hex row the
-            hairlines stay close to the outline throughout. The shared scale is
-            numbered once, 0 and 1 at the right of the bottom-right panel.
+            Probe R² traced across the equation for each RGB channel, stacked
+            by depth, with the named form on top and hex below. In the named
+            panels the three channels rise and fall together over whichever
+            operand is being read; in the hex panels they separate into a
+            staircase, each channel stepping up at its own hex digit. Only
+            named brings all three high together at the mix.
         """,
         caption="""
-            Per-channel leave-one-out probe $R^2$, center cell, seed-averaged —
-            the RGB mean of a panel's three lines is the matching cell of the
-            heatmap above, and the grid matches that layout: rows are the two
-            forms, columns are operand 1, operand 2 and the mix. Within a
-            block, rows are depth (embedding at the bottom) and the x axis runs
-            across the grammar landmarks, one step-line per channel. The pale
-            grey area is that mean, drawn so the heatmap's reading can be taken
-            in without tracing three lines. Its outline is the seed average and
-            the two hairlines are the highest and lowest of the three seeds, so
-            a hairline that lifts away is a landmark the seeds disagree about
-            and a single crisp edge is a result that replicated. Steps,
-            because each landmark is a discrete character position and a
-            straight line between two of them would claim measurements that
-            were never made. Every panel runs over the same two gridlines, 0 and
-            1, numbered once in the bottom-right corner. Risers that cross
-            characters no landmark measures
-            — the spaces flanking `+` and `=` in both forms, and the
-            variable-length middles of named words — are drawn in lighter ink,
-            so an interpolation doesn't read as another measured step. Only the
-            first and last character of each token is labelled; all four
-            sampled positions are drawn.
+            Per-channel leave-one-out probe $R^2$, center cell. Rows are the two
+            forms, columns are operand 1, operand 2 and the mix; within a block,
+            depth runs upward from the embedding and the x axis across the
+            grammar landmarks, one step-line per channel. The grey area is the
+            three-channel mean: its outline is the seed average and the two
+            hairlines are the highest and lowest of the three seeds, so a
+            hairline that lifts away marks a landmark the seeds disagree about
+            and a crisp single edge marks one that replicated. Steps, because
+            each landmark is a discrete character position and a straight line
+            between two of them would claim measurements that were never made;
+            risers over characters no landmark measures are drawn in lighter
+            ink. Every panel runs over the same 0 and 1 gridlines, numbered once
+            in the bottom-right corner.
         """,
     )
     def _plot() -> plt.Figure:
         # (seed, depth+1, landmark, 3) per form and target — unaggregated, so the figure can
-        # draw both the seed mean and the seed spread. r2_ch is the per-channel companion the
-        # heatmap collapses: its mean over the channel axis is a cell above.
+        # draw both the seed mean and the seed spread. r2_ch is the per-channel companion of
+        # the scalar r2: its mean over the channel axis is the aggregate probe score.
         _stacks = {
             (_f, _t): np.stack([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2_ch"] for _s in SEEDS])
             for _f in vp.FORMS
