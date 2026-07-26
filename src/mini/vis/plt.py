@@ -56,6 +56,74 @@ def _step_path(x: np.ndarray, y: np.ndarray, half_widths: np.ndarray, breaks: se
     return MplPath(np.array(verts), codes)
 
 
+def _strokes(path: MplPath) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Split a path into its connected strokes, one (vertices, codes) pair per MOVETO."""
+    verts, codes = np.asarray(path.vertices, float), np.asarray(path.codes, int)
+    starts = [*np.flatnonzero(codes == MplPath.MOVETO), len(codes)]
+    return [(verts[a:b], codes[a:b]) for a, b in zip(starts[:-1], starts[1:], strict=True)]
+
+
+def _band_path(upper: MplPath, lower: MplPath) -> MplPath:
+    """Close each of *upper*'s strokes onto the matching one of *lower*, giving filled ribbons.
+
+    The lower edge is walked backwards. Reversing a stroke's vertices reverses its segments,
+    and each segment's codes are the same read either way (a lone LINETO, or a CURVE4 triple),
+    so reversing the code list after the leading MOVETO re-describes the same curve.
+    """
+    verts, codes = [], []
+    for (uv, uc), (lv, lc) in zip(_strokes(upper), _strokes(lower), strict=True):
+        verts += [*uv, *lv[::-1], uv[0]]
+        codes += [*uc, MplPath.LINETO, *lc[:0:-1], MplPath.CLOSEPOLY]
+    return MplPath(np.array(verts), codes)
+
+
+def smooth_step_band(
+    ax: "Axes",
+    x: "ArrayLike",
+    lower: "ArrayLike",
+    upper: "ArrayLike",
+    *,
+    ramp: "float | ArrayLike" = 1.0,
+    breaks: "Iterable[int] | None" = None,
+    **kwargs,
+) -> PathPatch:
+    """Fill the ribbon between two :func:`smooth_step` curves.
+
+    Both edges are stepped the same way, so the band keeps the plateau-and-riser shape of
+    the lines it belongs to and never disagrees with them about where a value starts and
+    stops. Use it for a spread the reader should take in as a thickness rather than read
+    off — a min–max over seeds, a quantile range — behind the series it belongs to. Pass a
+    scalar *lower* for the common case of an area down to a baseline.
+    """
+    x = np.asarray(x, float)
+    if len(x) < 2:
+        raise ValueError("smooth_step_band needs at least two samples")
+    lo, hi = (np.broadcast_to(np.asarray(v, float), x.shape) for v in (lower, upper))
+    dx = (x[-1] - x[0]) / (len(x) - 1)
+    hs = np.broadcast_to(ramp, len(x) - 1) * dx / 2
+    brk = set(breaks or ())
+    patch = PathPatch(_band_path(_step_path(x, hi, hs, brk), _step_path(x, lo, hs, brk)), lw=0, **kwargs)
+    ax.add_patch(patch)
+    return patch
+
+
+def smooth_step_area(
+    ax: "Axes",
+    x: "ArrayLike",
+    y: "ArrayLike",
+    *,
+    baseline: float = 0.0,
+    **kwargs,
+) -> PathPatch:
+    """Fill between a :func:`smooth_step` curve and *baseline* — :func:`smooth_step_band` with a flat floor.
+
+    Use it for a summary the reader should be able to take in without tracing anything —
+    the total, the mean of the series drawn over it — in a neutral fill, so it reads as
+    ground rather than as one more series.
+    """
+    return smooth_step_band(ax, x, baseline, y, **kwargs)
+
+
 def smooth_step(
     ax: "Axes",
     x: "ArrayLike",

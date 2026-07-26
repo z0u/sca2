@@ -68,3 +68,26 @@ def test_only_the_bottom_row_of_blocks_is_labelled(stacks):
     labelled = [{t.get_text() for t in sfig.axes[-1].get_xticklabels()} != {""} for sfig in fig.subfigs]
     assert labelled == [False, False, False, True, True, True]
     plt.close(fig)
+
+
+def test_a_seed_axis_turns_into_a_band_without_changing_the_layout(stacks):
+    per_seed = {k: np.stack([v, v * 0.5, v * 0.8]) for k, v in stacks.items()}
+    plain = probe_trace_grid(stacks, form_axis="row")
+    banded = probe_trace_grid(per_seed, form_axis="row")
+    assert len(banded.get_axes()) == len(plain.get_axes())
+    # Same panels, one extra patch each: the min-max ribbon behind the lines.
+    counts = [len(a.patches) for a in plain.get_axes()], [len(a.patches) for a in banded.get_axes()]
+    assert all(b == p + 1 for p, b in zip(*counts, strict=True))
+    plt.close(plain)
+    plt.close(banded)
+
+
+def test_sub_zero_scores_are_floored_for_drawing_but_not_for_alias_detection():
+    """Clipping first would make every failed probe identically 0, and so falsely aliased."""
+    flat_negative = np.full((N_DEPTH, len(LANDMARKS), 3), -0.4)
+    assert aliased_risers(flat_negative) == frozenset(range(len(LANDMARKS) - 1))
+    fig = probe_trace_grid({(f, "mix"): flat_negative for f in FORMS}, targets=("mix",))
+    ax = fig.get_axes()[0]
+    ys = np.concatenate([p.get_path().vertices[:, 1] for p in ax.patches])
+    assert ys.min() >= 0.0  # drawn at the floor, not below the panel
+    plt.close(fig)

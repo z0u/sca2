@@ -705,7 +705,9 @@ def _(arrays):
             small line panels, one per residual depth, embedding at the bottom
             and the last layer at the top, sharing an x axis of grammar
             landmarks. Every panel carries three step-lines, one per RGB
-            channel. In the named row the three channels rise and fall together
+            channel, over a pale grey area whose height is their mean and a
+            darker grey band spanning the three seeds' means. In the named row
+            the three channels rise and fall together
             over whichever operand the probe targets, a single shared plateau
             that fades elsewhere; in the hex row they resolve at different
             characters, red, green and blue each stepping up at its own hex
@@ -714,7 +716,10 @@ def _(arrays):
             in its top panel named lifts all three channels together from the
             equals sign onward, at full height by the pre-answer landmark,
             while in hex they stay separated and none reaches the top of a
-            panel.
+            panel. The seed bands are narrow almost everywhere. They widen
+            sharply in the upper layers of all three named panels at the equals
+            landmark, where the widest spans most of the panel's height; the hex
+            bands stay thin throughout.
         """,
         caption="""
             Per-channel leave-one-out probe $R^2$, center cell, seed-averaged —
@@ -722,7 +727,11 @@ def _(arrays):
             heatmap above, and the grid matches that layout: rows are the two
             forms, columns are operand 1, operand 2 and the mix. Within a
             block, rows are depth (embedding at the bottom) and the x axis runs
-            across the grammar landmarks, one step-line per channel. Steps,
+            across the grammar landmarks, one step-line per channel. The pale
+            grey area is that mean, drawn so the heatmap's reading can be taken
+            in without tracing three lines; the darker band over it spans the
+            three seeds, so a wide band is a landmark the seeds disagree about
+            and a thin one is a result that replicated. Steps,
             because each landmark is a discrete character position and a
             straight line between two of them would claim measurements that
             were never made. Risers that cross characters no landmark measures
@@ -734,10 +743,11 @@ def _(arrays):
         """,
     )
     def _plot() -> plt.Figure:
-        # (depth+1, landmark, 3) per form and target, seed-averaged. r2_ch is the per-channel
-        # companion the heatmap collapses: its mean over the channel axis is a cell above.
+        # (seed, depth+1, landmark, 3) per form and target — unaggregated, so the figure can
+        # draw both the seed mean and the seed spread. r2_ch is the per-channel companion the
+        # heatmap collapses: its mean over the channel axis is a cell above.
         _stacks = {
-            (_f, _t): np.mean([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2_ch"] for _s in SEEDS], axis=0)
+            (_f, _t): np.stack([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2_ch"] for _s in SEEDS])
             for _f in vp.FORMS
             for _t in vp.TARGETS
         }

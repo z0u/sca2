@@ -26,7 +26,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure, SubFigure
 from matplotlib.layout_engine import ConstrainedLayoutEngine
 
-from mini.vis import light_dark, smooth_step
+from mini.vis import light_dark, smooth_step, smooth_step_area, smooth_step_band
 from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, OPERATORS, SPAN_RISERS
 
 FORMS = ("named", "hex")
@@ -65,6 +65,15 @@ def channel_colors() -> tuple[str, str, str]:
     return light_dark(("#d1495b", "#2a9d5c", "#3b6fd4"), ("#ff6b7d", "#4fd07a", "#6ea3ff"))
 
 
+def mean_color() -> str:
+    """Ink for the channel mean.
+
+    Deliberately hueless: the channels own the hues, and the mean is a summary of them
+    rather than a fourth thing measured alongside them.
+    """
+    return light_dark("#444", "#ccc")
+
+
 def aliased_risers(stack: np.ndarray) -> frozenset[int]:
     """Risers between landmarks that resolved to the same character, so their columns match bit for bit.
 
@@ -87,19 +96,60 @@ def draw_traces(
     lw: float | Sequence[float] = 1.0,
     ramp: float = 0.5,
     fade: float = 0.3,
+    fill: Literal["mean", "channel"] | None = "mean",
+    fill_alpha: float | None = None,
+    spread: np.ndarray | None = None,
+    band: Literal["mean", "channel"] | None = "mean",
+    band_alpha: float | None = None,
 ) -> None:
     """Draw one panel: a step-line per channel of *values*, shaped ``(landmark, channel)``.
 
     *ramp* below 1 leaves a flat shoulder at each landmark, which is what makes the
     discrete character positions legible. *elide* and *breaks* are the two ways a pair of
     landmarks can fail to be neighbours — see :func:`~mini.vis.smooth_step`.
+
+    *spread* holds the replicates *values* summarises, shaped ``(replicate, landmark,
+    channel)`` — the per-seed maps behind a seed mean. Their min–max is drawn as a band
+    behind the lines, turning "and the other seeds agree" from a claim in the prose into
+    something the reader can see. *band* chooses whose spread: ``"mean"`` bands the channel
+    mean alone, which is the quantity the summary fill and the heatmap both report, and
+    keeps the panel to one extra shape; ``"channel"`` bands each channel in its own hue,
+    which answers whether a *particular* channel's position is stable at the cost of three
+    overlapping areas.
+
+    *fill* shades the area under the traces, which gives the panel a height a reader can
+    take in without tracing a line. ``"mean"`` fills once, in neutral grey, under the mean
+    of the channels — the quantity a probe heatmap of the same data would show as one
+    cell's brightness, so the panel carries both readings at once. ``"channel"`` fills
+    under each channel in its own hue instead; the areas then overlap, and their combined
+    silhouette is the channel *maximum* rather than the mean, so the summary reading is
+    lost wherever the channels disagree.
+
+    *fill_alpha* defaults per theme. A pale fill lightens a white page but has to lighten a
+    near-black one by more to travel the same visual distance, so the dark figure needs a
+    stronger value to read as the same shade of quiet.
     """
+    fill_alpha = light_dark(0.18, 0.22) if fill_alpha is None else fill_alpha
+    band_alpha = light_dark(0.3, 0.32) if band_alpha is None else band_alpha
     colors = colors or channel_colors()
     lws = np.broadcast_to(lw, values.shape[1])
     breaks, elide = set(breaks), set(elide)
+    x = range(len(values))
+
+    if fill == "mean":
+        smooth_step_area(ax, x, values.mean(1), ramp=ramp, breaks=breaks, color=mean_color(), alpha=fill_alpha)
+    if spread is not None and band == "mean":
+        means = spread.mean(2)  # (replicate, landmark)
+        lo, hi = means.min(0), means.max(0)
+        smooth_step_band(ax, x, lo, hi, ramp=ramp, breaks=breaks, color=mean_color(), alpha=band_alpha)
     for c in range(values.shape[1]):
+        if fill == "channel":
+            smooth_step_area(ax, x, values[:, c], ramp=ramp, breaks=breaks, color=colors[c], alpha=fill_alpha)
+        if spread is not None and band == "channel":
+            lo, hi = spread[:, :, c].min(0), spread[:, :, c].max(0)
+            smooth_step_band(ax, x, lo, hi, ramp=ramp, breaks=breaks, color=colors[c], alpha=band_alpha)
         smooth_step(
-            ax, range(len(values)), values[:, c],
+            ax, x, values[:, c],
             ramp=ramp, breaks=breaks, elide=elide, fade=fade, color=colors[c], lw=lws[c],
         )  # fmt: skip
 
@@ -157,6 +207,10 @@ def draw_depth_stack(
 ) -> None:
     """Fill *sfig* with one panel per depth of *stack*, shaped ``(depth, landmark, channel)``.
 
+    A four-dimensional *stack* is read as ``(replicate, depth, landmark, channel)`` — the
+    per-seed maps rather than their average. The panels then plot the mean over replicates
+    and band their spread, so nothing upstream has to decide which of the two to keep.
+
     Depth 0 (the embedding) goes at the bottom and the last layer at the top, matching the
     heatmaps, so height on the page means depth in the network in both figures.
 
@@ -164,14 +218,27 @@ def draw_depth_stack(
     fares through the network, and a gap between rows would break it into five pictures.
     Blocks stay apart because each is its own sub-figure.
     """
+    spread = stack if stack.ndim == 4 else None
+    means = stack.mean(axis=0) if spread is not None else stack
+    # Alias detection runs on the raw scores, before the floor at 0. A probe that does worse
+    # than predicting the mean scores below zero, and clipping would make every such landmark
+    # identically 0 — indistinguishable from two landmarks that really are one character.
+    breaks = aliased_risers(means)
+
     engine = sfig.get_layout_engine()
     if isinstance(engine, ConstrainedLayoutEngine):
         engine.set(hspace=0, h_pad=0.01, wspace=0)
-    axes = sfig.subplots(len(stack), 1, sharex=True, sharey=True, squeeze=False)[:, 0]
-    breaks = aliased_risers(stack)
+    axes = sfig.subplots(len(means), 1, sharex=True, sharey=True, squeeze=False)[:, 0]
     for row, ax in enumerate(axes):
-        depth = len(stack) - 1 - row
-        draw_traces(ax, np.clip(stack[depth], 0, 1), elide=elide, breaks=breaks, **trace_kwargs)
+        depth = len(means) - 1 - row
+        draw_traces(
+            ax,
+            np.clip(means[depth], 0, 1),
+            elide=elide,
+            breaks=breaks,
+            spread=None if spread is None else np.clip(spread[:, depth], 0, 1),
+            **trace_kwargs,
+        )
         style_trace_panel(ax)
         if depth_labels:
             ax.set_ylabel(f"{depth}", fontsize=8)
@@ -195,7 +262,8 @@ def probe_trace_grid(
 ) -> Figure:
     """Lay out a depth stack per (form, target) pair, as a grid of blocks.
 
-    *stacks* maps ``(form, target)`` to an array of shape ``(depth, landmark, channel)``.
+    *stacks* maps ``(form, target)`` to an array of shape ``(depth, landmark, channel)``, or
+    ``(replicate, depth, landmark, channel)`` to band the spread across replicates.
     *form_axis* picks which way the grid runs: ``"row"`` puts the forms on separate rows
     and the targets across the columns, which is the heatmap's own arrangement — the two
     forms then sit one above the other over a shared x axis, which is the comparison the
@@ -208,7 +276,7 @@ def probe_trace_grid(
     rows, cols = (forms, targets) if form_axis == "row" else (targets, forms)
     pair = (lambda r, c: (r, c)) if form_axis == "row" else (lambda r, c: (c, r))
     elided = ELIDED_RISERS if elided is None else elided
-    n_depth = next(iter(stacks.values())).shape[0]
+    n_depth = next(iter(stacks.values())).shape[-3]  # from the right: depth, landmark, channel
     sparse_ticks = len(cols) > 2 if sparse_ticks is None else sparse_ticks
 
     fig = plt.figure(figsize=(width, len(rows) * (n_depth * panel_height + 0.3) + 0.3))
