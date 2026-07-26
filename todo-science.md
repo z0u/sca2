@@ -13,6 +13,20 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Open questions
 
+- [ ] **Refit the probe maps holding out one target *value* at a time, not one
+  equation.** `probe_maps` runs `ridge_probe_loo` over rows = equations, so a
+  color (or a hex digit) sits in both the fit and the held-out row and the probe
+  can memorize an identity → value table. That inflates some cells to the point
+  of tautology and leaves others untouched, and which is which is the whole
+  question — see the finding below for a one-cell prototype. The fix is a
+  leave-one-group-out where the group is the target's value in the channel being
+  scored (16 groups per hex digit, ~100–220 for named). Costs an eval-stage
+  re-run only (checkpoints are published under `CKPT_REF`), and it is *cheaper*
+  than the current fit. Two decisions to make: whether to report it beside the
+  preregistered per-equation numbers or in place of them, and whether the
+  cross-form ρ and principal angles (full-data fits, so unaffected mechanically)
+  should be gated on the stricter R². #metrics #ex-2.1.5 #representations
+
 - [ ] Probe all positions in a sample of sequences. So far we have only probed
   specific locations, e.g. last token of first operand; last token before answer.
   How do the other tokens compare? Visualize probe response as sublines; note that
@@ -237,6 +251,37 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   probe R² when judging cross-form transfer), and report the statistic's own
   best site beside it as an explicit upper bound. Also banked in the writing
   skill's preregistration section. #metrics #ex-2.1.5
+
+- **The hex embedding has one magnitude axis, and channel identity is positional
+  (ex-2.1.5, 2026-07-26).** The same 16 digit tokens serve all three channels, and the
+  model uses RoPE, so the depth-0 residual is the token embedding with no positional
+  component. The probe weights confirm what that implies: the readout direction for red
+  at digit 1, green at digit 2 and blue at digit 3 are *the same vector* — cosine
+  +1.000 on all three seeds. So at the input there is no hex "red" direction to anchor
+  or to align with named red; there is one value axis, read three times, with position
+  supplying the channel. The channels do differentiate with depth (within one landmark
+  at the last layer the three directions run cos −0.66 to +0.09), so channel-specific
+  directions exist — just not where the tokens enter. Bears directly on anchor
+  placement for a mixed-vocabulary corpus. #anchoring #ex-2.1.5 #representations
+
+- **Per-equation leave-one-out lets probes memorize identity → value; per-value
+  holdout separates memory from geometry (ex-2.1.5, 2026-07-26).** One-cell prototype
+  on `center-s0`, refitting with a leave-one-*value*-out group instead. Four different
+  outcomes, which is why it matters:
+  (1) hex digit cells at the embedding collapse 1.00 → 0.44, but land well above zero,
+  so the digit tokens do carry a real (partial) magnitude axis rather than an arbitrary
+  lookup;
+  (2) the same hex cell at the last layer holds 0.98 → 0.76, so depth *improves* the
+  value geometry instead of merely relaying the token;
+  (3) named operand readout falls 0.75 → 0.19 — the "holistic operand bundle" is mostly
+  name-identity recovery, which fits ex-2.1.4's finding that value → name translation is
+  the blocker and that named holdout accuracy is weak;
+  (4) the named mix at the pre-answer site is untouched, 0.944 → 0.943, so the headline
+  H2 result is geometry and survives the stricter test.
+  Net: the two forms carry value structure in different places — hex in its digit tokens
+  (deepening with depth), named only in the computed mix. That, rather than token
+  binding, is what a cross-form anchor would have to bridge. #metrics #ex-2.1.5
+  #anchoring #representations
 
 - **Use the embedding row as a surface-text control for any probe read at an answer
   position (methodology, 2026-07-26).** Under teacher forcing the answer tokens are in
