@@ -50,6 +50,7 @@ log() { echo "session-start: $*" >&2; }
     echo
     echo "Experiments (report.py dirs; annotated status in docs/index.md):"
     git ls-files 'docs/**/report.py' | sed 's#/report.py##; s#^docs/#  #' | paste -sd' '
+    echo "This is not an environment the human has direct access to, so if you are working on an experiment, *always* publish the report before pushing. Otherwise the human won't be able to see the rendered report and its figures, which hampers collaboration. When referring to figures in conversation you should share them with 'SendUserFile', or the 'Read' tool if you also want to see it too."
 ) 2>/dev/null
 
 # 0. Put the project venv first on PATH so bare `python` resolves to the

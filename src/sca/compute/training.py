@@ -58,8 +58,10 @@ def train_model(
     step = 0
 
     for epoch in range(config.scheduler.epochs):
+        train_losses = []
         for x, y in sample_batches(train_data, config.data, config.model, epoch_length, rng):
             model, opt_state, loss = train_step(model, opt_state, x, y)
+            train_losses.append(float(loss))
             step += 1
             emit_progress(step, total_steps, message=f"loss={float(loss):.4f}")
 
@@ -72,6 +74,7 @@ def train_model(
             learning_rate=float(jnp.asarray(schedule(step))),
             val_loss=float(np.mean(val_losses)),
             training_tokens=(epoch + 1) * tokens_per_epoch,
+            train_loss=float(np.mean(train_losses)),
         )
         all_metrics.append(metrics)
 

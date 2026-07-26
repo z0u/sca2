@@ -22,6 +22,25 @@ budget**, then reports. Depth lives in
   naming the right flag (`found N task(s) on modal — try: --app modal`);
   follow it.
 
+## Anomaly scan (every status pass)
+
+Runs misbehave while green: "no failures" is not "healthy". On each status
+read, compare observations against expectations, and report deviations as
+findings even when nothing has failed:
+
+- Throughput: compare `steps_per_min` across tasks of the same fn. A task
+  under ~⅓ of the sibling median is an anomaly — name it, its
+  container/region, and what differs about its environment.
+- Duration: project each running task's finish time (remaining steps ÷ rate)
+  against its role timeout. A task projected to exceed its timeout will be
+  killed and lose its work — report that *before* it happens.
+- Metrics: where status carries metrics (e.g. loss), check the trend. One
+  cell flat or rising while its siblings fall is an anomaly.
+- Verdict discipline: "healthy" means this scan came back clean, not merely
+  that nothing failed. List anomalies in their own section of the report,
+  with your best one-line hypothesis each; investigating beyond a hypothesis
+  is the main loop's call, not yours.
+
 ## Tick vs. read (cost rule)
 
 - `run` / `retry` / `cancel` **tick** the DAG: they launch or stop work and

@@ -108,3 +108,30 @@ def test_self_nearest_rate_falls_before_a_full_cell_of_error():
     shifted = np.asarray(RGB27, dtype=np.float32) / 15
     shifted[:, 0] = np.clip(shifted[:, 0] + 0.6 * step, 0, 1)
     assert bl.self_nearest_rate(RGB27, shifted) < 0.5
+
+
+def test_snap_margin_is_the_grid_step_on_a_regular_grid():
+    """v27 mixes land on grid points, so the runner-up sits one step away."""
+    mixes = [mix(a, b) for a, b in closed_pairs(V27)]
+    margins = bl.snap_margin(bl.distances(RGB27, mixes))
+    assert margins.min() == pytest.approx(7 / 15, abs=1e-6), "the smaller of v27's uneven steps"
+
+
+def test_precision_limited_acc_spans_the_margin():
+    """A guesser reading to a fraction of the margin is right; one reading coarsely isn't."""
+    pal = np.array([[0.0, 0, 0], [0.2, 0, 0]])  # margin 0.2, boundary at 0.1
+    mixes = np.zeros((64, 3))
+    rng = np.random.default_rng(0)
+    fine = bl.precision_limited_acc(pal, mixes, np.zeros(64, dtype=int), 0.02, rng, draws=50)
+    coarse = bl.precision_limited_acc(pal, mixes, np.zeros(64, dtype=int), 0.5, rng, draws=50)
+    assert fine.mean() > 0.99
+    assert coarse.mean() == pytest.approx(0.5, abs=0.1), "noise past the boundary is a coin flip"
+
+
+def test_fit_precision_recovers_the_sigma_it_was_given():
+    pal = np.asarray(RGB27, dtype=np.float64) / 15
+    mixes = np.array([mix(a, b) for a, b in closed_pairs(V27)], dtype=np.float64) / 15
+    true_idx = bl.distances(RGB27, [mix(a, b) for a, b in closed_pairs(V27)]).argmin(axis=1)
+    rng = np.random.default_rng(0)
+    target = bl.precision_limited_acc(pal, mixes, true_idx, 0.15, rng, draws=64).mean()
+    assert bl.fit_precision(pal, mixes, true_idx, target, rng, draws=64) == pytest.approx(0.15, abs=0.02)

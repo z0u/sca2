@@ -83,4 +83,12 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   27 colors exact match collapses to zero with confidently wrong neighbor
   answers. Reading names consumes most of the network's depth.
 
+- [Experiment 2.1.5](./m2/ex-2.1.5/report.py): disjoint vocabularies. A
+  preregistered baseline in which named and hex sublanguages never share a
+  line — 140 xkcd names at full 8-bit depth, no aliases, no cross form —
+  asking whether the two surface forms converge on one latent geometry.
+  Behavior and within-form geometry sections are filled (named held-out 0.667
+  over strong nulls; hex 0.996); the cross-form alignment sections are still
+  in their preregistered form, with the analysis round in progress.
+
 More reports will appear here as the M2 experiments land.

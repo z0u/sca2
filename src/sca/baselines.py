@@ -114,6 +114,74 @@ def k_nearest_stats(dists: np.ndarray, k: int) -> dict[str, float]:
     return {"dist": float(picked.mean()), "nearest": float((picked <= floor + _TOL).mean())}
 
 
+def snap_margin(dists: np.ndarray) -> np.ndarray:
+    """(N,) gap between the second-nearest and nearest candidate, per example.
+
+    How much room the snap leaves. `dists` is unit-cube, as `distances` returns it.
+    An answer whose margin is 0.01 asks the model to place the mix to within 0.005
+    of the decision boundary; one whose margin is 0.2 tolerates a coarse reading.
+    On a regular grid the margin is a constant (the grid step, when mixes land on
+    grid points); on an irregular palette it varies by two orders of magnitude, so
+    a raw accuracy pools easy and hard prompts.
+    """
+    o = np.sort(dists, axis=1)
+    return o[:, 1] - o[:, 0]
+
+
+def precision_limited_acc(
+    vocab_rgb: np.ndarray,
+    mixes: np.ndarray,
+    true_idx: np.ndarray,
+    sigma: float,
+    rng: np.random.Generator,
+    draws: int = 200,
+) -> np.ndarray:
+    """(N,) P(correct) for a guesser that reads the exact mix to ±*sigma*, then snaps.
+
+    The reference for "the geometry is there, the resolution isn't": isotropic
+    Gaussian error of per-channel scale *sigma* on the true mix, then nearest
+    candidate. All arrays are unit-cube; `true_idx` indexes `vocab_rgb`.
+
+    One free parameter, so it is a description rather than a mechanism — the model
+    does not literally snap. What it buys is comparability: a *sigma* fitted on one
+    palette predicts accuracy on another, which separates "reads colors less
+    precisely" from "was asked a finer question".
+    """
+    v = np.asarray(vocab_rgb, dtype=np.float64)
+    m = np.asarray(mixes, dtype=np.float64)
+    hits = np.zeros(len(m))
+    for _ in range(draws):
+        noisy = m + rng.normal(0, sigma, m.shape)
+        hits += np.linalg.norm(v[None] - noisy[:, None], axis=2).argmin(axis=1) == true_idx
+    return hits / draws
+
+
+def fit_precision(
+    vocab_rgb: np.ndarray,
+    mixes: np.ndarray,
+    true_idx: np.ndarray,
+    accuracy: float,
+    rng: np.random.Generator,
+    draws: int = 48,
+    steps: int = 16,
+    hi: float = 0.5,
+) -> float:
+    """The *sigma* whose `precision_limited_acc` matches an observed *accuracy*.
+
+    Bisection; accuracy falls monotonically in sigma, so it converges. Fitting to
+    the overall rate leaves the *shape* of accuracy-versus-margin free, which is
+    then a check on the account rather than a consequence of it.
+    """
+    lo = 1e-4
+    for _ in range(steps):
+        mid = (lo + hi) / 2
+        if precision_limited_acc(vocab_rgb, mixes, true_idx, mid, rng, draws).mean() > accuracy:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2
+
+
 def self_nearest_rate(vocab_rgb: np.ndarray, decoded: np.ndarray) -> float:
     """Fraction of decoded points whose nearest vocabulary color is their own.
 
