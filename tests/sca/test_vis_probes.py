@@ -102,6 +102,16 @@ def shading(ax):
     return [p for p in ax.patches if len(set(p.get_edgecolor()[:3])) == 1]
 
 
+def verts(patch) -> np.ndarray:
+    """The patch's (N, 2) vertex array. Matplotlib types it as the much looser `ArrayLike`."""
+    return np.asarray(patch.get_path().vertices)
+
+
+def top(patch) -> float:
+    """The highest point the patch reaches, which is what orders the shading lines."""
+    return verts(patch)[:, 1].max()
+
+
 def test_the_summary_outranks_the_envelope_it_sits_inside():
     """Ink follows the hierarchy: the fill's own silhouette reads first, the spread second."""
     values = np.linspace(0.2, 0.8, len(LANDMARKS))[:, None] * np.ones(3)
@@ -110,11 +120,11 @@ def test_the_summary_outranks_the_envelope_it_sits_inside():
     fig = probe_trace_grid({(f, "mix"): per_seed for f in FORMS}, targets=("mix",), elided={})
     ax = fig.get_axes()[0]
     fills = [p for p in shading(ax) if p.get_fill()]
-    assert len(fills) == 1 and np.isclose(fills[0].get_path().vertices[:, 1].min(), 0.0)
+    assert len(fills) == 1 and np.isclose(verts(fills[0])[:, 1].min(), 0.0)
     # Seed minimum, seed mean (what the fill and the lines plot), seed maximum, at the top landmark.
-    edges = sorted((p for p in shading(ax) if not p.get_fill()), key=lambda p: p.get_path().vertices[:, 1].max())
+    edges = sorted((p for p in shading(ax) if not p.get_fill()), key=top)
     assert np.allclose(
-        [p.get_path().vertices[:, 1].max() for p in edges],
+        [top(p) for p in edges],
         [0.8 * f for f in (0.75, (0.75 + 1 + 1.1) / 3, 1.1)],
     )
     lo, summary, hi = edges
@@ -135,7 +145,7 @@ def test_lines_over_the_fill_are_tinted_against_it_rather_than_against_the_page(
     fill = to_rgb(mix(page_color(), to_hex(face), face[3]))[0]  # the shade the fill composites to
     ink = to_rgb(mean_color())[0]
     # The two lowest lines are the minimum's stroke and the faded companion carrying its risers.
-    lines = sorted((p for p in shading(ax) if not p.get_fill()), key=lambda p: p.get_path().vertices[:, 1].max())
+    lines = sorted((p for p in shading(ax) if not p.get_fill()), key=top)
     assert all(min(fill, ink) < p.get_edgecolor()[0] < max(fill, ink) for p in lines[:2])
     plt.close(fig)
 
@@ -160,6 +170,6 @@ def test_sub_zero_scores_are_floored_for_drawing_but_not_for_alias_detection():
     assert aliased_risers(flat_negative) == frozenset(range(len(LANDMARKS) - 1))
     fig = probe_trace_grid({(f, "mix"): flat_negative for f in FORMS}, targets=("mix",))
     ax = fig.get_axes()[0]
-    ys = np.concatenate([p.get_path().vertices[:, 1] for p in ax.patches])
+    ys = np.concatenate([verts(p)[:, 1] for p in ax.patches])
     assert ys.min() >= 0.0  # drawn at the floor, not below the panel
     plt.close(fig)
