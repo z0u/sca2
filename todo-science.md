@@ -333,6 +333,36 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   a stable single-position home for a named operand's value, and hex has no counterpart.
   #representations #anchoring #ex-2.1.5 #task-grammar
 
+  **Qualified by a word-family control (2026-07-26).** 99 of the 140 names are
+  multi-word and modifiers recur (`green` in 26, `light` in 11), so part of what a
+  delimiter holds may be "this name contained *green*" rather than a resolved colour.
+  Holding out whole word families tests it, but names sharing a word also share a
+  region of the cube, so the holdout removes a colour *cluster* and the drop would be
+  ambiguous — hence a colour-matched control that removes the same number of names by
+  RGB proximity instead. The contrast (word − colour, last layer, 3 seeds):
+
+  | target, site | value | colour-matched | word-family | word − colour |
+  |---|---|---|---|---|
+  | op1 @ its own last character | +0.245 | −0.297 | −0.831 | **−0.534** |
+  | op1 @ its closing space | +0.320 | −0.062 | −0.488 | **−0.426** |
+  | op2 @ its closing space | +0.372 | +0.017 | −0.353 | **−0.370** |
+  | op1 @ the space after `+` | +0.559 | +0.284 | +0.209 | −0.075 |
+  | mix @ pre-answer | +0.879 | +0.644 | +0.772 | **+0.127** |
+
+  So a name's *own* closing space is substantially lexical, and "the model resolves the
+  name into the delimiter" was too clean a story. Two things survive it: one token
+  further on, at the space after the `+`, the lexical dependence is small and the value
+  still reads +0.209 under a holdout that removes 14 sibling names at the median (52 at
+  the max); and the mix at pre-answer shows none at all — its sign flips, so H2's
+  headline is not a lexical artefact. A bias runs *against* this reading, which makes it
+  sturdier: modifier families like `light` are spread across the cube rather than
+  clustered, so for those names the word holdout removes a scattered set that is easier
+  to extrapolate from than the tight cluster the control removes.
+
+  (Numbers here are restricted to the 108 names that have a family, and group the mix by
+  the snapped answer name rather than by the exact mix value, so they are not comparable
+  cell-for-cell with the strict-holdout table above — only within this table.)
+
 - **Retention and value-geometry are different questions, and ex-2.1.2's eviction
   finding may have measured the first (2026-07-26).** In ex-2.1.5, hex operand 2's red
   channel read at the *green* digit in the last layer scores 0.821 per-equation and

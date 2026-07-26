@@ -277,6 +277,28 @@ def _():
     hand-picked probe sites of earlier reports with a map, so the alignment
     measures below don't depend on us choosing the right position in advance.
 
+    /// note | Amendment: a second holdout (2026-07-26, after seeing the data)
+    The preregistered estimator holds out one *equation* at a time. A colour or
+    a hex digit therefore appears in both the fit and the held-out row, so the
+    probe may recover a value by memorizing an identity → value table. That is
+    the right measurement for asking whether a value is *present* at a site —
+    and one analysis below turns on it — but H2's claims are about latent
+    geometry, which is a different question.
+
+    So each site is now also scored under a second holdout: every row carrying
+    that value, as either operand or the answer, leaves the fit together, and
+    the probe has to place an unseen value from the others. Holding out only
+    where the value is scored would not be enough, since the same hex digit
+    serves all three channel slots and a colour can be operand 1 in one line and
+    operand 2 in another.
+
+    Both are reported. The preregistered one decides H2, and the two agree at
+    the site that does so (0.944 against 0.941), so nothing here turns on the
+    choice; where they come apart is stated explicitly. Two landmarks were also
+    added — the spaces closing each operand — after the strict holdout showed a
+    named operand's value sits on them rather than on the name's characters.
+    ///
+
     One subtlety: token positions don't line up across lines — names vary in
     length, and hex lines are shorter than named ones. Positions are therefore
     indexed by grammar landmarks (the last character of each operand, the
