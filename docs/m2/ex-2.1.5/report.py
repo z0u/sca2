@@ -23,6 +23,7 @@ with app.setup(hide_code=True):
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import light_dark, themed
+    from sca import baselines as bl
     from sca import vis as sv
     from sca import vis_probes as vp
     from sca.data import mixed_vocab as mv
@@ -176,16 +177,6 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    /// warning | Data (the language)
-    I notice the hex operands are clustered. They do look properly random, but it doesn't look uniform (it may be globally, but not locally). Maybe this biases training in some way? Clearly the models learnt the hex equations just fine, but this may have some effect on probe transfer between sublanguages.
-    ///
-    """)
-    return
-
-
-@app.cell(hide_code=True)
 def _(stats):
     _st = stats["n140-h216"]
     _pal = np.array(list(_st["palette"].values()), dtype=float) / 255
@@ -196,15 +187,18 @@ def _(stats):
         alt_text="""
             Two color-cube panels, each a hexagonal silhouette of the RGB cube
             standing on its black corner, with data-colored dots. Left: the 140
-            farthest-point xkcd names, spread evenly through the whole solid.
-            Right: the 216 randomly sampled hex operands, also covering the
-            solid with no obvious clusters or holes.
+            farthest-point xkcd names, evenly spaced through the whole solid with
+            no two dots touching. Right: the 216 randomly sampled hex operands,
+            reaching the same extent but visibly lumpy at close range — touching
+            pairs and triples in some places, bare patches in others.
         """,
         caption="""
             The two operand sets in the RGB cube (center corpus). Left: the 140
-            named colors; right: the 216 hex operands. Both spread through the
-            full solid — the names by farthest-point construction, the hex
-            subset by uniform sampling of the 4,096-point grid.
+            named colors; right: the 216 hex operands. Both reach through the
+            whole solid, but by different rules, and the rules show at close
+            range: farthest-point selection spaces the names as evenly as the
+            survey allows, while uniform sampling of the 4,096-point grid leaves
+            the hex operands clumped and gappy.
         """,
     )
     def _plot() -> plt.Figure:
@@ -215,6 +209,69 @@ def _(stats):
         return fig
 
     mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays, stats):
+    # Nearest-neighbour spacing and worst coverage gap, in 8-bit units, for the two
+    # operand sets and for fresh uniform draws of the same size — the reference that
+    # says whether the visible clumping is unusual or just what uniform sampling is.
+    _grid = np.array([mv.lift((_r, _g, _b)) for _r in range(16) for _g in range(16) for _b in range(16)], dtype=float)
+
+    def _spacing(_pts: np.ndarray) -> tuple[float, float, float]:
+        _dd = np.linalg.norm(_pts[:, None] - _pts[None], axis=2)
+        np.fill_diagonal(_dd, np.inf)
+        _nn = _dd.min(1)
+        _gap = np.linalg.norm(_grid[:, None] - _pts[None], axis=2).min(1).max()
+        return float(_nn.min()), float(np.median(_nn)), float(_gap)
+
+    _ops8 = np.array(
+        [mv.lift((int(_h[1], 16), int(_h[2], 16), int(_h[3], 16))) for _h in stats["n140-h216"]["hex_ops"]], dtype=float
+    )
+    _hex, _names = _spacing(_ops8), _spacing(np.array(list(stats["n140-h216"]["palette"].values()), dtype=float))
+    _draws = np.array(
+        [_spacing(_grid[np.random.default_rng(1000 + _i).permutation(len(_grid))[: len(_ops8)]]) for _i in range(24)]
+    )
+    _typical = np.median(_draws, axis=0)
+    _better_gap = float((_draws[:, 2] > _hex[2]).mean())
+
+    # Empirical control: hex-dense draws 2048 operands from the same grid, so its gaps are
+    # a tenth the size. If the clumping shaped the hex geometry, the two maps would differ.
+    def _agreement(_t: str) -> tuple[float, float]:
+        _a = np.mean([arrays[f"center-s{_s}/probes/hex/{_t}/r2_strict"] for _s in SEEDS], axis=0)
+        _b = np.mean([arrays[f"hex-dense-s{_s}/probes/hex/{_t}/r2_strict"] for _s in SEEDS], axis=0)
+        return float(np.corrcoef(_a.ravel(), _b.ravel())[0, 1]), float(np.abs(_a - _b).mean())
+
+    _corrs = {_t: _agreement(_t) for _t in ("op1", "op2", "mix")}
+    _corr_lo, _corr_hi = min(_c for _c, _ in _corrs.values()), max(_c for _c, _ in _corrs.values())
+    _dmax = max(_d for _, _d in _corrs.values())
+
+    mo.md(f"""
+    /// details | Is the clumping in the hex panel a problem?
+    It is conspicuous next to the names, and it is exactly what the two
+    sampling rules predict: farthest-point selection cannot leave a clump,
+    and uniform sampling clumps at every scale. Nearest-neighbour distances in
+    8-bit units — closest pair, then median — are {_hex[0]:.0f} and {_hex[1]:.0f}
+    for the hex operands against {_names[0]:.0f} and {_names[1]:.0f} for the
+    names, and {_typical[0]:.0f} and {_typical[1]:.0f} for a typical fresh draw
+    of {len(_ops8)} grid points. So the subset's local spacing is the median
+    draw, not an unlucky one. Its coverage is if anything better than average:
+    the farthest any of the 4,096 grid points sits from an operand is
+    {_hex[2]:.0f}, against {_typical[2]:.0f} for the typical draw, and
+    {_better_gap * 100:.0f}% of draws leave a wider hole.
+
+    Whether that biases the *geometry* is a separate question, and the sweep
+    already carries the control. The *hex-dense* cell draws 2,048 operands from
+    the same grid — a tenth of the spacing, and no visible clumping — and its
+    hex probe map is the same map: the two cells' depth × landmark maps
+    correlate {_corr_lo:.2f} to {_corr_hi:.2f} across the three targets, with a
+    mean absolute difference of at most {_dmax:.2f} in $R^2$. The two cells also
+    answer held-out hex equations equally well (see the density arms under H1).
+    Nothing about the hex form's layout appears to be an artifact of the
+    216-point draw, so the same should hold for what transfers out of it.
+    ///
+    """)
     return
 
 
@@ -526,9 +583,21 @@ def _(seed_mean, stats):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    /// warning | Exact-match accuracy (H1)
-    Interesting that named seen accuracy is significantly less than 1. So, the model hasn't properly learnt the geometry? But in 2.1.3 with one token per color (and no hex), it learnt it very well with 215 colors.
-    ///
+    Named accuracy is well short of 1 even on pairs the model trained on
+    (0.841), which reads at first like a model that never learned the
+    geometry — ex-2.1.3 answered a 216-color named vocabulary at ≈ 1.0. The
+    two numbers are not asking the same question, and the difference is in
+    the palette rather than in the model. Ex-2.1.3's colors sat on a regular
+    sub-grid closed under mixing, so an answer landed *on* a vocabulary point
+    with the runner-up a full grid step (0.2 of the unit cube) away; here the
+    answer is the nearest of 140 irregularly placed names, and the median gap
+    between the nearest and the second-nearest is 0.033 — six times finer.
+    Under "The named ceiling is a resolution limit" in the exploratory
+    section, accuracy tracks that gap prompt by prompt, and one
+    effective-precision figure of ≈ 0.033 per channel accounts for this
+    experiment's named accuracy and for the earlier grids' being nearly
+    saturated. So the geometry is present and the resolution is what runs
+    out — the same conclusion ex-2.1.3 reached at its own full grid.
     """)
     return
 
@@ -614,11 +683,91 @@ def _(seed_mean, stats):
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    /// warning | More data -> lower named accuracy
-    Yeah this is odd. This was at d64, right? So unlikely to be a capacity constraint (64 _sounds_ like plenty?)
-    ///
+def _(arrays, stats):
+    # Effective precision per cell and eval set: the single parameter of the
+    # noise-then-snap reference in `sca.baselines` that reproduces the observed
+    # exact-match rate. Shared by the density discussion below and by the
+    # exploratory figure that checks the account against the margin.
+    _rng = np.random.default_rng(0)
+
+    def _behavior(_arm: str, _corpus: str, _set: str) -> dict:
+        _pal = np.array(list(stats[_corpus]["palette"].values()), dtype=float) / 255
+
+        def _stack(_key: str) -> np.ndarray:
+            return np.concatenate([arrays[f"{_arm}-s{_s}/evals/{_set}/{_key}"] for _s in SEEDS]).astype(float) / 255
+
+        _mix, _true, _guess = _stack("mix_value"), _stack("true_value"), _stack("guess_value")
+        _true_idx = np.linalg.norm(_pal[None] - _true[:, None], axis=2).argmin(1)
+        _hit = np.all(np.abs(_guess - _true) < 1e-9, axis=1)
+        return {
+            "pal": _pal,
+            "mix": _mix,
+            "true_idx": _true_idx,
+            "hit": _hit,
+            "margin": bl.snap_margin(np.linalg.norm(_pal[None] - _mix[:, None], axis=2)),
+        }
+
+    precision = {}
+    for _arm, _corpus in (("center", "n140-h216"), ("palette-250", "n250-h216")):
+        for _set in ("named_seen", "named_holdout"):
+            _b = _behavior(_arm, _corpus, _set)
+            _b["sigma"] = bl.fit_precision(_b["pal"], _b["mix"], _b["true_idx"], _b["hit"].mean(), _rng, 24, 11)
+            _b["pred"] = bl.precision_limited_acc(_b["pal"], _b["mix"], _b["true_idx"], _b["sigma"], _rng, 120)
+            precision[_arm, _set] = _b
+    return (precision,)
+
+
+@app.cell(hide_code=True)
+def _(precision, stats):
+    # The counterfactual the density comparison needs: the 250-name prompts answered at
+    # the *center* cell's precision, so the palette's difficulty is held to one side.
+    _c, _p = precision["center", "named_holdout"], precision["palette-250", "named_holdout"]
+    _standardized = float(
+        bl.precision_limited_acc(
+            _p["pal"], _p["mix"], _p["true_idx"], _c["sigma"], np.random.default_rng(1), 160
+        ).mean()
+    )
+    _per_pair = {
+        _k: stats[_k]["n_lines"]["named"] / stats[_k]["n_seen_distinct"]["named"] for _k in ("n140-h216", "n250-h216")
+    }
+
+    mo.md(f"""
+    More names and fewer correct answers is a strange pairing, so it is worth
+    saying what it is not. Every cell in this table is d64-L4 with the same
+    parameter count, and the 250-name corpus has the same 100,000 lines, so
+    neither capacity nor data volume changed. Two other things did, and each
+    pushes the same way.
+
+    The question got finer. The median gap between the nearest and
+    second-nearest name to the exact mix falls from
+    {np.median(_c["margin"]):.3f} to {np.median(_p["margin"]):.3f} of the unit
+    cube, so more prompts ask the model to place the mix inside a tighter
+    boundary. Holding that difficulty to one side —
+    answering the 250-name prompts with the reference guesser fitted to the
+    *center* cell's precision — predicts {_standardized:.3f} against the
+    observed {_p["hit"].mean():.3f}, so roughly half of the drop from
+    {_c["hit"].mean():.3f} is the harder snap alone.
+
+    And the supervision per pair thinned. The same ≈ 50,000 named lines now
+    spread over {stats["n250-h216"]["n_seen_distinct"]["named"]:,} distinct
+    training pairs instead of
+    {stats["n140-h216"]["n_seen_distinct"]["named"]:,} —
+    {_per_pair["n250-h216"]:.1f} lines per pair against
+    {_per_pair["n140-h216"]:.1f}. That shows up as the seen/held-out gap nearly
+    closing: {precision["palette-250", "named_seen"]["hit"].mean():.3f} against
+    {_p["hit"].mean():.3f} at 250 names, where the center cell runs
+    {precision["center", "named_seen"]["hit"].mean():.3f} against
+    {_c["hit"].mean():.3f}. Fitted precision says the same thing from the other
+    side: on *seen* pairs it is
+    {precision["palette-250", "named_seen"]["sigma"]:.3f} at 250 names, which is
+    what the center cell manages on pairs it has never seen
+    ({_c["sigma"]:.3f}). At 140 names a training pair recurs often enough to be
+    remembered; at 250 it barely does.
+
+    Neither reading needs a capacity limit, and the residual gap after
+    standardizing ({_p["hit"].mean():.3f} against {_standardized:.3f}) is small
+    enough that three seeds cannot separate a genuine precision cost from the
+    seed spread. The width sweep is where capacity gets tested directly (H4).
     """)
     return
 
@@ -655,8 +804,10 @@ def _():
     qualifications. Part of what the closing space holds is lexical rather than
     chromatic — 99 of the 140 names are multi-word and the modifiers recur, and
     holding out whole word families costs that site $0.43$ more than a
-    color-matched holdout of the same size does (the control is under
-    Exploratory analyses). The site after the `+` is much less lexical, so the
+    color-matched holdout of the same size does (a separate refit on the
+    published checkpoints, since it needs folds the stored maps don't carry;
+    the numbers are quoted here rather than recomputed in this notebook).
+    The site after the `+` is much less lexical, so the
     $0.47$ there is the sturdier number. And this is where the preregistered
     estimator diverges most: it reads $0.75$ at the name's last character,
     which is name recognition — the identity is recoverable, the value is not
@@ -925,6 +1076,192 @@ def _():
     every cross-form measurement still to come: $\rho$ computed at answer
     positions would be inflated in both directions, since both forms' probes
     can read the emitted answer there.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### The named ceiling is a resolution limit (post hoc)
+
+    Named exact match tops out around 0.84 on trained pairs and 0.67 on
+    held-out ones, while hex sits at ≈ 1.0 and ex-2.1.3's regular 216-color
+    vocabulary reached ≈ 1.0 too. Reading that as "the named geometry is
+    weaker" would be a mistake, because the two vocabularies do not ask
+    equally precise questions.
+
+    What varies is the **snap margin**: how much closer the correct name is to
+    the exact mix than the runner-up. On a regular sub-grid closed under
+    mixing, the answer lands on a vocabulary point and the margin is a
+    constant — one grid step, 0.2 of the unit cube at ex-2.1.3's `v216`. On an
+    irregular palette it varies by two orders of magnitude, and its median
+    here is about a sixth of that. A raw accuracy pools prompts that need
+    0.1 of positional accuracy with prompts that need 0.005.
+
+    So we ask what a guesser limited only in resolution would do:
+    read the exact mix with isotropic Gaussian error of per-channel scale
+    $\sigma$, then answer with the nearest name
+    (`baselines.precision_limited_acc`). One parameter, fitted to the *overall*
+    accuracy, which leaves the shape of accuracy-versus-margin free to agree or
+    not.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(precision):
+    _panels = [
+        ("center", "named_seen", "140 names · trained pairs"),
+        ("center", "named_holdout", "140 names · held out"),
+        ("palette-250", "named_seen", "250 names · trained pairs"),
+        ("palette-250", "named_holdout", "250 names · held out"),
+    ]
+    _edges = np.array([0, 0.01, 0.02, 0.03, 0.045, 0.065, 0.09, 0.2])
+
+    @themed(
+        name="snap-margin",
+        alt_text="""
+            Four panels of exact-match rate against snap margin, one per palette
+            size and eval set. In every panel the observed rate climbs steadily
+            from about 0.4 at the tightest margins to near 1 at the widest, and a
+            line for the resolution-limited reference guesser runs through the
+            observed points. A faint histogram along the bottom shows most
+            prompts have small margins, and the 250-name panels are shifted
+            further toward the tight end than the 140-name ones.
+        """,
+        caption="""
+            Exact match against the snap margin — the distance from the exact mix
+            to the runner-up name minus the distance to the correct one, in
+            unit-cube units. Points are the observed rate in each margin bin,
+            pooled over three seeds, with binomial standard errors; the line is
+            the resolution-limited reference at the $\\sigma$ fitted to that
+            panel's overall accuracy, so its *level* is fitted but its *slope* is
+            not. The shaded profile along the bottom is the margin distribution,
+            which is where the two palettes differ: at 250 names more prompts sit
+            near a decision boundary.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, _axes = plt.subplots(1, 4, figsize=(9.6, 2.9), sharey=True)
+        _obs_c = light_dark("#1a5f8a", "#6ab0d4")
+        _ref_c = light_dark("#d1495b", "#ff6b7d")
+        for _ax, (_arm, _set, _title) in zip(_axes, _panels, strict=True):
+            _b = precision[_arm, _set]
+            _mg, _hit, _pred = _b["margin"], _b["hit"], _b["pred"]
+            _mid = np.sqrt(_edges[:-1] * np.maximum(_edges[1:], 1e-6))  # log-ish bin centre
+            _rate, _err, _ref, _x = [], [], [], []
+            for _lo, _hi, _m in zip(_edges[:-1], _edges[1:], _mid, strict=True):
+                _sel = (_mg >= _lo) & (_mg < _hi)
+                if _sel.sum() < 12:
+                    continue
+                _rate.append(_hit[_sel].mean())
+                _err.append(np.sqrt(_rate[-1] * (1 - _rate[-1]) / _sel.sum()))
+                _ref.append(_pred[_sel].mean())
+                _x.append(_m)
+            # Margin distribution behind the rates, scaled to the lower third of the panel:
+            # it says which bins carry the prompts, and the two palettes differ there.
+            _share = np.histogram(_mg, _edges)[0] / len(_mg)
+            _ax.fill_between(
+                _edges,
+                0,
+                np.append(_share, _share[-1]) / 1.5,
+                step="post",
+                color=_obs_c,
+                alpha=light_dark(0.14, 0.25),
+                lw=0,
+            )
+            _ax.plot(_x, _ref, color=_ref_c, lw=1.4, label="resolution-limited")
+            _ax.errorbar(_x, _rate, yerr=_err, fmt="o", ms=4, color=_obs_c, lw=1, label="observed")
+            _ax.set(xscale="log", xlim=(_edges[0] + 0.006, _edges[-1]), ylim=(0, 1.05))
+            _ax.set_title(_title, fontsize=8)
+            _ax.set_xlabel("snap margin")
+            _ax.grid(alpha=0.3)
+            _ax.text(
+                0.95, 0.06, f"σ = {_b['sigma']:.3f}", transform=_ax.transAxes, ha="right", fontsize=8, color=_ref_c
+            )
+        _axes[0].set_ylabel("exact match")
+        _axes[0].legend(fontsize=7, loc="upper left", framealpha=0.6)
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays, precision):
+    # What the same effective precision would score on the earlier experiments' regular
+    # grids, where every mix lands on a vocabulary point and the margin is the grid step.
+    _sigma = precision["center", "named_holdout"]["sigma"]
+    _rng = np.random.default_rng(2)
+    _grids = {"v216 (ex-2.1.3/2.1.4)": (0, 3, 6, 9, 12, 15), "v4096 (ex-2.1.3)": tuple(range(16))}
+    _preds = {}
+    for _name, _levels in _grids.items():
+        # Ex-2.1.3's named equations draw *closed* pairs only, so the answer is a
+        # vocabulary point and the runner-up sits one grid step away.
+        _pts = np.array([(_r, _g, _b) for _r in _levels for _g in _levels for _b in _levels])
+        _idx = np.random.default_rng(3).integers(len(_pts), size=(8192, 2))
+        _mix = (_pts[_idx[:, 0]] + _pts[_idx[:, 1]] + 1) // 2
+        _mix = _mix[np.isin(_mix, np.array(_levels)).all(1)][:256] / 15
+        _pal = _pts / 15
+        _ti = np.linalg.norm(_pal[None] - _mix[:, None], axis=2).argmin(1)
+        _preds[_name] = float(bl.precision_limited_acc(_pal, _mix, _ti, _sigma, _rng, 120).mean())
+
+    # The probe's own residual at the site that carries the mix, for comparison: R² is
+    # 1 − residual variance / target variance, so a residual scale falls out of it.
+    _target_sd = float(
+        np.sqrt(
+            np.var(
+                np.concatenate([arrays[f"center-s{_s}/evals/named_seen/mix_value"] for _s in SEEDS]).astype(float)
+                / 255,
+                axis=0,
+            ).mean()
+        )
+    )
+    _pre = float(
+        np.mean([arrays[f"center-s{_s}/probes/named/mix/r2_strict"][4, LANDMARKS.index("pre")] for _s in SEEDS])
+    )
+    _probe_sd = _target_sd * np.sqrt(max(0.0, 1 - _pre))
+
+    mo.md(f"""
+    The account holds up. The fitted $\\sigma$ is
+    {precision["center", "named_holdout"]["sigma"]:.3f} of the unit cube
+    ({precision["center", "named_holdout"]["sigma"] * 255:.0f} of 255 per
+    channel) on held-out named prompts, and the reference tracks the observed
+    rate across the whole margin range from that one number — including the
+    250-name cell, where the same shape appears shifted toward the tight end.
+    Trained pairs are the exception, and informatively so: at 140 names the
+    fitted $\\sigma$ halves to
+    {precision["center", "named_seen"]["sigma"]:.3f}, but the *shape* fits less
+    well, with the model beating the reference at tight margins and falling
+    short of it at wide ones. Precision alone does not describe errors on pairs
+    the model has seen; something more like recall is mixed in.
+
+    Two things fall out of having a number.
+
+    **The earlier rungs are consistent with the same precision.** Applied to
+    ex-2.1.3's regular grids, where a mix lands on a vocabulary point and the
+    margin is the grid step,
+    $\\sigma = {_sigma:.3f}$ predicts {_preds["v216 (ex-2.1.3/2.1.4)"]:.2f} at
+    `v216` — which is about what ex-2.1.3 (≈ 1.0, single-token names) and
+    ex-2.1.4 (0.91, spelled names) actually scored. So the jump from 0.67 here
+    to ≈ 1.0 there needs no change in how well colors are represented; the
+    coarser vocabulary simply forgives more. The exception is `v4096`, where
+    the same $\\sigma$ predicts {_preds["v4096 (ex-2.1.3)"]:.2f} against
+    ex-2.1.3's observed 0.65: that model read colors roughly 1.5× more finely
+    than this one, which is the direction a single-vocabulary corpus with
+    single-token answers should go.
+
+    **The behavior is more precise than the probe.** At the pre-answer position
+    in the last layer the strict mix probe reads $R^2 = {_pre:.3f}$, and the
+    mix targets have a per-channel standard deviation of {_target_sd:.3f}, so
+    the probe's own residual is about {_probe_sd:.3f} — roughly twice the
+    {_sigma:.3f} the behavior implies. The two are different estimands (a linear
+    decoder's error against an implied end-to-end resolution), so only the
+    ordering is worth reading, and it says the linear probe recovers a coarser
+    version of the value than the model itself uses. Worth carrying into anchor
+    design: a probe $R^2$ of 0.94 at a site is a floor on what is there, and an
+    anchor's own supervision is a linear readout with the same limitation.
     """)
     return
 

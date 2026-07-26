@@ -71,6 +71,18 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   earlier. A fold that also removes lines where the colour is the answer would
   separate them. #metrics #ex-2.1.5 #representations
 
+  Two more fold-shaped items to ride along in the same eval re-run, so the whole
+  set costs one pass. (a) The **word-family control** (identity-fold twin of the
+  colour-matched holdout) is quoted in H2 at −0.43 but computed offline, so the
+  report asserts a number it doesn't derive — the standard the retcon sweep set.
+  Storing a word-family-folded map alongside the two existing ones makes it a
+  report-side figure. (b) Nothing else in ex-2.1.5 needs the eval step touched,
+  so bundle (a), the identity-fold mix row, and the answer-inclusive fold
+  together. Not blocking H3–H6: ρ and the principal angles come from full-data
+  fits, and ρ's ≥ 0.5 gate can be recomputed report-side against either
+  estimator (both give ρ = 0 at the centre cell, since every cross-form R² there
+  is negative). #metrics #ex-2.1.5
+
 - [ ] Probe all positions in a sample of sequences. So far we have only probed
   specific locations, e.g. last token of first operand; last token before answer.
   How do the other tokens compare? Visualize probe response as sublines; note that
@@ -195,6 +207,30 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   afford. #model-arch
 
 ## Findings & notes to carry forward
+
+- **Named exact match is set by the palette's snap margin, not by how well the
+  model represents colour (ex-2.1.5, 2026-07-26).** On an irregular palette the
+  answer is the nearest name to the exact mix, so each prompt carries its own
+  difficulty: the *snap margin* (runner-up distance minus winner distance) has a
+  median of 0.033 of the unit cube at 140 names against a constant 0.2 on
+  ex-2.1.3's `v216` sub-grid, where closed pairs land the mix on a vocabulary
+  point. Accuracy tracks the margin prompt by prompt, and a reference guesser
+  that reads the exact mix with isotropic error σ and then snaps
+  (`baselines.precision_limited_acc`, one free parameter) reproduces the whole
+  curve at σ ≈ 0.033 (≈ 8/255 per channel) on held-out prompts. The same σ
+  predicts ≈ 0.99 on `v216` — about what ex-2.1.3 (≈ 1.0) and ex-2.1.4 (0.91)
+  scored — so no change in colour precision is needed to explain the earlier
+  rungs' near-saturation. Consequences. (1) Compare accuracies across
+  vocabularies only at matched margin, or through σ; raw exact match is a
+  property of the palette as much as of the model. Standardizing this way splits
+  `palette-250`'s drop (0.667 → 0.564) about evenly between a finer palette and a
+  real precision cost. (2) Trained pairs break the account's *shape* (the model
+  beats it at tight margins, falls short at wide ones), so errors on seen pairs
+  are not purely a resolution limit — recall is mixed in. (3) The behaviour is
+  finer than the probe: at the pre-answer site the strict mix probe's residual is
+  ≈ 0.058 against σ ≈ 0.033, so a probe R² is a floor on the value that is
+  present, which matters wherever an anchor's supervision is itself a linear
+  readout. #[D2.1] #ex-2.1.5 #metrics #representations
 
 - **Multi-token naming keeps the geometry where evidence is dense; `v27` cannot
   say anything either way (ex-2.1.4, 2026-07-19; revised 2026-07-22).** Char-level twin of
