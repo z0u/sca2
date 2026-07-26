@@ -77,14 +77,25 @@ infrastructure is <a href="https://github.com/z0u/mi-ni">mi-ni</a>.</p>
   pre-answer position, and guesses land near the nearest color even for held-out
   pairs. Exact match is non-monotonic in vocabulary size (essentially solved at
   216 colors; near misses at 4096).</li>
-<li><a href="m2/ex-2.1.4/">Experiment 2.1.4</a>: multi-token names. The char-level
+<li>
+<p><a href="m2/ex-2.1.4/">Experiment 2.1.4</a>: multi-token names. The char-level
   twin of Ex-2.1.3: corpora identical line for line, but colors are opaque
   four-letter random strings, read and written one character at a time. At 216
   colors the geometry survives multi-token naming: held-out accuracy 0.91 with
   neighbor-level misses, the mix computed in value space at the pre-answer
   position, and no per-channel eviction during emission (unlike hex answers). At
   27 colors exact match collapses to zero with confidently wrong neighbor
-  answers. Reading names consumes most of the network's depth.</li>
+  answers. Reading names consumes most of the network's depth.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.5/">Experiment 2.1.5</a>: disjoint vocabularies. A
+  preregistered baseline in which named and hex sublanguages never share a
+  line — 140 xkcd names at full 8-bit depth, no aliases, no cross form —
+  asking whether the two surface forms converge on one latent geometry.
+  Behavior and within-form geometry sections are filled (named held-out 0.667
+  over strong nulls; hex 0.996); the cross-form alignment sections are still
+  in their preregistered form, with the analysis round in progress.</p>
+</li>
 </ul>
 <p>More reports will appear here as the M2 experiments land.</p>
 </body>
