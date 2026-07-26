@@ -625,12 +625,39 @@ def _():
     looks like a holistic pre-answer mix, so the coupling tell that H2
     reserved judgment on did not appear.
 
+    The figure carries its own control. An operand-2 probe has nothing to
+    find before operand 2 arrives, and none rises above zero anywhere in
+    operand 1 or the plus, at any depth, in either form — the whole region
+    sits between −0.11 and −0.003. (Leave-one-out $R^2$ goes negative when a
+    fit has nothing to fit: below zero means worse than always guessing the
+    mean color.) Position alone doesn't leak a value.
+
     Per channel, the two forms differ in kind. Named reads each operand
-    holistically — the three channels ride together over its characters —
-    while hex resolves it digit by digit, each channel stepping up at its own
-    hex position. At the mix, named brings all three channels high together
-    from the pre-answer position onward in the last layer; hex never does, so
-    no site there carries the whole color.
+    holistically: the three channels ride together over its characters and
+    arrive as a bundle at $R^2 \approx 0.8$. Hex resolves it digit by digit,
+    and at the embedding the three are strictly disjoint — each channel hits
+    $R^2 = 1.00$ at its own digit and drops back to zero at the next, because
+    a hex digit *is* that channel's value and no memorized lookup stands
+    between the token and the number. That perfect readout is a property of
+    the notation rather than of the model, which is most of why the hex row
+    peaks higher than the named one. Depth turns the relay into an
+    accumulation: by the last layer earlier channels persist into later
+    digits (0.82, 0.96, 0.62 at operand 2's middle digit; 0.51, 0.74, 0.98
+    at its last), so a single site holds the whole operand only after
+    several layers of work, where named has it from layer 2.
+
+    At the mix, named brings all three channels high together from the
+    pre-answer position onward in the last layer. Hex instead runs a rolling
+    window, each channel decodable about one position before the digit that
+    carries it is emitted and fading afterwards: at `#` red is already at
+    0.98 with green and blue near zero, one token later green is at 0.96 and
+    red has started to fade, and at the last digit blue is at 0.95 with red
+    down to 0.38. So the 0.66 above is a channel mean over a window holding
+    one channel ready, one fading, and one not yet computed. Hex's mix is
+    never absent and never all present at once — which is the just-in-time
+    staircase stated per channel, and it is the reading that matters for
+    anchoring, since an anchor needs a site where the whole concept lives.
+    Read the answer-position numbers with the caveat below.
     """)
     return
 
@@ -686,7 +713,10 @@ def _():
     /// admonition | TODO
     Figure: transfer-ratio $\rho$ maps over layer × position, both
     directions (hex→name, name→hex), center cell. Expected: $\rho < 0.2$
-    everywhere the within-form probes are strong.
+    everywhere the within-form probes are strong. Site selection should
+    prefer the equals sign and the pre-answer space over answer positions,
+    where both forms' probes can read the emitted answer and inflate $\rho$
+    in both directions — see the post-hoc caveat under Exploratory analyses.
     ///
 
     /// admonition | TODO
@@ -760,8 +790,44 @@ def _():
     mo.md(r"""
     ## Exploratory analyses
 
-    Nothing yet. Analyses conceived after seeing the data land here, marked as
-    post hoc.
+    Analyses conceived after seeing the data land here, marked as post hoc.
+
+    ### Answer positions partly read the answer (post hoc)
+
+    A probe at an answer position can succeed for a dull reason: under
+    teacher forcing the answer tokens are in the input, so the residual
+    stream there contains the digits themselves and the probe may be reading
+    surface text rather than anything the model computed.
+
+    The embedding row settles it, because depth 0 is the token lookup before
+    any attention or MLP has run — whatever is decodable there is present in
+    the input by definition. In the hex form it is a lot: at the embedding, a
+    mix probe scores $R^2 \approx 1.00$ per channel at each answer digit
+    (each hex digit *is* one channel of the answer), and an operand probe
+    scores ≈ 0.48 at those same positions. That 0.48 is arithmetic,
+    not memory: the answer digit is the round-half-up mean of the two operand
+    digits, so knowing it pins about half the variance of each operand. Both
+    operands echo at the same strength, which is what a mixing story predicts
+    and what a retained-operand story would not.
+
+    Two consequences. First, any answer-position reading has to be compared
+    against its own depth-0 value rather than against zero — the hex mix's
+    best channel mean of 0.66 (depth 3, middle answer digit) is 0.22, 0.96, 0.80
+    against an embedding baseline of 0.00, 1.00, 0.00, so the green
+    channel there is read and the blue is computed a token ahead. Second, the
+    landmarks that carry the headline claims are exempt: at the equals sign
+    and the pre-answer space, every probe scores −0.003 at the embedding in
+    both forms, so those positions hold nothing but computation. That is why
+    the named mix result is quoted at the pre-answer space, where the last
+    layer reaches 0.95, 0.94, 0.94 from an embedding that knows nothing.
+    Compared on that clean ground the two forms separate further than the
+    mid-answer numbers suggest: hex's best uncontaminated mix reading is
+    0.42 at the equals sign and 0.38 pre-answer, against named's 0.94.
+
+    This is a probe-placement caveat rather than a result, and it applies to
+    every cross-form measurement still to come: $\rho$ computed at answer
+    positions would be inflated in both directions, since both forms' probes
+    can read the emitted answer there.
     """)
     return
 

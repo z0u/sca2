@@ -215,7 +215,11 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   final layer, channel k is decodable (R² ≈ 0.97) only at its own emission position, and
   previously-emitted channels are dropped from the deep residual stream — so a "result"
   concept never fully exists at any single position, and anchoring one there would fight
-  the model's schedule. Carry into anchor design. #[D2.1] #ex-2.1.2 #representations
+  the model's schedule. Carry into anchor design. Replicated in ex-2.1.5 on a corpus with
+  no name↔hex bridge, per channel: at the last layer each channel is decodable about one
+  position before its digit is emitted and fades after (0.98 red at `#`, 0.96 green a
+  token later, 0.95 blue at the last digit with red down to 0.38), so the schedule isn't
+  an artifact of the bridged language. #[D2.1] #ex-2.1.2 #ex-2.1.5 #representations
 
 - **Calibrate the redirect's γ against the model's pre-norm activation scale** instead of
   the fixed γ = 1. Ex-2.9.3 found the fixed value silently no-ops on ~1 run in 250 (the
@@ -233,6 +237,19 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   probe R² when judging cross-form transfer), and report the statistic's own
   best site beside it as an explicit upper bound. Also banked in the writing
   skill's preregistration section. #metrics #ex-2.1.5
+
+- **Use the embedding row as a surface-text control for any probe read at an answer
+  position (methodology, 2026-07-26).** Under teacher forcing the answer tokens are in
+  the input, so a probe there can succeed by reading the label. Depth 0 is the token
+  lookup before any attention or MLP, so whatever it decodes is present by definition and
+  is the right baseline. In ex-2.1.5's hex form it is nearly everything: at the embedding
+  a mix probe scores R² ≈ 1.00 per channel at each answer digit, and an operand probe
+  scores ≈ 0.48 there — the latter is arithmetic (the answer digit is the mean of the two
+  operand digits, so it pins about half of each operand's variance), and both operands
+  echo equally, which distinguishes mixing from a retained operand. The equals sign and
+  the pre-answer space score −0.003 at the embedding in both forms, so they are clean
+  ground; prefer them for cross-form ρ, which answer positions would inflate in both
+  directions. #metrics #ex-2.1.5 #representations
 
 - **On coarse grids, state the null before reading a pattern as behavior
   (methodology, 2026-07-21).** Two overclaims found in ex-2.1.4's `v27` analysis and
