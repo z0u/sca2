@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
-from matplotlib.colors import to_rgb
+from matplotlib.colors import to_hex
 
 from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, SPAN_RISERS
 from sca.vis_probes import (
@@ -18,7 +18,6 @@ from sca.vis_probes import (
     MINOR_LANDMARKS,
     TARGETS,
     aliased_risers,
-    mean_color,
     probe_trace_grid,
 )
 
@@ -72,6 +71,17 @@ def test_only_the_bottom_row_of_blocks_is_labelled(stacks):
     plt.close(fig)
 
 
+def test_one_panel_numbers_the_shared_scale_and_the_rest_reserve_its_room(stacks):
+    fig = probe_trace_grid(stacks, form_axis="row")
+    right = lambda ax: [t.label2 for t in ax.yaxis.get_major_ticks() if t.label2.get_visible()]  # noqa: E731
+    numbered = [ax for ax in fig.get_axes() if any(t.get_color() != "none" for t in right(ax))]
+    assert len(numbered) == 1
+    assert {t.get_text() for t in right(numbered[0])} == {"0", "1"}
+    # One panel per block claims the room, or the blocks would come out at different widths.
+    assert len([ax for ax in fig.get_axes() if right(ax)]) == len(fig.subfigs)
+    plt.close(fig)
+
+
 def test_a_seed_axis_adds_the_envelope_without_changing_the_layout(stacks):
     per_seed = {k: np.stack([v, v * 0.5, v * 0.8]) for k, v in stacks.items()}
     plain = probe_trace_grid(stacks, form_axis="row")
@@ -85,6 +95,11 @@ def test_a_seed_axis_adds_the_envelope_without_changing_the_layout(stacks):
     plt.close(shaded)
 
 
+def shading(ax):
+    """The panel's neutral patches — the channel traces are the chromatic ones."""
+    return [p for p in ax.patches if len(set(p.get_edgecolor()[:3])) == 1]
+
+
 def test_the_summary_outranks_the_envelope_it_sits_inside():
     """Ink follows the hierarchy: the fill's own silhouette reads first, the spread second."""
     values = np.linspace(0.2, 0.8, len(LANDMARKS))[:, None] * np.ones(3)
@@ -92,17 +107,29 @@ def test_the_summary_outranks_the_envelope_it_sits_inside():
     # Nothing elided, so each shading line is a single patch rather than a solid-plus-ghost pair.
     fig = probe_trace_grid({(f, "mix"): per_seed for f in FORMS}, targets=("mix",), elided={})
     ax = fig.get_axes()[0]
-    grey = [p for p in ax.patches if p.get_edgecolor()[:3] == to_rgb(mean_color())]
-    fills = [p for p in grey if p.get_fill()]
+    fills = [p for p in shading(ax) if p.get_fill()]
     assert len(fills) == 1 and np.isclose(fills[0].get_path().vertices[:, 1].min(), 0.0)
     # Seed minimum, seed mean (what the fill and the lines plot), seed maximum, at the top landmark.
-    edges = sorted((p for p in grey if not p.get_fill()), key=lambda p: p.get_path().vertices[:, 1].max())
+    edges = sorted((p for p in shading(ax) if not p.get_fill()), key=lambda p: p.get_path().vertices[:, 1].max())
     assert np.allclose(
         [p.get_path().vertices[:, 1].max() for p in edges],
         [0.8 * f for f in (0.75, (0.75 + 1 + 1.1) / 3, 1.1)],
     )
-    lo, summary, hi = (p.get_alpha() for p in edges)
-    assert summary > hi and summary > lo and lo == hi  # the envelope is a matched, quieter pair
+    lo, summary, hi = edges
+    grey = lambda p: p.get_edgecolor()[0]  # noqa: E731 — one channel is enough; they are neutral
+    assert grey(summary) < grey(lo) == grey(hi)  # the envelope is a matched, quieter pair
+    plt.close(fig)
+
+
+def test_shading_lines_are_opaque_so_agreeing_replicates_dont_read_as_emphasis():
+    """The three coincide wherever the seeds agree, which is most of the figure."""
+    values = np.linspace(0.2, 0.8, len(LANDMARKS))[:, None] * np.ones(3)
+    fig = probe_trace_grid({(f, "mix"): np.stack([values] * 3)[:, None] for f in FORMS}, targets=("mix",))
+    ax = fig.get_axes()[0]
+    lines = [p for p in shading(ax) if not p.get_fill()]
+    assert len(lines) == 6 and all(p.get_alpha() is None for p in lines)
+    # Summary and envelope, each with the paler companion carrying its elided risers.
+    assert len({to_hex(p.get_edgecolor()) for p in lines}) == 4
     plt.close(fig)
 
 

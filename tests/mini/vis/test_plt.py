@@ -7,6 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from matplotlib.colors import to_hex
 from matplotlib.path import Path as MplPath
 
 from mini.vis.plt import smooth_step, smooth_step_area, smooth_step_band
@@ -45,6 +46,14 @@ def test_elide_lifts_the_riser_onto_a_fainter_companion(ax):
     assert subpaths(solid) == 2  # the elided riser is gone from the solid stroke...
     assert subpaths(ghost) == 1  # ...and only the ghost still carries it
     assert ghost.get_alpha() == pytest.approx(0.2)  # fade × the line's own alpha
+
+
+def test_a_color_fade_draws_the_elided_riser_opaque(ax):
+    """So that several lines' elided risers landing together don't build up into emphasis."""
+    smooth_step(ax, range(len(Y)), Y, elide=[1], fade="#aabbcc", color="#123456")
+    ghost, solid = ax.patches
+    assert ghost.get_alpha() is None and to_hex(ghost.get_edgecolor()) == "#aabbcc"
+    assert to_hex(solid.get_edgecolor()) == "#123456"
 
 
 def test_a_break_beats_an_elision_on_the_same_riser(ax):

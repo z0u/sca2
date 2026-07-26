@@ -1,3 +1,4 @@
+from .color import mix, page_color
 from .nb import figure_html, themed
 from .plt import smooth_step, smooth_step_area, smooth_step_band, use_style
 from .theme import light_dark, use_theme
@@ -5,6 +6,8 @@ from .theme import light_dark, use_theme
 __all__ = [
     "figure_html",
     "light_dark",
+    "mix",
+    "page_color",
     "smooth_step",
     "smooth_step_area",
     "smooth_step_band",

@@ -26,7 +26,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure, SubFigure
 from matplotlib.layout_engine import ConstrainedLayoutEngine
 
-from mini.vis import light_dark, smooth_step, smooth_step_area
+from mini.vis import light_dark, mix, page_color, smooth_step, smooth_step_area
 from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, OPERATORS, SPAN_RISERS
 
 FORMS = ("named", "hex")
@@ -140,20 +140,26 @@ def draw_traces(
     x = range(len(values))
 
     def shade(summary: np.ndarray, replicates: np.ndarray | None, color: str) -> None:
-        def edge(y: np.ndarray, alpha: float) -> None:
-            # Elided like the traces: a summary line that crossed an unprobed stretch solidly
-            # would claim the neighbourhood the measurements it summarises decline to claim.
+        def edge(y: np.ndarray, weight: float) -> None:
+            # Opaque, not translucent: these three lines coincide wherever the replicates
+            # agree, which is most of the panel, and stacked translucent copies would put
+            # the heaviest ink exactly where the least is happening. Elided like the traces,
+            # since a summary line that crossed an unprobed stretch solidly would claim a
+            # neighbourhood the measurements it summarises decline to claim.
+            ink = mix(page_color(), color, weight)
             smooth_step(
                 ax, x, y,
-                ramp=ramp, breaks=breaks, elide=elide, fade=fade, color=color, alpha=alpha, lw=0.5,
+                ramp=ramp, breaks=breaks, elide=elide, fade=mix(page_color(), ink, fade),
+                color=ink, lw=0.5,
             )  # fmt: skip
 
         smooth_step_area(ax, x, summary, ramp=ramp, breaks=breaks, color=color, alpha=fill_alpha)
         if replicates is None:
             return
-        edge(summary, edge_alpha)  # the summary keeps the firm silhouette...
-        edge(replicates.min(0), edge_alpha * 0.55)  # ...and the envelope stays subordinate to it
+        # Envelope first, so where the three coincide the summary's own edge is what survives.
+        edge(replicates.min(0), edge_alpha * 0.55)
         edge(replicates.max(0), edge_alpha * 0.55)
+        edge(summary, edge_alpha)
 
     if fill == "mean":
         shade(values.mean(1), None if spread is None else spread.mean(2), mean_color())
@@ -179,6 +185,25 @@ def style_trace_panel(ax: Axes, *, ylim: tuple[float, float] = (-0.2, 1.2)) -> N
     ax.tick_params(axis="y", left=True, right=True, direction="in")
     ax.spines[:].set_visible(False)
     ax.grid(which="major", c="#888", alpha=0.2)
+
+
+def label_scale(axes: "Sequence[Axes] | np.ndarray", *, show: bool = True) -> None:
+    """Number the 0 and 1 gridlines on the right of the bottom panel of a stack.
+
+    Every panel in the figure is on the same scale, so one of them can say what it is and
+    the rest stay clean: numbering all thirty spends a lot of ink on a fact stated once. It
+    goes on the right because the left margin already carries the depth numbers.
+
+    *show* off still writes the numbers and still lets the layout engine measure them, but
+    paints them in no color. Tick labels take width from the block they sit in, so a block
+    that alone carried real ones would end up narrower than the block above it and the two
+    landmark axes would stop lining up — which is the comparison the stacked layout is for.
+    """
+    for ax in axes:
+        ax.tick_params(axis="y", labelleft=False, labelright=False)
+    key = axes[-1]
+    key.set_yticks([0, 1], ["0", "1"])  # the panels share a y axis, so this reaches them all
+    key.tick_params(axis="y", labelright=True, labelsize=7, pad=2, **({} if show else {"labelcolor": "none"}))
 
 
 def label_landmarks(ax: Axes, *, sparse: bool = False, labels: bool = True) -> None:
@@ -215,9 +240,13 @@ def draw_depth_stack(
     depth_labels: bool = True,
     tick_labels: bool = True,
     sparse_ticks: bool = False,
+    scale_key: bool = False,
     **trace_kwargs,
 ) -> None:
     """Fill *sfig* with one panel per depth of *stack*, shaped ``(depth, landmark, channel)``.
+
+    *scale_key* numbers this block's y axis — see :func:`label_scale`. Exactly one block in
+    a figure should carry it, and every other block still reserves the room for it.
 
     A four-dimensional *stack* is read as ``(replicate, depth, landmark, channel)`` — the
     per-seed maps rather than their average. The panels then plot the mean over replicates
@@ -257,6 +286,7 @@ def draw_depth_stack(
     if title:
         axes[0].set_title(title, fontsize=9)
     label_landmarks(axes[-1], sparse=sparse_ticks, labels=tick_labels)
+    label_scale(axes, show=scale_key)
 
 
 def probe_trace_grid(
@@ -284,6 +314,10 @@ def probe_trace_grid(
 
     *sparse_ticks* defaults to whether the grid is more than two blocks wide, since that is
     when the full landmark labels start to collide.
+
+    The bottom-right block carries the scale key — the only 0 and 1 numbered in the figure,
+    on the right where nothing else is written. Every panel is on the same scale, so the
+    reader needs it once, near the corner they end up in after reading the landmark axis.
     """
     rows, cols = (forms, targets) if form_axis == "row" else (targets, forms)
     pair = (lambda r, c: (r, c)) if form_axis == "row" else (lambda r, c: (c, r))
@@ -304,6 +338,7 @@ def probe_trace_grid(
                 depth_labels=j == 0,
                 tick_labels=i == len(rows) - 1,
                 sparse_ticks=sparse_ticks,
+                scale_key=(i, j) == (len(rows) - 1, len(cols) - 1),
                 **trace_kwargs,
             )
     if ylabel:

@@ -722,7 +722,8 @@ def _(arrays):
             in the upper layers of all three named panels at the equals
             landmark, where the upper hairline climbs to most of the panel's
             height while the outline stays near the floor; in the hex row the
-            hairlines stay close to the outline throughout.
+            hairlines stay close to the outline throughout. The shared scale is
+            numbered once, 0 and 1 at the right of the bottom-right panel.
         """,
         caption="""
             Per-channel leave-one-out probe $R^2$, center cell, seed-averaged —
@@ -738,7 +739,9 @@ def _(arrays):
             and a single crisp edge is a result that replicated. Steps,
             because each landmark is a discrete character position and a
             straight line between two of them would claim measurements that
-            were never made. Risers that cross characters no landmark measures
+            were never made. Every panel runs over the same two gridlines, 0 and
+            1, numbered once in the bottom-right corner. Risers that cross
+            characters no landmark measures
             — the spaces flanking `+` and `=` in both forms, and the
             variable-length middles of named words — are drawn in lighter ink,
             so an interpolation doesn't read as another measured step. Only the

@@ -132,7 +132,7 @@ def smooth_step(
     ramp: "float | ArrayLike" = 1.0,
     breaks: "Iterable[int] | None" = None,
     elide: "Iterable[int] | None" = None,
-    fade: float = 0.3,
+    fade: "float | str" = 0.3,
     **kwargs,
 ) -> PathPatch:
     """Draw a step plot whose risers are S-curves rather than vertical jumps.
@@ -174,6 +174,11 @@ def smooth_step(
     gaps), so the effect is real transparency: it needs no opaque mask matched to the
     background, and survives a transparent figure over any page color. Where *breaks* and
     *elide* name the same riser, the break wins and nothing is drawn.
+
+    Pass *fade* as a color instead to draw those risers opaque in that color — see
+    :func:`~mini.vis.mix` for computing one. Worth it where elided risers from several
+    lines land on top of each other: translucent copies accumulate into something darker
+    than any of them, which reads as emphasis where the data only agreed.
     """
     x, y = np.asarray(x, float), np.asarray(y, float)
     if len(x) < 2:
@@ -185,7 +190,10 @@ def smooth_step(
 
     if eli - brk:
         ghost = _step_path(x, y, hs, brk)  # keeps the elided risers; the solid path drops them
-        ax.add_patch(PathPatch(ghost, **style | {"alpha": fade * (kwargs.get("alpha") or 1.0)}))
+        quiet = (
+            {"color": fade, "alpha": None} if isinstance(fade, str) else {"alpha": fade * (kwargs.get("alpha") or 1.0)}
+        )
+        ax.add_patch(PathPatch(ghost, **style | quiet))
     patch = PathPatch(_step_path(x, y, hs, brk | eli), **style)
     ax.add_patch(patch)
     return patch
