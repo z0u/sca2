@@ -26,6 +26,7 @@ with app.setup(hide_code=True):
     from sca import vis as sv
     from sca import vis_probes as vp
     from sca.data import mixed_vocab as mv
+    from sca.data.mixed_vocab import LANDMARKS
 
     use_publisher(report_bundle(__file__))
 
@@ -627,81 +628,66 @@ def _():
     mo.md(r"""
     ## Within-form geometry (H2)
 
-    /// admonition | TODO
-    Refit pending. The probe holds out one *equation* at a time, so a colour or
-    a hex digit sits in both the fit and the held-out row and an identity →
-    value table is memorizable. A refit of all three centre seeds holding out
-    the value instead leaves the H2 prediction untouched (named mix at the
-    pre-answer site: 0.944 → 0.941) and overturns two claims made below: the
-    named operand bundle falls to ~0, so it is name recognition rather than
-    value geometry, and hex's earlier channels are *not* retained by value into
-    later digits (0.82 → −0.27). The paragraphs below still read the
-    per-equation numbers and need rewriting once the protocol is settled.
+    The figure below plots probe $R^2$ at every depth × landmark, for the two
+    operands and the mix, per form (center cell; depth 0 is the embedding
+    layer), one line per RGB channel with the three-seed spread behind it.
+    It uses the stricter of the two holdouts described under Measurements:
+    every row carrying a value leaves the fit along with it, so a plateau here
+    is a value the probe can *place*, not one it can look up.
 
-    The landmark set also needs two more positions. A named operand's value
-    turns out to sit on the space that closes it (−0.05 at the name's last
-    character against +0.35 at the following space and +0.47 after the `+`,
-    strict, last layer), and `LANDMARKS` doesn't measure the operand-closing
-    spaces — so the figure currently omits the named form's most informative
-    sites. Hex scores nothing there, as a form with fixed digit offsets should.
-    ///
+    **The named form matches the prediction.** The mix is decodable at $R^2 =
+    0.94$ at the pre-answer position in the last layer, and all three seeds
+    land there (0.93, 0.95, 0.95) — for mix values the probe never saw, which
+    is a stronger claim than the preregistered estimator makes. That estimator
+    gives 0.944 at the same site, so H2 is carried either way and nothing turns
+    on the change of protocol. Where the mix *first* appears is less settled:
+    one seed already reads it at the `=` sign by the second-to-last layer while
+    the other two stay near 0.3 there, visible as the upper hairline lifting
+    away from the outline at `=`. The earliest decodable site varies by seed;
+    the pre-answer, last-layer location does not.
 
-    The figure below plots leave-one-out probe $R^2$ at every depth ×
-    landmark, for the two operands and the mix, per form (center cell; depth
-    0 is the embedding layer), one line per RGB channel with the three-seed
-    spread behind it. The named form matches the prediction: operand readout
-    builds over the early layers, and the mix is decodable at $R^2 \approx
-    0.94$ at the pre-answer position in the last layer — all three seeds land
-    there (0.93, 0.95, 0.95), so this is the robust home of the result
-    concept. Where the mix *first* appears is less settled: one seed already
-    reads it at $R^2 \approx 0.97$ a landmark earlier, at the `=` sign by the
-    second-to-last layer, while the other two stay near 0.3 there and only
-    reach the mix at the pre-answer space. That disagreement is visible as
-    the upper hairline lifting away from the outline at `=` in the upper
-    layers of the named panels. So the earliest decodable site varies by
-    seed; the pre-answer, last-layer location does not. The hex form never
-    assembles the full mix at one site: its best full-mix $R^2$ is 0.66,
-    mid-answer, and all three seeds peak at the same landmark, consistent
-    with ex-2.1.2's just-in-time channel staircase. Nothing in the hex panels
-    looks like a holistic pre-answer mix, so the coupling tell that H2
-    reserved judgment on did not appear.
+    **A named operand's value is not on its name.** At the last character of
+    operand 1 the strict probe scores $-0.05$, and operand 2 scores $0.00$ —
+    nothing. The value sits instead on the spaces that follow: $0.23$ on the
+    space closing operand 1, rising to $0.47$ across the `+`, and $0.64$ by the
+    pre-answer position. A variable-length name has no fixed slot, and the
+    model appears to resolve it into the first fixed position available. Two
+    qualifications. Part of what the closing space holds is lexical rather than
+    chromatic — 99 of the 140 names are multi-word and the modifiers recur, and
+    holding out whole word families costs that site $0.43$ more than a
+    color-matched holdout of the same size does (the control is under
+    Exploratory analyses). The site after the `+` is much less lexical, so the
+    $0.47$ there is the sturdier number. And this is where the preregistered
+    estimator diverges most: it reads $0.75$ at the name's last character,
+    which is name recognition — the identity is recoverable, the value is not
+    placed.
 
-    The figure carries its own control. An operand-2 probe has nothing to
-    find before operand 2 arrives, and none rises above zero anywhere in
-    operand 1 or the plus, at any depth, in either form — the whole region
-    sits between −0.11 and −0.003. (Leave-one-out $R^2$ goes negative when a
-    fit has nothing to fit: below zero means worse than always guessing the
-    mean color.) Position alone doesn't leak a value.
+    **Hex relays its channels and does not retain them.** Each channel is
+    legible at its own digit and near zero at the next, a strict relay rather
+    than an accumulation. At the embedding the probe reads $0.42$ at a digit's
+    own position; the preregistered estimator reads $1.00$ there, but that is a
+    ceiling the setup hands out — a hex digit position holds one of 16 tokens,
+    the held-out unit is an equation, and 16 points in 64 dimensions admit an
+    exact linear fit whatever the values. The genuine finding is that $0.42$ is
+    well above zero, so those 16 embeddings do carry a real magnitude axis, and
+    that depth improves it: $0.78$ at operand 2's last digit by the last layer.
+    What does *not* survive is retention. Read at the *green* digit, the red
+    channel scores $0.82$ under the preregistered estimator and $-0.27$ under
+    the strict one: red is still recoverable there, because attention reaches
+    back to its digit, but it is no longer placed by value. Hex also reads
+    nothing at the delimiters ($-0.23$), which is what a form whose three
+    digits sit at fixed offsets should do — it needs no summary slot.
 
-    Per channel, the two forms differ in kind. Named reads each operand
-    holistically: the three channels ride together over its characters and
-    arrive as a bundle at $R^2 \approx 0.8$. Hex resolves it digit by digit,
-    and at the embedding the three are strictly disjoint — each channel hits
-    $R^2 = 1.00$ at its own digit and drops back to zero at the next. Read
-    that 1.00 as a ceiling rather than a finding: a hex digit position holds
-    one of only 16 tokens, the held-out unit is an equation rather than a
-    digit, so every held-out row's token was seen with its value during the
-    fit, and 16 points in 64 dimensions admit an exact linear fit whatever
-    the values. It measures the notation, and it is most of why the hex row
-    peaks higher than the named one, where a character position holds ~26
-    letters that have to predict 140 colors. Depth turns the relay into an
-    accumulation: by the last layer earlier channels persist into later
-    digits (0.82, 0.96, 0.62 at operand 2's middle digit; 0.51, 0.74, 0.98
-    at its last), so a single site holds the whole operand only after
-    several layers of work, where named has it from layer 2.
-
-    At the mix, named brings all three channels high together from the
-    pre-answer position onward in the last layer. Hex instead runs a rolling
-    window, each channel decodable about one position before the digit that
-    carries it is emitted and fading afterwards: at `#` red is already at
-    0.98 with green and blue near zero, one token later green is at 0.96 and
-    red has started to fade, and at the last digit blue is at 0.95 with red
-    down to 0.38. So the 0.66 above is a channel mean over a window holding
-    one channel ready, one fading, and one not yet computed. Hex's mix is
-    never absent and never all present at once — which is the just-in-time
-    staircase stated per channel, and it is the reading that matters for
-    anchoring, since an anchor needs a site where the whole concept lives.
-    Read the answer-position numbers with the caveat below.
+    **Hex never assembles the mix, and the pre-answer site is where named
+    keeps everything.** Hex's mix reaches only $0.20$ at the pre-answer
+    position and $0.55$ mid-answer, and the mid-answer reading sits where the
+    answer's own digits are in the input (see the surface-text caveat under
+    Exploratory analyses). Nothing in the hex panels looks like a holistic
+    pre-answer mix, so the coupling tell that H2 reserved judgment on did not
+    appear. The contrast matters for anchoring rather than for H2 alone: at the
+    named pre-answer position the mix reads $0.94$, operand 1 $0.64$ and
+    operand 2 $0.62$, so one site carries the whole equation at once. Hex has
+    no counterpart, and an anchor needs a site where the whole concept lives.
     """)
     return
 
@@ -712,14 +698,16 @@ def _(arrays):
         name="probe-channels",
         alt_text="""
             Probe R² traced across the equation for each RGB channel, stacked
-            by depth, with the named form on top and hex below. In the named
-            panels the three channels rise and fall together over whichever
-            operand is being read; in the hex panels they separate into a
-            staircase, each channel stepping up at its own hex digit. Only
-            named brings all three high together at the mix.
+            by depth, with the named form on top and hex below. The named
+            panels are flat over the names themselves and rise at the spaces
+            that follow them, peaking at the pre-answer position; the hex
+            panels show each channel legible only at its own digit. Only named
+            brings all three channels high together at the mix.
         """,
         caption="""
-            Per-channel leave-one-out probe $R^2$, center cell. Rows are the two
+            Per-channel probe $R^2$ under the strict holdout, center cell: every
+            row carrying a value leaves the fit with it, so a plateau is a value
+            the probe can place rather than one it can look up. Rows are the two
             forms, columns are operand 1, operand 2 and the mix; within a block,
             depth runs upward from the embedding and the x axis across the
             grammar landmarks, one step-line per channel. The grey area is the
@@ -728,10 +716,14 @@ def _(arrays):
             hairline that lifts away marks a landmark the seeds disagree about
             and a crisp single edge marks one that replicated. Steps, because
             each landmark is a discrete character position and a straight line
-            between two of them would claim measurements that were never made;
-            risers over characters no landmark measures are drawn in lighter
-            ink. Every panel runs over the same 0 and 1 gridlines, numbered once
-            in the bottom-right corner.
+            between two of them would claim measurements that were never made.
+            Elided risers, in lighter ink, cross a name's variable-length middle
+            — 0 to 22 characters depending on the line; a hex line has no elision
+            at all, since all four of its operand characters are landmarks. Every
+            panel runs over the same 0 and 1 gridlines, numbered once in the
+            bottom-right corner, and scores below zero are drawn at the floor:
+            this estimator goes negative wherever a fit has nothing to place, and
+            more negative is not more informative.
         """,
     )
     def _plot() -> plt.Figure:
@@ -747,6 +739,60 @@ def _(arrays):
         return vp.probe_trace_grid(_stacks, form_axis="row", panel_height=0.45, ylabel="probe R² per depth")
 
     mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays):
+    # Sites picked for the role they play in the claims above, not for the size of their
+    # disagreement — ranking by the quantity on show would guarantee a dramatic table.
+    _sites = [
+        ("named", "mix", "pre", None, "named mix, pre-answer (decides H2)"),
+        ("named", "mix", "eq", None, "named mix, at the ="),
+        ("named", "op1", "o1e0", None, "named operand 1, its last character"),
+        ("named", "op1", "plussp", None, "named operand 1, the space after +"),
+        ("hex", "op2", "o2s1", 0, "hex operand 2, red at its own digit (embedding)"),
+        ("hex", "op2", "o2e1", 0, "hex operand 2, red at the green digit"),
+        ("hex", "mix", "pre", None, "hex mix, pre-answer"),
+    ]
+    _lm = {_n: _i for _i, _n in enumerate(LANDMARKS)}
+
+    def _val(form: str, target: str, key: str, landmark: str, ch: int | None, depth: int) -> float:
+        _m = np.mean([arrays[f"center-s{_s}/probes/{form}/{target}/{key}"] for _s in SEEDS], axis=0)
+        _cell = _m[depth, _lm[landmark]]
+        return float(_cell[ch] if ch is not None else np.mean(_cell))
+
+    _thead = (
+        "<tr><th>site</th>"
+        + "".join(f'<th class="num">{_h}</th>' for _h in ("per-equation", "strict", "difference"))
+        + "</tr>"
+    )
+    _rows = ""
+    for _f, _t, _lmk, _ch, _desc in _sites:
+        _d = 0 if "embedding" in _desc else 4
+        _e = _val(_f, _t, "r2_ch", _lmk, _ch, _d)
+        _s = _val(_f, _t, "r2_strict_ch", _lmk, _ch, _d)
+        _rows += (
+            f"<tr><td>{_desc}</td>"
+            + f'<td class="num">{_e:+.3f}</td><td class="num">{_s:+.3f}</td>'
+            + f'<td class="num">{_s - _e:+.3f}</td></tr>'
+        )
+    mo.vstack(
+        [
+            mo.Html(
+                '<div class="report-table-scroll"><table class="report-table">' + _thead + _rows + "</table></div>"
+            ),
+            mo.md("""
+            Where the two holdouts part company, at the last layer except for the
+            embedding row. The gap is how much of a reading was identity recovery:
+            near zero means the site holds a value the probe can place without
+            having seen it, and a large negative gap means the probe was looking
+            the value up. H2's site is decided the same way by either estimator,
+            which is what lets the stricter one be adopted without the choice
+            doing any work.
+            """),
+        ]
+    )
     return
 
 

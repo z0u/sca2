@@ -27,7 +27,7 @@ from matplotlib.figure import Figure, SubFigure
 from matplotlib.layout_engine import ConstrainedLayoutEngine
 
 from mini.vis import light_dark, mix, page_color, smooth_step, smooth_step_area
-from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, SPAN_RISERS
+from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, OPERATORS, SPAN_RISERS
 
 FORMS = ("named", "hex")
 TARGETS = ("op1", "op2", "mix")
@@ -235,11 +235,17 @@ def label_landmarks(ax: Axes, *, sparse: bool = False, labels: bool = True) -> N
     def ticks(lms: Sequence[str]) -> tuple[list[int], list[str]]:
         return [LANDMARKS.index(lm) for lm in lms], [LANDMARK_LABELS[lm] if labels else "" for lm in lms]
 
-    minor = [lm for lm in MINOR_LANDMARKS if not sparse or lm.endswith("0")]
+    # Sparse keeps a token's outer characters (…0) and always the delimiter spaces: those
+    # carry no label — a space has nothing to print — so a tick mark is the only thing
+    # placing them, and they are where a named operand's value actually reads.
+    minor = [lm for lm in MINOR_LANDMARKS if not sparse or lm.endswith("0") or lm in OPERATORS]
     ax.set_xticks(*ticks(MAJOR_LANDMARKS), fontsize="x-small")
     ax.set_xticks(*ticks(minor), minor=True, fontsize="xx-small")
     ax.tick_params(axis="x", which="major", pad=10)
-    ax.tick_params(axis="x", which="minor", pad=1)
+    # A mark under each labelled landmark, and only there — the panels above carry tick
+    # positions without furniture (`style_trace_panel` zeroes the length). The delimiter
+    # spaces need it most: their label is blank, so without a mark nothing places them.
+    ax.tick_params(axis="x", which="minor", pad=1, length=2 if labels else 0)
 
 
 def draw_depth_stack(
