@@ -19,6 +19,7 @@ from typing import Any, Callable
 import cloudpickle
 
 from contextlib import nullcontext
+from math import isfinite
 
 from mini._queues import EndOfQueue
 from mini._watchdog import Watchdog, WatchdogStall
@@ -55,21 +56,27 @@ class _MemoSink:
     Beyond relaying emissions, the sink derives the record's liveness-vs-progress
     split: ``heartbeat_at`` (any emission — the worker breathes) vs ``progress_at``
     (the ``(step, total)`` pair advanced — the task *moves*), plus a
-    ``steps_per_min`` throughput over a trailing window. A wedged worker can keep
-    the former fresh while the latter freezes; monitors key on the difference.
-    The same advance signal feeds the *watchdog*, which aborts the worker when
-    progress stalls too long (see :mod:`mini._watchdog`).
+    ``steps_per_min`` throughput and per-metric movement over a trailing window —
+    the numbers a monitor needs to judge a run against expectation instead of
+    eyeballing it. A wedged worker can keep the heartbeat fresh while progress
+    freezes; monitors key on the difference.
+
+    Writes run on the progress emitter's own thread (see
+    :class:`~mini._debounce.BackgroundEmitter`), so nothing here is on the task's
+    critical path. The *watchdog* is fed separately, from the emitting thread, so
+    it measures the task rather than the control plane.
     """
 
-    def __init__(self, store: MemoStore, key: str, gen: str | None = None, watchdog: Watchdog | None = None):
+    def __init__(self, store: MemoStore, key: str, gen: str | None = None):
         self._store = store
         self._key = key
         self._gen = gen
         self._fenced = False
-        self._watchdog = watchdog
         self._last: tuple[int, int] | None = None
         self._progress_at: float | None = None
         self._rate_anchor: tuple[float, int] | None = None  # (time, step)
+        self._metric_anchor: dict[str, float] = {}
+        self._rising: dict[str, int] = {}  # consecutive windows a metric has moved up
 
     def put(self, item: Any, /, block: bool = True, timeout: float | None = None) -> None:
         del block, timeout
@@ -79,8 +86,6 @@ class _MemoSink:
         if (item.step, item.total) != self._last:
             self._last = (item.step, item.total)
             self._progress_at = now
-            if self._watchdog is not None:
-                self._watchdog.poke(item.step, item.total)
         fields = dict(
             step=item.step,
             total=item.total,
@@ -88,17 +93,41 @@ class _MemoSink:
             metrics=item.metrics,
             heartbeat_at=now,
         )
+        if item.metrics:  # NaN/inf loss: a diverged run, seen without a human reading it. Always written, so it clears.
+            fields["metrics_nonfinite"] = sorted(
+                k for k, v in item.metrics.items() if isinstance(v, float) and not isfinite(v)
+            )
         if self._progress_at is not None:
             fields["progress_at"] = self._progress_at
         if self._rate_anchor is None:
             self._rate_anchor = (now, item.step)
+            self._metric_anchor = dict(item.metrics)
         elif (elapsed := now - self._rate_anchor[0]) >= _RATE_WINDOW_S:
             fields["steps_per_min"] = round((item.step - self._rate_anchor[1]) / elapsed * 60.0, 1)
             self._rate_anchor = (now, item.step)
+            fields |= self._close_metric_window(item.metrics)
         if self._gen is None:
             self._store.update(self._key, **fields)
         elif not self._store.update_if(self._key, self._gen, **fields):
             self._fenced = True
+
+    def _close_metric_window(self, metrics: dict[str, float]) -> dict[str, Any]:
+        """Movement per metric since the window opened, and how long each has risen.
+
+        Records keep only the latest value of each metric, so "is the loss coming
+        down?" is unanswerable from a snapshot. A per-window delta plus a count of
+        consecutive rising windows makes the trend a number a tool can check —
+        one bad window is noise, several in a row is a run worth looking at.
+        """
+        delta = {
+            k: round(v - anchor, 6)
+            for k, v in metrics.items()
+            if isinstance(v, (int, float)) and (anchor := self._metric_anchor.get(k)) is not None
+        }
+        self._rising = {k: self._rising.get(k, 0) + 1 for k, d in delta.items() if d > 0}
+        self._metric_anchor = dict(metrics)
+        # Both written every window, empty included, so a run that recovers clears its flag.
+        return {"metrics_delta": delta, "metrics_rising": dict(self._rising)}
 
     def get(self, /, block: bool = True, timeout: float | None = None) -> Any:
         del block, timeout
@@ -342,7 +371,7 @@ def execute_task(
     result_dir = store.result_dir(key)
     result_dir.mkdir(parents=True, exist_ok=True)
     watchdog, wd_fields = _arm_watchdog(watchdog_s, watchdog_grace_s, store, key, gen, commit, record)
-    sink = _MemoSink(store, key, gen, watchdog=watchdog)
+    sink = _MemoSink(store, key, gen)
     if artifacts is not None and gen is not None:
         artifacts = _FencedStore(artifacts, store, key, gen)
     # Record what we actually ran on (host/GPU/…) and when the worker truly began,
@@ -362,7 +391,9 @@ def execute_task(
             store_context(artifacts) if artifacts is not None else nullcontext(),
             producer_context(producer) if producer is not None else nullcontext(),
             resolved_refs_context(resolved),
-            progress_context(key, key, queue=sink, emission_interval=0.2),
+            progress_context(
+                key, key, queue=sink, emission_interval=0.2, on_progress=watchdog.poke if watchdog else None
+            ),
             watchdog if watchdog is not None else nullcontext(),
         ):
             for hook in reversed(hooks):

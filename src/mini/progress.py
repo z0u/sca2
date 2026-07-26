@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import contextvars
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
-from mini._debounce import Debouncer
+from mini._debounce import BackgroundEmitter
 from mini._queues import QueueLike
 from mini.urns import matches_urn, parse_urn, to_urn
 
@@ -61,15 +62,22 @@ class JobContext:
     job_id: str
     queue: QueueLike[ProgressMessage] | None = None
     emission_interval: float = 0.1
+    # Called synchronously, on the emitting thread, with each ``(step, total)`` an
+    # ``emit_progress`` reports. The watchdog rides here rather than on the sink so
+    # it measures the *task's* progress: delivery happens on a background thread, so
+    # a slow control plane would otherwise read as a wedged worker.
+    on_progress: Callable[[int, int], None] | None = None
     metrics: dict[str, float] = field(default_factory=dict)
     _last: tuple[int, int, str] = field(default=(0, 0, ""), init=False, repr=False)
-    _emitter: Debouncer = field(init=False, repr=False)
+    _emitter: BackgroundEmitter = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._emitter = Debouncer(self._do_emit, interval=self.emission_interval)
+        self._emitter = BackgroundEmitter(
+            self._do_emit, interval=self.emission_interval, name=f"mini-emit-{self.job_id}"
+        )
 
     def _do_emit(self, progress: ProgressMessage) -> None:
-        """Actually emit a progress message."""
+        """Actually emit a progress message (on the emitter's thread)."""
         if self.queue is not None:
             self.queue.put(progress)
         else:
@@ -80,20 +88,27 @@ _job_context: contextvars.ContextVar[JobContext | None] = contextvars.ContextVar
 
 
 @contextmanager
-def progress_context(run_id: str, job_id: str, queue: QueueLike[ProgressMessage] | None, emission_interval: float):
+def progress_context(
+    run_id: str,
+    job_id: str,
+    queue: QueueLike[ProgressMessage] | None,
+    emission_interval: float,
+    on_progress: Callable[[int, int], None] | None = None,
+):
     """Context manager for setting the current job context"""
     ctx = JobContext(
         run_id=run_id,
         job_id=job_id,
         queue=queue,
         emission_interval=emission_interval if emission_interval is not None else 0.1,
+        on_progress=on_progress,
     )
     token = _job_context.set(ctx)
     try:
         try:
             yield
         finally:
-            ctx._emitter.flush()
+            ctx._emitter.close()  # let the last update land before the record settles
     finally:
         _job_context.reset(token)
 
@@ -105,12 +120,12 @@ def emit_progress(step: int, total: int, message: str = ""):
     Must be called within a job context. If a progress queue is available, the
     message is queued; otherwise it's printed to stdout.
 
-    Progress emission is debounced per-job with leading and trailing edge semantics:
-    - Leading edge: First call emits immediately
-    - Trailing edge: Rapid subsequent calls store the latest update and emit after interval
-    - Latest arguments: Trailing emission always uses the most recent progress values
-
-    The debounce interval is configured by the apparatus when setting up the job context.
+    **This call never blocks on the sink.** Delivery happens on a per-job daemon
+    thread holding one latest-wins slot: a call while an emission is in flight
+    replaces the pending update rather than queueing behind it, so a task emitting
+    every step runs at its own speed and simply reports coarser progress when the
+    sink is slow (see :class:`~mini._debounce.BackgroundEmitter`). *interval*, set
+    by the apparatus, is a floor on the spacing, not a promise of one.
 
     Args:
         step: Current step number
@@ -123,6 +138,8 @@ def emit_progress(step: int, total: int, message: str = ""):
         return
 
     ctx._last = (step, total, message)
+    if ctx.on_progress is not None:
+        ctx.on_progress(step, total)  # synchronous and local — the watchdog's advance signal
     progress = ProgressMessage(
         run_id=ctx.run_id, job_id=ctx.job_id, step=step, total=total, message=message, metrics=dict(ctx.metrics)
     )
