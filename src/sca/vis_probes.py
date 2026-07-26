@@ -77,6 +77,16 @@ def mean_color() -> str:
     return light_dark("#444", "#ccc")
 
 
+def transfer_color() -> str:
+    """Ink for a zero-shot cross-form reading, drawn over the within-form area.
+
+    Amber, which is outside the R/G/B hues :func:`channel_colors` spends: a cross-form
+    trace is a whole-value reading, and a red line here would invite the channel reading
+    the rest of the report has trained.
+    """
+    return light_dark("#b06a00", "#e0a458")
+
+
 def aliased_risers(stack: np.ndarray) -> frozenset[int]:
     """Risers between landmarks that resolved to the same character, so their columns match bit for bit.
 
@@ -357,6 +367,111 @@ def probe_trace_grid(
                 sparse_ticks=sparse_ticks,
                 scale_key=(i, j) == (len(rows) - 1, len(cols) - 1),
                 **trace_kwargs,
+            )
+    if ylabel:
+        fig.supylabel(ylabel, fontsize=9)
+    return fig
+
+
+def draw_transfer_stack(
+    sfig: SubFigure,
+    within: np.ndarray,
+    cross: np.ndarray,
+    *,
+    elide: Iterable[int] = (),
+    title: str | None = None,
+    depth_labels: bool = True,
+    tick_labels: bool = True,
+    sparse_ticks: bool = False,
+    scale_key: bool = False,
+) -> None:
+    """One block of :func:`transfer_trace_grid`: within-form area with the cross-form area over it.
+
+    Both arrays are shaped ``(replicate, depth, landmark)`` — the channel-mean maps, since
+    the question is whether a value transfers at all rather than which channel does. The
+    within-form reading is the grey area (the same ink the per-channel figure gives a
+    channel mean) and the cross-form reading is drawn over it in amber, so the amber
+    fraction of the grey *is* the transfer ratio ρ, read off the panel rather than
+    tabulated.
+
+    Negative scores clip to the floor, as everywhere in these figures: a probe that does
+    worse than predicting the mean has failed, and how much worse is not a finer grade of
+    failure. Where that matters — a cross-form reading pinned at zero could be −0.01 or
+    −30 — the caption has to say so.
+    """
+    means = (within.mean(0), cross.mean(0))
+    breaks = aliased_risers(means[0])
+
+    engine = sfig.get_layout_engine()
+    if isinstance(engine, ConstrainedLayoutEngine):
+        engine.set(hspace=0, h_pad=0.01, wspace=0)
+    axes = sfig.subplots(len(means[0]), 1, sharex=True, sharey=True, squeeze=False)[:, 0]
+    for row, ax in enumerate(axes):
+        depth = len(means[0]) - 1 - row
+        for series, color, lw, replicates in (
+            (means[0], mean_color(), 0.9, within),
+            (means[1], transfer_color(), 1.3, cross),
+        ):
+            draw_traces(
+                ax,
+                np.clip(series[depth], 0, 1)[:, None],
+                elide=elide,
+                breaks=breaks,
+                colors=[color],
+                lw=lw,
+                fill="channel",
+                spread=np.clip(replicates[:, depth], 0, 1)[:, :, None],
+            )
+        style_trace_panel(ax)
+        if depth_labels:
+            ax.set_ylabel(f"{depth}", fontsize=8)
+    if title:
+        axes[0].set_title(title, fontsize=9)
+    label_landmarks(axes[-1], sparse=sparse_ticks, labels=tick_labels)
+    label_scale(axes, show=scale_key)
+
+
+def transfer_trace_grid(
+    within: Mapping[tuple[str, str], np.ndarray],
+    cross: Mapping[tuple[str, str], np.ndarray],
+    *,
+    forms: Sequence[str] = FORMS,
+    targets: Sequence[str] = TARGETS,
+    titles: Mapping[str, str] | None = None,
+    elided: Mapping[str, Iterable[int]] | None = None,
+    width: float = 8.0,
+    panel_height: float = 0.45,
+    ylabel: str | None = None,
+) -> Figure:
+    """A block per (form, target): what the form's own probe reads, and what the other form's does.
+
+    Both mappings are keyed by the form the probes are *applied* to — which is also the form
+    whose landmarks the x axis belongs to, and whose within-form score is ρ's denominator.
+    Rows are forms, columns are targets, matching the per-channel figure's arrangement so
+    the two can be read against each other.
+
+    *titles* overrides a form's block heading; the default names the direction, e.g.
+    ``named ← hex``, since a block's subject is the pair and not either form alone.
+    """
+    elided = ELIDED_RISERS if elided is None else elided
+    other = {f: next(g for g in forms if g != f) for f in forms} if len(forms) == 2 else {}
+    n_depth = next(iter(within.values())).shape[-2]  # (replicate, depth, landmark)
+
+    fig = plt.figure(figsize=(width, len(forms) * (n_depth * panel_height + 0.3) + 0.3))
+    sfigs = fig.subfigures(len(forms), len(targets), squeeze=False)
+    for i, form in enumerate(forms):
+        head = (titles or {}).get(form) or f"{form} ← {other.get(form, 'other')}"
+        for j, target in enumerate(targets):
+            draw_transfer_stack(
+                sfigs[i, j],
+                within[form, target],
+                cross[form, target],
+                elide=elided.get(form, ()),
+                title=f"{head} · {target}",
+                depth_labels=j == 0,
+                tick_labels=i == len(forms) - 1,
+                sparse_ticks=len(targets) > 2,
+                scale_key=(i, j) == (len(forms) - 1, len(targets) - 1),
             )
     if ylabel:
         fig.supylabel(ylabel, fontsize=9)

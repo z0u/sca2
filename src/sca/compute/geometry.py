@@ -185,20 +185,30 @@ def transfer_maps(
     return out
 
 
+def principal_angles(
+    wa: Float[np.ndarray, "C K"],
+    wb: Float[np.ndarray, "C K"],
+) -> np.ndarray:
+    """The K principal angles (degrees) between two probes' weight column spaces, ascending.
+
+    The first is the smallest — the closest the two subspaces come — so it bounds how much
+    they could share. 0° = a direction of the stream both decoders use; 90° = orthogonal.
+    """
+    qa, _ = np.linalg.qr(wa)
+    qb, _ = np.linalg.qr(wb)
+    s = np.linalg.svd(qa.T @ qb, compute_uv=False)
+    return np.degrees(np.arccos(np.clip(s, -1.0, 1.0)))
+
+
 def principal_angle_maps(
     wa: Float[np.ndarray, "L1 M C K"],
     wb: Float[np.ndarray, "L1 M C K"],
 ) -> Float[np.ndarray, "L1 M K"]:
-    """Principal angles (degrees) between the two probes' weight column spaces
-    at every (layer, landmark). 0° = same K directions of the stream; 90° = orthogonal.
-    """
+    """`principal_angles` at every (layer, landmark) — the two probes compared in place."""
     angles = np.empty(wa.shape[:2] + (wa.shape[3],))
     for d in range(wa.shape[0]):
         for m in range(wa.shape[1]):
-            qa, _ = np.linalg.qr(wa[d, m])
-            qb, _ = np.linalg.qr(wb[d, m])
-            s = np.linalg.svd(qa.T @ qb, compute_uv=False)
-            angles[d, m] = np.degrees(np.arccos(np.clip(s, -1.0, 1.0)))
+            angles[d, m] = principal_angles(wa[d, m], wb[d, m])
     return angles
 
 

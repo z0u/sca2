@@ -21,6 +21,8 @@ from sca.vis_probes import (
     aliased_risers,
     mean_color,
     probe_trace_grid,
+    transfer_color,
+    transfer_trace_grid,
 )
 
 N_DEPTH = 5
@@ -175,4 +177,27 @@ def test_sub_zero_scores_are_floored_for_drawing_but_not_for_alias_detection():
     ax = fig.get_axes()[0]
     ys = np.concatenate([verts(p)[:, 1] for p in ax.patches])
     assert ys.min() >= 0.0  # drawn at the floor, not below the panel
+    plt.close(fig)
+
+
+def test_transfer_grid_draws_the_cross_form_reading_over_the_within_form_one():
+    """The amber fraction of the grey is ρ, so both areas have to be on the panel."""
+    within = np.stack([np.linspace(0.3, 0.9, len(LANDMARKS))] * 3)[:, None]  # (seed, depth, landmark)
+    cross = within * 0.25
+    fig = transfer_trace_grid({(f, "mix"): within for f in FORMS}, {(f, "mix"): cross for f in FORMS}, targets=("mix",))
+    ax = fig.get_axes()[0]
+    faces = {to_hex(p.get_facecolor()) for p in ax.patches if p.get_fill()}
+    assert to_hex(mean_color()) in faces and to_hex(transfer_color()) in faces
+    plt.close(fig)
+
+
+def test_transfer_grid_floors_a_failed_cross_form_probe_without_hiding_the_within_form_area():
+    """ρ = 0 is the expected reading at the disjoint cells, and it must not blank the panel."""
+    within = np.stack([np.full((1, len(LANDMARKS)), 0.8)] * 3)
+    cross = np.stack([np.full((1, len(LANDMARKS)), -12.0)] * 3)
+    fig = transfer_trace_grid({(f, "mix"): within for f in FORMS}, {(f, "mix"): cross for f in FORMS}, targets=("mix",))
+    ax = fig.get_axes()[0]
+    ys = np.concatenate([verts(p)[:, 1] for p in ax.patches])
+    assert ys.min() >= 0.0
+    assert ys.max() == pytest.approx(0.8, abs=1e-6), "the within-form area still reaches its own value"
     plt.close(fig)

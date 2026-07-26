@@ -25,6 +25,7 @@ with app.setup(hide_code=True):
     from mini.vis import light_dark, themed
     from sca import baselines as bl
     from sca import vis as sv
+    from sca.compute import geometry as gm
     from sca import vis_probes as vp
     from sca.data import mixed_vocab as mv
     from sca.data.mixed_vocab import LANDMARKS
@@ -954,29 +955,178 @@ def _(arrays):
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
+def _(arrays):
+    # Every cross-form cell in the centre cell's scan: 2 directions × 3 targets × 3 seeds ×
+    # depth × landmark. The extremes bound the whole claim, so quote them rather than a site.
+    _all_cross = np.concatenate(
+        [
+            arrays[f"center-s{_s}/cross/{_d}/{_t}/r2"].ravel()
+            for _s in SEEDS
+            for _d in ("hex2name", "name2hex")
+            for _t in vp.TARGETS
+        ]
+    )
+    _pre = LANDMARKS.index("pre")
+    _named_pre = float(np.mean([arrays[f"center-s{_s}/probes/named/mix/r2"][4, _pre] for _s in SEEDS]))
+    _carried_pre = float(np.mean([arrays[f"center-s{_s}/cross/hex2name/mix/r2"][4, _pre] for _s in SEEDS]))
+
+    mo.md(f"""
     ## Cross-form geometry separation (H3)
 
-    /// admonition | TODO
-    Figure: transfer-ratio $\rho$ maps over layer × position, both
-    directions (hex→name, name→hex), center cell. Expected: $\rho < 0.2$
-    everywhere the within-form probes are strong. Site selection should
-    prefer the equals sign and the pre-answer space over answer positions,
-    where both forms' probes can read the emitted answer and inflate $\rho$
-    in both directions — see the post-hoc caveat under Exploratory analyses.
-    ///
+    H3 predicted $\\rho < 0.2$ and large principal angles. Both hold, and with
+    no room left for argument: $\\rho$ is **exactly zero** at every cell where
+    the guard defines it, in both directions and for all three targets.
 
-    /// admonition | TODO
-    Figure: principal angles between the two probes' row-spaces. The
-    primary site is where within-form $R^2$ is strongest, chosen without
-    reference to $\rho$ so the verdict isn't shaped by the quantity being
-    judged; the maximum-$\rho$ site is reported beside it as an upper bound
-    on sharing ("even at its most aligned site…"). Expected: angles near
-    90° at the primary site, i.e. the decoders use different directions of
-    the stream.
-    ///
+    That is a stronger statement than the number looks. $\\rho$ clips a negative
+    cross-form $R^2$ to zero, so a floor reading could in principle be a hair
+    below break-even — but nothing here is close. All
+    {len(_all_cross):,} cross-form cells in the scan are negative, and the best
+    of them is ${_all_cross.max():.3f}$. At the pre-answer position in the last
+    layer, where the named form's own mix probe reads {_named_pre:.2f}, the hex
+    probe carried over unchanged reads ${_carried_pre:.0f}$. A probe taken across
+    forms is not weakly informative about the other vocabulary. It is far worse
+    than answering with the training mean, which is what a decoder pointed in an
+    unrelated direction does.
+
+    The figure below shows both readings on the same axes, per form and target:
+    the grey area is what the form's own probe recovers, and the amber over it
+    is what the other form's probe recovers from the same activations — so the
+    amber fraction of the grey *is* $\\rho$. There is no amber anywhere.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays):
+    # Keyed by the form the probes are *applied* to, which is also the form whose landmarks
+    # the x axis belongs to and whose within-form score is ρ's denominator.
+    _applied = {"named": "hex2name", "hex": "name2hex"}
+    _range = np.concatenate(
+        [
+            arrays[f"center-s{_s}/cross/{_d}/{_t}/r2"].ravel()
+            for _s in SEEDS
+            for _d in _applied.values()
+            for _t in vp.TARGETS
+        ]
+    )
+
+    @themed(
+        name="cross-form-transfer",
+        alt_text="""
+            Six blocks of stacked step-line panels, two rows by three columns:
+            named activations on the top row and hex on the bottom, with columns
+            for operand 1, operand 2 and the mix. Each panel is one residual
+            depth, embedding at the bottom, plotted across the grammar landmarks.
+            A grey filled area shows what the form's own probe reads — rising
+            over the operands and, in the named mix panel, high at the pre-answer
+            position of the last layer. An amber line for the other form's probe
+            applied to the same activations lies flat on the floor in every panel,
+            at every depth and every landmark.
+        """,
+        caption=f"""
+            Zero-shot cross-form transfer at the center cell, seed-averaged. Rows
+            are the form the probes are applied to, columns the probe target;
+            within a block, depth runs upward from the embedding and the x axis
+            across the grammar landmarks. Grey is the form's own probe with its
+            three-seed envelope, under the preregistered per-equation estimator
+            that $\\rho$'s denominator uses — so it reads higher than the strict
+            figure above, and it is the more generous denominator of the two.
+            Amber is the other form's probe applied
+            unchanged, so the amber share of the grey is the transfer ratio
+            $\\rho$. Both are floored at zero for drawing, which here hides
+            magnitude rather than nuance: the amber readings are not marginal
+            failures but $R^2$ from ${_range.max():.3f}$ down to
+            ${_range.min():.0f}$, worse everywhere than predicting the mean.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        _within = {
+            (_f, _t): np.stack([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2"] for _s in SEEDS])
+            for _f in vp.FORMS
+            for _t in vp.TARGETS
+        }
+        _cross = {
+            (_f, _t): np.stack([arrays[f"center-s{_s}/cross/{_applied[_f]}/{_t}/r2"] for _s in SEEDS])
+            for _f in vp.FORMS
+            for _t in vp.TARGETS
+        }
+        return vp.transfer_trace_grid(_within, _cross, ylabel="probe R² per depth")
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays, cells):
+    # Two sites, neither chosen by ρ. The preregistered one maximizes the *weaker* form's
+    # within-form R², so the comparison happens where both probes work; the pre-answer site
+    # is where the named form's own geometry is strongest and where the embedding baseline is
+    # zero in both forms (see the surface-text caveat).
+    _stored = cells["center-s0"]["alignment"]["primary_site"]
+    _lm = {_n: _i for _i, _n in enumerate(LANDMARKS)}
+
+    def _mean(_path: str, _depth: int, _landmark: str) -> float:
+        return float(np.mean([arrays[f"center-s{_s}/{_path}"][_depth, _lm[_landmark]] for _s in SEEDS]))
+
+    def _rho(_direction: str, _into: str, _depth: int, _landmark: str) -> str:
+        # ρ per direction, on the seed-mean maps, with its own guard: the denominator is the
+        # within-form R² of the form the probe is applied *to*, and below 0.5 it reports nothing.
+        _cross = np.mean([arrays[f"center-s{_s}/cross/{_direction}/mix/r2"] for _s in SEEDS], axis=0)
+        _within = np.mean([arrays[f"center-s{_s}/probes/{_into}/mix/r2"] for _s in SEEDS], axis=0)
+        _v = gm.rho(_cross, _within)[_depth, _lm[_landmark]]
+        return "—" if np.isnan(_v) else f"{_v:.2f}"
+
+    def _row(_label: str, _depth: int, _landmark: str) -> str:
+        _angles = np.mean([arrays[f"center-s{_s}/angles/mix"][_depth, _lm[_landmark]] for _s in SEEDS], axis=0)
+        _vals = [
+            f"{_mean('probes/named/mix/r2', _depth, _landmark):.2f}",
+            f"{_mean('probes/hex/mix/r2', _depth, _landmark):.2f}",
+            f"{_mean('cross/hex2name/mix/r2', _depth, _landmark):+.2f}",
+            _rho("hex2name", "named", _depth, _landmark),
+            f"{_mean('cross/name2hex/mix/r2', _depth, _landmark):+.2f}",
+            _rho("name2hex", "hex", _depth, _landmark),
+            " · ".join(f"{_a:.0f}°" for _a in _angles),
+        ]
+        return f"<tr><td>{_label}</td>" + "".join(f'<td class="num">{_v}</td>' for _v in _vals) + "</tr>"
+
+    _cols = ("within named", "within hex", "cross → named", "ρ → named", "cross → hex", "ρ → hex", "angles")
+    _thead = "<tr><th>site (mix)</th>" + "".join(f'<th class="num">{_h}</th>' for _h in _cols) + "</tr>"
+    _rows = _row(
+        f"depth {_stored['depth']}, {_stored['landmark']} (preregistered)", _stored["depth"], _stored["landmark"]
+    ) + _row("depth 4, pre-answer (clean ground)", 4, "pre")
+    _closest = float(np.mean([arrays[f"center-s{_s}/angles/mix"][4, _lm["pre"]] for _s in SEEDS], axis=0).min())
+
+    mo.vstack(
+        [
+            mo.Html(
+                '<div class="report-table-scroll"><table class="report-table">' + _thead + _rows + "</table></div>"
+            ),
+            mo.md(f"""
+            The mix probe at two sites, seed-averaged, under the preregistered
+            per-equation estimator. Neither site was picked using $\\rho$. The
+            first maximizes the weaker form's own $R^2$, so the two probes are
+            compared where both have something to carry; the second is where the
+            named form's geometry is strongest and where the answer text cannot
+            contaminate either form. They disagree about where hex is legible —
+            at the pre-answer site hex's own reading falls under $\\rho$'s guard,
+            so the ratio into hex reports nothing there rather than reporting
+            zero — and they agree about everything that bears on H3. The three
+            principal angles at the pre-answer site are the closest the two mix
+            decoders come anywhere near their own strongest ground, and the
+            nearest of them is still {_closest:.0f}° from a shared direction.
+
+            The guard behind $\\rho$ turns out not to matter either. It reports a
+            ratio only where the within-form $R^2$ clears 0.5, and swapping the
+            per-equation estimator for the strict one changes which cells qualify
+            — from 22–62 of 270 (5 depths × 18 landmarks × 3 seeds) down to
+            0–37, with hex's operand rows dropping out entirely, since their
+            strict readings never reach 0.5. It cannot change the verdict,
+            because the numerator is negative in every cell of the map, gated or
+            not. That settles the open question of whether the alignment
+            measures should be gated on the stricter estimator: here, either way.
+            """),
+        ]
+    )
     return
 
 
@@ -1076,6 +1226,81 @@ def _():
     every cross-form measurement still to come: $\rho$ computed at answer
     positions would be inflated in both directions, since both forms' probes
     can read the emitted answer there.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays):
+    # The depth-crossed subspace comparison: the named mix probe at each depth against the
+    # hex mix probe at each depth. Computable from the stored weights; the matching transfer
+    # R² is not, since it needs the other form's activations at the other depth.
+    _lm = {_n: _i for _i, _n in enumerate(LANDMARKS)}
+    _w = {_f: np.stack([arrays[f"center-s{_s}/probes/{_f}/mix/weights"] for _s in SEEDS]) for _f in ("named", "hex")}
+    _strict = {
+        _f: np.mean([arrays[f"center-s{_s}/probes/{_f}/mix/r2_strict"] for _s in SEEDS], axis=0)
+        for _f in ("named", "hex")
+    }
+    _n_depth = _w["named"].shape[1]
+
+    def _first_angle(_dn: int, _ln: int, _dh: int, _lh: int) -> float:
+        return float(
+            np.mean([gm.principal_angles(_w["named"][_s, _dn, _ln], _w["hex"][_s, _dh, _lh])[0] for _s in range(3)])
+        )
+
+    _pre = _lm["pre"]
+    _crossed = np.array([[_first_angle(_dn, _pre, _dh, _pre) for _dh in range(_n_depth)] for _dn in range(_n_depth)])
+    _off_embedding = _crossed[1:, 1:]  # depth 0 is the token embedding; see below
+    # The widest search that still asks the question of two probes that both work: every
+    # depth × landmark pair where each form's own strict reading clears a modest 0.3.
+    _sites = {_f: np.argwhere(_m >= 0.3) for _f, _m in _strict.items()}
+    _best = min(
+        (_first_angle(_dn, _ln, _dh, _lh) for _dn, _ln in _sites["named"] for _dh, _lh in _sites["hex"]),
+        default=float("nan"),
+    )
+    _hex_pre = _strict["hex"][:, _pre]
+
+    mo.md(f"""
+    ### The forms compute at different depths, and $\\rho$ compares in place (post hoc)
+
+    $\\rho$ as preregistered compares the same cell in both forms — same depth,
+    same landmark. That is the conservative choice for the question H3 asks, but
+    it does assume the two forms put the mix in the same place, and H2 showed
+    they do not. Named brings the mix together at the pre-answer position in the
+    last layer; hex's best mix reading is mid-answer, a layer earlier, and its
+    pre-answer column never clears
+    {_hex_pre.max():.2f} at any depth ({", ".join(f"{_v:.2f}" for _v in _hex_pre)} from
+    the embedding up). So a same-cell comparison might be scoring named's mature
+    mix against a hex representation that hasn't formed yet at that position — and
+    a depth-crossed $\\rho$ could in principle be higher.
+
+    The transfer half of that cannot be answered from what this sweep published:
+    applying hex's depth-{_n_depth - 3} probe to named's depth-{_n_depth - 1}
+    activations needs the activations, and only the fitted probes and their scores
+    are stored. The subspace half can, because the probe weights are stored. The
+    first principal angle between the named mix probe at *any* depth and the hex
+    mix probe at *any* depth, both read at the pre-answer position, stays between
+    {_off_embedding.min():.0f}° and {_off_embedding.max():.0f}° for every one of
+    the {_off_embedding.size} pairs. Widening the search to every depth ×
+    landmark pair where both forms' own strict readings clear 0.3 — a low bar,
+    and it admits the answer positions the surface-text caveat warns about — the
+    closest the two subspaces ever come is {_best:.0f}°.
+
+    So the depth offset is not concealing a shared set of directions: there is no
+    layer at which hex's mix decoder points where named's does. A depth-crossed
+    transfer $R^2$ is still worth having, since a subspace angle and a zero-shot
+    fit are different tests, and it is cheap to add to the eval step — banked in
+    todo-science rather than done here, because it is not the measurement H3 was
+    written against.
+
+    One curiosity in the angle map belongs here rather than in H3. Somewhere in
+    the scan the two probes do share a direction almost exactly — 0.4° — at the
+    embedding, on the space closing operand 1. That is an artifact of the site:
+    depth 0 is the token lookup, the space character is the same token in both
+    sublanguages, and a probe fitted to explain colour from a constant input has
+    no determined direction at all. It is worth stating because the same
+    degeneracy will show up in H4 and H5, where a small angle would otherwise
+    read as the alignment those hypotheses are looking for.
     """)
     return
 
