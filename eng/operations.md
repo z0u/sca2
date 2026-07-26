@@ -11,3 +11,26 @@
 - **CORS / Range.** The bucket reflects the request `Origin` on both the resolve redirect
   and the CDN response, and the CDN advertises `Accept-Ranges` — so a Pages-served report
   can `fetch()` a published JSON cross-origin and Range-slice a big binary.
+
+## Progress transport: a queue only where there's a consumer
+
+Two paths carry a job's progress, and they use different Modal primitives on purpose:
+
+- **Blocking `Apparatus.amap`** (a notebook cell, no `Ctx`) uses a `modal.Queue` —
+  streaming suits a live display, and the queue is `ephemeral()`, created and destroyed
+  inside the same `async with` that holds its consumer. It cannot outlive the reader,
+  so the "fills up with nobody draining it" hazard has no room to happen.
+- **Memoized orchestration** (`mini.orchestration`, driven by the CLI) has **no queue at
+  all**. Its workers are detached and its readers are short-lived polls — a fresh
+  `status`/`watch` process per wake, often none at all for minutes — so there is no
+  consumer to assume. Progress goes straight to the control-plane `modal.Dict`,
+  last-writer-wins, which is also exactly the shape a poller wants: one current value per
+  task, not a backlog to replay (`mini._taskworker._MemoSink`).
+
+So the split already matches where each assumption holds, and a queue is never reachable
+from the detached path. Worth knowing before reaching for one: the reason it works in the
+one place it's used is the live consumer, not the transport.
+
+Delivery to either sink runs on a per-job background thread with a single latest-wins slot
+(`mini._debounce.BackgroundEmitter`), so a slow or distant sink costs progress resolution
+rather than the task's own throughput.

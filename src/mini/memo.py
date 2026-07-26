@@ -728,6 +728,16 @@ class MemoStore:
         current = [r for r in records if r["key"] in wanted]
         return current, [r for r in records if r["key"] not in wanted]
 
+    def dag_complete(self) -> bool | None:
+        """Did the last tick run ``main`` to the end, or suspend part-way?
+
+        ``None`` when no tick has recorded it. The distinction a read-only view
+        can't derive for itself: with every launched task DONE, a run whose DAG
+        suspended still has stages to go and needs another ``run`` — while one
+        whose ``main`` returned is finished. Both read "all tasks done".
+        """
+        return self.meta().get("complete")
+
     def deadline(self) -> float | None:
         """The run's wall-clock deadline (epoch seconds), or ``None`` if unbudgeted."""
         return self.meta().get("deadline_at")

@@ -23,4 +23,5 @@ Start with whichever question you're holding:
 - [Non-goals and recorded decisions](./decisions.md) — chunked datatrees, checkpoints,
   `obstore`, the HF cache tier, and the open/deferred list with issue links.
 - [Operational constraints](./operations.md) — the egress allow-list, Modal gRPC TLS,
-  and CORS/Range: environment facts that cause confusing failures when they're missing.
+  CORS/Range, and which progress transport each execution path uses: environment facts
+  that cause confusing failures when they're missing.

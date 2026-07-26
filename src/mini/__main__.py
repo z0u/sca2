@@ -243,6 +243,31 @@ def _budget_suffix(store: MemoStore) -> str:
     return f"budget {meta.get('budget', '?')}, {when}"
 
 
+def _rearm_hint(store: MemoStore, path: str, args: argparse.Namespace) -> str:
+    """How to get a run moving again past an expired budget, as a runnable line.
+
+    Worth spelling out because the symptom is *silence*: past the deadline a
+    plain ``run`` launches nothing and settles what's in flight, so a run with
+    genuinely stale work reads exactly like one with nothing left to do.
+    """
+    return f"  nothing launches past an expired budget — re-arm with: {PROG} run {path} --budget {store.meta().get('budget') or '30m'}{_app_suffix(args)}"
+
+
+def _dag_note(store: MemoStore, state: RunState) -> str:
+    """The caveat on an all-DONE run whose ``main`` hasn't reached its end yet.
+
+    Every launched task can be DONE while the DAG still has stages to go — the
+    last tick suspended at a ``Pending`` rather than returning. Both read "done"
+    from the records alone, and mistaking one for the other is how a run sits
+    finished-looking with a publish step never executed.
+    """
+    if state != RunState.DONE or store.dag_complete() is not False:
+        return ""
+    if store.budget_expired():  # the compounding trap: work left, and nothing will launch
+        return "DAG suspended, and the budget has expired — re-run with --budget to advance"
+    return "DAG suspended at the last tick — re-run to advance"
+
+
 def _aggregate_state(states: list[RunState]) -> RunState:
     """Roll per-task states up to one experiment state."""
     if not states or all(s == RunState.DONE for s in states):
@@ -426,7 +451,11 @@ def _run(exp, apparatus: Apparatus, args: argparse.Namespace) -> None:
         cancelled = apparatus.enforce_budget(store)
         print(f"{exp.name}:")
         _print_records(store)
-        print(f"⊘ wall-clock budget elapsed — cancelled {len(cancelled)} in-flight task(s); run settled CANCELLED")
+        if cancelled:
+            print(f"⊘ wall-clock budget elapsed — cancelled {len(cancelled)} in-flight task(s); run settled CANCELLED")
+        else:
+            print("⊘ wall-clock budget elapsed — nothing was in flight, and this wake launched nothing")
+        print(_rearm_hint(store, args.path, args))
         return
     try:
         done, payload = tick(exp, apparatus, keep_stale=keep_stale)
@@ -492,6 +521,8 @@ def cmd_ls(args: argparse.Namespace) -> None:
         line = f"{name:16} {_GLYPH.get(agg, '?')} {agg:9} {done}/{len(states)} tasks"
         if stale:
             line += f"  (+{len(stale)} superseded)"
+        if _dag_note(store, agg):
+            line += "  (DAG suspended — re-run to advance)"
         print(line)
 
 
@@ -511,8 +542,9 @@ def cmd_status(args: argparse.Namespace) -> None:
         print(json.dumps(build(args.name, args, state, store, current, stale)))
         return
     header = f"{args.name}  —  {state}  ({len(current)} tasks{f', +{len(stale)} superseded' if stale else ''})"
-    if suffix := _budget_suffix(store):
-        header += f"  ·  {suffix}"
+    for suffix in (_budget_suffix(store), _dag_note(store, state)):
+        if suffix:
+            header += f"  ·  {suffix}"
     print(header)
     if brief:
         print(f"  {_fmt_counts(current)}")
@@ -702,10 +734,14 @@ def _attention_json(rec: dict) -> dict[str, Any]:
 def _budget_json(meta: dict[str, Any]) -> dict[str, Any] | None:
     if not (deadline := meta.get("deadline_at")):
         return None
+    remaining = deadline - time.time()
     return {
         "budget": meta.get("budget"),
         "deadline_at": deadline,
-        "remaining_s": round(max(0.0, deadline - time.time()), 1),
+        "remaining_s": round(max(0.0, remaining), 1),
+        # Explicit, because it changes what a `run` *does*: past the deadline it
+        # launches nothing at all until the budget is re-armed.
+        "expired": remaining <= 0,
     }
 
 
@@ -725,6 +761,8 @@ def _brief_json(
         "settled": all(_rec_state(r) in SETTLED for r in current),
         "counts": _counts(current),
     }
+    if (complete := store.dag_complete()) is not None:
+        out["dag_complete"] = complete  # settled tasks ≠ finished DAG; see `_dag_note`
     rates = _fleet_rates(current)
     attention = [r for r in sorted(current, key=_launch_order) if _needs_attention(r, rates)]
     if attention:
@@ -769,6 +807,8 @@ def _status_json(
         ],
     }
     meta = store.meta()
+    if (complete := store.dag_complete()) is not None:
+        out["dag_complete"] = complete  # settled tasks ≠ finished DAG; see `_dag_note`
     if budget := _budget_json(meta):
         out["budget"] = budget
     if kept := meta.get("kept_stale"):
@@ -861,6 +901,9 @@ def cmd_watch(args: argparse.Namespace) -> None:
         elif outcome == "timeout":
             print(f"⏱ {reason}")
         print(f"{args.name}  —  {state}  ({len(current)} tasks)")
+        if note := _dag_note(store, state):
+            # This watch never ticks, so settling is as far as it can take the run.
+            print(f"  … {note} — advance it with: {PROG} run <experiment.py>{_app_suffix(args)}")
     # Exit code = the branch to take, so scripts/monitors can gate without parsing.
     code = {"attention": 3, "timeout": 124}.get(outcome, 0 if state == RunState.DONE else 1)
     if code:
