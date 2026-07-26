@@ -14,7 +14,7 @@ from sca.training.loop import eval_step, make_train_step
 from sca.training.metrics import TrainingMetrics
 from sca.training.optimizer import configure_optimizer
 from sca.training.scheduler import configure_schedule
-from mini.progress import emit_progress
+from mini.progress import emit_metrics, emit_progress
 
 
 def train_model(
@@ -63,7 +63,11 @@ def train_model(
             model, opt_state, loss = train_step(model, opt_state, x, y)
             train_losses.append(float(loss))
             step += 1
-            emit_progress(step, total_steps, message=f"loss={float(loss):.4f}")
+            # Through the metrics dict, not the message string: that's where the
+            # record keeps it, so status/watch can flag a diverging or flat loss
+            # without anyone reading the line.
+            emit_metrics(loss=float(loss))
+            emit_progress(step, total_steps)
 
         val_losses = [
             float(eval_step(model, x, y))

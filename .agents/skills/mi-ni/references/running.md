@@ -76,11 +76,34 @@ With `--json` the live bars are replaced by one compact summary object
 one command — **never hand-roll a `while`/`sleep` polling loop, and never
 `grep` the human lines.** For a one-shot snapshot, `bin/mini status <exp>
 --json --brief` gives the aggregate `state`/`settled`, counts by state, and
-*only* the tasks needing attention (failed / stale / wedged / long-queued) —
-token-cheap on a big sweep. Full `status --json` (per-task `state` / `queued` /
-`heartbeat_age_s` / `stale_heartbeat` / `progress_age_s` / `stale_progress` /
-`steps_per_min`) is for digging into one task. Bound any wait with `--budget`
-so an unattended stall settles itself.
+*only* the tasks needing attention — token-cheap on a big sweep. Full `status
+--json` (per-task `state` / `queued` / `heartbeat_age_s` / `stale_heartbeat` /
+`progress_age_s` / `stale_progress` / `steps_per_min`) is for digging into one
+task. Bound any wait with `--budget` so an unattended stall settles itself.
+
+### What counts as needing attention
+
+Failures and liveness are the obvious half: terminal-not-DONE, a stale
+heartbeat, a frozen step, a task queued past the staleness window. The other
+half is **deviation from expectation**, because a run can misbehave while every
+liveness check reads green — so `status` does the comparing and puts a `cause`
+on each attention entry:
+
+- *running under a third of the sibling median* — the cells of a fan-out are
+  each other's yardstick, so a container placed badly (or throttled) shows up
+  against the median `steps_per_min` of its siblings. Needs three reporting
+  siblings before there's a distribution to speak of.
+- *projected Nm to finish, past its Mm timeout* — remaining steps ÷ current
+  rate, against the role's `timeout=`. A timeout sized as a multiple of the
+  expected duration turns into a kill switch when throughput drops, and it
+  fires near the end, after the work is paid for.
+- *loss is not finite* / *loss rising for several windows* — from the metrics
+  a task reports via `emit_metrics`. The worker measures movement over trailing
+  windows (`metrics_delta`, `metrics_rising` on the record), so a trend is a
+  number to check rather than a curve to eyeball.
+
+That last one only works if the task actually emits its numbers: put them
+through `emit_metrics(loss=…)`, not into the `emit_progress` message string.
 
 Watching a big sweep is cheap too: the watch loops cache settled
 (`DONE`/`FAILED`/`CANCELLED`) records — they're immutable — and re-read only the

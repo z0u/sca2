@@ -649,8 +649,12 @@ class ModalApparatus(Apparatus[ModalVolume]):
                 )
                 fc_ids[key] = (gen, fc.object_id)
         now = time.time()
+        # The role's task timeout rides on the record: it's what a projected
+        # finish time has to be judged against, and only the launching client
+        # knows it (see `_timeout_projection` in the CLI).
+        timeout_s = self.modal_fn_kwargs.get("timeout")
         for key, (gen, fc_id) in fc_ids.items():
-            store.update_if(key, gen, fc_id=fc_id, heartbeat_at=now)
+            store.update_if(key, gen, fc_id=fc_id, heartbeat_at=now, timeout_s=timeout_s)
         if app_id:  # record the app id so `mini cost` can attribute Modal billing to this run
             _record_app_id(store, app_id)
 

@@ -93,4 +93,6 @@ def test_progress_emitted_during_training(data_dir):
     steps = [m.step for m in messages]
     assert steps == sorted(steps)
     assert {m.total for m in messages} == {max(steps)}, "final step should equal the reported total"
-    assert "loss=" in messages[-1].message
+    # Through the metrics dict, not the message string: that's the field the memo
+    # record keeps and the status flags read.
+    assert messages[-1].metrics["loss"] > 0

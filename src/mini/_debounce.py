@@ -112,6 +112,7 @@ class BackgroundEmitter:
         self._pending: tuple[tuple, dict] | None = None
         self._busy = False
         self._closed = False
+        self._urgent = False  # someone is waiting on a flush — skip the pacing hold
         self._thread: threading.Thread | None = None
 
     def __call__(self, *args: Any, **kwargs: Any) -> None:
@@ -126,12 +127,20 @@ class BackgroundEmitter:
             self._cv.notify_all()
 
     def _run(self) -> None:
+        sent_at = 0.0
         while True:
             with self._cv:
                 while self._pending is None and not self._closed:
                     self._cv.wait()
                 if self._pending is None:
                     return  # closed and drained
+                # Hold the interval since the last delivery — the floor on spacing.
+                # A waiting flush (or a close) skips it: the point of the pause is to
+                # spare a fast sink, not to make a job wait on its final update.
+                while (
+                    not self._urgent and not self._closed and (left := self._interval + sent_at - time.monotonic()) > 0
+                ):
+                    self._cv.wait(left)
                 (args, kwargs), self._pending = self._pending, None
                 self._busy = True
             try:
@@ -139,10 +148,10 @@ class BackgroundEmitter:
             except Exception:
                 log.debug("progress emission failed; dropping it", exc_info=True)
             finally:
+                sent_at = time.monotonic()
                 with self._cv:
                     self._busy = False
                     self._cv.notify_all()
-            time.sleep(self._interval)  # floor on the spacing; the sink's own latency sets the rest
 
     def flush(self, timeout: float = 30.0) -> bool:
         """Wait (up to *timeout*) for the slot to drain. True if it did.
@@ -153,10 +162,15 @@ class BackgroundEmitter:
         """
         deadline = time.monotonic() + timeout
         with self._cv:
-            while self._thread is not None and (self._pending is not None or self._busy):
-                if not self._cv.wait(max(0.0, deadline - time.monotonic())):
-                    return False
-            return True
+            self._urgent = True
+            self._cv.notify_all()
+            try:
+                while self._thread is not None and (self._pending is not None or self._busy):
+                    if not self._cv.wait(max(0.0, deadline - time.monotonic())):
+                        return False
+                return True
+            finally:
+                self._urgent = False
 
     def close(self, timeout: float = 30.0) -> None:
         """Flush, then stop the thread (it's a daemon, so this is tidiness, not safety)."""

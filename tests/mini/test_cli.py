@@ -314,8 +314,14 @@ def test_status_brief_is_counts_plus_attention_only(tmp_path: Path, monkeypatch,
         "settled": False,
         "counts": {"done": 1, "running": 1, "failed": 1, "queued": 1},
         "attention": [
-            {"key": "t-failed", "fn": "train", "state": "failed", "error": "RuntimeError: boom"},
-            {"key": "t-parked", "fn": "train", "state": "running", "queued_s": ANY},
+            {
+                "key": "t-failed",
+                "fn": "train",
+                "state": "failed",
+                "error": "RuntimeError: boom",
+                "cause": "RuntimeError: boom",
+            },
+            {"key": "t-parked", "fn": "train", "state": "running", "queued_s": ANY, "cause": "queued too long"},
         ],
         "attention_total": 2,
         "attention_summary": [  # two distinct causes, one task each (launch order)
@@ -685,3 +691,78 @@ def test_run_with_a_name_instead_of_a_file_hints_at_the_split(tmp_path: Path, mo
         cmd_retry(ns("nope"))
     assert "no experiment file at 'nope'" in str(e.value)
     assert "experiment name" not in str(e.value)
+
+
+def _running(key: str, **fields) -> dict:
+    """A healthy-looking RUNNING record: live worker, fresh heartbeat, real env."""
+    now = time.time()
+    return {
+        "key": key,
+        "state": "running",
+        "fn": "train_one",
+        "pid": os.getpid(),
+        "heartbeat_at": now,
+        "progress_at": now,
+        "started_at": now - 600,
+        "env": {"host": "worker.test", "gpu": "L4"},
+        "step": 1000,
+        "total": 8000,
+    } | fields
+
+
+def test_status_flags_deviation_from_expectation(tmp_path: Path, monkeypatch, capsys):
+    """Healthy is not the same as "nothing failed". A cell crawling at a fraction
+    of its siblings' throughput, one projected to hit its timeout before it
+    finishes, and one whose loss has gone to NaN all pass every liveness check —
+    a monitor that only looks for failures reports "progressing normally" while
+    the run burns (ex-2.1.5). The comparison belongs in the tool, not the reader."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "devexp")
+    for i in range(3):  # the fleet: a median to compare against
+        store.records_backend.merge(f"t-fast{i}", _running(f"t-fast{i}", steps_per_min=3000))
+    store.records_backend.merge("t-slow", _running("t-slow", steps_per_min=100))
+    # 4000 steps left at 3000/min is ~80s, but it has already been running 600s of
+    # its 660s timeout — it will be killed just short of the finish line.
+    store.records_backend.merge("t-late", _running("t-late", steps_per_min=3000, step=4000, timeout_s=660))
+    store.records_backend.merge(
+        "t-nan", _running("t-nan", steps_per_min=3000, metrics={"loss": float("nan")}, metrics_nonfinite=["loss"])
+    )
+    store.records_backend.merge(
+        "t-rising", _running("t-rising", steps_per_min=3000, metrics={"loss": 2.5}, metrics_rising={"loss": 4})
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="devexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    flagged = {t["key"]: t["cause"] for t in payload["attention"]}
+    assert set(flagged) == {"t-slow", "t-late", "t-nan", "t-rising"}, "the healthy siblings must stay quiet"
+    assert "sibling median" in flagged["t-slow"]
+    assert "timeout" in flagged["t-late"]
+    assert "diverged" in flagged["t-nan"]
+    assert "rising" in flagged["t-rising"]
+
+
+def test_throughput_outlier_needs_a_fleet_to_compare_against(tmp_path: Path, monkeypatch, capsys):
+    """Two cells are not a distribution: with too few reporters there is no
+    expectation to deviate from, and flagging the slower of a pair would cry wolf
+    on every uneven sweep."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "lonelyexp")
+    store.records_backend.merge("t-fast", _running("t-fast", steps_per_min=3000))
+    store.records_backend.merge("t-slow", _running("t-slow", steps_per_min=100))
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="lonelyexp", app="local", json=True, brief=True))
+    assert "attention" not in json.loads(capsys.readouterr().out)

@@ -38,6 +38,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from statistics import median
 from typing import Any
 
 from mini.apparatus import Apparatus
@@ -266,8 +267,9 @@ def _print_records(store: MemoStore, records: list[dict] | None = None) -> tuple
     """
     current, stale = store.split_current(store.records() if records is None else records)
     kept = set(store.meta().get("kept_stale") or ())  # DONE served under old code (--keep-stale-done)
+    rates = _fleet_rates(current)
     for rec in sorted(current, key=_launch_order):
-        print(_memo_line(rec) + ("  (stale code — kept)" if rec["key"] in kept else ""))
+        print(_memo_line(rec, rates) + ("  (stale code — kept)" if rec["key"] in kept else ""))
     for rec in sorted(stale, key=_launch_order):
         print(f"{_memo_line(rec)}  (superseded)")
     return current, stale
@@ -280,12 +282,25 @@ def _launch_order(rec: dict) -> tuple:
     return (rec.get("started_at") or float("inf"), rec.get("fn") or "", rec["key"])
 
 
-def _memo_line(rec: dict) -> str:
+def _worry(rec: dict, rates: dict[str, float]) -> str:
+    """The badge a RUNNING task's line carries, worst worry first (or nothing)."""
+    if stale_heartbeat(rec):
+        return "  ⚠ stale — worker may be dead"
+    if stale_progress(rec):  # emitting but not advancing: the wedge signature, not a dead worker
+        return f"  ⚠ no step progress for {progress_age(rec):.0f}s — worker may be wedged"
+    if deviation := _metric_trouble(rec) or _slow_outlier(rec, rates) or _timeout_projection(rec):
+        return f"  ⚠ {deviation}"
+    return ""
+
+
+def _memo_line(rec: dict, rates: dict[str, float] | None = None) -> str:
     """One status line for a memoized task record (shared by `run`/`status`).
 
     A RUNNING record with no ``env`` yet reads ``queued`` — launched, but no
     worker has started (see :func:`mini.runs.is_queued`). Its ``heartbeat_at``
     is still the launch stamp, so it's shown as time-in-queue, not liveness.
+    *rates* (sibling throughput medians) enables the deviation flags — a cell
+    running far behind its siblings, or projected to overrun its timeout.
     """
     state = _rec_state(rec)
     queued = is_queued(rec)
@@ -299,10 +314,7 @@ def _memo_line(rec: dict) -> str:
         line += f"  {_fmt_metrics(rec['metrics'])}"
     if state == RunState.RUNNING and rec.get("heartbeat_at"):
         line += f"  ⧖ queued {_age(rec['heartbeat_at'])}" if queued else f"  ♥ {_age(rec['heartbeat_at'])}"
-        if stale_heartbeat(rec):
-            line += "  ⚠ stale — worker may be dead"
-        elif stale_progress(rec):  # emitting but not advancing: the wedge signature, not a dead worker
-            line += f"  ⚠ no step progress for {progress_age(rec):.0f}s — worker may be wedged"
+        line += _worry(rec, rates or {})
     if gpu := rec.get("env", {}).get("gpu"):
         line += f"  on {gpu}"  # what it actually ran on, when not the local CPU
     if rec.get("fc_id"):
@@ -541,20 +553,82 @@ def _fmt_counts(current: list[dict]) -> str:
     return " · ".join(f"{counts[label]} {label}" for label in order if counts.get(label)) or "no tasks"
 
 
-def _needs_attention(rec: dict) -> bool:
-    """Does a monitor need to look at this task? Terminal-not-DONE, stale/wedged
-    liveness, or queued past the generic staleness window (Modal capacity starvation).
+# A healthy run is not the same as a run where nothing has failed, so the flags
+# below also cover *deviation from expectation* — the class of trouble that used
+# to need a human to notice (ex-2.1.5: three of five containers running 15–30×
+# slow while every liveness check read green).
+_SLOW_FRACTION = 1 / 3  # of the sibling median before a cell counts as an outlier
+_MIN_SIBLINGS = 3  # reporters needed before a median means anything
+_RISING_WINDOWS = 3  # consecutive minutes a loss may climb before it's worth a look
+_LOWER_IS_BETTER = ("loss",)  # metric names a rising trend is bad news for
+
+
+def _fleet_rates(current: list[dict]) -> dict[str, float]:
+    """Median throughput (steps/min) per task fn, over the running cells reporting one.
+
+    A sweep's own cells are the fair yardstick for each other: same code, same
+    shape of work, different container. Below ``_MIN_SIBLINGS`` reporters there's
+    no fleet to compare against and the fn is left out.
     """
-    if _rec_state(rec) in (RunState.FAILED, RunState.CANCELLED):
-        return True
-    if stale_heartbeat(rec) or stale_progress(rec):
-        return True
-    return is_queued(rec) and bool(hb := rec.get("heartbeat_at")) and time.time() - hb > STALE_HEARTBEAT_S
+    rates: dict[str, list[float]] = {}
+    for rec in current:
+        if _rec_state(rec) == RunState.RUNNING and not is_queued(rec) and (rate := rec.get("steps_per_min")):
+            rates.setdefault(rec.get("fn") or "", []).append(rate)
+    return {fn: median(rs) for fn, rs in rates.items() if len(rs) >= _MIN_SIBLINGS}
 
 
-def _attention_cause(rec: dict) -> str:
-    """Why this task needs a look — the label that collapses a homogeneous mass
-    failure (30 identical OOMs → one line) and keeps distinct causes apart.
+def _slow_outlier(rec: dict, rates: dict[str, float]) -> str | None:
+    """Is this cell crawling relative to its siblings?
+
+    Placement, throttling, a cross-region control plane — all invisible to a
+    liveness probe, which reads green throughout.
+    """
+    rate, med = rec.get("steps_per_min"), rates.get(rec.get("fn") or "")
+    if not rate or not med or rate >= med * _SLOW_FRACTION:
+        return None
+    return f"running under a third of the sibling median ({med:g} steps/min)"
+
+
+def _timeout_projection(rec: dict, now: float | None = None) -> str | None:
+    """Will this task hit its role timeout before it finishes, at its current rate?
+
+    A timeout sized as a multiple of the expected duration is a safety net right
+    up until throughput drops, at which point it turns into a kill switch — and
+    the task is killed near the end, having burned the whole budget (ex-2.1.5 lost
+    a cell at step 7,895 of 7,900). Projecting it is the difference between
+    finding out now and finding out at the timeout.
+    """
+    rate, total, timeout_s = rec.get("steps_per_min"), rec.get("total"), rec.get("timeout_s")
+    started = rec.get("started_at")
+    if not (rate and total and timeout_s and started) or _rec_state(rec) != RunState.RUNNING:
+        return None
+    remaining_s = max(0, total - rec.get("step", 0)) / rate * 60.0
+    projected = ((now if now is not None else time.time()) - started) + remaining_s
+    if projected <= timeout_s:
+        return None
+    return f"projected {projected / 60:.0f}m to finish, past its {timeout_s / 60:.0f}m timeout"
+
+
+def _metric_trouble(rec: dict) -> str | None:
+    """Have the task's own numbers gone wrong — diverged, or steadily climbing?
+
+    Records keep the latest value of each metric plus the movement the worker
+    measured over trailing windows, so this is a check rather than an eyeball.
+    """
+    if nonfinite := rec.get("metrics_nonfinite"):
+        return f"{', '.join(nonfinite)} is not finite — the run has diverged"
+    rising = rec.get("metrics_rising") or {}
+    climbing = sorted(k for k, n in rising.items() if n >= _RISING_WINDOWS and any(w in k for w in _LOWER_IS_BETTER))
+    return f"{', '.join(climbing)} rising for several windows" if climbing else None
+
+
+def _attention_cause(rec: dict, rates: dict[str, float] | None = None) -> str | None:
+    """Why this task needs a look, or ``None`` if it looks healthy.
+
+    Doubles as the grouping label, which is what collapses a homogeneous mass
+    failure (30 identical OOMs → one line) while keeping distinct causes apart.
+    Ordered by how much it costs to be wrong: terminal first, then liveness, then
+    the softer deviation-from-expected signals.
     """
     if _rec_state(rec) in (RunState.FAILED, RunState.CANCELLED):
         return rec.get("error") or str(_rec_state(rec))
@@ -562,7 +636,15 @@ def _attention_cause(rec: dict) -> str:
         return "heartbeat stale — worker may be dead"
     if stale_progress(rec):
         return "no step progress — worker may be wedged"
-    return "queued too long"  # long-queued (capacity starvation)
+    if is_queued(rec):  # long-queued (capacity starvation)
+        hb = rec.get("heartbeat_at")
+        return "queued too long" if hb and time.time() - hb > STALE_HEARTBEAT_S else None
+    return _metric_trouble(rec) or _slow_outlier(rec, rates or {}) or _timeout_projection(rec)
+
+
+def _needs_attention(rec: dict, rates: dict[str, float] | None = None) -> bool:
+    """Does a monitor need to look at this task?"""
+    return _attention_cause(rec, rates) is not None
 
 
 def _attention_groups(current: list[dict]) -> list[dict[str, Any]]:
@@ -576,8 +658,9 @@ def _attention_groups(current: list[dict]) -> list[dict[str, Any]]:
     """
     groups: dict[tuple, dict[str, Any]] = {}
     keys: dict[tuple, list[str]] = {}
-    for rec in sorted((r for r in current if _needs_attention(r)), key=_launch_order):
-        sig = (rec.get("fn"), _display_state(rec), _attention_cause(rec))
+    rates = _fleet_rates(current)
+    for rec in sorted((r for r in current if _needs_attention(r, rates)), key=_launch_order):
+        sig = (rec.get("fn"), _display_state(rec), _attention_cause(rec, rates))
         if sig not in groups:
             groups[sig] = {"fn": rec.get("fn"), "state": sig[1], "cause": sig[2], "sample": rec}
             keys[sig] = []
@@ -606,8 +689,8 @@ def _attention_json(rec: dict) -> dict[str, Any]:
     lookup), without the env/metrics/timestamps bulk of the full ``--json``.
     """
     out = _task_json(rec)
-    for f in ("env", "metrics", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s", "steps_per_min"):
-        out.pop(f, None)
+    for f in ("env", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s"):
+        out.pop(f, None)  # metrics and throughput stay: they're what the deviation flags are about
     if out.pop("queued", None):
         out.pop("heartbeat_age_s", None)  # a queued record's heartbeat is just its launch stamp
         out.pop("stale_heartbeat", None)
@@ -642,12 +725,15 @@ def _brief_json(
         "settled": all(_rec_state(r) in SETTLED for r in current),
         "counts": _counts(current),
     }
-    attention = [r for r in sorted(current, key=_launch_order) if _needs_attention(r)]
+    rates = _fleet_rates(current)
+    attention = [r for r in sorted(current, key=_launch_order) if _needs_attention(r, rates)]
     if attention:
         # A capped list of representative task records (keys/fc_ids to act on),
         # plus a full cause→count rollup so a wide mass failure reads as its few
         # distinct causes, not N near-identical lines.
-        out["attention"] = [_attention_json(r) for r in attention[:_ATTENTION_CAP]]
+        out["attention"] = [
+            {**_attention_json(r), "cause": _attention_cause(r, rates)} for r in attention[:_ATTENTION_CAP]
+        ]
         out["attention_total"] = len(attention)
         out["attention_summary"] = [
             {"fn": g["fn"], "state": g["state"], "cause": g["cause"], "count": len(g["keys"])}
@@ -702,6 +788,9 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "step",
         "total",
         "metrics",
+        "metrics_delta",
+        "metrics_rising",
+        "metrics_nonfinite",
         "steps_per_min",
         "error",
         "exc_type",
@@ -709,6 +798,7 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "env",
         "started_at",
         "finished_at",
+        "timeout_s",
         "watchdog_s",
         "watchdog_grace_s",
     ):
