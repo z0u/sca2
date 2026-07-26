@@ -17,7 +17,17 @@ from mini._debounce import BackgroundEmitter
 from mini.progress import emit_metrics, emit_progress, progress_context
 
 
-class SlowSink:
+class _Sink:
+    """The write half of ``QueueLike`` — progress never reads back."""
+
+    def get(self, /, block: bool = True, timeout: float | None = None):
+        raise NotImplementedError
+
+    def empty(self) -> bool:
+        return True
+
+
+class SlowSink(_Sink):
     """A sink that takes *delay* seconds per delivery, recording what it received."""
 
     def __init__(self, delay: float = 0.05):
@@ -82,7 +92,7 @@ def test_watchdog_sees_progress_through_a_stalled_sink():
     poked: list[tuple[int, int]] = []
     blocked = threading.Event()
 
-    class WedgedSink:
+    class WedgedSink(_Sink):
         def put(self, item, /, block: bool = True, timeout: float | None = None) -> None:
             blocked.wait(timeout=5.0)  # never delivers during the test
 

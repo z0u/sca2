@@ -775,13 +775,16 @@ def test_region_defaults_from_the_project_config(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "pyproject.toml").write_text('[tool.mini]\nregion = "us-east"\n')
 
-    from mini.__main__ import _build_apparatus
-
-    def ns(region: str | None = None) -> argparse.Namespace:
-        return argparse.Namespace(app="modal", gpu=None, timeout=None, max_containers=None, region=region)
-
     pytest.importorskip("modal")
-    assert _build_apparatus("regionexp", ns()).modal_fn_kwargs["region"] == "us-east"
-    assert _build_apparatus("regionexp", ns(region="eu-west")).modal_fn_kwargs["region"] == "eu-west"
-    role = _build_apparatus("regionexp", ns()).w(region="asia-northeast3")
-    assert role.modal_fn_kwargs["region"] == "asia-northeast3"
+    from mini.__main__ import _build_apparatus
+    from mini.modal_apparatus import ModalApparatus
+
+    def built(region: str | None = None) -> ModalApparatus:
+        args = argparse.Namespace(app="modal", gpu=None, timeout=None, max_containers=None, region=region)
+        app = _build_apparatus("regionexp", args)
+        assert isinstance(app, ModalApparatus)
+        return app
+
+    assert built().modal_fn_kwargs["region"] == "us-east"
+    assert built("eu-west").modal_fn_kwargs["region"] == "eu-west"
+    assert built().w(region="asia-northeast3").modal_fn_kwargs["region"] == "asia-northeast3"
