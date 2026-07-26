@@ -70,16 +70,33 @@ def test_only_the_bottom_row_of_blocks_is_labelled(stacks):
     plt.close(fig)
 
 
-def test_a_seed_axis_turns_into_a_band_without_changing_the_layout(stacks):
+def test_a_seed_axis_turns_into_terrain_without_changing_the_layout(stacks):
     per_seed = {k: np.stack([v, v * 0.5, v * 0.8]) for k, v in stacks.items()}
     plain = probe_trace_grid(stacks, form_axis="row")
-    banded = probe_trace_grid(per_seed, form_axis="row")
-    assert len(banded.get_axes()) == len(plain.get_axes())
-    # Same panels, one extra patch each: the min-max ribbon behind the lines.
-    counts = [len(a.patches) for a in plain.get_axes()], [len(a.patches) for a in banded.get_axes()]
-    assert all(b == p + 1 for p, b in zip(*counts, strict=True))
+    shaded = probe_trace_grid(per_seed, form_axis="row")
+    assert len(shaded.get_axes()) == len(plain.get_axes())
+    # Same panels, two extra patches each: the areas under the seed minimum and maximum.
+    counts = [len(a.patches) for a in plain.get_axes()], [len(a.patches) for a in shaded.get_axes()]
+    assert all(s == p + 2 for p, s in zip(*counts, strict=True))
     plt.close(plain)
-    plt.close(banded)
+    plt.close(shaded)
+
+
+def test_spread_shades_as_stacked_contours_so_opacity_only_falls_off_with_height():
+    """A ribbon over a fill would make their overlap the darkest part of the panel."""
+    values = np.linspace(0.2, 0.8, len(LANDMARKS))[:, None] * np.ones(3)
+    per_seed = np.stack([values * 0.75, values, values * 1.1])[:, None]  # one depth
+    fig = probe_trace_grid({(f, "mix"): per_seed for f in FORMS}, targets=("mix",))
+    ax = fig.get_axes()[0]
+    areas = [p for p in ax.patches if p.get_fill()]
+    assert len(areas) == 3
+    # Every area starts at the floor, so a point is covered by each contour above it.
+    assert all(np.isclose(p.get_path().vertices[:, 1].min(), 0.0) for p in areas)
+    # Seed minimum, seed mean (what the lines plot), seed maximum — of the highest landmark.
+    tops = sorted(p.get_path().vertices[:, 1].max() for p in areas)
+    assert np.allclose(tops, [0.8 * f for f in (0.75, (0.75 + 1 + 1.1) / 3, 1.1)])
+    assert len({p.get_alpha() for p in areas}) == 1  # equal ink; the overlaps do the shading
+    plt.close(fig)
 
 
 def test_sub_zero_scores_are_floored_for_drawing_but_not_for_alias_detection():

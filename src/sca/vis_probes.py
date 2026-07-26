@@ -26,7 +26,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure, SubFigure
 from matplotlib.layout_engine import ConstrainedLayoutEngine
 
-from mini.vis import light_dark, smooth_step, smooth_step_area, smooth_step_band
+from mini.vis import light_dark, smooth_step, smooth_step_area
 from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, OPERATORS, SPAN_RISERS
 
 FORMS = ("named", "hex")
@@ -99,23 +99,12 @@ def draw_traces(
     fill: Literal["mean", "channel"] | None = "mean",
     fill_alpha: float | None = None,
     spread: np.ndarray | None = None,
-    band: Literal["mean", "channel"] | None = "mean",
-    band_alpha: float | None = None,
 ) -> None:
     """Draw one panel: a step-line per channel of *values*, shaped ``(landmark, channel)``.
 
     *ramp* below 1 leaves a flat shoulder at each landmark, which is what makes the
     discrete character positions legible. *elide* and *breaks* are the two ways a pair of
     landmarks can fail to be neighbours — see :func:`~mini.vis.smooth_step`.
-
-    *spread* holds the replicates *values* summarises, shaped ``(replicate, landmark,
-    channel)`` — the per-seed maps behind a seed mean. Their min–max is drawn as a band
-    behind the lines, turning "and the other seeds agree" from a claim in the prose into
-    something the reader can see. *band* chooses whose spread: ``"mean"`` bands the channel
-    mean alone, which is the quantity the summary fill and the heatmap both report, and
-    keeps the panel to one extra shape; ``"channel"`` bands each channel in its own hue,
-    which answers whether a *particular* channel's position is stable at the cost of three
-    overlapping areas.
 
     *fill* shades the area under the traces, which gives the panel a height a reader can
     take in without tracing a line. ``"mean"`` fills once, in neutral grey, under the mean
@@ -125,29 +114,40 @@ def draw_traces(
     silhouette is the channel *maximum* rather than the mean, so the summary reading is
     lost wherever the channels disagree.
 
-    *fill_alpha* defaults per theme. A pale fill lightens a white page but has to lighten a
-    near-black one by more to travel the same visual distance, so the dark figure needs a
-    stronger value to read as the same shade of quiet.
+    *spread* holds the replicates *values* summarises, shaped ``(replicate, landmark,
+    channel)`` — the per-seed maps behind a seed mean. It turns "and the other seeds agree"
+    from a claim in the prose into something the reader can see, and it shades as *terrain*
+    rather than as a separate band: an area under the replicate minimum, one under the
+    summary, one under the maximum, all from the same floor. Where the layers overlap the
+    shading builds up, so opacity falls off monotonically with height — solid up to the
+    minimum, one step lighter to the summary, lightest out to the maximum. A min–max ribbon
+    laid over a summary fill instead makes the *overlap* the darkest part of the panel, and
+    a reader sees a dark stripe floating between two lighter ones with nothing in the data
+    to match it.
+
+    *fill_alpha* is the opacity of the deepest layer, where every contour has stacked up, so
+    a panel whose replicates agree looks the same whether or not *spread* was passed; the
+    per-layer value is derived from it. It defaults per theme: a pale fill lightens a white
+    page but has to lighten a near-black one by more to travel the same visual distance, so
+    the dark figure needs a stronger value to read as the same shade of quiet.
     """
     fill_alpha = light_dark(0.18, 0.22) if fill_alpha is None else fill_alpha
-    band_alpha = light_dark(0.3, 0.32) if band_alpha is None else band_alpha
     colors = colors or channel_colors()
     lws = np.broadcast_to(lw, values.shape[1])
     breaks, elide = set(breaks), set(elide)
     x = range(len(values))
 
+    def terrain(summary: np.ndarray, replicates: np.ndarray | None, color: str) -> None:
+        contours = (summary,) if replicates is None else (replicates.min(0), summary, replicates.max(0))
+        alpha = 1 - (1 - fill_alpha) ** (1 / len(contours))  # n of these composite to fill_alpha
+        for y in contours:
+            smooth_step_area(ax, x, y, ramp=ramp, breaks=breaks, color=color, alpha=alpha)
+
     if fill == "mean":
-        smooth_step_area(ax, x, values.mean(1), ramp=ramp, breaks=breaks, color=mean_color(), alpha=fill_alpha)
-    if spread is not None and band == "mean":
-        means = spread.mean(2)  # (replicate, landmark)
-        lo, hi = means.min(0), means.max(0)
-        smooth_step_band(ax, x, lo, hi, ramp=ramp, breaks=breaks, color=mean_color(), alpha=band_alpha)
+        terrain(values.mean(1), None if spread is None else spread.mean(2), mean_color())
     for c in range(values.shape[1]):
         if fill == "channel":
-            smooth_step_area(ax, x, values[:, c], ramp=ramp, breaks=breaks, color=colors[c], alpha=fill_alpha)
-        if spread is not None and band == "channel":
-            lo, hi = spread[:, :, c].min(0), spread[:, :, c].max(0)
-            smooth_step_band(ax, x, lo, hi, ramp=ramp, breaks=breaks, color=colors[c], alpha=band_alpha)
+            terrain(values[:, c], None if spread is None else spread[:, :, c], colors[c])
         smooth_step(
             ax, x, values[:, c],
             ramp=ramp, breaks=breaks, elide=elide, fade=fade, color=colors[c], lw=lws[c],
@@ -209,7 +209,7 @@ def draw_depth_stack(
 
     A four-dimensional *stack* is read as ``(replicate, depth, landmark, channel)`` — the
     per-seed maps rather than their average. The panels then plot the mean over replicates
-    and band their spread, so nothing upstream has to decide which of the two to keep.
+    and shade their spread, so nothing upstream has to decide which of the two to keep.
 
     Depth 0 (the embedding) goes at the bottom and the last layer at the top, matching the
     heatmaps, so height on the page means depth in the network in both figures.
@@ -263,7 +263,7 @@ def probe_trace_grid(
     """Lay out a depth stack per (form, target) pair, as a grid of blocks.
 
     *stacks* maps ``(form, target)`` to an array of shape ``(depth, landmark, channel)``, or
-    ``(replicate, depth, landmark, channel)`` to band the spread across replicates.
+    ``(replicate, depth, landmark, channel)`` to shade the spread across replicates.
     *form_axis* picks which way the grid runs: ``"row"`` puts the forms on separate rows
     and the targets across the columns, which is the heatmap's own arrangement — the two
     forms then sit one above the other over a shared x axis, which is the comparison the

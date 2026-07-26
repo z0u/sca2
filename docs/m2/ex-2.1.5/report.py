@@ -705,8 +705,9 @@ def _(arrays):
             small line panels, one per residual depth, embedding at the bottom
             and the last layer at the top, sharing an x axis of grammar
             landmarks. Every panel carries three step-lines, one per RGB
-            channel, over a pale grey area whose height is their mean and a
-            darker grey band spanning the three seeds' means. In the named row
+            channel, over grey shading in three tones: solid up to the lowest
+            of the three seeds' channel means, one step lighter up to their
+            average, and lightest out to the highest. In the named row
             the three channels rise and fall together
             over whichever operand the probe targets, a single shared plateau
             that fades elsewhere; in the hex row they resolve at different
@@ -716,10 +717,11 @@ def _(arrays):
             in its top panel named lifts all three channels together from the
             equals sign onward, at full height by the pre-answer landmark,
             while in hex they stay separated and none reaches the top of a
-            panel. The seed bands are narrow almost everywhere. They widen
-            sharply in the upper layers of all three named panels at the equals
-            landmark, where the widest spans most of the panel's height; the hex
-            bands stay thin throughout.
+            panel. The three tones sit almost on top of each other nearly
+            everywhere. They separate sharply in the upper layers of all three
+            named panels at the equals landmark, where the palest tone rises to
+            most of the panel's height above a solid tone near the floor; in the
+            hex row the tones stay close together throughout.
         """,
         caption="""
             Per-channel leave-one-out probe $R^2$, center cell, seed-averaged —
@@ -728,10 +730,11 @@ def _(arrays):
             forms, columns are operand 1, operand 2 and the mix. Within a
             block, rows are depth (embedding at the bottom) and the x axis runs
             across the grammar landmarks, one step-line per channel. The pale
-            grey area is that mean, drawn so the heatmap's reading can be taken
-            in without tracing three lines; the darker band over it spans the
-            three seeds, so a wide band is a landmark the seeds disagree about
-            and a thin one is a result that replicated. Steps,
+            grey shading is that mean, drawn so the heatmap's reading can be
+            taken in without tracing three lines. It is shaded in three tones —
+            solid to the lowest seed, lighter to the seed average, lightest to
+            the highest — so a tall gradient is a landmark the seeds disagree
+            about and a crisp edge is a result that replicated. Steps,
             because each landmark is a discrete character position and a
             straight line between two of them would claim measurements that
             were never made. Risers that cross characters no landmark measures
