@@ -230,6 +230,27 @@ class ModalRecordStore(RecordStore):
             # can't take it, so fall through to the read-check-write path below.
         return super().write_if(key, record, gen)
 
+    def merge_if(self, key: str, fields: dict[str, Any], gen: str | None) -> bool:
+        """Gen-fenced merge in one read and one write, rather than the base's three.
+
+        The inherited version reads to check the fence, then calls ``merge``, which
+        reads *again* for something to merge onto. Locally that's free under the
+        store lock; here each step is a network round-trip, and this is the hottest
+        write in the system — every progress update from every worker lands through
+        it. One read serves both purposes.
+
+        The saved round-trip isn't the only gain: it also halves the gap between
+        checking the fence and acting on it (one write, not a read plus a write),
+        so a superseded worker has less room to land a merge it no longer owns.
+        Still not atomic — ``modal.Dict`` has no compare-and-swap — but strictly
+        tighter than what it replaces.
+        """
+        cur = self._d.get(key)
+        if (cur or {}).get("gen") != gen:
+            return False
+        self._d[key] = (cur or {}) | fields
+        return True
+
 
 class ModalMemoStore(MemoStore):
     """A ``MemoStore`` whose records live in a ``modal.Dict`` and whose results

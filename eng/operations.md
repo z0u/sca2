@@ -34,3 +34,14 @@ one place it's used is the live consumer, not the transport.
 Delivery to either sink runs on a per-job background thread with a single latest-wins slot
 (`mini._debounce.BackgroundEmitter`), so a slow or distant sink costs progress resolution
 rather than the task's own throughput.
+
+**The 2026-07-23 slowdown was the Dict, not a Queue.** Worth recording, because the first
+write-up named the wrong transport and the wrong cost. Ex-2.1.5 ran on the memoized path,
+so every `emit_progress` went `_MemoSink.put` → `MemoStore.update_if` →
+`ModalRecordStore.merge_if` — inherited from the base class at the time, which read to
+check the fence and then called `merge`, itself a get plus a set: **three** Dict
+round-trips per emission, on the training thread, at a 0.2 s debounce interval. Splitting
+the observed 92–220 steps/min across three round-trips gives ~0.09–0.22 s each, which
+reads like a cross-region RTT; the single 0.65 s hop the original note implied never quite
+did. `ModalRecordStore` now overrides `merge_if` to do one get and one set, which also
+halves the gap between checking the fence and acting on it.
