@@ -13,8 +13,13 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Open questions
 
-- [ ] **Refit the probe maps holding out one target *value* at a time, not one
-  equation.** `probe_maps` runs `ridge_probe_loo` over rows = equations, so a
+- [x] **Refit the probe maps holding out one target *value* at a time, not one
+  equation.** Done in ex-2.1.5: `geometry.strict_r2` reports both estimators
+  side by side, the report shows the strict figure with a disagreement table,
+  and the three operand-closing spaces are landmarks. The residual question is
+  the fold-strength asymmetry, split out as its own item below.
+
+  Original note follows. `probe_maps` runs `ridge_probe_loo` over rows = equations, so a
   color (or a hex digit) sits in both the fit and the held-out row and the probe
   can memorize an identity → value table. That inflates some cells to the point
   of tautology and leaves others untouched, and which is which is the whole
@@ -39,6 +44,32 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   footnote covers it. The caption should instead say that the elided span is 0–22
   characters wide depending on the line (median 6), since that averaging is the
   real approximation and it applies to every named panel.
+
+- [ ] **The strict holdout is not equally strict across targets, so R² is not
+  comparable between the operand rows and the mix row.** `_value_folds` groups
+  by the target's value in one channel. For a named operand that group *is* the
+  colour — every line carrying the name shares its R value — so ~93 folds remove
+  a median 15/768 lines and the name is genuinely gone. A mix value is a
+  midpoint, mostly unique to a line or two: ~219 folds removing a median 4/768,
+  with both operand names still in the fit. So "named mix @ pre = 0.94" and
+  "named op1 @ pre = 0.64" are answering different questions, and the report
+  currently reads them side by side as if they weren't.
+
+  Checked, and the headline survives: an identity-grouped fold (hold out every
+  line where a colour is an operand, score the lines where it is operand 1, so
+  every scored line has an unseen operand) gives mix @ pre = 0.94, op1 @ pre =
+  0.64 — both unchanged to two places, over 139 folds × 3 seeds. Two things
+  still worth doing. (1) Report the mix row under identity folds so the
+  comparison is like for like; the per-channel grouping is the right one for
+  hex, where the digit *is* the value, so this is a per-form choice. (2) Explain
+  why mix beats its own inputs. If the probe could only compose two independent
+  operand readouts, op1 at 0.64 with op2 seen bounds mix at ~0.82, and we see
+  0.94 — either the mix has its own direction by `pre`, or the probe is reading
+  the answer the model has already chosen and looking that colour up (the fold
+  removes a colour only where it is an *operand*). Same mechanism as the
+  "answer positions partly read the answer" section, arriving one position
+  earlier. A fold that also removes lines where the colour is the answer would
+  separate them. #metrics #ex-2.1.5 #representations
 
 - [ ] Probe all positions in a sample of sequences. So far we have only probed
   specific locations, e.g. last token of first operand; last token before answer.

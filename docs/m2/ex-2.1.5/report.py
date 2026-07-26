@@ -719,7 +719,13 @@ def _(arrays):
             between two of them would claim measurements that were never made.
             Elided risers, in lighter ink, cross a name's variable-length middle
             — 0 to 22 characters depending on the line; a hex line has no elision
-            at all, since all four of its operand characters are landmarks. Every
+            at all, since all four of its operand characters are landmarks. Where
+            a named trace steps up across one of those risers, that is the name
+            completing: the model reads left to right, and a color name's first
+            characters do not determine its value — predicting a held-out name's
+            RGB from the other names sharing its prefix scores $-0.21$ at two
+            characters, below the palette mean, since `sea green` and `salmon`
+            share a prefix and nothing else. Every
             panel runs over the same 0 and 1 gridlines, numbered once in the
             bottom-right corner, and scores below zero are drawn at the floor:
             this estimator goes negative wherever a fit has nothing to place, and
