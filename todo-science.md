@@ -304,6 +304,22 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   binding, is what a cross-form anchor would have to bridge. #metrics #ex-2.1.5
   #anchoring #representations
 
+- **A named operand's value lives at the space that closes it, not on its characters —
+  and the landmark set doesn't measure those spaces (ex-2.1.5, 2026-07-26).** Under the
+  strict holdout, named operand 1 scores −0.05 at its own last character in the last
+  layer, but +0.35 at the space that follows it and +0.47 at the space after the `+`;
+  operand 2 scores +0.30 at the space before the `=`. So the earlier reading that named
+  operands carry no value geometry was an artefact of *where* we measured. A
+  variable-length name has no fixed slot, so the model appears to resolve it into the
+  delimiter — a summary position — and the value stays there across the operator.
+  Hex does the opposite: at the same spaces it scores −0.19 to −0.34, nothing at all,
+  which fits a form whose three digits already sit at fixed offsets and need no summary
+  slot. `LANDMARKS` measures the operator characters and the pre-answer space but not
+  the two operand-closing spaces, so the current figure omits the named form's most
+  informative sites. Add them before the H2 rewrite. Bears on anchor placement: this is
+  a stable single-position home for a named operand's value, and hex has no counterpart.
+  #representations #anchoring #ex-2.1.5 #task-grammar
+
 - **Retention and value-geometry are different questions, and ex-2.1.2's eviction
   finding may have measured the first (2026-07-26).** In ex-2.1.5, hex operand 2's red
   channel read at the *green* digit in the last layer scores 0.821 per-equation and

@@ -615,6 +615,13 @@ def _():
     value geometry, and hex's earlier channels are *not* retained by value into
     later digits (0.82 → −0.27). The paragraphs below still read the
     per-equation numbers and need rewriting once the protocol is settled.
+
+    The landmark set also needs two more positions. A named operand's value
+    turns out to sit on the space that closes it (−0.05 at the name's last
+    character against +0.35 at the following space and +0.47 after the `+`,
+    strict, last layer), and `LANDMARKS` doesn't measure the operand-closing
+    spaces — so the figure currently omits the named form's most informative
+    sites. Hex scores nothing there, as a form with fixed digit offsets should.
     ///
 
     The figure below plots leave-one-out probe $R^2$ at every depth ×
