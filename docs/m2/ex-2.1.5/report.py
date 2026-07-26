@@ -967,7 +967,8 @@ def _(arrays):
         ]
     )
     _pre = LANDMARKS.index("pre")
-    _named_pre = float(np.mean([arrays[f"center-s{_s}/probes/named/mix/r2"][4, _pre] for _s in SEEDS]))
+    _named_pre = float(np.mean([arrays[f"center-s{_s}/probes/named/mix/r2_strict"][4, _pre] for _s in SEEDS]))
+    _named_pre_eq = float(np.mean([arrays[f"center-s{_s}/probes/named/mix/r2"][4, _pre] for _s in SEEDS]))
     _carried_pre = float(np.mean([arrays[f"center-s{_s}/cross/hex2name/mix/r2"][4, _pre] for _s in SEEDS]))
 
     mo.md(f"""
@@ -992,6 +993,25 @@ def _(arrays):
     the grey area is what the form's own probe recovers, and the amber over it
     is what the other form's probe recovers from the same activations — so the
     amber fraction of the grey *is* $\\rho$. There is no amber anywhere.
+
+    /// note | Which within-form estimate the denominator uses
+    Both the figure and the table use the **strict** holdout for the within-form
+    reading, so the grey areas here are the same quantity the per-channel figure
+    under H2 plots and can be read against it. That is a departure from the
+    preregistered $\\rho$, which used the per-equation estimator, and the reason
+    is that the two halves of the ratio should be measured alike: a cross-form
+    probe has never seen the target form's tokens, so it cannot recover a value
+    by looking up an identity, while the per-equation within-form estimate can.
+    Pairing a leak-prone denominator with a leak-free numerator biases $\\rho$
+    *downward* — it flatters H3 — and the strict denominator removes that.
+
+    Nothing turns on the choice: the preregistered ratios are zero too, since
+    the numerator is what fails and it is unchanged. Where the two estimators
+    differ materially is which cells clear $\\rho$'s guard, and both are reported
+    below. At the pre-answer site the named form reads {_named_pre:.2f} strict
+    against {_named_pre_eq:.2f} per-equation, so H3's headline site is one of the
+    places they agree.
+    ///
     """)
     return
 
@@ -1027,21 +1047,23 @@ def _(arrays):
             Zero-shot cross-form transfer at the center cell, seed-averaged. Rows
             are the form the probes are applied to, columns the probe target;
             within a block, depth runs upward from the embedding and the x axis
-            across the grammar landmarks. Grey is the form's own probe with its
-            three-seed envelope, under the preregistered per-equation estimator
-            that $\\rho$'s denominator uses — so it reads higher than the strict
-            figure above, and it is the more generous denominator of the two.
+            across the grammar landmarks. Grey is the form's own probe under the
+            strict holdout, with its three-seed envelope — the same quantity as
+            the per-channel figure under H2, so the two are directly comparable.
             Amber is the other form's probe applied
             unchanged, so the amber share of the grey is the transfer ratio
             $\\rho$. Both are floored at zero for drawing, which here hides
             magnitude rather than nuance: the amber readings are not marginal
             failures but $R^2$ from ${_range.max():.3f}$ down to
-            ${_range.min():.0f}$, worse everywhere than predicting the mean.
+            ${_range.min():.0f}$, worse everywhere than predicting the mean. The
+            hex row's grey is low because hex's own strict readings are low
+            (H2's finding: it relays its channels rather than holding them), so
+            the transfer claim rests on the named row and on those magnitudes.
         """,
     )
     def _plot() -> plt.Figure:
         _within = {
-            (_f, _t): np.stack([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2"] for _s in SEEDS])
+            (_f, _t): np.stack([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2_strict"] for _s in SEEDS])
             for _f in vp.FORMS
             for _t in vp.TARGETS
         }
@@ -1068,19 +1090,19 @@ def _(arrays, cells):
     def _mean(_path: str, _depth: int, _landmark: str) -> float:
         return float(np.mean([arrays[f"center-s{_s}/{_path}"][_depth, _lm[_landmark]] for _s in SEEDS]))
 
-    def _rho(_direction: str, _into: str, _depth: int, _landmark: str) -> str:
+    def _rho(_direction: str, _into: str, _depth: int, _landmark: str, _key: str = "r2_strict") -> str:
         # ρ per direction, on the seed-mean maps, with its own guard: the denominator is the
         # within-form R² of the form the probe is applied *to*, and below 0.5 it reports nothing.
         _cross = np.mean([arrays[f"center-s{_s}/cross/{_direction}/mix/r2"] for _s in SEEDS], axis=0)
-        _within = np.mean([arrays[f"center-s{_s}/probes/{_into}/mix/r2"] for _s in SEEDS], axis=0)
+        _within = np.mean([arrays[f"center-s{_s}/probes/{_into}/mix/{_key}"] for _s in SEEDS], axis=0)
         _v = gm.rho(_cross, _within)[_depth, _lm[_landmark]]
         return "—" if np.isnan(_v) else f"{_v:.2f}"
 
     def _row(_label: str, _depth: int, _landmark: str) -> str:
         _angles = np.mean([arrays[f"center-s{_s}/angles/mix"][_depth, _lm[_landmark]] for _s in SEEDS], axis=0)
         _vals = [
-            f"{_mean('probes/named/mix/r2', _depth, _landmark):.2f}",
-            f"{_mean('probes/hex/mix/r2', _depth, _landmark):.2f}",
+            f"{_mean('probes/named/mix/r2_strict', _depth, _landmark):.2f}",
+            f"{_mean('probes/hex/mix/r2_strict', _depth, _landmark):.2f}",
             f"{_mean('cross/hex2name/mix/r2', _depth, _landmark):+.2f}",
             _rho("hex2name", "named", _depth, _landmark),
             f"{_mean('cross/name2hex/mix/r2', _depth, _landmark):+.2f}",
@@ -1102,8 +1124,14 @@ def _(arrays, cells):
                 '<div class="report-table-scroll"><table class="report-table">' + _thead + _rows + "</table></div>"
             ),
             mo.md(f"""
-            The mix probe at two sites, seed-averaged, under the preregistered
-            per-equation estimator. Neither site was picked using $\\rho$. The
+            The mix probe at two sites, seed-averaged, within-form readings under
+            the strict holdout (the preregistered per-equation ratios are
+            {_rho("hex2name", "named", _stored["depth"], _stored["landmark"], "r2")} and
+            {_rho("name2hex", "hex", _stored["depth"], _stored["landmark"], "r2")} at
+            the first site and
+            {_rho("hex2name", "named", 4, "pre", "r2")} and
+            {_rho("name2hex", "hex", 4, "pre", "r2")} at the second — the same
+            reading). Neither site was picked using $\\rho$. The
             first maximizes the weaker form's own $R^2$, so the two probes are
             compared where both have something to carry; the second is where the
             named form's geometry is strongest and where the answer text cannot
