@@ -37,6 +37,30 @@ def test_probe_maps_and_transfer_recover_a_shared_code():
     assert np.nanmax(rho(cross_c["mix"], fitted["mix"]["r2"])) < 0.2
 
 
+def test_strict_holdout_separates_a_lookup_from_a_geometry():
+    """The two within-form estimators come apart exactly where memorization can carry a probe.
+
+    A planted linear code generalizes to a value the fit never saw, so both estimators
+    score it. A lookup table — each of a few identities given its own arbitrary direction —
+    is recoverable whenever the identity was in the fit, and nothing else, so per-equation
+    scores it and the strict holdout does not.
+    """
+    n, c = 300, 16
+    y = RNG.standard_normal((n, 3))
+    lm = np.tile(np.arange(len(LANDMARKS)), (n, 1))
+
+    linear = probe_maps(planted_acts(n, c, y, RNG.standard_normal((c, 3)), 0.01), lm, {"mix": y})["mix"]
+    assert linear["r2"].min() > 0.95
+    assert linear["r2_strict"].min() > 0.9  # interpolates to a held-out value
+
+    ids = RNG.integers(0, 12, n)  # a dozen identities, each with its own direction
+    table = RNG.standard_normal((12, c))
+    y_id = np.stack([ids, ids, ids], axis=1).astype(float)  # the target *is* the identity
+    lookup = probe_maps(np.repeat(table[ids][None, :, None, :], len(LANDMARKS), axis=2), lm, {"mix": y_id})["mix"]
+    assert lookup["r2"].min() > 0.95  # the identity was in the fit
+    assert lookup["r2_strict"].max() < 0.2  # it never was
+
+
 def test_rho_guards():
     within = np.array([[0.9, 0.4], [0.6, 0.8]])
     cross = np.array([[-0.5, 0.3], [0.3, 1.2]])

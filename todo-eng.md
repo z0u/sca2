@@ -24,6 +24,11 @@ readable cold without re-deriving code state.
   lists only the experiment-module helpers). Any change to geometry code or the
   landmark scheme is then a silent stale hit. Workaround in place: the eval map is
   tagged `version="lm-<sha1(LANDMARKS)>"`, so a scheme change re-runs the probes.
+  Hit again on 2026-07-26, one level along: adding the strict value-holdout estimator
+  changed `probe_maps` but not the landmark tuple, so the tag would not have moved and
+  the cells would have memo-hit again. The tag now hashes `inspect.getsource` of the
+  whole `sca.compute.geometry` module alongside `LANDMARKS`. That it needed widening
+  twice is the argument for a general fix rather than a per-experiment tag.
   Worth considering: (a) trace function-local imports of *project* modules, or at
   least warn when a task body imports untracked project code; (b) a convention to
   fold such deferred-import deps into `version=`/inputs. General hazard — it hits

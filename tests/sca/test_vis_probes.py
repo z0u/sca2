@@ -89,10 +89,13 @@ def test_a_seed_axis_adds_the_envelope_without_changing_the_layout(stacks):
     plain = probe_trace_grid(stacks, form_axis="row")
     shaded = probe_trace_grid(per_seed, form_axis="row")
     assert len(shaded.get_axes()) == len(plain.get_axes())
-    # Same panels, six extra patches each: the fill's outline and the two envelope hairlines,
-    # each with the faded companion that carries its elided risers (both forms elide some).
+    # Same panels, plus the fill's outline and the two envelope hairlines. Named draws each
+    # of the three twice — once for the solid line, once for the faded companion carrying
+    # its elided risers — while hex elides nothing to carry, so it gains three, not six.
+    # `form_axis="row"` puts the named block's panels first.
     counts = [len(a.patches) for a in plain.get_axes()], [len(a.patches) for a in shaded.get_axes()]
-    assert all(s == p + 6 for p, s in zip(*counts, strict=True))
+    expected = [6] * (len(plain.get_axes()) // 2) + [3] * (len(plain.get_axes()) // 2)
+    assert [s - p for p, s in zip(*counts, strict=True)] == expected
     plt.close(plain)
     plt.close(shaded)
 

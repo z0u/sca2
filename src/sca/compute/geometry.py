@@ -3,12 +3,23 @@
 Ex-2.1.5's measurement kit. Earlier experiments probed hand-picked positions
 (`probe_residual_stream`); here the probe scan covers every layer at every
 grammar landmark (`sca.data.mixed_vocab.LANDMARKS`), producing a map per
-target. Within-form R² is leave-one-out (`ridge_probe_loo`) — no split to
-choose, so no seed. Alongside each map the full-data probe (weights and bias)
-is kept, which is what transfers: applying one form's fitted probe unchanged to
-the other form's activations gives the zero-shot cross-form R² that the
-transfer ratio ρ is built from, and the fitted weight matrices' column spaces
-are what the principal-angle measure compares.
+target. Alongside each map the full-data probe (weights and bias) is kept, which
+is what transfers: applying one form's fitted probe unchanged to the other
+form's activations gives the zero-shot cross-form R² that the transfer ratio ρ
+is built from, and the fitted weight matrices' column spaces are what the
+principal-angle measure compares.
+
+Within-form R² comes in two flavours, because "recoverable here" and
+"geometrically organized here" are different questions and this task pulls them
+apart. Leave-one-*equation*-out (`ridge_probe_loo`) answers the first: a colour
+or a hex digit appears in both the fit and the held-out row, so an identity →
+value table is memorizable, which is what you want when asking whether a value
+is present at all. Leave-one-*value*-out (`strict_r2`) answers the second: every
+row carrying that value — as either operand or the answer — leaves the fit
+together, so the probe has to place an unseen value from the others. Holding out
+only where the value is *scored* would not do it, since the same hex digit sits
+in all three channel slots and a colour can be operand 1 in one line and operand
+2 in another.
 """
 
 from typing import Mapping, Sequence
@@ -58,6 +69,48 @@ def _fit(x: Float[np.ndarray, "N C"], y: Float[np.ndarray, "N K"], l2: float) ->
     return w, my - mx @ w
 
 
+def strict_r2(
+    x: Float[np.ndarray, "N C"],
+    y_col: Float[np.ndarray, " N"],
+    folds: Sequence[tuple[np.ndarray, np.ndarray]],
+    l2: float = 1e-2,
+) -> float:
+    """Out-of-sample R² over (held-out rows, scored rows) folds.
+
+    One uncentered Gram matrix serves every fold and each is downdated by its own
+    block — the group form of the rank-1 trick in ``ridge_probe_loo``, so this
+    costs one fit plus a small solve per fold rather than a fit per fold, which
+    makes it *cheaper* than the per-equation estimator it sits beside.
+    """
+    x64, y64 = np.asarray(x, np.float64), np.asarray(y_col, np.float64)
+    n, c = x64.shape
+    sum_x, sum_y = x64.sum(0), y64.sum()
+    gram_xx, gram_xy = x64.T @ x64, x64.T @ y64
+    pred = np.full(n, np.nan)
+    for held, scored in folds:
+        n_tr = n - int(held.sum())
+        if n_tr < c or not scored.any():
+            continue
+        xh, yh = x64[held], y64[held]
+        mx, my = (sum_x - xh.sum(0)) / n_tr, (sum_y - yh.sum()) / n_tr
+        xx = gram_xx - xh.T @ xh - n_tr * np.outer(mx, mx)
+        xy = gram_xy - xh.T @ yh - n_tr * mx * my
+        pred[scored] = (x64[scored] - mx) @ np.linalg.solve(xx + l2 * np.eye(c), xy) + my
+    ok = ~np.isnan(pred)
+    y_ok = y64[ok]
+    return float(1 - ((y_ok - pred[ok]) ** 2).sum() / ((y_ok - y_ok.mean()) ** 2).sum())
+
+
+def _value_folds(
+    y: Float[np.ndarray, "N K"], slots: Sequence[Float[np.ndarray, "N K"]], k: int
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Per distinct value of channel *k*: rows holding it in any slot, rows scored for it."""
+    return [
+        (np.any([np.abs(s[:, k] - v) < 1e-6 for s in slots], axis=0), np.abs(y[:, k] - v) < 1e-6)
+        for v in np.unique(y[:, k])
+    ]
+
+
 def probe_maps(
     acts: Float[np.ndarray, "L1 N T C"],
     lm: Float[np.ndarray, "N M"],
@@ -68,27 +121,45 @@ def probe_maps(
 
     Returns, keyed by target name:
 
-    - ``r2``: (L+1, M) leave-one-out R² — the within-form map;
+    - ``r2``: (L+1, M) leave-one-equation-out R² — is the value recoverable here;
     - ``r2_ch``: (L+1, M, K) the same, per target channel (``r2`` is its mean
-      over the last axis) — the map the heatmap collapses;
+      over the last axis);
+    - ``r2_strict`` / ``r2_strict_ch``: the same pair under the leave-one-value-out
+      holdout — is the value geometrically organized here (see the module docstring);
     - ``weights``: (L+1, M, C, K) and ``bias``: (L+1, M, K) — full-data fits,
       for zero-shot transfer and subspace comparison.
+
+    The strict folds are built from *all* of ``targets``, so it must carry the
+    line's every value-bearing slot (both operands and the mix) for the holdout
+    to be airtight.
     """
     n_depth, n_ex = acts.shape[0], acts.shape[1]
     at_lm = acts[:, np.arange(n_ex)[:, None], lm]  # (L+1, N, M, C)
+    slots = list(targets.values())
     out: dict[str, dict[str, np.ndarray]] = {name: {} for name in targets}
     for name, y in targets.items():
+        n_ch = y.shape[1]
         r2 = np.empty((n_depth, lm.shape[1]))
-        r2_ch = np.empty((n_depth, lm.shape[1], y.shape[1]))
-        ws = np.empty((n_depth, lm.shape[1], acts.shape[3], y.shape[1]))
-        bs = np.empty((n_depth, lm.shape[1], y.shape[1]))
+        r2_ch = np.empty((n_depth, lm.shape[1], n_ch))
+        r2_strict_ch = np.empty((n_depth, lm.shape[1], n_ch))
+        ws = np.empty((n_depth, lm.shape[1], acts.shape[3], n_ch))
+        bs = np.empty((n_depth, lm.shape[1], n_ch))
+        folds = [_value_folds(y, slots, k) for k in range(n_ch)]
         for d in range(n_depth):
             for m in range(lm.shape[1]):
                 x = at_lm[d, :, m]
                 r2_ch[d, m] = _r2_cols(ridge_probe_loo(x, y, l2), y)
                 r2[d, m] = r2_ch[d, m].mean()
+                r2_strict_ch[d, m] = [strict_r2(x, y[:, k], folds[k], l2) for k in range(n_ch)]
                 ws[d, m], bs[d, m] = _fit(x, y, l2)
-        out[name] = {"r2": r2, "r2_ch": r2_ch, "weights": ws, "bias": bs}
+        out[name] = {
+            "r2": r2,
+            "r2_ch": r2_ch,
+            "r2_strict": r2_strict_ch.mean(axis=-1),
+            "r2_strict_ch": r2_strict_ch,
+            "weights": ws,
+            "bias": bs,
+        }
     return out
 
 

@@ -470,13 +470,17 @@ def publish_results(results: list[dict], stats: dict, checkpoints: dict, evals: 
 
 def main(ctx: Ctx) -> dict:
     # eval_one imports the geometry helpers locally, so the evidence fingerprint can't
-    # reach LANDMARKS through them. Tag the eval map with the landmark scheme, so probes
-    # (which index activations by landmark) re-run when it changes. See todo-eng.
+    # reach them or the LANDMARKS they read. Tag the eval map with both the landmark
+    # scheme and the measurement module's source, so a probe change re-runs the cells.
+    # Hashing LANDMARKS alone was not enough: it would have served stale arrays for a
+    # change to `probe_maps` that left the scheme alone. See todo-eng.
     import hashlib
+    import inspect
 
+    from sca.compute import geometry
     from sca.data.mixed_vocab import LANDMARKS
 
-    lm_tag = "lm-" + hashlib.sha1(repr(LANDMARKS).encode()).hexdigest()[:8]
+    lm_tag = "lm-" + hashlib.sha1((repr(LANDMARKS) + inspect.getsource(geometry)).encode()).hexdigest()[:8]
 
     corpora = sorted({corpus_key(arm) for arm in ARMS.values()})
     specs = {corpus_key(arm): arm for arm in ARMS.values()}
@@ -528,10 +532,14 @@ experiment = Experiment(
     main=main,
     roles={
         # Corpus generation (100k lines, ~3M chars) + model-free references.
-        "prep": dict(cpu=2, timeout=1200),
+        "prep": dict(cpu=2, timeout=1200, region="us-east"),
         # ~8.5k steps of 64×128 tokens; L8 cells roughly double the L4 time.
-        "train": dict(gpu="L4", timeout=5400, watchdog=300, watchdog_grace=1500),
-        # Greedy decode (4 × 256 prompts) + LOO probe maps (2 forms × 3 targets).
-        "eval": dict(gpu="L4", timeout=1800),
+        "train": dict(gpu="L4", timeout=5400, watchdog=300, watchdog_grace=1500, region="us-east"),
+        # Greedy decode (4 × 256 prompts) + probe maps (2 forms × 3 targets × 2 estimators).
+        "eval": dict(gpu="L4", timeout=1800, region="us-east"),
     },
+    # Pinned to one region: the store lives there, so a container placed elsewhere pays
+    # cross-region transfer on every checkpoint and artifact and drags the whole run.
+    # Region is placement, not identity — mini fingerprints the task fn's source, so
+    # pinning does not invalidate the memoized training.
 )

@@ -118,4 +118,20 @@ def test_landmarks_point_at_the_right_characters():
         assert ex.text[lm["o1s0"]] == ops[0][0] and ex.text[lm["o1e0"]] == ops[0][-1]
         assert ex.text[lm["o2s0"]] == ops[1][0] and ex.text[lm["o2e0"]] == ops[1][-1]
         assert ex.text[lm["as0"]] == ex.answer[0] and ex.text[lm["ae0"]] == ex.answer[-1]
+        # The four delimiters are all spaces, and each closes the token before it.
+        assert [ex.text[lm[k]] for k in ("o1sp", "plussp", "o2sp", "pre")] == [" "] * 4
+        assert lm["o1sp"] == lm["o1e0"] + 1 and lm["o2sp"] == lm["o2e0"] + 1
+        assert lm["plussp"] == lm["plus"] + 1 and lm["pre"] == lm["eq"] + 1
     assert hex_ex.text[mv.landmark_indices(hex_ex)["as0"]] == "#"
+
+
+def test_a_hex_line_is_measured_at_every_character():
+    """Hex operands and answers are four characters and all four are landmarks, so with the
+    delimiters covered nothing in a hex line goes unprobed — the elision in the trace
+    figures is named-only, and `GAP_RISERS` is empty because of it."""
+    rng = np.random.default_rng(0)
+    palette = mv.xkcd_palette(140)
+    names = {v: k for k, v in palette.items()}
+    ex = mv.make_example("hex", mv.lift((14, 2, 6)), mv.lift((4, 8, 10)), names, rng)
+    assert sorted(mv.landmark_indices(ex).values()) == list(range(len(ex.prompt) + len(ex.answer)))
+    assert mv.GAP_RISERS == frozenset()

@@ -27,7 +27,7 @@ from matplotlib.figure import Figure, SubFigure
 from matplotlib.layout_engine import ConstrainedLayoutEngine
 
 from mini.vis import light_dark, mix, page_color, smooth_step, smooth_step_area
-from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, OPERATORS, SPAN_RISERS
+from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, SPAN_RISERS
 
 FORMS = ("named", "hex")
 TARGETS = ("op1", "op2", "mix")
@@ -36,16 +36,18 @@ LANDMARK_LABELS = {
     "o1s0": "$a_{1}$", "o1s1": "$a_{2}$", "o1e1": "$a_{n-1}$", "o1e0": "$a_{n}$",
     "o2s0": "$b_{1}$", "o2s1": "$b_{2}$", "o2e1": "$b_{n-1}$", "o2e0": "$b_{n}$",
     "as0": "$r_{1}$", "as1": "$r_{2}$", "ae1": "$r_{n-1}$", "ae0": "$r_{n}$",
-    "plus": "+", "eq": "=", "pre": " ",
+    "plus": "+", "eq": "=",
+    "o1sp": " ", "plussp": " ", "o2sp": " ", "pre": " ",
 }  # fmt: skip
 """Tick labels for :data:`~sca.data.mixed_vocab.LANDMARKS`: operand 1 is $a$, operand 2
 is $b$, the answer is $r$, subscripted by character position from whichever end the
-landmark is anchored to. The pre-answer space is left blank — it is a space."""
+landmark is anchored to. The four delimiter spaces are left blank — they are spaces, and
+a tick mark alone places them, sitting as they do either side of ``+`` and ``=``."""
 
-MAJOR_LANDMARKS = tuple(lm for lm in LANDMARKS if lm in OPERATORS and lm != "pre")
+MAJOR_LANDMARKS = tuple(lm for lm in LANDMARKS if lm in ("plus", "eq"))
 """The landmarks that divide the equation into its parts: ``+`` and ``=``. They get major
 ticks and a vertical rule, so every panel is read against the same three-part grammar.
-``pre`` is an operator landmark but not a divider, so it stays minor."""
+The delimiter spaces are operator landmarks but not dividers, so they stay minor."""
 
 MINOR_LANDMARKS = tuple(lm for lm in LANDMARKS if lm not in MAJOR_LANDMARKS)
 
@@ -53,11 +55,12 @@ ELIDED_RISERS = {
     "named": frozenset(GAP_RISERS | SPAN_RISERS),
     "hex": frozenset(GAP_RISERS),
 }
-"""Per form, the risers that cross characters no landmark measures. Both forms share the
-fixed grammar's unprobed spaces (``GAP_RISERS``). Only the named form also skips word
-middles (``SPAN_RISERS``): its words are variable-length, so the landmark scheme samples
-two characters from each end and passes over whatever sits between, while hex's fixed-width
-digits leave nothing in the middle to miss."""
+"""Per form, the risers that cross characters no landmark measures. ``GAP_RISERS`` is now
+empty — the fixed grammar, delimiter spaces included, is measured character by character —
+so hex elides nothing at all: its four-character operands and answers are landmarks
+throughout. Only the named form skips anything (``SPAN_RISERS``): its words are
+variable-length, so the landmark scheme samples two characters from each end and passes
+over whatever sits between, anywhere from 0 to 22 characters depending on the line."""
 
 
 def channel_colors() -> tuple[str, str, str]:

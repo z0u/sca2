@@ -255,9 +255,9 @@ def as_form(pairs: Iterable[tuple[Rgb8, Rgb8]], form: MixedForm, palette: dict[s
 
 LANDMARKS = (
     "o1s0", "o1s1", "o1e1", "o1e0",  # operand 1: chars from its start / end
-    "plus",
+    "o1sp", "plus", "plussp",  # the space closing operand 1, '+', the space opening operand 2
     "o2s0", "o2s1", "o2e1", "o2e0",  # operand 2
-    "eq", "pre",  # '=' and the pre-answer space
+    "o2sp", "eq", "pre",  # the space closing operand 2, '=' and the pre-answer space
     "as0", "as1",  # answer chars from its start
     "ae1", "ae0",  # answer chars from its end
 )  # fmt: skip
@@ -266,12 +266,22 @@ LANDMARKS = (
 Raw offsets don't line up across lines — names vary in length and hex lines
 are shorter — so probe maps index positions by these landmarks instead.
 The answer is sampled like an operand — two chars from each end (``as0, as1,
-ae1, ae0``) — so both mirror the ``s0, s1, e1, e0`` shape. Every landmark exists
-in every line (the shortest operand or answer is 3 characters), though on short
-words some landmarks coincide (e.g. ``as1`` and ``ae1`` on a 3-character answer).
+ae1, ae0``) — so both mirror the ``s0, s1, e1, e0`` shape.
+
+The four delimiter spaces are landmarks in their own right (``o1sp``, ``plussp``,
+``o2sp``, ``pre``). A variable-length name has no fixed slot, so the space that
+closes it is where its value turns out to be legible — ex-2.1.5 reads a named
+operand at −0.05 on its own last character and +0.35 on the following space. It
+also means a hex line is measured at every one of its characters, since a hex
+operand's four characters are all landmarks: what is left unprobed is only the
+variable-length middle of a name, which is what ``SPAN_RISERS`` marks.
+
+Every landmark exists in every line (the shortest operand or answer is 3
+characters), though on short words some landmarks coincide (e.g. ``as1`` and
+``ae1`` on a 3-character answer).
 """
-OPERATORS = ("plus", "eq", "pre")
-"""The subset of LANDMARKS that are operators (not operands or results)"""
+OPERATORS = ("o1sp", "plus", "plussp", "o2sp", "eq", "pre")
+"""The subset of LANDMARKS that are operators or delimiters (not operands or results)"""
 
 
 def _risers(predicate: Callable[[str, str], bool]) -> frozenset[int]:
@@ -296,12 +306,12 @@ adjacent characters — discrete digits — so only variable-length forms (named
 drawn as a smooth slide. Its companion is ``GAP_RISERS``, which every form shares."""
 
 
-GAP_RISERS = _risers(lambda a, b: "plus" in (a, b) or b == "eq")
+GAP_RISERS: frozenset[int] = frozenset()
 """Indices *i* where landmark *i*→*i+1* straddles an unprobed character in the fixed
-grammar: the spaces flanking ``+`` (``o1e0``→``plus``, ``plus``→``o2s0``) and the one
-before ``=`` (``o2e0``→``eq``; the space after ``=`` is probed as ``pre``). The grammar
-is identical across forms, so both hex and named want these drawn as a smooth slide
-rather than a discrete step. Compare ``SPAN_RISERS``, which is named-only."""
+grammar. Empty since the four delimiter spaces became landmarks: the fixed part of the
+grammar is now measured character by character in both forms, so no riser there
+interpolates. Kept as a named concept because ``SPAN_RISERS`` is defined against it —
+what remains unprobed is only a name's variable-length middle, which no form shares."""
 
 
 def landmark_indices(ex: Example) -> dict[str, int]:
@@ -313,9 +323,9 @@ def landmark_indices(ex: Example) -> dict[str, int]:
     ans, ane = len(ex.prompt), len(ex.prompt) + len(ex.answer) - 1
     return {
         "o1s0": o1s, "o1s1": o1s + 1, "o1e1": o1e - 1, "o1e0": o1e,
-        "plus": o1e + 2,
+        "o1sp": o1e + 1, "plus": o1e + 2, "plussp": o1e + 3,
         "o2s0": o2s, "o2s1": o2s + 1, "o2e1": o2e - 1, "o2e0": o2e,
-        "eq": o2e + 2, "pre": o2e + 3,
+        "o2sp": o2e + 1, "eq": o2e + 2, "pre": o2e + 3,
         "as0": ans, "as1": ans + 1,
         "ae1": ane - 1, "ae0": ane,
     }  # fmt: skip
