@@ -636,11 +636,14 @@ def _():
     holistically: the three channels ride together over its characters and
     arrive as a bundle at $R^2 \approx 0.8$. Hex resolves it digit by digit,
     and at the embedding the three are strictly disjoint — each channel hits
-    $R^2 = 1.00$ at its own digit and drops back to zero at the next, because
-    a hex digit *is* that channel's value and no memorized lookup stands
-    between the token and the number. That perfect readout is a property of
-    the notation rather than of the model, which is most of why the hex row
-    peaks higher than the named one. Depth turns the relay into an
+    $R^2 = 1.00$ at its own digit and drops back to zero at the next. Read
+    that 1.00 as a ceiling rather than a finding: a hex digit position holds
+    one of only 16 tokens, the held-out unit is an equation rather than a
+    digit, so every held-out row's token was seen with its value during the
+    fit, and 16 points in 64 dimensions admit an exact linear fit whatever
+    the values. It measures the notation, and it is most of why the hex row
+    peaks higher than the named one, where a character position holds ~26
+    letters that have to predict 140 colors. Depth turns the relay into an
     accumulation: by the last layer earlier channels persist into later
     digits (0.82, 0.96, 0.62 at operand 2's middle digit; 0.51, 0.74, 0.98
     at its last), so a single site holds the whole operand only after
