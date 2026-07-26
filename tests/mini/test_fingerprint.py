@@ -26,6 +26,10 @@ import pytest
 from mini.memo import task_key, task_key_parts
 
 TASK_ATTR = "import helpers\n\ndef task(x):\n    return helpers.helper(x)\n"
+TASK_DEFERRED = "def task(x):\n    from helpers import helper\n\n    return helper(x)\n"
+TASK_DEFERRED_MOD = "def task(x):\n    import helpers\n\n    return helpers.helper(x)\n"
+TASK_DEFERRED_INDIRECT = "def task(x):\n    from wrapper import wrapped\n\n    return wrapped(x)\n"
+WRAPPER = "from helpers import helper\n\ndef wrapped(x):\n    return helper(x) * 2\n"
 TASK_NESTED = "from helpers import helper\n\ndef task(xs):\n    inner = lambda v: helper(v)  # noqa: E731\n    return [inner(x) for x in xs]\n"
 TASK_METHOD = "from helpers import helper\n\nclass Model:\n    def run(self, x):\n        return helper(x)\n\ndef task(x):\n    return Model().run(x)\n"
 TASK_VALUE = "LR = 0.1\n\ndef task(x):\n    return x * LR\n"
@@ -55,6 +59,65 @@ def load_module(tmp_path: Path):
     yield _load
     for name in loaded:
         sys.modules.pop(name, None)
+
+
+@pytest.fixture
+def deferred_modules(tmp_path: Path, monkeypatch):
+    """Write a variant's modules and make them resolvable the way the fingerprint
+    resolves a deferred import: by searching ``sys.path``, without importing.
+
+    One variant is on the path at a time (same module names, different bodies), and
+    the resolver's path cache is cleared between them — within a real process a
+    module name maps to one file, so the cache is only wrong here.
+    """
+    from mini.memo import _module_file
+
+    def _write(variant: str, **modules: str) -> Path:
+        d = tmp_path / variant
+        d.mkdir(parents=True, exist_ok=True)
+        for name, source in modules.items():
+            (d / f"{name}.py").write_text(source)
+        monkeypatch.syspath_prepend(d)
+        _module_file.cache_clear()
+        return d
+
+    yield _write
+    _module_file.cache_clear()
+
+
+def _deferred_parts(load_module, deferred_modules, task_src: str, variant: str, **modules: str) -> tuple[str, dict]:
+    """Fingerprint a task whose body imports *modules* — which are on the path but
+    deliberately never imported, as a driver process would leave them."""
+    deferred_modules(variant, **modules)
+    return task_key_parts(load_module("tasks", task_src, variant).task, (1,))
+
+
+@pytest.mark.parametrize(
+    "task_src,extra",
+    [(TASK_DEFERRED, {}), (TASK_DEFERRED_MOD, {}), (TASK_DEFERRED_INDIRECT, {"wrapper": WRAPPER})],
+    ids=["from-import", "module import", "through another module"],
+)
+def test_deferred_imports_are_tracked(load_module, deferred_modules, task_src: str, extra: dict[str, str]):
+    """A task that imports project code *inside its body* — the usual way to keep a
+    driver light when the import pulls jax — still depends on that code. Editing it
+    must move the evidence, whether the task imports the helper directly or reaches
+    it through a module that does, or the next wake serves a stale memo hit."""
+    key_v1, p_v1 = _deferred_parts(load_module, deferred_modules, task_src, "a", helpers=HELPER_V1, **extra)
+    key_v2, p_v2 = _deferred_parts(load_module, deferred_modules, task_src, "b", helpers=HELPER_V2, **extra)
+    _, p_copy = _deferred_parts(load_module, deferred_modules, task_src, "c", helpers=HELPER_V1, **extra)
+    assert p_v1["code_fp"] != p_v2["code_fp"], "deferred-import edit invisible — stale results would be served"
+    assert key_v1 == key_v2, "the edit re-keyed the task — record/logs/history would be orphaned"
+    assert p_copy["code_fp"] == p_v1["code_fp"], "identical source must fingerprint identically"
+    assert "module:helpers" in p_v1["deps"], "explain should name the module that moved"
+
+
+def test_deferred_library_imports_are_not_tracked(load_module, deferred_modules):
+    """Only *project* modules join the evidence: a deferred ``import json`` reaches
+    the stdlib, whose churn must not invalidate anyone's cache."""
+    src = "def task(x):\n    import json\n\n    from helpers import helper\n\n    return json.dumps(helper(x))\n"
+    _, parts = _deferred_parts(load_module, deferred_modules, src, "a", helpers=HELPER_V1)
+    assert "module:helpers" in parts["deps"]
+    assert not [k for k in parts["deps"] if k.startswith("module:json")]
 
 
 def _key_and_parts(load_module, task_src: str, helper_src: str, variant: str) -> tuple[str, dict]:

@@ -470,19 +470,11 @@ def publish_results(results: list[dict], stats: dict, checkpoints: dict, evals: 
 
 
 def main(ctx: Ctx) -> dict:
-    # eval_one imports the geometry helpers locally, so the evidence fingerprint can't
-    # reach them or the LANDMARKS they read. Tag the eval map with both the landmark
-    # scheme and the measurement module's source, so a probe change re-runs the cells.
-    # Hashing LANDMARKS alone was not enough: it would have served stale arrays for a
-    # change to `probe_maps` that left the scheme alone. See todo-eng.
-    import hashlib
-    import inspect
-
-    from sca.compute import geometry
-    from sca.data.mixed_vocab import LANDMARKS
-
-    lm_tag = "lm-" + hashlib.sha1((repr(LANDMARKS) + inspect.getsource(geometry)).encode()).hexdigest()[:8]
-
+    # The eval map used to carry a hand-rolled `version=` tag hashing the geometry
+    # module and the landmark scheme, because eval_one imports both inside its body
+    # and the evidence fingerprint couldn't see past that. It now traces deferred
+    # imports itself (mini.memo), so the tag is redundant and the general mechanism
+    # covers a change anywhere in the reached modules.
     corpora = sorted({corpus_key(arm) for arm in ARMS.values()})
     specs = {corpus_key(arm): arm for arm in ARMS.values()}
     preps = ctx.map(
@@ -505,7 +497,6 @@ def main(ctx: Ctx) -> dict:
         arms,
         labels,
         role="eval",
-        version=lm_tag,
     )
     stats = {p["key"]: p["stats"] for p in preps}
     ckpts = dict(zip(labels, [t["checkpoint"] for t in trained], strict=True))

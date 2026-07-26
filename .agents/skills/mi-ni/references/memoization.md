@@ -19,7 +19,9 @@ results — are in [recovery.md](./recovery.md).
 
 ```
 key      = {fn name}-hash(fn's module-qualified name + fingerprint(inputs))
-evidence = fingerprint(source(fn) + source(project fns/classes fn calls, transitively)) + version
+evidence = fingerprint(source(fn)
+                       + source(project fns/classes fn calls, transitively)
+                       + source(project modules fn imports in its own body)) + version
 ```
 
 - **Inputs are the identity.** Plain data (dict/list/tuple/str/num, dataclasses,
@@ -39,6 +41,14 @@ evidence = fingerprint(source(fn) + source(project fns/classes fn calls, transit
   reads (a module-level `LR`, a config table), so editing any of them re-runs the
   task. **Site-packages and the mini framework are excluded**, so library churn
   (or editing mini itself) doesn't bust your cache.
+- **Deferred imports count too.** A task that imports inside its own body —
+  the usual way to keep the driver and CLI light when the import pulls jax —
+  gets the *whole source* of each project module it names, plus that module's
+  own project imports, transitively. Those modules are located by searching
+  `sys.path`, never imported, so the deferred import stays deferred. Coarser
+  than the reference walk above (module granularity, not per-helper), so an
+  unrelated edit in a reached module re-runs the task. Prefer a module-level
+  import where the weight allows; reach for a deferred one when it doesn't.
 - **`version=` is explicit evidence** — bump it to force a re-run without editing
   code. Like a code edit, the bump lands as a new attempt on the same record.
 

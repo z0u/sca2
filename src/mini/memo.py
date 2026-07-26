@@ -8,9 +8,10 @@ A task record answers two different questions, and the store keeps them apart:
   logs, results, history) keeps one address for the task's whole life.
 - **Validity — is the cached result current?** The *evidence* stored on each
   attempt: a fingerprint of the fn's source plus the source of the project
-  functions/classes it references (transitively), and the explicit ``version=``.
-  Stale evidence re-runs the task **in place** — a new attempt under the same
-  key, with the prior attempt compacted into the record's ``history``.
+  functions/classes it references (transitively), the modules it imports
+  *inside its own body*, and the explicit ``version=``. Stale evidence re-runs
+  the task **in place** — a new attempt under the same key, with the prior
+  attempt compacted into the record's ``history``.
 
 Both fingerprints must be **deterministic across processes** (every agent wake
 is a fresh process) — hashing ``cloudpickle.dumps(fn)`` fails that (its bytes
@@ -20,6 +21,7 @@ vary run to run), so we fingerprint *source*, which also ignores library churn
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import dis
 import enum
@@ -30,6 +32,7 @@ import inspect
 import json
 import logging
 import secrets
+import sys
 import time
 import types
 from abc import ABC, abstractmethod
@@ -59,15 +62,17 @@ _MINI_DIR = str(Path(__file__).parent.resolve())
 META_KEY = "__run__"
 
 
+def _is_project_file(path: str | Path) -> bool:
+    rf = str(Path(path).resolve())
+    return "site-packages" not in rf and "/lib/python3" not in rf and not rf.startswith(_MINI_DIR)
+
+
 def _is_project_source(obj: Any) -> bool:
     try:
         f = inspect.getsourcefile(obj)
     except TypeError, OSError:
         return False
-    if not f:
-        return False
-    rf = str(Path(f).resolve())
-    return "site-packages" not in rf and "/lib/python3" not in rf and not rf.startswith(_MINI_DIR)
+    return bool(f) and _is_project_file(cast(str, f))
 
 
 def _nested_codes(code: types.CodeType) -> Iterator[types.CodeType]:
@@ -168,6 +173,143 @@ def _named_refs(fn: Callable) -> list[tuple[str | None, Any]]:
     return refs + [(None, obj) for obj in _attr_chain_refs(fn)]
 
 
+# ---------------------------------------------------------------------------
+# Deferred (function-local) imports
+#
+# A task that keeps the driver light by importing inside its body —
+# ``def eval_one(...): from sca.compute.geometry import probe_maps`` — reaches
+# project code the reference walk above cannot see: the module never lands in
+# the fn's globals, so editing it used to serve a silent stale hit. We read
+# those modules' *source files* instead and fold the text in, following each
+# file's own project imports transitively.
+#
+# Coarser than the reference walk (a whole module, rather than the helpers
+# actually called), and deliberately so: telling which helpers are used would
+# mean importing the module, which is the very cost the deferred import exists
+# to avoid. The price is over-invalidation — editing anything in a reached
+# module re-runs the task — which is the safe direction to err.
+# ---------------------------------------------------------------------------
+
+# Ceiling on how far the transitive module walk spreads. A project's import
+# graph is small; the cap just stops a pathological one from dominating a
+# fingerprint.
+_MAX_DEFERRED_MODULES = 200
+
+
+@functools.cache
+def _module_file(name: str) -> Path | None:
+    """The source file for dotted module *name*, found by searching ``sys.path``.
+
+    Deliberately not ``importlib.util.find_spec``: that imports parent packages,
+    and a deferred import exists precisely because importing here is expensive.
+    A plain path search reads nothing and executes nothing. Cached — ``sys.path``
+    doesn't meaningfully move within a process.
+    """
+    rel = Path(*name.split("."))
+    for entry in sys.path:
+        if not entry:
+            continue
+        for cand in (Path(entry) / rel.with_suffix(".py"), Path(entry) / rel / "__init__.py"):
+            if cand.is_file():
+                return cand
+    return None
+
+
+def _resolve_relative(pkg: str, module: str | None, level: int) -> str | None:
+    """Absolute dotted name for ``from <level dots><module> import …`` inside *pkg*."""
+    if level == 0:
+        return module
+    parts = pkg.split(".") if pkg else []
+    if level - 1 > len(parts):
+        return None  # climbs past the top — nothing to resolve against
+    base = parts[: len(parts) - (level - 1)]
+    return ".".join([*base, *([module] if module else [])]) or None
+
+
+def _import_candidates(module: str | None, names: list[str]) -> list[str]:
+    """Every dotted module an import statement may name.
+
+    ``from sca.data import mixed_vocab`` reads as the package *and* the submodule
+    (only one of which exists), and ``import a.b.c`` executes all three packages
+    on the way down — so each form expands to its whole chain and the caller
+    keeps whichever resolve to real files.
+    """
+    if not module:
+        return []
+    parts = module.split(".")
+    chain = [".".join(parts[: i + 1]) for i in range(len(parts))]
+    return chain + [f"{module}.{n}" for n in names]
+
+
+def _bytecode_imports(fn: Callable) -> list[str]:
+    """Modules *fn*'s own body imports, from its bytecode (all nested code objects).
+
+    ``IMPORT_NAME`` carries the module; the two values pushed before it are the
+    relative ``level`` and the fromlist, and the ``IMPORT_FROM``s that follow name
+    what was pulled out of it.
+    """
+    code = getattr(fn, "__code__", None)
+    if code is None:
+        return []
+    pkg = getattr(sys.modules.get(getattr(fn, "__module__", "") or ""), "__package__", "") or ""
+    out: list[str] = []
+    for c in _nested_codes(code):
+        consts: list[Any] = []  # the last two values pushed (level, fromlist)
+        pending: str | None = None
+        for ins in dis.get_instructions(c):
+            match ins.opname:
+                case "LOAD_CONST" | "LOAD_SMALL_INT":
+                    consts = [*consts, ins.argval][-2:]
+                case "IMPORT_NAME":
+                    level = next((v for v in consts if isinstance(v, int)), 0)
+                    fromlist = next((v for v in consts if isinstance(v, tuple)), ())
+                    pending = _resolve_relative(pkg, ins.argval, level)
+                    out += _import_candidates(pending, list(fromlist))
+                case "IMPORT_FROM" if pending:
+                    out += _import_candidates(pending, [ins.argval])
+                case _:
+                    consts = []
+    return out
+
+
+def _module_imports(source: str, name: str, path: Path) -> list[str]:
+    """Every project-module candidate *source* imports, at any nesting depth."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    pkg = name if path.name == "__init__.py" else name.rpartition(".")[0]
+    out: list[str] = []
+    for node in ast.walk(tree):
+        match node:
+            case ast.Import(names=aliases):
+                for alias in aliases:
+                    out += _import_candidates(alias.name, [])
+            case ast.ImportFrom(module=mod, names=aliases, level=level):
+                if base := _resolve_relative(pkg, mod, level):
+                    out += _import_candidates(base, [a.name for a in aliases])
+    return out
+
+
+def _collect_module(name: str, seen: dict[str, str]) -> None:
+    """Fold a project module's source into *seen*, then follow its own imports."""
+    tag = f"module:{name}"
+    if tag in seen:
+        return
+    path = _module_file(name)
+    if path is None or not _is_project_file(path):
+        return  # stdlib, an installed package, mini itself, or not on the path at all
+    try:
+        seen[tag] = path.read_text()
+    except OSError:
+        return
+    if sum(k.startswith("module:") for k in seen) >= _MAX_DEFERRED_MODULES:
+        log.warning("deferred-import walk hit its %d-module ceiling at %s", _MAX_DEFERRED_MODULES, name)
+        return
+    for dep in _module_imports(seen[tag], name, path):
+        _collect_module(dep, seen)
+
+
 def _collect_sources(fn: Callable, seen: dict[str, str]) -> None:
     qualname = getattr(fn, "__qualname__", repr(fn))
     if qualname in seen:
@@ -189,6 +331,8 @@ def _collect_sources(fn: Callable, seen: dict[str, str]) -> None:
             # editing code. Skipped when it has no stable encoding (see _value_json).
             if (js := _value_json(obj)) is not None:
                 seen[f"{qualname}::{name}"] = js
+    for module in _bytecode_imports(fn):
+        _collect_module(module, seen)
 
 
 @functools.lru_cache(maxsize=256)
