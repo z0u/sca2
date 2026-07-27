@@ -473,8 +473,9 @@ def main(ctx: Ctx) -> dict:
     # The eval map used to carry a hand-rolled `version=` tag hashing the geometry
     # module and the landmark scheme, because eval_one imports both inside its body
     # and the evidence fingerprint couldn't see past that. It now traces deferred
-    # imports itself (mini.memo), so the tag is redundant and the general mechanism
-    # covers a change anywhere in the reached modules.
+    # imports itself (mini.memo), down to the names imported, so the tag is
+    # redundant and the general mechanism covers a change to anything eval_one
+    # actually reaches.
     corpora = sorted({corpus_key(arm) for arm in ARMS.values()})
     specs = {corpus_key(arm): arm for arm in ARMS.values()}
     preps = ctx.map(

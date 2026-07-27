@@ -41,14 +41,19 @@ evidence = fingerprint(source(fn)
   reads (a module-level `LR`, a config table), so editing any of them re-runs the
   task. **Site-packages and the mini framework are excluded**, so library churn
   (or editing mini itself) doesn't bust your cache.
-- **Deferred imports count too.** A task that imports inside its own body —
-  the usual way to keep the driver and CLI light when the import pulls jax —
-  gets the *whole source* of each project module it names, plus that module's
-  own project imports, transitively. Those modules are located by searching
-  `sys.path`, never imported, so the deferred import stays deferred. Coarser
-  than the reference walk above (module granularity, not per-helper), so an
-  unrelated edit in a reached module re-runs the task. Prefer a module-level
-  import where the weight allows; reach for a deferred one when it doesn't.
+- **Deferred imports count too, at the same granularity.** A task that imports
+  inside its own body — the usual way to keep the driver and CLI light when the
+  import pulls jax — gets the source of each *name* it imports, plus whatever
+  those names reference, transitively. `from sca.compute.geometry import
+  probe_maps` tracks `probe_maps` and its callees, not the other twenty
+  functions in the file; `from sca.data import mixed_vocab as mv` followed by
+  `mv.lift(...)` tracks `lift`. Modules are located by searching `sys.path` and
+  read as text, never imported, so the deferred import stays deferred. Where
+  source can't say what a name binds — a star-import, a name defined inside an
+  `if`, an alias passed around as a value rather than dotted into — the whole
+  module counts instead. Same for a plain `import x`: the name reached through
+  it isn't readable off the statement. So `from x import y` is both cheaper and
+  more precise than `import x`.
 - **`version=` is explicit evidence** — bump it to force a re-run without editing
   code. Like a code edit, the bump lands as a new attempt on the same record.
 

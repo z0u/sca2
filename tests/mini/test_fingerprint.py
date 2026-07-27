@@ -70,7 +70,11 @@ def deferred_modules(tmp_path: Path, monkeypatch):
     the resolver's path cache is cleared between them — within a real process a
     module name maps to one file, so the cache is only wrong here.
     """
-    from mini.memo import _module_file
+    from mini.memo import _module_file, _module_index
+
+    def _clear() -> None:
+        _module_file.cache_clear()
+        _module_index.cache_clear()
 
     def _write(variant: str, **modules: str) -> Path:
         d = tmp_path / variant
@@ -78,11 +82,11 @@ def deferred_modules(tmp_path: Path, monkeypatch):
         for name, source in modules.items():
             (d / f"{name}.py").write_text(source)
         monkeypatch.syspath_prepend(d)
-        _module_file.cache_clear()
+        _clear()
         return d
 
     yield _write
-    _module_file.cache_clear()
+    _clear()
 
 
 def _deferred_parts(load_module, deferred_modules, task_src: str, variant: str, **modules: str) -> tuple[str, dict]:
@@ -93,22 +97,30 @@ def _deferred_parts(load_module, deferred_modules, task_src: str, variant: str, 
 
 
 @pytest.mark.parametrize(
-    "task_src,extra",
-    [(TASK_DEFERRED, {}), (TASK_DEFERRED_MOD, {}), (TASK_DEFERRED_INDIRECT, {"wrapper": WRAPPER})],
+    "task_src,dep,extra",
+    [
+        (TASK_DEFERRED, "helpers:helper", {}),
+        (TASK_DEFERRED_MOD, "module:helpers", {}),
+        (TASK_DEFERRED_INDIRECT, "helpers:helper", {"wrapper": WRAPPER}),
+    ],
     ids=["from-import", "module import", "through another module"],
 )
-def test_deferred_imports_are_tracked(load_module, deferred_modules, task_src: str, extra: dict[str, str]):
+def test_deferred_imports_are_tracked(load_module, deferred_modules, task_src: str, dep: str, extra: dict[str, str]):
     """A task that imports project code *inside its body* — the usual way to keep a
     driver light when the import pulls jax — still depends on that code. Editing it
     must move the evidence, whether the task imports the helper directly or reaches
-    it through a module that does, or the next wake serves a stale memo hit."""
+    it through a module that does, or the next wake serves a stale memo hit.
+
+    ``explain`` should name what moved as precisely as the import allowed: the
+    helper itself for a ``from`` import, the whole module for a plain ``import``,
+    where the name reached through it can't be read off the source."""
     key_v1, p_v1 = _deferred_parts(load_module, deferred_modules, task_src, "a", helpers=HELPER_V1, **extra)
     key_v2, p_v2 = _deferred_parts(load_module, deferred_modules, task_src, "b", helpers=HELPER_V2, **extra)
     _, p_copy = _deferred_parts(load_module, deferred_modules, task_src, "c", helpers=HELPER_V1, **extra)
     assert p_v1["code_fp"] != p_v2["code_fp"], "deferred-import edit invisible — stale results would be served"
     assert key_v1 == key_v2, "the edit re-keyed the task — record/logs/history would be orphaned"
     assert p_copy["code_fp"] == p_v1["code_fp"], "identical source must fingerprint identically"
-    assert "module:helpers" in p_v1["deps"], "explain should name the module that moved"
+    assert dep in p_v1["deps"], "explain should name what moved"
 
 
 def test_deferred_library_imports_are_not_tracked(load_module, deferred_modules):
@@ -116,8 +128,60 @@ def test_deferred_library_imports_are_not_tracked(load_module, deferred_modules)
     the stdlib, whose churn must not invalidate anyone's cache."""
     src = "def task(x):\n    import json\n\n    from helpers import helper\n\n    return json.dumps(helper(x))\n"
     _, parts = _deferred_parts(load_module, deferred_modules, src, "a", helpers=HELPER_V1)
-    assert "module:helpers" in parts["deps"]
-    assert not [k for k in parts["deps"] if k.startswith("module:json")]
+    assert "helpers:helper" in parts["deps"]
+    assert not [k for k in parts["deps"] if k.startswith(("module:json", "json:"))]
+
+
+BIG_HELPERS = HELPER_V1 + "\n\ndef unrelated(x):\n    return x * 1000\n\nUNUSED = 'a' * 500\n"
+TASK_ALIAS = "def task(x):\n    from pkg import helpers as h\n\n    return h.helper(x)\n"
+TASK_ALIAS_BARE = "def task(x):\n    from pkg import helpers as h\n\n    return h.helper(x) + len(dir(h))\n"
+
+
+@pytest.mark.parametrize("task_src", [TASK_DEFERRED, TASK_DEFERRED_INDIRECT], ids=["direct", "through a wrapper"])
+def test_deferred_evidence_is_the_symbol_not_the_module(load_module, deferred_modules, task_src: str):
+    """The evidence should be the *helper*, not the file it lives in.
+
+    A deferred import is deferred because the module is expensive, which tends to
+    mean it's also big — so taking it whole makes a task depend on hundreds of
+    lines it never calls, and every unrelated edit re-runs it (on ex-2.1.5, half
+    the ``sca`` package for a fn whose real references were a twentieth of that).
+    Editing a sibling function must leave the fingerprint alone."""
+    _, p_v1 = _deferred_parts(load_module, deferred_modules, task_src, "a", helpers=BIG_HELPERS, wrapper=WRAPPER)
+    _, p_edited = _deferred_parts(
+        load_module,
+        deferred_modules,
+        task_src,
+        "b",
+        helpers=BIG_HELPERS.replace("x * 1000", "x * 2000").replace("'a' * 500", "'b' * 500"),
+        wrapper=WRAPPER,
+    )
+    assert p_v1["code_fp"] == p_edited["code_fp"], "an unrelated sibling edit re-ran the task for nothing"
+    assert not [k for k in p_v1["deps"] if k.startswith("module:")], "the module was taken whole"
+
+
+def test_module_alias_narrows_to_the_attributes_reached(load_module, deferred_modules, tmp_path):
+    """``from pkg import helpers as h`` then ``h.helper()`` names one function, so
+    that's what the evidence should be — while ``h`` passed somewhere else could
+    reach anything in the module, and has to take it whole."""
+
+    def parts(task_src: str, helpers: str, variant: str) -> dict:
+        d = tmp_path / variant
+        (d / "pkg").mkdir(parents=True, exist_ok=True)
+        (d / "pkg" / "__init__.py").write_text("")
+        (d / "pkg" / "helpers.py").write_text(helpers)
+        deferred_modules(variant)
+        return task_key_parts(load_module("tasks", task_src, variant).task, (1,))[1]
+
+    narrowed = parts(TASK_ALIAS, BIG_HELPERS, "a")
+    assert "pkg.helpers:helper" in narrowed["deps"]
+    assert "module:pkg.helpers" not in narrowed["deps"]
+    assert narrowed["code_fp"] == parts(TASK_ALIAS, BIG_HELPERS.replace("x * 1000", "x * 2000"), "b")["code_fp"]
+
+    # The same alias handed to `dir()`: what it reaches is no longer readable, so
+    # the whole module counts and the same sibling edit *does* invalidate.
+    whole = parts(TASK_ALIAS_BARE, BIG_HELPERS, "c")
+    assert "module:pkg.helpers" in whole["deps"]
+    assert whole["code_fp"] != parts(TASK_ALIAS_BARE, BIG_HELPERS.replace("x * 1000", "x * 2000"), "d")["code_fp"]
 
 
 def _key_and_parts(load_module, task_src: str, helper_src: str, variant: str) -> tuple[str, dict]:
