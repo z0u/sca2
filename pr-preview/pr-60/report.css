@@ -114,3 +114,21 @@ figure.report-figure > figcaption {
     }
   }
 }
+
+.output .footnote {
+  >ol>li {
+    font-size: 0.9em;
+    transition: 0.3s;
+    opacity: 0.5;
+    &:hover {
+      opacity: 1;
+    }
+  }
+  .footnote-backref {
+    transition: 0.3s;
+    opacity: 0.5;
+    &:hover {
+      opacity: 1;
+    }
+  }
+}
