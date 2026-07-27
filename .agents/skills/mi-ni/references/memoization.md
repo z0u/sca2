@@ -21,8 +21,11 @@ results — are in [recovery.md](./recovery.md).
 key      = {fn name}-hash(fn's module-qualified name + fingerprint(inputs))
 evidence = fingerprint(source(fn)
                        + source(project fns/classes fn calls, transitively)
-                       + source(project modules fn imports in its own body)) + version
+                       + source(what fn imports in its own body)) + version
 ```
+
+`joblib.Memory` and friends stop at the first line of that — why this is `mini`'s own
+code rather than a library's is recorded in [eng/decisions.md](../../../../eng/decisions.md).
 
 - **Inputs are the identity.** Plain data (dict/list/tuple/str/num, dataclasses,
   pydantic models, enums, `Artifact`s) fingerprints deterministically; a *function*

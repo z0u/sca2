@@ -49,6 +49,43 @@
   un-curated runs to compare — so revisit at that planning step. If we do, the cheapest
   first move is per-step time-series persistence in `mini` (extending `emit_metrics` past
   last-writer-wins), not necessarily WandB itself.
+- **No off-the-shelf library for the code fingerprint** (asked 2026-07-27, while narrowing
+  deferred-import evidence). `mini` computes its own answer to "does this cached result
+  still reflect the code?", and the alternatives were checked rather than assumed.
+
+  The field splits on one question: how does the system learn what a computation depends
+  on? Every mature tool answers *you tell it*. Bazel, Nix, DVC and Snakemake take a
+  declared dependency list. [redun](https://insitro.github.io/redun/design.html) hashes a
+  Task's own source and gets transitivity from the fact that a task's dependencies are
+  themselves tasks in the recorded call graph; Hamilton derives the same shape from
+  function signatures. `mini` takes the other branch and *infers* the graph from the code,
+  which is what lets `ctx.map(eval_one, cells)` work on plain Python functions with no
+  framework ceremony — the property that keeps experiment code reading as science. The
+  price of that branch is the code itself: roughly 370 of `memo.py`'s 1100 lines.
+
+  `joblib.Memory` is the closest drop-in and fails on the case that prompted ours. It
+  watches only the decorated function's source, so editing a helper it calls still serves
+  a hit — joblib [#1287](https://github.com/joblib/joblib/issues/1287) and
+  [#1621](https://github.com/joblib/joblib/issues/1621), both open and treated as a design
+  choice rather than a gap. That is the failure ex-2.1.5 hit twice.
+
+  The *static* half could be outsourced: [Griffe](https://mkdocstrings.github.io/griffe/)
+  parses a package into an object model without importing it and resolves aliases and
+  re-exports, which is what `_module_index`/`_resolve_ref` do by hand (`jedi` would also
+  serve). The *bytecode* half could not. It starts from a live function object and asks
+  what that object reaches through closures, attribute chains and deferred imports, where
+  every static tool starts from a module path — and `ctx.map` is handed a function, so we
+  are on the wrong side of that line by construction.
+
+  **Revisit when the fingerprint needs another round of edge-case repairs.** Three surfaced
+  in one sitting while narrowing the evidence: a closure-cell load reading as a bare use,
+  decorators falling outside a definition's source segment, module docstrings counting as
+  import-time behavior. Each silently changes what invalidates, which is the direction that
+  costs results rather than time. At the next round, put Griffe under the static half
+  before reopening the declare-vs-infer branch — it is the smaller move and it retires most
+  of the surface. What the fingerprint covers today is in
+  [memoization.md](../.agents/skills/mi-ni/references/memoization.md).
+
 - **The worker's `HFStore` warm cache lives on container-local disk, not the mounted
   Volume** (`WORKER_STORE_CACHE`). Under the mount it was committed alongside results,
   so every bucket artifact grew a second, redundant copy on the per-experiment Volume.
