@@ -46,7 +46,7 @@ Anti-patterns:
 - One move per paragraph. Prefer several short paragraphs over one dense one; don't pack too much into a single sentence held together by dashes.
 - Declare intent: say what's coming in plain first person, rather than framing it nominally after the fact. "Let's get a baseline before we anchor anything." "We will measure two things."
 - State results where they first become visible. When introducing a figure whose outcome is known, say the outcome ("...and we find the model fails this task").
-- Keep commentary adjacent to what it explains. Introduce a figure with a sentence or two (what's plotted, how to read it), show it, then interpret.
+- Keep commentary adjacent to what it explains. Introduce a figure with a sentence or two (what's plotted, how to read it, and the headline outcome), show it, then interpret. A sentence that points at a visual feature ("the upper hairline lifting away at `=`") must come after the figure it points at.
 - A small table for enumerable examples the text refers back to; inline numbering for alternatives ("answerable two ways: 1. recall..., or 2. composition...").
 - Cut tangents. A detail that serves another section belongs there or nowhere; use cross-references and forward-references sparingly.
 

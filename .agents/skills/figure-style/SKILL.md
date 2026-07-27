@@ -142,6 +142,14 @@ mode — rather than a heavier stroke.
 Give every figure alt text (see the alt-text skill), and set titles on the
 figure, not in surrounding Markdown, so exported PNGs are self-contained.
 
+A caption decodes the ink: what the rows, columns, marks, and shading mean,
+and how to read an unusual encoding. Findings, controls, and interpretation
+belong in prose cells near the figure, not in the caption — a result quoted
+only in a caption is easy to miss and hard to cross-reference. When an
+encoding needs a word of interpretation to be readable at all (say, what a
+step across an elided region signifies), keep one clause in the caption and
+put the supporting evidence in prose.
+
 Sequential/heatmap palettes must be theme-adaptive too: `@themed` renders a
 light and a dark variant, so pick the colormap itself with `light_dark(...)`
 rather than hard-coding a light-only map like `"Blues"`, whose pale low end

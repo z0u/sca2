@@ -187,11 +187,11 @@ def _(stats):
         name="palettes",
         alt_text="""
             Two color-cube panels, each a hexagonal silhouette of the RGB cube
-            standing on its black corner, with data-colored dots. Left: the 140
-            farthest-point xkcd names, evenly spaced through the whole solid with
-            no two dots touching. Right: the 216 randomly sampled hex operands,
-            reaching the same extent but visibly lumpy at close range — touching
-            pairs and triples in some places, bare patches in others.
+            standing on its black corner, with data-colored dots. Left: named
+            colors shown as dots, evenly spaced through the whole solid with no
+            two dots touching. Right: hex colors, reaching the same extent but
+            visibly lumpy at close range — touching pairs and triples in some
+            places, bare patches in others.
         """,
         caption="""
             The two operand sets in the RGB cube (center corpus). Left: the 140
@@ -262,15 +262,15 @@ def _(arrays, stats):
     {_hex[2]:.0f}, against {_typical[2]:.0f} for the typical draw, and
     {_better_gap * 100:.0f}% of draws leave a wider hole.
 
-    Whether that biases the *geometry* is a separate question, and the sweep
-    already carries the control. The *hex-dense* cell draws 2,048 operands from
-    the same grid — a tenth of the spacing, and no visible clumping — and its
-    hex probe map is the same map: the two cells' depth × landmark maps
-    correlate {_corr_lo:.2f} to {_corr_hi:.2f} across the three targets, with a
-    mean absolute difference of at most {_dmax:.2f} in $R^2$. The two cells also
-    answer held-out hex equations equally well (see the density arms under H1).
-    Nothing about the hex form's layout appears to be an artifact of the
-    216-point draw, so the same should hold for what transfers out of it.
+    Whether that biases the *geometry* is answered by the sweep. The *hex-dense*
+    cell draws 2,048 operands from the same grid — a tenth of the spacing, and
+    no visible clumping — and its hex probe map is the same map: the two cells'
+    depth × landmark maps correlate {_corr_lo:.2f} to {_corr_hi:.2f} across the
+    three targets, with a mean absolute difference of at most {_dmax:.2f} in
+    $R^2$. The two cells also answer held-out hex equations equally well (see
+    the density arms under H1). Nothing about the hex form's layout appears to
+    be an artifact of the 216-point draw, so the same should hold for what
+    transfers out of it.
     ///
     """)
     return
@@ -336,13 +336,12 @@ def _():
     hand-picked probe sites of earlier reports with a map, so the alignment
     measures below don't depend on us choosing the right position in advance.
 
-    /// note | Amendment: a second holdout (2026-07-26, after seeing the data)
+    /// note | Amendment: a second holdout
     The preregistered estimator holds out one *equation* at a time. A colour or
     a hex digit therefore appears in both the fit and the held-out row, so the
     probe may recover a value by memorizing an identity → value table. That is
-    the right measurement for asking whether a value is *present* at a site —
-    and one analysis below turns on it — but H2's claims are about latent
-    geometry, which is a different question.
+    the right measurement for asking whether a value is present at a site, and
+    one analysis below turns on it. But H2's claims are about latent geometry.
 
     So each site is now also scored under a second holdout: every row carrying
     that value, as either operand or the answer, leaves the fit together, and
@@ -352,14 +351,14 @@ def _():
     operand 2 in another.
 
     Both are reported. The preregistered one decides H2, and the two agree at
-    the site that does so (0.944 against 0.941), so nothing here turns on the
-    choice; where they come apart is stated explicitly. Two landmarks were also
-    added — the spaces closing each operand — after the strict holdout showed a
-    named operand's value sits on them rather than on the name's characters.
+    the site used for that decision (0.944 against 0.941). Two landmarks were
+    also added — the spaces closing each operand — after the strict holdout
+    showed a named operand's value sits on them rather than on the name's
+    characters.
     ///
 
-    One subtlety: token positions don't line up across lines — names vary in
-    length, and hex lines are shorter than named ones. Positions are therefore
+    One subtlety: token positions don't naturally line up. Names vary in length,
+    and hex expressions are shorter than named ones. Positions are therefore
     indexed by grammar landmarks (the last character of each operand, the
     operator, the pre-answer position, and answer characters counted from the
     answer's start and end), and the cross-form measures compare only at
@@ -419,12 +418,6 @@ def _():
     mo.md(r"""
     ## The sweep
 
-    <!-- Run plan (ops, not report content): 8 cells × 3 seeds = 24 runs. The
-    GPU container cap is 10; run with max 5 containers so each handles ~5
-    cells and the per-container startup time amortizes. Block size must be
-    ≥ ~96 (lines reach ~86 chars with the multi-word names); earlier
-    experiments used 64. -->
-
     A star design around one center cell, three seeds per cell:
 
     | Cell        | Names | Hex ops | Bridge | Width | Depth |
@@ -438,13 +431,14 @@ def _():
     | palette-250 | 250   | 216     | none   | 64    | 4     |
     | bridge      | 140   | 216     | cross  | 64    | 4     |
 
-    Each arm has a reading. L8, the width cells, and d16-L8 score H4 and H6;
-    the bridge cell scores H5. The two density arms attach to H1: *hex-dense*
-    checks that hex accuracy and geometry aren't artifacts of the 216-point
-    operand subset (expected: little change — ex-2.1.1's hex arithmetic
-    generalized from far sparser coverage), and *palette-250* extends the
-    density axis of ex-2.1.3 to the irregular palette (expected: named
-    held-out accuracy holds or improves, with misses staying neighbor-level).
+    Each arm provides data to score the hypotheses. L8, the width cells, and
+    d16-L8 score H4 and H6; the bridge cell scores H5. The two density arms
+    attach to H1: *hex-dense* checks that hex accuracy and geometry aren't
+    artifacts of the 216-point operand subset (expected: little change —
+    ex-2.1.1's hex arithmetic generalized from far sparser coverage), and
+    *palette-250* extends the density axis of ex-2.1.3 to the irregular palette
+    (expected: named held-out accuracy holds or improves, with misses staying
+    neighbor-level).
 
     Attention is held at 8 heads × 8 dims in every cell; only the residual
     stream and the MLP scale with width. The ngpt-scaling sweep validated
@@ -472,7 +466,8 @@ def _(cells):
     4 corpora, 24 training cells, 24 evals.
 
     /// details | Runtime
-    The sweep ran in about 2.5 hours of wall time on five L4 containers. It would have been faster, but there were cross-region I/O issues.
+    The sweep ran in about 2.5 hours of wall time on five L4 containers. It
+    would have been faster, but there were cross-region I/O issues.
     ///
 
     <div class="report-table-scroll"><table class="report-table">{_thead}{_rows}</table></div>
@@ -538,7 +533,7 @@ def _():
     completions in any of its eval sets. The named score sits far above the
     prompt-blind centroid (0.043). One null simplified itself: in this
     language the true answer *is* the candidate nearest the mix, so the
-    $k$-NN neighborhood null is exactly $1/k$ — the strongest version is a
+    $k$-NN neighborhood null is exactly $1/k$. The strongest version is a
     coin flip between the two nearest candidates at 0.5, and the model
     clears that too, by a margin the 1,946 held-out named pairs can resolve.
     """)
@@ -572,9 +567,9 @@ def _(seed_mean, stats):
             mo.md("""
             Center cell, mean over three seeds. Distances are Euclidean in the
             unit cube: *guess dist* from the emitted answer to the exact mix,
-            *floor dist* from the true (snapped) answer to the exact mix — the
-            quantization floor. The guesses sit near the floor even where
-            exact match misses.
+            *floor dist* from the true answer to the exact mix (the quantization
+            floor). The guesses sit near the floor even where exact match
+            misses.
             """),
         ]
     )
@@ -585,20 +580,18 @@ def _(seed_mean, stats):
 def _():
     mo.md(r"""
     Named accuracy is well short of 1 even on pairs the model trained on
-    (0.841), which reads at first like a model that never learned the
-    geometry — ex-2.1.3 answered a 216-color named vocabulary at ≈ 1.0. The
-    two numbers are not asking the same question, and the difference is in
-    the palette rather than in the model. Ex-2.1.3's colors sat on a regular
-    sub-grid closed under mixing, so an answer landed *on* a vocabulary point
-    with the runner-up a full grid step (0.2 of the unit cube) away; here the
-    answer is the nearest of 140 irregularly placed names, and the median gap
-    between the nearest and the second-nearest is 0.033 — six times finer.
-    Under "The named ceiling is a resolution limit" in the exploratory
-    section, accuracy tracks that gap prompt by prompt, and one
-    effective-precision figure of ≈ 0.033 per channel accounts for this
-    experiment's named accuracy and for the earlier grids' being nearly
-    saturated. So the geometry is present and the resolution is what runs
-    out — the same conclusion ex-2.1.3 reached at its own full grid.
+    (0.841), which reads at first like a model that never learned the geometry.
+    In contrast, ex-2.1.3 answered a 216-color named vocabulary at ≈ 1.0.
+
+    Ex-2.1.3's colors sat on a regular sub-grid closed under mixing, so an
+    answer landed on a vocabulary point with the runner-up a full grid step (0.2
+    of the unit cube) away. Here the answer is the nearest of 140 irregularly
+    placed names, and the median gap between the nearest and the second-nearest
+    is six times finer. Under "The named ceiling is a resolution limit" in the
+    exploratory section, accuracy tracks that gap prompt by prompt, and one
+    effective-precision figure per channel accounts for this experiment's named
+    accuracy and for the earlier grids' being nearly saturated. So the geometry
+    is present and the resolution is what runs out, just like in ex-2.1.3.
     """)
     return
 
@@ -608,9 +601,7 @@ def _(arrays):
     @themed(
         name="miss-ranks",
         alt_text="""
-            Two bar panels of guess rank, pooled over three seeds of the center
-            cell. Rank 0 means the emitted answer is the candidate nearest the
-            true mix, i.e. correct. For named held-out prompts, about two
+            Two bar panels of guess rank. For named held-out prompts, about two
             thirds of the mass is at rank 0 and most of the rest at ranks 1 and
             2, with a small tail beyond 6. For hex held-out prompts virtually
             all mass is at rank 0.
@@ -671,7 +662,7 @@ def _(seed_mean, stats):
             insensitive to the operand-subset size, as expected. At 250 names
             the mean named held-out accuracy drops to 0.564, in the predicted
             direction — the answer perplexity is 153 against 86 — though the
-            three seeds run 0.47 to 0.66, so the effect is soft. The hex-dense
+            three seeds span 0.47 to 0.66, so the effect is soft. The hex-dense
             mean of 0.582 looked at first like an unpredicted dip under denser
             hex operands, but it rests on one seed (0.39 against 0.67 and 0.69);
             the other two match the center cell, so there is little evidence of
@@ -733,14 +724,13 @@ def _(precision, stats):
     }
 
     mo.md(f"""
-    More names and fewer correct answers is a strange pairing, so it is worth
-    saying what it is not. Every cell in this table is d64-L4 with the same
-    parameter count, and the 250-name corpus has the same 100,000 lines, so
-    neither capacity nor data volume changed. Two other things did, and each
-    pushes the same way.
+    More names and fewer correct answers is a strange pairing. Every cell in
+    this table is d64-L4 with the same parameter count, and the 250-name corpus
+    has the same 100,000 lines, so neither capacity nor data volume changed. Two
+    other things did change, and we think they explain it.
 
-    The question got finer. The median gap between the nearest and
-    second-nearest name to the exact mix falls from
+    First, answering correctly became harder. The median gap between the nearest
+    and second-nearest name to the exact mix falls from
     {np.median(_c["margin"]):.3f} to {np.median(_p["margin"]):.3f} of the unit
     cube, so more prompts ask the model to place the mix inside a tighter
     boundary. Holding that difficulty to one side —
@@ -749,8 +739,8 @@ def _(precision, stats):
     observed {_p["hit"].mean():.3f}, so roughly half of the drop from
     {_c["hit"].mean():.3f} is the harder snap alone.
 
-    And the supervision per pair thinned. The same ≈ 50,000 named lines now
-    spread over {stats["n250-h216"]["n_seen_distinct"]["named"]:,} distinct
+    And second, the supervision per pair thinned. The same ≈ 50,000 named lines
+    now spread over {stats["n250-h216"]["n_seen_distinct"]["named"]:,} distinct
     training pairs instead of
     {stats["n140-h216"]["n_seen_distinct"]["named"]:,} —
     {_per_pair["n250-h216"]:.1f} lines per pair against
@@ -768,7 +758,9 @@ def _(precision, stats):
     Neither reading needs a capacity limit, and the residual gap after
     standardizing ({_p["hit"].mean():.3f} against {_standardized:.3f}) is small
     enough that three seeds cannot separate a genuine precision cost from the
-    seed spread. The width sweep is where capacity gets tested directly (H4).
+    seed spread.
+
+    We'll look at capacity more closely in the width sweep (H4), below.
     """)
     return
 
@@ -779,11 +771,8 @@ def _():
     ## Within-form geometry (H2)
 
     The figure below plots probe $R^2$ at every depth × landmark, for the two
-    operands and the mix, per form (center cell; depth 0 is the embedding
-    layer), one line per RGB channel with the three-seed spread behind it.
-    It uses the stricter of the two holdouts described under Measurements:
-    every row carrying a value leaves the fit along with it, so a plateau here
-    is a value the probe can *place*, not one it can look up.
+    operands and the mix, per form; center cell of the sweep only.
+    We used the stricter of the two holdouts described under Measurements.
 
     **The named form matches the prediction.** The mix is decodable at $R^2 =
     0.94$ at the pre-answer position in the last layer, and all three seeds
