@@ -29,8 +29,10 @@ does this comparison for you and puts the result in the attention list, each
 entry carrying a `cause`. Read the causes rather than re-deriving them:
 
 - Throughput: a task under ⅓ of its siblings' median `steps_per_min` reads
-  *running under a third of the sibling median*. Name it, its
-  container/region, and what differs about its environment.
+  *N steps/min — under a third of the sibling median (M)*. Name it, its
+  container/region, and what differs about its environment. It compares cells
+  of the same fn, so check first that they're doing comparable work — a sweep
+  over model sizes will flag its big cells, and that's expected.
 - Duration: a task whose projected finish (remaining steps ÷ rate) lands past
   its role timeout reads *projected Nm to finish, past its Mm timeout*. It
   will be killed and lose its work — report that *before* it happens.

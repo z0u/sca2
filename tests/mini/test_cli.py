@@ -748,6 +748,31 @@ def test_status_flags_deviation_from_expectation(tmp_path: Path, monkeypatch, ca
     assert "rising" in flagged["t-rising"]
 
 
+def test_deviation_flags_let_go_of_a_finished_task(tmp_path: Path, monkeypatch, capsys):
+    """The deviation flags describe a task *now*. A settled record keeps the numbers
+    from its final window forever, so without a state guard a cell whose last minute
+    was slow reads "under a third of the sibling median" after it finished, and a
+    loss that ticked up at the end parks a completed run in the attention list for
+    good — which would make "healthy means the scan came back clean" unreachable."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "settledexp")
+    for i in range(3):
+        store.records_backend.merge(f"t-fast{i}", _running(f"t-fast{i}", steps_per_min=3000))
+    store.records_backend.merge(
+        "t-was-slow", _running("t-was-slow", state="done", steps_per_min=100, metrics_rising={"loss": 9})
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="settledexp", app="local", json=True, brief=True))
+    assert "attention" not in json.loads(capsys.readouterr().out)
+
+
 def test_throughput_outlier_needs_a_fleet_to_compare_against(tmp_path: Path, monkeypatch, capsys):
     """Two cells are not a distribution: with too few reporters there is no
     expectation to deviate from, and flagging the slower of a pair would cry wolf

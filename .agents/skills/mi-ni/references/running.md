@@ -89,10 +89,12 @@ half is **deviation from expectation**, because a run can misbehave while every
 liveness check reads green — so `status` does the comparing and puts a `cause`
 on each attention entry:
 
-- *running under a third of the sibling median* — the cells of a fan-out are
-  each other's yardstick, so a container placed badly (or throttled) shows up
-  against the median `steps_per_min` of its siblings. Needs three reporting
-  siblings before there's a distribution to speak of.
+- *N steps/min — under a third of the sibling median (M)* — the cells of a
+  fan-out are each other's yardstick, so a container placed badly (or throttled)
+  shows up against the median `steps_per_min` of its siblings. Needs three
+  reporting siblings before there's a distribution to speak of, and it assumes
+  the cells do comparable work: a `map` whose args vary the amount of work per
+  cell will flag its big cells, so read the flag against the args.
 - *projected Nm to finish, past its Mm timeout* — remaining steps ÷ current
   rate, against the role's `timeout=`. A timeout sized as a multiple of the
   expected duration turns into a kill switch when throughput drops, and it
@@ -118,30 +120,31 @@ duration.
 ## Where the containers land (`--region`)
 
 Left unspecified, Modal places containers wherever it has capacity — which for
-one sweep can mean several continents. The shared Volume, control-plane `Dict`
-and artifact bucket live in one place, so a distant cell pays a few hundred
-milliseconds per round-trip to them.
+one sweep can mean several continents. What that costs depends on *which* shared
+thing the task talks to, and the three behave differently:
 
-How much that matters depends on how often a task talks to them. Ex-2.1.5's
-training cells outside `us-east` ran 15–30× slow, but the mechanism was a
-*per-step* progress emission blocking on the network; emission now runs off the
-task's thread, so that particular cliff is gone. What remains is per-checkpoint
-and per-artifact latency — real, but paid a few times an epoch rather than a few
-thousand times.
+- The control-plane `modal.Dict` is a synchronous RPC per call, so distance is
+  paid as latency, once per call. This is the one we've measured: ex-2.1.5's
+  training cells outside `us-east` ran 15–30× slow, in order of distance, because
+  a per-step progress emission blocked on it. Emission now runs off the task's
+  thread, so that cliff is gone even unpinned.
+- **Volume writes are buffered and committed in bulk**, and the Volume is
+  eventually-consistent anyway, so distance costs one bulk transfer per commit
+  rather than a round-trip per write. We have no measurement here, and the shape
+  of the cost argues it's minor.
+- Cold Volume *reads* fetch on open, so a role that reads a lot of data it hasn't
+  cached is the most plausible remaining case for pinning — also unmeasured.
 
 Pin it with `--region us-east` (or `[tool.mini] region` for a project-wide
 default, or `region=` on a role, which wins over both). The trade-off goes the
 other way too: pinning costs a per-region premium and narrows the capacity pool,
 so a pinned sweep can sit queued where an unpinned one would have started.
-Rules of thumb:
 
-- Roles that move real bytes to storage (checkpoints, large artifacts) — pin
-  them, next to the storage.
-- Compute-bound roles that read and write little — leave them free and let them
-  find capacity.
-- Suspecting placement is the problem? `env.region` is on every task record
-  (`status --json`), and a cell far behind its siblings' throughput is flagged
-  for you.
+So the default is: **don't pin**, and reach for it when you have a reason. If you
+suspect placement is the problem, `env.region` is on every task record
+(`status --json`), and a cell far behind its siblings' throughput is flagged for
+you — measure before pinning, since the per-call chatter that made placement bite
+last time has moved off the task's thread.
 
 ## Provenance & cost
 

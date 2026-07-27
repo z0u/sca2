@@ -622,7 +622,7 @@ def _slow_outlier(rec: dict, rates: dict[str, float]) -> str | None:
     rate, med = rec.get("steps_per_min"), rates.get(rec.get("fn") or "")
     if not rate or not med or rate >= med * _SLOW_FRACTION:
         return None
-    return f"running under a third of the sibling median ({med:g} steps/min)"
+    return f"{rate:g} steps/min — under a third of the sibling median ({med:g})"
 
 
 def _timeout_projection(rec: dict, now: float | None = None) -> str | None:
@@ -675,6 +675,14 @@ def _attention_cause(rec: dict, rates: dict[str, float] | None = None) -> str | 
     if is_queued(rec):  # long-queued (capacity starvation)
         hb = rec.get("heartbeat_at")
         return "queued too long" if hb and time.time() - hb > STALE_HEARTBEAT_S else None
+    if _rec_state(rec) != RunState.RUNNING:
+        # The deviation flags describe a task *now*, and a DONE record keeps the
+        # numbers from its final window forever — so without this, a cell whose last
+        # minute was slow reads "running under a third of…" after it finished, and a
+        # loss that ticked up at the end parks a settled run in the attention list
+        # for good. A finished run's numbers are the scientist's problem, not the
+        # monitor's.
+        return None
     return _metric_trouble(rec) or _slow_outlier(rec, rates or {}) or _timeout_projection(rec)
 
 

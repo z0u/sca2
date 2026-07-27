@@ -530,8 +530,10 @@ experiment = Experiment(
         # Greedy decode (4 × 256 prompts) + probe maps (2 forms × 3 targets × 2 estimators).
         "eval": dict(gpu="L4", timeout=1800, region="us-east"),
     },
-    # Pinned to one region: the store lives there, so a container placed elsewhere pays
-    # cross-region transfer on every checkpoint and artifact and drags the whole run.
+    # Pinned to one region, next to the store — kept from the run where placement cost
+    # us 15–30× throughput. That mechanism (per-step progress blocking on the control
+    # plane) is fixed, and Volume writes commit in bulk rather than per-write, so this
+    # is now belt-and-braces on an already-settled run rather than a measured need.
     # Region is placement, not identity — mini fingerprints the task fn's source, so
     # pinning does not invalidate the memoized training.
 )
