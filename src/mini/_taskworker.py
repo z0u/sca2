@@ -45,6 +45,15 @@ from mini.volume import data_dir_context
 # ``progress_at`` age, not by the rate — a wedge stops updating both).
 _RATE_WINDOW_S = 60.0
 
+# Directions for names that can only mean one thing, so the common case needs no
+# declaration. Deliberately *exact* names rather than substrings: ``loss_scale`` is
+# a mixed-precision scale factor that climbs by design, and guessing it wrong is
+# worse than staying quiet. Anything else opts in via ``expect_metrics`` (which
+# also overrides these), and an undeclared metric is measured but never flagged.
+_GUESSED_GOALS = dict.fromkeys(
+    ("loss", "train_loss", "val_loss", "eval_loss", "test_loss", "nll", "perplexity", "ppl"), "down"
+)
+
 
 class _MemoSink:
     """Writes the latest progress/metrics for a task straight to its memo record.
@@ -75,8 +84,9 @@ class _MemoSink:
         self._last: tuple[int, int] | None = None
         self._progress_at: float | None = None
         self._rate_anchor: tuple[float, int] | None = None  # (time, step)
-        self._metric_anchor: dict[str, float] = {}
-        self._rising: dict[str, int] = {}  # consecutive windows a metric has moved up
+        self._metric_anchor: dict[str, float] = {}  # previous window's mean, per metric
+        self._window: dict[str, tuple[float, int]] = {}  # this window's (sum, count)
+        self._wrong_way: dict[str, int] = {}  # consecutive windows a metric has moved against its goal
 
     def put(self, item: Any, /, block: bool = True, timeout: float | None = None) -> None:
         del block, timeout
@@ -99,35 +109,59 @@ class _MemoSink:
             )
         if self._progress_at is not None:
             fields["progress_at"] = self._progress_at
+        self._accumulate(item.metrics)
         if self._rate_anchor is None:
             self._rate_anchor = (now, item.step)
-            self._metric_anchor = dict(item.metrics)
         elif (elapsed := now - self._rate_anchor[0]) >= _RATE_WINDOW_S:
             fields["steps_per_min"] = round((item.step - self._rate_anchor[1]) / elapsed * 60.0, 1)
             self._rate_anchor = (now, item.step)
-            fields |= self._close_metric_window(item.metrics)
+            fields |= self._close_metric_window(item.goals)
         if self._gen is None:
             self._store.update(self._key, **fields)
         elif not self._store.update_if(self._key, self._gen, **fields):
             self._fenced = True
 
-    def _close_metric_window(self, metrics: dict[str, float]) -> dict[str, Any]:
-        """Movement per metric since the window opened, and how long each has risen.
+    def _accumulate(self, metrics: dict[str, float]) -> None:
+        """Fold this emission's numbers into the open window's running mean."""
+        for k, v in metrics.items():
+            if isinstance(v, (int, float)) and isfinite(v):
+                total, n = self._window.get(k, (0.0, 0))
+                self._window[k] = (total + v, n + 1)
+
+    def _close_metric_window(self, goals: dict[str, str]) -> dict[str, Any]:
+        """Movement per metric across windows, and how long each has gone the wrong way.
 
         Records keep only the latest value of each metric, so "is the loss coming
         down?" is unanswerable from a snapshot. A per-window delta plus a count of
-        consecutive rising windows makes the trend a number a tool can check —
+        consecutive wrong-way windows makes the trend a number a tool can check —
         one bad window is noise, several in a row is a run worth looking at.
+
+        The delta compares window *means*, not the two samples that happened to land
+        on the boundaries. A per-step loss is noisy, and endpoint-to-endpoint on a
+        plateau is a coin flip per window — three in a row would then fire on ⅛ of
+        windows with nothing wrong, which on an hour-long run is several false
+        alarms. Averaging what the window actually saw costs a running sum.
+
+        *goals* is the job's own :func:`~mini.progress.expect_metrics` declaration;
+        a metric with no goal (declared or guessed) records its movement but is
+        never counted as wrong-way — this layer reports, the job decides what
+        "wrong" means.
         """
+        means = {k: total / n for k, (total, n) in self._window.items() if n}
+        self._window = {}
         delta = {
-            k: round(v - anchor, 6)
-            for k, v in metrics.items()
-            if isinstance(v, (int, float)) and (anchor := self._metric_anchor.get(k)) is not None
+            k: round(v - anchor, 6) for k, v in means.items() if (anchor := self._metric_anchor.get(k)) is not None
         }
-        self._rising = {k: self._rising.get(k, 0) + 1 for k, d in delta.items() if d > 0}
-        self._metric_anchor = dict(metrics)
-        # Both written every window, empty included, so a run that recovers clears its flag.
-        return {"metrics_delta": delta, "metrics_rising": dict(self._rising)}
+        self._metric_anchor = means
+        resolved = {k: goals.get(k) or _GUESSED_GOALS.get(k) for k in means}
+        wrong = {k for k, d in delta.items() if d and (resolved.get(k) == ("down" if d > 0 else "up"))}
+        self._wrong_way = {k: self._wrong_way.get(k, 0) + 1 for k in wrong}
+        # All written every window, empty included, so a run that recovers clears its flag.
+        return {
+            "metrics_delta": delta,
+            "metrics_wrong_way": dict(self._wrong_way),
+            "metric_goals": {k: g for k, g in resolved.items() if g},
+        }
 
     def get(self, /, block: bool = True, timeout: float | None = None) -> Any:
         del block, timeout

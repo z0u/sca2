@@ -595,8 +595,7 @@ def _fmt_counts(current: list[dict]) -> str:
 # slow while every liveness check read green).
 _SLOW_FRACTION = 1 / 3  # of the sibling median before a cell counts as an outlier
 _MIN_SIBLINGS = 3  # reporters needed before a median means anything
-_RISING_WINDOWS = 3  # consecutive minutes a loss may climb before it's worth a look
-_LOWER_IS_BETTER = ("loss",)  # metric names a rising trend is bad news for
+_WRONG_WAY_WINDOWS = 3  # consecutive minutes a metric may drift the wrong way before it's worth a look
 
 
 def _fleet_rates(current: list[dict]) -> dict[str, float]:
@@ -646,16 +645,25 @@ def _timeout_projection(rec: dict, now: float | None = None) -> str | None:
 
 
 def _metric_trouble(rec: dict) -> str | None:
-    """Have the task's own numbers gone wrong — diverged, or steadily climbing?
+    """Have the task's own numbers gone wrong — diverged, or steadily drifting?
 
     Records keep the latest value of each metric plus the movement the worker
     measured over trailing windows, so this is a check rather than an eyeball.
+
+    Which way is *wrong* is settled at the worker, from the job's own
+    ``expect_metrics`` declaration — nothing here matches on metric names, because
+    a name can't tell you whether a number is meant to climb. A metric with no
+    declared direction still reports its movement (``metrics_delta``); it just
+    never lands here.
     """
     if nonfinite := rec.get("metrics_nonfinite"):
         return f"{', '.join(nonfinite)} is not finite — the run has diverged"
-    rising = rec.get("metrics_rising") or {}
-    climbing = sorted(k for k, n in rising.items() if n >= _RISING_WINDOWS and any(w in k for w in _LOWER_IS_BETTER))
-    return f"{', '.join(climbing)} rising for several windows" if climbing else None
+    goals = rec.get("metric_goals") or {}
+    drifting = sorted(k for k, n in (rec.get("metrics_wrong_way") or {}).items() if n >= _WRONG_WAY_WINDOWS)
+    if not drifting:
+        return None
+    moved = ", ".join(f"{k} {'rising' if goals.get(k) == 'down' else 'falling'}" for k in drifting)
+    return f"{moved} for several windows"
 
 
 def _attention_cause(rec: dict, rates: dict[str, float] | None = None) -> str | None:
@@ -841,7 +849,8 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "total",
         "metrics",
         "metrics_delta",
-        "metrics_rising",
+        "metrics_wrong_way",
+        "metric_goals",
         "metrics_nonfinite",
         "steps_per_min",
         "error",

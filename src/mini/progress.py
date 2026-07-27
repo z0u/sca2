@@ -24,6 +24,10 @@ class ProgressMessage:
     total: int
     message: str = ""
     metrics: dict[str, float] = field(default_factory=dict)
+    # Which way each metric is *supposed* to move ("up" / "down"), as declared by
+    # :func:`expect_metrics`. Travels with the numbers because only the job knows
+    # it — see there for why it isn't inferred downstream.
+    goals: dict[str, str] = field(default_factory=dict)
 
     def __str__(self) -> str:
         return self.to_urn()
@@ -68,6 +72,7 @@ class JobContext:
     # a slow control plane would otherwise read as a wedged worker.
     on_progress: Callable[[int, int], None] | None = None
     metrics: dict[str, float] = field(default_factory=dict)
+    goals: dict[str, str] = field(default_factory=dict)
     _last: tuple[int, int, str] = field(default=(0, 0, ""), init=False, repr=False)
     _emitter: BackgroundEmitter = field(init=False, repr=False)
 
@@ -140,10 +145,7 @@ def emit_progress(step: int, total: int, message: str = ""):
     ctx._last = (step, total, message)
     if ctx.on_progress is not None:
         ctx.on_progress(step, total)  # synchronous and local — the watchdog's advance signal
-    progress = ProgressMessage(
-        run_id=ctx.run_id, job_id=ctx.job_id, step=step, total=total, message=message, metrics=dict(ctx.metrics)
-    )
-    ctx._emitter(progress)
+    ctx._emitter(_message(ctx, step, total, message))
 
 
 def emit_metrics(**scalars: float) -> None:
@@ -154,15 +156,49 @@ def emit_metrics(**scalars: float) -> None:
     merged (last-writer-wins) and travel with progress updates, so a watching
     agent or human can see a run's numbers — and step in if they go awry —
     without waiting for it to finish.
+
+    Pair it with :func:`expect_metrics` for anything whose direction isn't
+    obvious from its name, and the tools will flag a metric heading the wrong way.
     """
     ctx = _job_context.get()
     if ctx is None:
         return
 
     ctx.metrics.update(scalars)
-    step, total, message = ctx._last
-    ctx._emitter(
-        ProgressMessage(
-            run_id=ctx.run_id, job_id=ctx.job_id, step=step, total=total, message=message, metrics=dict(ctx.metrics)
-        )
+    ctx._emitter(_message(ctx, *ctx._last))
+
+
+def expect_metrics(**directions: str) -> None:
+    """
+    Declare which way each metric is *supposed* to move: ``"up"`` or ``"down"``.
+
+    ``expect_metrics(loss="down", accuracy="up")``. With this, ``status`` can flag
+    a metric drifting the wrong way for several windows — a sliding accuracy reads
+    exactly as loudly as a climbing loss.
+
+    The declaration lives here, in the job, because this is the only place that
+    knows. A name is a poor proxy: ``loss_scale`` is a mixed-precision scale factor
+    that climbs quite happily, and a domain-specific score gives nothing away at
+    all. So the worker guesses only for a few unambiguous names (``loss``,
+    ``val_loss``, ``nll``, ``perplexity``, …) and stays quiet about the rest —
+    silence rather than a wrong guess. Declaring is how you opt a metric in.
+
+    A no-op outside a job context, and safe to call repeatedly (later calls win).
+    Call it before the loop; it rides along on every subsequent update.
+    """
+    if bad := {k: v for k, v in directions.items() if v not in ("up", "down")}:
+        raise ValueError(f"metric directions must be 'up' or 'down', got {bad}")
+    if (ctx := _job_context.get()) is not None:
+        ctx.goals.update(directions)
+
+
+def _message(ctx: JobContext, step: int, total: int, message: str) -> ProgressMessage:
+    return ProgressMessage(
+        run_id=ctx.run_id,
+        job_id=ctx.job_id,
+        step=step,
+        total=total,
+        message=message,
+        metrics=dict(ctx.metrics),
+        goals=dict(ctx.goals),
     )

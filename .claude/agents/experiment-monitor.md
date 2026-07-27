@@ -36,14 +36,19 @@ entry carrying a `cause`. Read the causes rather than re-deriving them:
 - Duration: a task whose projected finish (remaining steps ÷ rate) lands past
   its role timeout reads *projected Nm to finish, past its Mm timeout*. It
   will be killed and lose its work — report that *before* it happens.
-- Metrics: a NaN/inf metric reads *diverged*; one climbing for several
-  minutes reads *rising*. `metrics_delta` on the task entry carries the
-  per-window movement if you want the number.
+- Metrics: a NaN/inf metric reads *diverged*; one that has run against its
+  own declared goal for several minutes reads *rising* or *falling* (a loss
+  climbing and an accuracy sliding are the same alarm). `metrics_delta` and
+  `metric_goals` on the task entry carry the per-window movement and the
+  direction, if you want the numbers.
 - The flags need data to work from: throughput comparison needs at least
   three reporting siblings, the timeout projection needs a role `timeout=`,
-  and metric trends need the task to call `emit_metrics`. Where a flag can't
-  fire, fall back to reading `steps_per_min` / `metrics` across the fan-out
-  yourself, and say that you did.
+  and metric trends need the task to call `emit_metrics` — plus
+  `expect_metrics` for anything but a plainly-named loss, since an undeclared
+  metric is measured and never flagged. Trends also need ~4 windows before
+  they can fire. Where a flag can't fire, fall back to reading
+  `steps_per_min` / `metrics` across the fan-out yourself, and say that you
+  did.
 - Verdict discipline: "healthy" means this scan came back clean, not merely
   that nothing failed. List anomalies in their own section of the report,
   with your best one-line hypothesis each; investigating beyond a hypothesis

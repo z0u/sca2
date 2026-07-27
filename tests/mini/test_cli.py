@@ -733,7 +733,14 @@ def test_status_flags_deviation_from_expectation(tmp_path: Path, monkeypatch, ca
         "t-nan", _running("t-nan", steps_per_min=3000, metrics={"loss": float("nan")}, metrics_nonfinite=["loss"])
     )
     store.records_backend.merge(
-        "t-rising", _running("t-rising", steps_per_min=3000, metrics={"loss": 2.5}, metrics_rising={"loss": 4})
+        "t-rising",
+        _running(
+            "t-rising",
+            steps_per_min=3000,
+            metrics={"loss": 2.5},
+            metrics_wrong_way={"loss": 4},
+            metric_goals={"loss": "down"},
+        ),
     )
 
     from mini.__main__ import cmd_status
@@ -746,6 +753,54 @@ def test_status_flags_deviation_from_expectation(tmp_path: Path, monkeypatch, ca
     assert "timeout" in flagged["t-late"]
     assert "diverged" in flagged["t-nan"]
     assert "rising" in flagged["t-rising"]
+
+
+def test_a_metric_meant_to_rise_is_flagged_when_it_falls(tmp_path: Path, monkeypatch, capsys):
+    """Direction comes from the job, so the flag reads the same alarm either way: a
+    sliding accuracy is as much of a problem as a climbing loss, and the CLI matches
+    on no metric names at all. An undeclared metric is measured but never flagged —
+    silence beats guessing which way a domain-specific score is supposed to go."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "goalexp")
+    for i in range(3):
+        store.records_backend.merge(f"t-ok{i}", _running(f"t-ok{i}", steps_per_min=3000))
+    store.records_backend.merge(
+        "t-sliding",
+        _running(
+            "t-sliding",
+            steps_per_min=3000,
+            metrics={"accuracy": 0.4},
+            metrics_wrong_way={"accuracy": 5},
+            metric_goals={"accuracy": "up"},
+        ),
+    )
+    store.records_backend.merge(  # climbing, but climbing is what it's for
+        "t-climbing",
+        _running(
+            "t-climbing",
+            steps_per_min=3000,
+            metrics={"accuracy": 0.9},
+            metrics_delta={"accuracy": 0.02},
+            metric_goals={"accuracy": "up"},
+        ),
+    )
+    store.records_backend.merge(  # moving, but nobody said which way it should go
+        "t-undeclared",
+        _running("t-undeclared", steps_per_min=3000, metrics={"score": 7.0}, metrics_delta={"score": 1.5}),
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="goalexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    flagged = {t["key"]: t["cause"] for t in payload["attention"]}
+    assert set(flagged) == {"t-sliding"}
+    assert flagged["t-sliding"] == "accuracy falling for several windows"
 
 
 def test_deviation_flags_let_go_of_a_finished_task(tmp_path: Path, monkeypatch, capsys):
@@ -764,7 +819,7 @@ def test_deviation_flags_let_go_of_a_finished_task(tmp_path: Path, monkeypatch, 
     for i in range(3):
         store.records_backend.merge(f"t-fast{i}", _running(f"t-fast{i}", steps_per_min=3000))
     store.records_backend.merge(
-        "t-was-slow", _running("t-was-slow", state="done", steps_per_min=100, metrics_rising={"loss": 9})
+        "t-was-slow", _running("t-was-slow", state="done", steps_per_min=100, metrics_wrong_way={"loss": 9})
     )
 
     from mini.__main__ import cmd_status

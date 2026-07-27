@@ -38,31 +38,21 @@ readable cold without re-deriving code state.
   wants a record reset so the next tick relaunches. Touches `keep_stale`,
   `retry`, and the `settled` aggregates; worth its own change.
 
-- **The metric-trend flag only knows one direction, and reads a noisy signal
-  (2026-07-27, PR #58 review).** Two problems in the same few lines, worth fixing
-  together because they touch the same computation.
-  (a) *Direction is hard-coded in the wrong place.* `_LOWER_IS_BETTER = ("loss",)`
-  in `mini/__main__.py` is a substring match, so a metric that's meant to *rise*
-  (accuracy, R²) can only be handled by never flagging it — a sliding accuracy is
-  exactly as alarming as a climbing loss and is currently invisible. The name
-  match is loose in both directions too (`loss_scale` legitimately climbs and
-  would flag; `nll`/`ppl`/`err` wouldn't). The CLI can't know which way a metric
-  should go; the job can. AF's suggestion: let a job nominate its metrics'
-  directions, or have status report movement neutrally and let the monitor judge.
-  Proposal is to do both halves by responsibility — the job declares (something
-  like `expect_metrics(loss="down", accuracy="up")` alongside `emit_metrics`,
-  riding on the `ProgressMessage`), the worker counts consecutive *wrong-way*
-  windows instead of rising ones, and the CLI flags on that number with no name
-  list at all. Keep a guessed default for unnamed metrics so existing jobs don't
-  go quiet, but as a default the job can override rather than a truth in the CLI.
-  (b) *Three endpoint samples is weak evidence.* `_close_metric_window`
-  (`mini/_taskworker.py`) compares the last delivered metric value of each window
-  against the previous window's last value. For a plateaued loss with symmetric
-  noise that's a coin flip per window, so `_RISING_WINDOWS = 3` fires with
-  probability ~⅛ per window — several false alarms in an hour-long run, exactly
-  when the loss has flattened and nothing is wrong. The sink sees every delivered
-  message, so a per-window *mean* is nearly free and much steadier; better still
-  would be judging the movement against the within-window spread.
+- **Metric trends are declared, not guessed — and the residual noise (2026-07-27,
+  PR #58 review).** Done: `expect_metrics(loss="down", accuracy="up")` rides on
+  the `ProgressMessage`, the worker counts consecutive *wrong-way* windows against
+  that goal, and the CLI matches on no metric names at all. Undeclared metrics are
+  measured and never flagged; a handful of unambiguous names (`loss`, `val_loss`,
+  `nll`, …) are guessed by exact match. The delta also moved from endpoint samples
+  to window *means* — endpoint-to-endpoint on a plateaued loss is a coin flip per
+  window, so a 3-window streak fired on ~⅛ of windows with nothing wrong.
+  Still crude: a window mean is compared without reference to the within-window
+  spread, so a metric with a genuinely wide spread can still string together three
+  wrong-way windows by chance. If that starts crying wolf, the next step is to
+  judge the movement against the spread the worker already has the samples to
+  compute (a running sum of squares would do it). Also unaddressed: the goal is a
+  direction, not a *rate* — a loss descending far too slowly to finish in budget
+  reads as perfectly healthy.
 
 - **Region pinning is now available but unset by default (2026-07-26).** `mini
   run --region us-east`, `[tool.mini] region`, or `region=` on a role (which wins

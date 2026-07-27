@@ -99,13 +99,26 @@ on each attention entry:
   rate, against the role's `timeout=`. A timeout sized as a multiple of the
   expected duration turns into a kill switch when throughput drops, and it
   fires near the end, after the work is paid for.
-- *loss is not finite* / *loss rising for several windows* — from the metrics
-  a task reports via `emit_metrics`. The worker measures movement over trailing
-  windows (`metrics_delta`, `metrics_rising` on the record), so a trend is a
-  number to check rather than a curve to eyeball.
+- *loss is not finite* / *accuracy falling for several windows* — from the
+  metrics a task reports via `emit_metrics`. The worker compares window *means*
+  (a per-step loss is noisy enough that two boundary samples are a coin flip)
+  and counts how long each metric has run against its goal, so a trend is a
+  number to check rather than a curve to eyeball: `metrics_delta`,
+  `metrics_wrong_way` and `metric_goals` on the record.
 
-That last one only works if the task actually emits its numbers: put them
+That last one only works if the task emits its numbers as numbers: put them
 through `emit_metrics(loss=…)`, not into the `emit_progress` message string.
+
+**Which way is wrong is yours to say.** `expect_metrics(loss="down",
+accuracy="up")`, once before the loop, and both directions read as the same
+alarm — a sliding accuracy is as much of a problem as a climbing loss. Nothing
+downstream matches on metric names, because a name can't tell you whether a
+number is meant to climb (`loss_scale` climbs by design; a domain-specific score
+gives away nothing). The worker guesses only for a handful of unambiguous names
+— `loss`, `val_loss`, `nll`, `perplexity` and friends — and anything else is
+measured but never flagged until you declare it. The count needs one window more
+than its threshold before it can fire, since the first window only sets the
+baseline, so give a young run about four minutes before reading its trends.
 
 Watching a big sweep is cheap too: the watch loops cache settled
 (`DONE`/`FAILED`/`CANCELLED`) records — they're immutable — and re-read only the

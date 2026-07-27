@@ -12,9 +12,14 @@ from __future__ import annotations
 
 import threading
 import time
+from pathlib import Path
+
+import pytest
 
 from mini._debounce import BackgroundEmitter
-from mini.progress import emit_metrics, emit_progress, progress_context
+from mini._taskworker import _MemoSink
+from mini.memo import MemoStore
+from mini.progress import ProgressMessage, emit_metrics, emit_progress, expect_metrics, progress_context
 
 
 class _Sink:
@@ -116,3 +121,106 @@ def test_metrics_ride_along_with_progress():
         emit_progress(2, 10)
     assert sink.seen[-1].metrics == {"loss": 0.25}
     assert sink.seen[-1].step == 2
+
+
+# ---------------------------------------------------------------------------
+# Which way a metric is meant to move — declared by the job, judged at the worker
+# ---------------------------------------------------------------------------
+
+
+def test_declared_directions_travel_with_the_numbers():
+    """A name can't say whether a number should climb, so the job says it, and the
+    declaration rides on every update from then on."""
+    sink = SlowSink(delay=0.0)
+    with progress_context("run", "job", queue=sink, emission_interval=0.0):
+        expect_metrics(accuracy="up", loss="down")
+        emit_metrics(accuracy=0.4, loss=2.0)
+        emit_progress(1, 10)
+    assert sink.seen[-1].goals == {"accuracy": "up", "loss": "down"}
+
+    with pytest.raises(ValueError, match="'up' or 'down'"):
+        expect_metrics(accuracy="higher")
+
+
+def _windows(
+    store: MemoStore, key: str, monkeypatch, series: list[tuple[float, float]], metric: str = "loss", **goals: str
+) -> dict:
+    """Feed ``(time, value)`` samples through a sink and return the final record.
+
+    The rate window is 60 s, so a sample ≥60 s after the window opened closes it.
+    """
+    now = [series[0][0]]
+    monkeypatch.setattr(time, "time", lambda: now[0])
+    sink = _MemoSink(store, key)
+    for step, (t, value) in enumerate(series, start=1):
+        now[0] = t
+        sink.put(ProgressMessage(run_id="r", job_id="j", step=step, total=999, metrics={metric: value}, goals=goals))
+    return store.record(key)
+
+
+def test_a_window_is_judged_by_its_mean_not_its_last_sample(tmp_path: Path, monkeypatch):
+    """A per-step loss is noisy, and comparing the two samples that happen to land on
+    the window boundaries is a coin flip. Here the loss is flat — every window means
+    exactly 2.0 — but the closing samples climb 1, 2, 3, 4, so endpoint comparison
+    would have called three consecutive rises and flagged a run doing nothing wrong."""
+    rec = _windows(
+        MemoStore(tmp_path / "mean"),
+        "k",
+        monkeypatch,
+        [
+            (1000.0, 3.0), (1030.0, 2.0), (1060.0, 1.0),  # window 1 closes: mean 2.0, last 1.0
+            (1090.0, 2.0), (1120.0, 2.0),                 # window 2 closes: mean 2.0, last 2.0
+            (1150.0, 1.0), (1180.0, 3.0),                 # window 3 closes: mean 2.0, last 3.0
+            (1210.0, 0.0), (1240.0, 4.0),                 # window 4 closes: mean 2.0, last 4.0
+        ],
+        loss="down",
+    )  # fmt: skip
+    assert rec["metrics_delta"] == {"loss": 0.0}
+    assert rec["metrics_wrong_way"] == {}, "a flat loss must not read as a rising one"
+
+
+def test_a_metric_going_the_wrong_way_accumulates_windows(tmp_path: Path, monkeypatch):
+    """Steadily climbing where it should fall, window over window — the count is what
+    ``status`` thresholds on, so one bad window stays quiet and a trend doesn't.
+
+    Five samples a minute apart close four windows, and the first close only *sets*
+    the anchor there's nothing yet to compare against — so the count is three. Worth
+    knowing when reading a young run: the flag needs one window more than its
+    threshold before it can fire."""
+    rec = _windows(
+        MemoStore(tmp_path / "wrong"),
+        "k",
+        monkeypatch,
+        [(1000.0 + 60 * i, 1.0 + i) for i in range(5)],
+        loss="down",
+    )
+    assert rec["metrics_wrong_way"] == {"loss": 3}
+    assert rec["metric_goals"] == {"loss": "down"}
+
+
+def test_the_same_climb_is_fine_when_the_job_says_it_should_climb(tmp_path: Path, monkeypatch):
+    """The identical series, declared the other way, is a metric doing its job."""
+    series = [(1000.0 + 60 * i, 1.0 + i) for i in range(5)]
+    rec = _windows(MemoStore(tmp_path / "up"), "k", monkeypatch, series, metric="accuracy", accuracy="up")
+    assert rec["metrics_wrong_way"] == {}
+    assert rec["metrics_delta"] == {"accuracy": 1.0}, "movement is still reported either way"
+
+
+def test_an_undeclared_metric_is_measured_but_not_judged(tmp_path: Path, monkeypatch):
+    """A domain-specific score gives away nothing about which way it ought to go, so
+    an undeclared one records its movement and is never flagged — silence beats a
+    wrong guess. The few names that can only mean one thing are the exception."""
+    series = [(1000.0 + 60 * i, 1.0 + i) for i in range(5)]
+
+    quiet = _windows(MemoStore(tmp_path / "mute"), "k", monkeypatch, series, metric="rho")
+    assert quiet["metrics_delta"] == {"rho": 1.0} and quiet["metrics_wrong_way"] == {}
+    assert quiet["metric_goals"] == {}
+
+    guessed = _windows(MemoStore(tmp_path / "guess"), "k", monkeypatch, series, metric="val_loss")
+    assert guessed["metric_goals"] == {"val_loss": "down"}
+    assert guessed["metrics_wrong_way"] == {"val_loss": 3}, "a climbing loss needs no declaration"
+
+    # …and a name that merely *contains* one of them is not guessed at: a
+    # mixed-precision loss scale climbs by design.
+    scale = _windows(MemoStore(tmp_path / "scale"), "k", monkeypatch, series, metric="loss_scale")
+    assert scale["metric_goals"] == {} and scale["metrics_wrong_way"] == {}

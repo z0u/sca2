@@ -14,7 +14,7 @@ from sca.training.loop import eval_step, make_train_step
 from sca.training.metrics import TrainingMetrics
 from sca.training.optimizer import configure_optimizer
 from sca.training.scheduler import configure_schedule
-from mini.progress import emit_metrics, emit_progress
+from mini.progress import emit_metrics, emit_progress, expect_metrics
 
 
 def train_model(
@@ -57,6 +57,8 @@ def train_model(
     all_metrics: list[TrainingMetrics] = []
     step = 0
 
+    # `loss` would be guessed anyway; saying it keeps the guess from being load-bearing.
+    expect_metrics(loss="down")
     for epoch in range(config.scheduler.epochs):
         train_losses = []
         for x, y in sample_batches(train_data, config.data, config.model, epoch_length, rng):
