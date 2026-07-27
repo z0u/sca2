@@ -303,6 +303,13 @@ re-run to advance a multi-step DAG inherits the existing deadline. This is
 distinct from `cancel` (manual, immediate) — the budget is the unattended
 backstop.
 
+**Size the first run's budget for the image build.** In a fresh Modal environment
+the first launch spends minutes building the container image while the task sits
+`queued`, and the clock is running: a `--budget 10m` has expired before any work
+starts, and the next poll settles the run CANCELLED. The image is cached
+afterwards, so `retry --budget …` goes straight through — confusing rather than
+costly, but only if you know to expect it.
+
 ## Escalation contract
 
 Attempt only a **local, obvious** fix on a terminal task (typo, bad path, wrong

@@ -38,59 +38,30 @@ readable cold without re-deriving code state.
   wants a record reset so the next tick relaunches. Touches `keep_stale`,
   `retry`, and the `settled` aggregates; worth its own change.
 
-- **Metric trends are declared, not guessed — and the residual noise (2026-07-27,
-  PR #58 review).** Done: `expect_metrics(loss="down", accuracy="up")` rides on
-  the `ProgressMessage`, the worker counts consecutive *wrong-way* windows against
-  that goal, and the CLI matches on no metric names at all. Undeclared metrics are
-  measured and never flagged; a handful of unambiguous names (`loss`, `val_loss`,
-  `nll`, …) are guessed by exact match. The delta also moved from endpoint samples
-  to window *means* — endpoint-to-endpoint on a plateaued loss is a coin flip per
-  window, so a 3-window streak fired on ~⅛ of windows with nothing wrong.
-  Still crude: a window mean is compared without reference to the within-window
-  spread, so a metric with a genuinely wide spread can still string together three
-  wrong-way windows by chance. If that starts crying wolf, the next step is to
-  judge the movement against the spread the worker already has the samples to
-  compute (a running sum of squares would do it). Also unaddressed: the goal is a
-  direction, not a *rate* — a loss descending far too slowly to finish in budget
-  reads as perfectly healthy.
+- **Metric trends know a direction, not a rate (2026-07-27, PR #58 review).**
+  `expect_metrics` + wrong-way window counting shipped; what's left is how coarse
+  the judgement is. A window mean is compared without reference to the
+  within-window spread, so a metric with a genuinely wide spread can still string
+  together three wrong-way windows by chance — if that starts crying wolf, judge
+  the movement against the spread the worker already has the samples to compute (a
+  running sum of squares would do it). And a direction can't catch a loss that is
+  descending far too slowly to reach anything useful inside the budget: that reads
+  as perfectly healthy. A projected-final-value flag would be the counterpart to
+  the timeout projection.
 
-- **Region pinning is now available but unset by default (2026-07-26).** `mini
-  run --region us-east`, `[tool.mini] region`, or `region=` on a role (which wins
-  over both) — see the "Where the containers land" section of the mi-ni
-  running.md for the trade-off. Deliberately *no* project default: pinning costs
-  a region premium and narrows the capacity pool, and the per-step cost that made
-  placement bite (progress emission blocking on the network) is gone, so what's
-  left is per-checkpoint/artifact latency, paid a few times an epoch. Ex-2.1.5's
-  roles pin explicitly. Revisit if a checkpoint-heavy run shows the same
-  ordered-by-distance throughput spread; the flag to watch is the sibling-median
-  one in `status --brief`.
-
-- **Deferred-import evidence is module-granular (2026-07-26).** The fingerprint
-  now folds in the source of project modules a task imports inside its own body,
-  and their project import closure — so any edit in a *reached module* re-runs
-  the task, not just an edit to the helper it calls. That's the safe direction,
-  but a widely-imported module (`sca.config`, say) makes a big blast radius. If
-  spurious re-runs start costing real GPU time, the next step is resolving which
-  names the body actually pulls out of the module and folding only those — needs
-  an AST walk of the *importing* function, not just the import statement.
-  Two smaller gaps: a module the path search can't resolve is silently skipped
-  (no evidence, no warning), and `sys.path` order is assumed stable within a
-  process.
+- **Deferred-import evidence is module-granular (2026-07-26).** Now that a task's
+  body-level imports fold whole project modules into its evidence, an edit
+  *anywhere* in a reached module re-runs the task. Safe direction, but a
+  widely-imported module (`sca.config`, say) makes a big blast radius. If spurious
+  re-runs start costing real GPU time, narrow it to the names the body actually
+  pulls out of the module — needs an AST walk of the *importing* function, not just
+  the import statement. Two smaller gaps: a module the path search can't resolve is
+  silently skipped (no evidence, no warning — the one direction that can serve a
+  stale hit), and `sys.path` order is assumed stable within a process.
 
 - **Science skill.** We have a fledgeling `science` skill that describes how to
   collaborate on experiment design. There may be old descisions in
   todo-science.md that could be moved there and polished.
-
-- **First-run Modal image build can eat a small `--budget` (observed
-  2026-07-20).** In a fresh Modal environment the first launch spends minutes
-  building the container image while the task sits `queued`; a `--budget 10m`
-  expired during the build and the watch's opportunistic enforcement settled
-  the run CANCELLED before any work ran. Harmless-but-confusing: the image is
-  cached, so a `retry --budget …` succeeds immediately (that's what happened).
-  Options if it bites again: exclude time-in-queue from the budget clock (risky
-  — queue time is exactly what the budget guards on a capacity-starved run), or
-  just document "size the first run's budget for the image build" in
-  running.md. Leaning documentation-only.
 
 - **Document subline.** Describe subline in a skill: what it is, why we might
   use it instead of a token heatmap, and how to use it.
@@ -157,20 +128,6 @@ readable cold without re-deriving code state.
   min-width/scroll wrapper lives — a `themed` option, or a CSS class the author
   opts into. Decide before the anchoring reports reuse these figures.
 
-- **Reconsider WandB (or a hosted tracker) at M3/M4 planning.** Removed from M2
-  (2026-07-17): it was authenticated and a declared dep but unused — `mini`'s own
-  stack covers everything M2 needs (live `emit_metrics`/`watch`, content-addressed
-  artifact/checkpoint versioning, git-aware lineage, memoized sweeps, Modal cost).
-  The five things a hosted tracker adds and `mini` doesn't — persisted metric
-  *time-series* (mini keeps only the latest value per key), an interactive
-  live-curve dashboard, cross-run/sweep comparison UI, live GPU/system-utilization
-  telemetry, and grouped-hyperparameter views — don't earn their keep on M2's short
-  synthetic-domain runs with publication-curated matplotlib figures. They get more
-  attractive at M3/M4 (small LMs, then LLM fine-tunes): longer, costlier runs and
-  many un-curated runs to compare. Revisit then; if we do, the cheapest first step
-  is per-step time-series persistence in `mini` (extend `emit_metrics` past
-  last-writer-wins), not necessarily WandB.
-
 - **CLI usability, remaining gaps** (from the 2026-07-14 cold-exploration
   session; the copy-pasteable-hints / sorting / help-text tier shipped — see
   #57 for the running thread):
@@ -219,25 +176,6 @@ readable cold without re-deriving code state.
   writes into the existing bundle dir without pruning. Harmless locally (the
   HTML stops referencing them) but it ships dead bytes on publish — a prune of
   assets not referenced by the fresh `index.html` would cover both.
-
-- Cross-experiment lineage is now **auto-detected**: `set_ref` in a task worker
-  stamps producer identity onto the ref (via an ambient `producer_context`, so
-  the project-shared `Store` stays experiment-agnostic), `get_ref` records the
-  resolution on the task record (`upstream_refs`), and the driver rolls both
-  into `lineage.upstreams`. `Experiment(deps=[...])` remains for upstreams a run
-  doesn't read via a ref. Known gaps: refs written by the interactive
-  `Apparatus` (`app.map` in a notebook) or driver-side code are unstamped, and
-  a consumer served entirely from memo hits records nothing new — its
-  previously-recorded `upstream_refs` persist on the old records, which is
-  usually what you want. Pre-existing refs (e.g. the m1 `reports/*` ones) stay
-  unstamped until their publish step re-runs, so their report footers are empty
-  for now.
-
-- Modal `mem_total_gb` in a task's `env` reads the *host* total from
-  `/proc/meminfo` (gvisor shows the whole node, ~186–363 GB), not the container's
-  memory limit. Fine as a coarse "what class of machine" signal; if we ever want
-  the true per-container cap, read the requested `memory=` from the role config
-  instead (or the cgroup limit, if gvisor exposes it).
 
 - `mini.temporal` can't drive feedback control. `DynamicProp.set()` retargets
   mid-flight from the current (value, velocity) state — exactly what a
@@ -293,21 +231,9 @@ readable cold without re-deriving code state.
 
 - #38 — publish-tier hardening (private-CAS/public-publish bucket split;
   citable versioned publish via a dataset repo). Only matters once the template
-  is used for work that shouldn't be world-readable by default.
-- Settled: #46 shipped (gen-fenced `set_ref`/`publish` + `StaleWriteError`,
-  PR #56). #37 (implicit cross-experiment dedup + shared working volume) closed
-  as not planned — the explicit ref path covers reuse; reopen only if
-  identical-prep recompute becomes a real recurring cost.
-
-**Sequence after the above:**
-
-- #15 — GC across the control plane, I/O-plane volume dirs, and the CAS.
-  Shipped in two cuts: the local per-experiment control-plane + I/O-plane sweep
-  (`mini gc <name>`, PR #49), then the Modal Volume sweep and the CAS
-  mark-and-sweep (`mini gc --store`, PR #60). Rationale and safety posture in
-  [`eng/gc.md`](./eng/gc.md). Only #38 (bucket split) would
-  still reshape the CAS leg; the `mini-hf-cache` Volume (#50) stays out of scope
-  (pure cache — `modal volume delete mini-hf-cache` is a safe reset).
+  is used for work that shouldn't be world-readable by default. It's also the
+  only thing left that would reshape what "CAS" means to
+  [`mini gc`](./eng/gc.md) (#15, shipped in two cuts).
 
 **Orthogonal, no code overlap with the above:**
 

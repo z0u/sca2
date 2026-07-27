@@ -37,6 +37,18 @@
   *does* cover buckets, though: since `huggingface_hub` ≥ 1.19 bucket transfers go through
   the shared `hf_xet` session, so chunk-level dedup and the `HF_HOME/xet` chunk cache
   apply to CAS blobs as well.
+- **No hosted experiment tracker for M2** (WandB removed 2026-07-17: authenticated, a
+  declared dep, and unused). `mini`'s own stack covers what M2 needs — live
+  `emit_metrics`/`watch`, content-addressed artifact and checkpoint versioning, git-aware
+  lineage, memoized sweeps, Modal cost reconciliation. The five things a hosted tracker
+  adds and `mini` doesn't: persisted metric *time-series* (mini keeps the latest value per
+  key), an interactive live-curve dashboard, cross-run/sweep comparison UI, live
+  GPU/system telemetry, and grouped-hyperparameter views. None earn their keep on M2's
+  short synthetic-domain runs with publication-curated matplotlib figures. They get more
+  attractive at M3/M4 (small LMs, then LLM fine-tunes): longer, costlier runs and many
+  un-curated runs to compare — so revisit at that planning step. If we do, the cheapest
+  first move is per-step time-series persistence in `mini` (extending `emit_metrics` past
+  last-writer-wins), not necessarily WandB itself.
 - **The worker's `HFStore` warm cache lives on container-local disk, not the mounted
   Volume** (`WORKER_STORE_CACHE`). Under the mount it was committed alongside results,
   so every bucket artifact grew a second, redundant copy on the per-experiment Volume.
@@ -50,7 +62,9 @@
 ## Open / deferred
 
 - Implicit cross-experiment memo dedup, + optional shared working volume and a
-  `materialize` front door — **#37**.
+  `materialize` front door — **#37**, closed as not planned. The explicit ref path covers
+  reuse (see [Artifacts](./artifacts.md) for why the fork was deliberate); reopen only if
+  identical-prep recompute becomes a real recurring cost.
 - Private-CAS / public-publish split + citable versioned publish tier — **#38**. Landed as
   an opt-in seam: `HFStore` routes `publish`/`export_*` to a Hugging Face **dataset repo**
   (versioned → citable) when `[tool.mini] publish-repo` is set, leaving `cas/`+`refs/` in a

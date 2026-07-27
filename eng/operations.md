@@ -11,6 +11,30 @@
 - **CORS / Range.** The bucket reflects the request `Origin` on both the resolve redirect
   and the CDN response, and the CDN advertises `Accept-Ranges` — so a Pages-served report
   can `fetch()` a published JSON cross-origin and Range-slice a big binary.
+- **`env.mem_total_gb` is the host's, not the container's.** On Modal it comes from
+  `/proc/meminfo`, and gvisor shows the whole node (~186–363 GB). Fine as a coarse "what
+  class of machine" signal, misleading as a limit. For the true per-container cap, read
+  the role's requested `memory=` (or the cgroup limit, if gvisor ever exposes it).
+
+## Region: no project-wide default, on purpose
+
+Modal can pin containers to a region, and `mini` exposes it three ways (`--region`,
+`[tool.mini] region`, `region=` on a role, most specific winning). **Nothing is set by
+default**, and that's a decision rather than an oversight: pinning costs a per-region
+premium and narrows the capacity pool, so a pinned sweep can sit queued where an unpinned
+one would have started.
+
+The case for pinning got weaker once the per-step cost above moved off the task's thread.
+What's left is per-checkpoint and per-artifact traffic, and those pay for distance
+differently: a Volume write is buffered and committed in bulk against an
+eventually-consistent Volume, so it costs one transfer per commit rather than a
+round-trip per write. Cold Volume *reads* fetch on open and are the most plausible
+remaining case — but neither has been measured, unlike the `Dict` path. Ex-2.1.5's roles
+still pin, inherited from the run where placement did bite.
+
+So: measure first. `env.region` is on every task record, and `status --brief` flags a
+cell running far behind its siblings. Revisit the default if a checkpoint-heavy run ever
+shows the same ordered-by-distance throughput spread.
 
 ## Progress transport: a queue only where there's a consumer
 
