@@ -46,7 +46,10 @@ entry carrying a `cause`. Read the causes rather than re-deriving them:
   and metric trends need the task to call `emit_metrics` — plus
   `expect_metrics` for anything but a plainly-named loss, since an undeclared
   metric is measured and never flagged. Trends also need ~4 windows before
-  they can fire. Where a flag can't fire, fall back to reading
+  they can fire, and a window needs both a minute and 20 samples — so a job
+  emitting a couple of times a minute takes far longer than four minutes to
+  reach a verdict, and shows no trend fields at all until it does. Where a
+  flag can't fire, fall back to reading
   `steps_per_min` / `metrics` across the fan-out yourself, and say that you
   did.
 - Verdict discipline: "healthy" means this scan came back clean, not merely

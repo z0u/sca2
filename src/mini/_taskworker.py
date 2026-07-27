@@ -45,6 +45,16 @@ from mini.volume import data_dir_context
 # ``progress_at`` age, not by the rate — a wedge stops updating both).
 _RATE_WINDOW_S = 60.0
 
+# …and a *metric* window closes on whichever comes later: that interval, or this
+# many samples. A trend is judged from the window's mean, and how much a mean is
+# worth depends on how many samples went into it, not on how long they took to
+# arrive. A minute is hundreds of samples for a fast training loop and two for a
+# job whose steps take half a minute, and two-sample means would have that job
+# flagged on noise. So the floor sizes the window by evidence: fast jobs clear it
+# within a second of opening and never notice, slow ones stretch the window in
+# time until it holds enough to mean something.
+_MIN_WINDOW_SAMPLES = 20
+
 # Directions for names that can only mean one thing, so the common case needs no
 # declaration. Deliberately *exact* names rather than substrings: ``loss_scale`` is
 # a mixed-precision scale factor that climbs by design, and guessing it wrong is
@@ -86,6 +96,7 @@ class _MemoSink:
         self._rate_anchor: tuple[float, int] | None = None  # (time, step)
         self._metric_anchor: dict[str, float] = {}  # previous window's mean, per metric
         self._window: dict[str, tuple[float, int]] = {}  # this window's (sum, count)
+        self._samples = 0  # emissions carrying metrics since the window opened
         self._wrong_way: dict[str, int] = {}  # consecutive windows a metric has moved against its goal
 
     def put(self, item: Any, /, block: bool = True, timeout: float | None = None) -> None:
@@ -115,7 +126,8 @@ class _MemoSink:
         elif (elapsed := now - self._rate_anchor[0]) >= _RATE_WINDOW_S:
             fields["steps_per_min"] = round((item.step - self._rate_anchor[1]) / elapsed * 60.0, 1)
             self._rate_anchor = (now, item.step)
-            fields |= self._close_metric_window(item.goals)
+            if self._samples >= _MIN_WINDOW_SAMPLES:  # else keep filling — see the constant
+                fields |= self._close_metric_window(item.goals)
         if self._gen is None:
             self._store.update(self._key, **fields)
         elif not self._store.update_if(self._key, self._gen, **fields):
@@ -123,6 +135,7 @@ class _MemoSink:
 
     def _accumulate(self, metrics: dict[str, float]) -> None:
         """Fold this emission's numbers into the open window's running mean."""
+        self._samples += bool(metrics)
         for k, v in metrics.items():
             if isinstance(v, (int, float)) and isfinite(v):
                 total, n = self._window.get(k, (0.0, 0))
@@ -140,7 +153,8 @@ class _MemoSink:
         on the boundaries. A per-step loss is noisy, and endpoint-to-endpoint on a
         plateau is a coin flip per window — three in a row would then fire on ⅛ of
         windows with nothing wrong, which on an hour-long run is several false
-        alarms. Averaging what the window actually saw costs a running sum.
+        alarms. Averaging what the window actually saw costs a running sum, and
+        ``_MIN_WINDOW_SAMPLES`` is what makes the average worth having.
 
         *goals* is the job's own :func:`~mini.progress.expect_metrics` declaration;
         a metric with no goal (declared or guessed) records its movement but is
@@ -148,7 +162,7 @@ class _MemoSink:
         "wrong" means.
         """
         means = {k: total / n for k, (total, n) in self._window.items() if n}
-        self._window = {}
+        self._window, self._samples = {}, 0
         delta = {
             k: round(v - anchor, 6) for k, v in means.items() if (anchor := self._metric_anchor.get(k)) is not None
         }

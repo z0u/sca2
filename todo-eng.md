@@ -39,25 +39,28 @@ readable cold without re-deriving code state.
   `retry`, and the `settled` aggregates; worth its own change.
 
 - **Metric trends know a direction, not a rate (2026-07-27, PR #58 review).**
-  `expect_metrics` + wrong-way window counting shipped; what's left is how coarse
-  the judgement is. A window mean is compared without reference to the
-  within-window spread, so a metric with a genuinely wide spread can still string
-  together three wrong-way windows by chance — if that starts crying wolf, judge
-  the movement against the spread the worker already has the samples to compute (a
-  running sum of squares would do it). And a direction can't catch a loss that is
-  descending far too slowly to reach anything useful inside the budget: that reads
-  as perfectly healthy. A projected-final-value flag would be the counterpart to
-  the timeout projection.
+  `expect_metrics`, wrong-way window counting, and a sample floor on the window
+  all shipped; what's left is how coarse the judgement is. A window mean is
+  compared without reference to the within-window spread, so a metric with a
+  genuinely wide spread can still string together three wrong-way windows by
+  chance — if that starts crying wolf, judge the movement against the spread the
+  worker already has the samples to compute (a running sum of squares would do
+  it, alongside the sum it already keeps). And a direction can't catch a loss that
+  is descending far too slowly to reach anything useful inside the budget: that
+  reads as perfectly healthy. A projected-final-value flag would be the
+  counterpart to the timeout projection.
 
-- **Deferred-import evidence is module-granular (2026-07-26).** Now that a task's
-  body-level imports fold whole project modules into its evidence, an edit
-  *anywhere* in a reached module re-runs the task. Safe direction, but a
-  widely-imported module (`sca.config`, say) makes a big blast radius. If spurious
-  re-runs start costing real GPU time, narrow it to the names the body actually
-  pulls out of the module — needs an AST walk of the *importing* function, not just
-  the import statement. Two smaller gaps: a module the path search can't resolve is
-  silently skipped (no evidence, no warning — the one direction that can serve a
-  stale hit), and `sys.path` order is assumed stable within a process.
+- **An unresolvable module leaves no evidence and says nothing (2026-07-26).**
+  Deferred-import evidence is now symbol-granular, so the blast-radius half of
+  this is done. What's left is the failure direction that can actually serve a
+  stale hit: if the `sys.path` search doesn't find a module, `_module_index`
+  returns `None` and the walk moves on — indistinguishable from the stdlib and
+  site-packages, which are *meant* to be skipped. A task importing something the
+  driver process can't see would then depend on nothing and cache forever. Fixing
+  it means telling "deliberately excluded" from "expected to resolve and didn't",
+  which needs a notion of what should have been findable (an installed-distribution
+  check, or a project-roots list). A warning would be enough. Related smaller
+  assumption: `sys.path` order is taken as stable within a process.
 
 - **Science skill.** We have a fledgeling `science` skill that describes how to
   collaborate on experiment design. There may be old descisions in

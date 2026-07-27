@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from mini import _taskworker
 from mini._debounce import BackgroundEmitter
 from mini._taskworker import _MemoSink
 from mini.memo import MemoStore
@@ -148,7 +149,11 @@ def _windows(
     """Feed ``(time, value)`` samples through a sink and return the final record.
 
     The rate window is 60 s, so a sample ≥60 s after the window opened closes it.
+    The sample floor is dropped to one for these, so a handful of hand-picked
+    values can make a point about *which way* a window read without twenty
+    samples of padding around each. The floor has its own test below.
     """
+    monkeypatch.setattr(_taskworker, "_MIN_WINDOW_SAMPLES", 1)
     now = [series[0][0]]
     monkeypatch.setattr(time, "time", lambda: now[0])
     sink = _MemoSink(store, key)
@@ -224,3 +229,37 @@ def test_an_undeclared_metric_is_measured_but_not_judged(tmp_path: Path, monkeyp
     # mixed-precision loss scale climbs by design.
     scale = _windows(MemoStore(tmp_path / "scale"), "k", monkeypatch, series, metric="loss_scale")
     assert scale["metric_goals"] == {} and scale["metrics_wrong_way"] == {}
+
+
+def _feed(store: MemoStore, key: str, monkeypatch, per_minute: int, minutes: int) -> dict:
+    """Run a job that emits *per_minute* samples of a climbing loss, for *minutes*."""
+    now = [1000.0]
+    monkeypatch.setattr(time, "time", lambda: now[0])
+    sink = _MemoSink(store, key)
+    for step in range(per_minute * minutes):
+        now[0] = 1000.0 + step * 60.0 / per_minute
+        sink.put(ProgressMessage("r", "j", step + 1, 999, metrics={"loss": 1.0 + step}, goals={"loss": "down"}))
+    return store.record(key)
+
+
+def test_a_metric_window_waits_for_enough_samples_to_mean_something(tmp_path: Path, monkeypatch):
+    """A window's verdict is a comparison of means, so it's worth what the sample
+    count makes it worth — and that has nothing to do with elapsed time. A job
+    emitting twice a minute would otherwise have two-sample means judged as
+    confidently as a training loop's three hundred.
+
+    So the window closes on the rate interval *or* the sample floor, whichever
+    comes later. Both jobs below climb identically for ten minutes; the fast one
+    fills a window a minute and flags it, the slow one has yet to reach a verdict
+    — and gets there later, on its own terms, rather than never."""
+    fast = _feed(MemoStore(tmp_path / "fast"), "k", monkeypatch, per_minute=60, minutes=10)
+    assert fast["metrics_wrong_way"] == {"loss": 8}, "a window a minute, minus the one that set the anchor"
+
+    slow = _feed(MemoStore(tmp_path / "slow"), "k", monkeypatch, per_minute=2, minutes=10)
+    assert "metrics_wrong_way" not in slow, "no window has closed, so there is no verdict to publish yet"
+    assert slow["steps_per_min"] == 2.0, "the throughput rate still reports on its own 60 s cadence"
+
+    # The window stretched in time rather than going quiet: same emission rate,
+    # long enough to fill several windows, and the climb is flagged.
+    patient = _feed(MemoStore(tmp_path / "patient"), "k", monkeypatch, per_minute=2, minutes=60)
+    assert patient["metrics_wrong_way"]["loss"] >= 3, "past the count `status` flags on"
