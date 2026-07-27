@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.9"
+__generated_with = "0.23.15"
 app = marimo.App(
     width="medium",
     app_title="Ex 2.1.5: disjoint vocabularies and more named colors",
@@ -353,7 +353,7 @@ def _():
     hand-picked probe sites of earlier reports with a map, so the alignment
     measures below don't depend on us choosing the right position in advance.
 
-    /// note | Amendment: a second holdout
+    /// admonition | Amendment: a second holdout protocol
     The preregistered estimator holds out one *equation* at a time. A colour or
     a hex digit therefore appears in both the fit and the held-out row, so the
     probe may recover a value by memorizing an identity → value table. That is
@@ -798,7 +798,31 @@ def _():
 
     The figure below plots probe $R^2$ at every depth × landmark, for the two
     operands and the mix, per form; center cell of the sweep only. We used the
-    stricter of the two holdouts described under Measurements.
+    stricter of the two probe holdout protocols described under
+    [Measurements](#measurements).
+
+    To be concrete about what one point on a line is: every {seed, form, target,
+    depth, landmark} (a "site") is its own independently fitted ridge probe,
+    where the target is the probed quantity: operand 1, operand 2, or the mix.
+    Its inputs are the N equations' residual-stream activations at that single
+    token (character) position and depth, an N × C matrix, and its regression
+    targets are the probed quantity's RGB triple (N × 3). A probe is neither fit
+    on nor scored against activations from any other depth or position. The
+    height of a line is that site's held-out $R^2$: predictions come from refits
+    that exclude the held-out value's rows (the strict holdout protocol), and
+    the score compares them to the target variance across the N equations at
+    that site alone. The colored step-lines are the per-channel scores averaged
+    over the three seeds, and the hairlines show the seed spread.
+
+    Because the sites are independent, $R^2$ says nothing about how probe
+    directions relate across sites. A high score does mean a value-aligned
+    readout direction exists at that site, but the score is the same whichever
+    direction it is, so two sites can score alike with orthogonal readouts. The
+    staggered per-channel bumps in the hex panels, similar as they look, are
+    three separate fits. At the embedding they plausibly are one readout of the
+    shared digit-embedding axis seen at three positions, but checking that would
+    take a direction comparison (as in the principal-angle measure), which this
+    figure does not make.
     """)
     return
 
@@ -850,7 +874,7 @@ def _(arrays):
             for _f in vp.FORMS
             for _t in vp.TARGETS
         }
-        return vp.probe_trace_grid(_stacks, form_axis="row", panel_height=0.45, ylabel="probe R² per depth")
+        return vp.probe_trace_grid(_stacks, form_axis="row", width=10.5, panel_height=0.4, ylabel="probe R² per depth")
 
     mo.Html(_plot())
     return
@@ -1107,7 +1131,7 @@ def _(arrays):
             for _f in vp.FORMS
             for _t in vp.TARGETS
         }
-        return vp.transfer_trace_grid(_within, _cross, ylabel="probe R² per depth")
+        return vp.transfer_trace_grid(_within, _cross, width=10.5, panel_height=0.4, ylabel="probe R² per depth")
 
     mo.Html(_plot())
     return
@@ -1273,11 +1297,10 @@ def _(rho_summary):
 
     H4 predicted that narrowing the residual stream would push the two forms
     together: $\\rho$ and subspace overlap rising over d64 → d32 → d16, with
-    d16-L8 the most aligned cell. Nothing of the sort happened. $\\rho$ is
+    d16-L8 the most aligned cell, but that didn't happen. $\\rho$ is
     {_best:.2f} at every one of the {_guarded:,} cells where the guard defines it
     across the whole sweep ({_total:,} cells before gating), in both directions
-    and for all three targets. There is no width trend in $\\rho$ because there
-    is nothing to trend.
+    and for all three targets.
 
     What compression does instead is wear the named form down. The figure below
     tracks three quantities against width: how well each form answers held-out
@@ -1314,10 +1337,10 @@ def _(angles_at, cells, maps):
             cells sit clearly above the 4-layer ones at width 16 and coincide
             with them at width 64.
         """,
-        caption="""
+        caption=r"""
             What narrowing the residual stream does, across the width arms.
-            Filled markers joined by lines are the 4-layer cells; open markers
-            are the 8-layer cells, drawn unjoined because there is no d32-L8
+            Filled $\bullet$ markers joined by lines are the 4-layer cells; open $\scriptstyle\Box$ markers
+            are the 8-layer cells, with a dashed line because there is no d32-L8
             cell to run a line through. Left and middle: the two forms come apart
             under compression rather than together, hex losing far less than
             named. Right: the first principal angle between the named and hex mix
@@ -1336,18 +1359,21 @@ def _(angles_at, cells, maps):
         _hex = light_dark("#6a4f8a", "#b79ad6")
         _amber, _ref = vp.transfer_color(), light_dark("#d1495b", "#ff6b7d")
 
-        def _series(_ax, _fn, _color, _label):
+        def _series(_ax: plt.Axes, _fn, _color, _label):
             _ax.plot(_widths, [_fn(_l4[_w]) for _w in _widths], "o-", color=_color, lw=1.4, ms=5, label=_label)
-            _ax.plot(list(_l8), [_fn(_l8[_w]) for _w in _l8], "s", mfc="none", color=_color, ms=6)
+            _ax.plot(list(_l8), [_fn(_l8[_w]) for _w in _l8], "s:", mfc="none", color=_color, lw=0.8, ms=6)
 
+        _axes[0].set_title("accuracy")
         _series(_axes[0], lambda _a: _acc(_a, "hex_holdout"), _hex, "hex")
         _series(_axes[0], lambda _a: _acc(_a, "named_holdout"), _named, "named")
         _axes[0].set(ylabel="held-out exact match", ylim=(0, 1.05))
         _axes[0].legend(fontsize=7, loc="center left", framealpha=0.6)
 
+        _axes[1].set_title("probe")
         _series(_axes[1], _within, _named, "named")
         _axes[1].set(ylabel="named mix $R^2$, pre-answer", ylim=(0, 1.05))
 
+        _axes[2].set_title("rotation")
         _ang = {_w: angles_at(_l4[_w]) for _w in _widths}
         _mean = np.array([_ang[_w]["random"] for _w in _widths])
         _sd = np.array([_ang[_w]["random_sd"] for _w in _widths])
@@ -1366,7 +1392,7 @@ def _(angles_at, cells, maps):
             _ax.set(xlabel="residual width", xticks=_widths)
             _ax.xaxis.set_minor_locator(plt.NullLocator())
             _ax.xaxis.set_major_formatter(lambda _v, _p: f"{_v:.0f}")
-            _ax.grid(alpha=0.3)
+            _ax.grid(alpha=0.1)
         return fig
 
     mo.Html(_plot())
@@ -1432,16 +1458,15 @@ def _(angles_at, fit_sigma, maps, rho_summary, seed_mean):
     mo.md(f"""
     The angle does fall as the stream narrows, from {_g["center"]["cross_form"]:.0f}°
     at d64 to {_g["d32"]["cross_form"]:.0f}° at d32 and {_g["d16"]["cross_form"]:.0f}°
-    at d16. Read on its own that looks like the trend H4 asked for. But two
+    at d16. That *looks* like the trend H4 predicted, but it's not: two
     3-dimensional subspaces drawn at random come just as close once the space
-    they sit in is small enough: the same three widths give
+    they sit in is small enough. The same three widths give
     {_g["center"]["random"]:.0f}°, {_g["d32"]["random"]:.0f}° and
     {_g["d16"]["random"]:.0f}° for a random pair. Every observed angle sits inside
     one standard deviation of its null, and the seed control (two seeds' *named*
     probes, decoding the same quantity in unrelated bases) tracks the same curve.
     So the cross-form angle at every width is what two unrelated decoders would
-    give. Any width sweep that reads raw angles will find this trend, whatever the
-    forms are doing.
+    give.
 
     Under compression the two forms don't merge; one of them gives way first. Hex
     keeps its held-out accuracy at {seed_mean("d32", "hex_holdout", "accuracy"):.2f}
@@ -1450,18 +1475,17 @@ def _(angles_at, fit_sigma, maps, rho_summary, seed_mean):
     {seed_mean("center", "named_holdout", "accuracy"):.2f} to
     {seed_mean("d32", "named_holdout", "accuracy"):.2f} to
     {seed_mean("d16", "named_holdout", "accuracy"):.2f}. Read through the
-    resolution account from H1, the fitted precision $\\sigma$ coarsens from
+    resolution account from H1 the fitted precision $\\sigma$[^sigma] coarsens from
     {_sig["center"]:.3f} of the unit cube at d64 to {_sig["d32"]:.3f} at d32 and
     {_sig["d16"]:.3f} at d16: roughly an eightfold loss of color resolution over
     two halvings of width. Hex needs far less of it, since a hex answer's
     runner-up is a whole grid step away, so a coarse read still lands on the
     right digit.
 
-    That asymmetry is the more interesting outcome here, and it isn't what H4
-    was written to look for. Capacity pressure is real, and the named form
-    clearly lacks capacity at these widths, but the pressure buys no sharing at
+    So the named form
+    clearly lacks capacity at these widths, but the pressure causes no sharing at
     all. If two representations can be kept apart under this much of it, keeping
-    them apart evidently costs the model less than merging them would.
+    them apart apparently costs the model less than merging them would.
 
     /// details | Whether d16 is too broken to test
     d16 answers {seed_mean("d16", "named_seen", "accuracy"):.2f} of the named
@@ -1477,8 +1501,12 @@ def _(angles_at, fit_sigma, maps, rho_summary, seed_mean):
     reads {maps("d32", "probes/named/mix/r2_strict")[4, LANDMARKS.index("pre")]:.2f}.
     Adding depth back at d16 recovers a good deal
     ({seed_mean("d16-L8", "named_holdout", "accuracy"):.2f} held-out named, and
-    $\\sigma$ back to {_sig["d16-L8"]:.3f}); see H6.
+    $\\sigma$[^sigma] back to {_sig["d16-L8"]:.3f}); see H6.
     ///
+
+    [^sigma]: $\\sigma$ is the per-channel noise a guesser would need,
+        reading the true mix and snapping to the nearest name, to match the
+        observed accuracy; see H1.
     """)
     return
 
@@ -1500,7 +1528,7 @@ def _(cross, rho_summary, stats):
     every other cell's, so H5 is unsupported on its own terms.
 
     That would be an easy result to dismiss if the bridge had simply failed to
-    learn anything, so it's worth establishing first that the supervision took.
+    learn anything, so let's check whether the supervision worked.
     Cross lines are {_share * 100:.0f}% of the bridge corpus:
     {_n["n_lines"]:,} of them, drawn over {_n["seen"]:,} distinct
     (name, hex) pairs out of {_n["seen"] + _n["unseen"]:,} possible, so a pair
@@ -1509,7 +1537,7 @@ def _(cross, rho_summary, stats):
     form exists to supervise alignment rather than to be scored, so we decoded
     them afterwards from the published checkpoints.[^crosseval]
 
-    The bridge answers them, and it generalizes. Exact match is
+    The model does learn to answer bridge-form equations. Exact match is
     {_acc["cross_seen"]:.2f} on cross pairs that appeared in training and
     {_acc["cross_unseen"]:.2f} on pairs that did not, with no malformed
     completions; at 1.2 lines per pair there is not much for the model to
@@ -1630,7 +1658,7 @@ def _(arrays, cross, stats):
             for _f in vp.FORMS
             for _t in vp.TARGETS
         }
-        return vp.transfer_trace_grid(_within, _cross, ylabel="probe R² per depth")
+        return vp.transfer_trace_grid(_within, _cross, width=10.5, panel_height=0.4, ylabel="probe R² per depth")
 
     mo.Html(_plot())
     return
