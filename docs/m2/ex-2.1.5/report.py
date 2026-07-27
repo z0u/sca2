@@ -994,38 +994,36 @@ def _(arrays):
     _carried_pre = float(np.mean([arrays[f"center-s{_s}/cross/hex2name/mix/r2"][4, _pre] for _s in SEEDS]))
 
     mo.md(f"""
-    That is a stronger statement than the number looks. $\\rho$ clips a negative
-    cross-form $R^2$ to zero, so a floor reading could in principle be a hair
-    below break-even — but nothing here is close. All
-    {len(_all_cross):,} cross-form cells in the scan are negative, and the best
-    of them is ${_all_cross.max():.3f}$. At the pre-answer position in the last
-    layer, where the named form's own mix probe reads {_named_pre:.2f}, the hex
-    probe carried over unchanged reads ${_carried_pre:.0f}$. A probe taken across
-    forms is not weakly informative about the other vocabulary. It is far worse
-    than answering with the training mean, suggesting the decoder is pointing in an
-    unrelated direction.
+    Zero is a stronger statement than it looks. $\\rho$ clips negative cross-form
+    $R^2$ to zero, so in principle a floor reading could hide a score just below
+    break-even. Nothing here is close: all {len(_all_cross):,} cross-form cells
+    in the scan are negative, and the best of them is ${_all_cross.max():.3f}$.
+    Take the pre-answer position in the last layer as an example. The named
+    form's own mix probe reads {_named_pre:.2f} there; the hex probe applied to
+    the same activations reads ${_carried_pre:.0f}$. That is far worse than
+    answering with the training mean, which suggests the decoder is pointing in
+    an unrelated direction.
 
-    The figure below shows both readings on the same axes, per form and target:
-    the grey area is what the form's own probe recovers, and the amber over it
-    is what the other form's probe recovers from the same activations — so the
-    amber fraction of the grey *is* $\\rho$, and it's zero everywhere
+    The figure below shows both readings on the same axes, per form and target.
+    The grey area is what the form's own probe recovers; the amber line is what
+    the other form's probe recovers from the same activations. The amber
+    fraction of the grey is $\\rho$, and it is zero everywhere.
 
     /// details | Which within-form estimate the denominator uses
-    Both the figure and the table use the **strict** holdout for the within-form
-    reading, so the grey areas here are the same quantity the per-channel figure
-    under H2 plots and can be read against it. That is a departure from the
-    preregistered $\\rho$, which used the per-equation estimator, and the reason
-    is that the two halves of the ratio should be measured alike: a cross-form
-    probe has never seen the target form's tokens, so it cannot recover a value
-    by looking up an identity, while the per-equation within-form estimate can.
-    Pairing a leak-prone denominator with a leak-free numerator biases $\\rho$
-    *downward* (it would flatter H3) and the strict denominator removes that.
+    The figure and the table use the **strict** holdout for the within-form
+    reading, so the grey areas are the same quantity as in H2's per-channel
+    figure. The preregistered $\\rho$ used the per-equation estimator instead.
+    We switched because the two halves of the ratio should be measured alike: a
+    cross-form probe has never seen the target form's tokens, so it cannot
+    recover a value by identity lookup, while the per-equation within-form
+    estimate can. Mixing the two biases $\\rho$ downward, which would flatter
+    H3; the strict denominator removes that.
 
-    Nothing turns on the choice: the preregistered ratios are zero too, since
-    the numerator is what fails and it is unchanged. Where the two estimators
-    differ materially is which cells clear $\\rho$'s guard, and both are reported
-    below. At the pre-answer site the named form reads {_named_pre:.2f} strict
-    against {_named_pre_eq:.2f} per-equation, so H3's headline site is one of the
+    The result is the same either way, since the numerator is what fails and it
+    is unchanged: the preregistered ratios are zero too. The estimators do
+    differ in which cells clear $\\rho$'s guard, and both are reported below.
+    At the pre-answer site the named form reads {_named_pre:.2f} strict against
+    {_named_pre_eq:.2f} per-equation, so H3's headline site is one of the
     places they agree.
     ///
     """)
@@ -1060,21 +1058,20 @@ def _(arrays):
             at every depth and every landmark.
         """,
         caption=f"""
-            Zero-shot cross-form transfer at the center cell, seed-averaged. Rows
-            are the form the probes are applied to, columns the probe target;
-            within a block, depth runs upward from the embedding and the x axis
-            across the grammar landmarks. Grey is the form's own probe under the
-            strict holdout, with its three-seed envelope — the same quantity as
-            the per-channel figure under H2, so the two are directly comparable.
-            Amber is the other form's probe applied
-            unchanged, so the amber share of the grey is the transfer ratio
-            $\\rho$. Both are floored at zero for drawing, which here hides
-            magnitude rather than nuance: the amber readings are not marginal
-            failures but $R^2$ from ${_range.max():.3f}$ down to
-            ${_range.min():.0f}$, worse everywhere than predicting the mean. The
-            hex row's grey is low because hex's own strict readings are low
-            (H2's finding: it relays its channels rather than holding them), so
-            the transfer claim rests on the named row and on those magnitudes.
+            Zero-shot cross-form transfer at the center cell, seed-averaged.
+            Rows are the form the probes are applied to; columns are the probe
+            target. Within a panel, depth runs upward from the embedding, and
+            the x axis runs across the grammar landmarks. Grey is the form's
+            own probe under the strict holdout, with its three-seed envelope;
+            it is the same quantity as the per-channel figure under H2. Amber
+            is the other form's probe applied unchanged, so the amber share of
+            the grey is the transfer ratio $\\rho$. Both are floored at zero
+            for drawing, which hides only magnitude: the amber $R^2$ readings
+            run from ${_range.max():.3f}$ down to ${_range.min():.0f}$, worse
+            everywhere than predicting the mean. The hex row's grey is low
+            because hex's own strict readings are low (H2 found it relays its
+            channels rather than holding them), so the transfer claim rests on
+            the named row and on those magnitudes.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1140,34 +1137,38 @@ def _(arrays, cells):
                 '<div class="report-table-scroll"><table class="report-table">' + _thead + _rows + "</table></div>"
             ),
             mo.md(f"""
-            The mix probe at two sites, seed-averaged, within-form readings under
-            the strict holdout (the preregistered per-equation ratios are
+            The mix probe at two sites, seed-averaged; within-form readings use
+            the strict holdout. The preregistered per-equation ratios give the
+            same reading:
             {_rho("hex2name", "named", _stored["depth"], _stored["landmark"], "r2")} and
             {_rho("name2hex", "hex", _stored["depth"], _stored["landmark"], "r2")} at
-            the first site and
+            the preregistered site,
             {_rho("hex2name", "named", 4, "pre", "r2")} and
-            {_rho("name2hex", "hex", 4, "pre", "r2")} at the second — the same
-            reading). Neither site was picked using $\\rho$. The
-            first maximizes the weaker form's own $R^2$, so the two probes are
-            compared where both have something to carry; the second is where the
-            named form's geometry is strongest and where the answer text cannot
-            contaminate either form. They disagree about where hex is legible —
-            at the pre-answer site hex's own reading falls under $\\rho$'s guard,
-            so the ratio into hex reports nothing there rather than reporting
-            zero — and they agree about everything that bears on H3. The three
-            principal angles at the pre-answer site are the closest the two mix
-            decoders come anywhere near their own strongest ground, and the
-            nearest of them is still {_closest:.0f}° from a shared direction.
+            {_rho("name2hex", "hex", 4, "pre", "r2")} at the pre-answer site.
 
-            The guard behind $\\rho$ turns out not to matter either. It reports a
-            ratio only where the within-form $R^2$ clears 0.5, and swapping the
-            per-equation estimator for the strict one changes which cells qualify
-            — from 22–62 of 270 (5 depths × 18 landmarks × 3 seeds) down to
-            0–37, with hex's operand rows dropping out entirely, since their
-            strict readings never reach 0.5. It cannot change the verdict,
-            because the numerator is negative in every cell of the map, gated or
-            not. That settles the open question of whether the alignment
-            measures should be gated on the stricter estimator: here, either way.
+            Neither site was picked using $\\rho$. The preregistered site
+            maximizes the weaker form's own $R^2$, so the two probes are
+            compared where both have something to carry. The pre-answer site is
+            where the named form's geometry is strongest and where the answer
+            text cannot contaminate either form. The two sites disagree about
+            where hex is legible: at the pre-answer site, hex's own reading
+            falls under $\\rho$'s guard, so the ratio into hex reports nothing
+            there rather than zero. They agree about everything that bears on
+            H3. The three principal angles at the pre-answer site are the
+            closest the two mix decoders come anywhere near their own strongest
+            ground, and the nearest of them is still {_closest:.0f}° from a
+            shared direction.
+
+            The guard behind $\\rho$ turns out not to matter either. It reports
+            a ratio only where the within-form $R^2$ clears 0.5. Swapping the
+            per-equation estimator for the strict one changes which cells
+            qualify, from 22–62 of 270 (5 depths × 18 landmarks × 3 seeds) down
+            to 0–37; hex's operand rows drop out entirely, since their strict
+            readings never reach 0.5. The verdict is the same either way,
+            because the numerator is negative in every cell of the map, gated
+            or not. That settles the open question of whether the alignment
+            measures should be gated on the stricter estimator: here it makes
+            no difference.
             """),
         ]
     )
@@ -1236,40 +1237,36 @@ def _():
 
     ### Answer positions partly read the answer (post hoc)
 
-    A probe at an answer position can succeed for a dull reason: under
-    teacher forcing the answer tokens are in the input, so the residual
-    stream there contains the digits themselves and the probe may be reading
-    surface text rather than anything the model computed.
+    Under teacher forcing the answer tokens are part of the input. So a probe
+    at an answer position may be reading the digits off the surface text
+    rather than anything the model computed.
 
-    The embedding row settles it, because depth 0 is the token lookup before
-    any attention or MLP has run — whatever is decodable there is present in
-    the input by definition. In the hex form it is a lot: at the embedding, a
+    The embedding row (depth 0) tells us how much, because it is the token
+    lookup before any attention or MLP has run: whatever is decodable there
+    was already in the input. In the hex form it is a lot. At the embedding, a
     mix probe scores $R^2 \approx 1.00$ per channel at each answer digit
     (each hex digit *is* one channel of the answer), and an operand probe
-    scores ≈ 0.48 at those same positions. That 0.48 is arithmetic,
-    not memory: the answer digit is the round-half-up mean of the two operand
-    digits, so knowing it pins about half the variance of each operand. Both
-    operands echo at the same strength, which is what a mixing story predicts
-    and what a retained-operand story would not.
+    scores ≈ 0.48 at the same positions. The answer digit is the round-half-up
+    mean of the two operand digits, so knowing it pins about half the variance
+    of each operand. Both operands echo at the same strength, consistent with
+    mixing rather than one operand being retained.
 
-    Two consequences. First, any answer-position reading has to be compared
-    against its own depth-0 value rather than against zero — the hex mix's
-    best channel mean of 0.66 (depth 3, middle answer digit) is 0.22, 0.96, 0.80
-    against an embedding baseline of 0.00, 1.00, 0.00, so the green
-    channel there is read and the blue is computed a token ahead. Second, the
-    landmarks that carry the headline claims are exempt: at the equals sign
-    and the pre-answer space, every probe scores −0.003 at the embedding in
-    both forms, so those positions hold nothing but computation. That is why
-    the named mix result is quoted at the pre-answer space, where the last
-    layer reaches 0.95, 0.94, 0.94 from an embedding that knows nothing.
-    Compared on that clean ground the two forms separate further than the
-    mid-answer numbers suggest: hex's best uncontaminated mix reading is
-    0.42 at the equals sign and 0.38 pre-answer, against named's 0.94.
+    This suggests that an answer-position reading should be compared against its
+    own depth-0 value, not against zero. For example, the hex mix's best channel
+    mean of 0.66 (depth 3, middle answer digit) breaks down as 0.22, 0.96, 0.80
+    per channel, against an embedding baseline of 0.00, 1.00, 0.00: the green
+    channel is read from the input, and the blue is computed a token ahead.
 
-    This is a probe-placement caveat rather than a result, and it applies to
-    every cross-form measurement still to come: $\rho$ computed at answer
-    positions would be inflated in both directions, since both forms' probes
-    can read the emitted answer there.
+    The landmarks that carry the headline claims are clean: at the equals sign
+    and the pre-answer space, every probe scores −0.003 at the embedding in both
+    forms. That is why the named mix result is quoted at the pre-answer space,
+    where the last layer reaches 0.95, 0.94, 0.94. Compared at those clean
+    positions, the two forms separate further than the mid-answer numbers
+    suggest: hex's best uncontaminated mix reading is 0.42 at the equals sign
+    and 0.38 pre-answer, against named's 0.94.
+
+    Similarly, $\rho$ computed at answer positions would be inflated in both
+    directions, since both forms' probes can read the emitted answer there.
     """)
     return
 
@@ -1307,44 +1304,41 @@ def _(arrays):
     mo.md(f"""
     ### The forms compute at different depths, and $\\rho$ compares in place (post hoc)
 
-    $\\rho$ as preregistered compares the same cell in both forms — same depth,
-    same landmark. That is the conservative choice for the question H3 asks, but
-    it does assume the two forms put the mix in the same place, and H2 showed
-    they do not. Named brings the mix together at the pre-answer position in the
-    last layer; hex's best mix reading is mid-answer, a layer earlier, and its
-    pre-answer column never clears
-    {_hex_pre.max():.2f} at any depth ({", ".join(f"{_v:.2f}" for _v in _hex_pre)} from
-    the embedding up). So a same-cell comparison might be scoring named's mature
-    mix against a hex representation that hasn't formed yet at that position — and
-    a depth-crossed $\\rho$ could in principle be higher.
+    $\\rho$ as preregistered compares the same cell in both forms: same depth,
+    same landmark. That assumes the two forms put the mix in the same place, and
+    H2 showed they do not. Named color mixes are assembled at the pre-answer
+    position in the last layer. Hex's best mix reading is mid-answer, a layer
+    earlier, and its pre-answer column never clears {_hex_pre.max():.2f} at any
+    depth ({", ".join(f"{_v:.2f}" for _v in _hex_pre)} from the embedding up).
+    So the same-cell comparison may score named's mature mix against a hex
+    representation that hasn't formed at that position, and a depth-crossed
+    $\\rho$ could in principle be higher.
 
-    The transfer half of that cannot be answered from what this sweep published:
-    applying hex's depth-{_n_depth - 3} probe to named's depth-{_n_depth - 1}
-    activations needs the activations, and only the fitted probes and their scores
-    are stored. The subspace half can, because the probe weights are stored. The
-    first principal angle between the named mix probe at *any* depth and the hex
-    mix probe at *any* depth, both read at the pre-answer position, stays between
-    {_off_embedding.min():.0f}° and {_off_embedding.max():.0f}° for every one of
-    the {_off_embedding.size} pairs. Widening the search to every depth ×
-    landmark pair where both forms' own strict readings clear 0.3 — a low bar,
-    and it admits the answer positions the surface-text caveat warns about — the
-    closest the two subspaces ever come is {_best:.0f}°.
+    We can check half of this from the stored data. The transfer half cannot be
+    answered: applying hex's depth-{_n_depth - 3} probe to named's
+    depth-{_n_depth - 1} activations needs the activations, and only the fitted
+    probes and their scores are stored. The subspace half can, from the probe
+    weights alone. The first principal angle between the named mix probe at
+    *any* depth and the hex mix probe at *any* depth, both at the pre-answer
+    position, stays between {_off_embedding.min():.0f}° and
+    {_off_embedding.max():.0f}° across all {_off_embedding.size} pairs. Widening
+    the search to every depth × landmark pair where both forms' own strict
+    readings clear 0.3 (a low bar, and one that admits the contaminated answer
+    positions), the closest the two subspaces come is {_best:.0f}°.
 
-    So the depth offset is not concealing a shared set of directions: there is no
-    layer at which hex's mix decoder points where named's does. A depth-crossed
-    transfer $R^2$ is still worth having, since a subspace angle and a zero-shot
-    fit are different tests, and it is cheap to add to the eval step — banked in
-    todo-science rather than done here, because it is not the measurement H3 was
-    written against.
+    So the depth offset is not concealing a shared set of directions: there is
+    no layer at which hex's mix decoder points where named's does. A
+    depth-crossed transfer $R^2$ would still be a different test (zero-shot fit
+    rather than subspace angle) and is cheap to add to the eval step; it is
+    banked in todo-science rather than done here, because it is not the
+    measurement H3 was written against.
 
-    One curiosity in the angle map belongs here rather than in H3. Somewhere in
-    the scan the two probes do share a direction almost exactly — 0.4° — at the
-    embedding, on the space closing operand 1. That is an artifact of the site:
-    depth 0 is the token lookup, the space character is the same token in both
-    sublanguages, and a probe fitted to explain colour from a constant input has
-    no determined direction at all. It is worth stating because the same
-    degeneracy will show up in H4 and H5, where a small angle would otherwise
-    read as the alignment those hypotheses are looking for.
+    One artifact in the angle map: At the embedding, on the space closing
+    operand 1, the two probes appear to share a direction almost exactly (0.4°).
+    The space character is the same token in both sublanguages, so at depth 0
+    the probe's input is constant and its fitted direction is undetermined. The
+    same degeneracy will show up in H4 and H5, where a small angle would
+    otherwise read as the alignment those hypotheses are looking for.
     """)
     return
 
@@ -1354,25 +1348,24 @@ def _():
     mo.md(r"""
     ### The named ceiling is a resolution limit (post hoc)
 
-    Named exact match tops out around 0.84 on trained pairs and 0.67 on
-    held-out ones, while hex sits at ≈ 1.0 and ex-2.1.3's regular 216-color
-    vocabulary reached ≈ 1.0 too. Reading that as "the named geometry is
-    weaker" would be a mistake, because the two vocabularies do not ask
-    equally precise questions.
+    Named exact match tops out around 0.84 on trained pairs and 0.67 on held-out
+    ones, while hex sits at ≈ 1.0, as did ex-2.1.3's regular 216-color
+    vocabulary. That does not mean the named geometry is weaker; the two
+    vocabularies ask questions of different precision.
 
     What varies is the **snap margin**: how much closer the correct name is to
-    the exact mix than the runner-up. On a regular sub-grid closed under
-    mixing, the answer lands on a vocabulary point and the margin is a
-    constant — one grid step, 0.2 of the unit cube at ex-2.1.3's `v216`. On an
-    irregular palette it varies by two orders of magnitude, and its median
-    here is about a sixth of that. A raw accuracy pools prompts that need
-    0.1 of positional accuracy with prompts that need 0.005.
+    the exact mix than the runner-up. On a regular sub-grid closed under mixing,
+    the answer lands on a vocabulary point and the margin is a constant (one
+    grid step, 0.2 of the unit cube at ex-2.1.3's `v216`). On an irregular
+    palette it varies by two orders of magnitude, and its median here is about a
+    sixth of that. So a raw accuracy pools prompts that need 0.1 of positional
+    accuracy with prompts that need 0.005.
 
-    So we ask what a guesser limited only in resolution would do:
-    read the exact mix with isotropic Gaussian error of per-channel scale
-    $\sigma$, then answer with the nearest name
-    (`baselines.precision_limited_acc`). One parameter, fitted to the *overall*
-    accuracy, which leaves the shape of accuracy-versus-margin free to agree or
+    To separate resolution from everything else, we fit a one-parameter
+    reference guesser: read the exact mix with isotropic Gaussian error of
+    per-channel scale $\sigma$, then answer with the nearest name
+    (`baselines.precision_limited_acc`). $\sigma$ is fitted to the *overall*
+    accuracy only, so the shape of accuracy versus margin is free to agree or
     not.
     """)
     return
@@ -1493,44 +1486,41 @@ def _(arrays, precision):
     _probe_sd = _target_sd * np.sqrt(max(0.0, 1 - _pre))
 
     mo.md(f"""
-    The account holds up. The fitted $\\sigma$ is
+    The reference fits. On held-out named prompts the fitted $\\sigma$ is
     {precision["center", "named_holdout"]["sigma"]:.3f} of the unit cube
     ({precision["center", "named_holdout"]["sigma"] * 255:.0f} of 255 per
-    channel) on held-out named prompts, and the reference tracks the observed
-    rate across the whole margin range from that one number — including the
-    250-name cell, where the same shape appears shifted toward the tight end.
-    Trained pairs are the exception, and informatively so: at 140 names the
-    fitted $\\sigma$ halves to
-    {precision["center", "named_seen"]["sigma"]:.3f}, but the *shape* fits less
-    well, with the model beating the reference at tight margins and falling
-    short of it at wide ones. Precision alone does not describe errors on pairs
-    the model has seen; something more like recall is mixed in.
+    channel), and from that one number the reference tracks the observed rate
+    across the whole margin range, including the 250-name cell, where the same
+    shape appears shifted toward the tight end. Trained pairs fit less well:
+    at 140 names the fitted $\\sigma$ halves to
+    {precision["center", "named_seen"]["sigma"]:.3f}, but the model beats the
+    reference at tight margins and falls short of it at wide ones. Precision
+    alone does not describe errors on pairs the model has seen; something more
+    like recall is mixed in.
 
-    Two things fall out of having a number.
-
-    **The earlier rungs are consistent with the same precision.** Applied to
+    **The earlier rungs are consistent with the same precision.** On
     ex-2.1.3's regular grids, where a mix lands on a vocabulary point and the
     margin is the grid step,
     $\\sigma = {_sigma:.3f}$ predicts {_preds["v216 (ex-2.1.3/2.1.4)"]:.2f} at
-    `v216` — which is about what ex-2.1.3 (≈ 1.0, single-token names) and
-    ex-2.1.4 (0.91, spelled names) actually scored. So the jump from 0.67 here
-    to ≈ 1.0 there needs no change in how well colors are represented; the
-    coarser vocabulary simply forgives more. The exception is `v4096`, where
-    the same $\\sigma$ predicts {_preds["v4096 (ex-2.1.3)"]:.2f} against
-    ex-2.1.3's observed 0.65: that model read colors roughly 1.5× more finely
-    than this one, which is the direction a single-vocabulary corpus with
-    single-token answers should go.
+    `v216`, which is about what ex-2.1.3 (≈ 1.0, single-token names) and
+    ex-2.1.4 (0.91, spelled names) actually scored. So the drop from ≈ 1.0
+    there to 0.67 here needs no change in how well colors are represented; the
+    coarser vocabulary forgives more. The exception is `v4096`, where the same
+    $\\sigma$ predicts {_preds["v4096 (ex-2.1.3)"]:.2f} against ex-2.1.3's
+    observed 0.65: that model read colors roughly 1.5× more finely than this
+    one, plausible for a single-vocabulary corpus with single-token answers.
 
-    **The behavior is more precise than the probe.** At the pre-answer position
-    in the last layer the strict mix probe reads $R^2 = {_pre:.3f}$, and the
-    mix targets have a per-channel standard deviation of {_target_sd:.3f}, so
-    the probe's own residual is about {_probe_sd:.3f} — roughly twice the
-    {_sigma:.3f} the behavior implies. The two are different estimands (a linear
-    decoder's error against an implied end-to-end resolution), so only the
-    ordering is worth reading, and it says the linear probe recovers a coarser
-    version of the value than the model itself uses. Worth carrying into anchor
-    design: a probe $R^2$ of 0.94 at a site is a floor on what is there, and an
-    anchor's own supervision is a linear readout with the same limitation.
+    **The behavior is more precise than the probe.** At the pre-answer
+    position in the last layer the strict mix probe reads
+    $R^2 = {_pre:.3f}$. With a per-channel target standard deviation of
+    {_target_sd:.3f}, that puts the probe's residual near {_probe_sd:.3f},
+    roughly twice the {_sigma:.3f} the behavior implies. The two are different
+    estimands (a linear decoder's error versus an implied end-to-end
+    resolution), so only the ordering is worth reading: the linear probe
+    recovers a coarser version of the value than the model itself uses. For
+    anchor design this means a probe $R^2$ of 0.94 at a site is a floor on
+    what is there, and an anchor's own supervision is a linear readout with
+    the same limitation.
     """)
     return
 
