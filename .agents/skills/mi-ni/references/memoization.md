@@ -69,6 +69,12 @@ invisible by nature — fold them into the *inputs* instead:
 - **Files read at runtime.** Pass an `Artifact` handle (keys by content), not a
   path the task opens.
 - **Env vars and machine state.** Pass them as arguments if they affect the result.
+  The exception this project makes deliberately is `XLA_FLAGS`, which decides
+  whether a GPU reduction is deterministic: it's set project-wide via `[tool.mini]
+  env` and recorded on every attempt (`env.numerics_env`) rather than folded into
+  the key, so turning determinism on didn't invalidate four published sweeps. The
+  reasoning, and the measurements behind it, are in
+  [eng/determinism.md](../../../../eng/determinism.md).
 - **Attributes on instances** (`self.x` set elsewhere, monkeypatching) and values
   with no stable JSON encoding — not tracked; keep task behavior in code and plain
   data.

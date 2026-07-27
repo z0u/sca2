@@ -580,3 +580,74 @@ def test_reap_settles_timeout_killed_modal_task(monkeypatch, tmp_path):
     assert app.reap_dead(store) == ["t1"]
     rec = store.record("t1")
     assert rec["state"] == "failed" and rec["gen"] is None and "vanished" in rec["error"]
+
+
+# ---------------------------------------------------------------------------
+# Worker environment (`env=`)
+# ---------------------------------------------------------------------------
+
+
+def test_modal_env_becomes_a_container_secret():
+    """``env=`` reaches the container as a Secret, and never as a ``@function``
+    kwarg — Modal has no ``env`` parameter, so a leak would be a TypeError at
+    registration. The container is the right level: a task that set it in-process
+    would be too late for anything that reads its env once at init."""
+    from mini.modal_apparatus import _attach_env
+
+    fn_kwargs: dict = {"gpu": "L4", "env": {"XLA_FLAGS": "--xla_gpu_deterministic_ops=true"}}
+    _attach_env(fn_kwargs)
+    assert "env" not in fn_kwargs
+    assert fn_kwargs["gpu"] == "L4"
+    assert len(fn_kwargs["secrets"]) == 1
+    assert isinstance(fn_kwargs["secrets"][0], modal.Secret)
+
+
+def test_modal_env_appends_to_existing_secrets_and_no_ops_when_empty():
+    """The HF store/cache secrets are attached alongside, so ``env`` must append
+    rather than replace; an absent or empty mapping adds nothing at all."""
+    from mini.modal_apparatus import _attach_env
+
+    sentinel = modal.Secret.from_dict({"EXISTING": "1"})
+    fn_kwargs = {"secrets": [sentinel], "env": {"XLA_FLAGS": "-x"}}
+    _attach_env(fn_kwargs)
+    assert fn_kwargs["secrets"][0] is sentinel and len(fn_kwargs["secrets"]) == 2
+
+    for empty in ({}, None):
+        bare: dict = {"gpu": "L4"} | ({"env": empty} if empty is not None else {})
+        _attach_env(bare)
+        assert bare == {"gpu": "L4"}
+
+
+def test_modal_w_merges_env_key_by_key(monkeypatch):
+    """Unlike every other option, ``env`` merges: a role adds one variable without
+    having to restate the project-wide defaults it inherits."""
+    app = _make_modal(monkeypatch).w(env={"XLA_FLAGS": "-x", "KEEP": "1"}, gpu="T4")
+    role = app.w(env={"XLA_FLAGS": "-y"}, gpu="L4")
+    assert role.modal_fn_kwargs["env"] == {"XLA_FLAGS": "-y", "KEEP": "1"}
+    assert role.modal_fn_kwargs["gpu"] == "L4"  # everything else still replaces
+    assert app.modal_fn_kwargs["env"] == {"XLA_FLAGS": "-x", "KEEP": "1"}  # caller untouched
+
+
+def test_local_env_reaches_the_task_worker_subprocess(tmp_path, monkeypatch):
+    """Locally the memoized path is a subprocess per task, so it can carry the same
+    env. ``.w(env=)`` merges like Modal's, and the value lands in the child's
+    environment rather than only the parent's."""
+    captured: dict = {}
+
+    def fake_popen(argv, **kwargs):
+        captured.update(kwargs)
+        return type("P", (), {"pid": 4321})()
+
+    monkeypatch.setattr("mini.runs.subprocess.Popen", fake_popen)
+    from mini.runs import spawn_taskworker
+
+    app = LocalApparatus("envexp", data_dir=tmp_path / "envexp").w(env={"XLA_FLAGS": "-x"}).w(env={"OTHER": "2"})
+    assert app.env == {"XLA_FLAGS": "-x", "OTHER": "2"}
+
+    assert spawn_taskworker(tmp_path, "k", env=app.env) == 4321
+    assert captured["env"]["XLA_FLAGS"] == "-x" and captured["env"]["OTHER"] == "2"
+    assert "PATH" in captured["env"]  # overlaid on the parent env, not a replacement
+
+    captured.clear()
+    spawn_taskworker(tmp_path, "k")  # no env → inherit, unchanged from before
+    assert captured["env"] is None

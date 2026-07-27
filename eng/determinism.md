@@ -1,0 +1,128 @@
+# Reproducible GPU runs
+
+*Part of the [engineering notes](./README.md).*
+
+Two tasks with the same code and the same inputs should produce the same result. On a
+GPU they don't, by default — and because the memo keys a task on the *content* of its
+inputs, that turns one re-run upstream into a re-run of everything downstream.
+
+## What we measured
+
+150 training steps of the real `train_step` (nGPT, d64-L4, batch 64×128, one seed),
+three replicas in three separate `single_use_containers=True` L4 containers,
+`us-east`. The probe hashes the final weights; the flags ride in the container
+environment.
+
+| `XLA_FLAGS` (beyond the CPU scheduler flag) | distinct digests | seconds |
+| --- | --- | --- |
+| *(none)* | **3 of 3** | 29.0, 29.8, 29.0 |
+| `deterministic_ops` | 1 | 49.6, 79.3, 49.0 |
+| `deterministic_ops` + `autotune_level=0` | 1 | 49.3, 83.7, 50.2 |
+| all three | 1 | 49.1, 85.3, 48.3 |
+| **`deterministic_ops` + `exclude_nondeterministic_ops`** (shipped) | 1 | 82.9, 48.0, 49.0 |
+
+The baseline's three final losses were 4.147422, 4.147426, 4.147430 — a drift in the
+sixth significant figure, which is invisible in a plot and total for a hash. All four
+deterministic settings landed on the *same* digest (`6d18d792…`), so there's one
+canonical answer they agree on rather than four flavours of stable.
+
+One replica per batch runs 1.6–1.7× slower than its siblings, in the deterministic
+rows only. It was the middle replica three times running and then the first one, so
+it reads as an unlucky container rather than anything about the flags — but it does
+mean a run's slowest cell isn't well predicted by its fastest. The cost figure to
+plan around is the fast replicas: **~1.7×** (29s → 48s) on a cell this size.
+
+## What we set, and why only that
+
+`[tool.mini] env` in `pyproject.toml` carries the CPU scheduler flag plus:
+
+- **`--xla_gpu_deterministic_ops=true`** — the one that does the work. It makes
+  scatter deterministic through XLA's scatter-determinism expander (an optimized
+  rewrite, so it's much cheaper than the fallback). Our model has one big scatter:
+  the token-embedding gradient. Without the flag those accumulate in whatever order
+  the atomics land, which is a different order every run.
+- **`--xla_gpu_exclude_nondeterministic_ops=true`** — the broader guard, for ops the
+  scatter expander doesn't cover. It measured free at our sizes, and it's what keeps
+  a future model that reaches for some other atomically-reducing op from quietly
+  reintroducing drift.
+
+The pair was measured on its own (last row) rather than inferred from the three-flag
+run, so what's configured is what was tested.
+
+**Autotuning stays on.** It's the other classic source of GPU nondeterminism — the
+algorithm pick comes from measured timings, so a noisy host can pick differently —
+but turning it off changed neither the digest nor the time here. It has a plausible
+cost on larger models (a worse GEMM), so we're not paying it for a benefit this
+project hasn't observed. If a future run drifts *with* the flags above,
+`--xla_gpu_autotune_level=0` is the next thing to reach for.
+
+Not established here: whether the digest holds across GPU *models*. Determinism is a
+per-device-class property, and the role tables pin `gpu="L4"` anyway.
+
+## Why the environment, and not a line of Python
+
+A Modal container is reused across the tasks of a map, and XLA parses `XLA_FLAGS`
+once, when its backend comes up. So a task that sets the variable on itself only wins
+if it's the first task on that container — every later one silently inherits whatever
+the first one had. (This is why `sca/__init__.py`'s scheduler flag was never reliable
+on Modal; it's still right for the interactive path, where a notebook is one process
+and imports `sca` before touching jax.)
+
+So it's an apparatus option: `env=`, which `ModalApparatus` turns into a container
+Secret and `LocalApparatus` overlays onto the task worker's subprocess. `[tool.mini]
+env` supplies it project-wide — the same shape as `region` — and a role's own `env=`
+merges over it key by key. It is deliberately **not** a credential channel: the
+values are recorded on the task record, and `secrets=` is still there for tokens.
+
+## Why this isn't in the memo fingerprint
+
+Flipping the flags changes results without changing code or inputs, so the memo can't
+see it. We chose not to make it evidence:
+
+- Turning determinism on today would invalidate every DONE record in the project and
+  re-run four published sweeps to reproduce numbers we already have. The existing
+  records are honest about what they are; they just came from the older regime.
+- The question this actually needs to answer is "what was *this* number computed
+  under?", which is provenance, not identity. `compute_env` records `XLA_FLAGS` on
+  every attempt (`env.numerics_env`, alongside the GPU model and region), read from
+  the worker's own environment — so a setting that never reached the container reads
+  as absent instead of as what the client meant to send.
+
+If we ever do want a re-run on a flag change, `version=` on the task is the explicit
+lever, and it lands as a new attempt on the same record.
+
+## The alternative we didn't take: tolerating small differences
+
+The tempting move is to leave the GPU alone and teach the DAG that 4.147422 and
+4.147430 are the same number. It doesn't work, for a reason worth writing down:
+near-equality isn't an equivalence relation. `a ≈ b` and `b ≈ c` doesn't give
+`a ≈ c`, so there's no way to bucket values into hashable classes. Concretely:
+
+- **Rounding before hashing** just relocates the problem to the bucket boundaries.
+  Two values a hair apart that straddle one still hash differently, so misses become
+  rarer *and* less predictable — the worst combination for a cache you're trying to
+  trust. It also does nothing for the input that dominates here, which is a
+  checkpoint blob.
+- **Keeping the previous result when the new one is within tolerance** does hold the
+  downstream keys still, and it's the only version that's mechanically compatible
+  with content addressing. But it serves a result the current code didn't produce, it
+  needs a tolerance per result *shape* (there isn't a meaningful one for checkpoint
+  bytes), and it makes the DAG's answer depend on run history rather than on inputs
+  — which is the property that makes a memo worth trusting.
+- **Keying downstream on the upstream's identity rather than its bytes** — pass the
+  config and seed, stash the weights beside it — is the honest version, and it's the
+  fallback if determinism ever costs too much. It's also a deliberate trade: a
+  genuine change in the upstream result stops invalidating downstream. Worth pairing
+  with recording the checkpoint digest, so a surprise is at least detectable after
+  the fact.
+
+Determinism is simply the cheaper lever: one flag, one place, ~1.7× on the training
+role, and the DAG's equality test keeps meaning what it says.
+
+## Re-measuring
+
+The probe isn't checked in — it needs a GPU, so it can't be a test. It's ~70 lines:
+map the real `train_step` over N replicas with `single_use_containers=True` and
+`.w(env={"XLA_FLAGS": ...})`, hash `jax.tree.leaves(eqx.filter(model,
+eqx.is_inexact_array))`, and compare digests across containers. Worth re-running when
+the model grows a new kind of op, or when the 1.7× starts to hurt.

@@ -76,6 +76,24 @@ store-bucket = "z0u/sca2-store"
 # per-shell with MINI_PUBLISH_REPO. See eng/publishing.md and issue #38.
 publish-repo = "z0u/sca2-pub"
 
+# Environment every task worker gets, on both backends. It has to be here rather
+# than set from inside a task: a Modal container is reused across tasks, and XLA
+# parses XLA_FLAGS once when its backend comes up, so an in-process setting takes
+# effect for whichever task happened to run first and is ignored thereafter.
+#
+#   deterministic_ops       makes scatter deterministic, via the fast expander.
+#                           Without it, embedding-gradient scatter-adds accumulate
+#                           in whatever order the atomics land, so the same seed
+#                           and code give a different model every run. Measured on
+#                           an L4: three containers, three digests; with it, one.
+#                           Costs about 1.7x on a d64-L4 cell (eng/determinism.md).
+#   exclude_nondeterministic_ops  the broader guard, for ops the scatter expander
+#                           doesn't cover. Free at our sizes.
+#
+# A role can override per-experiment with env= (merged key by key). Not a secret
+# channel: these values are recorded on every task record. Tokens go in secrets=.
+env = { XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false --xla_gpu_deterministic_ops=true --xla_gpu_exclude_nondeterministic_ops=true" }
+
 [tool.uv]
 # Dependency cooldown to mitigate risk of supply chain attacks.
 # https://docs.astral.sh/uv/concepts/resolution/#dependency-cooldowns

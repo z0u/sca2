@@ -121,3 +121,13 @@ compilation) is covered by `watchdog_grace=` instead (default: same as
 `watchdog`), so a slow prep phase doesn't force the watchdog loose. The grace
 ends at the first emission — emit once real step cadence begins, not before.
 Leave `watchdog` unset for steps that never emit step progress.
+
+A role can also set `env=` — environment for the worker, in place *before* the
+process starts (a Modal container Secret; locally, the task subprocess's env).
+Reach for it when a library reads its env once at init and a task setting it on
+itself would be too late: a Modal container is reused across a map's tasks, so
+whichever task ran first fixes the setting for the rest. `[tool.mini] env` in
+`pyproject.toml` gives every experiment a baseline (this project uses it for
+`XLA_FLAGS`, so GPU results reproduce — see [eng/determinism.md](../../../../eng/determinism.md));
+a role's `env=` merges over it key by key. It is *not* a credential channel — the
+values land on the task record; pass tokens through Modal's `secrets=`.

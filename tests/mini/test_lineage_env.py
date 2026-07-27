@@ -92,3 +92,16 @@ def test_aggregate_cost_sums_only_wanted_apps_with_breakdown():
 def test_aggregate_cost_empty_when_no_match():
     out = _aggregate_cost([_Item("ap-x", Decimal("1"), {})], {"ap-y"})
     assert out == {"total": Decimal(0), "by_resource": {}, "intervals": 0}
+
+
+def test_compute_env_records_the_numerics_env(monkeypatch):
+    """``XLA_FLAGS`` decides whether a GPU reduction is deterministic, so two
+    attempts can agree on code and inputs and still disagree on results across a
+    change to it. Recorded per attempt, from the worker's own environment — so a
+    setting that never reached the container reads as absent rather than as
+    whatever the client asked for."""
+    monkeypatch.delenv("XLA_FLAGS", raising=False)
+    assert "numerics_env" not in runs.compute_env()
+
+    monkeypatch.setenv("XLA_FLAGS", "--xla_gpu_deterministic_ops=true")
+    assert runs.compute_env()["numerics_env"] == {"XLA_FLAGS": "--xla_gpu_deterministic_ops=true"}
