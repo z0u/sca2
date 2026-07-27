@@ -770,65 +770,13 @@ def _():
     mo.md(r"""
     ## Within-form geometry (H2)
 
+    Outcome: the named form matches the prediction, with the mix decodable at
+    $R^2 = 0.94$ at the pre-answer position in the last layer, and hex never
+    assembles a pre-answer mix at all.
+
     The figure below plots probe $R^2$ at every depth × landmark, for the two
-    operands and the mix, per form; center cell of the sweep only.
-    We used the stricter of the two holdouts described under Measurements.
-
-    **The named form matches the prediction.** The mix is decodable at $R^2 =
-    0.94$ at the pre-answer position in the last layer, and all three seeds
-    land there (0.93, 0.95, 0.95) — for mix values the probe never saw, which
-    is a stronger claim than the preregistered estimator makes. That estimator
-    gives 0.944 at the same site, so H2 is carried either way and nothing turns
-    on the change of protocol. Where the mix *first* appears is less settled:
-    one seed already reads it at the `=` sign by the second-to-last layer while
-    the other two stay near 0.3 there, visible as the upper hairline lifting
-    away from the outline at `=`. The earliest decodable site varies by seed;
-    the pre-answer, last-layer location does not.
-
-    **A named operand's value is not on its name.** At the last character of
-    operand 1 the strict probe scores $-0.05$, and operand 2 scores $0.00$ —
-    nothing. The value sits instead on the spaces that follow: $0.23$ on the
-    space closing operand 1, rising to $0.47$ across the `+`, and $0.64$ by the
-    pre-answer position. A variable-length name has no fixed slot, and the
-    model appears to resolve it into the first fixed position available. Two
-    qualifications. Part of what the closing space holds is lexical rather than
-    chromatic — 99 of the 140 names are multi-word and the modifiers recur, and
-    holding out whole word families costs that site $0.43$ more than a
-    color-matched holdout of the same size does (a separate refit on the
-    published checkpoints, since it needs folds the stored maps don't carry;
-    the numbers are quoted here rather than recomputed in this notebook).
-    The site after the `+` is much less lexical, so the
-    $0.47$ there is the sturdier number. And this is where the preregistered
-    estimator diverges most: it reads $0.75$ at the name's last character,
-    which is name recognition — the identity is recoverable, the value is not
-    placed.
-
-    **Hex relays its channels and does not retain them.** Each channel is
-    legible at its own digit and near zero at the next, a strict relay rather
-    than an accumulation. At the embedding the probe reads $0.42$ at a digit's
-    own position; the preregistered estimator reads $1.00$ there, but that is a
-    ceiling the setup hands out — a hex digit position holds one of 16 tokens,
-    the held-out unit is an equation, and 16 points in 64 dimensions admit an
-    exact linear fit whatever the values. The genuine finding is that $0.42$ is
-    well above zero, so those 16 embeddings do carry a real magnitude axis, and
-    that depth improves it: $0.78$ at operand 2's last digit by the last layer.
-    What does *not* survive is retention. Read at the *green* digit, the red
-    channel scores $0.82$ under the preregistered estimator and $-0.27$ under
-    the strict one: red is still recoverable there, because attention reaches
-    back to its digit, but it is no longer placed by value. Hex also reads
-    nothing at the delimiters ($-0.23$), which is what a form whose three
-    digits sit at fixed offsets should do — it needs no summary slot.
-
-    **Hex never assembles the mix, and the pre-answer site is where named
-    keeps everything.** Hex's mix reaches only $0.20$ at the pre-answer
-    position and $0.55$ mid-answer, and the mid-answer reading sits where the
-    answer's own digits are in the input (see the surface-text caveat under
-    Exploratory analyses). Nothing in the hex panels looks like a holistic
-    pre-answer mix, so the coupling tell that H2 reserved judgment on did not
-    appear. The contrast matters for anchoring rather than for H2 alone: at the
-    named pre-answer position the mix reads $0.94$, operand 1 $0.64$ and
-    operand 2 $0.62$, so one site carries the whole equation at once. Hex has
-    no counterpart, and an anchor needs a site where the whole concept lives.
+    operands and the mix, per form; center cell of the sweep only. We used the
+    stricter of the two holdouts described under Measurements.
     """)
     return
 
@@ -846,38 +794,35 @@ def _(arrays):
             brings all three channels high together at the mix.
         """,
         caption="""
-            Per-channel probe $R^2$ under the strict holdout, center cell: every
-            row carrying a value leaves the fit with it, so a plateau is a value
-            the probe can place rather than one it can look up. Rows are the two
-            forms, columns are operand 1, operand 2 and the mix; within a block,
-            depth runs upward from the embedding and the x axis across the
-            grammar landmarks, one step-line per channel. The grey area is the
-            three-channel mean: its outline is the seed average and the two
-            hairlines are the highest and lowest of the three seeds, so a
-            hairline that lifts away marks a landmark the seeds disagree about
-            and a crisp single edge marks one that replicated. Steps, because
-            each landmark is a discrete character position and a straight line
-            between two of them would claim measurements that were never made.
-            Elided risers, in lighter ink, cross a name's variable-length middle
-            — 0 to 22 characters depending on the line; a hex line has no elision
-            at all, since all four of its operand characters are landmarks. Where
-            a named trace steps up across one of those risers, that is the name
-            completing: the model reads left to right, and a color name's first
-            characters do not determine its value — predicting a held-out name's
-            RGB from the other names sharing its prefix scores $-0.21$ at two
-            characters, below the palette mean, since `sea green` and `salmon`
-            share a prefix and nothing else. Every
+            Per-channel probe $R^2$ under the strict holdout, center sweep cell.
+            Every equation containing a held-out value is removed from the
+            probe's training fit, so a plateau is a value the probe can place
+            rather than one it can look up. Named form on top, hex below;
+            columns are operand 1, operand 2 and the mix. Within a block, depth
+            runs upward from the embedding and the x axis across the grammar
+            landmarks, one step-line per RGB channel. The grey area is the
+            three-channel mean, and the two hairlines are the highest and lowest
+            of the three seeds, so a hairline that lifts away marks a landmark
+            the seeds disagree about and a crisp single edge marks one that
+            replicated. The lines are stepped because each landmark is a
+            discrete character position and a straight line between two of them
+            would claim measurements that were never made. Risers drawn in
+            lighter ink skip over a name's variable-length middle — 0 to 22
+            characters depending on the line; hex lines skip nothing, since all
+            four of a hex operand's characters are landmarks. A named trace that
+            steps up across one of those risers is the name completing. Every
             panel runs over the same 0 and 1 gridlines, numbered once in the
             bottom-right corner, and scores below zero are drawn at the floor:
-            this estimator goes negative wherever a fit has nothing to place, and
-            more negative is not more informative.
+            this estimator goes negative wherever a fit has nothing to place,
+            and more negative is not more informative.
         """,
     )
     def _plot() -> plt.Figure:
         # (seed, depth+1, landmark, 3) per form and target — unaggregated, so the figure can
-        # draw both the seed mean and the seed spread. The strict per-channel map: every row
-        # carrying a value leaves the fit with it, so a plateau here is geometry rather than
-        # a recovered identity. Its per-equation twin is in the exploratory section.
+        # draw both the seed mean and the seed spread. The strict per-channel map: equations
+        # containing a held-out value are removed from the probe's fit, so a plateau here is
+        # geometry rather than a recovered identity. Its per-equation twin is in the
+        # exploratory section.
         _stacks = {
             (_f, _t): np.stack([arrays[f"center-s{_s}/probes/{_f}/{_t}/r2_strict_ch"] for _s in SEEDS])
             for _f in vp.FORMS
@@ -886,6 +831,83 @@ def _(arrays):
         return vp.probe_trace_grid(_stacks, form_axis="row", panel_height=0.45, ylabel="probe R² per depth")
 
     mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    **The named form matches the prediction.** The mix is decodable at $R^2 =
+    0.94$ at the pre-answer position in the last layer, and all three seeds land
+    there (0.93, 0.95, 0.95) — for mix *values* the probe never saw, which is a
+    stronger claim than the preregistered estimator makes. That estimator gives
+    0.944 at the same site, so H2 is carried either way and nothing turns on the
+    change of protocol. Where the mix *first* appears is less settled: one seed
+    already reads it at the `=` sign by the second-to-last layer while the other
+    two stay near 0.3 there, visible as the upper hairline lifting away from the
+    outline at `=`.
+
+    **A named operand's value is not on its name.** At the last character of
+    operand 1 the strict probe scores $-0.05$, and operand 2 scores $0.00$ —
+    nothing. The value sits instead on the spaces that follow: $0.23$ on the
+    space closing operand 1, rising to $0.47$ across the `+`, and $0.64$ by the
+    pre-answer position. A variable-length name has no fixed slot, and the model
+    appears to resolve it into the first fixed position available. Nor could the
+    value have appeared any earlier: the model reads left to right, and a color
+    name's first characters do not determine its value — predicting a held-out
+    name's RGB from the other names sharing its prefix scores $-0.21$ at two
+    characters, below the palette mean, since `sea green` and `salmon` share a
+    prefix and nothing else.
+
+    Part of what the closing space holds is lexical rather than chromatic: 99 of
+    the 140 names are multi-word and the modifiers recur, and holding out whole
+    word families costs that site $0.43$ more than a color-matched holdout of
+    the same size does.[^wordfam] The site after the `+` is much less
+    lexical, so the $0.47$ there is the sturdier number. And this is where the
+    preregistered estimator diverges most: it reads $0.75$ at the name's last
+    character, which is name recognition. That is, the identity is recoverable,
+    but the value is not placed geometrically there.
+
+    **Hex relays its channels and does not retain them.** Each channel is
+    legible at its own digit and near zero at the next, a strict relay rather
+    than an accumulation. At the embedding the probe reads $0.42$ at a digit's
+    own position, so the 16 digit embeddings do carry a real magnitude axis.
+    Depth then improves it, rising to $0.78$ at operand 2's last digit by the
+    last layer.
+
+    Hex reads nothing at the delimiters ($-0.23$), which is what a form whose
+    three digits sit at fixed offsets should do, because it needs no summary
+    slot.
+
+    /// details | Why the preregistered estimator reads 1.00 at the embedding
+    That reading is a ceiling the setup hands out rather than a measurement:
+    a hex digit position holds one of 16 tokens, the held-out unit is an
+    equation, and 16 points in 64 dimensions admit an exact linear fit
+    whatever the values. The strict $0.42$ is the informative number, since
+    under that holdout the digit's value never enters the fit.
+
+    Read at the *green* digit, the red channel scores $0.82$ under the
+    preregistered estimator and $-0.27$ under the strict one: red is still
+    recoverable there, because attention reaches back to its digit, but it is no
+    longer placed by value.
+    ///
+
+    **Hex never assembles the mix, and the pre-answer site is where named keeps
+    everything.** Hex's mix reaches only $0.20$ at the pre-answer position and
+    $0.55$ mid-answer, and the mid-answer reading sits where the answer's own
+    digits are in the input (see the surface-text caveat under Exploratory
+    analyses). Nothing in the hex panels looks like a holistic pre-answer mix,
+    so the coupling tell that H2 reserved judgment on did not appear. This is
+    likely to matter for anchoring: at the named pre-answer position the mix
+    reads $0.94$, operand 1 $0.64$ and operand 2 $0.62$, so one site carries the
+    whole equation at once. Hex has no counterpart, and a general RGB anchor
+    needs a site where the whole concept lives, even if only one color is being
+    anchored.
+
+    [^wordfam]: A separate refit on the published checkpoints, since it needs
+        folds the stored maps don't carry; the numbers are quoted here rather
+        than recomputed in this notebook.
+    """)
     return
 
 
