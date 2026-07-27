@@ -966,6 +966,17 @@ def _(arrays):
 
 
 @app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ## Cross-form geometry separation (H3)
+
+    H3 predicted $\rho < 0.2$ and large principal angles. Both hold conclusively: $\rho$ is **zero** at every cell where
+    the guard defines it, in both directions and for all three targets.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _(arrays):
     # Every cross-form cell in the centre cell's scan: 2 directions × 3 targets × 3 seeds ×
     # depth × landmark. The extremes bound the whole claim, so quote them rather than a site.
@@ -983,12 +994,6 @@ def _(arrays):
     _carried_pre = float(np.mean([arrays[f"center-s{_s}/cross/hex2name/mix/r2"][4, _pre] for _s in SEEDS]))
 
     mo.md(f"""
-    ## Cross-form geometry separation (H3)
-
-    H3 predicted $\\rho < 0.2$ and large principal angles. Both hold, and with
-    no room left for argument: $\\rho$ is **exactly zero** at every cell where
-    the guard defines it, in both directions and for all three targets.
-
     That is a stronger statement than the number looks. $\\rho$ clips a negative
     cross-form $R^2$ to zero, so a floor reading could in principle be a hair
     below break-even — but nothing here is close. All
@@ -997,15 +1002,15 @@ def _(arrays):
     layer, where the named form's own mix probe reads {_named_pre:.2f}, the hex
     probe carried over unchanged reads ${_carried_pre:.0f}$. A probe taken across
     forms is not weakly informative about the other vocabulary. It is far worse
-    than answering with the training mean, which is what a decoder pointed in an
-    unrelated direction does.
+    than answering with the training mean, suggesting the decoder is pointing in an
+    unrelated direction.
 
     The figure below shows both readings on the same axes, per form and target:
     the grey area is what the form's own probe recovers, and the amber over it
     is what the other form's probe recovers from the same activations — so the
-    amber fraction of the grey *is* $\\rho$. There is no amber anywhere.
+    amber fraction of the grey *is* $\\rho$, and it's zero everywhere
 
-    /// note | Which within-form estimate the denominator uses
+    /// details | Which within-form estimate the denominator uses
     Both the figure and the table use the **strict** holdout for the within-form
     reading, so the grey areas here are the same quantity the per-channel figure
     under H2 plots and can be read against it. That is a departure from the
@@ -1014,7 +1019,7 @@ def _(arrays):
     probe has never seen the target form's tokens, so it cannot recover a value
     by looking up an identity, while the per-equation within-form estimate can.
     Pairing a leak-prone denominator with a leak-free numerator biases $\\rho$
-    *downward* — it flatters H3 — and the strict denominator removes that.
+    *downward* (it would flatter H3) and the strict denominator removes that.
 
     Nothing turns on the choice: the preregistered ratios are zero too, since
     the numerator is what fails and it is unchanged. Where the two estimators
