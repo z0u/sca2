@@ -110,10 +110,6 @@ readable cold without re-deriving code state.
   survives) fixes it, but it restyles the published ex-2.1.1/2.1.2 figures, so it
   wants an opt-in parameter and a deliberate pass rather than a drive-by edit.
 
-- **GPU determinism.** Configure GPU runs to use deterministic computation when
-  we care about reproducibility (e.g. when we want to refer to a stable
-  measurement from a particular seed).
-
 - **Responsive multi-panel figures in reports (opened 2026-07-16).** The
   ex-2.1.1 two-panel *named-pair lattice* was split into two independent
   `themed` figures wrapped in a `.report-figure-row` (inline-block, reflows to
@@ -138,7 +134,9 @@ readable cold without re-deriving code state.
     stale attempt files/superseded records, so a scratch or renamed experiment's
     DONE records live forever — on Modal too (a `cli-probe` probe experiment now
     sits there as a permanent example). Wants a `mini rm <name>` with the same
-    dry-run-by-default posture as gc.
+    dry-run-by-default posture as gc. The manual escape hatch, verified: `bin/modal
+    dict delete mini-cp-<name> --yes` plus `bin/modal volume delete <name> --yes`
+    clears both planes — which is roughly what `mini rm` would wrap.
   - `mini ls` reads local launch state only and (alone among the verbs) has no
     `--app` — there's no way to enumerate experiments that exist on Modal; you
     must already know the name. The empty-state hint now says so, but listing

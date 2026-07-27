@@ -53,6 +53,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
         self.max_workers = max_workers
         self.watchdog_s: float | None = None
         self.watchdog_grace_s: float | None = None
+        self.env: dict[str, str] = {}
         self._before_hooks: list[Callable[[], Any]] = []
         self._volume: LocalVolume | None = LocalVolume(Path(data_dir) if data_dir else data_root() / name)
 
@@ -63,6 +64,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
         new_app = LocalApparatus(self.name, self.max_workers)
         new_app.watchdog_s = self.watchdog_s
         new_app.watchdog_grace_s = self.watchdog_grace_s
+        new_app.env = dict(self.env)
         new_app._before_hooks = self._before_hooks[:]
         new_app._volume = self._volume
         return new_app
@@ -70,16 +72,23 @@ class LocalApparatus(Apparatus[LocalVolume]):
     @override
     def w(self, **kwargs: Any) -> LocalApparatus:
         """Honor the backend-agnostic ``watchdog=`` (seconds without step
-        progress before the worker aborts itself) and ``watchdog_grace=`` (the
-        looser threshold until the first emission); every other option is a
+        progress before the worker aborts itself), ``watchdog_grace=`` (the
+        looser threshold until the first emission) and ``env=`` (environment for
+        the task worker, merged key by key); every other option is a
         backend-native knob this apparatus has no use for, ignored as before —
         so a role table written for Modal still loads locally.
+
+        ``env`` reaches the *memoized* path only, where each task is its own
+        subprocess. The interactive ``map``/``arun`` path runs threads in the
+        caller's process, which has one shared environment and, for anything that
+        reads env at init, has usually already read it.
         """
-        if not ({"watchdog", "watchdog_grace"} & kwargs.keys()):
+        if not ({"watchdog", "watchdog_grace", "env"} & kwargs.keys()):
             return self
         new_app = self.clone()
         new_app.watchdog_s = kwargs.get("watchdog", self.watchdog_s)
         new_app.watchdog_grace_s = kwargs.get("watchdog_grace", self.watchdog_grace_s)
+        new_app.env |= kwargs.get("env") or {}
         return new_app
 
     @override
@@ -98,7 +107,8 @@ class LocalApparatus(Apparatus[LocalVolume]):
     def spawn_tasks(self, store: MemoStore, batch: list[tuple[str, str, Callable, tuple, list]]) -> None:
         for key, gen, fn, args, hooks in batch:
             store.write_call(key, fn, args, hooks, gen, self.watchdog_s, self.watchdog_grace_s)  # stage for worker
-            store.update_if(key, gen, pid=spawn_taskworker(store.data_dir, key))  # pid == pgid, for cancel
+            pid = spawn_taskworker(store.data_dir, key, env=self.env)  # pid == pgid, for cancel
+            store.update_if(key, gen, pid=pid)
 
     @override
     def _stop_task(self, rec: dict[str, Any]) -> None:

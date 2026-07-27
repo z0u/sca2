@@ -154,6 +154,23 @@ HF_CACHE_MOUNT = "/hf-cache"
 WORKER_STORE_CACHE = Path("/tmp/mini-store-cache")
 
 
+def _attach_env(fn_kwargs: dict[str, Any]) -> None:
+    """Turn the intercepted ``env=`` mapping into a container Secret (in place).
+
+    Env has to be in place *before* the worker process starts: a container is
+    reused across tasks, and a library that reads its env once at init (XLA parses
+    ``XLA_FLAGS`` when the backend comes up) locks in whatever the *first* task on
+    that container saw. Setting it from inside a task is therefore order-dependent
+    — which is why this is a container-level option rather than a hook.
+
+    A Secret is the vehicle Modal gives us, but this channel is **not** for
+    credentials: ``env=`` values are recorded in the task record (see
+    :func:`mini.runs.compute_env`). Pass tokens through ``secrets=`` instead.
+    """
+    if env := fn_kwargs.pop("env", None):
+        fn_kwargs["secrets"] = [*fn_kwargs.get("secrets", []), modal.Secret.from_dict(dict(env))]
+
+
 def _attach_hf_cache(fn_kwargs: dict[str, Any]) -> None:
     """Mount the shared HF cache Volume and point ``HF_HOME`` at it (in place).
 
@@ -576,11 +593,16 @@ class ModalApparatus(Apparatus[ModalVolume]):
         timeouts. A few are intercepted by mini rather than passed to Modal:
         ``startup_timeout`` (a client-side wait), ``watchdog`` (seconds without
         step progress before the worker aborts itself — the backend-agnostic
-        wedge guard, see :mod:`mini._watchdog`) and ``watchdog_grace`` (the
-        looser threshold until the first emission, covering one-off setup).
+        wedge guard, see :mod:`mini._watchdog`), ``watchdog_grace`` (the looser
+        threshold until the first emission, covering one-off setup) and ``env``
+        (container environment, see :func:`_attach_env`).
+
+        ``env`` *merges* key by key, so a role can add one variable without
+        restating the project-wide defaults; every other option replaces.
         """
         new_app = self.clone()
-        new_app.modal_fn_kwargs = {**self.modal_fn_kwargs, **kwargs}
+        env = {**self.modal_fn_kwargs.get("env", {}), **kwargs.get("env", {})}
+        new_app.modal_fn_kwargs = {**self.modal_fn_kwargs, **kwargs} | ({"env": env} if env else {})
         return new_app
 
     @override
@@ -646,6 +668,7 @@ class ModalApparatus(Apparatus[ModalVolume]):
                 }
             if secret := _hf_store_secret():  # forward HF bucket creds so put/get hit the shared store
                 fn_kwargs["secrets"] = [*fn_kwargs.get("secrets", []), secret]
+            _attach_env(fn_kwargs)  # container-level env (e.g. XLA_FLAGS), in place before the worker starts
             _attach_hf_cache(fn_kwargs)  # shared HF_HOME, so from_pretrained caches across containers
             self._memo_fns[name] = self.app.function(serialized=True, name=name, **fn_kwargs)(_modal_task_entry)
         return self._memo_fns[name]
@@ -834,6 +857,7 @@ class ModalApparatus(Apparatus[ModalVolume]):
             }
         if secret := _hf_store_secret():  # forward HF bucket creds so put/get hit the shared store
             fn_kwargs["secrets"] = [*fn_kwargs.get("secrets", []), secret]
+        _attach_env(fn_kwargs)  # container-level env (e.g. XLA_FLAGS), in place before the worker starts
         _attach_hf_cache(fn_kwargs)  # shared HF_HOME, so from_pretrained caches across containers
         modal_fn = self.app.function(serialized=True, **fn_kwargs)(wrapped_fn)
         return modal_fn, startup_timeout

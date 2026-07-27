@@ -169,7 +169,7 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
     Compute is an execution choice, not part of the experiment definition.
     """
     backend = _resolve_app(name, args)
-    wd_overrides = {
+    common = {
         k: v
         for k, v in (
             ("watchdog", getattr(args, "watchdog", None)),
@@ -177,9 +177,15 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
         )
         if v is not None
     }
+    # Project-wide worker environment, on both backends: a setting that decides what
+    # a task computes (`XLA_FLAGS`) belongs with the project, not restated per
+    # experiment, and has to be in place before the worker starts. A role's own
+    # `env=` merges over this key by key (roles are applied on top).
+    if env := _project_config().get("env"):
+        common["env"] = env
     if backend == "local":
         app: Apparatus = LocalApparatus(name, max_workers=getattr(args, "workers", 1))
-        return app.w(**wd_overrides) if wd_overrides else app
+        return app.w(**common) if common else app
     if backend == "modal":
         from mini.modal_apparatus import ModalApparatus
 
@@ -196,7 +202,7 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
                 ("region", getattr(args, "region", None) or _project_config().get("region")),
             )
             if v is not None
-        } | wd_overrides
+        } | common
         return app.w(**overrides) if overrides else app
     raise SystemExit(
         f'unknown backend {backend!r} — use "local" or "modal" (--app / .app marker / $MINI_APP / [tool.mini] app)'

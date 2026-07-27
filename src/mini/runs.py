@@ -95,6 +95,14 @@ _MODAL_ENV_KEYS = {
     "MODAL_IMAGE_ID": "modal_image_id",
 }
 
+# Env that changes what a task *computes*, as opposed to where it runs. Recorded
+# verbatim so a number can be traced back to the numerics that produced it —
+# `XLA_FLAGS` decides whether a GPU reduction is deterministic, so two attempts
+# that agree on code and inputs can still disagree on results across a change
+# here. Read from the worker's own environment rather than from what the client
+# asked for, so a setting that failed to arrive shows up as absent.
+_NUMERICS_ENV_KEYS = ("XLA_FLAGS",)
+
 
 def compute_env() -> dict[str, Any]:
     """A snapshot of *what a task actually ran on*, recorded by the worker.
@@ -103,8 +111,8 @@ def compute_env() -> dict[str, Any]:
     reflects the real execution environment rather than the requested backend —
     useful when a sweep fans out across heterogeneous Modal containers. Kept small
     (it rides the hot control-plane record): host, OS/arch, Python, CPU/RAM, the GPU
-    model + count if any, and — on Modal — the container/region/cloud ids (never any
-    token or secret; see ``_MODAL_ENV_KEYS``).
+    model + count if any, the numerics env (``_NUMERICS_ENV_KEYS``), and — on Modal —
+    the container/region/cloud ids (never any token or secret; see ``_MODAL_ENV_KEYS``).
     """
     env: dict[str, Any] = {
         "host": platform.node(),
@@ -122,6 +130,8 @@ def compute_env() -> dict[str, Any]:
     for src, dst in _MODAL_ENV_KEYS.items():
         if val := os.environ.get(src):
             env[dst] = val
+    if numerics := {k: v for k in _NUMERICS_ENV_KEYS if (v := os.environ.get(k))}:
+        env["numerics_env"] = numerics
     return env
 
 
@@ -224,17 +234,22 @@ def _merge_json(path: Path, fields: dict) -> None:
     _atomic_write(path, json.dumps(cur))
 
 
-def spawn_taskworker(data_dir: Path, key: str) -> int:
+def spawn_taskworker(data_dir: Path, key: str, env: dict[str, str] | None = None) -> int:
     """Launch a detached worker for one memoized task *key*; return its pid.
 
     The local implementation of ``Apparatus.spawn_task``: a subprocess that runs
     the staged call (``MemoStore._call``) and persists its result/state under the
     content key, outliving the orchestration tick that launched it.
+
+    *env* is overlaid on the parent environment, the local counterpart of Modal's
+    per-container env: a fresh process per task, so a library that reads its env
+    once at init sees this task's setting rather than an earlier task's.
     """
     proc = subprocess.Popen(
         [sys.executable, "-m", "mini._taskworker", str(data_dir), key],
         start_new_session=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env=(os.environ | env) if env else None,
     )
     return proc.pid

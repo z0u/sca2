@@ -125,7 +125,9 @@ Watching a big sweep is cheap too: the watch loops cache settled
 tasks still in flight, so a mostly-done sweep stops paying to poll its settled
 tail (on Modal each record read is a `Dict` round-trip). Each task also records
 **what it actually ran on** (host/OS/Python, CPU/RAM, the GPU + count when
-attached, and on Modal the container id / region / cloud — never any token);
+attached, the numerics env it ran under — `XLA_FLAGS`, which decides whether a
+GPU reduction is deterministic — and on Modal the container id / region / cloud
+(never any token);
 `status` shows `on <GPU>` for remote tasks, and the full snapshot is on the
 record under `env`, with `started_at`/`finished_at` for a real execution
 duration.

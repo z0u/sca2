@@ -868,3 +868,27 @@ def test_region_defaults_from_the_project_config(tmp_path: Path, monkeypatch):
     assert built().modal_fn_kwargs["region"] == "us-east"
     assert built("eu-west").modal_fn_kwargs["region"] == "eu-west"
     assert built().w(region="asia-northeast3").modal_fn_kwargs["region"] == "asia-northeast3"
+
+
+def test_worker_env_defaults_from_the_project_config(tmp_path: Path, monkeypatch):
+    """What a task computes under (``XLA_FLAGS``) is a property of the project, not
+    of one experiment, so it has a project-wide default on both backends — with a
+    role's own ``env=`` merging over it key by key rather than replacing it."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.mini]\nenv = { XLA_FLAGS = "-x", KEEP = "1" }\n')
+
+    from mini.__main__ import _build_apparatus
+
+    args = argparse.Namespace(app="local", workers=1, watchdog=None, watchdog_grace=None)
+    local = _build_apparatus("envexp", args)
+    assert isinstance(local, LocalApparatus)
+    assert local.env == {"XLA_FLAGS": "-x", "KEEP": "1"}
+    assert local.w(env={"XLA_FLAGS": "-y"}).env == {"XLA_FLAGS": "-y", "KEEP": "1"}
+
+    pytest.importorskip("modal")
+    from mini.modal_apparatus import ModalApparatus
+
+    margs = argparse.Namespace(app="modal", gpu=None, timeout=None, max_containers=None, region=None)
+    remote = _build_apparatus("envexp", margs)
+    assert isinstance(remote, ModalApparatus)
+    assert remote.modal_fn_kwargs["env"] == {"XLA_FLAGS": "-x", "KEEP": "1"}
