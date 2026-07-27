@@ -14,6 +14,13 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **"Cell" vs "condition" terminology split (2026-07-27).** Report prose now
+  says "condition" for one sweep item, reserving "cell" for visual elements
+  (heatmap/table cells). The `mini` library still says "cell" throughout
+  (`orchestration.py`, `__main__.py` monitor output, docstrings). Decide whether
+  to rename the library term to match — it touches CLI output and docs, so it's
+  a deliberate rename, not a sweep-through.
+
 - **Published sweeps are one tick away from a full re-run after an evidence-scheme
   change (2026-07-27).** Widening what the fingerprint tracks re-stamps every
   task's evidence, so the next `mini run` re-runs the whole DAG in place, even

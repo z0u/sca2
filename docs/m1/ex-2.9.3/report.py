@@ -58,7 +58,7 @@ def _():
       should repeat all along that init's row, while a failure that comes from
       the data ordering should scatter.
     - Schedule sweep: peak LR {0.10, 0.07, 0.05, 0.03} × regularizer anneal
-      {on, off}, 32 seeds per cell, trained with the fallback term and scored by
+      {on, off}, 32 seeds per condition, trained with the fallback term and scored by
       the `redirect` intervention (ex-2.9.2's recipe, so the score reflects
       anchoring quality).
 
@@ -367,7 +367,7 @@ def _(sweep_cell):
             for lbl, c in (("anneal on", colors[True]), ("anneal off (hold)", colors[False]))
         ]
         axes[0].legend(handles=handles, loc="lower left")
-        axes[0].set_title("Redirect score and leakage across the schedule sweep (32 seeds per cell)")
+        axes[0].set_title("Redirect score and leakage across the schedule sweep (32 seeds per condition)")
         return fig
 
     mo.Html(_plot())
@@ -388,26 +388,26 @@ def _(sweep_cell):
     mo.md(f"""
     Three results come out of the sweep.
 
-    First, peak LR 0.05 with the anneal is the safe cell: {_nbad(_cool)}/32 unhealthy runs
+    First, peak LR 0.05 with the anneal is the safe condition: {_nbad(_cool)}/32 unhealthy runs
     (0.10 gives {_nbad(_hot)}; 0.07 gives {_nbad(sweep_cell(0.07, True))}), a median score of
-    {np.median(_rd(_cool)):.2f}, and reconstruction as good as the hot cell (median
+    {np.median(_rd(_cool)):.2f}, and reconstruction as good as the hot condition (median
     {np.median(_rc(_cool)):.6f} versus {np.median(_rc(_hot)):.6f}). On the other
     hand, at 0.03 the model doesn't train properly, with {_nbad(_cold)} leaky
     runs and a median score of {np.median(_rd(_cold)):.2f}.
 
     Second, the anneal should be kept. Holding the regularizers on lowers typical leak a
-    little, but it widens the tail: {_hold_bad} leaky runs across the four hold cells versus
+    little, but it widens the tail: {_hold_bad} leaky runs across the four hold conditions versus
     {sum(_nbad(sweep_cell(p, True)) for p in PEAK_LRS)} with the anneal, because the live anchor
     term keeps pulling pinkish-labeled samples onto the axis in unlucky runs. Holding on also
     costs about 10× in reconstruction (median {_hold_rc:.6f} versus
     {np.median(np.concatenate([_rc(sweep_cell(p, True)) for p in PEAK_LRS])):.6f}).
 
-    Third, γ should be calibrated per model. The worst hot-cell score ({_rd(_hot).min():.2f}, seed
+    Third, γ should be calibrated per model. The worst hot-condition score ({_rd(_hot).min():.2f}, seed
     {min(_hot, key=lambda r: r["interventions"]["redirect"]["score"])["seed"]}) anchored
     cleanly, but the redirect's fixed γ = 1 bias was too small to dominate that seed's
     pre-norm scale, so "deleted" red passed through almost untouched (damage to
     pure red {min(r["interventions"]["redirect"]["red_pure"] for r in _hot):.3f}).
-    Excluding it, the hot cell's floor is {_hot_ok.min():.2f}.
+    Excluding it, the hot condition's floor is {_hot_ok.min():.2f}.
     """)
     return
 
@@ -425,7 +425,7 @@ def _(arm):
     collapsed, or leak went beyond 0.3 — occurred only in the fallback-free
     arms: {_cat(_base)} of {len(_base)} base-config runs, against **{_cat(_fb)}
     of {len(_fb)}** fallback-trained runs across all eight schedules
-    ({_cat(_like)} of {len(_like)} in the like-for-like cell, the same schedule
+    ({_cat(_like)} of {len(_like)} in the like-for-like condition, the same schedule
     as the base arms). Ex-2.9.2 saw this pattern at 32 seeds and was careful
     about reading much into it, since one extra loss term is hard to tell apart
     from luck at that scale. At {len(_fb)} runs the pattern has held without
@@ -434,7 +434,7 @@ def _(arm):
     A mechanism seems plausible. The fallback term pins the decoder's output at
     −e₀, which flattens the loss landscape around the redirect direction and may
     remove the direction along which the instability grows. Only the
-    like-for-like cell is a clean comparison, so the schedule confound prevents
+    like-for-like condition is a clean comparison, so the schedule confound prevents
     this from being conclusive. Still, this is now the second experiment in
     which fallback training produced zero catastrophes.
     """)
@@ -459,7 +459,7 @@ def _(arm, sweep_cell):
 
     For M2 defaults:
 
-    - Reduce the LR. That cell had 0/32 unhealthy runs, scores {_rd.min():.2f}
+    - Reduce the LR. That condition had 0/32 unhealthy runs, scores {_rd.min():.2f}
       to {_rd.max():.2f} (median {np.median(_rd):.2f}), and reconstruction as
       good as the hot schedule. Reducing it only during the anneal phase may be
       enough.
@@ -469,7 +469,7 @@ def _(arm, sweep_cell):
     - Calibrate the redirect's γ against the model's pre-norm activation scale.
       A fixed γ = 1 silently no-ops on about 1 run in 250.
     - Keep the cheap endpoint screening (leak < 0.1, anchor loss, recon). Even
-      the safe cell only bounds what we measured, and the failure mechanism is
+      the safe condition only bounds what we measured, and the failure mechanism is
       chaotic.
 
     A tuned schedule fixes the symptom but still requires tuning.

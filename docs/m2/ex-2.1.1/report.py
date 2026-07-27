@@ -70,7 +70,7 @@ with app.setup(hide_code=True):
         return dict(zip(WIDTHS, plt.cm.viridis(stops), strict=True))
 
     def pick_arch(metrics: list[dict]) -> tuple[int, int]:
-        """The smallest cell (by params ∝ width²·depth) that saturates the unseen-pair sets."""
+        """The smallest condition (by params ∝ width²·depth) that saturates the unseen-pair sets."""
 
         def unseen(w: int, d: int) -> float:
             return float(np.mean([acc(metrics, w, d, s, es) for s in SEEDS for es in ("hex_unseen", "cross_unseen")]))
@@ -107,7 +107,7 @@ def _():
     correct completion.
 
     We sweep width {16, 32, 64} × depth {2, 4} × 3 seeds ([experiment
-    definition](./experiment.py)), and for each cell we measure:
+    definition](./experiment.py)), and for each condition we measure:
 
     - Completion accuracy: greedy decoding, scored as an exact string match,
       over four evaluation sets. Those are named pairs seen in training;
@@ -399,7 +399,7 @@ def _(metrics):
     Results: Accuracy on unseen hex pairs spans
     **{min(_hex):.2f}–{max(_hex):.2f}** across the sweep, while held-out named
     pairs, the compositional test, span **{min(_hold):.2f}–{max(_hold):.2f}**.
-    The figures below break this down by cell and eval set.
+    The figures below break this down by condition and eval set.
     """)
     return
 
@@ -832,7 +832,7 @@ def _():
     mo.md(r"""
     Rising R² for the *result* means the mix becomes partly readable before the
     answer starts. It plateaus well below the operand's R², though, even in
-    cells whose hex accuracy is perfect. Probing every answer position, per
+    conditions whose hex accuracy is perfect. Probing every answer position, per
     channel, would map that spread-out schedule (to do).
 
     The probes read the residual stream at two positions, marked below. The first
@@ -939,7 +939,7 @@ def _(metrics):
         f"""
     ## Findings
 
-    The smallest cell that saturates the unseen-pair eval sets is
+    The smallest condition that saturates the unseen-pair eval sets is
     **width {_best[0]}, {_best[1]} layers**. For D2.1, we can take that
     architecture as the baseline and add the anchor, which pulls sequences
     labeled *red-ish* (supplied as sparse, noisy labels) toward a chosen

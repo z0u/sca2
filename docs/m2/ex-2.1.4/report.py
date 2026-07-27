@@ -854,7 +854,7 @@ def _(arrays, metrics):
             position, with the value held across the position and ramping between; line
             width tapers R → G → B so an offset where all three agree reads as nested bands
             rather than as whichever channel drew last. Hex answers (right, from ex-2.1.2's
-            base-grammar cells) spell one channel per digit, and the probe found each
+            base-grammar conditions) spell one channel per digit, and the probe found each
             channel computed just in time and dropped once emitted. Opaque names cannot be
             written that way, and H4 predicts all three channels stay decodable across the
             window.

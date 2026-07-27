@@ -122,7 +122,7 @@ def _(loaded):
     the ±0.08 of noise we see between epochs, so the depth axis is flat. Width
     behaves the way added capacity should: loss falls monotonically from
     {plateau(curves, 32, 4):.2f} at width 32 to {plateau(curves, 128, 12):.2f} at
-    width 128 with 12 layers. No cell spikes or stalls, and the same learning rate
+    width 128 with 12 layers. No condition spikes or stalls, and the same learning rate
     (10⁻²) works everywhere. So fixing the residual step to a scalar constant seems
     to be enough.
     """
@@ -225,7 +225,7 @@ def _(curves):
     ## Findings
 
     Across the whole grid, the simplified nGPT trains flat across depth and keeps
-    improving with width, and no cell destabilizes ({_best:.2f} nats/char at the
+    improving with width, and no condition destabilizes ({_best:.2f} nats/char at the
     deepest, widest corner). That is what we were hoping for. The architecture that SCA
     will anchor concepts in scales without a depth penalty, so if a later
     experiment runs into trouble, the simplified architecture is unlikely to be the

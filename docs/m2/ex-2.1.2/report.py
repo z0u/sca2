@@ -828,7 +828,7 @@ def _(metrics):
     )
     mo.md(rf"""
     Every set the model fails, it fails confidently rather than hedging, which is
-    what the garden-path sublines illustrate. Across the {len(_s2)} cell and
+    what the garden-path sublines illustrate. Across the {len(_s2)} condition and
     eval-set pairs at zero accuracy, s₂ averages {np.mean(_s2):.2f} and spans
     {_s2[0]:.2f} to {_s2[-1]:.2f}.
     """)

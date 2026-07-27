@@ -33,7 +33,7 @@ with app.setup(hide_code=True):
     use_publisher(report_bundle(__file__))
 
     def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
-        """Resolve metrics and stacked per-cell arrays from the store, or None if unpublished."""
+        """Resolve metrics and stacked per-condition arrays from the store, or None if unpublished."""
         store = project_store()
         arts = store.get_refs([METRICS_REF, ARRAYS_REF])
         m_art, a_art = arts[METRICS_REF], arts[ARRAYS_REF]
@@ -47,7 +47,7 @@ with app.setup(hide_code=True):
         return metrics, arrays
 
     def load_cross() -> dict | None:
-        """Cross-form exact match for the bridge cell, or None if it hasn't been scored.
+        """Cross-form exact match for the bridge condition, or None if it hasn't been scored.
 
         Written by `cross_eval.py`, which sits outside the sweep's DAG — see H5.
         """
@@ -144,7 +144,7 @@ def _():
 
     **Names.** The named palette comes from the [xkcd color survey][xkcd]: all
     949 names, ordered by farthest-point selection so that the first $N$ form
-    the most uniform palette available at that size. The center cell uses
+    the most uniform palette available at that size. The center condition uses
     $N = 140$; at that size the minimum and median nearest-neighbor distances
     are ≈ 41 and ≈ 46 (8-bit Euclidean), against 4 and 27 for the CSS keyword
     list. Names map to points on the full cube.
@@ -177,14 +177,14 @@ def _():
     - Hex operands are lifted to it by digit repetition (`#f80` → `#ff8800`)
       and the answer is snapped back to the hex grid.
 
-    Two forms appear in every cell of the sweep, and a third only in the
+    Two forms appear in every condition of the sweep, and a third only in the
     _bridge_ arm:
 
-    | Form  | Example                       | Sweep cells |
-    |-------|-------------------------------|-------------|
-    | named | `melon + ultramarine = <name>`| all         |
-    | hex   | `#e26 + #48a = #958`          | all         |
-    | cross | `melon + #48a = #<hex>`       | bridge arm  |
+    | Form  | Example                       | Sweep conditions |
+    |-------|-------------------------------|------------------|
+    | named | `melon + ultramarine = <name>`| all              |
+    | hex   | `#e26 + #48a = #958`          | all              |
+    | cross | `melon + #48a = #<hex>`       | bridge arm       |
 
     (Examples are illustrative until the corpus code lands.) Named equations
     always answer with a name, and hex equations with a hex code, so the answer
@@ -280,11 +280,11 @@ def _(arrays, stats):
     {_better_gap * 100:.0f}% of draws leave a wider hole.
 
     Whether that biases the *geometry* is answered by the sweep. The *hex-dense*
-    cell draws 2,048 operands from the same grid — a tenth of the spacing, and
-    no visible clumping — and its hex probe map is the same map: the two cells'
+    condition draws 2,048 operands from the same grid — a tenth of the spacing, and
+    no visible clumping — and its hex probe map is the same map: the two conditions'
     depth × landmark maps correlate {_corr_lo:.2f} to {_corr_hi:.2f} across the
     three targets, with a mean absolute difference of at most {_dmax:.2f} in
-    $R^2$. The two cells also answer held-out hex equations equally well (see
+    $R^2$. The two conditions also answer held-out hex equations equally well (see
     the density arms under H1). Nothing about the hex form's layout appears to
     be an artifact of the 216-point draw, so the same should hold for what
     transfers out of it.
@@ -315,7 +315,7 @@ def _(stats):
     mo.vstack(
         [
             mo.md("""
-            Corpus statistics, one row per corpus (cells that share
+            Corpus statistics, one row per corpus (conditions that share
             names × hex × bridge share a corpus). The design study's numbers
             held up: answer perplexity is 86 over 140 names with every name
             reachable as an answer (the 250-name palette reaches 248), and
@@ -403,7 +403,7 @@ def _():
     mo.md(r"""
     ## Hypotheses
 
-    - **H1.** The disjoint language trains at the center cell: hex+hex exact
+    - **H1.** The disjoint language trains at the center condition: hex+hex exact
       match on unseen pairs is comparable to ex-2.1.1's hex levels, and
       name+name held-out exact match clears the $k$-NN analogues of the
       neighborhood nulls.
@@ -413,16 +413,16 @@ def _():
       answers assemble just-in-time, channel by channel, with pre-answer
       full-mix $R^2$ staying low. An elevated pre-answer hex-mix $R^2$ would
       instead be evidence of cross-form coupling (see H3).
-    - **H3.** The two latent geometries live apart in sweep cells that have no
+    - **H3.** The two latent geometries live apart in sweep conditions that have no
       bridging grammar and width d64: $\rho < 0.2$, and the two probes'
       row-spaces show large principal angles. ($0.2 < \rho < 0.8$ reads as
       partial sharing and falsifies the crisp version of both H3 and H5.)
     - **H4.** Narrowing the stream aligns the forms: $\rho$ and subspace
       overlap rise monotonically over d64 → d32 → d16, with d16-L8 the most
-      aligned cell.
-    - **H5.** Adding the cross form produces alignment: the bridge cell (d64)
+      aligned condition.
+    - **H5.** Adding the cross form produces alignment: the bridge condition (d64)
       reaches $\rho > 0.8$. The star design tests this at one width only;
-      bridge × width cells are candidates for a follow-up round if H4 shows
+      bridge × width conditions are candidates for a follow-up round if H4 shows
       width matters.
     - **H6.** At L8, name+name accuracy improves at fixed width and the mix
       crystallizes before the last layer.
@@ -435,9 +435,9 @@ def _():
     mo.md(r"""
     ## The sweep
 
-    A star design around one center cell, three seeds per cell:
+    A star design around one center condition, three seeds per condition:
 
-    | Cell        | Names | Hex ops | Bridge | Width | Depth |
+    | Condition   | Names | Hex ops | Bridge | Width | Depth |
     |-------------|-------|---------|--------|-------|-------|
     | center      | 140   | 216     | none   | 64    | 4     |
     | L8          | 140   | 216     | none   | 64    | 8     |
@@ -448,8 +448,8 @@ def _():
     | palette-250 | 250   | 216     | none   | 64    | 4     |
     | bridge      | 140   | 216     | cross  | 64    | 4     |
 
-    Each arm provides data to score the hypotheses. L8, the width cells, and
-    d16-L8 score H4 and H6; the bridge cell scores H5. The two density arms
+    Each arm provides data to score the hypotheses. L8, the width conditions, and
+    d16-L8 score H4 and H6; the bridge condition scores H5. The two density arms
     attach to H1: *hex-dense* checks that hex accuracy and geometry aren't
     artifacts of the 216-point operand subset (expected: little change —
     ex-2.1.1's hex arithmetic generalized from far sparser coverage), and
@@ -457,10 +457,10 @@ def _():
     (expected: named held-out accuracy holds or improves, with misses staying
     neighbor-level).
 
-    Attention is held at 8 heads × 8 dims in every cell; only the residual
+    Attention is held at 8 heads × 8 dims in every condition; only the residual
     stream and the MLP scale with width. The ngpt-scaling sweep validated
     widths {32, 64, 128} under this scheme, so d16 sits one step below the
-    tested range. If the d16 cells train poorly, that is an architecture
+    tested range. If the d16 conditions train poorly, that is an architecture
     effect to report, and the width trend in H4 rests on d64 → d32.
     """)
     return
@@ -468,7 +468,9 @@ def _():
 
 @app.cell(hide_code=True)
 def _(cells):
-    _thead = "<tr><th>cell</th>" + "".join(f'<th class="num">{h}</th>' for h in ("width", "depth", "params")) + "</tr>"
+    _thead = (
+        "<tr><th>condition</th>" + "".join(f'<th class="num">{h}</th>' for h in ("width", "depth", "params")) + "</tr>"
+    )
     _rows = "".join(
         f"<tr><td>{_a}</td>"
         + f'<td class="num">{ARMS[_a]["width"]}</td>'
@@ -479,8 +481,8 @@ def _(cells):
     )
 
     mo.md(f"""
-    Parameter counts per cell (seeds share a count). The full sweep —
-    4 corpora, 24 training cells, 24 evals.
+    Parameter counts per condition (seeds share a count). The full sweep —
+    4 corpora, 24 training conditions, 24 evals.
 
     /// details | Runtime
     The sweep ran in about 2.5 hours of wall time on five L4 containers. It
@@ -497,8 +499,8 @@ def _():
     mo.md(r"""
     ## Training
 
-    All 24 cells converge smoothly under the shared 100-epoch schedule —
-    including the d16 cells, which sit one step below ngpt-scaling's
+    All 24 conditions converge smoothly under the shared 100-epoch schedule —
+    including the d16 conditions, which sit one step below ngpt-scaling's
     validated width range. No width-gated instability appeared.
     """)
     return
@@ -509,14 +511,14 @@ def _(cells):
     @themed(
         name="loss-curves",
         alt_text="""
-            Eight small panels of loss versus epoch, one per sweep cell, each
+            Eight small panels of loss versus epoch, one per sweep condition, each
             with three validation curves (one per seed) and three fainter
             training curves. Every curve descends smoothly and flattens within
             the 100-epoch budget; no panel shows divergence or oscillation.
         """,
         caption="""
-            Loss per epoch for every cell: validation solid, training faint,
-            one line per seed. All cells share the character vocabulary, so
+            Loss per epoch for every condition: validation solid, training faint,
+            one line per seed. All conditions share the character vocabulary, so
             per-token losses are comparable across panels.
         """,
     )
@@ -545,7 +547,7 @@ def _():
     mo.md(r"""
     ## Exact-match accuracy (H1)
 
-    The center cell answers held-out hex equations almost perfectly (0.996
+    The center condition answers held-out hex equations almost perfectly (0.996
     exact) and held-out named equations at 0.667, with no malformed
     completions in any of its eval sets. The named score sits far above the
     prompt-blind centroid (0.043). One null simplified itself: in this
@@ -582,7 +584,7 @@ def _(seed_mean, stats):
                 + "</table></div>"
             ),
             mo.md("""
-            Center cell, mean over three seeds. Distances are Euclidean in the
+            Center condition, mean over three seeds. Distances are Euclidean in the
             unit cube: *guess dist* from the emitted answer to the exact mix,
             *floor dist* from the true answer to the exact mix (the quantization
             floor). The guesses sit near the floor even where exact match
@@ -624,7 +626,7 @@ def _(arrays):
             all mass is at rank 0.
         """,
         caption="""
-            Where the guesses land, center cell, pooled over seeds: the rank of
+            Where the guesses land, center condition, pooled over seeds: the rank of
             the emitted answer among the form's candidate vocabulary, ordered
             by distance to the true mix. Rank 0 is the correct answer; rank 1
             is its nearest competitor. Malformed completions would be excluded,
@@ -657,7 +659,7 @@ def _(arrays):
 def _(seed_mean, stats):
     _corpus_of = {"center": "n140-h216", "hex-dense": "n140-h2048", "palette-250": "n250-h216"}
     _thead = (
-        "<tr><th>cell</th>"
+        "<tr><th>condition</th>"
         + "".join(f'<th class="num">{h}</th>' for h in ("named held-out", "hex held-out", "answer ppl"))
         + "</tr>"
     )
@@ -682,7 +684,7 @@ def _(seed_mean, stats):
             three seeds span 0.47 to 0.66, so the effect is soft. The hex-dense
             mean of 0.582 looked at first like an unpredicted dip under denser
             hex operands, but it rests on one seed (0.39 against 0.67 and 0.69);
-            the other two match the center cell, so there is little evidence of
+            the other two match the center condition, so there is little evidence of
             a real hex-density effect on named accuracy. Three seeds is thin
             for a difference this size.
             """),
@@ -693,7 +695,7 @@ def _(seed_mean, stats):
 
 @app.cell(hide_code=True)
 def _(arrays, stats):
-    # Effective precision per cell and eval set: the single parameter of the
+    # Effective precision per condition and eval set: the single parameter of the
     # noise-then-snap reference in `sca.baselines` that reproduces the observed
     # exact-match rate. Shared by the density discussion below and by the
     # exploratory figure that checks the account against the margin.
@@ -717,7 +719,7 @@ def _(arrays, stats):
         }
 
     def fit_sigma(arm: str, corpus: str, set_name: str) -> dict:
-        """One cell's behavior on one eval set, with the effective precision that reproduces it."""
+        """One condition's behavior on one eval set, with the effective precision that reproduces it."""
         _b = _behavior(arm, corpus, set_name)
         _b["sigma"] = bl.fit_precision(_b["pal"], _b["mix"], _b["true_idx"], _b["hit"].mean(), _rng, 24, 11)
         return _b
@@ -734,7 +736,7 @@ def _(arrays, stats):
 @app.cell(hide_code=True)
 def _(precision, stats):
     # The counterfactual the density comparison needs: the 250-name prompts answered at
-    # the *center* cell's precision, so the palette's difficulty is held to one side.
+    # the *center* condition's precision, so the palette's difficulty is held to one side.
     _c, _p = precision["center", "named_holdout"], precision["palette-250", "named_holdout"]
     _standardized = float(
         bl.precision_limited_acc(
@@ -746,7 +748,7 @@ def _(precision, stats):
     }
 
     mo.md(f"""
-    More names and fewer correct answers is a strange pairing. Every cell in
+    More names and fewer correct answers is a strange pairing. Every condition in
     this table is d64-L4 with the same parameter count, and the 250-name corpus
     has the same 100,000 lines, so neither capacity nor data volume changed. Two
     other things did change, and we think they explain it.
@@ -757,7 +759,7 @@ def _(precision, stats):
     cube, so more prompts ask the model to place the mix inside a tighter
     boundary. Holding that difficulty to one side —
     answering the 250-name prompts with the reference guesser fitted to the
-    *center* cell's precision — predicts {_standardized:.3f} against the
+    *center* condition's precision — predicts {_standardized:.3f} against the
     observed {_p["hit"].mean():.3f}, so roughly half of the drop from
     {_c["hit"].mean():.3f} is the harder snap alone.
 
@@ -768,12 +770,12 @@ def _(precision, stats):
     {_per_pair["n250-h216"]:.1f} lines per pair against
     {_per_pair["n140-h216"]:.1f}. That shows up as the seen/held-out gap nearly
     closing: {precision["palette-250", "named_seen"]["hit"].mean():.3f} against
-    {_p["hit"].mean():.3f} at 250 names, where the center cell runs
+    {_p["hit"].mean():.3f} at 250 names, where the center condition runs
     {precision["center", "named_seen"]["hit"].mean():.3f} against
     {_c["hit"].mean():.3f}. Fitted precision says the same thing from the other
     side: on *seen* pairs it is
     {precision["palette-250", "named_seen"]["sigma"]:.3f} at 250 names, which is
-    what the center cell manages on pairs it has never seen
+    what the center condition manages on pairs it has never seen
     ({_c["sigma"]:.3f}). At 140 names a training pair recurs often enough to be
     remembered; at 250 it barely does.
 
@@ -797,7 +799,7 @@ def _():
     assembles a pre-answer mix at all.
 
     The figure below plots probe $R^2$ at every depth × landmark, for the two
-    operands and the mix, per form; center cell of the sweep only. We used the
+    operands and the mix, per form; center condition of the sweep only. We used the
     stricter of the two probe holdout protocols described under
     [Measurements](#measurements).
 
@@ -840,7 +842,7 @@ def _(arrays):
             brings all three channels high together at the mix.
         """,
         caption="""
-            Per-channel probe $R^2$ under the strict holdout, center sweep cell.
+            Per-channel probe $R^2$ under the strict holdout, center sweep condition.
             Every equation containing a held-out value is removed from the
             probe's training fit, so a plateau is a value the probe can place
             rather than one it can look up. Named form on top, hex below;
@@ -1024,7 +1026,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _(arrays):
-    # Every cross-form cell in the centre cell's scan: 2 directions × 3 targets × 3 seeds ×
+    # Every cross-form cell in the centre condition's scan: 2 directions × 3 targets × 3 seeds ×
     # depth × landmark. The extremes bound the whole claim, so quote them rather than a site.
     _all_cross = np.concatenate(
         [
@@ -1104,7 +1106,7 @@ def _(arrays):
             at every depth and every landmark.
         """,
         caption=f"""
-            Zero-shot cross-form transfer at the center cell, seed-averaged.
+            Zero-shot cross-form transfer at the center condition, seed-averaged.
             Rows are the form the probes are applied to; columns are the probe
             target. Within a panel, depth runs upward from the embedding, and
             the x axis runs across the grammar landmarks. Grey is the form's
@@ -1260,13 +1262,13 @@ def _(arrays, maps):
         }
 
     def rho_summary(arm: str) -> dict:
-        """ρ at the preregistered site and over the whole scan, for one cell.
+        """ρ at the preregistered site and over the whole scan, for one condition.
 
         The preregistered site maximizes the *weaker* form's own $R^2$, so the two
         probes are compared where both have something to carry; it is chosen without
-        reference to ρ, since a per-cell maximum of a noisy map rises with the noise
+        reference to ρ, since a per-condition maximum of a noisy map rises with the noise
         and could manufacture a width trend on its own. The scan maximum is reported
-        beside it as the upper bound on sharing anywhere in the cell.
+        beside it as the upper bound on sharing anywhere in the condition.
         """
         _wn, _wh = maps(arm, "probes/named/mix/r2"), maps(arm, "probes/hex/mix/r2")
         _site = np.unravel_index(np.minimum(_wn, _wh).argmax(), _wn.shape)
@@ -1297,7 +1299,7 @@ def _(rho_summary):
 
     H4 predicted that narrowing the residual stream would push the two forms
     together: $\\rho$ and subspace overlap rising over d64 → d32 → d16, with
-    d16-L8 the most aligned cell, but that didn't happen. $\\rho$ is
+    d16-L8 the most aligned condition, but that didn't happen. $\\rho$ is
     {_best:.2f} at every one of the {_guarded:,} cells where the guard defines it
     across the whole sweep ({_total:,} cells before gating), in both directions
     and for all three targets.
@@ -1334,14 +1336,14 @@ def _(angles_at, cells, maps):
             angle between the two forms' mix decoders falls from about 75° to 60°
             to 51°, and a shaded band for random subspaces of the same size falls
             with it, covering every observed point. Open markers for the 8-layer
-            cells sit clearly above the 4-layer ones at width 16 and coincide
+            conditions sit clearly above the 4-layer ones at width 16 and coincide
             with them at width 64.
         """,
         caption=r"""
             What narrowing the residual stream does, across the width arms.
-            Filled $\bullet$ markers joined by lines are the 4-layer cells; open $\scriptstyle\Box$ markers
-            are the 8-layer cells, with a dashed line because there is no d32-L8
-            cell to run a line through. Left and middle: the two forms come apart
+            Filled $\bullet$ markers joined by lines are the 4-layer conditions; open $\scriptstyle\Box$ markers
+            are the 8-layer conditions, with a dashed line because there is no d32-L8
+            condition to run a line through. Left and middle: the two forms come apart
             under compression rather than together, hex losing far less than
             named. Right: the first principal angle between the named and hex mix
             decoders at the pre-answer position, in amber, against two
@@ -1425,7 +1427,7 @@ def _(angles_at, cells, maps, rho_summary):
         "width", "depth", "named held-out", "named mix R²",
         "ρ → named", "ρ → hex", "ρ best", "angle", "seed control", "random",
     )  # fmt: skip
-    _thead = "<tr><th>cell</th>" + "".join(f'<th class="num">{_h}</th>' for _h in _cols) + "</tr>"
+    _thead = "<tr><th>condition</th>" + "".join(f'<th class="num">{_h}</th>' for _h in _cols) + "</tr>"
 
     mo.vstack(
         [
@@ -1440,7 +1442,7 @@ def _(angles_at, cells, maps, rho_summary):
             preregistered site (the depth × landmark where the weaker form's own
             $R^2$ is highest, chosen without reference to ρ), and read "—" where
             that form's within-form score falls under ρ's 0.5 guard. "ρ best" is
-            the largest ρ anywhere in the cell's scan, over both directions and
+            the largest ρ anywhere in the condition's scan, over both directions and
             all three targets. The last three columns are the first principal
             angle between the two mix decoders at the pre-answer position, and
             the two references the figure plots.
@@ -1524,8 +1526,8 @@ def _(cross, rho_summary, stats):
 
     H5 predicted that a little shared supervision would place both forms in the
     same subspace: cross-form equations lifting $\\rho$ above 0.8 at d64. The
-    bridge cell's $\\rho$ is {rho_summary("bridge")["best"]:.2f}, the same as
-    every other cell's, so H5 is unsupported on its own terms.
+    bridge condition's $\\rho$ is {rho_summary("bridge")["best"]:.2f}, the same as
+    every other condition's, so H5 is unsupported on its own terms.
 
     That would be an easy result to dismiss if the bridge had simply failed to
     learn anything, so let's check whether the supervision worked.
@@ -1550,7 +1552,7 @@ def _(cross, rho_summary, stats):
         checkpoints and writes its results back to the store, so the numbers
         here are computed rather than transcribed. It sits outside the
         experiment's DAG because a tick of `experiment.py` would now re-train
-        all 24 cells: `mini`'s evidence scheme has changed since the sweep ran,
+        all 24 conditions: `mini`'s evidence scheme has changed since the sweep ran,
         and a re-trained sweep would not reproduce the numbers quoted elsewhere
         in this report.
     """)
@@ -1586,7 +1588,7 @@ def _(angles_at, cross, maps, rho_summary, seed_mean):
         "named held-out", "hex held-out", "cross unseen", "named mix R²",
         "ρ → named", "ρ → hex", "ρ best", "angle", "seed control", "random",
     )  # fmt: skip
-    _thead = "<tr><th>cell</th>" + "".join(f'<th class="num">{_h}</th>' for _h in _cols) + "</tr>"
+    _thead = "<tr><th>condition</th>" + "".join(f'<th class="num">{_h}</th>' for _h in _cols) + "</tr>"
 
     mo.vstack(
         [
@@ -1598,7 +1600,7 @@ def _(angles_at, cross, maps, rho_summary, seed_mean):
                 + "</table></div>"
             ),
             mo.md("""
-            The bridge cell beside the center cell, both d64-L4, seed-averaged.
+            The bridge condition beside the center condition, both d64-L4, seed-averaged.
             The columns after the accuracies are the same measures as the H4
             table. Adding cross-form equations leaves every alignment measure
             where it was, and costs the two single-form tasks nothing worth
@@ -1629,20 +1631,20 @@ def _(arrays, cross, stats):
         alt_text="""
             Six blocks of stacked step-line panels, two rows by three columns,
             in the same layout as the cross-form transfer figure under H3, but
-            for the bridge cell. A grey filled area shows what each form's own
+            for the bridge condition. A grey filled area shows what each form's own
             probe reads, rising over the operands and peaking at the pre-answer
             position of the named mix panel. The amber line for the other form's
             probe lies flat on the floor in every panel, at every depth and every
             landmark, exactly as it does without a bridge.
         """,
         caption=f"""
-            Zero-shot cross-form transfer at the bridge cell, seed-averaged,
+            Zero-shot cross-form transfer at the bridge condition, seed-averaged,
             drawn exactly as the H3 figure so the two can be laid side by side.
             Rows are the form the probes are applied to; columns are the probe
             target; grey is the form's own probe under the strict holdout and
             amber is the other form's probe applied unchanged. The amber $R^2$
             readings run from ${_range.max():.3f}$ down to ${_range.min():.0f}$.
-            Cross-form equations are {_share * 100:.0f}% of this cell's training
+            Cross-form equations are {_share * 100:.0f}% of this condition's training
             corpus and it answers them at {_unseen:.2f} on unseen pairs, and still
             nothing transfers between the two single-form probes.
         """,
@@ -1674,7 +1676,7 @@ def _(angles_at, cross, stats):
     _share = _lines["cross"] / sum(_lines.values())
 
     mo.md(f"""
-    So the bridge cell converts between the two vocabularies and keeps their
+    So the bridge condition converts between the two vocabularies and keeps their
     geometries apart. Behaviorally the forms are joined: an unseen name and an
     unseen hex code mix to the right answer {_unseen * 100:.0f}% of the time, and
     the answers it emits sit {_guess:.3f} from the exact mix on average, against a
@@ -1774,20 +1776,20 @@ def _(arrays):
             Two panels of named mix probe R² against relative depth, from the
             embedding at 0 to the last layer at 1. Left panel, at the equals
             sign; right panel, at the pre-answer space. Four curves in each. The
-            two width-64 cells rise late and steeply, ending near 0.6 (4 layers)
+            two width-64 conditions rise late and steeply, ending near 0.6 (4 layers)
             and 0.75 (8 layers) at the equals sign and near 0.95 at the
             pre-answer space, where the 8-layer curve reaches its ceiling one
-            layer before the end and holds it. The two width-16 cells stay far
+            layer before the end and holds it. The two width-16 conditions stay far
             lower throughout, the 8-layer one about twice as high as the 4-layer
             one and flattening from mid-depth. Shaded bands show the seed spread,
             which is widest in the layers just before each curve's rise.
         """,
         caption="""
-            Where the named mix becomes readable, by depth and by cell. The x
-            axis is position in the stream as a fraction of the cell's layers, so
+            Where the named mix becomes readable, by depth and by condition. The x
+            axis is position in the stream as a fraction of the condition's layers, so
             the 4-layer and 8-layer curves can be laid over each other; 0 is the
             token embedding and 1 the last layer. Solid lines are the 4-layer
-            cells and dashed the 8-layer ones, blue for width 64 and purple for
+            conditions and dashed the 8-layer ones, blue for width 64 and purple for
             width 16. Bands span the three seeds. Left is the `=` sign and right
             the pre-answer space that follows it, the site H2 uses. Reading the
             right panel: doubling the layers does not move the rise leftward, it
@@ -2128,7 +2130,7 @@ def _(arrays, precision):
     {precision["center", "named_holdout"]["sigma"]:.3f} of the unit cube
     ({precision["center", "named_holdout"]["sigma"] * 255:.0f} of 255 per
     channel), and from that one number the reference tracks the observed rate
-    across the whole margin range, including the 250-name cell, where the same
+    across the whole margin range, including the 250-name condition, where the same
     shape appears shifted toward the tight end. Trained pairs fit less well:
     at 140 names the fitted $\\sigma$ halves to
     {precision["center", "named_seen"]["sigma"]:.3f}, but the model beats the

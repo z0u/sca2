@@ -328,7 +328,7 @@ def _(cond, n_cat, rd):
             for v, c in (("static (timed anneal)", gray), ("controller", accent))
         ]
         axes[0].legend(handles=handles, loc="lower left")
-        axes[0].set_title("Fallback-trained cells: feedback adds no headroom")
+        axes[0].set_title("Fallback-trained conditions: feedback adds no headroom")
         return fig
 
     mo.Html(_plot())
