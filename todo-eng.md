@@ -110,18 +110,6 @@ readable cold without re-deriving code state.
   survives) fixes it, but it restyles the published ex-2.1.1/2.1.2 figures, so it
   wants an opt-in parameter and a deliberate pass rather than a drive-by edit.
 
-- ~~**GPU determinism.**~~ Done — `[tool.mini] env` sets `XLA_FLAGS` for every
-  task worker, and a measured L4 probe backs the choice: without
-  `--xla_gpu_deterministic_ops=true`, one seed gave three different models in
-  three containers (embedding-gradient scatter-adds racing), which the memo reads
-  as three different inputs and re-runs every downstream eval on. Costs ~1.7× on a
-  d64-L4 cell. Rationale, the numbers, and why "tolerate small differences"
-  doesn't work against a content-addressed DAG: [eng/determinism.md](eng/determinism.md).
-  Left open, and cheap to do next time either file is touched: `eval_one` takes the
-  whole `trained` dict, so it re-runs on any change to the loss curves it never
-  reads — passing `trained["checkpoint"]` would decouple it (the "pass narrow
-  inputs" habit in the memoization docs).
-
 - **Responsive multi-panel figures in reports (opened 2026-07-16).** The
   ex-2.1.1 two-panel *named-pair lattice* was split into two independent
   `themed` figures wrapped in a `.report-figure-row` (inline-block, reflows to
