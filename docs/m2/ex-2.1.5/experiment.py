@@ -58,6 +58,7 @@ ARMS: dict[str, dict] = {
 
 METRICS_REF = "reports/m2/ex-2.1.5/metrics"
 ARRAYS_REF = "reports/m2/ex-2.1.5/arrays"
+CROSS_REF = "reports/m2/ex-2.1.5/cross-evals"
 EVALS_REF = "reports/m2/ex-2.1.5/evals"  # + f"/{corpus}"
 CKPT_REF = "reports/m2/ex-2.1.5/checkpoints"  # + f"/{label}"
 

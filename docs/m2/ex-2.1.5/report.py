@@ -19,7 +19,7 @@ with app.setup(hide_code=True):
 
     # Marimo puts the notebook's directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
-    from experiment import ARMS, ARRAYS_REF, METRICS_REF, SEEDS
+    from experiment import ARMS, ARRAYS_REF, CROSS_REF, METRICS_REF, SEEDS
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import light_dark, themed
@@ -45,6 +45,18 @@ with app.setup(hide_code=True):
             with np.load(a_path) as z:
                 arrays = {k: z[k] for k in z.files}
         return metrics, arrays
+
+    def load_cross() -> dict | None:
+        """Cross-form exact match for the bridge cell, or None if it hasn't been scored.
+
+        Written by `cross_eval.py`, which sits outside the sweep's DAG — see H5.
+        """
+        store = project_store()
+        art = store.get_refs([CROSS_REF])[CROSS_REF]
+        if art is None:
+            return None
+        with tempfile.TemporaryDirectory() as d:
+            return json.loads(store.get(art, Path(d) / "cross.json").read_text())
 
 
 @app.cell(hide_code=True)
@@ -105,12 +117,17 @@ def _():
     metrics, arrays = _res
     cells = {c["label"]: c for c in metrics["cells"]}
     stats = metrics["corpus_stats"]
+    cross = load_cross()
 
     def seed_mean(arm: str, set_name: str, key: str) -> float:
         vals = [cells[f"{arm}-s{s}"]["sets"][set_name][key] for s in SEEDS]
         return float(np.mean([v for v in vals if v is not None]))
 
-    return arrays, cells, seed_mean, stats
+    def maps(arm: str, path: str) -> np.ndarray:
+        """The seed mean of one stored depth × landmark map."""
+        return np.mean([arrays[f"{arm}-s{s}/{path}"] for s in SEEDS], axis=0)
+
+    return arrays, cells, cross, maps, seed_mean, stats
 
 
 @app.cell(hide_code=True)
@@ -699,14 +716,19 @@ def _(arrays, stats):
             "margin": bl.snap_margin(np.linalg.norm(_pal[None] - _mix[:, None], axis=2)),
         }
 
+    def fit_sigma(arm: str, corpus: str, set_name: str) -> dict:
+        """One cell's behavior on one eval set, with the effective precision that reproduces it."""
+        _b = _behavior(arm, corpus, set_name)
+        _b["sigma"] = bl.fit_precision(_b["pal"], _b["mix"], _b["true_idx"], _b["hit"].mean(), _rng, 24, 11)
+        return _b
+
     precision = {}
     for _arm, _corpus in (("center", "n140-h216"), ("palette-250", "n250-h216")):
         for _set in ("named_seen", "named_holdout"):
-            _b = _behavior(_arm, _corpus, _set)
-            _b["sigma"] = bl.fit_precision(_b["pal"], _b["mix"], _b["true_idx"], _b["hit"].mean(), _rng, 24, 11)
+            _b = fit_sigma(_arm, _corpus, _set)
             _b["pred"] = bl.precision_limited_acc(_b["pal"], _b["mix"], _b["true_idx"], _b["sigma"], _rng, 120)
             precision[_arm, _set] = _b
-    return (precision,)
+    return fit_sigma, precision
 
 
 @app.cell(hide_code=True)
@@ -1176,54 +1198,642 @@ def _(arrays, cells):
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
+def _(arrays, maps):
+    # Two nulls for the principal angle, both needed because the angle between two
+    # 3-dimensional subspaces shrinks as the ambient space does — the width sweep moves
+    # the ambient dimension, so an unadjusted angle trend says nothing on its own.
+    _rng = np.random.default_rng(0)
+
+    def _first(_wa: np.ndarray, _wb: np.ndarray) -> float:
+        return float(gm.principal_angles(_wa, _wb)[0])
+
+    def random_angle_null(width: int, n: int = 2000) -> tuple[float, float]:
+        """Mean and spread of the first angle between two random 3-planes in R^width."""
+        _a = [_first(_rng.normal(size=(width, 3)), _rng.normal(size=(width, 3))) for _ in range(n)]
+        return float(np.mean(_a)), float(np.std(_a))
+
+    def angles_at(arm: str, target: str = "mix") -> dict[str, float]:
+        """Cross-form first angle at the clean pre-answer site, with both nulls.
+
+        The seed control replaces the random draw's arbitrary directions with real
+        probes that decode the same quantity in unrelated bases: three seeds train
+        in three different coordinate systems, so their named-form probes are as
+        unaligned as two probes can be while still being probes.
+        """
+        _d, _w = ARMS[arm]["depth"], ARMS[arm]["width"]
+        _pre = LANDMARKS.index("pre")
+        _wt = {
+            (_f, _s): arrays[f"{arm}-s{_s}/probes/{_f}/{target}/weights"][_d, _pre] for _f in vp.FORMS for _s in SEEDS
+        }
+        _mean, _sd = random_angle_null(_w)
+        return {
+            "cross_form": float(np.mean([_first(_wt["named", _s], _wt["hex", _s]) for _s in SEEDS])),
+            "seed_control": float(
+                np.mean([_first(_wt["named", _a], _wt["named", _b]) for _a, _b in ((0, 1), (0, 2), (1, 2))])
+            ),  # fmt: skip
+            "random": _mean,
+            "random_sd": _sd,
+        }
+
+    def rho_summary(arm: str) -> dict:
+        """ρ at the preregistered site and over the whole scan, for one cell.
+
+        The preregistered site maximizes the *weaker* form's own $R^2$, so the two
+        probes are compared where both have something to carry; it is chosen without
+        reference to ρ, since a per-cell maximum of a noisy map rises with the noise
+        and could manufacture a width trend on its own. The scan maximum is reported
+        beside it as the upper bound on sharing anywhere in the cell.
+        """
+        _wn, _wh = maps(arm, "probes/named/mix/r2"), maps(arm, "probes/hex/mix/r2")
+        _site = np.unravel_index(np.minimum(_wn, _wh).argmax(), _wn.shape)
+        _at, _best, _guarded, _total = {}, -np.inf, 0, 0
+        for _dir, _into in (("hex2name", "named"), ("name2hex", "hex")):
+            for _t in vp.TARGETS:
+                _r = gm.rho(maps(arm, f"cross/{_dir}/{_t}/r2"), maps(arm, f"probes/{_into}/{_t}/r2_strict"))
+                _guarded += int((~np.isnan(_r)).sum())
+                _total += _r.size
+                if not np.isnan(_r).all():
+                    _best = max(_best, float(np.nanmax(_r)))
+                if _t == "mix":
+                    _at[_into] = float(_r[_site])
+        return {"site": _site, "at": _at, "best": _best, "guarded": _guarded, "total": _total}
+
+    return angles_at, rho_summary
+
+
+@app.cell(hide_code=True)
+def _(rho_summary):
+    _all = {_a: rho_summary(_a) for _a in ARMS}
+    _best = max(_r["best"] for _r in _all.values())
+    _guarded = sum(_r["guarded"] for _r in _all.values())
+    _total = sum(_r["total"] for _r in _all.values())
+
+    mo.md(f"""
     ## Alignment under compression (H4)
 
-    /// admonition | TODO
-    Figure: $\rho$ and principal angles versus width (d64, d32, d16, plus
-    the d16-L8 cell), at each cell's strongest within-form site, with the
-    maximum-$\rho$ site as a second series. The primary site is chosen
-    independently of $\rho$: a per-cell maximum of a noisy map rises with
-    the noise, which could manufacture a width trend on its own. Expected: a
-    monotonic rise in sharing as the stream narrows, with d16-L8 the most
-    aligned. A
-    flat line at low $\rho$ would say capacity pressure alone doesn't merge
-    the forms at these scales; alignment already present at d64 would say
-    the merge is a bias of training, and H3 falls.
+    H4 predicted that narrowing the residual stream would push the two forms
+    together: $\\rho$ and subspace overlap rising over d64 → d32 → d16, with
+    d16-L8 the most aligned cell. Nothing of the sort happened. $\\rho$ is
+    {_best:.2f} at every one of the {_guarded:,} cells where the guard defines it
+    across the whole sweep ({_total:,} cells before gating), in both directions
+    and for all three targets. There is no width trend in $\\rho$ because there
+    is nothing to trend.
+
+    What compression does instead is wear the named form down. The figure below
+    tracks three quantities against width: how well each form answers held-out
+    equations, how well the named mix can be read out of the residual stream, and
+    how close the two forms' mix decoders come to sharing a direction.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(angles_at, cells, maps):
+    _widths = [16, 32, 64]
+    _by_shape = {(ARMS[_a]["width"], ARMS[_a]["depth"]): _a for _a in ARMS if not ARMS[_a]["bridge"]}
+    _l4 = {_w: _by_shape[_w, 4] for _w in _widths}
+    _l8 = {_w: _by_shape[_w, 8] for _w in _widths if (_w, 8) in _by_shape}
+
+    def _acc(_arm: str, _set: str) -> float:
+        return float(np.mean([cells[f"{_arm}-s{_s}"]["sets"][_set]["accuracy"] for _s in SEEDS]))
+
+    def _within(_arm: str) -> float:
+        return float(maps(_arm, "probes/named/mix/r2_strict")[ARMS[_arm]["depth"], LANDMARKS.index("pre")])
+
+    @themed(
+        name="compression",
+        alt_text="""
+            Three panels against residual width, plotted at 16, 32 and 64. Left:
+            held-out exact match. The hex curve runs 1.00, 1.00, 0.72 as the
+            stream narrows; the named curve falls much further, 0.67, 0.43, 0.05.
+            Middle: the named mix probe's R² at the pre-answer position follows
+            the named curve down, 0.94, 0.80, 0.35. Right: the first principal
+            angle between the two forms' mix decoders falls from about 75° to 60°
+            to 51°, and a shaded band for random subspaces of the same size falls
+            with it, covering every observed point. Open markers for the 8-layer
+            cells sit clearly above the 4-layer ones at width 16 and coincide
+            with them at width 64.
+        """,
+        caption="""
+            What narrowing the residual stream does, across the width arms.
+            Filled markers joined by lines are the 4-layer cells; open markers
+            are the 8-layer cells, drawn unjoined because there is no d32-L8
+            cell to run a line through. Left and middle: the two forms come apart
+            under compression rather than together, hex losing far less than
+            named. Right: the first principal angle between the named and hex mix
+            decoders at the pre-answer position, in amber, against two
+            references. The grey band is the mean ± 1 s.d. of the angle between
+            two *random* 3-planes at that width, which falls as the ambient space
+            shrinks; the red marks are the angle between two different seeds'
+            named probes, which decode the same quantity in unrelated coordinate
+            systems. All three fall together, so the narrowing angle is the
+            ambient dimension shrinking rather than the forms converging.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, _axes = plt.subplots(1, 3, figsize=(9.2, 2.9))
+        _named = light_dark("#1a5f8a", "#6ab0d4")
+        _hex = light_dark("#6a4f8a", "#b79ad6")
+        _amber, _ref = vp.transfer_color(), light_dark("#d1495b", "#ff6b7d")
+
+        def _series(_ax, _fn, _color, _label):
+            _ax.plot(_widths, [_fn(_l4[_w]) for _w in _widths], "o-", color=_color, lw=1.4, ms=5, label=_label)
+            _ax.plot(list(_l8), [_fn(_l8[_w]) for _w in _l8], "s", mfc="none", color=_color, ms=6)
+
+        _series(_axes[0], lambda _a: _acc(_a, "hex_holdout"), _hex, "hex")
+        _series(_axes[0], lambda _a: _acc(_a, "named_holdout"), _named, "named")
+        _axes[0].set(ylabel="held-out exact match", ylim=(0, 1.05))
+        _axes[0].legend(fontsize=7, loc="center left", framealpha=0.6)
+
+        _series(_axes[1], _within, _named, "named")
+        _axes[1].set(ylabel="named mix $R^2$, pre-answer", ylim=(0, 1.05))
+
+        _ang = {_w: angles_at(_l4[_w]) for _w in _widths}
+        _mean = np.array([_ang[_w]["random"] for _w in _widths])
+        _sd = np.array([_ang[_w]["random_sd"] for _w in _widths])
+        _axes[2].fill_between(_widths, _mean - _sd, _mean + _sd, color=vp.mean_color(), alpha=0.2, lw=0)
+        _axes[2].plot(_widths, _mean, color=vp.mean_color(), lw=1, alpha=0.7, label="random 3-planes")
+        _series(_axes[2], lambda _a: angles_at(_a)["seed_control"], _ref, "seed control")
+        _series(_axes[2], lambda _a: angles_at(_a)["cross_form"], _amber, "named vs hex")
+        _axes[2].set(ylabel="first principal angle", ylim=(0, 95))
+        _axes[2].yaxis.set_major_formatter(lambda _v, _p: f"{_v:.0f}°")
+        _axes[2].legend(fontsize=7, loc="lower right", framealpha=0.6)
+
+        for _ax in _axes:
+            # Width doubles per step, so space the ticks by octave; the minor decade ticks a
+            # log axis brings with it label the wrong scale entirely and collide with 16/32/64.
+            _ax.set_xscale("log", base=2)
+            _ax.set(xlabel="residual width", xticks=_widths)
+            _ax.xaxis.set_minor_locator(plt.NullLocator())
+            _ax.xaxis.set_major_formatter(lambda _v, _p: f"{_v:.0f}")
+            _ax.grid(alpha=0.3)
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(angles_at, cells, maps, rho_summary):
+    _order = [_a for _a in ARMS if not ARMS[_a]["bridge"] and ARMS[_a]["names"] == 140 and ARMS[_a]["hex"] == 216]
+    _pre = LANDMARKS.index("pre")
+
+    def _row(_arm: str) -> str:
+        _r, _g = rho_summary(_arm), angles_at(_arm)
+        _fmt = lambda _v: "—" if np.isnan(_v) else f"{_v:.2f}"  # noqa: E731
+        _vals = [
+            f"{ARMS[_arm]['width']}",
+            f"{ARMS[_arm]['depth']}",
+            f"{np.mean([cells[f'{_arm}-s{_s}']['sets']['named_holdout']['accuracy'] for _s in SEEDS]):.3f}",
+            f"{maps(_arm, 'probes/named/mix/r2_strict')[ARMS[_arm]['depth'], _pre]:.2f}",
+            _fmt(_r["at"]["named"]),
+            _fmt(_r["at"]["hex"]),
+            f"{_r['best']:.2f}",
+            f"{_g['cross_form']:.0f}°",
+            f"{_g['seed_control']:.0f}°",
+            f"{_g['random']:.0f}°",
+        ]
+        return f"<tr><td>{_arm}</td>" + "".join(f'<td class="num">{_v}</td>' for _v in _vals) + "</tr>"
+
+    _cols = (
+        "width", "depth", "named held-out", "named mix R²",
+        "ρ → named", "ρ → hex", "ρ best", "angle", "seed control", "random",
+    )  # fmt: skip
+    _thead = "<tr><th>cell</th>" + "".join(f'<th class="num">{_h}</th>' for _h in _cols) + "</tr>"
+
+    mo.vstack(
+        [
+            mo.Html(
+                '<div class="report-table-scroll"><table class="report-table">'
+                + _thead
+                + "".join(_row(_a) for _a in _order)
+                + "</table></div>"
+            ),
+            mo.md("""
+            The width arms, seed-averaged. The two ρ columns are at the
+            preregistered site (the depth × landmark where the weaker form's own
+            $R^2$ is highest, chosen without reference to ρ), and read "—" where
+            that form's within-form score falls under ρ's 0.5 guard. "ρ best" is
+            the largest ρ anywhere in the cell's scan, over both directions and
+            all three targets. The last three columns are the first principal
+            angle between the two mix decoders at the pre-answer position, and
+            the two references the figure plots.
+            """),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(angles_at, fit_sigma, maps, rho_summary, seed_mean):
+    _sig = {_a: fit_sigma(_a, "n140-h216", "named_holdout")["sigma"] for _a in ("center", "d32", "d16", "d16-L8")}
+    _g = {_a: angles_at(_a) for _a in ("center", "d32", "d16")}
+
+    mo.md(f"""
+    The angle does fall as the stream narrows, from {_g["center"]["cross_form"]:.0f}°
+    at d64 to {_g["d32"]["cross_form"]:.0f}° at d32 and {_g["d16"]["cross_form"]:.0f}°
+    at d16. Read on its own that looks like the trend H4 asked for. But two
+    3-dimensional subspaces drawn at random come just as close once the space
+    they sit in is small enough: the same three widths give
+    {_g["center"]["random"]:.0f}°, {_g["d32"]["random"]:.0f}° and
+    {_g["d16"]["random"]:.0f}° for a random pair. Every observed angle sits inside
+    one standard deviation of its null, and the seed control (two seeds' *named*
+    probes, decoding the same quantity in unrelated bases) tracks the same curve.
+    So the cross-form angle at every width is what two unrelated decoders would
+    give. Any width sweep that reads raw angles will find this trend, whatever the
+    forms are doing.
+
+    Under compression the two forms don't merge; one of them gives way first. Hex
+    keeps its held-out accuracy at {seed_mean("d32", "hex_holdout", "accuracy"):.2f}
+    at d32 and loses little even at d16
+    ({seed_mean("d16", "hex_holdout", "accuracy"):.2f}), while named falls from
+    {seed_mean("center", "named_holdout", "accuracy"):.2f} to
+    {seed_mean("d32", "named_holdout", "accuracy"):.2f} to
+    {seed_mean("d16", "named_holdout", "accuracy"):.2f}. Read through the
+    resolution account from H1, the fitted precision $\\sigma$ coarsens from
+    {_sig["center"]:.3f} of the unit cube at d64 to {_sig["d32"]:.3f} at d32 and
+    {_sig["d16"]:.3f} at d16: roughly an eightfold loss of color resolution over
+    two halvings of width. Hex needs far less of it, since a hex answer's
+    runner-up is a whole grid step away, so a coarse read still lands on the
+    right digit.
+
+    That asymmetry is the more interesting outcome here, and it isn't what H4
+    was written to look for. Capacity pressure is real, and the named form
+    clearly lacks capacity at these widths, but the pressure buys no sharing at
+    all. If two representations can be kept apart under this much of it, keeping
+    them apart evidently costs the model less than merging them would.
+
+    /// details | Whether d16 is too broken to test
+    d16 answers {seed_mean("d16", "named_seen", "accuracy"):.2f} of the named
+    equations it trained on, and its named mix probe reads
+    {maps("d16", "probes/named/mix/r2_strict")[4, LANDMARKS.index("pre")]:.2f}
+    at the pre-answer position, so there is not much named geometry left there to
+    align. The sweep anticipated this: d16 sits one step below the width range
+    ngpt-scaling validated, and H4's trend was to rest on d64 → d32 if it trained
+    poorly. It does train, with smooth loss curves, but it does not learn the
+    named form. Taking d16 out changes nothing about the verdict, since ρ is
+    {rho_summary("d32")["best"]:.2f} at d32 too, where the named form still
+    answers {seed_mean("d32", "named_holdout", "accuracy"):.2f} and its mix
+    reads {maps("d32", "probes/named/mix/r2_strict")[4, LANDMARKS.index("pre")]:.2f}.
+    Adding depth back at d16 recovers a good deal
+    ({seed_mean("d16-L8", "named_holdout", "accuracy"):.2f} held-out named, and
+    $\\sigma$ back to {_sig["d16-L8"]:.3f}); see H6.
     ///
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
+def _(cross, rho_summary, stats):
+    _n = cross["n_pairs"]
+    _acc = {
+        _s: float(np.mean([_c["sets"][_s]["accuracy"] for _c in cross["cells"]])) for _s in ("cross_seen", "cross_unseen")
+    }  # fmt: skip
+    _share = stats["n140-h216-bridge"]["n_lines"]["cross"] / sum(stats["n140-h216-bridge"]["n_lines"].values())
+
+    mo.md(f"""
     ## Alignment with a bridge (H5)
 
-    /// admonition | TODO
-    Figure/table: the bridge cell's $\rho$ beside the center cell's, at d64.
-    Expected: cross-form equations lift $\rho$ above 0.8, i.e. a small amount
-    of shared supervision places both forms in the same subspace.
+    H5 predicted that a little shared supervision would place both forms in the
+    same subspace: cross-form equations lifting $\\rho$ above 0.8 at d64. The
+    bridge cell's $\\rho$ is {rho_summary("bridge")["best"]:.2f}, the same as
+    every other cell's, so H5 is unsupported on its own terms.
+
+    That would be an easy result to dismiss if the bridge had simply failed to
+    learn anything, so it's worth establishing first that the supervision took.
+    Cross lines are {_share * 100:.0f}% of the bridge corpus:
+    {_n["n_lines"]:,} of them, drawn over {_n["seen"]:,} distinct
+    (name, hex) pairs out of {_n["seen"] + _n["unseen"]:,} possible, so a pair
+    recurs about {_n["n_lines"] / _n["seen"]:.1f} times and two thirds of the
+    cross space is never seen at all. The sweep doesn't grade them, because the
+    form exists to supervise alignment rather than to be scored, so we decoded
+    them afterwards from the published checkpoints.[^crosseval]
+
+    The bridge answers them, and it generalizes. Exact match is
+    {_acc["cross_seen"]:.2f} on cross pairs that appeared in training and
+    {_acc["cross_unseen"]:.2f} on pairs that did not, with no malformed
+    completions; at 1.2 lines per pair there is not much for the model to
+    memorize, and the two numbers say it didn't. Given the unseen prompt
+    `pale lime + #fc7 = `, all three seeds return `#dd7`, which is the right
+    answer. So a color name's value does reach the hex answer path, for names and
+    hex codes the model has never seen together.
+
+    [^crosseval]: `cross_eval.py`, beside this report. It reads the sweep's
+        checkpoints and writes its results back to the store, so the numbers
+        here are computed rather than transcribed. It sits outside the
+        experiment's DAG because a tick of `experiment.py` would now re-train
+        all 24 cells: `mini`'s evidence scheme has changed since the sweep ran,
+        and a re-trained sweep would not reproduce the numbers quoted elsewhere
+        in this report.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(angles_at, cross, maps, rho_summary, seed_mean):
+    _pre = LANDMARKS.index("pre")
+    _cross_acc = {
+        _s: float(np.mean([_c["sets"][_s]["accuracy"] for _c in cross["cells"]])) for _s in ("cross_seen", "cross_unseen")
+    }  # fmt: skip
+
+    def _row(_arm: str) -> str:
+        _r, _g = rho_summary(_arm), angles_at(_arm)
+        _fmt = lambda _v: "—" if np.isnan(_v) else f"{_v:.2f}"  # noqa: E731
+        _bridged = ARMS[_arm]["bridge"]
+        _vals = [
+            f"{seed_mean(_arm, 'named_holdout', 'accuracy'):.3f}",
+            f"{seed_mean(_arm, 'hex_holdout', 'accuracy'):.3f}",
+            f"{_cross_acc['cross_unseen']:.3f}" if _bridged else "—",
+            f"{maps(_arm, 'probes/named/mix/r2_strict')[4, _pre]:.2f}",
+            _fmt(_r["at"]["named"]),
+            _fmt(_r["at"]["hex"]),
+            f"{_r['best']:.2f}",
+            f"{_g['cross_form']:.0f}°",
+            f"{_g['seed_control']:.0f}°",
+            f"{_g['random']:.0f}°",
+        ]
+        return f"<tr><td>{_arm}</td>" + "".join(f'<td class="num">{_v}</td>' for _v in _vals) + "</tr>"
+
+    _cols = (
+        "named held-out", "hex held-out", "cross unseen", "named mix R²",
+        "ρ → named", "ρ → hex", "ρ best", "angle", "seed control", "random",
+    )  # fmt: skip
+    _thead = "<tr><th>cell</th>" + "".join(f'<th class="num">{_h}</th>' for _h in _cols) + "</tr>"
+
+    mo.vstack(
+        [
+            mo.Html(
+                '<div class="report-table-scroll"><table class="report-table">'
+                + _thead
+                + _row("center")
+                + _row("bridge")
+                + "</table></div>"
+            ),
+            mo.md("""
+            The bridge cell beside the center cell, both d64-L4, seed-averaged.
+            The columns after the accuracies are the same measures as the H4
+            table. Adding cross-form equations leaves every alignment measure
+            where it was, and costs the two single-form tasks nothing worth
+            reading.
+            """),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays, cross, stats):
+    _applied = {"named": "hex2name", "hex": "name2hex"}
+    _range = np.concatenate(
+        [
+            arrays[f"bridge-s{_s}/cross/{_d}/{_t}/r2"].ravel()
+            for _s in SEEDS
+            for _d in _applied.values()
+            for _t in vp.TARGETS
+        ]
+    )
+    _lines = stats["n140-h216-bridge"]["n_lines"]
+    _share = _lines["cross"] / sum(_lines.values())
+    _unseen = float(np.mean([_c["sets"]["cross_unseen"]["accuracy"] for _c in cross["cells"]]))
+
+    @themed(
+        name="bridge-transfer",
+        alt_text="""
+            Six blocks of stacked step-line panels, two rows by three columns,
+            in the same layout as the cross-form transfer figure under H3, but
+            for the bridge cell. A grey filled area shows what each form's own
+            probe reads, rising over the operands and peaking at the pre-answer
+            position of the named mix panel. The amber line for the other form's
+            probe lies flat on the floor in every panel, at every depth and every
+            landmark, exactly as it does without a bridge.
+        """,
+        caption=f"""
+            Zero-shot cross-form transfer at the bridge cell, seed-averaged,
+            drawn exactly as the H3 figure so the two can be laid side by side.
+            Rows are the form the probes are applied to; columns are the probe
+            target; grey is the form's own probe under the strict holdout and
+            amber is the other form's probe applied unchanged. The amber $R^2$
+            readings run from ${_range.max():.3f}$ down to ${_range.min():.0f}$.
+            Cross-form equations are {_share * 100:.0f}% of this cell's training
+            corpus and it answers them at {_unseen:.2f} on unseen pairs, and still
+            nothing transfers between the two single-form probes.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        _within = {
+            (_f, _t): np.stack([arrays[f"bridge-s{_s}/probes/{_f}/{_t}/r2_strict"] for _s in SEEDS])
+            for _f in vp.FORMS
+            for _t in vp.TARGETS
+        }
+        _cross = {
+            (_f, _t): np.stack([arrays[f"bridge-s{_s}/cross/{_applied[_f]}/{_t}/r2"] for _s in SEEDS])
+            for _f in vp.FORMS
+            for _t in vp.TARGETS
+        }
+        return vp.transfer_trace_grid(_within, _cross, ylabel="probe R² per depth")
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(angles_at, cross, stats):
+    _unseen = float(np.mean([_c["sets"]["cross_unseen"]["accuracy"] for _c in cross["cells"]]))
+    _guess = float(np.mean([_c["sets"]["cross_unseen"]["guess_dist"] for _c in cross["cells"]]))
+    _floor = float(np.mean([_c["sets"]["cross_unseen"]["floor_dist"] for _c in cross["cells"]]))
+    _g = angles_at("bridge")
+    _lines = stats["n140-h216-bridge"]["n_lines"]
+    _share = _lines["cross"] / sum(_lines.values())
+
+    mo.md(f"""
+    So the bridge cell converts between the two vocabularies and keeps their
+    geometries apart. Behaviorally the forms are joined: an unseen name and an
+    unseen hex code mix to the right answer {_unseen * 100:.0f}% of the time, and
+    the answers it emits sit {_guess:.3f} from the exact mix on average, against a
+    quantization floor of {_floor:.3f}. Geometrically nothing moved: $\\rho$ stays at zero
+    across the whole scan, and the two mix decoders' first principal angle is
+    {_g["cross_form"]:.0f}° against a random-subspace null of
+    {_g["random"]:.0f}° and a seed control of {_g["seed_control"]:.0f}°.
+
+    The two readings are compatible, and the way they fit together is worth being
+    careful about. Our measurement asks a narrow question: fit a probe on
+    single-form lines, apply it unchanged to the other form's lines, at the same
+    layer and the same grammar landmark. A model that routes by form (one
+    pathway for `melon + ultramarine`, another for `melon + #48a`, sharing
+    whatever they need to share somewhere we didn't look) would answer cross
+    equations well and still score zero on that question. What we can say is that
+    a bridge does not make the two single-form geometries interchangeable at
+    matched sites, which is the property H5 named and the property an anchor
+    would want.
+
+    We don't know where the conversion happens. The obvious place to look is the
+    cross lines themselves: fit probes on those activations and ask which form's
+    geometry a name's value lands in once the answer must come out as hex. That
+    is a new measurement rather than a different reading of this one, so it goes
+    to the backlog rather than into this report. The same applies to a
+    depth-crossed $\\rho$, which the exploratory section reaches the edge of.
+
+    /// details | What a stronger bridge might have done
+    Cross lines are {_share * 100:.0f}% of the corpus here, and the weight was set
+    before we knew what the disjoint corpus would do. A larger share, or cross
+    equations that answer in *both* forms rather than only in hex, would be a
+    different experiment; this one shows that {_share * 100:.0f}% is enough to
+    teach the conversion and not enough to merge the geometries. Whether those
+    two thresholds are far apart is open. It is also possible that no amount of bridging merges them under this
+    grammar, since the answer form is determined by the prompt form, and keeping
+    two decoders is a perfectly good way to satisfy that.
     ///
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
+def _(fit_sigma, seed_mean):
+    _sig = {_a: fit_sigma(_a, "n140-h216", "named_holdout")["sigma"] for _a in ("center", "L8", "d16", "d16-L8")}
+
+    mo.md(f"""
     ## Depth (H6)
 
-    /// admonition | TODO
-    Figure: name-form accuracy and the mix-crystallization map at L8
-    versus L4. Expected: held-out named accuracy rises, and the layer ×
-    position probe map shows the mix decodable before the final layer,
-    giving the result concept more than one layer of existence. A live
-    counter-expectation: nothing in the loss rewards computing early, so the
-    mix may instead stay pressed against the answer and build gradually —
-    that outcome would refute this clause of H6.
-    ///
+    H6 had two clauses. Doubling the layers at fixed width should improve
+    name+name accuracy, and the mix should crystallize before the last layer,
+    giving the result concept more than one layer of existence. The
+    preregistration also named a live counter-expectation for the second clause:
+    nothing in the loss rewards computing early, so the mix might stay pressed
+    against the answer instead. The first clause fails at d64 and holds at d16;
+    the second splits, and which way you read it depends on whether you count
+    layers or fractions of the network.
+
+    At d64 the extra layers buy nothing. Held-out named accuracy goes from
+    {seed_mean("center", "named_holdout", "accuracy"):.3f} at L4 to
+    {seed_mean("L8", "named_holdout", "accuracy"):.3f} at L8, and accuracy on
+    trained pairs from {seed_mean("center", "named_seen", "accuracy"):.3f} to
+    {seed_mean("L8", "named_seen", "accuracy"):.3f}. Three seeds cannot resolve
+    differences that small. Fitted precision agrees: $\\sigma$ comes out at
+    {_sig["center"]:.3f} of the unit cube at L4 and {_sig["L8"]:.3f} at L8, the
+    same to three decimals, so the model reads colors to the same resolution
+    either way. That fits the H1
+    account, where the named ceiling at d64 is the palette's spacing rather than
+    anything the model ran out of. Depth cannot buy resolution the task isn't
+    short of.
+
+    At d16 it buys a great deal. Held-out named accuracy goes from
+    {seed_mean("d16", "named_holdout", "accuracy"):.3f} to
+    {seed_mean("d16-L8", "named_holdout", "accuracy"):.3f}, and $\\sigma$ from
+    {_sig["d16"]:.3f} to {_sig["d16-L8"]:.3f}. The same eight layers that do
+    nothing at width 64 recover about half the color resolution lost by narrowing
+    to width 16. So depth substitutes for width here, up to the point where the
+    task's own resolution ceiling takes over.
+
+    The figure below follows the named mix probe up through the stream at two
+    landmarks: the `=` sign, and the pre-answer space one character later where
+    H2 found the mature mix.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays):
+    _cellset = [
+        ("center", "d64-L4", "#1a5f8a", "#6ab0d4", "-"),
+        ("L8", "d64-L8", "#1a5f8a", "#6ab0d4", "--"),
+        ("d16", "d16-L4", "#6a4f8a", "#b79ad6", "-"),
+        ("d16-L8", "d16-L8", "#6a4f8a", "#b79ad6", "--"),
+    ]
+
+    @themed(
+        name="depth-profiles",
+        alt_text="""
+            Two panels of named mix probe R² against relative depth, from the
+            embedding at 0 to the last layer at 1. Left panel, at the equals
+            sign; right panel, at the pre-answer space. Four curves in each. The
+            two width-64 cells rise late and steeply, ending near 0.6 (4 layers)
+            and 0.75 (8 layers) at the equals sign and near 0.95 at the
+            pre-answer space, where the 8-layer curve reaches its ceiling one
+            layer before the end and holds it. The two width-16 cells stay far
+            lower throughout, the 8-layer one about twice as high as the 4-layer
+            one and flattening from mid-depth. Shaded bands show the seed spread,
+            which is widest in the layers just before each curve's rise.
+        """,
+        caption="""
+            Where the named mix becomes readable, by depth and by cell. The x
+            axis is position in the stream as a fraction of the cell's layers, so
+            the 4-layer and 8-layer curves can be laid over each other; 0 is the
+            token embedding and 1 the last layer. Solid lines are the 4-layer
+            cells and dashed the 8-layer ones, blue for width 64 and purple for
+            width 16. Bands span the three seeds. Left is the `=` sign and right
+            the pre-answer space that follows it, the site H2 uses. Reading the
+            right panel: doubling the layers does not move the rise leftward, it
+            moves the ceiling one layer back from the end and holds it there.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, _axes = plt.subplots(1, 2, figsize=(8.0, 3.0), sharey=True)
+        for _ax, _lmk, _title in [(_axes[0], "eq", "at the ="), (_axes[1], "pre", "at the pre-answer space")]:
+            _i = LANDMARKS.index(_lmk)
+            for _arm, _label, _cl, _cd, _ls in _cellset:
+                _v = np.stack([arrays[f"{_arm}-s{_s}/probes/named/mix/r2_strict"][:, _i] for _s in SEEDS])
+                _x = np.arange(_v.shape[1]) / (_v.shape[1] - 1)
+                _c = light_dark(_cl, _cd)
+                _ax.fill_between(_x, _v.min(0), _v.max(0), color=_c, alpha=0.15, lw=0)
+                _ax.plot(_x, _v.mean(0), _ls, color=_c, lw=1.4, label=_label)
+            _ax.set(title=_title, xlabel="relative depth", ylim=(-0.1, 1.05))
+            _ax.grid(alpha=0.3)
+        _axes[0].set_ylabel("named mix $R^2$")
+        _axes[0].legend(fontsize=7, loc="upper left", framealpha=0.6)
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays, maps):
+    _pre, _eq = LANDMARKS.index("pre"), LANDMARKS.index("eq")
+
+    def _profile(_arm: str, _seed: int) -> np.ndarray:
+        return arrays[f"{_arm}-s{_seed}/probes/named/mix/r2_strict"][:, _pre]
+
+    def _layers_at_ceiling(_arm: str, _thresh: float = 0.9) -> float:
+        """Mean number of layers, per seed, where the pre-answer mix clears *thresh*."""
+        return float(np.mean([(_profile(_arm, _s) >= _thresh).sum() for _s in SEEDS]))
+
+    def _crossings(_arm: str, _thresh: float = 0.9) -> str:
+        """The layer at which each seed's pre-answer mix first clears *thresh*."""
+        return ", ".join(str(int(np.argmax(_profile(_arm, _s) >= _thresh))) for _s in SEEDS)
+
+    _c, _l = maps("center", "probes/named/mix/r2_strict"), maps("L8", "probes/named/mix/r2_strict")
+
+    mo.md(f"""
+    The mix does crystallize before the last layer at L8, which is what the
+    clause asked for. It reads {_l[6, _pre]:.2f} at layer 6, {_l[7, _pre]:.2f} at
+    layer 7 and {_l[8, _pre]:.2f} at layer 8, so the final layer adds nothing and
+    the concept exists for two layers rather than one. Counting layers over 0.9,
+    L4 averages {_layers_at_ceiling("center"):.1f} of 4 across seeds and L8
+    {_layers_at_ceiling("L8"):.1f} of 8.
+
+    Read as a fraction of the network, though, the mix sits *later* at L8, not
+    earlier: from about {_layers_at_ceiling("center") / 4:.0%} of the layers at L4
+    down to {_layers_at_ceiling("L8") / 8:.0%} at L8. The extra layers went in
+    front of the computation rather than after it, and the mature mix stayed
+    where it was, up against the answer. That is the counter-expectation H6
+    flagged, and it is the reading we'd trust, since it's the one that would
+    generalize to a deeper model.
+
+    Depth does move the mix earlier in the sequence. At the `=` sign the named
+    mix reads {_c[4, _eq]:.2f} at L4 and {_l[7, _eq]:.2f} at L8, so one character
+    before the site H2 measures, the deeper model has already assembled most of
+    the answer. A head start on the token axis is a plausible thing for four
+    extra layers to buy, though we haven't tested that reading.
+
+    Which layer the rise happens in varies by seed, at both depths. At L4 the
+    pre-answer mix first clears 0.9 at layer {_crossings("center")} for the three
+    seeds; at L8, layer {_crossings("L8")}. The bands in the figure are widest
+    exactly there. What replicates is the level reached and where it stops.
+
+    For anchoring, the count matters more than the position. Wherever an anchor
+    goes, it needs a site holding the concept, and at these depths that is one
+    layer at L4 and about two at L8. That is a narrow window either way, and it
+    doesn't widen in proportion to the network.
     """)
     return
 
