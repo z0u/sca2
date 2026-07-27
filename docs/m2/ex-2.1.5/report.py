@@ -1806,16 +1806,6 @@ def _(arrays, maps):
     before the site H2 measures, the deeper model has already assembled most of
     the answer. A head start on the token axis is a plausible thing for four
     extra layers to buy, though we haven't tested that reading.
-
-    Which layer the rise happens in varies by seed, at both depths. At L4 the
-    pre-answer mix first clears 0.9 at layer {_crossings("center")} for the three
-    seeds; at L8, layer {_crossings("L8")}. The bands in the figure are widest
-    exactly there. What replicates is the level reached and where it stops.
-
-    For anchoring, the count matters more than the position. Wherever an anchor
-    goes, it needs a site holding the concept, and at these depths that is one
-    layer at L4 and about two at L8. That is a narrow window either way, and it
-    doesn't widen in proportion to the network.
     """)
     return
 
