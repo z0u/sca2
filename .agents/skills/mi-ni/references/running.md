@@ -76,11 +76,49 @@ With `--json` the live bars are replaced by one compact summary object
 one command — **never hand-roll a `while`/`sleep` polling loop, and never
 `grep` the human lines.** For a one-shot snapshot, `bin/mini status <exp>
 --json --brief` gives the aggregate `state`/`settled`, counts by state, and
-*only* the tasks needing attention (failed / stale / wedged / long-queued) —
-token-cheap on a big sweep. Full `status --json` (per-task `state` / `queued` /
-`heartbeat_age_s` / `stale_heartbeat` / `progress_age_s` / `stale_progress` /
-`steps_per_min`) is for digging into one task. Bound any wait with `--budget`
-so an unattended stall settles itself.
+*only* the tasks needing attention — token-cheap on a big sweep. Full `status
+--json` (per-task `state` / `queued` / `heartbeat_age_s` / `stale_heartbeat` /
+`progress_age_s` / `stale_progress` / `steps_per_min`) is for digging into one
+task. Bound any wait with `--budget` so an unattended stall settles itself.
+
+### What counts as needing attention
+
+Failures and liveness are the obvious half: terminal-not-DONE, a stale
+heartbeat, a frozen step, a task queued past the staleness window. The other
+half is **deviation from expectation**, because a run can misbehave while every
+liveness check reads green — so `status` does the comparing and puts a `cause`
+on each attention entry:
+
+- *N steps/min — under a third of the sibling median (M)* — the cells of a
+  fan-out are each other's yardstick, so a container placed badly (or throttled)
+  shows up against the median `steps_per_min` of its siblings. Needs three
+  reporting siblings before there's a distribution to speak of, and it assumes
+  the cells do comparable work: a `map` whose args vary the amount of work per
+  cell will flag its big cells, so read the flag against the args.
+- *projected Nm to finish, past its Mm timeout* — remaining steps ÷ current
+  rate, against the role's `timeout=`. A timeout sized as a multiple of the
+  expected duration turns into a kill switch when throughput drops, and it
+  fires near the end, after the work is paid for.
+- *loss is not finite* / *accuracy falling for several windows* — from the
+  metrics a task reports via `emit_metrics`. The worker compares window *means*
+  (a per-step loss is noisy enough that two boundary samples are a coin flip)
+  and counts how long each metric has run against its goal, so a trend is a
+  number to check rather than a curve to eyeball: `metrics_delta`,
+  `metrics_wrong_way` and `metric_goals` on the record.
+
+That last one only works if the task emits its numbers as numbers: put them
+through `emit_metrics(loss=…)`, not into the `emit_progress` message string.
+
+**Which way is wrong is yours to say.** `expect_metrics(loss="down",
+accuracy="up")`, once before the loop, and both directions read as the same
+alarm — a sliding accuracy is as much of a problem as a climbing loss. Nothing
+downstream matches on metric names, because a name can't tell you whether a
+number is meant to climb (`loss_scale` climbs by design; a domain-specific score
+gives away nothing). The worker guesses only for a handful of unambiguous names
+— `loss`, `val_loss`, `nll`, `perplexity` and friends — and anything else is
+measured but never flagged until you declare it. The count needs one window more
+than its threshold before it can fire, since the first window only sets the
+baseline, so give a young run about four minutes before reading its trends.
 
 Watching a big sweep is cheap too: the watch loops cache settled
 (`DONE`/`FAILED`/`CANCELLED`) records — they're immutable — and re-read only the
@@ -91,6 +129,35 @@ attached, and on Modal the container id / region / cloud — never any token);
 `status` shows `on <GPU>` for remote tasks, and the full snapshot is on the
 record under `env`, with `started_at`/`finished_at` for a real execution
 duration.
+
+## Where the containers land (`--region`)
+
+Left unspecified, Modal places containers wherever it has capacity — which for
+one sweep can mean several continents. What that costs depends on *which* shared
+thing the task talks to, and the three behave differently:
+
+- The control-plane `modal.Dict` is a synchronous RPC per call, so distance is
+  paid as latency, once per call. This is the one we've measured: ex-2.1.5's
+  training cells outside `us-east` ran 15–30× slow, in order of distance, because
+  a per-step progress emission blocked on it. Emission now runs off the task's
+  thread, so that cliff is gone even unpinned.
+- **Volume writes are buffered and committed in bulk**, and the Volume is
+  eventually-consistent anyway, so distance costs one bulk transfer per commit
+  rather than a round-trip per write. We have no measurement here, and the shape
+  of the cost argues it's minor.
+- Cold Volume *reads* fetch on open, so a role that reads a lot of data it hasn't
+  cached is the most plausible remaining case for pinning — also unmeasured.
+
+Pin it with `--region us-east` (or `[tool.mini] region` for a project-wide
+default, or `region=` on a role, which wins over both). The trade-off goes the
+other way too: pinning costs a per-region premium and narrows the capacity pool,
+so a pinned sweep can sit queued where an unpinned one would have started.
+
+So the default is: **don't pin**, and reach for it when you have a reason. If you
+suspect placement is the problem, `env.region` is on every task record
+(`status --json`), and a cell far behind its siblings' throughput is flagged for
+you — measure before pinning, since the per-call chatter that made placement bite
+last time has moved off the task's thread.
 
 ## Provenance & cost
 
@@ -235,6 +302,13 @@ deadline relative to now (so you can `retry` past an expired budget); a plain
 re-run to advance a multi-step DAG inherits the existing deadline. This is
 distinct from `cancel` (manual, immediate) — the budget is the unattended
 backstop.
+
+**Size the first run's budget for the image build.** In a fresh Modal environment
+the first launch spends minutes building the container image while the task sits
+`queued`, and the clock is running: a `--budget 10m` has expired before any work
+starts, and the next poll settles the run CANCELLED. The image is cached
+afterwards, so `retry --budget …` goes straight through — confusing rather than
+costly, but only if you know to expect it.
 
 ## Escalation contract
 

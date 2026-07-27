@@ -14,119 +14,57 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- **Function-local imports hide a task's real dependencies from the evidence
-  fingerprint (2026-07-24, ex-2.1.5).** Dropping the `as2` landmark should have
-  re-run the 24 probe cells, but they memo-hit and served stale 16-column arrays.
-  Cause: `eval_one` imports `collect_activations`/`probe_maps`/etc. *inside the
-  function* (to keep `main` and the CLI light — they pull jax), and the
-  fingerprinter only traces module-level references — so `sca.compute.geometry`,
-  and the `LANDMARKS` it reads, never enter `eval_one`'s evidence (`mini explain`
-  lists only the experiment-module helpers). Any change to geometry code or the
-  landmark scheme is then a silent stale hit. Workaround in place: the eval map is
-  tagged `version="lm-<sha1(LANDMARKS)>"`, so a scheme change re-runs the probes.
-  Hit again on 2026-07-26, one level along: adding the strict value-holdout estimator
-  changed `probe_maps` but not the landmark tuple, so the tag would not have moved and
-  the cells would have memo-hit again. The tag now hashes `inspect.getsource` of the
-  whole `sca.compute.geometry` module alongside `LANDMARKS`. That it needed widening
-  twice is the argument for a general fix rather than a per-experiment tag.
-  Worth considering: (a) trace function-local imports of *project* modules, or at
-  least warn when a task body imports untracked project code; (b) a convention to
-  fold such deferred-import deps into `version=`/inputs. General hazard — it hits
-  any task that defers heavy imports this way.
+- **A settled state can land on a successor's attempt, and the reader then
+  trusts it (2026-07-26).** `merge_if` on Modal is read-check-write with a
+  one-round-trip window (`ModalRecordStore.merge_if`), so a superseded worker
+  can merge `state=DONE` onto a record its successor now owns. The record then
+  reads `gen=B, state=DONE` while `result-B.pkl` doesn't exist yet, and
+  `Ctx._classify` → `store.result` raises `FileNotFoundError` out of the map.
+  Cosmetic for progress fields (overwritten a second later); real for the one
+  terminal write per task. Long-standing — the previous three-round-trip
+  version had a *wider* window.
+  Not fixable with `modal.Dict` primitives: `put(skip_if_exists=)` is
+  insert-if-absent, which arbitrates *creating* a key (`write_if` already uses
+  it for the double-spawn race) but can't compare-and-swap a value. Building
+  CAS from it means a lock — 4+ round-trips on the hottest write in the system,
+  and a worker dying mid-lock wedges the record forever unless the value
+  carries a lease, whose expiry can't be stolen safely without… CAS.
+  Cheaper where it counts: don't trust `state=DONE` without the matching
+  gen-qualified result. A missing one means "the current attempt hasn't
+  finished", which is exactly true, and it covers the race however it arose.
+  Care needed — a missing result can also be a swept blob or a Volume commit
+  that didn't land, and reading *that* as "still running" suspends the DAG
+  forever (`reap_dead` only settles records that say RUNNING), so it probably
+  wants a record reset so the next tick relaunches. Touches `keep_stale`,
+  `retry`, and the `settled` aggregates; worth its own change.
 
-- **`mini run` can settle a run as `done` while a downstream task still needs a
-  later wake — and an expired budget silently reaps it (2026-07-24, ex-2.1.5).**
-  Adding `r2_ch` to `eval_one` correctly re-ran all 24 eval cells and (because an
-  `Artifact` keys by content, so publish's `input_fp` moved) correctly gave
-  `publish_results` a new key — but it took several `mini run` invocations before
-  publish actually executed and `ARRAYS_REF` picked up the new stack. Two traps
-  compounded, and cost a long misdiagnosis (I first, wrongly, blamed a publish
-  memo-hit — `Artifact` content-addressing already handles this):
-  (a) the very first re-run was reaped by an *expired* wall-clock deadline stamped
-  by a prior invocation ("budget elapsed — settled CANCELLED", 0 launched); a
-  plain `run` past an expired budget does nothing until you re-arm with
-  `--budget`. (b) publish only becomes runnable after all 24 evals finish, so an
-  earlier wake that launched the eval batch exited before advancing to publish,
-  yet `status` still read `done` (of the *prior* settled DAG). Worth a
-  `status`/`explain` hint that distinguishes "nothing stale" from "stale but
-  reaped by expired budget", and a clearer signal when `done` reflects a
-  superseded DAG rather than the current one.
+- **Metric trends know a direction, not a rate (2026-07-27, PR #58 review).**
+  `expect_metrics`, wrong-way window counting, and a sample floor on the window
+  all shipped; what's left is how coarse the judgement is. A window mean is
+  compared without reference to the within-window spread, so a metric with a
+  genuinely wide spread can still string together three wrong-way windows by
+  chance — if that starts crying wolf, judge the movement against the spread the
+  worker already has the samples to compute (a running sum of squares would do
+  it, alongside the sum it already keeps). And a direction can't catch a loss that
+  is descending far too slowly to reach anything useful inside the budget: that
+  reads as perfectly healthy. A projected-final-value flag would be the
+  counterpart to the timeout projection.
 
-- **Single region.** By default, the Modal container region is unspecified.
-  Within a single sweep, containers may be placed anywhere in the world, and
-  disparate containers have high latency to the shared Volume, Queue, and Dict.
-  This can significantly impact training runs and waste GPU time. It's possible
-  to specify the region when launching a function; see
-  https://modal.com/docs/guide/region-selection.md. Note that doing so increases
-  the cost, so analysis of the trade-off is required; perhaps we can change the
-  way we do I/O to avoid the need most of the time.
-
-- **Monitoring should compare against expectations, and the tools should do
-  the comparing (2026-07-23, ex-2.1.5).** The haiku experiment-monitor
-  reported "progressing normally" while 3 of 5 containers ran 15–30× slow:
-  its playbook covered settled/failed/wedged but not deviation-from-expected.
-  Agent-side fix applied (anomaly-scan section in
-  `.claude/agents/experiment-monitor.md`: sibling throughput comparison,
-  finish-time-vs-timeout projection, metric trends, "healthy ≠ nothing
-  failed"). Tooling half still open, so a small model reads verdicts instead
-  of computing them: (a) `train_model` passes loss in the progress *message
-  string*, not the `ProgressMessage.metrics` dict, so status shows
-  `"metrics": {}` and no tool can check trends — one-line fix in
-  `sca/compute/training.py`, but it's memoization evidence, so bundle with
-  the next change that re-runs cells; (b) `status --brief` attention flags
-  for throughput outliers (vs sibling median) and projected timeout
-  overruns, complementing the existing queued-too-long and stale-progress
-  flags; (c) a loss-trend flag once (a) lands. #monitoring
-
-- **Synchronous progress emission serializes training on cross-region queue
-  puts (diagnosed 2026-07-23, ex-2.1.5).** Containers outside us-east-1 ran
-  identical train cells 15–30× slower (92–220 steps/min vs 2,500–3,500), in
-  order of distance from us-east — initially misread as a possible CPU
-  fallback; AF's I/O hypothesis was right. Mechanism: `train_model` calls
-  `emit_progress` every step; `Debouncer`'s leading edge runs the Modal Queue
-  `put` synchronously on the training thread (`mini/progress.py` `_do_emit`,
-  `mini/_debounce.py`); and once put latency exceeds `emission_interval`
-  (`max_containers / 10` = 0.5 s this run), every step re-triggers the leading
-  edge, so the loop degrades to one blocking put per step. Implied put
-  latencies from steps/min: ~0.28 s us-west1, ~0.38 s eu-south-2, ~0.65 s
-  asia-northeast3 — a few RTTs each, i.e. HTTPS without connection reuse.
-  Fixes, in order: (1) emit from a background thread with a single-slot
-  latest-wins buffer so the training thread never blocks on the network —
-  removes the cliff outright; (2) adaptive interval (≥ k × observed put
-  latency) as a cheap guard; (3) optionally region-pin workers to the queue's
-  home region for locality. Still worth doing for observability regardless:
-  accelerator identity in task `env`, and a `status --brief`
-  throughput-outlier flag (steps_per_min under ~⅓ of the sibling median for
-  the same fn joins the attention list). Not a wedge: progress heartbeats
-  stayed fresh throughout, as the watchdog's stale-progress flag is designed
-  to check. Knock-on cost: the train role's 1.5 h timeout was sized for
-  full-speed cells, so the slowdown turned it into a kill switch — the
-  asia-northeast3 cell was killed at step 7,895 of 7,900 and retrained from
-  scratch (a fast container redid it in 5 min). Timeouts sized to a multiple
-  of expected duration only work if throughput is observable and roughly
-  uniform; the background-emit fix restores that assumption.
-
-  Also, should we even be using a Queue? It's useful when calling Apparatus.run
-  directly, but when polling/ticking the DAG, it may not be the right container.
-  We also have a Dict and maybe that's enough; consider whether it makes sense
-  to prevent Queue use when using the `mini.orchestration` path, and maybe even
-  remove the Queue altogether (it has other hazards, e.g. it may fill up if
-  there's no consumer).
+- **An unresolvable module leaves no evidence and says nothing (2026-07-26).**
+  Deferred-import evidence is now symbol-granular, so the blast-radius half of
+  this is done. What's left is the failure direction that can actually serve a
+  stale hit: if the `sys.path` search doesn't find a module, `_module_index`
+  returns `None` and the walk moves on — indistinguishable from the stdlib and
+  site-packages, which are *meant* to be skipped. A task importing something the
+  driver process can't see would then depend on nothing and cache forever. Fixing
+  it means telling "deliberately excluded" from "expected to resolve and didn't",
+  which needs a notion of what should have been findable (an installed-distribution
+  check, or a project-roots list). A warning would be enough. Related smaller
+  assumption: `sys.path` order is taken as stable within a process.
 
 - **Science skill.** We have a fledgeling `science` skill that describes how to
   collaborate on experiment design. There may be old descisions in
   todo-science.md that could be moved there and polished.
-
-- **First-run Modal image build can eat a small `--budget` (observed
-  2026-07-20).** In a fresh Modal environment the first launch spends minutes
-  building the container image while the task sits `queued`; a `--budget 10m`
-  expired during the build and the watch's opportunistic enforcement settled
-  the run CANCELLED before any work ran. Harmless-but-confusing: the image is
-  cached, so a `retry --budget …` succeeds immediately (that's what happened).
-  Options if it bites again: exclude time-in-queue from the budget clock (risky
-  — queue time is exactly what the budget guards on a capacity-starved run), or
-  just document "size the first run's budget for the image build" in
-  running.md. Leaning documentation-only.
 
 - **Document subline.** Describe subline in a skill: what it is, why we might
   use it instead of a token heatmap, and how to use it.
@@ -193,20 +131,6 @@ readable cold without re-deriving code state.
   min-width/scroll wrapper lives — a `themed` option, or a CSS class the author
   opts into. Decide before the anchoring reports reuse these figures.
 
-- **Reconsider WandB (or a hosted tracker) at M3/M4 planning.** Removed from M2
-  (2026-07-17): it was authenticated and a declared dep but unused — `mini`'s own
-  stack covers everything M2 needs (live `emit_metrics`/`watch`, content-addressed
-  artifact/checkpoint versioning, git-aware lineage, memoized sweeps, Modal cost).
-  The five things a hosted tracker adds and `mini` doesn't — persisted metric
-  *time-series* (mini keeps only the latest value per key), an interactive
-  live-curve dashboard, cross-run/sweep comparison UI, live GPU/system-utilization
-  telemetry, and grouped-hyperparameter views — don't earn their keep on M2's short
-  synthetic-domain runs with publication-curated matplotlib figures. They get more
-  attractive at M3/M4 (small LMs, then LLM fine-tunes): longer, costlier runs and
-  many un-curated runs to compare. Revisit then; if we do, the cheapest first step
-  is per-step time-series persistence in `mini` (extend `emit_metrics` past
-  last-writer-wins), not necessarily WandB.
-
 - **CLI usability, remaining gaps** (from the 2026-07-14 cold-exploration
   session; the copy-pasteable-hints / sorting / help-text tier shipped — see
   #57 for the running thread):
@@ -255,25 +179,6 @@ readable cold without re-deriving code state.
   writes into the existing bundle dir without pruning. Harmless locally (the
   HTML stops referencing them) but it ships dead bytes on publish — a prune of
   assets not referenced by the fresh `index.html` would cover both.
-
-- Cross-experiment lineage is now **auto-detected**: `set_ref` in a task worker
-  stamps producer identity onto the ref (via an ambient `producer_context`, so
-  the project-shared `Store` stays experiment-agnostic), `get_ref` records the
-  resolution on the task record (`upstream_refs`), and the driver rolls both
-  into `lineage.upstreams`. `Experiment(deps=[...])` remains for upstreams a run
-  doesn't read via a ref. Known gaps: refs written by the interactive
-  `Apparatus` (`app.map` in a notebook) or driver-side code are unstamped, and
-  a consumer served entirely from memo hits records nothing new — its
-  previously-recorded `upstream_refs` persist on the old records, which is
-  usually what you want. Pre-existing refs (e.g. the m1 `reports/*` ones) stay
-  unstamped until their publish step re-runs, so their report footers are empty
-  for now.
-
-- Modal `mem_total_gb` in a task's `env` reads the *host* total from
-  `/proc/meminfo` (gvisor shows the whole node, ~186–363 GB), not the container's
-  memory limit. Fine as a coarse "what class of machine" signal; if we ever want
-  the true per-container cap, read the requested `memory=` from the role config
-  instead (or the cgroup limit, if gvisor exposes it).
 
 - `mini.temporal` can't drive feedback control. `DynamicProp.set()` retargets
   mid-flight from the current (value, velocity) state — exactly what a
@@ -329,21 +234,9 @@ readable cold without re-deriving code state.
 
 - #38 — publish-tier hardening (private-CAS/public-publish bucket split;
   citable versioned publish via a dataset repo). Only matters once the template
-  is used for work that shouldn't be world-readable by default.
-- Settled: #46 shipped (gen-fenced `set_ref`/`publish` + `StaleWriteError`,
-  PR #56). #37 (implicit cross-experiment dedup + shared working volume) closed
-  as not planned — the explicit ref path covers reuse; reopen only if
-  identical-prep recompute becomes a real recurring cost.
-
-**Sequence after the above:**
-
-- #15 — GC across the control plane, I/O-plane volume dirs, and the CAS.
-  Shipped in two cuts: the local per-experiment control-plane + I/O-plane sweep
-  (`mini gc <name>`, PR #49), then the Modal Volume sweep and the CAS
-  mark-and-sweep (`mini gc --store`, PR #60). Rationale and safety posture in
-  [`eng/gc.md`](./eng/gc.md). Only #38 (bucket split) would
-  still reshape the CAS leg; the `mini-hf-cache` Volume (#50) stays out of scope
-  (pure cache — `modal volume delete mini-hf-cache` is a safe reset).
+  is used for work that shouldn't be world-readable by default. It's also the
+  only thing left that would reshape what "CAS" means to
+  [`mini gc`](./eng/gc.md) (#15, shipped in two cuts).
 
 **Orthogonal, no code overlap with the above:**
 

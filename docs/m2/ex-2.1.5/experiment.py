@@ -470,19 +470,12 @@ def publish_results(results: list[dict], stats: dict, checkpoints: dict, evals: 
 
 
 def main(ctx: Ctx) -> dict:
-    # eval_one imports the geometry helpers locally, so the evidence fingerprint can't
-    # reach them or the LANDMARKS they read. Tag the eval map with both the landmark
-    # scheme and the measurement module's source, so a probe change re-runs the cells.
-    # Hashing LANDMARKS alone was not enough: it would have served stale arrays for a
-    # change to `probe_maps` that left the scheme alone. See todo-eng.
-    import hashlib
-    import inspect
-
-    from sca.compute import geometry
-    from sca.data.mixed_vocab import LANDMARKS
-
-    lm_tag = "lm-" + hashlib.sha1((repr(LANDMARKS) + inspect.getsource(geometry)).encode()).hexdigest()[:8]
-
+    # The eval map used to carry a hand-rolled `version=` tag hashing the geometry
+    # module and the landmark scheme, because eval_one imports both inside its body
+    # and the evidence fingerprint couldn't see past that. It now traces deferred
+    # imports itself (mini.memo), down to the names imported, so the tag is
+    # redundant and the general mechanism covers a change to anything eval_one
+    # actually reaches.
     corpora = sorted({corpus_key(arm) for arm in ARMS.values()})
     specs = {corpus_key(arm): arm for arm in ARMS.values()}
     preps = ctx.map(
@@ -505,7 +498,6 @@ def main(ctx: Ctx) -> dict:
         arms,
         labels,
         role="eval",
-        version=lm_tag,
     )
     stats = {p["key"]: p["stats"] for p in preps}
     ckpts = dict(zip(labels, [t["checkpoint"] for t in trained], strict=True))
@@ -539,8 +531,10 @@ experiment = Experiment(
         # Greedy decode (4 × 256 prompts) + probe maps (2 forms × 3 targets × 2 estimators).
         "eval": dict(gpu="L4", timeout=1800, region="us-east"),
     },
-    # Pinned to one region: the store lives there, so a container placed elsewhere pays
-    # cross-region transfer on every checkpoint and artifact and drags the whole run.
+    # Pinned to one region, next to the store — kept from the run where placement cost
+    # us 15–30× throughput. That mechanism (per-step progress blocking on the control
+    # plane) is fixed, and Volume writes commit in bulk rather than per-write, so this
+    # is now belt-and-braces on an already-settled run rather than a measured need.
     # Region is placement, not identity — mini fingerprints the task fn's source, so
     # pinning does not invalidate the memoized training.
 )

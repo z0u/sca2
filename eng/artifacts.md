@@ -52,6 +52,14 @@ noting each resolution — is what lets a consuming run detect its upstream expe
 (`lineage.upstreams`, no `deps=` declared) and a rendering report cite its data
 sources; both listeners are ambient too, so the store stays dumb.
 
+Being ambient is also where the stamping stops. A ref written outside a task worker —
+`app.map` in a notebook, or driver-side code — has no `producer_context` to bind, so it
+lands unstamped; and a consumer served entirely from memo hits records nothing new,
+keeping whatever its previous run resolved (usually what you want). Refs that predate the
+stamping, such as m1's `reports/*`, stay unstamped until their publish step re-runs, so
+those report footers read empty. `Experiment(deps=[...])` remains the way to declare an
+upstream a run doesn't reach through a ref. Closing the interactive-path gap is **#39**.
+
 ## Scoping: store project-wide, memo and volume per-experiment
 
 The artifact **store is one per project** — the sharing surface. The **memo store and

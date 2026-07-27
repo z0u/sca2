@@ -8,9 +8,10 @@ A task record answers two different questions, and the store keeps them apart:
   logs, results, history) keeps one address for the task's whole life.
 - **Validity — is the cached result current?** The *evidence* stored on each
   attempt: a fingerprint of the fn's source plus the source of the project
-  functions/classes it references (transitively), and the explicit ``version=``.
-  Stale evidence re-runs the task **in place** — a new attempt under the same
-  key, with the prior attempt compacted into the record's ``history``.
+  functions/classes it references (transitively), whatever it imports *inside
+  its own body*, and the explicit ``version=``. Stale evidence re-runs the task
+  **in place** — a new attempt under the same key, with the prior attempt
+  compacted into the record's ``history``.
 
 Both fingerprints must be **deterministic across processes** (every agent wake
 is a fresh process) — hashing ``cloudpickle.dumps(fn)`` fails that (its bytes
@@ -20,6 +21,7 @@ vary run to run), so we fingerprint *source*, which also ignores library churn
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import dis
 import enum
@@ -30,6 +32,7 @@ import inspect
 import json
 import logging
 import secrets
+import sys
 import time
 import types
 from abc import ABC, abstractmethod
@@ -59,15 +62,17 @@ _MINI_DIR = str(Path(__file__).parent.resolve())
 META_KEY = "__run__"
 
 
+def _is_project_file(path: str | Path) -> bool:
+    rf = str(Path(path).resolve())
+    return "site-packages" not in rf and "/lib/python3" not in rf and not rf.startswith(_MINI_DIR)
+
+
 def _is_project_source(obj: Any) -> bool:
     try:
         f = inspect.getsourcefile(obj)
     except TypeError, OSError:
         return False
-    if not f:
-        return False
-    rf = str(Path(f).resolve())
-    return "site-packages" not in rf and "/lib/python3" not in rf and not rf.startswith(_MINI_DIR)
+    return bool(f) and _is_project_file(cast(str, f))
 
 
 def _nested_codes(code: types.CodeType) -> Iterator[types.CodeType]:
@@ -168,6 +173,382 @@ def _named_refs(fn: Callable) -> list[tuple[str | None, Any]]:
     return refs + [(None, obj) for obj in _attr_chain_refs(fn)]
 
 
+# ---------------------------------------------------------------------------
+# Deferred (function-local) imports
+#
+# A task that keeps the driver light by importing inside its body —
+# ``def eval_one(...): from sca.compute.geometry import probe_maps`` — reaches
+# project code the reference walk above cannot see: the module never lands in
+# the fn's globals, so editing it would serve a silent stale hit.
+#
+# The reference walk above resolves live *objects*; down here there are none,
+# because importing is the very cost a deferred import exists to avoid. So we
+# read source instead — find the module's file by searching ``sys.path``, parse
+# it, take the top-level definitions the import actually named, then follow what
+# *those* reference, through the same module and on into its own imports. The
+# result matches the reference walk's granularity (a helper, not its module)
+# while importing nothing and running no project code.
+#
+# Source doesn't always say what a name binds: a star-import, a name defined
+# inside an ``if``, a module alias passed around as a value. Each of those falls
+# back to folding in the whole module. Over-invalidation is the safe direction —
+# a spurious re-run is visible and bounded, a stale hit isn't.
+# ---------------------------------------------------------------------------
+
+# Ceiling on how far the transitive walk spreads. A project's dependency graph
+# is small; the cap just stops a pathological one from dominating a fingerprint.
+_MAX_DEFERRED_SYMBOLS = 500
+
+# What the walk resolves: a top-level name in a module, or — where narrowing
+# isn't sound — the whole module, as ``(module, None)``.
+type _Ref = tuple[str, str | None]
+
+# The module's own import-time statements, as a pseudo-symbol: reserved because
+# no Python identifier contains a dot.
+_PRELUDE = "<module>"
+
+
+@functools.cache
+def _module_file(name: str) -> Path | None:
+    """The source file for dotted module *name*, found by searching ``sys.path``.
+
+    Deliberately not ``importlib.util.find_spec``: that imports parent packages,
+    and a deferred import exists precisely because importing here is expensive.
+    A plain path search reads nothing and executes nothing. Cached — ``sys.path``
+    doesn't meaningfully move within a process.
+    """
+    rel = Path(*name.split("."))
+    for entry in sys.path:
+        if not entry:
+            continue
+        for cand in (Path(entry) / rel.with_suffix(".py"), Path(entry) / rel / "__init__.py"):
+            if cand.is_file():
+                return cand
+    return None
+
+
+def _resolve_relative(pkg: str, module: str | None, level: int) -> str | None:
+    """Absolute dotted name for ``from <level dots><module> import …`` inside *pkg*."""
+    if level == 0:
+        return module
+    parts = pkg.split(".") if pkg else []
+    if level - 1 > len(parts):
+        return None  # climbs past the top — nothing to resolve against
+    base = parts[: len(parts) - (level - 1)]
+    return ".".join([*base, *([module] if module else [])]) or None
+
+
+@dataclasses.dataclass(frozen=True)
+class _ModuleIndex:
+    """A project module's top-level namespace, read from its source file.
+
+    Enough to answer "what does this imported name bind, and what does *it*
+    reach" without importing: the definitions by name, the module's own import
+    bindings, the statements that are neither (they run on import, and can bind
+    names no source read can see), and which names are ever used as something
+    other than the root of an attribute access.
+    """
+
+    name: str
+    pkg: str
+    source: str
+    tree: ast.Module
+    defs: dict[str, ast.stmt]
+    imports: dict[str, _Ref]
+    prelude: tuple[ast.stmt, ...]
+    bare: frozenset[str]
+    opaque: bool  # a star-import: the namespace can't be enumerated, so narrowing is unsound
+
+
+def _bare_names(tree: ast.AST) -> frozenset[str]:
+    """Names loaded somewhere other than as the root of an attribute access.
+
+    A module alias narrows to the attributes actually reached (``mv.lift``) only
+    while *every* use is an attribute access. Once the bare name goes somewhere
+    else — passed to a function, stored in a dict — what it reaches is anyone's
+    guess, and the whole module has to count.
+    """
+    rooted = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)}
+    return frozenset(n.id for n in ast.walk(tree) if isinstance(n, ast.Name) and id(n) not in rooted)
+
+
+def _segment(source: str, node: ast.stmt) -> str:
+    """A definition's source text, decorators included.
+
+    Whole lines from the first decorator (``ast``'s ``lineno`` for a decorated
+    def points at the ``def`` itself, so a decorator — which changes what the
+    name binds — would otherwise sit outside the text and its edits go unseen).
+    """
+    start = min([node.lineno, *(d.lineno for d in getattr(node, "decorator_list", ()))]) - 1
+    return "".join(source.splitlines(keepends=True)[start : node.end_lineno or node.lineno])
+
+
+def _stmt_defs(node: ast.stmt) -> dict[str, ast.stmt]:
+    """The top-level names one statement defines, each mapped to the statement."""
+    match node:
+        case ast.FunctionDef() | ast.AsyncFunctionDef() | ast.ClassDef():
+            return {node.name: node}
+        case ast.TypeAlias(name=ast.Name(id=alias)):
+            return {alias: node}
+        case ast.Assign(targets=targets):
+            return {t.id: node for t in targets if isinstance(t, ast.Name)}
+        case ast.AnnAssign(target=ast.Name(id=target)):
+            return {target: node}
+        case _:
+            return {}
+
+
+def _stmt_imports(node: ast.stmt, pkg: str) -> dict[str, _Ref]:
+    """The names one import statement binds, and what each of them reaches."""
+    match node:
+        case ast.Import(names=aliases):
+            # ``import a.b.c`` binds ``a`` but runs all three; ``… as z`` binds ``z``
+            # to the leaf. Either way the leaf is what the name reaches through.
+            return {(a.asname or a.name.split(".")[0]): (a.name, None) for a in aliases}
+        case ast.ImportFrom(module=mod, names=aliases, level=level) if base := _resolve_relative(pkg, mod, level):
+            return {(a.asname or a.name): (base, a.name) for a in aliases if a.name != "*"}
+        case _:
+            return {}
+
+
+def _is_docstring(node: ast.stmt) -> bool:
+    return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
+
+
+@functools.cache
+def _module_index(name: str) -> _ModuleIndex | None:
+    """Read *name*'s top-level namespace from source.
+
+    ``None`` for anything that isn't project code — the stdlib, an installed
+    package, ``mini`` itself, or a name that resolves to no file at all.
+    """
+    path = _module_file(name)
+    if path is None or not _is_project_file(path):
+        return None
+    try:
+        source = path.read_text()
+        tree = ast.parse(source)
+    except OSError, SyntaxError:
+        return None
+    pkg = name if path.name == "__init__.py" else name.rpartition(".")[0]
+    defs: dict[str, ast.stmt] = {}
+    imports: dict[str, _Ref] = {}
+    prelude: list[ast.stmt] = []
+    opaque = False
+    for node in tree.body:
+        opaque |= isinstance(node, ast.ImportFrom) and any(a.name == "*" for a in node.names)
+        defs |= (bound := _stmt_defs(node))
+        imports |= (imported := _stmt_imports(node, pkg))
+        # Whatever binds no name is import-time behavior: it runs, and it can bind
+        # names no source read can see. A docstring is text with nothing behind it.
+        if not (bound or imported or isinstance(node, (ast.Import, ast.ImportFrom)) or _is_docstring(node)):
+            prelude.append(node)
+    return _ModuleIndex(name, pkg, source, tree, defs, imports, tuple(prelude), _bare_names(tree), opaque)
+
+
+def _package_chain(module: str) -> list[_Ref]:
+    """The packages executed on the way down to *module*.
+
+    Their ``__init__`` runs before it does, and that can matter well beyond
+    re-exports — ``sca/__init__.py`` sets ``XLA_FLAGS``, which changes what the
+    task computes.
+    """
+    parts = module.split(".")[:-1]
+    return [(".".join(parts[: i + 1]), None) for i in range(len(parts))]
+
+
+def _imports_within(node: ast.AST, idx: _ModuleIndex) -> list[_Ref]:
+    """Every project reference the ``import`` statements inside *node* name.
+
+    At any depth, so a module's own function-local imports are followed the same
+    way the task's are.
+    """
+    out: list[_Ref] = []
+    for n in ast.walk(node):
+        match n:
+            case ast.Import(names=aliases):
+                out += [(a.name, None) for a in aliases]
+            case ast.ImportFrom(module=mod, names=aliases, level=level):
+                if base := _resolve_relative(idx.pkg, mod, level):
+                    out += [(base, a.name) if a.name != "*" else (base, None) for a in aliases]
+    return out
+
+
+def _through_attr(idx: _ModuleIndex, root: str, attr: str) -> list[_Ref]:
+    """The narrowest reference an ``root.attr`` access implies.
+
+    Through a *module* alias it's the single attribute reached; through anything
+    else — a class, a function, a name defined right here — it's that whole
+    object, whose own source already contains the attribute.
+    """
+    if (ref := idx.imports.get(root)) is None:
+        return [(idx.name, root)] if root in idx.defs else []
+    module, symbol = ref
+    target = f"{module}.{symbol}" if symbol else module
+    return [(target, attr)] if _module_file(target) else [ref]
+
+
+def _node_refs(node: ast.stmt, idx: _ModuleIndex) -> list[_Ref]:
+    """What one definition reaches: names from its own module, attributes through
+    a module alias, and whatever it imports inside its own body.
+    """
+    out = _imports_within(node, idx)
+    for n in ast.walk(node):
+        match n:
+            # A name that is *only* ever an attribute root narrows to the attribute;
+            # one used bare anywhere in the module can't, and falls to the case below.
+            case ast.Attribute(value=ast.Name(id=root), attr=attr) if root not in idx.bare:
+                out += _through_attr(idx, root, attr)
+            case ast.Name(id=name) if name in idx.bare:
+                out += [idx.imports[name]] if name in idx.imports else [(idx.name, name)] * (name in idx.defs)
+    return out
+
+
+def _whole_module(idx: _ModuleIndex, seen: dict[str, str]) -> list[_Ref]:
+    """Fall back to a module's entire source — still following it narrowly."""
+    seen[f"module:{idx.name}"] = idx.source
+    return _imports_within(idx.tree, idx)
+
+
+def _resolve_ref(ref: _Ref, seen: dict[str, str]) -> list[_Ref]:
+    """Record one reference's source in *seen*, and return what it reaches in turn."""
+    module, symbol = ref
+    idx = _module_index(module)
+    if idx is None:
+        return []  # stdlib, an installed package, mini itself, or off the path entirely
+    chain = _package_chain(module)
+    if symbol is None or idx.opaque:
+        return chain + _whole_module(idx, seen)
+    if symbol == _PRELUDE:
+        if idx.prelude:  # most modules are all defs and imports — no entry rather than an empty one
+            seen[f"{module}:{_PRELUDE}"] = "\n".join(_segment(idx.source, n) for n in idx.prelude)
+        return chain + [r for n in idx.prelude for r in _node_refs(n, idx)]
+    if (target := idx.imports.get(symbol)) is not None:
+        return [target, (module, _PRELUDE)]  # a re-export: follow it to where it's defined
+    if (node := idx.defs.get(symbol)) is None:
+        # Not a top-level name here: either a submodule (``from sca.data import
+        # mixed_vocab``) or something no source read can see — bound inside an
+        # ``if``, or by code that runs on import. The submodule is a reference of
+        # its own; anything else means the whole module counts.
+        return chain + (
+            [(f"{module}.{symbol}", None)] if _module_file(f"{module}.{symbol}") else _whole_module(idx, seen)
+        )
+    seen[f"{module}:{symbol}"] = _segment(idx.source, node)
+    return chain + [(module, _PRELUDE), *_node_refs(node, idx)]
+
+
+def _collect_deferred(refs: list[_Ref], seen: dict[str, str]) -> None:
+    """Fold the source behind each reference into *seen*, transitively.
+
+    A work list rather than recursion: the graph reaches a project's whole import
+    closure in the worst case, and the ceiling wants one place to live.
+    """
+    queue, done = list(refs), set[_Ref]()
+    while queue:
+        if (ref := queue.pop()) in done:
+            continue
+        done.add(ref)
+        if len(done) > _MAX_DEFERRED_SYMBOLS:
+            log.warning("deferred-import walk hit its %d-symbol ceiling at %s", _MAX_DEFERRED_SYMBOLS, ref)
+            return
+        queue += _resolve_ref(ref, seen)
+
+
+# Loads whose operand is a local/global name; the fused pairs push two, the
+# second of which is what a following ``LOAD_ATTR`` applies to.
+_LOADS_FAST = ("LOAD_FAST", "LOAD_FAST_BORROW", "LOAD_FAST_LOAD_FAST", "LOAD_FAST_BORROW_LOAD_FAST_BORROW")
+_LOADS = (*_LOADS_FAST, "LOAD_NAME", "LOAD_DEREF", "LOAD_GLOBAL")
+_STORES = ("STORE_FAST", "STORE_NAME", "STORE_DEREF", "STORE_GLOBAL")
+
+
+def _scan_code(
+    code: types.CodeType, pkg: str, bound: dict[str, _Ref], attrs: dict[str, set[str]], bare: set[str]
+) -> None:
+    """Fold one code object's imports and name uses into the shared maps.
+
+    ``IMPORT_NAME`` carries the module and the two values pushed before it are
+    the relative level and the fromlist; the ``IMPORT_FROM``s that follow name
+    what came out of it, and the ``STORE`` after each names the local it lands
+    in. Tracking that local is what lets ``from sca.data import mixed_vocab as
+    mv`` narrow to the ``mv.lift`` the body actually reaches, instead of taking
+    the module whole.
+
+    The maps are shared across a function's nested code objects because the two
+    halves usually *are* in different ones: the import binds in the outer body
+    while the attribute is reached from a closure or comprehension inside it.
+    A name reused for something unrelated in a nested scope only ever reads as
+    "used bare", which costs the whole module — the safe direction.
+    """
+    consts: list[Any] = []  # the last two values pushed (level, fromlist)
+    module: str | None = None
+    fromlist: tuple = ()
+    pending: str | None = None  # the name a following STORE binds; "" is the module itself
+    top: str | None = None  # the name most recently loaded, awaiting its next instruction
+
+    for ins in dis.get_instructions(code):
+        if top is not None and ins.opname == "LOAD_ATTR":
+            attrs.setdefault(top, set()).add(ins.argval)
+            top, consts = None, []
+            continue
+        if top is not None:  # loaded and then used as something other than an attribute root
+            bare.add(top)
+            top = None
+        match ins.opname:
+            case "LOAD_CONST" | "LOAD_SMALL_INT":
+                consts = [*consts, ins.argval][-2:]
+                continue
+            case "IMPORT_NAME":
+                level = next((v for v in consts if isinstance(v, int)), 0)
+                fromlist = next((v for v in consts if isinstance(v, tuple)), ())
+                module = _resolve_relative(pkg, ins.argval, level)
+                pending = None if fromlist else ""
+            case "IMPORT_FROM":
+                pending = ins.argval
+            case op if op in _STORES and module and pending is not None:
+                bound[ins.argval] = (module, pending or None)
+                pending = None
+            case op if op in _LOADS:
+                # A ``LOAD_FAST`` of a *cell* variable is closure plumbing — the cell
+                # object on its way into an inner function, not a read of its value.
+                # Counting it as a use would mark every closed-over import "used
+                # bare" and cost the whole module; the inner code object is scanned
+                # in its own right, where the real read shows up as ``LOAD_DEREF``.
+                cells = code.co_cellvars if op in _LOADS_FAST else ()
+                raw = cast("list[str]", list(ins.argval) if isinstance(ins.argval, tuple) else [ins.argval])
+                names = [n for n in raw if n not in cells]
+                # Whatever is left on the stack is what a following LOAD_ATTR applies
+                # to — so if *that* one was plumbing, nothing here awaits an attribute.
+                top = names[-1] if names and raw[-1] not in cells else None
+                bare.update(names[:-1] if top else names)
+        consts = []
+    if top is not None:
+        bare.add(top)
+
+
+def _bytecode_imports(fn: Callable) -> list[_Ref]:
+    """What *fn*'s own body imports, narrowed by what it does with each binding."""
+    code = getattr(fn, "__code__", None)
+    if code is None:
+        return []
+    pkg = getattr(sys.modules.get(getattr(fn, "__module__", "") or ""), "__package__", "") or ""
+    bound: dict[str, _Ref] = {}
+    attrs: dict[str, set[str]] = {}
+    bare: set[str] = set()
+    for c in _nested_codes(code):
+        _scan_code(c, pkg, bound, attrs, bare)
+
+    out: list[_Ref] = []
+    for local, (mod, name) in bound.items():
+        target = f"{mod}.{name}" if name else mod
+        if name is None:
+            out.append((mod, None))  # a plain ``import``: the statement's own effect is the point
+        elif local in bare or local not in attrs:
+            out.append((mod, name))  # used bare, or never loaded — nothing to narrow to
+        else:
+            out += [(target, a) for a in attrs[local]] if _module_file(target) else [(mod, name)]
+    return out
+
+
 def _collect_sources(fn: Callable, seen: dict[str, str]) -> None:
     qualname = getattr(fn, "__qualname__", repr(fn))
     if qualname in seen:
@@ -189,6 +570,7 @@ def _collect_sources(fn: Callable, seen: dict[str, str]) -> None:
             # editing code. Skipped when it has no stable encoding (see _value_json).
             if (js := _value_json(obj)) is not None:
                 seen[f"{qualname}::{name}"] = js
+    _collect_deferred(_bytecode_imports(fn), seen)
 
 
 @functools.lru_cache(maxsize=256)
@@ -583,6 +965,16 @@ class MemoStore:
         wanted = set(requested)
         current = [r for r in records if r["key"] in wanted]
         return current, [r for r in records if r["key"] not in wanted]
+
+    def dag_complete(self) -> bool | None:
+        """Did the last tick run ``main`` to the end, or suspend part-way?
+
+        ``None`` when no tick has recorded it. The distinction a read-only view
+        can't derive for itself: with every launched task DONE, a run whose DAG
+        suspended still has stages to go and needs another ``run`` — while one
+        whose ``main`` returned is finished. Both read "all tasks done".
+        """
+        return self.meta().get("complete")
 
     def deadline(self) -> float | None:
         """The run's wall-clock deadline (epoch seconds), or ``None`` if unbudgeted."""

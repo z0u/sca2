@@ -38,6 +38,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from statistics import median
 from typing import Any
 
 from mini.apparatus import Apparatus
@@ -189,6 +190,10 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
                 ("gpu", getattr(args, "gpu", None)),
                 ("timeout", getattr(args, "timeout", None)),
                 ("max_containers", getattr(args, "max_containers", None)),
+                # A project-wide default, since placement is usually a property of
+                # where the run's *storage* lives rather than of one experiment. A
+                # role's own region= still wins (roles are applied over this).
+                ("region", getattr(args, "region", None) or _project_config().get("region")),
             )
             if v is not None
         } | wd_overrides
@@ -242,6 +247,31 @@ def _budget_suffix(store: MemoStore) -> str:
     return f"budget {meta.get('budget', '?')}, {when}"
 
 
+def _rearm_hint(store: MemoStore, path: str, args: argparse.Namespace) -> str:
+    """How to get a run moving again past an expired budget, as a runnable line.
+
+    Worth spelling out because the symptom is *silence*: past the deadline a
+    plain ``run`` launches nothing and settles what's in flight, so a run with
+    genuinely stale work reads exactly like one with nothing left to do.
+    """
+    return f"  nothing launches past an expired budget — re-arm with: {PROG} run {path} --budget {store.meta().get('budget') or '30m'}{_app_suffix(args)}"
+
+
+def _dag_note(store: MemoStore, state: RunState) -> str:
+    """The caveat on an all-DONE run whose ``main`` hasn't reached its end yet.
+
+    Every launched task can be DONE while the DAG still has stages to go — the
+    last tick suspended at a ``Pending`` rather than returning. Both read "done"
+    from the records alone, and mistaking one for the other is how a run sits
+    finished-looking with a publish step never executed.
+    """
+    if state != RunState.DONE or store.dag_complete() is not False:
+        return ""
+    if store.budget_expired():  # the compounding trap: work left, and nothing will launch
+        return "DAG suspended, and the budget has expired — re-run with --budget to advance"
+    return "DAG suspended at the last tick — re-run to advance"
+
+
 def _aggregate_state(states: list[RunState]) -> RunState:
     """Roll per-task states up to one experiment state."""
     if not states or all(s == RunState.DONE for s in states):
@@ -266,8 +296,9 @@ def _print_records(store: MemoStore, records: list[dict] | None = None) -> tuple
     """
     current, stale = store.split_current(store.records() if records is None else records)
     kept = set(store.meta().get("kept_stale") or ())  # DONE served under old code (--keep-stale-done)
+    rates = _fleet_rates(current)
     for rec in sorted(current, key=_launch_order):
-        print(_memo_line(rec) + ("  (stale code — kept)" if rec["key"] in kept else ""))
+        print(_memo_line(rec, rates) + ("  (stale code — kept)" if rec["key"] in kept else ""))
     for rec in sorted(stale, key=_launch_order):
         print(f"{_memo_line(rec)}  (superseded)")
     return current, stale
@@ -280,12 +311,25 @@ def _launch_order(rec: dict) -> tuple:
     return (rec.get("started_at") or float("inf"), rec.get("fn") or "", rec["key"])
 
 
-def _memo_line(rec: dict) -> str:
+def _worry(rec: dict, rates: dict[str, float]) -> str:
+    """The badge a RUNNING task's line carries, worst worry first (or nothing)."""
+    if stale_heartbeat(rec):
+        return "  ⚠ stale — worker may be dead"
+    if stale_progress(rec):  # emitting but not advancing: the wedge signature, not a dead worker
+        return f"  ⚠ no step progress for {progress_age(rec):.0f}s — worker may be wedged"
+    if deviation := _metric_trouble(rec) or _slow_outlier(rec, rates) or _timeout_projection(rec):
+        return f"  ⚠ {deviation}"
+    return ""
+
+
+def _memo_line(rec: dict, rates: dict[str, float] | None = None) -> str:
     """One status line for a memoized task record (shared by `run`/`status`).
 
     A RUNNING record with no ``env`` yet reads ``queued`` — launched, but no
     worker has started (see :func:`mini.runs.is_queued`). Its ``heartbeat_at``
     is still the launch stamp, so it's shown as time-in-queue, not liveness.
+    *rates* (sibling throughput medians) enables the deviation flags — a cell
+    running far behind its siblings, or projected to overrun its timeout.
     """
     state = _rec_state(rec)
     queued = is_queued(rec)
@@ -299,10 +343,7 @@ def _memo_line(rec: dict) -> str:
         line += f"  {_fmt_metrics(rec['metrics'])}"
     if state == RunState.RUNNING and rec.get("heartbeat_at"):
         line += f"  ⧖ queued {_age(rec['heartbeat_at'])}" if queued else f"  ♥ {_age(rec['heartbeat_at'])}"
-        if stale_heartbeat(rec):
-            line += "  ⚠ stale — worker may be dead"
-        elif stale_progress(rec):  # emitting but not advancing: the wedge signature, not a dead worker
-            line += f"  ⚠ no step progress for {progress_age(rec):.0f}s — worker may be wedged"
+        line += _worry(rec, rates or {})
     if gpu := rec.get("env", {}).get("gpu"):
         line += f"  on {gpu}"  # what it actually ran on, when not the local CPU
     if rec.get("fc_id"):
@@ -414,7 +455,11 @@ def _run(exp, apparatus: Apparatus, args: argparse.Namespace) -> None:
         cancelled = apparatus.enforce_budget(store)
         print(f"{exp.name}:")
         _print_records(store)
-        print(f"⊘ wall-clock budget elapsed — cancelled {len(cancelled)} in-flight task(s); run settled CANCELLED")
+        if cancelled:
+            print(f"⊘ wall-clock budget elapsed — cancelled {len(cancelled)} in-flight task(s); run settled CANCELLED")
+        else:
+            print("⊘ wall-clock budget elapsed — nothing was in flight, and this wake launched nothing")
+        print(_rearm_hint(store, args.path, args))
         return
     try:
         done, payload = tick(exp, apparatus, keep_stale=keep_stale)
@@ -480,6 +525,8 @@ def cmd_ls(args: argparse.Namespace) -> None:
         line = f"{name:16} {_GLYPH.get(agg, '?')} {agg:9} {done}/{len(states)} tasks"
         if stale:
             line += f"  (+{len(stale)} superseded)"
+        if _dag_note(store, agg):
+            line += "  (DAG suspended — re-run to advance)"
         print(line)
 
 
@@ -499,8 +546,9 @@ def cmd_status(args: argparse.Namespace) -> None:
         print(json.dumps(build(args.name, args, state, store, current, stale)))
         return
     header = f"{args.name}  —  {state}  ({len(current)} tasks{f', +{len(stale)} superseded' if stale else ''})"
-    if suffix := _budget_suffix(store):
-        header += f"  ·  {suffix}"
+    for suffix in (_budget_suffix(store), _dag_note(store, state)):
+        if suffix:
+            header += f"  ·  {suffix}"
     print(header)
     if brief:
         print(f"  {_fmt_counts(current)}")
@@ -541,20 +589,90 @@ def _fmt_counts(current: list[dict]) -> str:
     return " · ".join(f"{counts[label]} {label}" for label in order if counts.get(label)) or "no tasks"
 
 
-def _needs_attention(rec: dict) -> bool:
-    """Does a monitor need to look at this task? Terminal-not-DONE, stale/wedged
-    liveness, or queued past the generic staleness window (Modal capacity starvation).
+# A healthy run is not the same as a run where nothing has failed, so the flags
+# below also cover *deviation from expectation* — the class of trouble that used
+# to need a human to notice (ex-2.1.5: three of five containers running 15–30×
+# slow while every liveness check read green).
+_SLOW_FRACTION = 1 / 3  # of the sibling median before a cell counts as an outlier
+_MIN_SIBLINGS = 3  # reporters needed before a median means anything
+_WRONG_WAY_WINDOWS = 3  # consecutive minutes a metric may drift the wrong way before it's worth a look
+
+
+def _fleet_rates(current: list[dict]) -> dict[str, float]:
+    """Median throughput (steps/min) per task fn, over the running cells reporting one.
+
+    A sweep's own cells are the fair yardstick for each other: same code, same
+    shape of work, different container. Below ``_MIN_SIBLINGS`` reporters there's
+    no fleet to compare against and the fn is left out.
     """
-    if _rec_state(rec) in (RunState.FAILED, RunState.CANCELLED):
-        return True
-    if stale_heartbeat(rec) or stale_progress(rec):
-        return True
-    return is_queued(rec) and bool(hb := rec.get("heartbeat_at")) and time.time() - hb > STALE_HEARTBEAT_S
+    rates: dict[str, list[float]] = {}
+    for rec in current:
+        if _rec_state(rec) == RunState.RUNNING and not is_queued(rec) and (rate := rec.get("steps_per_min")):
+            rates.setdefault(rec.get("fn") or "", []).append(rate)
+    return {fn: median(rs) for fn, rs in rates.items() if len(rs) >= _MIN_SIBLINGS}
 
 
-def _attention_cause(rec: dict) -> str:
-    """Why this task needs a look — the label that collapses a homogeneous mass
-    failure (30 identical OOMs → one line) and keeps distinct causes apart.
+def _slow_outlier(rec: dict, rates: dict[str, float]) -> str | None:
+    """Is this cell crawling relative to its siblings?
+
+    Placement, throttling, a cross-region control plane — all invisible to a
+    liveness probe, which reads green throughout.
+    """
+    rate, med = rec.get("steps_per_min"), rates.get(rec.get("fn") or "")
+    if not rate or not med or rate >= med * _SLOW_FRACTION:
+        return None
+    return f"{rate:g} steps/min — under a third of the sibling median ({med:g})"
+
+
+def _timeout_projection(rec: dict, now: float | None = None) -> str | None:
+    """Will this task hit its role timeout before it finishes, at its current rate?
+
+    A timeout sized as a multiple of the expected duration is a safety net right
+    up until throughput drops, at which point it turns into a kill switch — and
+    the task is killed near the end, having burned the whole budget (ex-2.1.5 lost
+    a cell at step 7,895 of 7,900). Projecting it is the difference between
+    finding out now and finding out at the timeout.
+    """
+    rate, total, timeout_s = rec.get("steps_per_min"), rec.get("total"), rec.get("timeout_s")
+    started = rec.get("started_at")
+    if not (rate and total and timeout_s and started) or _rec_state(rec) != RunState.RUNNING:
+        return None
+    remaining_s = max(0, total - rec.get("step", 0)) / rate * 60.0
+    projected = ((now if now is not None else time.time()) - started) + remaining_s
+    if projected <= timeout_s:
+        return None
+    return f"projected {projected / 60:.0f}m to finish, past its {timeout_s / 60:.0f}m timeout"
+
+
+def _metric_trouble(rec: dict) -> str | None:
+    """Have the task's own numbers gone wrong — diverged, or steadily drifting?
+
+    Records keep the latest value of each metric plus the movement the worker
+    measured over trailing windows, so this is a check rather than an eyeball.
+
+    Which way is *wrong* is settled at the worker, from the job's own
+    ``expect_metrics`` declaration — nothing here matches on metric names, because
+    a name can't tell you whether a number is meant to climb. A metric with no
+    declared direction still reports its movement (``metrics_delta``); it just
+    never lands here.
+    """
+    if nonfinite := rec.get("metrics_nonfinite"):
+        return f"{', '.join(nonfinite)} is not finite — the run has diverged"
+    goals = rec.get("metric_goals") or {}
+    drifting = sorted(k for k, n in (rec.get("metrics_wrong_way") or {}).items() if n >= _WRONG_WAY_WINDOWS)
+    if not drifting:
+        return None
+    moved = ", ".join(f"{k} {'rising' if goals.get(k) == 'down' else 'falling'}" for k in drifting)
+    return f"{moved} for several windows"
+
+
+def _attention_cause(rec: dict, rates: dict[str, float] | None = None) -> str | None:
+    """Why this task needs a look, or ``None`` if it looks healthy.
+
+    Doubles as the grouping label, which is what collapses a homogeneous mass
+    failure (30 identical OOMs → one line) while keeping distinct causes apart.
+    Ordered by how much it costs to be wrong: terminal first, then liveness, then
+    the softer deviation-from-expected signals.
     """
     if _rec_state(rec) in (RunState.FAILED, RunState.CANCELLED):
         return rec.get("error") or str(_rec_state(rec))
@@ -562,7 +680,23 @@ def _attention_cause(rec: dict) -> str:
         return "heartbeat stale — worker may be dead"
     if stale_progress(rec):
         return "no step progress — worker may be wedged"
-    return "queued too long"  # long-queued (capacity starvation)
+    if is_queued(rec):  # long-queued (capacity starvation)
+        hb = rec.get("heartbeat_at")
+        return "queued too long" if hb and time.time() - hb > STALE_HEARTBEAT_S else None
+    if _rec_state(rec) != RunState.RUNNING:
+        # The deviation flags describe a task *now*, and a DONE record keeps the
+        # numbers from its final window forever — so without this, a cell whose last
+        # minute was slow reads "running under a third of…" after it finished, and a
+        # loss that ticked up at the end parks a settled run in the attention list
+        # for good. A finished run's numbers are the scientist's problem, not the
+        # monitor's.
+        return None
+    return _metric_trouble(rec) or _slow_outlier(rec, rates or {}) or _timeout_projection(rec)
+
+
+def _needs_attention(rec: dict, rates: dict[str, float] | None = None) -> bool:
+    """Does a monitor need to look at this task?"""
+    return _attention_cause(rec, rates) is not None
 
 
 def _attention_groups(current: list[dict]) -> list[dict[str, Any]]:
@@ -576,8 +710,9 @@ def _attention_groups(current: list[dict]) -> list[dict[str, Any]]:
     """
     groups: dict[tuple, dict[str, Any]] = {}
     keys: dict[tuple, list[str]] = {}
-    for rec in sorted((r for r in current if _needs_attention(r)), key=_launch_order):
-        sig = (rec.get("fn"), _display_state(rec), _attention_cause(rec))
+    rates = _fleet_rates(current)
+    for rec in sorted((r for r in current if _needs_attention(r, rates)), key=_launch_order):
+        sig = (rec.get("fn"), _display_state(rec), _attention_cause(rec, rates))
         if sig not in groups:
             groups[sig] = {"fn": rec.get("fn"), "state": sig[1], "cause": sig[2], "sample": rec}
             keys[sig] = []
@@ -606,8 +741,8 @@ def _attention_json(rec: dict) -> dict[str, Any]:
     lookup), without the env/metrics/timestamps bulk of the full ``--json``.
     """
     out = _task_json(rec)
-    for f in ("env", "metrics", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s", "steps_per_min"):
-        out.pop(f, None)
+    for f in ("env", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s"):
+        out.pop(f, None)  # metrics and throughput stay: they're what the deviation flags are about
     if out.pop("queued", None):
         out.pop("heartbeat_age_s", None)  # a queued record's heartbeat is just its launch stamp
         out.pop("stale_heartbeat", None)
@@ -619,10 +754,14 @@ def _attention_json(rec: dict) -> dict[str, Any]:
 def _budget_json(meta: dict[str, Any]) -> dict[str, Any] | None:
     if not (deadline := meta.get("deadline_at")):
         return None
+    remaining = deadline - time.time()
     return {
         "budget": meta.get("budget"),
         "deadline_at": deadline,
-        "remaining_s": round(max(0.0, deadline - time.time()), 1),
+        "remaining_s": round(max(0.0, remaining), 1),
+        # Explicit, because it changes what a `run` *does*: past the deadline it
+        # launches nothing at all until the budget is re-armed.
+        "expired": remaining <= 0,
     }
 
 
@@ -642,12 +781,17 @@ def _brief_json(
         "settled": all(_rec_state(r) in SETTLED for r in current),
         "counts": _counts(current),
     }
-    attention = [r for r in sorted(current, key=_launch_order) if _needs_attention(r)]
+    if (complete := store.dag_complete()) is not None:
+        out["dag_complete"] = complete  # settled tasks ≠ finished DAG; see `_dag_note`
+    rates = _fleet_rates(current)
+    attention = [r for r in sorted(current, key=_launch_order) if _needs_attention(r, rates)]
     if attention:
         # A capped list of representative task records (keys/fc_ids to act on),
         # plus a full cause→count rollup so a wide mass failure reads as its few
         # distinct causes, not N near-identical lines.
-        out["attention"] = [_attention_json(r) for r in attention[:_ATTENTION_CAP]]
+        out["attention"] = [
+            {**_attention_json(r), "cause": _attention_cause(r, rates)} for r in attention[:_ATTENTION_CAP]
+        ]
         out["attention_total"] = len(attention)
         out["attention_summary"] = [
             {"fn": g["fn"], "state": g["state"], "cause": g["cause"], "count": len(g["keys"])}
@@ -683,6 +827,8 @@ def _status_json(
         ],
     }
     meta = store.meta()
+    if (complete := store.dag_complete()) is not None:
+        out["dag_complete"] = complete  # settled tasks ≠ finished DAG; see `_dag_note`
     if budget := _budget_json(meta):
         out["budget"] = budget
     if kept := meta.get("kept_stale"):
@@ -702,6 +848,10 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "step",
         "total",
         "metrics",
+        "metrics_delta",
+        "metrics_wrong_way",
+        "metric_goals",
+        "metrics_nonfinite",
         "steps_per_min",
         "error",
         "exc_type",
@@ -709,6 +859,7 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "env",
         "started_at",
         "finished_at",
+        "timeout_s",
         "watchdog_s",
         "watchdog_grace_s",
     ):
@@ -771,6 +922,9 @@ def cmd_watch(args: argparse.Namespace) -> None:
         elif outcome == "timeout":
             print(f"⏱ {reason}")
         print(f"{args.name}  —  {state}  ({len(current)} tasks)")
+        if note := _dag_note(store, state):
+            # This watch never ticks, so settling is as far as it can take the run.
+            print(f"  … {note} — advance it with: {PROG} run <experiment.py>{_app_suffix(args)}")
     # Exit code = the branch to take, so scripts/monitors can gate without parsing.
     code = {"attention": 3, "timeout": 124}.get(outcome, 0 if state == RunState.DONE else 1)
     if code:
@@ -1211,6 +1365,14 @@ def main() -> None:
             default=None,
             dest="max_containers",
             help="cap concurrent Modal containers (--app modal; default: unbounded)",
+        )
+        p.add_argument(
+            "--region",
+            default=None,
+            help="pin Modal containers to a region, e.g. us-east (--app modal; default: "
+            "[tool.mini] region, else Modal's choice — which may place a sweep's cells "
+            "on different continents, far from the shared Volume/Dict). Costs a region "
+            "premium; a role's own region= wins over this",
         )
 
     p = sub.add_parser("run", help="advance a (multi-step) memoized orchestration")

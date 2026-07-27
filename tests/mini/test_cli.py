@@ -314,8 +314,14 @@ def test_status_brief_is_counts_plus_attention_only(tmp_path: Path, monkeypatch,
         "settled": False,
         "counts": {"done": 1, "running": 1, "failed": 1, "queued": 1},
         "attention": [
-            {"key": "t-failed", "fn": "train", "state": "failed", "error": "RuntimeError: boom"},
-            {"key": "t-parked", "fn": "train", "state": "running", "queued_s": ANY},
+            {
+                "key": "t-failed",
+                "fn": "train",
+                "state": "failed",
+                "error": "RuntimeError: boom",
+                "cause": "RuntimeError: boom",
+            },
+            {"key": "t-parked", "fn": "train", "state": "running", "queued_s": ANY, "cause": "queued too long"},
         ],
         "attention_total": 2,
         "attention_summary": [  # two distinct causes, one task each (launch order)
@@ -685,3 +691,180 @@ def test_run_with_a_name_instead_of_a_file_hints_at_the_split(tmp_path: Path, mo
         cmd_retry(ns("nope"))
     assert "no experiment file at 'nope'" in str(e.value)
     assert "experiment name" not in str(e.value)
+
+
+def _running(key: str, **fields) -> dict:
+    """A healthy-looking RUNNING record: live worker, fresh heartbeat, real env."""
+    now = time.time()
+    return {
+        "key": key,
+        "state": "running",
+        "fn": "train_one",
+        "pid": os.getpid(),
+        "heartbeat_at": now,
+        "progress_at": now,
+        "started_at": now - 600,
+        "env": {"host": "worker.test", "gpu": "L4"},
+        "step": 1000,
+        "total": 8000,
+    } | fields
+
+
+def test_status_flags_deviation_from_expectation(tmp_path: Path, monkeypatch, capsys):
+    """Healthy is not the same as "nothing failed". A cell crawling at a fraction
+    of its siblings' throughput, one projected to hit its timeout before it
+    finishes, and one whose loss has gone to NaN all pass every liveness check —
+    a monitor that only looks for failures reports "progressing normally" while
+    the run burns (ex-2.1.5). The comparison belongs in the tool, not the reader."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "devexp")
+    for i in range(3):  # the fleet: a median to compare against
+        store.records_backend.merge(f"t-fast{i}", _running(f"t-fast{i}", steps_per_min=3000))
+    store.records_backend.merge("t-slow", _running("t-slow", steps_per_min=100))
+    # 4000 steps left at 3000/min is ~80s, but it has already been running 600s of
+    # its 660s timeout — it will be killed just short of the finish line.
+    store.records_backend.merge("t-late", _running("t-late", steps_per_min=3000, step=4000, timeout_s=660))
+    store.records_backend.merge(
+        "t-nan", _running("t-nan", steps_per_min=3000, metrics={"loss": float("nan")}, metrics_nonfinite=["loss"])
+    )
+    store.records_backend.merge(
+        "t-rising",
+        _running(
+            "t-rising",
+            steps_per_min=3000,
+            metrics={"loss": 2.5},
+            metrics_wrong_way={"loss": 4},
+            metric_goals={"loss": "down"},
+        ),
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="devexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    flagged = {t["key"]: t["cause"] for t in payload["attention"]}
+    assert set(flagged) == {"t-slow", "t-late", "t-nan", "t-rising"}, "the healthy siblings must stay quiet"
+    assert "sibling median" in flagged["t-slow"]
+    assert "timeout" in flagged["t-late"]
+    assert "diverged" in flagged["t-nan"]
+    assert "rising" in flagged["t-rising"]
+
+
+def test_a_metric_meant_to_rise_is_flagged_when_it_falls(tmp_path: Path, monkeypatch, capsys):
+    """Direction comes from the job, so the flag reads the same alarm either way: a
+    sliding accuracy is as much of a problem as a climbing loss, and the CLI matches
+    on no metric names at all. An undeclared metric is measured but never flagged —
+    silence beats guessing which way a domain-specific score is supposed to go."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "goalexp")
+    for i in range(3):
+        store.records_backend.merge(f"t-ok{i}", _running(f"t-ok{i}", steps_per_min=3000))
+    store.records_backend.merge(
+        "t-sliding",
+        _running(
+            "t-sliding",
+            steps_per_min=3000,
+            metrics={"accuracy": 0.4},
+            metrics_wrong_way={"accuracy": 5},
+            metric_goals={"accuracy": "up"},
+        ),
+    )
+    store.records_backend.merge(  # climbing, but climbing is what it's for
+        "t-climbing",
+        _running(
+            "t-climbing",
+            steps_per_min=3000,
+            metrics={"accuracy": 0.9},
+            metrics_delta={"accuracy": 0.02},
+            metric_goals={"accuracy": "up"},
+        ),
+    )
+    store.records_backend.merge(  # moving, but nobody said which way it should go
+        "t-undeclared",
+        _running("t-undeclared", steps_per_min=3000, metrics={"score": 7.0}, metrics_delta={"score": 1.5}),
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="goalexp", app="local", json=True, brief=True))
+    payload = json.loads(capsys.readouterr().out)
+    flagged = {t["key"]: t["cause"] for t in payload["attention"]}
+    assert set(flagged) == {"t-sliding"}
+    assert flagged["t-sliding"] == "accuracy falling for several windows"
+
+
+def test_deviation_flags_let_go_of_a_finished_task(tmp_path: Path, monkeypatch, capsys):
+    """The deviation flags describe a task *now*. A settled record keeps the numbers
+    from its final window forever, so without a state guard a cell whose last minute
+    was slow reads "under a third of the sibling median" after it finished, and a
+    loss that ticked up at the end parks a completed run in the attention list for
+    good — which would make "healthy means the scan came back clean" unreachable."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "settledexp")
+    for i in range(3):
+        store.records_backend.merge(f"t-fast{i}", _running(f"t-fast{i}", steps_per_min=3000))
+    store.records_backend.merge(
+        "t-was-slow", _running("t-was-slow", state="done", steps_per_min=100, metrics_wrong_way={"loss": 9})
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="settledexp", app="local", json=True, brief=True))
+    assert "attention" not in json.loads(capsys.readouterr().out)
+
+
+def test_throughput_outlier_needs_a_fleet_to_compare_against(tmp_path: Path, monkeypatch, capsys):
+    """Two cells are not a distribution: with too few reporters there is no
+    expectation to deviate from, and flagging the slower of a pair would cry wolf
+    on every uneven sweep."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import data_root
+
+    store = MemoStore(data_root() / "lonelyexp")
+    store.records_backend.merge("t-fast", _running("t-fast", steps_per_min=3000))
+    store.records_backend.merge("t-slow", _running("t-slow", steps_per_min=100))
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="lonelyexp", app="local", json=True, brief=True))
+    assert "attention" not in json.loads(capsys.readouterr().out)
+
+
+def test_region_defaults_from_the_project_config(tmp_path: Path, monkeypatch):
+    """Placement is usually a property of where the run's storage lives, not of one
+    experiment, so it has a project-wide default — with the explicit flag winning,
+    and a role's own ``region=`` winning over both (roles are applied on top)."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[tool.mini]\nregion = "us-east"\n')
+
+    pytest.importorskip("modal")
+    from mini.__main__ import _build_apparatus
+    from mini.modal_apparatus import ModalApparatus
+
+    def built(region: str | None = None) -> ModalApparatus:
+        args = argparse.Namespace(app="modal", gpu=None, timeout=None, max_containers=None, region=region)
+        app = _build_apparatus("regionexp", args)
+        assert isinstance(app, ModalApparatus)
+        return app
+
+    assert built().modal_fn_kwargs["region"] == "us-east"
+    assert built("eu-west").modal_fn_kwargs["region"] == "eu-west"
+    assert built().w(region="asia-northeast3").modal_fn_kwargs["region"] == "asia-northeast3"

@@ -19,6 +19,7 @@ from typing import Any, Callable
 import cloudpickle
 
 from contextlib import nullcontext
+from math import isfinite
 
 from mini._queues import EndOfQueue
 from mini._watchdog import Watchdog, WatchdogStall
@@ -44,6 +45,25 @@ from mini.volume import data_dir_context
 # ``progress_at`` age, not by the rate — a wedge stops updating both).
 _RATE_WINDOW_S = 60.0
 
+# …and a *metric* window closes on whichever comes later: that interval, or this
+# many samples. A trend is judged from the window's mean, and how much a mean is
+# worth depends on how many samples went into it, not on how long they took to
+# arrive. A minute is hundreds of samples for a fast training loop and two for a
+# job whose steps take half a minute, and two-sample means would have that job
+# flagged on noise. So the floor sizes the window by evidence: fast jobs clear it
+# within a second of opening and never notice, slow ones stretch the window in
+# time until it holds enough to mean something.
+_MIN_WINDOW_SAMPLES = 20
+
+# Directions for names that can only mean one thing, so the common case needs no
+# declaration. Deliberately *exact* names rather than substrings: ``loss_scale`` is
+# a mixed-precision scale factor that climbs by design, and guessing it wrong is
+# worse than staying quiet. Anything else opts in via ``expect_metrics`` (which
+# also overrides these), and an undeclared metric is measured but never flagged.
+_GUESSED_GOALS = dict.fromkeys(
+    ("loss", "train_loss", "val_loss", "eval_loss", "test_loss", "nll", "perplexity", "ppl"), "down"
+)
+
 
 class _MemoSink:
     """Writes the latest progress/metrics for a task straight to its memo record.
@@ -55,21 +75,29 @@ class _MemoSink:
     Beyond relaying emissions, the sink derives the record's liveness-vs-progress
     split: ``heartbeat_at`` (any emission — the worker breathes) vs ``progress_at``
     (the ``(step, total)`` pair advanced — the task *moves*), plus a
-    ``steps_per_min`` throughput over a trailing window. A wedged worker can keep
-    the former fresh while the latter freezes; monitors key on the difference.
-    The same advance signal feeds the *watchdog*, which aborts the worker when
-    progress stalls too long (see :mod:`mini._watchdog`).
+    ``steps_per_min`` throughput and per-metric movement over a trailing window —
+    the numbers a monitor needs to judge a run against expectation instead of
+    eyeballing it. A wedged worker can keep the heartbeat fresh while progress
+    freezes; monitors key on the difference.
+
+    Writes run on the progress emitter's own thread (see
+    :class:`~mini._debounce.BackgroundEmitter`), so nothing here is on the task's
+    critical path. The *watchdog* is fed separately, from the emitting thread, so
+    it measures the task rather than the control plane.
     """
 
-    def __init__(self, store: MemoStore, key: str, gen: str | None = None, watchdog: Watchdog | None = None):
+    def __init__(self, store: MemoStore, key: str, gen: str | None = None):
         self._store = store
         self._key = key
         self._gen = gen
         self._fenced = False
-        self._watchdog = watchdog
         self._last: tuple[int, int] | None = None
         self._progress_at: float | None = None
         self._rate_anchor: tuple[float, int] | None = None  # (time, step)
+        self._metric_anchor: dict[str, float] = {}  # previous window's mean, per metric
+        self._window: dict[str, tuple[float, int]] = {}  # this window's (sum, count)
+        self._samples = 0  # emissions carrying metrics since the window opened
+        self._wrong_way: dict[str, int] = {}  # consecutive windows a metric has moved against its goal
 
     def put(self, item: Any, /, block: bool = True, timeout: float | None = None) -> None:
         del block, timeout
@@ -79,8 +107,6 @@ class _MemoSink:
         if (item.step, item.total) != self._last:
             self._last = (item.step, item.total)
             self._progress_at = now
-            if self._watchdog is not None:
-                self._watchdog.poke(item.step, item.total)
         fields = dict(
             step=item.step,
             total=item.total,
@@ -88,17 +114,68 @@ class _MemoSink:
             metrics=item.metrics,
             heartbeat_at=now,
         )
+        if item.metrics:  # NaN/inf loss: a diverged run, seen without a human reading it. Always written, so it clears.
+            fields["metrics_nonfinite"] = sorted(
+                k for k, v in item.metrics.items() if isinstance(v, float) and not isfinite(v)
+            )
         if self._progress_at is not None:
             fields["progress_at"] = self._progress_at
+        self._accumulate(item.metrics)
         if self._rate_anchor is None:
             self._rate_anchor = (now, item.step)
         elif (elapsed := now - self._rate_anchor[0]) >= _RATE_WINDOW_S:
             fields["steps_per_min"] = round((item.step - self._rate_anchor[1]) / elapsed * 60.0, 1)
             self._rate_anchor = (now, item.step)
+            if self._samples >= _MIN_WINDOW_SAMPLES:  # else keep filling — see the constant
+                fields |= self._close_metric_window(item.goals)
         if self._gen is None:
             self._store.update(self._key, **fields)
         elif not self._store.update_if(self._key, self._gen, **fields):
             self._fenced = True
+
+    def _accumulate(self, metrics: dict[str, float]) -> None:
+        """Fold this emission's numbers into the open window's running mean."""
+        self._samples += bool(metrics)
+        for k, v in metrics.items():
+            if isinstance(v, (int, float)) and isfinite(v):
+                total, n = self._window.get(k, (0.0, 0))
+                self._window[k] = (total + v, n + 1)
+
+    def _close_metric_window(self, goals: dict[str, str]) -> dict[str, Any]:
+        """Movement per metric across windows, and how long each has gone the wrong way.
+
+        Records keep only the latest value of each metric, so "is the loss coming
+        down?" is unanswerable from a snapshot. A per-window delta plus a count of
+        consecutive wrong-way windows makes the trend a number a tool can check —
+        one bad window is noise, several in a row is a run worth looking at.
+
+        The delta compares window *means*, not the two samples that happened to land
+        on the boundaries. A per-step loss is noisy, and endpoint-to-endpoint on a
+        plateau is a coin flip per window — three in a row would then fire on ⅛ of
+        windows with nothing wrong, which on an hour-long run is several false
+        alarms. Averaging what the window actually saw costs a running sum, and
+        ``_MIN_WINDOW_SAMPLES`` is what makes the average worth having.
+
+        *goals* is the job's own :func:`~mini.progress.expect_metrics` declaration;
+        a metric with no goal (declared or guessed) records its movement but is
+        never counted as wrong-way — this layer reports, the job decides what
+        "wrong" means.
+        """
+        means = {k: total / n for k, (total, n) in self._window.items() if n}
+        self._window, self._samples = {}, 0
+        delta = {
+            k: round(v - anchor, 6) for k, v in means.items() if (anchor := self._metric_anchor.get(k)) is not None
+        }
+        self._metric_anchor = means
+        resolved = {k: goals.get(k) or _GUESSED_GOALS.get(k) for k in means}
+        wrong = {k for k, d in delta.items() if d and (resolved.get(k) == ("down" if d > 0 else "up"))}
+        self._wrong_way = {k: self._wrong_way.get(k, 0) + 1 for k in wrong}
+        # All written every window, empty included, so a run that recovers clears its flag.
+        return {
+            "metrics_delta": delta,
+            "metrics_wrong_way": dict(self._wrong_way),
+            "metric_goals": {k: g for k, g in resolved.items() if g},
+        }
 
     def get(self, /, block: bool = True, timeout: float | None = None) -> Any:
         del block, timeout
@@ -342,7 +419,7 @@ def execute_task(
     result_dir = store.result_dir(key)
     result_dir.mkdir(parents=True, exist_ok=True)
     watchdog, wd_fields = _arm_watchdog(watchdog_s, watchdog_grace_s, store, key, gen, commit, record)
-    sink = _MemoSink(store, key, gen, watchdog=watchdog)
+    sink = _MemoSink(store, key, gen)
     if artifacts is not None and gen is not None:
         artifacts = _FencedStore(artifacts, store, key, gen)
     # Record what we actually ran on (host/GPU/…) and when the worker truly began,
@@ -362,7 +439,9 @@ def execute_task(
             store_context(artifacts) if artifacts is not None else nullcontext(),
             producer_context(producer) if producer is not None else nullcontext(),
             resolved_refs_context(resolved),
-            progress_context(key, key, queue=sink, emission_interval=0.2),
+            progress_context(
+                key, key, queue=sink, emission_interval=0.2, on_progress=watchdog.poke if watchdog else None
+            ),
             watchdog if watchdog is not None else nullcontext(),
         ):
             for hook in reversed(hooks):

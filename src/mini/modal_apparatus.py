@@ -230,6 +230,34 @@ class ModalRecordStore(RecordStore):
             # can't take it, so fall through to the read-check-write path below.
         return super().write_if(key, record, gen)
 
+    def merge_if(self, key: str, fields: dict[str, Any], gen: str | None) -> bool:
+        """Gen-fenced merge in one read and one write, rather than the base's three.
+
+        The inherited version reads to check the fence, then calls ``merge``, which
+        reads *again* for something to merge onto. Locally that's free under the
+        store lock; here each step is a network round-trip, and this is the hottest
+        write in the system — every progress update from every worker lands through
+        it. One read serves both purposes.
+
+        The saved round-trip isn't the only gain: it also halves the gap between
+        checking the fence and acting on it (one write, not a read plus a write),
+        so a superseded worker has less room to land a merge it no longer owns.
+
+        Not atomic, and can't be made so here. ``put(skip_if_exists=)`` — the
+        primitive ``write_if`` uses — arbitrates who *creates* a key, not who
+        replaces a value; compare-and-swap on top of it means a lock, at 4+
+        round-trips on the hottest write in the system, and no per-key TTL to
+        release one a dead worker still holds. For progress fields the residual
+        race is cosmetic (the next update overwrites them); the terminal write is
+        the one that matters, and that's better handled on the read side — see
+        todo-eng.
+        """
+        cur = self._d.get(key)
+        if (cur or {}).get("gen") != gen:
+            return False
+        self._d[key] = (cur or {}) | fields
+        return True
+
 
 class ModalMemoStore(MemoStore):
     """A ``MemoStore`` whose records live in a ``modal.Dict`` and whose results
@@ -649,8 +677,12 @@ class ModalApparatus(Apparatus[ModalVolume]):
                 )
                 fc_ids[key] = (gen, fc.object_id)
         now = time.time()
+        # The role's task timeout rides on the record: it's what a projected
+        # finish time has to be judged against, and only the launching client
+        # knows it (see `_timeout_projection` in the CLI).
+        timeout_s = self.modal_fn_kwargs.get("timeout")
         for key, (gen, fc_id) in fc_ids.items():
-            store.update_if(key, gen, fc_id=fc_id, heartbeat_at=now)
+            store.update_if(key, gen, fc_id=fc_id, heartbeat_at=now, timeout_s=timeout_s)
         if app_id:  # record the app id so `mini cost` can attribute Modal billing to this run
             _record_app_id(store, app_id)
 

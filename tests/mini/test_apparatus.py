@@ -458,6 +458,43 @@ def test_modal_write_if_reclaims_reset_record():
     assert store.write_if("k", {"key": "k", "gen": "c"}, "a") is True  # supersede gen a
 
 
+class _CountingModalDict(_FakeModalDict):
+    """A fake Dict that records each round-trip, so a test can count them."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ops: list[str] = []
+
+    def get(self, key, default=None):
+        self.ops.append("get")
+        return super().get(key, default)
+
+    def __setitem__(self, key, value) -> None:
+        self.ops.append("set")
+        super().__setitem__(key, value)
+
+
+def test_modal_merge_if_costs_one_round_trip_each_way():
+    """Every progress update from every worker lands through ``merge_if``, and on
+    Modal each step of it is a network call. The inherited version reads to check
+    the fence and then reads again for something to merge onto — three round-trips
+    where one read serves both. A fenced-out merge writes nothing at all."""
+    from mini.modal_apparatus import ModalRecordStore
+
+    d = _CountingModalDict({"k": {"key": "k", "gen": "a", "state": "running"}})
+    store = ModalRecordStore(d)
+
+    d.ops.clear()
+    assert store.merge_if("k", {"step": 3}, "a") is True
+    assert d.ops == ["get", "set"]
+    assert store.read("k") == {"key": "k", "gen": "a", "state": "running", "step": 3}  # merged, not replaced
+
+    d.ops.clear()
+    assert store.merge_if("k", {"step": 4}, "b") is False  # superseded — this worker no longer owns the record
+    assert d.ops == ["get"]  # …and it costs one read to find out, with no write
+    assert (store.read("k") or {})["step"] == 3
+
+
 # ---------------------------------------------------------------------------
 # Modal liveness probe — reap_dead's _is_task_alive. A *settled* failure
 # (function timeout, terminated, init failure) must read dead, or a killed

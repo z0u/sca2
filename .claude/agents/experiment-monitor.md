@@ -24,18 +24,34 @@ budget**, then reports. Depth lives in
 
 ## Anomaly scan (every status pass)
 
-Runs misbehave while green: "no failures" is not "healthy". On each status
-read, compare observations against expectations, and report deviations as
-findings even when nothing has failed:
+Runs misbehave while green: "no failures" is not "healthy". `status --brief`
+does this comparison for you and puts the result in the attention list, each
+entry carrying a `cause`. Read the causes rather than re-deriving them:
 
-- Throughput: compare `steps_per_min` across tasks of the same fn. A task
-  under ~⅓ of the sibling median is an anomaly — name it, its
-  container/region, and what differs about its environment.
-- Duration: project each running task's finish time (remaining steps ÷ rate)
-  against its role timeout. A task projected to exceed its timeout will be
-  killed and lose its work — report that *before* it happens.
-- Metrics: where status carries metrics (e.g. loss), check the trend. One
-  cell flat or rising while its siblings fall is an anomaly.
+- Throughput: a task under ⅓ of its siblings' median `steps_per_min` reads
+  *N steps/min — under a third of the sibling median (M)*. Name it, its
+  container/region, and what differs about its environment. It compares cells
+  of the same fn, so check first that they're doing comparable work — a sweep
+  over model sizes will flag its big cells, and that's expected.
+- Duration: a task whose projected finish (remaining steps ÷ rate) lands past
+  its role timeout reads *projected Nm to finish, past its Mm timeout*. It
+  will be killed and lose its work — report that *before* it happens.
+- Metrics: a NaN/inf metric reads *diverged*; one that has run against its
+  own declared goal for several minutes reads *rising* or *falling* (a loss
+  climbing and an accuracy sliding are the same alarm). `metrics_delta` and
+  `metric_goals` on the task entry carry the per-window movement and the
+  direction, if you want the numbers.
+- The flags need data to work from: throughput comparison needs at least
+  three reporting siblings, the timeout projection needs a role `timeout=`,
+  and metric trends need the task to call `emit_metrics` — plus
+  `expect_metrics` for anything but a plainly-named loss, since an undeclared
+  metric is measured and never flagged. Trends also need ~4 windows before
+  they can fire, and a window needs both a minute and 20 samples — so a job
+  emitting a couple of times a minute takes far longer than four minutes to
+  reach a verdict, and shows no trend fields at all until it does. Where a
+  flag can't fire, fall back to reading
+  `steps_per_min` / `metrics` across the fan-out yourself, and say that you
+  did.
 - Verdict discipline: "healthy" means this scan came back clean, not merely
   that nothing failed. List anomalies in their own section of the report,
   with your best one-line hypothesis each; investigating beyond a hypothesis

@@ -21,6 +21,8 @@ Start with whichever question you're holding:
   leaves behind, and the mark-and-sweep that reclaims the CAS without ever collecting a
   live memo hit.
 - [Non-goals and recorded decisions](./decisions.md) — chunked datatrees, checkpoints,
-  `obstore`, the HF cache tier, and the open/deferred list with issue links.
+  `obstore`, the HF cache tier, why no hosted experiment tracker, why the code fingerprint
+  is ours rather than a library's, and the open/deferred list with issue links.
 - [Operational constraints](./operations.md) — the egress allow-list, Modal gRPC TLS,
-  and CORS/Range: environment facts that cause confusing failures when they're missing.
+  CORS/Range, which progress transport each execution path uses, and why containers are
+  left unpinned: environment facts that cause confusing failures when they're missing.
