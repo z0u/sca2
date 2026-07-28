@@ -5,13 +5,13 @@ This is the *consumer* half of the artifact-sharing demo. It does **not** extrac
 activations itself — it resolves the cache that ``docs/acts`` published by name
 from the project-scoped store, then computes a small interpretability summary
 (per-neuron mean activation, per layer). The reuse is the whole point: B reads
-A's bytes straight from the content-addressed store — no recompute, no shared
+the bytes from A straight from the content-addressed store — no recompute, no shared
 volume, across the experiment boundary.
 
     bin/mini run docs/acts/experiment.py  --watch    # produce the cache first
     bin/mini run docs/probe/experiment.py --watch    # then probe it
 
-The companion ``report.py`` reads this experiment's durable result, renders the
+The companion ``report.py`` reads the durable result of this experiment, renders the
 summary as a figure, and *publishes* the figure to a shareable URL — the report
 is where assets go out to the web, distinct from the durable store the step writes.
 """
@@ -34,7 +34,7 @@ def probe_activations(dataset: str) -> dict:
     if art is None:
         raise FileNotFoundError(f"no activation cache published for {dataset!r} — run docs/acts/experiment.py first")
 
-    # Pull the shared tree into this step's volume (a warm checkout); the bytes
+    # Pull the shared tree into the volume for this step (a warm checkout); the bytes
     # come from the project store, not from a recomputed prep.
     local = get(art, get_data_dir() / "acts-in")
     per_layer_means = {
@@ -46,7 +46,7 @@ def probe_activations(dataset: str) -> dict:
     asset = put(json.dumps(summary).encode(), name=f"{dataset}-neuron-means.json")
     return {
         "dataset": dataset,
-        "source_sha": art.sha256,  # proof we read A's exact bytes
+        "source_sha": art.sha256,  # proof we read the exact bytes from A
         "n_layers": len(per_layer_means),
         "summary": asset,
     }

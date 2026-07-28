@@ -31,7 +31,7 @@ with app.setup(hide_code=True):
     DOPESHEET = Path(__file__).parent / "dopesheet.csv"
 
     def load_results() -> tuple[list[dict], dict[str, np.ndarray]] | None:
-        """Resolve per-seed metrics and the best run's eval dump from the store, or None if unpublished."""
+        """Resolve per-seed metrics and the eval dump of the best run from the store, or None if unpublished."""
         store = project_store()
         metrics_art, best_art = store.get_ref(METRICS_REF), store.get_ref(BEST_EVAL_REF)
         if metrics_art is None or best_art is None:
@@ -49,8 +49,8 @@ def _():
     # Experiment 2.9.1 redux: deleting *red*, now in JAX
 
     This is a port of [ex-preppy](https://github.com/z0u/ex-preppy) experiment
-    2.9.1 (M1, autoencoders), run as an end-to-end test of this repo's
-    infrastructure before the M2 transformer experiments. It re-answers M1's
+    2.9.1 (M1, autoencoders), run as an end-to-end test of the infrastructure
+    in this repo before the M2 transformer experiments. It re-answers the M1
     question: if Sparse Concept Anchoring pins *red* to one latent axis during
     training, does zeroing that axis delete red, and only red?
 
@@ -66,8 +66,8 @@ def _():
     with probability 0.08 per draw.
 
     After training, we ablate (zero out) axis 0 and reconstruct every color,
-    then score the run by how tightly each color's post-ablation
-    reconstruction error tracks its HSV similarity to red. The score is R²,
+    then score the run by how tightly the post-ablation reconstruction error of
+    each color tracks its HSV similarity to red. The score is R²,
     which runs from 0 (no relationship) to 1 (a perfect linear fit): a value
     near 1 means the deletion was clean, with error scaling with redness and
     colors unlike red left untouched.
@@ -115,7 +115,7 @@ def _(loaded):
     {len(metrics)} runs completed. Scores range {min(scores):.2f}–{max(scores):.2f}
     (median {np.median(scores):.2f}): anchoring quality depends on the seed, as it did in
     the original. The best run is seed {best["seed"]} with score **{best["score"]:.3f}**, in
-    line with the original's best of 0.985 over 60 seeds.
+    line with the best of 0.985 over 60 seeds in the original.
     """)
     return best, best_eval, metrics
 
@@ -126,8 +126,8 @@ def _():
     ## The schedule
 
     Training uses a [dopesheet](./dopesheet.csv): a table of keyframes for
-    the regularizer weights and the learning rate, much like an animator's
-    keyframe track. `mini.temporal` interpolates between keyframes with a
+    the regularizer weights and the learning rate, much like a keyframe
+    track in animation. `mini.temporal` interpolates between keyframes with a
     minimum-jerk curve, which eases values in and out. Everything ramps to
     zero by step 1425, leaving the last 75 steps as pure reconstruction
     fine-tuning.
@@ -214,7 +214,7 @@ def _():
 
     For the best run, we ablate latent axis 0 and reconstruct the full 8×8×8
     RGB grid. If the anchored concept was fully contained in that axis, the
-    damage should be proportional to each color's similarity to red, and colors
+    damage should be proportional to the similarity of each color to red, and colors
     unlike red should be untouched.
     """)
     return
@@ -315,7 +315,7 @@ def _():
     mo.md(r"""
     ## Findings
 
-    The result reproduces M1's finding, but the point of this run was the
+    The result reproduces the M1 finding, but the point of this run was the
     plumbing: the same dopesheet driving a JAX training loop through
     `mini.temporal`; a 16-way `ctx.map` fan-out on Modal with memoized,
     resumable records; artifacts and refs flowing through the store to this
@@ -323,8 +323,8 @@ def _():
     single seed takes about ten seconds, and the runs are bit-identical
     between local CPU and Modal. So, the infrastructure seems to work.
 
-    Next: the M2 experiments proper, anchoring concepts in a small transformer's
-    residual stream on the color-mixing task (see the [README](../../README.md)).
+    Next: the M2 experiments proper, anchoring concepts in the residual stream
+    of a small transformer on the color-mixing task (see the [README](../../README.md)).
     """)
     return
 

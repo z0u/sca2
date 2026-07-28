@@ -17,7 +17,7 @@ with app.setup(hide_code=True):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    # Marimo puts the notebook's directory on sys.path, so the experiment
+    # Marimo puts the notebook directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import (
         ARRAYS_REF,
@@ -73,7 +73,7 @@ with app.setup(hide_code=True):
         return dict(zip(GRID_NAMES, plt.cm.viridis(stops), strict=True))
 
     def sw(name: str, grid: str) -> str:
-        """Inline swatch + name for any grid's palette (the classic `swatch` knows only the 27)."""
+        """Inline swatch + name for the palette of any grid (the classic `swatch` knows only the 27)."""
         rgb = PALETTES[grid].get(name)
         if rgb is None:
             return f"<code>{name}</code>"
@@ -90,11 +90,11 @@ with app.setup(hide_code=True):
         return np.array(list(PALETTES[grid].values()))
 
     def dist_matrix(grid: str, exs: list) -> np.ndarray:
-        """(N, V) distance from every vocabulary color to each example's true mix."""
+        """(N, V) distance from every vocabulary color to the true mix of each example."""
         return bl.distances(raw_rgb(grid), [ex.result for ex in exs])
 
     def exact_null(grid: str, evals: dict) -> float:
-        """Exact-match rate for a guesser that knows only the answer's neighborhood.
+        """Exact-match rate for a guesser that knows only the neighborhood of the answer.
 
         On a coarse grid this is well above zero, so held-out accuracy has to clear
         it before it shows the model can name the mix rather than only locate it.
@@ -117,7 +117,7 @@ def _():
     The hex form spells a color one channel at a time, so the geometry of color
     space is legible in the text.
 
-    In this experiment's language, each color is a single opaque token, and
+    In the language of this experiment, each color is a single opaque token, and
     every sentence is a mixing equation between named colors whose mix is also
     named. Nothing about the tokens says that colors live on a 3D grid, that
     `purple` sits midway between `red` and `blue`, or that colors are values at
@@ -164,7 +164,7 @@ def _():
     falls between grid cells are "open": they never appear in training, since
     there is no name to write on the right-hand side, and we use them only as
     probes of graded generalization. The corpus is {N_EXAMPLES:,} with lines
-    drawn at random. The model architecture is the d64-L4 nGPT cell from
+    drawn at random. The model architecture is the d64-L4 nGPT condition from
     ex-2.1.1, with {len(SEEDS)} seeds per grid.
 
     Here are a few lines from two of the corpora.
@@ -203,7 +203,7 @@ def _():
     (where a single answer exists).
 
     For all pairs (including open pairs), we also find the graded score as the
-    RGB distance from the model's highest-probability color to the true mix.
+    RGB distance from the highest-probability color of the model to the true mix.
     There are two reference distances per prompt to compare against: the *floor*
     (the distance from the true mix to the nearest vocabulary color, which is
     zero for closed pairs) and *chance* (the mean distance over the whole
@@ -229,7 +229,7 @@ def _():
     near the floor distance, well below chance; where it is low, guesses sit
     at or near chance.
 
-    **H4.** The embedding-to-RGB probe's R² and the low-dimensionality of the
+    **H4.** The R² of the embedding-to-RGB probe and the low-dimensionality of the
     embedding table (top-3 explained variance) rise with grid size, and a PCA of
     the embeddings shows the color cube where, and only where, held-out
     performance is good.
@@ -273,7 +273,7 @@ def _(evals, metrics):
         **Headline numbers.** Mean held-out accuracy by grid:
         {", ".join(f"`{g}` **{v:.2f}**" for g, v in _hold.items())}.
         On every grid but the smallest, that is far above what a model knowing
-        only the answer's neighborhood would score
+        only the neighborhood of the answer would score
         ({", ".join(f"`{g}` {v:.2f}" for g, v in _null.items())}), so the model
         does infer the geometry (except `v27`, which is discussed below). Misses are
         interesting: at `v4096` they land a mean distance of just
@@ -322,7 +322,7 @@ def _():
     mo.md(r"""
     ## Training
 
-    All twelve cells train stably. Each grid settles within the 100-epoch
+    All twelve conditions train stably. Each grid settles within the 100-epoch
     budget, `v4096` included, whose curve is flat over its last twenty epochs. So
     the results that follow reflect what this budget and schedule produce at
     convergence.
@@ -420,7 +420,7 @@ def _(arrays, evals, geom, metrics):
         """Held-out accuracy above the neighborhood null, in standard errors.
 
         Pooling seeds treats repeat runs on the same pairs as independent draws, so
-        this flatters the small grids; `v27`'s ten pairs are the binding limit.
+        this flatters the small grids; the ten pairs at `v27` are the binding limit.
         """
         null, n = exact_null(g, evals), len(evals[g]["named_holdout"]) * len(SEEDS)
         return (_acc(g, "named_holdout") - null) / ((null * (1 - null) / n) ** 0.5)
@@ -467,14 +467,14 @@ def _(arrays, evals, geom, metrics):
 
     Only three of those four numbers mean much. On a 27-color grid the true mix
     has just {_shell27:.1f} one-step neighbors on average, so a model that has
-    located the answer's neighborhood and picks within it scores
-    {_null27:.2f} without being able to name anything. `v27`'s
+    located the neighborhood of the answer and picks within it scores
+    {_null27:.2f} without being able to name anything. The `v27` score of
     {_acc("v27", "named_holdout"):.2f} sits {_z27:.1f} std above
     that, over ten distinct pairs, which is not a difference worth reading. The
     denser grids clear the same bar easily: {_z64:.0f} std at `v64`,
     {_z216:.0f} at `v216` and {_z4096:.0f} at `v4096`.
 
-    So `v27`'s score is not evidence on its own. It is tempting to read it as a
+    So the `v27` score is not evidence on its own. It is tempting to read it as a
     shift from the base language, where `named_holdout` sat at zero through
     every intervention ex-2.1.2 tried, but two of ten pairs on a grid this
     coarse cannot carry that. The case that the geometry is inferable from names
@@ -497,8 +497,8 @@ def _():
     mo.md(r"""
     ## Closeness
 
-    Let's switch to the graded view. For every prompt we take the model's
-    highest-probability color and measure its RGB distance to the true mix, and
+    Let's switch to the graded view. For every prompt we take the
+    highest-probability color from the model and measure its RGB distance to the true mix, and
     plot the cumulative distribution. For each distance x, the curve shows the
     fraction of prompts that landed within x of the answer.
     """)
@@ -512,11 +512,11 @@ def _(arrays, evals, metrics):
     @themed(
         name="distance-ecdf",
         alt_text="""
-            Two panels of cumulative distributions of the RGB distance from the model's
-            guessed color to the true mix, pooled over three seeds, one panel for
+            Two panels of cumulative distributions of the RGB distance from the guessed
+            color to the true mix, pooled over three seeds, one panel for
             held-out pairs and one for open pairs. One line per vocabulary grid. A dashed
             line shows the nearest-name floor on open pairs. Triangles under the x-axis
-            mark the prompt-blind constant baseline. Every grid's curve stays close to its
+            mark the prompt-blind constant baseline. The curve for every grid stays close to its
             floor and well to the left of the reference; v216 and v4096 rise to 1 within a
             fraction of the chance distance.
         """,
@@ -599,7 +599,7 @@ def _(arrays, evals, metrics):
     so they cluster centrally, and always answering the middle name scores
     {bl.blind_stats(dist_matrix("v27", evals["v27"]["open"]), blind_for("v27", evals))["dist"]:.2f}
     on `v27` open pairs where chance is {_mean("v27", "open", "chance_dist"):.2f}.
-    That much supports H3's picture.
+    That much supports the picture in H3.
 
     {_table}
 
@@ -608,8 +608,8 @@ def _(arrays, evals, metrics):
     grid points, so two names bracket it, often at the same distance. A model
     that has located the answer but picks between those two at random is the
     "2 nearest" column, and every grid sits behind it: `v27` guesses
-    {_mean("v27", "open", "guess_dist"):.3f} against that baseline's
-    {bl.k_nearest_stats(dist_matrix("v27", evals["v27"]["open"]), 2)["dist"]:.3f}.
+    {_mean("v27", "open", "guess_dist"):.3f} against
+    {bl.k_nearest_stats(dist_matrix("v27", evals["v27"]["open"]), 2)["dist"]:.3f} for that baseline.
     On the nearest-name rate the gap is wider, {_mean("v27", "open", "nearest_acc"):.2f}
     against {bl.k_nearest_stats(dist_matrix("v27", evals["v27"]["open"]), 2)["nearest"]:.2f}.
     So the guesses are near the true
@@ -629,17 +629,17 @@ def _():
     ## Embedding geometry
 
     The behavior suggests the model knows where the colors are in the cube.
-    Since colors are single tokens, everything the model knows about a color's
-    identity must live in that token's embedding. If the model inferred
+    Since colors are single tokens, everything the model knows about the identity
+    of a color must live in the embedding of that token. If the model inferred
     the hidden space, the embedding table should hold a color cube: some linear
     view of the 64-dimensional embeddings under which the tokens arrange
     themselves by their RGB values. A ridge probe from embeddings to RGB
     measures how true that is, and a PCA projection (principal component
     analysis, which finds the few directions along which the vectors vary most)
-    gives an unsupervised look at the table's dominant structure.
+    gives an unsupervised look at the dominant structure of the table.
 
     We'll look twice: first with PCA, which is unsupervised and so answers "what
-    is this table mostly doing?", then with the probe's own weights, which
+    is this table mostly doing?", then with the probe weights, which
     answer the narrower question.
     """)
     return
@@ -648,7 +648,7 @@ def _():
 @app.cell(hide_code=True)
 def _(arrays):
     def _geometry(g: str, s: int) -> dict:
-        """Where a grid's color tokens sit, read through a probe rather than through variance."""
+        """Where the color tokens of a grid sit, read through a probe rather than through variance."""
         emb, rgb = arrays[f"{g}-s{s}/embeddings"], VOCAB_RGB[g]
         centered = emb - emb.mean(0)
         # Leave-one-out, so no token helps place itself and there is no split to draw:
@@ -656,10 +656,10 @@ def _(arrays):
         # otherwise move the answer.
         pred = ridge_probe_loo(emb, rgb)
         ss_res = ((pred - rgb) ** 2).sum(0) / ((rgb - rgb.mean(0)) ** 2).sum(0)
-        # How much of the table's variation the probe's 3-d read-out subspace holds, against
+        # How much of the table variation the 3-d probe read-out subspace holds, against
         # the most any three directions could. PCA can only find the cube when this is near
         # 1, whatever the probe says. Descriptive rather than predictive — it asks where the
-        # full table's variance sits, so it uses the full fit.
+        # variance of the full table sits, so it uses the full fit.
         w, *_ = ridge_probe(emb, rgb, emb, rgb)
         q, _ = np.linalg.qr(w)
         top3 = (np.linalg.svd(centered, compute_uv=False)[:3] ** 2).sum()
@@ -682,7 +682,7 @@ def _(arrays):
     geometry = {(g, s): _geometry(g, s) for g in GRID_NAMES for s in SEEDS}
 
     def geom(g: str, key: str) -> float:
-        """One grid's geometry number, averaged over seeds."""
+        """The geometry number of one grid, averaged over seeds."""
         return float(np.mean([geometry[(g, s)][key] for s in SEEDS]))
 
     return geom, geometry
@@ -694,7 +694,7 @@ def _(arrays, metrics):
         name="embedding-pca",
         alt_text="""
             Four scatter panels, one per vocabulary grid, showing the first two
-            principal components of each grid's color-token embeddings, with every point
+            principal components of the color-token embeddings of each grid, with every point
             drawn in the color it names. v27 and v64 show loose clusters with only rough
             color grouping; v216 shows a clear gradient organized by hue; v4096 shows a
             smooth color wheel, with hues arranged around a disc and darker colors toward
@@ -703,7 +703,7 @@ def _(arrays, metrics):
         caption="""
             The embedding table, projected onto its own first two principal components
             (seed 0), with each token drawn in the color it names. Only `v4096` shows the
-            hue wheel we thought we might find. The percentage is how much of the table's
+            hue wheel we thought we might find. The percentage is how much of the table
             variance its leading *three* components hold — the most any three directions
             could — of which the panel draws the leading two.
         """,
@@ -752,7 +752,7 @@ def _(geom):
     How well do they agree in this case? If representing color is what the table
     mostly does, the probe should be reading close to the top-variance
     directions and the two should capture similar amounts. They don't, at least
-    not until the vocabulary gets large. The probe's directions hold
+    not until the vocabulary gets large. The probe directions hold
     {geom("v27", "share"):.0%} as much variance as the best three at `v27` and
     {geom("v64", "share"):.0%} at `v64`, then {geom("v216", "share"):.0%} at
     `v216` and {geom("v4096", "share"):.0%} at `v4096`. So it is only at the
@@ -763,7 +763,7 @@ def _(geom):
     64-dimensional embedding onto RGB, so we can use it to decode the color
     tokens. If the table holds a color cube, the decoded values should be
     similar to the source data. To keep this from being a statement about the
-    probe's memory rather than the model's geometry, every token is placed by a
+    memory of the probe rather than the geometry of the model, every token is placed by a
     probe fit on every *other* token in the vocabulary.
     """)
     return
@@ -775,7 +775,7 @@ def _(geom, geometry):
         name="embedding-probe-cube",
         alt_text="""
             Four hexagonal panels, one per vocabulary grid, showing where the probe places
-            each color token in the RGB cube, viewed down the cube's grey diagonal so hue
+            each color token in the RGB cube, viewed down the grey diagonal of the cube so hue
             runs around the panel and the six chromatic corners sit on the rim. Filled dots
             are where a token landed, open rings its true position, joined by a short stub.
             At v27 many dots sit well away from their rings; v64 is closer; v216 has dots
@@ -852,7 +852,7 @@ def _(geom, metrics):
     embedding variance is doing something else.
 
     [^folds]: Probes fit per-color with leave-one-out, which matters most at the
-    small grids. A single half/half split leaves `v27`'s probe fitting a 64→3
+    small grids. A single half/half split leaves the `v27` probe fitting a 64→3
     map from 13 points, and scores it {_cell_mean("v27", "emb_r2"):.2f} against
     {geom("v27", "r2"):.2f} here; `v4096` is unmoved either way
     ({_cell_mean("v4096", "emb_r2"):.2f} against {geom("v4096", "r2"):.2f}).
@@ -867,7 +867,7 @@ def _():
 
     The embeddings hold the geometry of individual colors; the last question is
     about the computation that combines them. At the pre-answer position (`=`),
-    does the residual stream already contain the mix's value before the answer
+    does the residual stream already contain the value of the mix before the answer
     is emitted? We'll check with probes fit at each depth on seen prompts and
     then apply them to held-out and open prompts.
     """)
@@ -880,13 +880,13 @@ def _(metrics):
         name="residual-probes",
         alt_text="""
             Four line panels, one per vocabulary grid, of ridge-probe R-squared for the
-            mix's RGB read from the residual stream at the pre-answer position, over
+            mix RGB read from the residual stream at the pre-answer position, over
             residual depth 0 to 4. Each panel has three lines: seen pairs (the probe fit
             set), held-out pairs, and open pairs.
         """,
         caption="""
-            Ridge probes from the pre-answer residual stream to the true mix's
-            RGB, one per depth (0 = embeddings, 4 = final layer), fit on half
+            Ridge probes from the pre-answer residual stream to the RGB of the
+            true mix, one per depth (0 = embeddings, 4 = final layer), fit on half
             the seen prompts (seed 0). Transfer to held-out and open prompts
             tells a genuine value-space computation apart from a probe that
             memorized its fit set.
@@ -919,13 +919,13 @@ def _(metrics):
     {_mid["v27"]:.2f} at `v27`, {_mid["v64"]:.2f} at `v64`, {_mid["v216"]:.2f}
     at `v216`, and {_mid["v4096"]:.2f} at `v4096` (seed 0), with most of the
     value present from depth 1 or 2 onward. This quite different from the base
-    language. There, ex-2.1.2 found that the answer's channels are computed just
+    language. There, ex-2.1.2 found that the answer channels are computed just
     in time and cleared away after emission (for hex answers), so a full
     "result" concept wasn't readable at any single position. But now with
     one-token answers there is no schedule to spread the work over, so the whole
     mix must be present at the pre-answer position.
 
-    Even `v27`'s held-out prompts probe at about 0.9 mid-stack while their
+    Even the `v27` held-out prompts probe at about 0.9 mid-stack while their
     exact-match accuracy is 0.2 to 0.3. The model computes roughly the right
     value, and then the readout picks a neighboring name.
 
@@ -966,7 +966,7 @@ def _(arrays, evals):
 @app.cell(hide_code=True)
 def _(completion_rows):
     _head = (
-        "<tr><th>a</th><th>b</th><th>true mix</th><th>model's guess</th>"
+        "<tr><th>a</th><th>b</th><th>true mix</th><th>model guess</th>"
         '<th class="num">distance</th><th class="num">floor</th></tr>'
     )
     _k = 5
@@ -1000,12 +1000,12 @@ def _(arrays, evals):
             _k += tuple(_gv) in (tuple(_ex.lhs), tuple(_ex.rhs))
 
     mo.md(rf"""
-    `v27`'s misses are neighbor names (`violet` guessed as `blue`, `maroon` as
-    `red`); `v216`'s open-pair guesses sit a step away from the floor; and
-    `v4096`'s worst held-out misses still agree with the true mix on two of the
-    three channels.
+    The `v27` misses are neighbor names (`violet` guessed as `blue`, `maroon` as
+    `red`); the `v216` open-pair guesses sit a step away from the floor; and
+    the worst held-out misses at `v4096` still agree with the true mix on two of
+    the three channels.
 
-    Several of `v27`'s rows return one of the operands, may or may not be an echo.
+    Several of the `v27` rows return one of the operands, may or may not be an echo.
     Returning an operand and returning a neighbor are close to the same thing here.
     {_k} of {_n} guesses are operands, against {_null:.0%} for a guess drawn
     uniformly from the neighbors.

@@ -18,7 +18,7 @@ with app.setup(hide_code=True):
     import numpy as np
     from matplotlib.legend_handler import HandlerTuple
 
-    # Marimo puts the notebook's directory on sys.path, so the experiment
+    # Marimo puts the notebook directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import (
         ARRAYS_REF,
@@ -42,9 +42,9 @@ with app.setup(hide_code=True):
     PALETTES = {g: ch.opaque_names(nc.GRIDS[g], NAME_SEED) for g in GRID_NAMES}
     VOCAB_RGB = {g: np.array(list(p.values()), dtype=np.float32) / (N_LEVELS - 1) for g, p in PALETTES.items()}
 
-    # The word-level sibling's published metrics, for rung-to-rung comparisons.
+    # The published metrics of the word-level sibling, for rung-to-rung comparisons.
     WORD_METRICS_REF = "reports/m2/ex-2.1.3/metrics"
-    # The base language's schedule probes (hex answers), for the eviction contrast.
+    # The base-language schedule probes (hex answers), for the eviction contrast.
     HEX_MARGINS_REF = "reports/m2/ex-2.1.2/margins"
 
     def load_results() -> tuple[dict, dict[str, np.ndarray], dict[str, dict]] | None:
@@ -70,7 +70,7 @@ with app.setup(hide_code=True):
         return metrics, arrays, evals
 
     def load_sibling(ref: str, kind: str = "json"):
-        """A sibling experiment's published artifact, or None if unavailable."""
+        """The published artifact of a sibling experiment, or None if unavailable."""
         store = project_store()
         art = store.get_ref(ref)
         if art is None:
@@ -92,14 +92,14 @@ with app.setup(hide_code=True):
         return dict(zip(GRID_NAMES, plt.cm.viridis(stops), strict=True))
 
     def sw(name: str, grid: str) -> str:
-        """Inline swatch + name for a grid's opaque names."""
+        """Inline swatch + name for the opaque names of a grid."""
         rgb = PALETTES[grid].get(name)
         if rgb is None:
             return f"<code>{name}</code>"
         return f'<span class="sw" style="--sw: {to_hex(rgb)};" aria-hidden="true"></span> <code>{name}</code>'
 
     def dists_for(grid: str, exs: list) -> np.ndarray:
-        """(N, V) distance from every vocabulary color to each example's true mix."""
+        """(N, V) distance from every vocabulary color to the true mix of each example."""
         result = np.array([ex.result for ex in exs], dtype=np.float32) / (N_LEVELS - 1)
         return np.linalg.norm(VOCAB_RGB[grid][None] - result[:, None], axis=2)
 
@@ -145,7 +145,7 @@ with app.setup(hide_code=True):
 
         See `sca.baselines` for why the operand rate needs a null at all: closure puts
         an operand one grid level from the mix wherever the operands differ, so on a
-        coarse grid it is usually a member of the mix's one-step shell by construction.
+        coarse grid it is usually a member of the one-step shell of the mix by construction.
         """
         exs = evals[grid]["named_holdout"]
         rgb = raw_rgb(grid)
@@ -210,7 +210,7 @@ def _():
     isn't a significant confound as long as training reaches a low loss.
 
     The model now has to recognize `tkzk` as one unit spread over four positions
-    and attach a value to it. It then has to start writing the mix's name before
+    and attach a value to it. It then has to start writing the name of the mix before
     any of it is in the context, and continue without losing track.
 
     A few lines from each corpus:
@@ -239,22 +239,22 @@ def _():
 
     - Greedy accuracy: decode five characters, taking the most likely at each
       step, and check them against the true name. We also record `p_malformed`:
-      how often the output is no color's name at all.
+      how often the output is not the name of any color.
     - Candidate accuracy: teacher-force every vocabulary name plus its closing
       newline and take the highest scorer. This sets spelling aside, and it
-      recovers the model's full distribution over well-formed answers.
+      recovers the full model distribution over well-formed answers.
     - Distribution distance: compare that answer distribution to soft targets
       built from color geometry — a softmax of negative RGB distance to the true
       mix at a temperature τ. A model that has learned the geometry should
       spread its uncertainty over colors near the true mix. This also works on
       open pairs, where no name is exactly right.
-    - Distances, as in ex-2.1.3: RGB distance from the model's chosen name (the
+    - Distances, as in ex-2.1.3: RGB distance from the name the model chose (the
       candidate argmax) to the true mix, set against the nearest-name floor and
       the vocabulary-mean chance.
     - Probes: per-depth ridge probes for operand and result RGB, fit on
       in-training lines and checked for transfer to held-out and open prompts;
       plus the answer-schedule probe from ex-2.1.2, which teacher-forces whole
-      equations and probes for the mix's three channels at every position around
+      equations and probes for the three channels of the mix at every position around
       the answer, at each depth.
     """)
     return
@@ -289,7 +289,7 @@ def _():
     compute one channel, write it, and drop it; whatever it knows about the mix
     has to stay put while the name is being spelled. Concretely, all three RGB
     channels stay decodable at late depth across the whole emission window, unlike
-    ex-2.1.2's per-channel stair-step. We also expect the mix to be largely
+    the ex-2.1.2 per-channel stair-step. We also expect the mix to be largely
     decodable at the pre-answer position, as at word level, though it may come
     together later in depth, since identifying the operands now takes layers of
     work that embeddings used to handle.
@@ -298,8 +298,8 @@ def _():
     divergence from the distance-softmax target to the candidate distribution,
     minimized over τ, sits far below the same divergence for a value-blind
     reference (uniform over names), and the best-fit τ is on the order of the grid
-    spacing. Less confidently, `v216`'s distribution should match the targets
-    better than `v27`'s, echoing the geometric trend of the word-level sweep.
+    spacing. Less confidently, the `v216` distribution should match the targets
+    better than the `v27` one, echoing the geometric trend of the word-level sweep.
     """)
     return
 
@@ -364,7 +364,7 @@ def _(metrics):
     )
     _caption = mo.md(
         f"""
-        Pair counts per grid. These match ex-2.1.3's by construction (same
+        Pair counts per grid. These match those of ex-2.1.3 by construction (same
         sampler, same seed); only the token count changes ({N_EXAMPLES:,} equations
         × 19 characters, against × 6 word-level tokens). At `v27` the two pair
         columns are the entire closed universe: 76 equations exist, and 27 of
@@ -381,7 +381,7 @@ def _():
     ## Training
 
     Both grids train smoothly under the same 100-epoch schedule as before. The
-    curves are not comparable to ex-2.1.3's: the vocabulary here is 30 characters
+    curves are not comparable to those of ex-2.1.3: the vocabulary here is 30 characters
     rather than hundreds of names, so chance loss is lower.
     """)
     return
@@ -399,7 +399,7 @@ def _(metrics):
         caption="""
             Validation loss per epoch, with three thin lines per grid, one per seed.
             This is per-token loss over characters, so it does not line up with the
-            word-level experiment's curves; what matters is that each curve converges.
+            curves of the word-level experiment; what matters is that each curve converges.
         """,
     )
     def _plot() -> plt.Figure:
@@ -425,7 +425,7 @@ def _():
 
     Greedy accuracy is the end-to-end score; candidate accuracy (the argmax
     over teacher-forced names) tells us how much of any gap is spelling rather
-    than knowledge. The dashed line over each group of bars is ex-2.1.3's
+    than knowledge. The dashed line over each group of bars is the ex-2.1.3
     word-level accuracy on the same pairs.
     """)
     return
@@ -442,18 +442,18 @@ def _(metrics):
             Two bar panels of exact-match accuracy (0 to 1) for grids v27 and v216,
             one panel for seen pairs and one for held-out pairs. Each grid shows a
             greedy bar and a candidate (argmax over teacher-forced names) bar in the
-            grid's color, with a dashed horizontal line over the group marking
-            ex-2.1.3's word-level accuracy on the same pairs. Bars are means over three
+            grid color, with a dashed horizontal line over the group marking the
+            ex-2.1.3 word-level accuracy on the same pairs. Bars are means over three
             seeds, dots the individual seeds. On seen pairs all bars are at 1.0. On
-            held-out pairs v27's bars sit at zero, below its word-level line at 0.27,
-            while v216's bars reach 0.91, just under its word-level line near 1.0.
+            held-out pairs the v27 bars sit at zero, below the word-level line at 0.27,
+            while the v216 bars reach 0.91, just under the word-level line near 1.0.
         """,
         caption="""
             Exact match by grid and eval set; bars are means over three seeds, dots the
             individual seeds. Greedy decoding writes freely, so spelling mistakes count
             as misses; candidate scoring picks the highest-probability vocabulary name
             and so cannot misspell. The dashed line over each group is the word-level
-            benchmark, ex-2.1.3's accuracy on the same pairs with one-token names.
+            benchmark, the ex-2.1.3 accuracy on the same pairs with one-token names.
         """,
     )
     def _plot() -> plt.Figure:
@@ -544,7 +544,7 @@ def _(arrays, evals, metrics):
     `v27` drops much more than H2 expected: zero on every seed (compared to 0.27
     for word-level tokens). And the model is confident about it: s₂ =
     {_s2_27:.2f} on those prompts (confidently wrong; `v216` reads
-    {_s2_216:.2f}, well calibrated), and the true answer's candidate NLL is ≈ 13
+    {_s2_216:.2f}, well calibrated), and the candidate NLL of the true answer is ≈ 13
     nats. The failure rows further down show that it expects nearby names —
     often one of the operands, though the section after them shows that is what
     the grid geometry predicts on its own.
@@ -558,7 +558,7 @@ def _():
     ## How close do the guesses land?
 
     The graded view, as in ex-2.1.3: for every prompt, the RGB distance from
-    the model's chosen name (the candidate argmax, so spelling plays no part)
+    the name the model chose (the candidate argmax, so spelling plays no part)
     to the true mix, drawn as a cumulative distribution.
     """)
     return
@@ -571,14 +571,14 @@ def _(arrays, evals):
     @themed(
         name="distance-ecdf",
         alt_text="""
-            Two panels of cumulative distributions of the RGB distance from the model's
-            chosen name to the true mix, pooled over three seeds, one panel for held-out
+            Two panels of cumulative distributions of the RGB distance from the chosen
+            name to the true mix, pooled over three seeds, one panel for held-out
             pairs and one for open pairs. One line per grid (v27, v216). Dashed lines
             show the nearest-name floor on open pairs. Under each axis a triangle marks
             the prompt-blind constant baseline.
         """,
         caption="""
-            Distance from the model's choice to the true mix, in unit-cube units, pooled
+            Distance from the chosen name to the true mix, in unit-cube units, pooled
             over seeds; a curve that climbs sooner (further left) is better. On held-out
             pairs the height at distance 0 is the candidate exact-match accuracy. On open
             pairs no name is exactly right, so the dashed line marks the best reachable
@@ -632,7 +632,7 @@ def _(arrays, evals, metrics):
     {_mean("v216", "open", "nearest_acc"):.0%} of the time.
 
     `v27` lands on the single nearest name {_mean("v27", "open", "nearest_acc"):.0%} of the time against
-    the constant's {blind_nearest("v27", "open", evals):.0%}, and
+    {blind_nearest("v27", "open", evals):.0%} for the constant, and
     {_shape["shell"]} of the {_shape["n"]} held-out guesses sit one grid step
     from the true mix (0.53), the rest at two steps. So the geometry did come
     through the tokenizer change on both grids, and what `v27` lost is the last
@@ -646,7 +646,7 @@ def _():
     mo.md(r"""
     ## Is the whole distribution shaped like the geometry?
 
-    Exact match and the distance metrics read the top of the model's answer
+    Exact match and the distance metrics read the top of the model answer
     distribution. To check the rest of the mass, we build a target distribution
     per prompt for each temperature τ: a softmax of negative RGB distance from
     every vocabulary name to the true mix. Then we measure the KL divergence
@@ -689,17 +689,17 @@ def _(arrays, evals):
         name="distance-kl",
         alt_text="""
             Two panels (held-out pairs, open pairs) of KL divergence from a
-            distance-shaped target distribution to the model's answer distribution,
+            distance-shaped target distribution to the model answer distribution,
             against the target temperature tau on a log axis. One solid line per grid
             (v27, v216); dashed lines show the same divergence to a uniform
             distribution, the value-blind reference.
         """,
         caption="""
-            How well does the model's answer distribution match distance-shaped
+            How well does the model answer distribution match distance-shaped
             targets? Solid lines: mean KL(q_τ ‖ model), pooled over seeds and prompts,
             where q_τ is a softmax of −distance/τ around the true mix. Dashed lines:
             KL(q_τ ‖ uniform), the score a value-blind guesser gets. A dip well below
-            the dashed line at moderate τ means the model's probability mass gathers
+            the dashed line at moderate τ means the model probability mass gathers
             near the true mix, spread over its neighbors rather than resting on one
             best guess.
         """,
@@ -731,8 +731,8 @@ def _():
 
     `v27` fits worse than uniform at every temperature, even though the distance
     curves above showed its guesses are close. `KL(q_τ ‖ p)` is very sensitive
-    to confident error, and this model's answer entropy is under 0.2 nats, so
-    whenever its chosen name is not the target's favorite, the divergence shoots
+    to confident error, and the answer entropy of this model is under 0.2 nats, so
+    whenever its chosen name is not the favorite of the target, the divergence shoots
     up. The metric shows whether the mass sits in geometrically sensible places
     and whether the confidence is appropriate. So H5 is confirmed on `v216`, but
     not on `v27`.
@@ -766,12 +766,12 @@ def _(metrics):
         name="residual-probes",
         alt_text="""
             Two line panels, one per grid (v27, v216), of ridge-probe R-squared for the
-            mix's RGB read from the pre-answer residual stream, against depth 0 to 4.
-            Lines show the probe's fit set (in-training lines) and its transfer to seen,
+            mix RGB read from the pre-answer residual stream, against depth 0 to 4.
+            Lines show the probe fit set (in-training lines) and its transfer to seen,
             held-out, and open prompts.
         """,
         caption="""
-            Ridge probes from the pre-answer residual stream to the true mix's RGB, per
+            Ridge probes from the pre-answer residual stream to the RGB of the true mix, per
             depth (0 is embeddings, 4 is the final block), fit on half the in-training
             probe lines (seed 0) and transferred to the eval sets.
         """,
@@ -841,20 +841,20 @@ def _(arrays, metrics):
         alt_text="""
             Line panels of probe R-squared against position around the answer (offsets −4
             to 3), read from the final residual layer, with one line per RGB channel drawn
-            in its own color. Left panels show this experiment's opaque names (v27, v216),
+            in its own color. Left panels show the opaque names of this experiment (v27, v216),
             where the three channel lines run together at every offset. The right panel, if
-            available, shows ex-2.1.2's hex answers, where the three separate into a
+            available, shows the ex-2.1.2 hex answers, where the three separate into a
             staircase, each channel high only around its own emission position.
         """,
         caption="""
             The answer-emission schedule at the final residual depth (seed 0). Each line is
-            R² for one RGB channel across offsets from the answer's first character; the
-            answer sits at offsets 0–3, and the prompt's last characters are the negative
+            R² for one RGB channel across offsets from the first character of the answer; the
+            answer sits at offsets 0–3, and the last characters of the prompt are the negative
             offsets. Lines are drawn as steps because each offset is a separate character
             position, with the value held across the position and ramping between; line
             width tapers R → G → B so an offset where all three agree reads as nested bands
-            rather than as whichever channel drew last. Hex answers (right, from ex-2.1.2's
-            base-grammar cells) spell one channel per digit, and the probe found each
+            rather than as whichever channel drew last. Hex answers (right, from the ex-2.1.2
+            base-grammar conditions) spell one channel per digit, and the probe found each
             channel computed just in time and dropped once emitted. Opaque names cannot be
             written that way, and H4 predicts all three channels stay decodable across the
             window.
@@ -862,7 +862,7 @@ def _(arrays, metrics):
     )
     def _plot() -> plt.Figure:
         # (title, r2, offsets, is_reference) — reference panels come from another
-        # experiment, and are set apart from this one's panels below.
+        # experiment, and are set apart from the panels of this one below.
         panels: list[tuple[str, np.ndarray, list[int], bool]] = []
         for g in GRID_NAMES:
             r2 = arrays[f"{g}-s0/schedule/r2"]  # (offsets, depth+1, 3)
@@ -870,7 +870,7 @@ def _(arrays, metrics):
         if _hex is not None and "control-s0/schedule/r2" in _hex:
             panels.append(("hex (ex-2.1.2)", _hex["control-s0/schedule/r2"][:, -1], list(range(-4, 4)), True))
 
-        # Color is data: each channel's line is drawn in that channel's own hue.
+        # Color is data: the line for each channel is drawn in the hue of that channel.
         cols = light_dark(["#d1495b", "#2a9d5c", "#3b6fd4"], ["#ff6b7d", "#4fd07a", "#6ea3ff"])
         # The finding at v27/v216 is that all three channels agree, so the lines coincide
         # almost exactly. Tapering the widths keeps every channel visible where they do.
@@ -937,7 +937,7 @@ def _():
     ## What the misses look like
 
     A few completions, picked as the widest misses, so worst cases rather than
-    typical ones. Swatches show each opaque name's actual color.
+    typical ones. Swatches show the actual color of each opaque name.
     """)
     return
 
@@ -974,7 +974,7 @@ def _(arrays, evals):
 @app.cell(hide_code=True)
 def _(completion_rows):
     _head = (
-        "<tr><th>a</th><th>b</th><th>true mix</th><th>model's choice</th>"
+        "<tr><th>a</th><th>b</th><th>true mix</th><th>model choice</th>"
         '<th class="num">distance</th><th class="num">floor</th></tr>'
     )
     _k = 5
@@ -1006,7 +1006,7 @@ def _(arrays, evals):
     The `v27` misses often return an operand ({_k} of {_n} predictions,
     {_k / _n:.0%}), which looks like an echo until you count the alternatives.
     Closure puts each operand one grid level from the mix, so a guesser that
-    picks uniformly from the mix's one-step shell already returns an operand
+    picks uniformly from the one-step shell of the mix already returns an operand
     {_null:.0%} of the time; against that reference the observed rate is about
     {(_k / _n - _null) / (_se / _n):.1f} standard errors away, on {_n}
     predictions. So there is no operand echo here, only a small vocabulary.
@@ -1030,10 +1030,10 @@ def _(arrays, evals):
     both operands and the true answer occur in training only as `a + a = a`.
     No amount of skill reaches that answer from this corpus.
 
-    The grading side is equally thin for v27. A guesser confined to the true mix's
-    one-step shell scores {_ev["shell_null"]:.2f} exact on these ten pairs, and
+    The grading side is equally thin for v27. A guesser confined to the one-step
+    shell of the true mix scores {_ev["shell_null"]:.2f} exact on these ten pairs, and
     always answering the center of the training answers scores
-    {_ev["blind_exact"]:.2f}, so Ex-2.1.3's word level 0.27 and this experiment's 0.00 both
+    {_ev["blind_exact"]:.2f}, so the word-level 0.27 of Ex-2.1.3 and the 0.00 of this experiment both
     sit inside the range a model with no naming ability produces.
 
     The same caution applies to the base language in Ex-2.1.1. That experiment measured `named_holdout` = 0, but named sub-grid is this same 27-color regime with a hex distraction on top.
@@ -1049,7 +1049,7 @@ def _(arrays, evals):
     - Without hex, all three channels stay decodable together
       from the pre-answer position through the last character, with a dip
       mid-name, so an anchored result direction at the pre-answer position would
-      not have to work around ex-2.1.2's compute-and-evict schedule.
+      not have to work around the ex-2.1.2 compute-and-evict schedule.
     """)
     return
 

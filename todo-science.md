@@ -98,6 +98,39 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   loops. Ride it along with the fold items above. #metrics #ex-2.1.5
   #representations
 
+- [ ] **Where does the bridge convert?** Ex-2.1.5's bridge cell answers unseen
+  `name + #hex` equations at 0.92 exact match, so a name's value reaches the hex
+  answer path, and yet ρ between the two single-form probes is 0 and their mix
+  decoders sit at the random-subspace angle. Both readings can hold if the model
+  routes by form and converts somewhere our matched-site measurement doesn't
+  look. The measurement that would say: collect activations on *cross* lines and
+  fit probes there, then ask (a) at which landmark a named operand's value first
+  becomes legible to the hex-form probe, and (b) whether the cross line's own
+  geometry is the named one, the hex one, or a third. Needs a probe suite of
+  cross lines in `prepare_corpus` and a third form in `eval_one`, so it is a
+  re-run rather than a report-side read.
+
+  Prediction to test (2026-07-27): the simple candidate is per-digit conversion
+  at emission time, not a hidden shared subspace. H2 showed hex never assembles
+  a pre-answer mix — it relays channels digit by digit — so there is no stable
+  hex mix representation for a bridge to align the named one with, and H5's
+  premise of two representations converging may never have had a target. Under
+  that account a cross line should read as named-form geometry upstream (the
+  operand's value on its closing space and across the `+`, per the delimiter
+  finding) and switch to hex's relay pattern at the answer, each channel legible
+  only at its own digit, with nothing new in between. Finding the mix assembled
+  at the cross line's pre-answer site in a third geometry would refute it and
+  point to a genuinely shared intermediate. #ex-2.1.5 #representations #[D2.1]
+
+- [ ] **How much bridging does it take, and does answering in both forms
+  matter?** Ex-2.1.5 set the cross-line weight to 12% before we knew what the
+  disjoint corpus would do, and that turns out to be enough to teach the
+  conversion and not enough to move any alignment measure. A weight sweep would
+  say whether those two thresholds are far apart. Worth pairing with a grammar
+  change: this corpus's cross lines always answer in hex, so keeping two decoders
+  is a perfectly good way to satisfy the task, and cross equations that answer in
+  *both* forms would remove that option. #ex-2.1.5 #task-grammar #[D2.1]
+
 - [ ] Probe all positions in a sample of sequences. So far we have only probed
   specific locations, e.g. last token of first operand; last token before answer.
   How do the other tokens compare? Visualize probe response as sublines; note that
@@ -222,6 +255,46 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   afford. #model-arch
 
 ## Findings & notes to carry forward
+
+- **A principal angle between probe subspaces needs a dimension-matched null
+  (ex-2.1.5, 2026-07-27).** The angle between two 3-dimensional row-spaces
+  shrinks as the space they sit in does, so any sweep over residual width will
+  see angles fall whatever the representations are doing. Ex-2.1.5's cross-form
+  mix decoders go 75° → 60° → 51° over d64 → d32 → d16, and two *random*
+  3-planes at those widths give 72° → 64° → 51°: the whole trend is the ambient
+  dimension. Two nulls are worth carrying. Random 3-planes are the cheap one. The
+  better one is a seed control — the same form's probe from a different seed,
+  which decodes the same quantity in an unrelated basis, so it matches the real
+  probes' conditioning as well as their dimension; here it tracks the random null
+  to within a few degrees at every width. Report raw angles only against one of
+  these. #metrics #ex-2.1.5 #representations
+
+- **Compression separates the two forms rather than merging them (ex-2.1.5,
+  2026-07-27).** Narrowing the residual stream from 64 to 32 to 16 leaves ρ at 0
+  and the angles at their null, so capacity pressure buys no sharing at these
+  scales. What it does instead is spend the remaining capacity unevenly: hex
+  held-out accuracy runs 1.00 / 1.00 / 0.72 while named runs 0.67 / 0.43 / 0.05,
+  and fitted precision σ coarsens 0.033 / 0.068 / 0.257. That asymmetry follows
+  from the snap-margin account — a hex answer's runner-up is a whole grid step
+  away, so a coarse read still lands on the right digit, while an irregular
+  140-name palette needs six times the resolution. So "which form survives
+  compression" is a property of the answer vocabulary's spacing, and a
+  capacity-pressure design that wants both forms to feel the squeeze equally has
+  to match their margins. #ex-2.1.5 #superposition #task-grammar
+
+- **Depth moves the mix earlier in the sequence, not earlier in the stream
+  (ex-2.1.5, 2026-07-27).** Doubling L4 → L8 at d64 leaves held-out named
+  accuracy (0.667 → 0.671) and σ (0.032 → 0.032) untouched, so depth buys no
+  resolution once the palette's spacing is the ceiling. It does buy about one
+  extra layer of mature mix (1.7 of 4 layers over R² 0.9 at L4, 2.3 of 8 at L8),
+  but as a fraction of the network the mature mix sits *later*, 42% → 29%: the
+  extra layers went in front of the computation, and the mix stayed against the
+  answer. Where depth shows up is the token axis — the named mix at the `=` sign
+  reads 0.58 at L4 against 0.77 at L8. At d16, where capacity rather than the
+  palette is the limit, depth does buy accuracy (0.047 → 0.164) and halves σ.
+  For anchor placement, the window holding a mature concept is one to two layers
+  at these depths and does not widen in proportion to the network. #ex-2.1.5
+  #representations #anchoring
 
 - **Named exact match is set by the palette's snap margin, not by how well the
   model represents colour (ex-2.1.5, 2026-07-26).** On an irregular palette the

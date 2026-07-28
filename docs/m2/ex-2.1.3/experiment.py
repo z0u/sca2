@@ -5,27 +5,27 @@ arithmetic), and ex-2.1.2 showed the value → name direction is the part that
 never engages. This experiment removes the crutch entirely: every color is a
 single opaque token, the only sentences are ``name + name = name`` equations,
 and nothing in the stream reveals that colors live on a 3D grid. Completing a
-*held-out* pair then requires inferring the latent geometry from the mixing
-table's co-occurrence statistics — tensor completion, in effect. The todo
-item's framing: can the model infer the color-space geometry, and when it
+*held-out* pair then requires inferring the latent geometry from the
+co-occurrence statistics of the mixing table — tensor completion, in effect.
+The framing from the todo item: can the model infer the color-space geometry, and when it
 guesses, is the guess *close*?
 
 We sweep the vocabulary size over level sub-grids of the 16-level RGB cube
 (`sca.data.named_colors.GRIDS`): 27, 64, 216, and 4096 colors. Small grids
 have few closed pairs (49 distinct at 27 colors) so the table is memorizable;
-the full grid's 8.4M pairs can only be covered ~1%, so the task is
+the 8.4M pairs of the full grid can only be covered ~1%, so the task is
 generalization or nothing. Per cell (grid × seed, the fixed d64-L4 architecture):
 
 - **Exact-match accuracy and answer NLL** on seen and held-out closed pairs
   (single-token answers, so cross-entropy over the vocabulary is exact).
-- **Distance metrics**: the RGB distance from the model's guessed color to the
+- **Distance metrics**: the RGB distance from the guessed color to the
   true mix — for held-out pairs and for *open* pairs whose mix has no name,
   where "close" is the only possible kind of correct. Baselines per prompt:
   the nearest-vocabulary floor and the vocabulary-mean (chance) distance.
 - **Geometry probes**: a ridge probe from the color-token embeddings to RGB
   (did the embedding table become a color cube?), the top-3 PCA explained
   variance of those embeddings, and per-layer probes from the pre-answer
-  residual stream to the mix's RGB (is the answer computed in value space?).
+  residual stream to the RGB of the mix (is the answer computed in value space?).
 
 Results inform the vocabulary design for the anchored D2.1.x experiments.
 
@@ -44,7 +44,7 @@ SEEDS = [0, 1, 2]
 PEAK_LR = 1e-2
 
 CORPUS_SEED = 0
-N_EXAMPLES = 100_000  # lines of 6 tokens ≈ the sibling experiments' token budget
+N_EXAMPLES = 100_000  # lines of 6 tokens ≈ the token budget of the sibling experiments
 HOLDOUT_FRAC = 0.2  # of distinct closed pairs
 N_EVAL = 256  # cap per eval set (small grids have fewer; we take what exists)
 
@@ -55,7 +55,7 @@ CKPT_REF = "reports/m2/ex-2.1.3/checkpoints"  # + f"/{label}"
 
 
 def prepare_corpus(grid: str, levels: tuple) -> dict:
-    """Sample and tokenize one grid's corpus; build its eval sets and stats."""
+    """Sample and tokenize the corpus of one grid; build its eval sets and stats."""
     import numpy as np
 
     from sca.compute.data_pipelines import save_data
@@ -169,7 +169,7 @@ def build_sweep(preps: list[dict]) -> list[tuple]:
 
 
 def train_one(config, grid: str, label: str) -> dict:
-    """Train one cell on its grid's corpus; checkpoint into the store."""
+    """Train one cell on the corpus of its grid; checkpoint into the store."""
     from sca.compute.training import train_model
     from mini.store import put
 
@@ -267,7 +267,7 @@ def eval_one(trained: dict, evals, grid: str) -> dict:
         probe_data[set_name] = (acts, result)
 
     # Value-space probes: ridge from the pre-answer residual stream (per depth)
-    # to the mix's RGB, fit on half of named_seen, scored on everything else.
+    # to the RGB of the mix, fit on half of named_seen, scored on everything else.
     x, y = probe_data["named_seen"]
     half = x.shape[1] // 2
     fitted = [ridge_probe(x[d, :half], y[:half], x[d, half:], y[half:]) for d in range(x.shape[0])]

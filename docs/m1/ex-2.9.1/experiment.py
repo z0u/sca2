@@ -1,9 +1,9 @@
 """
 Experiment 2.9.1 redux: delete *red* from a tiny color autoencoder — in JAX.
 
-A port of ex-preppy's experiment 2.9.1 ([repo](https://github.com/z0u/ex-preppy),
-`docs/m2-control/ex-2.9.1-redux.ipynb`), run as an end-to-end shakedown of this
-repo's infrastructure before the M2 transformer experiments. The science is M1's:
+A port of experiment 2.9.1 from ex-preppy ([repo](https://github.com/z0u/ex-preppy),
+`docs/m2-control/ex-2.9.1-redux.ipynb`), run as an end-to-end shakedown of the
+infrastructure in this repo before the M2 transformer experiments. The science is from M1:
 train an RGB autoencoder with Sparse Concept Anchoring so that *red* lands on
 latent axis 0, then zero that axis and check that the damage is confined to
 red-like colors.
@@ -13,8 +13,8 @@ unit-normalized 5D bottleneck — anchor (pull red-labeled samples to e₀),
 anti-anchor (repel everything from −e₀), separate (angular repulsion within a
 batch), and anti-subspace (repel everything from axis 0) — with the loss weights
 and LR driven per-step by the original dopesheet (`mini.temporal`, unchanged
-from ex-preppy). Then ablate axis 0 and score the run: the R² between each
-color's post-ablation reconstruction error and its HSV similarity to red. A high
+from ex-preppy). Then ablate axis 0 and score the run: the R² between the
+post-ablation reconstruction error of each color and its HSV similarity to red. A high
 score means the deletion was clean — errors land on red-like colors and nowhere
 else.
 
@@ -131,7 +131,7 @@ def train_one(seed: int, dopesheet_csv: str) -> dict:
 
 
 def publish_results(results: list[dict]) -> dict:
-    """Publish per-seed metrics and the best run's eval dump under stable names for the report."""
+    """Publish per-seed metrics and the eval dump of the best run under stable names for the report."""
     metrics = [{k: v for k, v in r.items() if k != "eval"} for r in results]
     best = max(results, key=lambda r: r["score"])
     set_ref(METRICS_REF, put(json.dumps(metrics, indent=2).encode(), name="ex-2.9.1-metrics.json"))

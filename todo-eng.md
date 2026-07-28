@@ -14,6 +14,32 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **"Cell" vs "condition" terminology split (2026-07-27).** Report prose now
+  says "condition" for one sweep item, reserving "cell" for visual elements
+  (heatmap/table cells). The `mini` library still says "cell" throughout
+  (`orchestration.py`, `__main__.py` monitor output, docstrings). Decide whether
+  to rename the library term to match — it touches CLI output and docs, so it's
+  a deliberate rename, not a sweep-through.
+
+- **Published sweeps are one tick away from a full re-run after an evidence-scheme
+  change (2026-07-27).** Widening what the fingerprint tracks re-stamps every
+  task's evidence, so the next `mini run` re-runs the whole DAG in place, even
+  though no experiment code moved. Adding a small step to ex-2.1.5 tripped this:
+  the deferred-import tracing from #58/#59 landed after the sweep, so the tick
+  re-ran `prepare_corpus` and would have re-trained all 24 cells. Cost is the
+  smaller half of the problem; the real one is that a re-trained sweep may not
+  reproduce the numbers a published report already quotes (determinism landed
+  after that run too), so the report and the store would silently disagree.
+  Nothing to fix in the mechanism itself — over-invalidation is the right bias —
+  but two things would help. A read-only `mini plan <exp>` that lists what a tick
+  *would* launch and why, so the choice to re-run is made before the launch and
+  not after; and something that records, per published ref, the evidence the run
+  was produced under, so "this report's numbers predate the current scheme" is a
+  fact the report can state rather than a thing you rediscover. The workaround
+  for now is what `docs/m2/ex-2.1.5/cross_eval.py` does: read the published
+  checkpoints from a standalone script and write results back under their own
+  ref, leaving the DAG alone.
+
 - **A settled state can land on a successor's attempt, and the reader then
   trusts it (2026-07-26).** `merge_if` on Modal is read-check-write with a
   one-round-trip window (`ModalRecordStore.merge_if`), so a superseded worker

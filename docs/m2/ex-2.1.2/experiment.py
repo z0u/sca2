@@ -1,6 +1,6 @@
 """Experiment 2.1.2: making composition necessary — corpus fixes for the named-holdout failure.
 
-Ex-2.1.1's baseline never solves ``named_holdout``: the named slice is
+The ex-2.1.1 baseline never solves ``named_holdout``: the named slice is
 memorizable, the alias dictionary is one-way, and hex answers factorize per
 channel, so nothing ever forces the model to compose. Its garden-path
 walkthrough showed the failure is *close*, though — on ``lime + black`` the
@@ -14,14 +14,14 @@ split fixed:
   readout that the one-way dictionary leaves untrained (the reversal-curse leg).
 - **open** — named operands whose mix is off-palette, answered in hex
   (``red + navy = #804``): make name + name prompts engage the arithmetic,
-  because the answer's *form* now depends on the mix's value (the lookup-table
+  because the *form* of the answer now depends on the value of the mix (the lookup-table
   leg).
 
 Each intervention carves its token share out of the (over-saturated) hex slice;
 everything else — example count, seeds, LR, architecture — is fixed. Per cell
 (condition × seed) we measure:
 
-- **Completion accuracy** on ex-2.1.1's four eval sets (identical splits) plus
+- **Completion accuracy** on the four ex-2.1.1 eval sets (identical splits) plus
   three new ones: seen and held-out *open* pairs, and reverse-alias prompts.
 - **Name margins**: teacher-forced log-probability of every palette name (and
   the relevant hex codes) as a complete answer to each named prompt. The margin
@@ -29,7 +29,7 @@ everything else — example count, seeds, LR, architecture — is fixed. Per cel
   measure; ex-2.1.1 could only sample it anecdotally.
 - **Calibration** (mean answer surprisal, entropy, and s₂) per eval set — the
   graded early-warning metric queued in the todo list.
-- **Probes**: ex-2.1.1's per-layer suite (comparability), a per-answer-position ×
+- **Probes**: the ex-2.1.1 per-layer suite (comparability), a per-answer-position ×
   per-channel schedule probe on hex answers (the stair-step hypothesis), and a
   result-color probe fit on open-pair prompts and transferred to the named eval
   sets ("computed but outvoted" vs "never computed").
@@ -91,7 +91,7 @@ def _corpus(cond: str) -> list:
 
 
 def prepare_corpus(cond: str, weights: dict) -> dict:
-    """Tokenize one condition's corpus onto the volume; *weights* keys the memo."""
+    """Tokenize the corpus of one condition onto the volume; *weights* keys the memo."""
     import numpy as np
 
     from sca.compute.data_pipelines import save_data
@@ -143,7 +143,7 @@ def prepare_eval_sets() -> dict:
     seen = {p for cond in CONDITIONS for ex in _corpus(cond) if (p := ex.pair) is not None}
     rng = np.random.default_rng(8)
     evals = {
-        "named_seen": colors.as_named(named_train, seed=1),  # ex-2.1.1's sets, verbatim
+        "named_seen": colors.as_named(named_train, seed=1),  # the ex-2.1.1 sets, verbatim
         "named_holdout": colors.as_named(named_holdout, seed=2),
         "hex_unseen": colors.sample_unseen("hex", N_EVAL, 3, seen),
         "cross_unseen": colors.sample_unseen("cross", N_EVAL, 4, seen),
@@ -152,7 +152,7 @@ def prepare_eval_sets() -> dict:
         "alias_rev": [colors.make_example("alias_rev", c, None, rng) for c in colors.PALETTE.values()],
     }
     probes = {
-        # Same recipe as ex-2.1.1's probe set, for comparable classic probes.
+        # Same recipe as the ex-2.1.1 probe set, for comparable classic probes.
         "probe": colors.sample_corpus(N_PROBE, 5, named_train, {"hex": 0.5, "named": 0.25, "cross": 0.25}),
         # Hex-only: fixed prompt/answer lengths for the schedule probe.
         "schedule": colors.sample_corpus(N_SCHEDULE, 6, [], {"hex": 1.0}),
@@ -167,7 +167,7 @@ def prepare_eval_sets() -> dict:
 
 
 def _make_config(seed: int):
-    """The d64-L4 config, identical to ex-2.1.1's cell."""
+    """The d64-L4 config, identical to the ex-2.1.1 cell."""
     from sca.config import (
         DataConfig,
         ModelConfig,
@@ -210,7 +210,7 @@ def build_sweep(meta) -> list[tuple]:
 
 
 def train_one(config, cond: str, label: str) -> dict:
-    """Train one cell on its condition's corpus; checkpoint into the store."""
+    """Train one cell on the corpus of its condition; checkpoint into the store."""
     from sca.compute.training import train_model
     from mini.store import put
 
@@ -256,12 +256,12 @@ def eval_one(trained: dict, evals, probes) -> dict:
     calibration = {name: answer_calibration(model, tokenizer, exs) for name, exs in eval_sets.items()}
 
     # Greedy completions of the held-out named prompts — precomputed here, where the
-    # model's already loaded, so the report reads them from metrics instead of pulling
+    # model is already loaded, so the report reads them from metrics instead of pulling
     # every checkpoint and re-decoding on each edit.
     holdout_completions = greedy_completions(model, tokenizer, [ex.prompt for ex in eval_sets["named_holdout"]], 12)
 
-    # Margins: score every palette name — plus the hex codes this set's true
-    # mixes render to — as a complete answer to each prompt.
+    # Margins: score every palette name — plus the hex codes the true mixes
+    # of this set render to — as a complete answer to each prompt.
     margins = {}
     for name in MARGIN_SETS:
         exs = eval_sets[name]

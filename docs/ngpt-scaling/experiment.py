@@ -3,10 +3,10 @@
 Our nGPT strips the published recipe down to scalar gains (in place of the
 per-channel eigen learning rates) and a residual step ``α`` *fixed* at
 ``1/n_layer`` rather than learned. The residual form we keep is the nGPT LERP
-toward the sub-module's *normalized* output,
+toward the *normalized* output of the sub-module,
 ``h ← normalize(h + α·(normalize(sublayer) − h))``: normalizing the target makes
 ``α`` a true interpolation fraction, so the per-layer rotation stays ~α and the
-stack's travel holds O(1) regardless of width.
+total travel across the stack holds O(1) regardless of width.
 
 The milestone leans on this transformer actually scaling — if we want to argue
 SCA carries to LLMs, the architecture has to hold up as it grows. So this experiment
@@ -92,7 +92,7 @@ def _make_config(n_embd: int, n_layer: int, batch_size: int = 16):
 
 
 def build_sweep(meta) -> list[tuple]:
-    """Derive the (config, label) cells from prep's tokenizer.
+    """Derive the (config, label) cells from the prep tokenizer.
 
     Runs every wake (cheap + deterministic), so the memo keys are stable: each
     cell re-runs only if its own config changes.

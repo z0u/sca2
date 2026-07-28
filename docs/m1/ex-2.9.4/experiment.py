@@ -21,20 +21,20 @@ during training (no ground-truth probes):
   transient and keep λ near zero when training is healthy — a live anchor
   weight late in training otherwise fights the label noise, dragging
   pinkish-labeled colors onto the axis.
-- λ is capped near the dopesheet's proven constant (anchor 0.15; the sheet
+- λ is capped near the proven dopesheet constant (anchor 0.15; the sheet
   held 0.1), so even a saturated controller cannot over-anchor much.
 
 The anti-subspace weight is not controlled: its raw value has a red-mass floor
-that a labeled-blind controller can't separate from leakage, and ex-2.9.3's
+that a labeled-blind controller can't separate from leakage, and the ex-2.9.3
 sweep shows simply holding its small late value (0.003) is enough. The LR and
 `separate` still come from the dopesheet.
 
 Conditions (32 seeds each, scored by the redirect intervention): {static,
-ctrl} × peak LR {0.10 hostile, 0.05 benign} with ex-2.9.2's fallback term; a
+ctrl} × peak LR {0.10 hostile, 0.05 benign} with the ex-2.9.2 fallback term; a
 coarse sensitivity grid at the hostile LR (anchor targets ×0.75 and ×1.5,
 gains ×0.5 and ×2); and a fallback-free pair {static, ctrl} at the hostile LR,
 because that's the config where catastrophic failures actually occur (5/160
-in ex-2.9.3's base arms). "static" is the original timed-anneal schedule at
+in the ex-2.9.3 base arms). "static" is the original timed-anneal schedule at
 that peak. The questions: does feedback prevent the catastrophes where they
 exist, what does it cost where they don't, and is it knife-edge in its own
 hyperparameters? The testbed (model, grids, loss terms, interventions) is
@@ -91,7 +91,7 @@ FALLBACK_WEIGHT = 0.05
 TAU_HI = np.array([0.20, 0.02])  # engage above this EMA level
 TAU_LO = np.array([0.10, 0.005])  # release below this level; hold in the deadband
 ETA = 0.005  # dual ascent rate; decay is 5× faster (see module docstring)
-CAPS = np.array([0.15, 0.05])  # λ ceilings, near the dopesheet's proven constants
+CAPS = np.array([0.15, 0.05])  # λ ceilings, near the proven dopesheet constants
 EMA_ALPHA = np.array([0.2, 0.02])  # anchor EMA updates only on labeled batches, so it's faster
 
 # Store refs the report reads (see report.py).
@@ -103,8 +103,8 @@ def train_one(seed: int, peak_lr: float, ctrl: bool, tau_scale: float, eta_scale
     """Train one run, static (timed anneal) or controlled (feedback duals), and score it.
 
     With ctrl=True the anchor and anti-anchor weights come from the hysteresis duals
-    (targets scaled by *tau_scale*, rates by *eta_scale*); the anti-subspace weight is the
-    dopesheet's, clamped to its step-750 value so it never anneals to zero. With ctrl=False
+    (targets scaled by *tau_scale*, rates by *eta_scale*); the anti-subspace weight comes from
+    the dopesheet, clamped to its step-750 value so it never anneals to zero. With ctrl=False
     all four weights follow the timed-anneal dopesheet and the scales are ignored.
     """
     sheet = Dopesheet.from_csv(io.StringIO(make_dopesheet(peak_lr, anneal=True)))
@@ -114,7 +114,7 @@ def train_one(seed: int, peak_lr: float, ctrl: bool, tau_scale: float, eta_scale
     w_sheet = np.stack([df[p].to_numpy(np.float32) for p in WEIGHT_PROPS], axis=1)
     if ctrl:
         w_sheet = w_sheet.copy()
-        w_sheet[:, 1:3] = 0.0  # anchor and anti-anchor are the duals' job
+        w_sheet[:, 1:3] = 0.0  # anchor and anti-anchor are the job of the duals
         w_sheet[:, 3] = np.maximum(w_sheet[:, 3], w_sheet[750, 3])  # hold anti-subspace, never anneal
     w_sheet = jnp.asarray(w_sheet)
     tau_hi = jnp.asarray(TAU_HI * tau_scale)
@@ -149,7 +149,7 @@ def train_one(seed: int, peak_lr: float, ctrl: bool, tau_scale: float, eta_scale
             (_, (recon, terms)), grads = jax.value_and_grad(loss_fn, has_aux=True)(params, x_train[idx], labels, w)
             updates, opt_state = opt.update(grads, opt_state, params)
             params = cast(Params, optax.apply_updates(params, updates))
-            if ctrl:  # dual updates from the controlled terms' EMAs (anchor updates only on labeled batches)
+            if ctrl:  # dual updates from the EMAs of the controlled terms (anchor updates only on labeled batches)
                 has_label = (jnp.sum(labels) > 0).astype(jnp.float32)
                 ema = ema + jnp.stack([has_label * alpha[0], alpha[1]]) * (terms[1:3] - ema)
                 rise, fall = jnp.maximum(ema - tau_hi, 0.0), jnp.maximum(tau_lo - ema, 0.0)
@@ -233,7 +233,7 @@ def main(ctx: Ctx) -> dict:
         ("static", 0.05, False, 1.0, 1.0, FALLBACK_WEIGHT),
         ("ctrl", 0.10, True, 1.0, 1.0, FALLBACK_WEIGHT),
         ("ctrl", 0.05, True, 1.0, 1.0, FALLBACK_WEIGHT),
-        # Sensitivity at the troublesome LR: are the controller's own params twitchy?
+        # Sensitivity at the troublesome LR: are the controller params twitchy?
         ("ctrl-tau0.75", 0.10, True, 0.75, 1.0, FALLBACK_WEIGHT),
         ("ctrl-tau1.5", 0.10, True, 1.5, 1.0, FALLBACK_WEIGHT),
         ("ctrl-eta0.5", 0.10, True, 1.0, 0.5, FALLBACK_WEIGHT),

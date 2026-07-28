@@ -5,14 +5,14 @@ the color-space geometry from co-occurrence alone — but every color was a
 single token, so a name *was* an embedding row and the answer had one fixed
 home position. This experiment keeps the language identical (same pairs, same
 splits, same operand orders, same equation count) and changes only the
-tokenizer's view: every color is now an opaque fixed-length letter string
+tokenizer view: every color is now an opaque fixed-length letter string
 (`sca.data.char_names`), read and written one character at a time::
 
     tkzk + qwfd = hjnp
 
 Two questions. First, is one-token-per-concept load-bearing for geometry
 inference, or does the value subspace survive when name → value binding must
-be assembled across characters? Second, does ex-2.1.2's answer schedule —
+be assembled across characters? Second, does the ex-2.1.2 answer schedule —
 just-in-time computation with eviction — return with multi-token answers?
 There it *could* evict: hex digit k is channel k, so an emitted channel is
 done. Here no character maps to a channel; the whole mix must stay live until
@@ -24,7 +24,7 @@ spot), three seeds each, on the fixed d64-L4 architecture. Per cell:
 
 - **Exact match** two ways: greedy decode (with well-formedness accounting)
   and argmax over teacher-forced candidate names — plus the full candidate
-  log-probability matrix, saved so the report can compare the model's answer
+  log-probability matrix, saved so the report can compare the model answer
   distribution against *distance-shaped* targets (not just the one-hot truth).
 - **Distance metrics** mirroring ex-2.1.3: guess vs nearest-name floor vs
   chance, on held-out and open pairs.
@@ -63,7 +63,7 @@ CKPT_REF = "reports/m2/ex-2.1.4/checkpoints"  # + f"/{label}"
 
 
 def prepare_corpus(grid: str, levels: tuple) -> dict:
-    """Re-render one grid's ex-2.1.3 corpus at char level; build eval + probe sets."""
+    """Re-render the ex-2.1.3 corpus of one grid at char level; build eval + probe sets."""
     import numpy as np
 
     from sca.compute.data_pipelines import save_data
@@ -168,7 +168,7 @@ def build_sweep(preps: list[dict]) -> list[tuple]:
 
 
 def train_one(config, grid: str, label: str) -> dict:
-    """Train one cell on its grid's corpus; checkpoint into the store."""
+    """Train one cell on the corpus of its grid; checkpoint into the store."""
     from sca.compute.training import train_model
     from mini.store import put
 
@@ -223,8 +223,8 @@ def eval_one(trained: dict, evals, grid: str, levels: tuple) -> dict:
         got = greedy_completions(model, tokenizer, prompts, ch.NAME_LEN + 1)
         well = np.array([g in palette for g in got])
         # Candidate scoring: log P(name + "\n") for every vocabulary name. The
-        # argmax is the model's best *well-formed* answer; the full matrix is
-        # saved for the report's distribution-vs-distance analysis.
+        # argmax is the best *well-formed* answer of the model; the full matrix is
+        # saved for the distribution-vs-distance analysis in the report.
         lp = candidate_logprobs(model, tokenizer, prompts, names_list)
         cand_guess = lp.argmax(axis=1)
         p = np.exp(lp)

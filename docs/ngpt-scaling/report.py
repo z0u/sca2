@@ -68,13 +68,13 @@ def _():
     at a range of sizes and checks that none of them misbehave.
 
     The model is a simplified version of *nGPT*. The idea behind nGPT is to keep
-    the model's running state (the *residual stream*, the vector that each layer
+    the running state of the model (the *residual stream*, the vector that each layer
     reads from and writes back to) on the surface of a hypersphere, by normalizing
     it after every step. We keep that residual update,
     `h ← Norm(h + α·(Norm(sub(h)) − h))`, which moves the state `h` a fraction `α`
-    of the way toward a sub-module's normalized output and then renormalizes. We
+    of the way toward the normalized output of a sub-module and then renormalizes. We
     simplify two pieces of it. Each sub-module gets a single learned *gain* (one
-    number that scales its output) in place of nGPT's per-channel *eigen learning
+    number that scales its output) in place of the nGPT per-channel *eigen learning
     rates*, and the residual step `α` is fixed at 1/n_layer instead of being learned,
     which is about where the learned version settled anyway.
 
@@ -115,14 +115,14 @@ def _(loaded):
     mo.md(
         f"""
     **The architecture scales cleanly.** We score each run by its converged loss: the
-    model's average error at predicting the next character once training has
+    average model error at predicting the next character once training has
     settled, measured in *nats per character* (natural-log units, where lower is
     better). That loss never rises as we add layers. At each width, the three
     depths land within {depth_spread:.02f} nats/char of one another, well inside
     the ±0.08 of noise we see between epochs, so the depth axis is flat. Width
     behaves the way added capacity should: loss falls monotonically from
     {plateau(curves, 32, 4):.2f} at width 32 to {plateau(curves, 128, 12):.2f} at
-    width 128 with 12 layers. No cell spikes or stalls, and the same learning rate
+    width 128 with 12 layers. No condition spikes or stalls, and the same learning rate
     (10⁻²) works everywhere. So fixing the residual step to a scalar constant seems
     to be enough.
     """
@@ -225,7 +225,7 @@ def _(curves):
     ## Findings
 
     Across the whole grid, the simplified nGPT trains flat across depth and keeps
-    improving with width, and no cell destabilizes ({_best:.2f} nats/char at the
+    improving with width, and no condition destabilizes ({_best:.2f} nats/char at the
     deepest, widest corner). That is what we were hoping for. The architecture that SCA
     will anchor concepts in scales without a depth penalty, so if a later
     experiment runs into trouble, the simplified architecture is unlikely to be the
