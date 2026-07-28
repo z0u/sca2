@@ -2108,23 +2108,38 @@ def _(arrays, precision):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ## Discussion
+    ## Findings
 
-    /// admonition | TODO
-    Verdict table for H1–H6 (supported / partial / unsupported), with a
-    pointer to the figure/analysis section that decides each.
-    ///
+    Both sublanguages train, each builds its own linear color geometry, and the
+    two geometries stay separate under every condition tested.
 
-    /// admonition | TODO
-    What the outcome suggests for anchoring across surface forms: if
-    alignment requires a bridge or compression, anchored runs on a
-    mixed-vocabulary corpus need their labels to touch both forms (or need
-    the bridge); if alignment is free, one form's labels may suffice. Especially
-    for these suggestions, the verdicts above should be read with wide error
-    bars: we're working with one synthetic task, small models, and there are
-    many variables we haven't tested. The outcomes inform the design of the
-    anchored runs; they don't settle the general question.
-    ///
+    - **H1.** Supported: top-1 exact match on held-out equations was 0.996 for
+      hex and 0.667 for named, clearing the 0.5 nearest-neighbor null.
+    - **H2.** Supported: the named mix decodes at $R^2 = 0.94$ pre-answer; hex
+      assembles just-in-time with no pre-answer mix.
+    - **H3.** Supported: $\rho$ is zero everywhere it's defined, and the
+      cross-form principal angles match a random pair of subspaces.
+    - **H4.** Not supported: narrowing the stream never aligns the forms — it
+      wears the named form down instead.
+    - **H5.** Not supported: the bridge supervision works, yet $\rho$ stays
+      zero.
+    - **H6.** Mixed: depth helps at d16 and does nothing at d64; the
+      crystallization clause depends on whether you count layers or network
+      fraction.
+
+    The separation is resilient: even where narrowing the stream costs the named
+    form roughly an eightfold loss of color resolution, the model keeps the two
+    geometries apart, so maintaining separate representations apparently costs
+    it less than merging them would. Perhaps we would see something different at
+    greater depths.
+
+    The named ceiling is a property of the palette rather than the model: misses
+    land on the mix's immediate neighbors, and a single fitted read-noise
+    parameter reproduces the accuracy across conditions.
+
+    And the forms seem to compute in different places: named assembles its mix
+    before the answer while hex emits digits just-in-time. So the separation is
+    positional as well as directional.
     """)
     return
 
