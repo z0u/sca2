@@ -14,31 +14,60 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- **Ex-2.1.5 export time: what's left after the snap-baseline fix (2026-07-28).**
-  A warm export of `docs/m2/ex-2.1.5/report.py` went 67s → 39s once
-  `baselines.precision_limited_acc` stopped materializing the (N, V, 3)
-  difference per draw. The remaining time is not in the setup cell (imports are
-  ~1.7s); per-cell timing puts ~73% of it inside `mini.vis.themed`. Two threads
-  worth pulling, both measured rather than guessed:
+- **`./go site` downloads every report's assets and throws them away
+  (2026-07-28).** The CI Pages build takes ~45s for 10 reports, of which only
+  ~3s is CPU — it is almost entirely network wait, and it grows linearly with
+  the report count. Two causes, both in the externalize path:
 
-  - `random_angle_null(width)` in the report costs ~10s across 37 calls, each
-    redrawing a 2000-sample null for one of only *three* distinct widths (64,
-    32, 16) — and calls that sit inside a `@themed` plot function pay it twice,
-    once per theme. Two options: memoize by width (biggest win, and it makes the
-    reported null a property of the width rather than of call order, but it
-    shifts published digits by roughly the null's standard error), or batch the
-    QR/SVD over the 2000 draws — `np.linalg.qr` is stacked-aware, and drawing one
-    `(n, 2, width, 3)` block preserves the current a/b interleave, so the numbers
-    stay put. Batching alone measured ~4× on the null.
-  - `@themed` renders every figure twice (light + dark), so all figure-building
-    work — including whatever the plot function computes inline — is paid twice.
-    18 `savefig` calls account for ~23s of the profile, about 9s of that in
-    constrained layout. Worth considering whether the plot function's *data* can
-    be hoisted out of the theme loop, so only the drawing repeats.
+  - `HFStore._fetch_export_from_repo` does `snapshot_download(allow_patterns=
+    "exports/<key>/*")`, pulling the whole bundle. But externalize mode reads
+    *only* `index.html` and inserts a `<base>` pointing at the CDN — the
+    `_assets/` bytes are never copied into `_site`. ex-2.1.5 is 3.2 MB of which
+    2.6 MB is discarded PNGs; across all reports it's 4.4 MB fetched to use
+    ~1.5 MB, and 130-odd file downloads where 10 would do. Wants an
+    `index.html`-only read path (`hf_hub_download` on the one file), with the
+    existing `file_exists` probe folded into catching `EntryNotFoundError` —
+    that's a second round trip per report bought for nothing.
+  - `build_site.build_reports` loops over reports sequentially. They're
+    independent, so a `ThreadPoolExecutor` over the fetch turns 10 serial waits
+    into one wave; collect and print in notebook order so the log stays stable.
+
+  Together this should take the build to a few seconds and make it scale with
+  the slowest single fetch rather than the sum. Note the *report export* is a
+  separate matter — `./go publish` runs the notebook locally, and CI never does.
+
+- **Ex-2.1.5 export time: what's left (2026-07-28).** Two fixes landed —
+  `baselines.precision_limited_acc` now finds the nearest candidate with a
+  matmul, and `geometry.principal_angles` batches over leading dimensions so
+  the report's 2000-sample null is one pair of LAPACK calls. Both are
+  bit-identical, verified. Interleaved A/B on the same machine: ~85s → ~46s.
+
+  What's left is matplotlib, and it's structural. `@themed` renders each figure
+  twice, and `base.mplstyle` sets `figure.constrained_layout.use: True`, so
+  every save solves a layout: 9.4s across the 18 saves, with ~13s in
+  `get_tightbbox` overall. Measured on a synthetic multi-panel figure, the
+  layout engine costs *about as much as drawing the figure again*, and it
+  scales with **panel count, not data volume** — +0.05s per panel (0.05s at 1
+  panel, 0.56s at 12, 1.23s at 24), and flat from 200 to 20,000 points per
+  panel. It has to measure the rendered extent of every tick label, axis label
+  and title to allocate margins, then iterate the solve; our figures are
+  12-panel grids, so we pay it 12 times over.
+
+  Two things to try, in order of bluntness:
+  - `themed_figure_html` passes `bbox_inches="tight"` *on top of* constrained
+    layout, which makes `print_figure` draw the figure a second time to measure
+    the crop (the profile shows 36 `figure.draw` for 18 saves). Measured ~20%
+    off a save with no visible change in what constrained layout already
+    produced — the two are solving nearly the same problem.
+  - Beyond that it's the engine itself, and the honest options are fewer panels
+    per figure or a fixed layout for the grid-shaped figures that don't need
+    solving. Both change margins, so eyeball across a few reports rather than
+    swapping blind.
 
   Reproduce with: `python -m cProfile -o p.prof` around a `MINI_EXPORTING=1`
   `runpy` of the notebook, or monkeypatch `DefaultExecutor.execute_cell` for
-  per-cell times.
+  per-cell times. Beware absolute timings across container restarts — the box
+  this was measured on drifted ~25% between sessions, so A/B interleaved.
 
 - **"Cell" vs "condition" terminology split (2026-07-27).** Report prose now
   says "condition" for one sweep item, reserving "cell" for visual elements
