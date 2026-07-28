@@ -186,17 +186,23 @@ def transfer_maps(
 
 
 def principal_angles(
-    wa: Float[np.ndarray, "C K"],
-    wb: Float[np.ndarray, "C K"],
-) -> np.ndarray:
+    wa: Float[np.ndarray, "*B C K"],
+    wb: Float[np.ndarray, "*B C K"],
+) -> Float[np.ndarray, "*B K"]:
     """The K principal angles (degrees) between two probes' weight column spaces, ascending.
 
     The first is the smallest — the closest the two subspaces come — so it bounds how much
     they could share. 0° = a direction of the stream both decoders use; 90° = orthogonal.
+
+    Any leading batch dimensions are carried through: `qr` and `svd` are both
+    stacked-aware, so a (…, C, K) pair is one LAPACK call per routine rather than one
+    per subspace pair. A Python loop over slices gives bit-identical results — the
+    batch form is the same arithmetic, just handed over in bulk — so callers with many
+    pairs (a null distribution, a layer × landmark map) should pass the stack.
     """
     qa, _ = np.linalg.qr(wa)
     qb, _ = np.linalg.qr(wb)
-    s = np.linalg.svd(qa.T @ qb, compute_uv=False)
+    s = np.linalg.svd(qa.mT @ qb, compute_uv=False)
     return np.degrees(np.arccos(np.clip(s, -1.0, 1.0)))
 
 
@@ -205,11 +211,7 @@ def principal_angle_maps(
     wb: Float[np.ndarray, "L1 M C K"],
 ) -> Float[np.ndarray, "L1 M K"]:
     """`principal_angles` at every (layer, landmark) — the two probes compared in place."""
-    angles = np.empty(wa.shape[:2] + (wa.shape[3],))
-    for d in range(wa.shape[0]):
-        for m in range(wa.shape[1]):
-            angles[d, m] = principal_angles(wa[d, m], wb[d, m])
-    return angles
+    return principal_angles(wa, wb)
 
 
 def rho(

@@ -1201,9 +1201,16 @@ def _(arrays, maps):
         return float(gm.principal_angles(_wa, _wb)[0])
 
     def random_angle_null(width: int, n: int = 2000) -> tuple[float, float]:
-        """Mean and spread of the first angle between two random 3-planes in R^width."""
-        _a = [_first(_rng.normal(size=(width, 3)), _rng.normal(size=(width, 3))) for _ in range(n)]
-        return float(np.mean(_a)), float(np.std(_a))
+        """Mean and spread of the first angle between two random 3-planes in R^width.
+
+        Drawn as one (n, 2, width, 3) block and reduced in a single batched call.
+        The block interleaves the two planes exactly as a pair-at-a-time loop would,
+        and `principal_angles` batches without changing the arithmetic, so this
+        reports the same numbers as the loop it replaces.
+        """
+        _pairs = _rng.normal(size=(n, 2, width, 3))
+        _a = gm.principal_angles(_pairs[:, 0], _pairs[:, 1])[:, 0]
+        return float(_a.mean()), float(_a.std())
 
     def angles_at(arm: str, target: str = "mix") -> dict[str, float]:
         """Cross-form first angle at the clean pre-answer site, with both nulls.
