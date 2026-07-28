@@ -95,15 +95,6 @@ def _():
     bridge, and replaces the coarse named sub-grid with 140 real color names
     spread through the full 8-bit cube.
 
-    /// note | How to read this draft
-    This report was preregistered (drafted before the experiment ran).
-    Admonitions marked TODO are placeholders: each states what its figure or
-    table should show and the pattern we expect. As results land, placeholders are
-    replaced with observations. The hypotheses section is frozen except for
-    immaterial changes; any analysis invented after seeing data goes under
-    "Exploratory analyses" and is marked as post hoc.
-    ///
-
     [M1/Ex-1.7]: https://z0u.github.io/ex-preppy/m1-color-mlp/ex-1.7-sparse-labels.html#Labelling
     """)
     return
