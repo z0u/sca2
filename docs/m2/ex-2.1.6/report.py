@@ -103,14 +103,20 @@ def _():
     truth for *where* the concept should condense unambiguous (the either-slot
     labeling scheme is queued as a follow-up).
 
-    Labels are drawn **once, at corpus build**, and are properties of lines
-    thereafter — the labeled-internet-text analogue. (M1 redrew labels per
-    visit; this is a deliberate departure, noted so the comparison is honest.)
-    Expected yield is ≈ 0.1 % of lines, ≈ 100 labeled lines. Batches are
-    **label-balanced** (issue #10): each batch of 64 holds 4 labeled lines by
-    oversampling, and the anchor term normalizes by the labeled count (M1's
-    label-affinity-weighted mean), so the term's gradient variance does not
-    inherit the label sparsity.
+    Labels are drawn **per visit**, as in M1, so a color's expected pull is
+    proportional to its label affinity — which is where H2's graded response
+    is predicted to come from. Under a plain Bernoulli draw ≈ 0.1 % of lines
+    would be labeled and ~93 % of batches would carry none, so batches are
+    **label-balanced** (issue #10): each batch of 64 includes 4 lines drawn
+    with probability proportional to their label affinity and treated as
+    labeled, with the anchor term normalized by the labeled count (M1's
+    label-affinity-weighted mean). That reproduces the Bernoulli expectation
+    with the per-batch count fixed, so the term's gradient variance does not
+    inherit the label sparsity. (The realism variant — labels drawn once at
+    corpus build, a property of lines like labeled internet text — is queued
+    beside either-slot labeling: both replace expected pull with what the
+    model infers from sparse fixed evidence, and both deserve a run where the
+    baseline mechanism is already understood.)
 
     ### Model and anchor term
 
@@ -155,7 +161,11 @@ def _():
       mean. The headline statistic is the layer-mean contrast at op1's
       position, $A = \tfrac{1}{L+1}\sum_\ell C(\ell, \text{op1})$ — the mean
       over anchored sites, chosen because the anchor applies to all of them
-      equally (no site selection).
+      equally (no site selection). The min and max over layers are reported
+      beside it as unscored diagnostics: a wide min–max gap localizes which
+      depths resist the anchor (the last layer is the candidate, if
+      next-token pressure competes), without any single layer's behavior
+      deciding a hypothesis.
     - **Grading**: per op1 color, the layer-mean $\cos(h, a)$ at op1's
       position, against that color's redness.
     - **Leakage** (secondary, no threshold): a ridge probe for redness fit on
@@ -164,7 +174,9 @@ def _():
       question SCA exists to answer, measured rather than assumed.
     - **Trajectories**: every ~50 steps, $A$ and validation loss, with the LR
       and anchor-weight schedules recorded alongside — the ex-2.9.3
-      apparatus, carried over per issue #10's first queue item.
+      apparatus, carried over per issue #10's first queue item. A flat loss
+      curve does not mean learning is done; the alignment trajectory is the
+      evidence to consult before any future decision to shorten the schedule.
     """)
     return
 
@@ -182,7 +194,9 @@ def _():
       $w{=}0$ control's seed mean. *Partial*: the gate passes at
       $w \le 0.1$ but fails at $0.3$ (a capacity cost with a knee, not a
       broken method).
-    - **H2.** The concept lands on the anchor, graded: **(a)** $A \ge 0.5$;
+    - **H2.** The concept lands on the anchor, graded: **(a)** $A \ge 0.5$
+      (the layer *mean*; per-layer min and max are reported but unscored, so
+      no single depth decides the verdict);
       **(b)** Spearman $\rho \ge 0.8$ between op1 redness and per-color
       layer-mean $\cos(h, a)$ at op1, over the 216 colors; **(c)** the
       control arm shows $|A| \le 0.1$. *Partial*: (a) and (c) hold but the
@@ -341,8 +355,9 @@ def _():
 
     /// admonition | Open decisions for review (pre-freeze)
     Defaults chosen for drafting; flag disagreement before the freeze.
-    (1) Labels fixed at corpus build rather than redrawn per visit.
-    (2) Balanced batching at 4 labeled lines per batch of 64.
+    (1) H2 scores the layer-*mean* alignment; min and max are reported as
+    diagnostics only. (2) Labels redrawn per visit (as M1), via balanced
+    batching at 4 affinity-sampled lines per batch of 64.
     (3) Weight ladder $\{0, 0.03, 0.1, 0.3\}$ with $w{=}0.1$ as the
     prespecified scoring rung. (4) Three seeds. (5) H2's grading groups
     reuse M1's `SIM3` red/other split. (6) Anneal window epochs 90–100 to
