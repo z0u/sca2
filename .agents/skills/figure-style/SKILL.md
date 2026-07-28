@@ -170,6 +170,47 @@ underneath: `path_effects=[pe.withStroke(linewidth=2, foreground=light_dark("#ff
 (`import matplotlib.patheffects as pe`), or the draw-twice halo technique the
 color-matrix figure uses.
 
+## What a figure costs to render
+
+`@themed` calls the plot function **twice** — once per theme — so everything
+inside it is paid twice, including work that has nothing to do with color.
+Only the drawing genuinely differs between the two passes. Compute the data
+in the cell, outside the decorated function, and let the plot function receive
+it and draw:
+
+```python
+_null = {w: random_angle_null(w) for w in _widths}  # once, in the cell
+
+@themed(name="angles", ...)
+def _plot():
+    ...  # draws _null; no fitting, sampling or bootstrapping in here
+```
+
+This matters most for anything sampled or fitted — a null distribution, a
+bootstrap, a bisection. A 5-second resample inside a plot function is a
+10-second one.
+
+Reach for vectorized NumPy over Python comprehensions in that computation.
+A list comprehension calling a NumPy function per item pays interpreter and
+dispatch overhead on every element, and `np.linalg`'s decompositions
+(`qr`, `svd`, `solve`, `inv`) all accept leading batch dimensions, so a stack
+is one LAPACK call instead of *n*. The batch form is the same arithmetic — it
+gives bit-identical results, so it's safe to apply to a published figure:
+
+```python
+# 2000 QR/SVD pairs, one call each, ~4x faster than the comprehension
+pairs = rng.normal(size=(n, 2, width, 3))
+angles = gm.principal_angles(pairs[:, 0], pairs[:, 1])
+```
+
+Likewise for nearest-neighbour work: `argmin` over distances doesn't need the
+distances themselves. Expanding the squared distance to `|v|^2 - 2 v.x` turns
+a materialized (N, V, K) difference into one (N, V) matmul — see
+`sca.baselines.precision_limited_acc`.
+
+Comprehensions are fine for assembling a handful of panels or labels; the rule
+is about per-element numerics.
+
 ## Prior art
 
 M1's figure code lives in
