@@ -7,7 +7,7 @@ the bucket under ``exports/<key>/``. The assembly mode is an explicit choice, ne
 inferred from credentials:
 
 ``--externalize`` (CI, ``./go site``)
-    The deterministic, read-only half of publishing: pull each *synced* bundle,
+    The deterministic, read-only half of publishing: read each *synced* bundle's HTML,
     resolve author links against the repo, insert one ``<base>`` pointing at the
     bucket, and write only ``_site/<key>/index.html`` (asset bytes stay on the CDN).
     Requires a configured store; fails loudly without one.
@@ -23,7 +23,7 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -223,64 +223,102 @@ def prepare_dirs_and_resolver() -> LinkResolver:
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class _Bundle:
+    """One report's exported HTML as read from its source, before any assembly.
+
+    ``html`` is ``None`` when there's nothing to assemble (never published, or never
+    exported locally). ``notes`` are log lines the read wants printed — held here rather
+    than printed on the spot, so a concurrent read still logs in notebook order.
+    """
+
+    html: str | None
+    base_href: str | None = None  # externalize: the CDN dir the report's _assets/ resolve against
+    assets: Path | None = None  # localize: the local _assets/ dir to copy beside the HTML
+    notes: tuple[str, ...] = ()
+
+
+def _read_bundle(nb: Path, *, store, pins: dict[str, str], externalizing: bool) -> _Bundle:
+    """Read one report's exported ``index.html`` — off the bucket, or from ``.mini/exports/``.
+
+    Externalize reads *only* the HTML. The page's ``_assets/`` links stay relative and the
+    ``<base>`` sends them to the bundle on the CDN, so pulling the whole bundle here would
+    fetch megabytes of figures the build has no use for. It's also the one step that waits
+    on the network, which is why it's separable: the reports are independent, so the caller
+    runs these together instead of serially.
+
+    A report pinned in ``docs/publish.lock`` is read *and* based at that revision, so the
+    page serves exactly what its publish uploaded — a later re-publish (e.g. from a branch
+    whose PR hasn't merged) can't swap the assets under this build. An unpinned report
+    falls back to the mutable branch head, with a warning.
+    """
+    key = export_key(nb)
+    if not externalizing:
+        bundle = export_dir(nb)
+        if not (bundle / "index.html").exists():
+            nb_rel = nb.relative_to(WORKSPACE_ROOT).as_posix()
+            return _Bundle(None, notes=(f"  ! {key}: not exported locally — run `./go preview {nb_rel}` (skipping)",))
+        assets = bundle / ASSET_LINK
+        return _Bundle((bundle / "index.html").read_text("utf-8"), assets=assets if assets.is_dir() else None)
+
+    notes: list[str] = []
+    revision = pins.get(key)
+    # Only a git-backed publish tier can pin; on the single-bucket default the mutable
+    # head is all there is, so the nudge would be misleading.
+    if revision is None and store.publish_repo is not None:
+        notes.append(f"  ! {key}: not pinned in {PUBLISH_LOCK} — serving the mutable head; `./go publish` to pin")
+    html = store.read_export_html(key, revision=revision)
+    if html is None:
+        notes.append(f"  ! {key}: no synced export on the bucket — run `./go publish` (skipping)")
+        return _Bundle(None, notes=tuple(notes))
+    return _Bundle(html, base_href=store.export_base(key, revision=revision), notes=tuple(notes))
+
+
 def build_reports(links: LinkResolver, store, externalizing: bool):
     """Assemble each report bundle into ``_site/<key>/index.html``.
 
-    Externalize: pull the synced bundle from the bucket, insert one ``<base>`` at
+    Externalize: read the synced HTML from the bucket, insert one ``<base>`` at
     ``exports/<key>/`` so its relative ``_assets/`` resolve there, and write only the
     HTML into ``_site`` (the bytes stay on the bucket CDN). Localize: read the bundle
     from ``.mini/exports`` and copy its ``_assets/`` beside the HTML so it works offline.
     Author links are resolved to absolute/relative targets either way.
-
-    A report pinned in ``docs/publish.lock`` is fetched *and* based at that revision,
-    so the page serves exactly what its publish uploaded — a later re-publish (e.g.
-    from a branch whose PR hasn't merged) can't swap the assets under this build.
-    An unpinned report falls back to the mutable branch head, with a warning.
     """
     print("Building reports...")
     pins = load_pins(WORKSPACE_ROOT) if externalizing else {}
     report_css = REPORT_CSS.read_text("utf-8") if REPORT_CSS.exists() else ""
-    for nb in report_notebooks(DOCS_DIR):
+    nbs = report_notebooks(DOCS_DIR)
+    # Externalized, each read is a round trip to the bucket and the reports don't depend
+    # on each other — so read them in one wave and the build waits for the slowest report
+    # rather than the sum of all of them. Assembly below is CPU-cheap and stays sequential
+    # in notebook order, so the log reads the same however the threads interleaved.
+    with ThreadPoolExecutor(max_workers=min(8, max(len(nbs), 1))) as pool:
+        bundles = pool.map(lambda nb: _read_bundle(nb, store=store, pins=pins, externalizing=externalizing), nbs)
+
+    for nb, bundle in zip(nbs, list(bundles), strict=True):
         key = export_key(nb)
+        for note in bundle.notes:
+            print(note)
+        if bundle.html is None:
+            continue
         from_dir = nb.parent.relative_to(DOCS_DIR).as_posix()  # where author links resolve
         from_dir = "" if from_dir == "." else from_dir
         nb_rel = nb.relative_to(WORKSPACE_ROOT).as_posix()
 
-        with tempfile.TemporaryDirectory() as tmp:
-            if externalizing:
-                revision = pins.get(key)
-                # Only a git-backed publish tier can pin; on the single-bucket default
-                # the mutable head is all there is, so the nudge would be misleading.
-                if revision is None and store.publish_repo is not None:
-                    print(f"  ! {key}: not pinned in {PUBLISH_LOCK} — serving the mutable head; `./go publish` to pin")
-                bundle = Path(tmp)
-                if not store.fetch_export(key, bundle, revision=revision):
-                    print(f"  ! {key}: no synced export on the bucket — run `./go publish` (skipping)")
-                    continue
-                base_href = store.export_base(key, revision=revision)
-            else:
-                bundle = export_dir(nb)
-                if not (bundle / "index.html").exists():
-                    print(f"  ! {key}: not exported locally — run `./go preview {nb_rel}` (skipping)")
-                    continue
-                base_href = None
+        html = _resolve_html_links(bundle.html, links, from_dir=from_dir, out_dir=key, externalizing=externalizing)
+        html = set_theme(html)  # follow the visitor's device, not the exporter's setting
+        html = set_responsive(html)  # fit narrow screens; drop Marimo's watermark
+        index_url, source_url = _nav_urls(links, key=key, nb_rel=nb_rel, externalizing=externalizing)
+        html = set_banner(html, index_url=index_url, source_url=source_url)
+        html = set_report_styles(html, report_css)  # last, so shared report rules win ties
+        if bundle.base_href:
+            html = insert_base(html, bundle.base_href)
+        dest = SITE_DIR / key / "index.html"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(html, "utf-8")
 
-            html = (bundle / "index.html").read_text("utf-8")
-            html = _resolve_html_links(html, links, from_dir=from_dir, out_dir=key, externalizing=externalizing)
-            html = set_theme(html)  # follow the visitor's device, not the exporter's setting
-            html = set_responsive(html)  # fit narrow screens; drop Marimo's watermark
-            index_url, source_url = _nav_urls(links, key=key, nb_rel=nb_rel, externalizing=externalizing)
-            html = set_banner(html, index_url=index_url, source_url=source_url)
-            html = set_report_styles(html, report_css)  # last, so shared report rules win ties
-            if base_href:
-                html = insert_base(html, base_href)
-            dest = SITE_DIR / key / "index.html"
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(html, "utf-8")
-
-            if not externalizing and (bundle / ASSET_LINK).is_dir():
-                shutil.copytree(bundle / ASSET_LINK, dest.parent / ASSET_LINK, dirs_exist_ok=True)
-            print(f"  {key} -> _site/{key}/index.html{' [+base]' if base_href else ''}")
+        if bundle.assets is not None:
+            shutil.copytree(bundle.assets, dest.parent / ASSET_LINK, dirs_exist_ok=True)
+        print(f"  {key} -> _site/{key}/index.html{' [+base]' if bundle.base_href else ''}")
 
 
 def _nav_urls(links: LinkResolver, *, key: str, nb_rel: str, externalizing: bool) -> tuple[str | None, str | None]:

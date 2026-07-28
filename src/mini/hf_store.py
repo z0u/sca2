@@ -77,14 +77,18 @@ class HFStore(Store):
         self._cache = cache  # local warm checkout, keyed by sha (a LocalStore)
         self._token = token or os.environ.get("HF_TOKEN")
         self._api: Any = None
+        self._api_lock = threading.Lock()
 
     @property
     def api(self) -> Any:
-        if self._api is None:
-            from huggingface_hub import HfApi
+        # Locked because a store is read from several threads at once (the site build
+        # fetches its reports in one wave), and one shared HfApi is the point.
+        with self._api_lock:
+            if self._api is None:
+                from huggingface_hub import HfApi
 
-            self._api = HfApi(token=self._token)
-        return self._api
+                self._api = HfApi(token=self._token)
+            return self._api
 
     @property
     def _cas(self) -> str:
@@ -321,9 +325,10 @@ class HFStore(Store):
     # -- report bundles (the publish-a-report handoff) ------------------------
     #
     # A report is exported (HTML + named-keyed _assets/) to a self-contained local dir,
-    # then mirrored *as-is* to ``exports/<key>/``. The build (CI) reads those back and
-    # assembles the site, pointing a single <base> at ``exports/<key>/`` — at the commit
-    # sha the sync returned, when the caller pinned one (docs/publish.lock), so a later
+    # then mirrored *as-is* to ``exports/<key>/``. The build (CI) reads back the one file
+    # it rewrites — index.html — and assembles the site, pointing a single <base> at
+    # ``exports/<key>/`` so the assets serve from the CDN untouched: at the commit sha the
+    # sync returned, when the caller pinned one (docs/publish.lock), so a later
     # re-publish can't swap assets under already-built HTML. This keeps the
     # heavy/authenticated half (export, which needs the data + a write token) on the
     # agent, and the deterministic half (link resolution, <base>) read-only in CI — no
@@ -370,46 +375,56 @@ class HFStore(Store):
         self.api.sync_bucket(source=str(local_dir), dest=f"hf://buckets/{self.bucket}/exports/{key}", delete=True)
         return None
 
-    def fetch_export(self, key: str, dest: Path, *, revision: str | None = None) -> bool:
-        """Download ``exports/<key>/`` into *dest*; ``False`` if nothing is synced.
+    def read_export_html(self, key: str, *, revision: str | None = None) -> str | None:
+        """The synced bundle's ``index.html`` for *key*, or ``None`` if nothing is synced.
 
         The build reads exports back this way — read-only, no notebook execution — so a
-        report missing here just means it hasn't been ``./go publish``ed yet. Pass the
-        *revision* the build will serve (see :meth:`export_base`) so the HTML it
-        assembles matches the assets that revision pins; ``None`` reads the head.
-        """
-        if self.publish_repo is not None:
-            return self._fetch_export_from_repo(key, dest, revision)
-        if not self._remote_has(f"exports/{key}/index.html"):
-            return False
-        dest.mkdir(parents=True, exist_ok=True)
-        self.api.sync_bucket(source=f"hf://buckets/{self.bucket}/exports/{key}", dest=str(dest))
-        return True
+        report missing here just means it hasn't been ``./go publish``ed yet. Only the
+        HTML travels: the page keeps its ``_assets/`` links relative and the build points
+        one ``<base>`` (see :meth:`export_base`) at the bundle on the CDN, so the figure
+        bytes are already served from where they live. Pass the *revision* the build will
+        serve so the HTML matches the assets that revision pins; ``None`` reads the head.
 
-    def _fetch_export_from_repo(self, key: str, dest: Path, revision: str | None) -> bool:
-        from huggingface_hub import snapshot_download
+        Safe to call concurrently — the site build fetches its reports in one wave.
+        """
+        path = f"exports/{key}/index.html"
+        return self._read_repo_file(path, revision) if self.publish_repo is not None else self._read_bucket_file(path)
+
+    def _read_repo_file(self, path: str, revision: str | None) -> str | None:
+        """One text file off the publish repo, or ``None`` if the repo has no such path.
+
+        The not-found error *is* the existence answer, so catching it does the work a
+        separate ``file_exists`` probe would — one round trip per file rather than two.
+        Anything else (bad revision, missing repo, rejected token) is a real
+        misconfiguration and propagates.
+        """
+        from huggingface_hub import hf_hub_download
+        from huggingface_hub.errors import EntryNotFoundError
 
         repo = self.publish_repo
-        assert repo is not None  # only reached from fetch_export when the publish tier is a repo
-        prefix = f"exports/{key}"
-        if not self.api.file_exists(
-            repo_id=repo, filename=f"{prefix}/index.html", repo_type="dataset", revision=revision
-        ):
-            return False
-        dest.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory() as d:
-            snap = snapshot_download(
+        assert repo is not None  # only reached from read_export_html when the publish tier is a repo
+        try:
+            local = hf_hub_download(
                 repo_id=repo,
+                filename=path,
                 repo_type="dataset",
                 revision=revision,
-                allow_patterns=f"{prefix}/*",
-                local_dir=d,
                 token=self._token,
             )
-            src = Path(snap) / prefix
-            for p in src.rglob("*"):  # lift the bundle out of its exports/<key>/ prefix into dest
-                if p.is_file():
-                    out = dest / p.relative_to(src)
-                    out.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(p, out)
-        return True
+        except EntryNotFoundError:
+            return None
+        return Path(local).read_text("utf-8")
+
+    def _read_bucket_file(self, path: str) -> str | None:
+        """One text file off the bucket, or ``None`` if it isn't there.
+
+        Buckets keep no history, so there's no revision to read at — the head is all
+        there is (see :meth:`export_base`).
+        """
+        infos = self._paths_info([path])
+        if path not in infos:
+            return None
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "file"
+            self.api.download_bucket_files(self._cas, files=[(infos[path], str(out))])
+            return out.read_text("utf-8")

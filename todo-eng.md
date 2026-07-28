@@ -14,28 +14,6 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- **`./go site` downloads every report's assets and throws them away
-  (2026-07-28).** The CI Pages build takes ~45s for 10 reports, of which only
-  ~3s is CPU — it is almost entirely network wait, and it grows linearly with
-  the report count. Two causes, both in the externalize path:
-
-  - `HFStore._fetch_export_from_repo` does `snapshot_download(allow_patterns=
-    "exports/<key>/*")`, pulling the whole bundle. But externalize mode reads
-    *only* `index.html` and inserts a `<base>` pointing at the CDN — the
-    `_assets/` bytes are never copied into `_site`. ex-2.1.5 is 3.2 MB of which
-    2.6 MB is discarded PNGs; across all reports it's 4.4 MB fetched to use
-    ~1.5 MB, and 130-odd file downloads where 10 would do. Wants an
-    `index.html`-only read path (`hf_hub_download` on the one file), with the
-    existing `file_exists` probe folded into catching `EntryNotFoundError` —
-    that's a second round trip per report bought for nothing.
-  - `build_site.build_reports` loops over reports sequentially. They're
-    independent, so a `ThreadPoolExecutor` over the fetch turns 10 serial waits
-    into one wave; collect and print in notebook order so the log stays stable.
-
-  Together this should take the build to a few seconds and make it scale with
-  the slowest single fetch rather than the sum. Note the *report export* is a
-  separate matter — `./go publish` runs the notebook locally, and CI never does.
-
 - **Ex-2.1.5 export time: what's left (2026-07-28).** Two fixes landed —
   `baselines.precision_limited_acc` now finds the nearest candidate with a
   matmul, and `geometry.principal_angles` batches over leading dimensions so
