@@ -2,8 +2,8 @@
 Extract a stand-in activation cache and share it project-wide by name.
 
 This is the *producer* half of a cross-experiment artifact-sharing demo (the
-*consumer* is ``docs/probe``). A real interpretability run would cache a model's
-per-layer activations — a few big files, or many small per-shard ones. Here we
+*consumer* is ``docs/probe``). A real interpretability run would cache the
+per-layer activations of a model — a few big files, or many small per-shard ones. Here we
 synthesize a tiny deterministic stand-in so the *storage* path runs end to end
 without a GPU or a large download.
 
@@ -18,8 +18,8 @@ no shared volume:
     bin/mini run docs/probe/experiment.py --watch   # reuses what this produced
 
 The step returns the :class:`~mini.store.Artifact` *handle* (a sha + size + name,
-no location), so it pickles durably into the memo result and a downstream step's
-memo key fingerprints it by content rather than by a path that may evaporate.
+no location), so it pickles durably into the memo result and the memo key of a
+downstream step fingerprints it by content rather than by a path that may evaporate.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ def extract_activations(dataset: str) -> dict:
 
     import numpy as np
 
-    # A *stable* seed (Python's str hash is per-process randomized) so the same
+    # A *stable* seed (the Python str hash is per-process randomized) so the same
     # dataset yields byte-identical shards — the precondition for the content
     # hashes to coincide across runs, processes, and experiments.
     seed = int.from_bytes(hashlib.sha256(dataset.encode()).digest()[:4], "big")

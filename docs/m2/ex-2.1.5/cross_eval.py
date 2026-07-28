@@ -1,14 +1,14 @@
 """Cross-form exact match for the bridge cell — a side analysis for H5.
 
-The sweep's eval sets are single-form. Cross pairs have no holdout, because the
+The sweep eval sets are single-form. Cross pairs have no holdout, because the
 form exists to supervise alignment rather than to be graded, so `experiment.py`
-never scores them. H5's verdict turns on whether that supervision took: a bridge
+never scores them. The verdict of H5 turns on whether that supervision took: a bridge
 that never learned to answer `name + #hex` would say nothing about whether a
 bridge aligns the two geometries. This scores it after the fact, reading the
 published checkpoints and writing its results back to the store under
 `CROSS_REF`, so `report.py` reads it the same way it reads everything else.
 
-It lives outside the experiment DAG on purpose. The sweep's evidence scheme has
+It lives outside the experiment DAG on purpose. The evidence scheme has
 moved on since the sweep ran (mini now traces deferred imports), so any tick of
 `experiment.py` re-trains all 24 cells — and a re-trained sweep would not
 reproduce the numbers the rest of the report already quotes. A plain module,

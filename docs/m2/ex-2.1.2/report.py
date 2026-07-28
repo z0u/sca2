@@ -17,7 +17,7 @@ with app.setup(hide_code=True):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    # Marimo puts the notebook's directory on sys.path, so the experiment
+    # Marimo puts the notebook directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import (
         CONDITIONS,
@@ -98,7 +98,7 @@ def _():
       the hex → name readout.
     - Named equations that mix to a color that falls *off* the palette, answered
       in hex (`red + navy = #804`). Now the surface form of the answer depends
-      on the mix rather than on the operands' forms alone, so a name + name
+      on the mix rather than on the operand forms alone, so a name + name
       prompt can't be settled by lookup.
 
     | Type | Example |
@@ -157,7 +157,7 @@ def _():
     )
     _caption = mo.md(
         f"""
-        Lines per form in each condition's {N_EXAMPLES:,}-line corpus. The named equations
+        Lines per form in the {N_EXAMPLES:,}-line corpus of each condition. The named equations
         draw from the same {len(_named_train)} training pairs as ex-2.1.1, with the same
         {len(_named_holdout)} pairs held out. The open equations draw from {len(_open_train)}
         of the 302 off-palette named pairs, and {len(_open_holdout)} are held out entirely.
@@ -187,8 +187,8 @@ def _():
     through the memorizable named slice.
 
     **H2.** Margins: scoring all 27 names as complete answers gives each held-out
-    pair a *margin*, the log-probability of the true name minus the best
-    competitor's. In `control` the margins are negative (accuracy is zero) but
+    pair a *margin*, the log-probability of the true name minus that of the best
+    competitor. In `control` the margins are negative (accuracy is zero) but
     spread out well above the random floor. The pairs with the least-negative
     control margins should be the first to flip positive under intervention. The
     interventions shift the whole margin distribution upward, while `named_seen`
@@ -345,7 +345,7 @@ def _():
 @app.cell(hide_code=True)
 def _(metrics):
     # Greedy completions of the named-holdout prompts are precomputed in `eval_one`
-    # (where the model's already loaded) and ride the metrics JSON — so this reads
+    # (where the model is already loaded) and ride the metrics JSON — so this reads
     # them from the store rather than pulling 12 checkpoints and re-decoding per edit.
     mo.stop(
         any("holdout_completions" not in cell(metrics, cond, s) for cond in CONDS for s in SEEDS),
@@ -569,7 +569,7 @@ def _():
     mo.md(r"""
     ## When each channel becomes readable in-sequence
 
-    Ex-2.1.1's probes read one pre-answer position and averaged over R, G, and B,
+    The ex-2.1.1 probes read one pre-answer position and averaged over R, G, and B,
     which hides at which token the mix gets computed. So here we fit a separate ridge probe
     for every combination of position, channel, and layer on the hex prompts. We then watch each channel become readable as
     the answer is spelled out.
@@ -595,7 +595,7 @@ def _(sched_offsets, sched_r2):
         alt_text="""
             Line charts of probe R-squared against position offset around the answer, one
             panel per residual-stream depth, three lines per panel for the R, G, and B
-            channels of the result. Lines are solid before each channel's digit enters the
+            channels of the result. Lines are solid before the digit of each channel enters the
             context and dotted after. In the deeper layers each channel peaks near 1 at its
             own emission position and falls away on either side, so the three channels form a
             sequence of staggered peaks rather than a cumulative plateau; at depth 0 the
@@ -670,12 +670,12 @@ def _(metrics):
         name="transfer-probe",
         alt_text="""
             Four line charts of probe R-squared against residual-stream depth, one panel per
-            prompt set: the fit set's held-back half, open holdout, named seen, and named
+            prompt set: the held-back half of the fit set, open holdout, named seen, and named
             holdout. One line per condition (control, rev, open, both; darker means richer
             corpus). The probes were fit on open-pair prompts at the pre-answer position.
         """,
         caption="""
-            One panel per scored set: the fit set's held-back half, open holdout, named seen,
+            One panel per scored set: the held-back half of the fit set, open holdout, named seen,
             and named holdout. R² against residual depth, one line per condition (darker means
             a richer corpus). Depth 0 is left out, since the pre-answer embedding is constant
             across prompts until attention runs.
@@ -687,7 +687,7 @@ def _(metrics):
         for ax, name in zip(axes, _sets, strict=True):
             for cond in CONDS:
                 rows = np.array([cell(metrics, cond, s)["transfer_r2"][name] for s in SEEDS])
-                # Skip depth 0: the pre-answer position's raw embedding is a constant
+                # Skip depth 0: the raw embedding at the pre-answer position is a constant
                 # across prompts (attention hasn't run), so its transfer R² only reflects
                 # the fit-vs-eval mean gap — no result is decodable there in any set.
                 depths = np.arange(rows.shape[1])
@@ -706,11 +706,11 @@ def _(metrics):
 def _():
     mo.md(r"""
     Partial computation shows up everywhere, `control` included. The held-out
-    named prompts carry about as much linearly-decodable result as the fit set's
-    own ceiling (≈ 0.6 at the deep layers). The `open` conditions lift the mid-depth transfer a
+    named prompts carry about as much linearly-decodable result as the ceiling
+    of the fit set (≈ 0.6 at the deep layers). The `open` conditions lift the mid-depth transfer a
     little, which fits the idea that the arithmetic is doing real work on these
-    prompts, and their *final*-layer R² drops on the named sets, where the last
-    layer's job has become committing to a surface form. The main point, though,
+    prompts, and their *final*-layer R² drops on the named sets, where the job
+    of the last layer has become committing to a surface form. The main point, though,
     is that "computed but not emitted" was already true in `control`: making the
     computation stronger (`open`) or the readout available (`rev`) still does not
     join the two up.

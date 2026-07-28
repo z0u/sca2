@@ -14,13 +14,13 @@ equations. Per cell:
 
 - **Exact match** per form on seen and held-out operand pairs, graded against
   two prompt-free references (the prompt-blind centroid and a guesser handed
-  the answer's neighborhood; both computed at prep time, since neither reads
+  the neighborhood of the answer; both computed at prep time, since neither reads
   the model).
 - **Probe maps**: leave-one-out ridge R² for operand and mix values at every
   layer × grammar landmark, separately per form (`sca.compute.geometry`).
 - **Cross-form alignment**: zero-shot transfer R² in both directions (the
-  transfer ratio ρ), and principal angles between the two forms' probe
-  subspaces — the H3-H5 measurements.
+  transfer ratio ρ), and principal angles between the probe subspaces of the
+  two forms — the H3-H5 measurements.
 
     bin/mini run docs/m2/ex-2.1.5/experiment.py --app modal --max-containers 5
     bin/mini status ex-2.1.5
@@ -31,8 +31,8 @@ from __future__ import annotations
 from mini import Ctx, Experiment, get_data_dir
 
 SEEDS = [0, 1, 2]
-PEAK_LR = 1e-2  # carried from the siblings; nGPT's normalization makes the LR forgiving
-BLOCK_SIZE = 128  # named lines reach ~85 chars, so the siblings' 64 can't hold a line
+PEAK_LR = 1e-2  # carried from the siblings; the nGPT normalization makes the LR forgiving
+BLOCK_SIZE = 128  # named lines reach ~85 chars, so the 64 used by the siblings can't hold a line
 
 CORPUS_SEED = 0
 HEX_SUBSET_SEED = 0
@@ -83,7 +83,7 @@ def _reference_guessers(exs, candidates, train_answers, ks=(2, 5)) -> dict:
 
     `candidates` is the (V, 3) answer vocabulary (palette or full hex grid);
     `train_answers` the (T, 3) snapped answer values seen in training. Exact
-    match and distances are graded against the set's true answers, which are
+    match and distances are graded against the true answers of the set, which are
     by construction the candidates nearest each exact mix.
     """
     import numpy as np
@@ -115,7 +115,7 @@ def _reference_guessers(exs, candidates, train_answers, ks=(2, 5)) -> dict:
 
 
 def _answer_value(ex) -> tuple[int, int, int]:
-    """The snapped answer's full-cube value (the exact mix is `ex.result`)."""
+    """The full-cube value of the snapped answer (the exact mix is `ex.result`)."""
     from sca.data import mixed_vocab as mv
 
     if ex.answer.startswith("#"):
@@ -217,7 +217,7 @@ def prepare_corpus(key: str, n_names: int, n_hex: int, bridge: bool) -> dict:
 
 
 def _make_config(width: int, depth: int, vocab_size: int, seed: int):
-    """One cell's training config; schedule and data pipeline fixed across the sweep."""
+    """Training config for one cell; schedule and data pipeline fixed across the sweep."""
     from sca.config import (
         DataConfig,
         ModelConfig,
@@ -536,6 +536,6 @@ experiment = Experiment(
     # us 15–30× throughput. That mechanism (per-step progress blocking on the control
     # plane) is fixed, and Volume writes commit in bulk rather than per-write, so this
     # is now belt-and-braces on an already-settled run rather than a measured need.
-    # Region is placement, not identity — mini fingerprints the task fn's source, so
+    # Region is placement, not identity — mini fingerprints the source of the task fn, so
     # pinning does not invalidate the memoized training.
 )

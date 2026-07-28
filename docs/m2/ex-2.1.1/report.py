@@ -18,7 +18,7 @@ with app.setup(hide_code=True):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    # Marimo puts the notebook's directory on sys.path, so the experiment
+    # Marimo puts the notebook directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import (
         CKPT_REF,
@@ -117,8 +117,8 @@ def _():
       together.
 
     - Probe alignment [^probes]: ridge regression from the residual stream at
-      each depth out to the operand color, the result color, and the result's
-      *redness*.
+      each depth out to the operand color, the result color, and the *redness*
+      of the result.
 
     ## Hypotheses
 
@@ -134,8 +134,8 @@ def _():
     training turns up a different geometry every time, whereas SCA should let us
     fix the location in advance.
 
-    [^probes]: A probe is a small linear model we fit on the model's internal
-    activations to read out what those activations carry. Ridge regression is
+    [^probes]: A probe is a small linear model we fit on the internal
+    activations of the model to read out what those activations carry. Ridge regression is
     linear regression with a penalty on large weights, which keeps the fit
     stable.
     """)
@@ -148,7 +148,7 @@ def _():
     ## Training data
 
     The corpus sampler is deterministic. Regenerating it here with the
-    experiment's own constants gives back the same training data the model saw,
+    constants defined in the experiment gives back the same training data the model saw,
     and these are its first lines:
     """)
     return
@@ -177,7 +177,7 @@ def _():
     {figure_html(_body, caption=_caption, class_="report-figure")}
 
     Between them they cover {len(_pairs):,} distinct operand pairs, **{len(_pairs) / _all_pairs:.2%}**
-    of the grid's {_all_pairs / 1e6:.1f}M. So the unseen-pair eval sets, sampled to steer clear of
+    of the {_all_pairs / 1e6:.1f}M in the grid. So the unseen-pair eval sets, sampled to steer clear of
     all of them, test the mixing rule rather than recall.
     """)
     return holdout, train_pairs
@@ -223,8 +223,8 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    The 27 named colors sit only on the {0, 8, 15}³ sub-lattice, the cube's
-    corners and edge midpoints. Note that no *color* is held out: every point
+    The 27 named colors sit only on the {0, 8, 15}³ sub-lattice, the corners
+    and edge midpoints of the cube. Note that no *color* is held out: every point
     shows up in training, since hex operands are sampled over the whole grid and
     each name appears in an alias line. What we hold out is operand pairs, both
     named and hex.
@@ -237,7 +237,7 @@ def _(holdout, train_pairs):
     # Split the two-panel lattice into two independent figures so they reflow and shrink
     # separately: on a narrow screen the pair stacks instead of shrinking as a block,
     # keeping each panel legible. The panels used to share a y-axis; now that they are
-    # separate figures, an identical figsize and the cube panel's fixed limits give them the
+    # separate figures, an identical figsize and the fixed limits of the cube panel give them the
     # same lattice scale — and, since the tight crop is dominated by that shared axes box,
     # the same size — without a shared axis. The lettered tags sit just outside those limits
     # (annotation_clip=False) and are picked up by the crop.
@@ -305,7 +305,7 @@ def _(holdout, train_pairs):
         "vertical with black at the bottom and white at the top. Each named color is a small dot in its true "
         "color. The pairs used as named equations in training are bold and colored by the color their two "
         "operands mix to; the held-out pairs are drawn faint for context. One training edge is picked out on "
-        "the cube's silhouette with italic letters a and b at its endpoints (white and magenta), the worked "
+        "the cube silhouette with italic letters a and b at its endpoints (white and magenta), the worked "
         "example a + b = orchid. The panel has no background fill or axes; front-facing edges are heavier than "
         "back and interior ones, so the lattice reads three-dimensionally. Titled 'train'."
     )
@@ -313,7 +313,7 @@ def _(holdout, train_pairs):
         "The same orthographic front view of the 27 named colors in the rotated RGB cube, same orientation and "
         "styling as the train panel. Here the pairs held out for the named-holdout evaluation are bold and "
         "colored by their mixed result, with the training pairs drawn faint for context. One held-out edge is "
-        "picked out on the cube's silhouette with italic letters c and d at its endpoints (magenta and blue), "
+        "picked out on the cube silhouette with italic letters c and d at its endpoints (magenta and blue), "
         "the worked example c + d = violet. Titled 'held out for eval'."
     )
     _left = themed(
@@ -347,8 +347,8 @@ def _(holdout, train_pairs):
 def _():
     mo.md(rf"""
     Both figures show the same lattice from the front. The vertices are the
-    named colors, and each edge joins the two operands of a named pair. An edge's
-    midpoint, is the answer that equation should
+    named colors, and each edge joins the two operands of a named pair. The midpoint
+    of an edge is the answer that equation should
     produce.
 
     Two edges are labeled as worked examples:
@@ -464,7 +464,7 @@ def _(metrics):
     For the d{_w}-L{_d} model (seed {SEEDS[0]}), we plot one example per eval set
     and draw two series beneath the text, both as fractions of $\log |V|$, the
     value a uniform guess over the vocabulary would give. The first is the
-    model's surprisal at each character: how "surprised" it is by the character that
+    surprisal of the model at each character: how "surprised" it is by the character that
     actually comes next. The second is the entropy of its predictive
     distribution, the surprisal it expected on average before seeing that
     character.
@@ -483,21 +483,21 @@ def _(metrics):
 def _(metrics):
     _w, _d = pick_arch(metrics)
     (_cell,) = [r for r in metrics if r["label"] == label(_w, _d, SEEDS[0])]
-    # named_holdout's index 1 is `lime + black = green`, the example "Why the
+    # Index 1 of named_holdout is `lime + black = green`, the example "Why the
     # named answers fail" walks through below; index 0 is a same-set spare.
     _idx = {"named_holdout": 1}
     rows = [(es, _cell["surprisal"][es][_idx.get(es, 0)]) for es in EVAL_SETS]
     log_v = np.log(len(colors.alphabet()))
     sub_width = min(max(len(r["text"]) for _, r in rows), 80)
-    # Match the sublines' dark background to this notebook's, rather than subline's
-    # neutral default; light mode already matches. `css` overrides the library's own
-    # `--bg-color` (later rule wins).
+    # Match the dark background of the sublines to this notebook, rather than the
+    # neutral subline default; light mode already matches. `css` overrides the
+    # `--bg-color` of the library (later rule wins).
     sub_css = "svg { --bg-color: light-dark(#fff, #181c1a); }"
 
     def sublines(rows: list[tuple[str, dict]], series, aria_label: str, name: str) -> mo.Html:
         """Lay out one captioned subline per eval set; `series(row)` builds its series list.
 
-        The block is inlined (so the SVGs share the page's CSS) *and* externalized as
+        The block is inlined (so the SVGs share the page CSS) *and* externalized as
         `_assets/<name>.html` — a plain file for tooling that can't run the frontend.
         """
 
@@ -545,7 +545,7 @@ def _():
     $$s_2 = \frac{i - h}{\log |V|}$$
 
     where $i$ is the surprisal and $h$ the entropy. This sits near zero when the
-    model's confidence matched the outcome, whether it was confident and right or
+    model confidence matched the outcome, whether it was confident and right or
     unsure and appropriately surprised. It goes positive when the model was confidently
     wrong, and negative when the character was more predictable than its
     distribution suggested. The sparkline clips at zero, so we draw the negative
@@ -733,7 +733,7 @@ def _(complete, holdout, named_holdout_exs):
     mo.md(rf"""
     The model never answers these in hex. It always reaches for a name, and
     usually one adjacent to the true mix: {_hits} of {_tot} guesses land in the
-    mix's one-step neighborhood, against {_null:.0%} for a name drawn uniformly
+    one-step neighborhood of the mix, against {_null:.0%} for a name drawn uniformly
     from the palette. Sometimes the name is an echo of one operand
     (`olive + lavender = lavender`), though on this palette an operand is often a
     neighbor anyway, so that part is weaker evidence than it looks.
@@ -764,8 +764,8 @@ def _(train_pairs):
     - The alias dictionary runs one way. Alias lines are always `name = hex`.
       This may be an instance of the *reversal curse*, where training on `A = B`
       doesn't teach `B = A`.
-    - A hex answer can be computed channel-by-channel, whereas a name's first
-      character depends on all three channels and the inverted dictionary at the
+    - A hex answer can be computed channel-by-channel, whereas the first
+      character of a name depends on all three channels and the inverted dictionary at the
       same time. The probe section below looks at this more.
 
     A few corpus changes might help: reverse some alias lines (`#f00 = red`);
@@ -788,7 +788,7 @@ def _(metrics):
     panel per probe target and one line per width. We test only the deepest
     models (L{_d}) and show the mean over seeds.
 
-    [^rsquare]: This R² is the fraction of the target's variance the probe
+    [^rsquare]: This R² is the fraction of target variance the probe
     recovers, so 1 means the color is fully readable from the stream and 0 means
     it is not there linearly.
     """)
@@ -831,12 +831,12 @@ def _(metrics):
 def _():
     mo.md(r"""
     Rising R² for the *result* means the mix becomes partly readable before the
-    answer starts. It plateaus well below the operand's R², though, even in
+    answer starts. It plateaus well below the operand R², though, even in
     conditions whose hex accuracy is perfect. Probing every answer position, per
     channel, would map that spread-out schedule (to do).
 
     The probes read the residual stream at two positions, marked below. The first
-    is the first operand's last character, where the whole operand has been read
+    is the last character of the first operand, where the whole operand has been read
     in, so its value can be represented. The second is the space after `=`, the
     last position before the answer begins, where the result has to be ready.
     """)
@@ -870,9 +870,9 @@ def _():
             '<pre style="line-height: 2.2; font-size: 1.05em">' + "<br>".join(_mark(ex) for ex in _exs) + "</pre>",
             caption="""
                 <span style="background: #e4572e66; border-radius: 2px">&nbsp;operand&nbsp;</span>
-                probes read the first operand's color at this character;
+                probes read the color of the first operand at this character;
                 <span style="background: #4d9de066; border-radius: 2px">&nbsp;result&nbsp;</span>
-                probes read the result's color and redness at the space just before the answer (shown as ␣).
+                probes read the result color and redness at the space just before the answer (shown as ␣).
                 The dimmed answer is never probed.
                 """,
             class_="report-figure",
@@ -901,7 +901,7 @@ def _():
 @app.cell(hide_code=True)
 def _(weights):
     def _redness_cosines(w: int, d: int) -> np.ndarray:
-        """Pairwise |cos| between seeds' redness probe directions: (n_pairs, depth+1)."""
+        """Pairwise |cos| between redness probe directions across seeds: (n_pairs, depth+1)."""
         vecs = [weights[f"{label(w, d, s)}/result_redness"][:, :, 0] for s in SEEDS]  # (L+1, C) each
         unit = [v / np.linalg.norm(v, axis=1, keepdims=True) for v in vecs]
         return np.array([np.abs((unit[i] * unit[j]).sum(axis=1)) for i in range(3) for j in range(i + 1, 3)])

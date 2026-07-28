@@ -16,7 +16,7 @@ anneal removes its protection while the optimizer is still hot.
 
 This experiment pins that down with three arms:
 
-- **trajectories** (32 seeds, ex-2.9.2's base config exactly): record per-step
+- **trajectories** (32 seeds, the ex-2.9.2 base config exactly): record per-step
   anchor progress (z₀ of pure red), leakage, and grid reconstruction error, to
   show when failures happen relative to the schedule.
 - **attribution** (16 inits × 8 data streams, same config): factor the RNG into
@@ -24,10 +24,10 @@ This experiment pins that down with three arms:
   initial conditions, it would follow the init row; if it is a mid-training
   accident, it follows neither and scatters.
 - **sweep** (peak LR {0.10, 0.07, 0.05, 0.03} × anneal {on, off} × 32 seeds,
-  with ex-2.9.2's fallback term, scored by the redirect intervention): find
+  with the ex-2.9.2 fallback term, scored by the redirect intervention): find
   whether a static schedule removes the failures, and what the LR peak buys.
 
-The sweep's (0.10, anneal) cell replicates ex-2.9.2's fallback arm; the
+The (0.10, anneal) sweep cell replicates the ex-2.9.2 fallback arm; the
 trajectory arm replicates its base arm, so known-bad seeds (22, 27) reproduce.
 The testbed (model, grids, loss terms, interventions) is `sca.colorcube`.
 
@@ -89,7 +89,7 @@ def train_one(seed: int, stream: int | None, w_fb: float, dopesheet_csv: str) ->
     """Train one run and score it; also record per-step anchoring diagnostics.
 
     *seed* picks the model init. *stream* picks the batch/label sequence; None uses
-    ex-2.9.1's derivation (init and stream both from *seed*), so those runs replicate
+    the ex-2.9.1 derivation (init and stream both from *seed*), so those runs replicate
     earlier experiments bit-for-bit.
     """
     sheet = Dopesheet.from_csv(io.StringIO(dopesheet_csv))
@@ -206,7 +206,7 @@ def main(ctx: Ctx) -> dict:
     orig = make_dopesheet(0.10, anneal=True)
     jobs: list[tuple[dict, int, int | None, float, str]] = []
 
-    # Arm 1 — trajectories: ex-2.9.2's base arm, bit-for-bit (w_fb = 0, original schedule).
+    # Arm 1 — trajectories: the ex-2.9.2 base arm, bit-for-bit (w_fb = 0, original schedule).
     for seed in SEEDS:
         jobs.append(({"arm": "trajectories", "peak_lr": 0.10, "anneal": True}, seed, None, 0.0, orig))
 

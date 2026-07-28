@@ -47,19 +47,19 @@ def _():
     or per init, which is expensive and gets worse as models grow.
 
     This experiment tests that, and it doesn't hold up. There are three arms,
-    all built on ex-2.9.1's small color autoencoder.
+    all built on the small color autoencoder from ex-2.9.1.
 
-    - Trajectories: retrain ex-2.9.2's base arm (the same 32 seeds), recording
+    - Trajectories: retrain the base arm of ex-2.9.2 (the same 32 seeds), recording
       anchor progress, leakage, and reconstruction error at every step. When do
       failures happen, relative to the schedule?
     - Attribution: separate the two sources of randomness, the model init and
       the batch/label stream (16 inits × 8 streams, including the two inits
       whose earlier runs failed badly). A failure that comes from the init
-      should repeat all along that init's row, while a failure that comes from
+      should repeat all along the row for that init, while a failure that comes from
       the data ordering should scatter.
     - Schedule sweep: peak LR {0.10, 0.07, 0.05, 0.03} × regularizer anneal
       {on, off}, 32 seeds per condition, trained with the fallback term and scored by
-      the `redirect` intervention (ex-2.9.2's recipe, so the score reflects
+      the `redirect` intervention (the ex-2.9.2 recipe, so the score reflects
       anchoring quality).
 
     The experiment is [`experiment.py`](./experiment.py):
@@ -108,7 +108,7 @@ def _(arm):
     _cat = [r for r in _bad if classify(r) == "catastrophic"]
     mo.md(f"""
     {len(arm("trajectories")) + len(arm("attribution")) + len(arm("sweep"))}
-    runs completed. The trajectory arm reproduces ex-2.9.2's base arm:
+    runs completed. The trajectory arm reproduces the base arm of ex-2.9.2:
     {len(_bad)} of {len(_t)} runs end unhealthy. {len(_cat)} of them failed
     catastrophically, meaning the anchor was lost or reconstruction collapsed,
     and {len(_bad) - len(_cat)} finished with non-red colors leaking onto the
@@ -125,7 +125,7 @@ def _():
     mo.md(r"""
     ## When failures happen
 
-    Each line below is one seed's training run under the original schedule. The
+    Each line below is the training run of one seed under the original schedule. The
     top panel tracks anchor progress: z₀ of pure red, which reaches 1 when *red*
     sits exactly on its anchor. The middle panel tracks leakage, the mean |z₀|
     over colors that are clearly not red. The bottom panel is the schedule
@@ -153,7 +153,7 @@ def _(arm, steps, traj):
         z0 of pure red, for all 32 seeds. Every line, including the {len(_bad)} failures drawn
         in color, climbs from near 0 to about 1 by step 750. After that the gray healthy lines
         hold at 1 while the colored ones diverge. Seeds 22 and 8 dip briefly as the learning
-        rate reaches its peak, and both recover on this metric, though seed 22's reconstruction
+        rate reaches its peak, and both recover on this metric, though reconstruction for seed 22
         does not. Seed 15 breaks away to about 0.65 from step 900, and seed 27 falls to about
         0.4 after step 1100. Middle: leakage for the same runs. Healthy lines settle near 0.05
         while the failures climb to 0.1 to 0.6 in the same late window. Bottom: the schedule,
@@ -404,10 +404,10 @@ def _(sweep_cell):
 
     Third, γ should be calibrated per model. The worst hot-condition score ({_rd(_hot).min():.2f}, seed
     {min(_hot, key=lambda r: r["interventions"]["redirect"]["score"])["seed"]}) anchored
-    cleanly, but the redirect's fixed γ = 1 bias was too small to dominate that seed's
-    pre-norm scale, so "deleted" red passed through almost untouched (damage to
+    cleanly, but the fixed γ = 1 redirect bias was too small to dominate the
+    pre-norm scale of that seed, so "deleted" red passed through almost untouched (damage to
     pure red {min(r["interventions"]["redirect"]["red_pure"] for r in _hot):.3f}).
-    Excluding it, the hot condition's floor is {_hot_ok.min():.2f}.
+    Excluding it, the floor for the hot condition is {_hot_ok.min():.2f}.
     """)
     return
 
@@ -431,7 +431,7 @@ def _(arm):
     from luck at that scale. At {len(_fb)} runs the pattern has held without
     exception.
 
-    A mechanism seems plausible. The fallback term pins the decoder's output at
+    A mechanism seems plausible. The fallback term pins the decoder output at
     −e₀, which flattens the loss landscape around the redirect direction and may
     remove the direction along which the instability grows. Only the
     like-for-like condition is a clean comparison, so the schedule confound prevents
@@ -466,7 +466,7 @@ def _(arm, sweep_cell):
     - Keep the fallback term, both for its designed purpose (a predictable
       intervention response) and for its apparent side effect of preventing
       catastrophic training failures.
-    - Calibrate the redirect's γ against the model's pre-norm activation scale.
+    - Calibrate the redirect γ against the pre-norm activation scale of the model.
       A fixed γ = 1 silently no-ops on about 1 run in 250.
     - Keep the cheap endpoint screening (leak < 0.1, anchor loss, recon). Even
       the safe condition only bounds what we measured, and the failure mechanism is

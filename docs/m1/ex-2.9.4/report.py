@@ -23,7 +23,7 @@ with app.setup(hide_code=True):
     METRICS_REF = "reports/ex-2.9.4/metrics"
     TRAJS_REF = "reports/ex-2.9.4/trajectories"
 
-    LAM_CAP = 0.15  # the anchor dual's ceiling
+    LAM_CAP = 0.15  # the ceiling of the anchor dual
 
 
 @app.cell(hide_code=True)
@@ -53,9 +53,9 @@ def _():
     - The weight λ rises while its average sits above an engage threshold,
       decays (5× faster) once it falls below a release threshold, and holds
       steady in the band between the two. That keeps the ordinary
-      early transient from winding the weight up, and lets a healthy run's λ
-      return to zero.
-    - λ is capped at 0.15, close to the dopesheet's constant 0.1 from earlier
+      early transient from winding the weight up, and lets λ return to zero
+      in a healthy run.
+    - λ is capped at 0.15, close to the dopesheet constant 0.1 from earlier
       experiments.
 
     The anti-subspace weight is left uncontrolled. Its raw value has a floor
@@ -64,11 +64,11 @@ def _():
     late value instead of annealing it. Learning rate and `separate` follow
     the dopesheet as before.
 
-    We ran ten conditions, 32 seeds each, scored by ex-2.9.2's `redirect`
+    We ran ten conditions, 32 seeds each, scored by the ex-2.9.2 `redirect`
     intervention: {static timed-anneal, controller} × peak LR {0.10 risky,
     0.05 safe} with the fallback term; the same pair with the fallback term
     removed, at 0.10, since ex-2.9.3 showed that is where catastrophic failures
-    actually appear; and a sensitivity grid over the controller's own
+    actually appear; and a sensitivity grid over the controller
     parameters (targets ×0.75, ×1.5; gains ×0.5, ×2). The experiment is
     [`experiment.py`](./experiment.py):
 
@@ -235,9 +235,9 @@ def _(cond, traj):
     _c27 = next(r for r in _cn if r["seed"] == 27)
     _drop = int(np.flatnonzero(traj(_r27, "z0_red") < 0.7)[-1]) * TRAJ_STRIDE
     mo.md(f"""
-    The weight's trajectory separates the two outcomes. In the rescues, λ engages while
-    the anchor is forming, then releases once the constraint is met. On seed 27 (the static
-    schedule's worst, still below z₀ = 0.7 at step {_drop}), the controlled run holds z₀
+    The weight trajectory separates the two outcomes. In the rescues, λ engages while
+    the anchor is forming, then releases once the constraint is met. On seed 27 (the worst
+    under the static schedule, still below z₀ = 0.7 at step {_drop}), the controlled run holds z₀
     near 1 through the plateau, with λ decaying to {_c27["lam_anchor_end"]:.2f}. In the
     failures the labeled anchor EMA never reaches its target, so λ climbs to the {LAM_CAP}
     cap and stays there: {_sat_bad} of {len(_bad)} catastrophic runs had mean λ > 0.13,
@@ -379,7 +379,7 @@ def _(cond, n_cat):
     ## Lessons
 
     The idea seemed reasonable: protection on demand instead of on a timer.
-    The controller's response is fine; the measurement it relies on is the
+    The controller response is fine; the measurement it relies on is the
     problem. The training-time signal for anchor health was the
     anchor loss on noisy labels, and in this experiment, that signal couldn't tell a drifting red
     from a pink that should be off-axis.
@@ -388,11 +388,11 @@ def _(cond, n_cat):
     experiments, has removed every catastrophic failure), peak LR 0.05, the
     original timed anneal, and cheap endpoint screening.
 
-    One engineering note. `mini.temporal`'s `DynamicProp.set()` can retarget a
+    One engineering note. `DynamicProp.set()` in `mini.temporal` can retarget a
     value mid-flight, which is what a controller needs, but experiments consume
     schedules through `realize_timeline`, which bakes the dopesheet into a static
     array before training. Dopesheet keyframes and runtime `set()` calls would
-    then compete over the same prop. So this experiment's controller lives inside
+    then compete over the same prop. So the controller in this experiment lives inside
     the training loop instead, carrying its dual state in the `lax.scan` carry,
     while the dopesheet drives the props it doesn't control. That split worked
     well and is worth keeping, even though the controller itself is not adopted.

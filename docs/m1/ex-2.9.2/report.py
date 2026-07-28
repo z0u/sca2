@@ -84,8 +84,8 @@ def _():
     Optimal ablation measures importance while minimizing spoofing. It replaces
     the removed component with the constant $a^* = \arg\min_a \mathbb{E}[\mathcal{L}]$,
     the value that affects loss the least. But for concept removal, that
-    objective points the wrong way: the loss it minimizes includes the target's
-    own loss, so $a^*$ gets pulled toward whatever constant best restores *red*.
+    objective points the wrong way: the loss it minimizes includes the loss on
+    the target itself, so $a^*$ gets pulled toward whatever constant best restores *red*.
     We evaluate both the literal method (`oa`) and a removal-appropriate version
     (`oa-nontarget`, which optimizes the constant over non-red colors only).
 
@@ -101,11 +101,11 @@ def _():
     ## Conditions
 
     We run two training variants, otherwise identical to ex-2.9.1 (same model,
-    data, dopesheet), with 32 seeds each: `base` (ex-2.9.1's loss, unchanged)
+    data, dopesheet), with 32 seeds each: `base` (the ex-2.9.1 loss, unchanged)
     and `fallback` (the same loss plus 0.05 × the fallback term). Each trained
     model is then scored under five weight-level interventions on axis 0:
 
-    - `zero` — zero the encoder's output row 0 and bias (the status quo).
+    - `zero` — zero encoder output row 0 and bias (the status quo).
     - `oa` — zero row 0, then set the bias to the constant that minimizes mean
       reconstruction error over the full grid (optimal ablation, taken
       literally).
@@ -178,7 +178,7 @@ def _():
 
     What matters here is what happens to the bad seeds, because the floor and
     spread of the distribution decide how many seeds you need to run. Each dot
-    below is one trained model, and the bar is the condition's median.
+    below is one trained model, and the bar is the median of the condition.
     """)
     return
 
@@ -265,8 +265,8 @@ def _():
     SCA aims for bounded side effects. With the decoder pinned to mid-gray at
     −e₀, redirecting pure red there should give MSE(red, gray) = ¼. Without
     fallback training there is no bound at all, and red lands wherever the
-    untrained region happens to decode. Zero ablation's expectation under random
-    redistribution is ⅓, but the seed-to-seed spread makes that expectation
+    untrained region happens to decode. The expectation for zero ablation under
+    random redistribution is ⅓, but the seed-to-seed spread makes that expectation
     unhelpful.
     """)
     return
@@ -351,11 +351,11 @@ def _(exemplars):
         name="error-vs-similarity",
         alt_text=f"""
         Two scatter plots of post-intervention reconstruction error against cubed HSV similarity
-        to red, one point per grid color, each drawn in its own color. On the left, the base variant's
-        median seed under zero ablation (R squared {_r2[("base", "zero")]:.2f}): error rises
-        with similarity and tops out wherever this seed's redistribution happened to put red,
-        here about {float(_panels[0][2]["mse_zero"].max()):.2f}. On the right, the fallback variant's
-        median seed under redirect (R squared {_r2[("fallback", "redirect")]:.2f}): points rise
+        to red, one point per grid color, each drawn in its own color. On the left, the median seed
+        of the base variant under zero ablation (R squared {_r2[("base", "zero")]:.2f}): error rises
+        with similarity and tops out wherever redistribution happened to put red for this seed,
+        here about {float(_panels[0][2]["mse_zero"].max()):.2f}. On the right, the median seed of
+        the fallback variant under redirect (R squared {_r2[("fallback", "redirect")]:.2f}): points rise
         from gray colors at zero error up to red points clustered together at about
         {float(_panels[1][2]["mse_redirect"].max()):.2f}.
         """,
@@ -445,7 +445,7 @@ def _():
     mo.md(r"""
     ## Why optimal ablation scores lower here
 
-    Optimal ablation scored lower than plain zeroing on selectivity: OA's
+    Optimal ablation scored lower than plain zeroing on selectivity: the OA
     constant minimizes expected loss over the task distribution, and that
     distribution includes the concept being removed. In an anchored model the
     cheapest way to reduce expected loss is to partially restore the concept and
@@ -453,7 +453,7 @@ def _():
     question OA was built for, where a small loss gap is the useful outcome.
 
     The removal-appropriate version, which optimizes the constant over non-red
-    colors only, lands close to zero. SCA's anti-subspace regularizer already
+    colors only, lands close to zero. The SCA anti-subspace regularizer already
     made small constants the least disruptive for bystander colors during
     training, so this version behaves like plain zeroing. Anchoring, in other
     words, gives you most of the "optimal" part of optimal ablation for free.

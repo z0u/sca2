@@ -17,7 +17,7 @@ with app.setup(hide_code=True):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    # Marimo puts the notebook's directory on sys.path, so the experiment
+    # Marimo puts the notebook directory on sys.path, so the experiment
     # definition is importable — refs and sweep constants can't drift.
     from experiment import ARMS, ARRAYS_REF, CROSS_REF, METRICS_REF, SEEDS
     from mini.reports import report_bundle, use_publisher
@@ -49,7 +49,7 @@ with app.setup(hide_code=True):
     def load_cross() -> dict | None:
         """Cross-form exact match for the bridge condition, or None if it hasn't been scored.
 
-        Written by `cross_eval.py`, which sits outside the sweep's DAG — see H5.
+        Written by `cross_eval.py`, which sits outside the sweep DAG — see H5.
         """
         store = project_store()
         art = store.get_refs([CROSS_REF])[CROSS_REF]
@@ -270,7 +270,7 @@ def _(arrays, stats):
     8-bit units (closest pair, then median) are {_hex[0]:.0f} and {_hex[1]:.0f}
     for the hex operands, against {_names[0]:.0f} and {_names[1]:.0f} for the
     names and {_typical[0]:.0f} and {_typical[1]:.0f} for a typical fresh draw
-    of {len(_ops8)} grid points. So the subset's local spacing matches the
+    of {len(_ops8)} grid points. So the local spacing of the subset matches the
     median draw; it is not an unlucky one. Its coverage is if anything better
     than average: the farthest any of the 4,096 grid points sits from an
     operand is {_hex[2]:.0f}, against {_typical[2]:.0f} for the typical draw,
@@ -282,7 +282,7 @@ def _(arrays, stats):
     depth × landmark maps correlate {_corr_lo:.2f} to {_corr_hi:.2f} across the
     three targets, with a mean absolute difference of at most {_dmax:.2f} in
     $R^2$. The two conditions also answer held-out hex equations equally well (see
-    the density arms under H1). Nothing about the hex form's layout appears to
+    the density arms under H1). Nothing about the layout of the hex form appears to
     be an artifact of the 216-point draw, so the same should hold for what
     transfers out of it.
     ///
@@ -313,11 +313,11 @@ def _(stats):
         [
             mo.md("""
             Corpus statistics, one row per corpus (conditions that share
-            names × hex × bridge share a corpus). The design study's numbers
+            names × hex × bridge share a corpus). The numbers from the design study
             held up: answer perplexity is 86 over 140 names with every name
             reachable as an answer (the 250-name palette reaches 248), and
             the longest line is 85 characters, inside the block size of 128.
-            Line counts are the training corpus's 100,000 lines split by form.
+            Line counts are the 100,000 lines of the training corpus split by form.
             """),
             mo.Html(
                 '<div class="report-table-scroll"><table class="report-table">'
@@ -339,7 +339,7 @@ def _():
     pairs. On a small palette, raw accuracy can flatter a weak strategy, so
     each number sits beside two reference guessers. One never reads the
     prompt: it always answers with the centroid of the training answers. The
-    other is handed the answer's neighborhood for free: it guesses uniformly
+    other is handed the neighborhood of the answer for free: it guesses uniformly
     among the $k$ palette entries nearest the true mix (the irregular-palette
     version of the one-step-shell null in earlier reports). The model has
     learned something only where it beats both.
@@ -352,7 +352,7 @@ def _():
 
     /// admonition | Amendment: a second holdout protocol
     The preregistered estimator holds out one *equation* at a time. But the
-    held-out equation's colors and hex digits still appear in other equations
+    colors and hex digits of the held-out equation still appear in other equations
     in the fit, so a probe can score well just by memorizing which token has
     which value. That is a fair way to ask whether a value is present at a site,
     and one analysis below uses it for that. But it's not a good test of H2,
@@ -367,28 +367,28 @@ def _():
     Both scores are reported. The preregistered one decides H2 (and it turns out
     the two agree at the site used for that decision (0.944 against 0.941). We
     also added two landmarks, the spaces closing each operand, after the strict
-    holdout showed that a named operand's value sits on them rather than on the
-    name's characters.
+    holdout showed that the value of a named operand sits on them rather than
+    on the characters of the name.
     ///
 
     One subtlety: token positions don't naturally line up. Names vary in length,
     and hex expressions are shorter than named ones. Positions are therefore
     indexed by grammar landmarks (the last character of each operand, the
     operator, the pre-answer position, and answer characters counted from the
-    answer's start and end), and the cross-form measures compare only at
+    start and end of the answer), and the cross-form measures compare only at
     landmarks the two forms share.
 
     Alignment between the two forms is scored two ways:
 
     - Transfer ratio $\rho$: zero-shot cross-form $R^2$ divided by within-form
       $R^2$, at the same layer and landmark. Zero-shot means the probe is
-      fitted on one form's activations and applied unchanged to the other's.
+      fitted on the activations of one form and applied unchanged to the other.
       Two guards keep the ratio well-behaved. First, $\rho$ is reported only
       where the within-form $R^2 \ge 0.5$; below that the site isn't measuring
       geometry, and a small denominator makes the ratio erratic. Second,
       negative cross-form $R^2$ clips to zero, so $\rho \in [0, 1]$ with 0
       meaning no transfer.
-    - Principal angles between the row-spaces of the two forms' fitted probes:
+    - Principal angles between the row-spaces of the fitted probes of the two forms:
       a graded measure of whether the two decoders use the same directions of
       the residual stream.
     """)
@@ -401,7 +401,7 @@ def _():
     ## Hypotheses
 
     - **H1.** The disjoint language trains at the center condition: hex+hex exact
-      match on unseen pairs is comparable to ex-2.1.1's hex levels, and
+      match on unseen pairs is comparable to the hex levels of ex-2.1.1, and
       name+name held-out exact match clears the $k$-NN analogues of the
       neighborhood nulls.
     - **H2.** Each sublanguage develops latent linear color geometry, with
@@ -449,7 +449,7 @@ def _():
     d16-L8 score H4 and H6; the bridge condition scores H5. The two density arms
     attach to H1: *hex-dense* checks that hex accuracy and geometry aren't
     artifacts of the 216-point operand subset (expected: little change —
-    ex-2.1.1's hex arithmetic generalized from far sparser coverage), and
+    hex arithmetic in ex-2.1.1 generalized from far sparser coverage), and
     *palette-250* extends the density axis of ex-2.1.3 to the irregular palette
     (expected: named held-out accuracy holds or improves, with misses staying
     neighbor-level).
@@ -497,8 +497,8 @@ def _():
     ## Training
 
     All 24 conditions converge smoothly under the shared 100-epoch schedule —
-    including the d16 conditions, which sit one step below ngpt-scaling's
-    validated width range. No width-gated instability appeared.
+    including the d16 conditions, which sit one step below the width range
+    validated by ngpt-scaling. No width-gated instability appeared.
     """)
     return
 
@@ -600,14 +600,14 @@ def _():
     (0.841), which reads at first like a model that never learned the geometry.
     In contrast, ex-2.1.3 answered a 216-color named vocabulary at ≈ 1.0.
 
-    But ex-2.1.3's colors sat on a regular grid closed under mixing: every
+    But the ex-2.1.3 colors sat on a regular grid closed under mixing: every
     answer landed on a vocabulary point, and the runner-up was a full grid step
     away (0.2 of the unit cube). Here the answer is the nearest of 140
     irregularly placed names, and the median gap between the nearest name and
     the second-nearest is six times smaller. In the exploratory section ("The
     named ceiling is a resolution limit"), accuracy tracks that gap prompt by
     prompt, and a single effective-precision number per channel accounts both
-    for this experiment's named accuracy and for the earlier grids scoring
+    for named accuracy in this experiment and for the earlier grids scoring
     near 1. So the geometry is present; what runs out is resolution, as in
     ex-2.1.3.
     """)
@@ -625,7 +625,7 @@ def _(arrays):
             all mass is at rank 0.
         """,
         caption="""
-            Rank of the emitted answer among the form's candidate vocabulary,
+            Rank of the emitted answer among the candidate vocabulary of the form,
             ordered by distance to the true mix; rank 0 is the correct answer.
             Center condition, pooled over seeds.
         """,
@@ -716,7 +716,7 @@ def _(arrays, stats):
         }
 
     def fit_sigma(arm: str, corpus: str, set_name: str) -> dict:
-        """One condition's behavior on one eval set, with the effective precision that reproduces it."""
+        """The behavior of one condition on one eval set, with the effective precision that reproduces it."""
         _b = _behavior(arm, corpus, set_name)
         _b["sigma"] = bl.fit_precision(_b["pal"], _b["mix"], _b["true_idx"], _b["hit"].mean(), _rng, 24, 11)
         return _b
@@ -733,7 +733,7 @@ def _(arrays, stats):
 @app.cell(hide_code=True)
 def _(precision, stats):
     # The counterfactual the density comparison needs: the 250-name prompts answered at
-    # the *center* condition's precision, so the palette's difficulty is held to one side.
+    # the precision of the *center* condition, so the difficulty of the palette is held to one side.
     _c, _p = precision["center", "named_holdout"], precision["palette-250", "named_holdout"]
     _standardized = float(
         bl.precision_limited_acc(
@@ -753,10 +753,10 @@ def _(precision, stats):
     and second-nearest name to the exact mix falls from
     {np.median(_c["margin"]):.3f} to {np.median(_p["margin"]):.3f} of the unit
     cube, so more prompts ask the model to place the mix inside a tighter
-    boundary. A reference guesser with the *center* condition's precision,
+    boundary. A reference guesser with the precision of the *center* condition,
     answering the 250-name prompts, predicts {_standardized:.3f}. The observed
     score is {_p["hit"].mean():.3f}, so roughly half of the drop from
-    {_c["hit"].mean():.3f} can be attributed to the more harder precision.
+    {_c["hit"].mean():.3f} can be attributed to the tighter precision demand.
 
     Second, each training pair got less supervision. The same ≈ 50,000 named
     lines now spread over
@@ -801,12 +801,12 @@ def _():
     To be concrete about what one point on a line is: each combination of
     {seed, form, target, depth, landmark} is a "site", and each site gets its
     own independently fitted ridge probe. The target is the probed quantity
-    (operand 1, operand 2, or the mix). The probe's inputs are the N equations'
-    residual-stream activations at that one token position and depth (an N × C
-    matrix), and its regression targets are the probed quantity's RGB triples
+    (operand 1, operand 2, or the mix). The probe inputs are the residual-stream
+    activations of the N equations at that one token position and depth (an N × C
+    matrix), and its regression targets are the RGB triples of the probed quantity
     (N × 3). A probe never sees activations from any other depth or position,
-    in fitting or in scoring. The height of a line is that site's held-out
-    $R^2$ under the strict holdout protocol. The colored step-lines are the
+    in fitting or in scoring. The height of a line is the held-out
+    $R^2$ at that site under the strict holdout protocol. The colored step-lines are the
     per-channel scores averaged over the three seeds, and the hairlines show
     the seed spread.
 
@@ -823,10 +823,10 @@ def _():
     A few reading notes. The lines are stepped because each landmark is a
     discrete character position; a straight line between two would claim
     measurements that were never made. Risers drawn in lighter ink skip over a
-    name's variable-length middle (0 to 22 characters, depending on the name),
+    variable-length middle of a name (0 to 22 characters, depending on the name),
     so a named trace that steps up across one of those risers is the name
-    completing; hex lines skip nothing, since all four of a hex operand's
-    characters are landmarks. Every minor panel shares the same 0 and 1
+    completing; hex lines skip nothing, since all four characters of a hex
+    operand are landmarks. Every minor panel shares the same 0 and 1
     gridlines. Scores below zero are drawn at the floor (clamped to zero).
     """)
     return
@@ -856,7 +856,7 @@ def _(arrays):
     def _plot() -> plt.Figure:
         # (seed, depth+1, landmark, 3) per form and target — unaggregated, so the figure can
         # draw both the seed mean and the seed spread. The strict per-channel map: equations
-        # containing a held-out value are removed from the probe's fit, so a plateau here is
+        # containing a held-out value are removed from the probe fit, so a plateau here is
         # geometry rather than a recovered identity. Its per-equation twin is in the
         # exploratory section.
         _stacks = {
@@ -883,16 +883,16 @@ def _():
     two stay near 0.3 there, visible as the upper hairline lifting away from the
     outline at `=`.
 
-    **A named operand's value is not on its name.** At the last character of
+    **The value of a named operand is not on its name.** At the last character of
     operand 1 the strict probe scores $-0.05$, and operand 2 scores $0.00$:
     nothing. The value sits instead on the spaces that follow. It reads $0.23$
     on the space closing operand 1, rises to $0.47$ across the `+`, and reaches
     $0.64$ by the pre-answer position. A variable-length name has no fixed
     slot, and the model appears to resolve it into the first fixed position
     available. The value could not have appeared any earlier: the model
-    reads left to right, and a color name's first characters do not determine
+    reads left to right, and the first characters of a color name do not determine
     its value: `sea green` and `salmon` share a prefix and nothing else, and
-    predicting a held-out name's RGB from the other names sharing its
+    predicting the RGB of a held-out name from the other names sharing its
     two-character prefix scores $-0.21$, below the palette mean.
 
     Part of what the closing space holds is lexical rather than chromatic. 99
@@ -901,14 +901,14 @@ def _():
     holdout of the same size does.[^wordfam] The site after the `+` is much
     less lexical, so the $0.47$ there is the sturdier number. This is also
     where the preregistered estimator diverges most: it reads $0.75$ at the
-    name's last character. That reading is name recognition — the identity is
+    last character of the name. That reading is name recognition — the identity is
     recoverable there, but the value is not placed geometrically.
 
     **Hex relays its channels and does not retain them.** Each channel is
     legible at its own digit and near zero at the next, a strict relay rather
-    than an accumulation. At the embedding the probe reads $0.42$ at a digit's
-    own position, so the 16 digit embeddings do carry a real magnitude axis.
-    Depth then improves it, rising to $0.78$ at operand 2's last digit by the
+    than an accumulation. At the embedding the probe reads $0.42$ at the
+    position of the digit itself, so the 16 digit embeddings do carry a real magnitude axis.
+    Depth then improves it, rising to $0.78$ at the last digit of operand 2 by the
     last layer.
 
     Hex reads nothing at the delimiters ($-0.23$), which is what a form whose
@@ -920,7 +920,7 @@ def _():
     a hex digit position holds one of 16 tokens, the held-out unit is an
     equation, and 16 points in 64 dimensions admit an exact linear fit
     whatever the values. The strict $0.42$ is the informative number, since
-    under that holdout the digit's value never enters the fit.
+    under that holdout the value of the digit never enters the fit.
 
     Read at the *green* digit, the red channel scores $0.82$ under the
     preregistered estimator and $-0.27$ under the strict one: red is still
@@ -929,9 +929,9 @@ def _():
     ///
 
     **Hex never assembles the mix, and the named pre-answer site carries
-    everything at once.** Hex's mix reaches only $0.20$ at the pre-answer
+    everything at once.** The hex mix reaches only $0.20$ at the pre-answer
     position and $0.55$ mid-answer, and the mid-answer reading sits where the
-    answer's own digits are in the input (see the surface-text caveat under
+    answer digits themselves are in the input (see the surface-text caveat under
     Exploratory analyses). Nothing in the hex panels looks like a whole
     pre-answer mix, so the coupling signal that H2 reserved judgment on did
     not appear. This is likely to matter for anchoring. At the named
@@ -993,7 +993,7 @@ def _(arrays):
             was identity recovery: near zero means the site holds a value the
             probe can place without having seen it, and a large negative gap
             means the probe was looking the value up. Either estimator decides
-            H2's site the same way, so adopting the stricter one changes no
+            the H2 site the same way, so adopting the stricter one changes no
             conclusion.
             """),
         ]
@@ -1014,7 +1014,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _(arrays):
-    # Every cross-form cell in the centre condition's scan: 2 directions × 3 targets × 3 seeds ×
+    # Every cross-form cell in the centre-condition scan: 2 directions × 3 targets × 3 seeds ×
     # depth × landmark. The extremes bound the whole claim, so quote them rather than a site.
     _all_cross = np.concatenate(
         [
@@ -1034,35 +1034,35 @@ def _(arrays):
     $R^2$ to zero, so in principle a floor reading could hide a score just below
     break-even. Nothing here is close: all {len(_all_cross):,} cross-form cells
     in the scan are negative, and the best of them is ${_all_cross.max():.3f}$.
-    Take the pre-answer position in the last layer as an example. The named
-    form's own mix probe reads {_named_pre:.2f} there; the hex probe applied to
+    Take the pre-answer position in the last layer as an example. The mix probe
+    fitted on the named form reads {_named_pre:.2f} there; the hex probe applied to
     the same activations reads ${_carried_pre:.0f}$. That is far worse than
     answering with the training mean, which suggests the decoder is pointing in
     an unrelated direction.
 
     The figure below shows both readings on the same axes, per form and target.
-    The grey area is what the form's own probe recovers; the amber line is what
-    the other form's probe recovers from the same activations. The amber
-    fraction of the grey is $\\rho$, and it is zero everywhere. Note that the
-    hex row's grey is low because hex's own strict readings are low (H2 found
+    The grey area is what the own-form probe recovers; the amber line is what
+    the other-form probe recovers from the same activations. The amber
+    fraction of the grey is $\\rho$, and it is zero everywhere. Note that
+    grey in the hex row is low because the strict readings for hex itself are low (H2 found
     it relays its channels rather than holding them), so the transfer claim
     rests on the named row and on the magnitudes quoted above.
 
     /// details | Which within-form estimate the denominator uses
     The figure and the table use the **strict** holdout for the within-form
-    reading, so the grey areas are the same quantity as in H2's per-channel
+    reading, so the grey areas are the same quantity as in the per-channel H2
     figure. The preregistered $\\rho$ used the per-equation estimator instead.
     We switched because the two halves of the ratio should be measured alike: a
-    cross-form probe has never seen the target form's tokens, so it cannot
+    cross-form probe has never seen tokens of the target form, so it cannot
     recover a value by identity lookup, while the per-equation within-form
     estimate can. Mixing the two biases $\\rho$ downward, which would flatter
     H3; the strict denominator removes that.
 
     The result is the same either way, since the numerator is what fails and it
     is unchanged: the preregistered ratios are zero too. The estimators do
-    differ in which cells clear $\\rho$'s guard, and both are reported below.
+    differ in which cells clear the guard on $\\rho$, and both are reported below.
     At the pre-answer site the named form reads {_named_pre:.2f} strict against
-    {_named_pre_eq:.2f} per-equation, so H3's headline site is one of the
+    {_named_pre_eq:.2f} per-equation, so the H3 headline site is one of the
     places they agree.
     ///
     """)
@@ -1072,7 +1072,7 @@ def _(arrays):
 @app.cell(hide_code=True)
 def _(arrays):
     # Keyed by the form the probes are *applied* to, which is also the form whose landmarks
-    # the x axis belongs to and whose within-form score is ρ's denominator.
+    # the x axis belongs to and whose within-form score is the denominator of ρ.
     _applied = {"named": "hex2name", "hex": "name2hex"}
 
     @themed(
@@ -1082,9 +1082,9 @@ def _(arrays):
             named activations on the top row and hex on the bottom, with columns
             for operand 1, operand 2 and the mix. Each panel is one residual
             depth, embedding at the bottom, plotted across the grammar landmarks.
-            A grey filled area shows what the form's own probe reads — rising
+            A grey filled area shows what the own-form probe reads — rising
             over the operands and, in the named mix panel, high at the pre-answer
-            position of the last layer. An amber line for the other form's probe
+            position of the last layer. An amber line for the other-form probe
             applied to the same activations lies flat on the floor in every panel,
             at every depth and every landmark.
         """,
@@ -1092,10 +1092,10 @@ def _(arrays):
             Zero-shot cross-form transfer at the center condition, seed-averaged.
             Rows are the form the probes are applied to; columns are the probe
             target; within a panel, depth runs upward from the embedding and
-            the x axis across the grammar landmarks. Grey is the form's own
+            the x axis across the grammar landmarks. Grey is the own-form
             probe under the strict holdout (the same quantity as the
             per-channel figure under H2), with its three-seed envelope; amber
-            is the other form's probe applied unchanged. Both are floored at
+            is the other-form probe applied unchanged. Both are floored at
             zero for drawing.
         """,
     )
@@ -1118,9 +1118,9 @@ def _(arrays):
 
 @app.cell(hide_code=True)
 def _(arrays, cells):
-    # Two sites, neither chosen by ρ. The preregistered one maximizes the *weaker* form's
-    # within-form R², so the comparison happens where both probes work; the pre-answer site
-    # is where the named form's own geometry is strongest and where the embedding baseline is
+    # Two sites, neither chosen by ρ. The preregistered one maximizes the within-form R²
+    # of the *weaker* form, so the comparison happens where both probes work; the pre-answer site
+    # is where the geometry of the named form is strongest and where the embedding baseline is
     # zero in both forms (see the surface-text caveat).
     _stored = cells["center-s0"]["alignment"]["primary_site"]
     _lm = {_n: _i for _i, _n in enumerate(LANDMARKS)}
@@ -1172,12 +1172,12 @@ def _(arrays, cells):
             {_rho("name2hex", "hex", 4, "pre", "r2")} at the pre-answer site.
 
             Neither site was picked using $\\rho$. The preregistered site
-            maximizes the weaker form's own $R^2$, so the two probes are
+            maximizes the within-form $R^2$ of the weaker form, so the two probes are
             compared where both have something to carry. The pre-answer site is
-            where the named form's geometry is strongest and where the answer
+            where the geometry of the named form is strongest and where the answer
             text cannot contaminate either form. The two sites disagree about
-            where hex is legible: at the pre-answer site, hex's own reading
-            falls under $\\rho$'s guard, so the ratio into hex reports nothing
+            where hex is legible: at the pre-answer site, the within-form hex reading
+            falls under the guard on $\\rho$, so the ratio into hex reports nothing
             there rather than zero. They agree about everything that bears on
             H3. The pre-answer site is also where the two mix decoders come
             closest to sharing a direction, and even there the smallest of the
@@ -1187,7 +1187,7 @@ def _(arrays, cells):
             a ratio only where the within-form $R^2$ clears 0.5. Swapping the
             per-equation estimator for the strict one changes which cells
             qualify, from 22–62 of 270 (5 depths × 18 landmarks × 3 seeds) down
-            to 0–37; hex's operand rows drop out entirely, since their strict
+            to 0–37; the hex operand rows drop out entirely, since their strict
             readings never reach 0.5. The verdict is the same either way,
             because the numerator is negative in every cell of the map, gated
             or not. That settles the open question of whether the alignment
@@ -1217,7 +1217,7 @@ def _(arrays, maps):
     def angles_at(arm: str, target: str = "mix") -> dict[str, float]:
         """Cross-form first angle at the clean pre-answer site, with both nulls.
 
-        The seed control replaces the random draw's arbitrary directions with real
+        The seed control replaces the arbitrary directions of the random draw with real
         probes that decode the same quantity in unrelated bases: three seeds train
         in three different coordinate systems, so their named-form probes are as
         unaligned as two probes can be while still being probes.
@@ -1240,7 +1240,7 @@ def _(arrays, maps):
     def rho_summary(arm: str) -> dict:
         """ρ at the preregistered site and over the whole scan, for one condition.
 
-        The preregistered site maximizes the *weaker* form's own $R^2$, so the two
+        The preregistered site maximizes the within-form $R^2$ of the *weaker* form, so the two
         probes are compared where both have something to carry; it is chosen without
         reference to ρ, since a per-condition maximum of a noisy map rises with the noise
         and could manufacture a width trend on its own. The scan maximum is reported
@@ -1283,7 +1283,7 @@ def _(rho_summary):
     What compression does instead is wear the named form down. The figure below
     tracks three quantities against width: how well each form answers held-out
     equations, how well the named mix can be read out of the residual stream, and
-    how close the two forms' mix decoders come to sharing a direction.
+    how close the mix decoders of the two forms come to sharing a direction.
     """)
     return
 
@@ -1307,9 +1307,9 @@ def _(angles_at, cells, maps):
             Three panels against residual width, plotted at 16, 32 and 64. Left:
             held-out exact match. The hex curve runs 1.00, 1.00, 0.72 as the
             stream narrows; the named curve falls much further, 0.67, 0.43, 0.05.
-            Middle: the named mix probe's R² at the pre-answer position follows
+            Middle: the named mix probe R² at the pre-answer position follows
             the named curve down, 0.94, 0.80, 0.35. Right: the first principal
-            angle between the two forms' mix decoders falls from about 75° to 60°
+            angle between the mix decoders of the two forms falls from about 75° to 60°
             to 51°, and a shaded band for random subspaces of the same size falls
             with it, covering every observed point. Open markers for the 8-layer
             conditions sit clearly above the 4-layer ones at width 16 and coincide
@@ -1323,7 +1323,7 @@ def _(angles_at, cells, maps):
             the first principal angle between the named and hex mix decoders at
             the pre-answer position (amber), with two references: the angle
             between two random 3-planes at that width (grey band, mean ± 1
-            s.d.) and between two seeds' named probes (red).
+            s.d.) and between the named probes of two seeds (red).
         """,
     )
     def _plot() -> plt.Figure:
@@ -1410,10 +1410,10 @@ def _(angles_at, cells, maps, rho_summary):
             ),
             mo.md("""
             The width arms, seed-averaged. The two ρ columns are at the
-            preregistered site (the depth × landmark where the weaker form's own
-            $R^2$ is highest, chosen without reference to ρ), and read "—" where
-            that form's within-form score falls under ρ's 0.5 guard. "ρ best" is
-            the largest ρ anywhere in the condition's scan, over both directions and
+            preregistered site (the depth × landmark where the within-form
+            $R^2$ of the weaker form is highest, chosen without reference to ρ), and read "—" where
+            the within-form score of that form falls under the 0.5 guard on ρ. "ρ best" is
+            the largest ρ anywhere in the scan for that condition, over both directions and
             all three targets. The last three columns are the first principal
             angle between the two mix decoders at the pre-answer position, and
             the two references the figure plots.
@@ -1436,8 +1436,8 @@ def _(angles_at, fit_sigma, maps, rho_summary, seed_mean):
     they sit in is small enough. The same three widths give
     {_g["center"]["random"]:.0f}°, {_g["d32"]["random"]:.0f}° and
     {_g["d16"]["random"]:.0f}° for a random pair. Every observed angle sits inside
-    one standard deviation of its null, and the seed control (two seeds' *named*
-    probes, decoding the same quantity in unrelated bases) tracks the same curve.
+    one standard deviation of its null, and the seed control (the *named*
+    probes of two seeds, decoding the same quantity in unrelated bases) tracks the same curve.
     So the cross-form angle at every width is what two unrelated decoders would
     give.
 
@@ -1452,7 +1452,7 @@ def _(angles_at, fit_sigma, maps, rho_summary, seed_mean):
     from {_sig["center"]:.3f} of the unit cube at d64 to {_sig["d32"]:.3f} at
     d32 and {_sig["d16"]:.3f} at d16: roughly an eightfold loss of color
     resolution over two halvings of width. Hex needs far less resolution,
-    because a hex answer's runner-up is a whole grid step away, so a coarse
+    because the runner-up to a hex answer is a whole grid step away, so a coarse
     read still lands on the right digit.
 
     So the named form clearly lacks capacity at these widths, yet even that
@@ -1465,7 +1465,7 @@ def _(angles_at, fit_sigma, maps, rho_summary, seed_mean):
     {maps("d16", "probes/named/mix/r2_strict")[4, LANDMARKS.index("pre")]:.2f}
     at the pre-answer position, so there is not much named geometry left there to
     align. The sweep anticipated this: d16 sits one step below the width range
-    ngpt-scaling validated, and H4's trend was to rest on d64 → d32 if it trained
+    ngpt-scaling validated, and the H4 trend was to rest on d64 → d32 if it trained
     poorly. It does train, with smooth loss curves, but it does not learn the
     named form. Taking d16 out changes nothing about the verdict, since ρ is
     {rho_summary("d32")["best"]:.2f} at d32 too, where the named form still
@@ -1496,8 +1496,8 @@ def _(cross, rho_summary, stats):
 
     H5 predicted that a little shared supervision would place both forms in the
     same subspace: cross-form equations lifting $\\rho$ above 0.8 at d64. The
-    bridge condition's $\\rho$ is {rho_summary("bridge")["best"]:.2f}, the same as
-    every other condition's, so H5 is unsupported on its own terms.
+    $\\rho$ for the bridge condition is {rho_summary("bridge")["best"]:.2f}, the same as
+    for every other condition, so H5 is unsupported on its own terms.
 
     That would be an easy result to dismiss if the bridge had simply failed to
     learn anything, so let's check whether the supervision worked.
@@ -1515,14 +1515,14 @@ def _(cross, rho_summary, stats):
     completions; at 1.2 lines per pair there is not much for the model to
     memorize, and the two numbers say it didn't. Given the unseen prompt
     `pale lime + #fc7 = `, all three seeds return `#dd7`, which is the right
-    answer. So a color name's value does reach the hex answer path, for names and
+    answer. So the value of a color name does reach the hex answer path, for names and
     hex codes the model has never seen together.
 
-    [^crosseval]: `cross_eval.py`, beside this report. It reads the sweep's
+    [^crosseval]: `cross_eval.py`, beside this report. It reads the sweep
         checkpoints and writes its results back to the store, so the numbers
         here are computed rather than transcribed. It sits outside the
-        experiment's DAG because a tick of `experiment.py` would now re-train
-        all 24 conditions: `mini`'s evidence scheme has changed since the sweep ran,
+        experiment DAG because a tick of `experiment.py` would now re-train
+        all 24 conditions: the evidence scheme in `mini` has changed since the sweep ran,
         and a re-trained sweep would not reproduce the numbers quoted elsewhere
         in this report.
     """)
@@ -1590,9 +1590,9 @@ def _(arrays):
         alt_text="""
             Six blocks of stacked step-line panels, two rows by three columns,
             in the same layout as the cross-form transfer figure under H3, but
-            for the bridge condition. A grey filled area shows what each form's own
+            for the bridge condition. A grey filled area shows what the own-form
             probe reads, rising over the operands and peaking at the pre-answer
-            position of the named mix panel. The amber line for the other form's
+            position of the named mix panel. The amber line for the other-form
             probe lies flat on the floor in every panel, at every depth and every
             landmark, exactly as it does without a bridge.
         """,
@@ -1600,8 +1600,8 @@ def _(arrays):
             Zero-shot cross-form transfer at the bridge condition, seed-averaged,
             drawn exactly as the H3 figure so the two can be laid side by side.
             Rows are the form the probes are applied to; columns are the probe
-            target; grey is the form's own probe under the strict holdout and
-            amber is the other form's probe applied unchanged.
+            target; grey is the own-form probe under the strict holdout and
+            amber is the other-form probe applied unchanged.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1636,12 +1636,12 @@ def _(angles_at, cross, stats):
     unseen hex code mix to the right answer {_unseen * 100:.0f}% of the time, and
     the answers it emits sit {_guess:.3f} from the exact mix on average, against a
     quantization floor of {_floor:.3f}. Geometrically nothing moved: $\\rho$ stays at zero
-    across the whole scan, and the two mix decoders' first principal angle is
+    across the whole scan, and the first principal angle between the two mix decoders is
     {_g["cross_form"]:.0f}° against a random-subspace null of
     {_g["random"]:.0f}° and a seed control of {_g["seed_control"]:.0f}°.
 
     Our measurement is fairly narrow: fit a probe on single-form lines, then
-    apply it unchanged to the other form's lines at the same layer and grammar
+    apply it unchanged to lines of the other form at the same layer and grammar
     landmark. Suppose the model routes by form, with one pathway for `melon +
     ultramarine` and another for `melon + #48a`, sharing whatever they need
     somewhere we didn't look. Such a model would answer cross equations well and
@@ -1650,8 +1650,8 @@ def _(angles_at, cross, stats):
     property H5 named, and a property a unidirectional anchor might want.
 
     We don't know where the conversion happens. The obvious place to look is the
-    cross lines themselves: fit probes on those activations and ask which form's
-    geometry a name's value lands in once the answer must come out as hex. That
+    cross lines themselves: fit probes on those activations and ask which
+    geometry — named or hex — the value of a name lands in once the answer must come out as hex. That
     is a new measurement rather than a different reading of this one, so it goes
     to the backlog rather than into this report. The same applies to a
     depth-crossed $\\rho$, which the exploratory section reaches the edge of.
@@ -1696,7 +1696,7 @@ def _(fit_sigma, seed_mean):
     {_sig["center"]:.3f} of the unit cube at L4 and {_sig["L8"]:.3f} at L8, the
     same to three decimals, so the model reads colors to the same resolution
     either way. That fits the H1
-    account, where the named ceiling at d64 is the palette's spacing rather than
+    account, where the named ceiling at d64 is the spacing of the palette rather than
     anything the model ran out of. Depth cannot buy resolution the task isn't
     short of.
 
@@ -1706,7 +1706,7 @@ def _(fit_sigma, seed_mean):
     {_sig["d16"]:.3f} to {_sig["d16-L8"]:.3f}. The same eight layers that do
     nothing at width 64 recover about half the color resolution lost by narrowing
     to width 16. So depth substitutes for width here, up to the point where the
-    task's own resolution ceiling takes over.
+    resolution ceiling of the task itself takes over.
 
     The figure below follows the named mix probe up through the stream at two
     landmarks: the `=` sign, and the pre-answer space one character later where
@@ -1736,12 +1736,12 @@ def _(arrays):
             layer before the end and holds it. The two width-16 conditions stay far
             lower throughout, the 8-layer one about twice as high as the 4-layer
             one and flattening from mid-depth. Shaded bands show the seed spread,
-            which is widest in the layers just before each curve's rise.
+            which is widest in the layers just before the rise of each curve.
         """,
         caption="""
             Where the named mix becomes readable, at the `=` sign (left) and the
             pre-answer space (right, the site H2 uses). The x axis is depth as a
-            fraction of the condition's layers, so the 4-layer and 8-layer
+            fraction of the layers in the condition, so the 4-layer and 8-layer
             curves overlay; 0 is the token embedding and 1 the last layer.
             Solid lines are the 4-layer conditions and dashed the 8-layer ones,
             blue for width 64 and purple for width 16; bands span the three
@@ -1780,7 +1780,7 @@ def _(arrays, maps):
         return float(np.mean([(_profile(_arm, _s) >= _thresh).sum() for _s in SEEDS]))
 
     def _crossings(_arm: str, _thresh: float = 0.9) -> str:
-        """The layer at which each seed's pre-answer mix first clears *thresh*."""
+        """The layer at which the pre-answer mix of each seed first clears *thresh*."""
         return ", ".join(str(int(np.argmax(_profile(_arm, _s) >= _thresh))) for _s in SEEDS)
 
     _c, _l = maps("center", "probes/named/mix/r2_strict"), maps("L8", "probes/named/mix/r2_strict")
@@ -1834,8 +1834,8 @@ def _():
     mixing rather than one operand being retained.
 
     This suggests that an answer-position reading should be compared against its
-    own depth-0 value, not against zero. For example, the hex mix's best channel
-    mean of 0.66 (depth 3, middle answer digit) breaks down as 0.22, 0.96, 0.80
+    own depth-0 value, not against zero. For example, the best channel
+    mean of the hex mix, 0.66 (depth 3, middle answer digit), breaks down as 0.22, 0.96, 0.80
     per channel, against an embedding baseline of 0.00, 1.00, 0.00: the green
     channel is read from the input, and the blue is computed a token ahead.
 
@@ -1844,11 +1844,11 @@ def _():
     forms. That is why the named mix result is quoted at the pre-answer space,
     where the last layer reaches 0.95, 0.94, 0.94. Compared at those clean
     positions, the two forms separate further than the mid-answer numbers
-    suggest: hex's best uncontaminated mix reading is 0.42 at the equals sign
-    and 0.38 pre-answer, against named's 0.94.
+    suggest: the best uncontaminated hex mix reading is 0.42 at the equals sign
+    and 0.38 pre-answer, against 0.94 for named.
 
     Similarly, $\rho$ computed at answer positions would be inflated in both
-    directions, since both forms' probes can read the emitted answer there.
+    directions, since the probes of both forms can read the emitted answer there.
     """)
     return
 
@@ -1857,7 +1857,7 @@ def _():
 def _(arrays):
     # The depth-crossed subspace comparison: the named mix probe at each depth against the
     # hex mix probe at each depth. Computable from the stored weights; the matching transfer
-    # R² is not, since it needs the other form's activations at the other depth.
+    # R² is not, since it needs activations of the other form at the other depth.
     _lm = {_n: _i for _i, _n in enumerate(LANDMARKS)}
     _w = {_f: np.stack([arrays[f"center-s{_s}/probes/{_f}/mix/weights"] for _s in SEEDS]) for _f in ("named", "hex")}
     _strict = {
@@ -1875,7 +1875,7 @@ def _(arrays):
     _crossed = np.array([[_first_angle(_dn, _pre, _dh, _pre) for _dh in range(_n_depth)] for _dn in range(_n_depth)])
     _off_embedding = _crossed[1:, 1:]  # depth 0 is the token embedding; see below
     # The widest search that still asks the question of two probes that both work: every
-    # depth × landmark pair where each form's own strict reading clears a modest 0.3.
+    # depth × landmark pair where the strict within-form reading of each form clears a modest 0.3.
     _sites = {_f: np.argwhere(_m >= 0.3) for _f, _m in _strict.items()}
     _best = min(
         (_first_angle(_dn, _ln, _dh, _lh) for _dn, _ln in _sites["named"] for _dh, _lh in _sites["hex"]),
@@ -1889,27 +1889,27 @@ def _(arrays):
     $\\rho$ as preregistered compares the same cell in both forms: same depth,
     same landmark. That assumes the two forms put the mix in the same place, and
     H2 showed they do not. Named color mixes are assembled at the pre-answer
-    position in the last layer. Hex's best mix reading is mid-answer, a layer
+    position in the last layer. The best hex mix reading is mid-answer, a layer
     earlier, and its pre-answer column never clears {_hex_pre.max():.2f} at any
     depth ({", ".join(f"{_v:.2f}" for _v in _hex_pre)} from the embedding up).
-    So the same-cell comparison may score named's mature mix against a hex
+    So the same-cell comparison may score the mature named mix against a hex
     representation that hasn't formed at that position, and a depth-crossed
     $\\rho$ could in principle be higher.
 
     We can check half of this from the stored data. The transfer half cannot be
-    answered: applying hex's depth-{_n_depth - 3} probe to named's
+    answered: applying the hex depth-{_n_depth - 3} probe to the named
     depth-{_n_depth - 1} activations needs the activations, and only the fitted
     probes and their scores are stored. The subspace half can, from the probe
     weights alone. The first principal angle between the named mix probe at
     *any* depth and the hex mix probe at *any* depth, both at the pre-answer
     position, stays between {_off_embedding.min():.0f}° and
     {_off_embedding.max():.0f}° across all {_off_embedding.size} pairs. Widening
-    the search to every depth × landmark pair where both forms' own strict
-    readings clear 0.3 (a low bar, and one that admits the contaminated answer
+    the search to every depth × landmark pair where the strict within-form
+    readings of both forms clear 0.3 (a low bar, and one that admits the contaminated answer
     positions), the closest the two subspaces come is {_best:.0f}°.
 
     So the depth offset is not concealing a shared set of directions: there is
-    no layer at which hex's mix decoder points where named's does. A
+    no layer at which the hex mix decoder points where the named one does. A
     depth-crossed transfer $R^2$ would still be a different test (zero-shot fit
     rather than subspace angle) and is cheap to add to the eval step; it is
     banked in todo-science rather than done here, because it is not the
@@ -1918,7 +1918,7 @@ def _(arrays):
     One artifact in the angle map: At the embedding, on the space closing
     operand 1, the two probes appear to share a direction almost exactly (0.4°).
     The space character is the same token in both sublanguages, so at depth 0
-    the probe's input is constant and its fitted direction is undetermined. The
+    the probe input is constant and its fitted direction is undetermined. The
     same degeneracy will show up in H4 and H5, where a small angle would
     otherwise read as the alignment those hypotheses are looking for.
     """)
@@ -1931,14 +1931,14 @@ def _():
     ### The named ceiling is a resolution limit (post hoc)
 
     Named exact match tops out around 0.84 on trained pairs and 0.67 on held-out
-    ones, while hex sits at ≈ 1.0, as did ex-2.1.3's regular 216-color
+    ones, while hex sits at ≈ 1.0, as did the regular 216-color ex-2.1.3
     vocabulary. That does not mean the named geometry is weaker; the two
     vocabularies ask questions of different precision.
 
     What varies is the **snap margin**: how much closer the correct name is to
     the exact mix than the runner-up. On a regular sub-grid closed under mixing,
     the answer lands on a vocabulary point and the margin is a constant (one
-    grid step, 0.2 of the unit cube at ex-2.1.3's `v216`). On an irregular
+    grid step, 0.2 of the unit cube at `v216` in ex-2.1.3). On an irregular
     palette it varies by two orders of magnitude, and its median here is about a
     sixth of that. So a raw accuracy pools prompts that need 0.1 of positional
     accuracy with prompts that need 0.005.
@@ -1980,7 +1980,7 @@ def _(precision):
             unit-cube units). Points are the observed rate in each margin bin,
             pooled over three seeds, with binomial standard errors; the line is
             the resolution-limited reference at the $\\sigma$ fitted to that
-            panel's overall accuracy, so its level is fitted but its slope is
+            overall accuracy of that panel, so its level is fitted but its slope is
             not. The shaded profile along the bottom is the margin distribution.
         """,
     )
@@ -2032,14 +2032,14 @@ def _(precision):
 
 @app.cell(hide_code=True)
 def _(arrays, precision):
-    # What the same effective precision would score on the earlier experiments' regular
-    # grids, where every mix lands on a vocabulary point and the margin is the grid step.
+    # What the same effective precision would score on the regular grids of the earlier
+    # experiments, where every mix lands on a vocabulary point and the margin is the grid step.
     _sigma = precision["center", "named_holdout"]["sigma"]
     _rng = np.random.default_rng(2)
     _grids = {"v216 (ex-2.1.3/2.1.4)": (0, 3, 6, 9, 12, 15), "v4096 (ex-2.1.3)": tuple(range(16))}
     _preds = {}
     for _name, _levels in _grids.items():
-        # Ex-2.1.3's named equations draw *closed* pairs only, so the answer is a
+        # The named equations in ex-2.1.3 draw *closed* pairs only, so the answer is a
         # vocabulary point and the runner-up sits one grid step away.
         _pts = np.array([(_r, _g, _b) for _r in _levels for _g in _levels for _b in _levels])
         _idx = np.random.default_rng(3).integers(len(_pts), size=(8192, 2))
@@ -2049,7 +2049,7 @@ def _(arrays, precision):
         _ti = np.linalg.norm(_pal[None] - _mix[:, None], axis=2).argmin(1)
         _preds[_name] = float(bl.precision_limited_acc(_pal, _mix, _ti, _sigma, _rng, 120).mean())
 
-    # The probe's own residual at the site that carries the mix, for comparison: R² is
+    # The probe residual at the site that carries the mix, for comparison: R² is
     # 1 − residual variance / target variance, so a residual scale falls out of it.
     _target_sd = float(
         np.sqrt(
@@ -2079,27 +2079,27 @@ def _(arrays, precision):
     like recall is mixed in.
 
     **The earlier rungs are consistent with the same precision.** On
-    ex-2.1.3's regular grids, where a mix lands on a vocabulary point and the
+    the regular grids of ex-2.1.3, where a mix lands on a vocabulary point and the
     margin is the grid step,
     $\\sigma = {_sigma:.3f}$ predicts {_preds["v216 (ex-2.1.3/2.1.4)"]:.2f} at
     `v216`, which is about what ex-2.1.3 (≈ 1.0, single-token names) and
     ex-2.1.4 (0.91, spelled names) actually scored. So the drop from ≈ 1.0
     there to 0.67 here needs no change in how well colors are represented; the
     coarser vocabulary forgives more. The exception is `v4096`, where the same
-    $\\sigma$ predicts {_preds["v4096 (ex-2.1.3)"]:.2f} against ex-2.1.3's
-    observed 0.65: that model read colors roughly 1.5× more finely than this
+    $\\sigma$ predicts {_preds["v4096 (ex-2.1.3)"]:.2f} against the observed
+    0.65 in ex-2.1.3: that model read colors roughly 1.5× more finely than this
     one, plausible for a single-vocabulary corpus with single-token answers.
 
     **The behavior is more precise than the probe.** At the pre-answer
     position in the last layer the strict mix probe reads
     $R^2 = {_pre:.3f}$. With a per-channel target standard deviation of
-    {_target_sd:.3f}, that puts the probe's residual near {_probe_sd:.3f},
+    {_target_sd:.3f}, that puts the probe residual near {_probe_sd:.3f},
     roughly twice the {_sigma:.3f} the behavior implies. The two are different
-    estimands (a linear decoder's error versus an implied end-to-end
+    estimands (the error of a linear decoder versus an implied end-to-end
     resolution), so only the ordering is worth reading: the linear probe
     recovers a coarser version of the value than the model itself uses. For
     anchor design this means a probe $R^2$ of 0.94 at a site is a floor on
-    what is there, and an anchor's own supervision is a linear readout with
+    what is there, and anchor supervision is itself a linear readout with
     the same limitation.
     """)
     return
@@ -2134,7 +2134,7 @@ def _():
     greater depths.
 
     The named ceiling is a property of the palette rather than the model: misses
-    land on the mix's immediate neighbors, and a single fitted read-noise
+    land on the immediate neighbors of the mix, and a single fitted read-noise
     parameter reproduces the accuracy across conditions.
 
     And the forms seem to compute in different places: named assembles its mix

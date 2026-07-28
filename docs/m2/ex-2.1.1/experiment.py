@@ -23,10 +23,10 @@ LM over the corpus, then measure:
   never seen together; and cross-form pairs never seen together. The unseen
   sets measure whether the model learned the arithmetic rather than the table.
 - **Per-layer linear decodability**: ridge probes from the residual stream to
-  the operand color (at the operand's last character) and the result color and
+  the operand color (at the last character of the operand) and the result color and
   its *redness* (at the pre-answer position), R² on a held-out half.
 - **Per-character surprisal and entropy** on a couple of lines per eval set,
-  for the report's subline figures: where along ``a + b = c`` the model is
+  for the subline figures in the report: where along ``a + b = c`` the model is
   uncertain, and whether it *knew* it would be (entropy) or was caught out
   (surprisal exceeding entropy).
 
@@ -48,7 +48,7 @@ WIDTHS = [16, 32, 64]
 DEPTHS = [2, 4]
 SEEDS = [0, 1, 2]
 # Carried over from ngpt-scaling, which trained stably at this LR across its
-# whole width × depth grid; nGPT's normalization makes the LR forgiving.
+# whole width × depth grid; the nGPT normalization makes the LR forgiving.
 PEAK_LR = 1e-2
 
 CORPUS_SEED = 0
@@ -58,7 +58,7 @@ N_EVAL = 256  # examples per unseen eval set
 N_PROBE = 2048
 N_SURPRISAL = 2  # examples per eval set in the surprisal capture
 
-# Store refs, namespaced by milestone (m1's predate the nesting and stay flat).
+# Store refs, namespaced by milestone (the m1 refs predate the nesting and stay flat).
 # The report imports these, so they can't drift.
 METRICS_REF = "reports/m2/ex-2.1.1/metrics"
 WEIGHTS_REF = "reports/m2/ex-2.1.1/probe-weights"
@@ -108,7 +108,7 @@ def prepare_data() -> dict:
 
 
 def _make_config(n_embd: int, n_layer: int, seed: int):
-    """One cell's training config; LR and schedule fixed across the sweep."""
+    """Training config for one cell; LR and schedule fixed across the sweep."""
     from sca.config import (
         DataConfig,
         ModelConfig,
@@ -137,8 +137,8 @@ def _make_config(n_embd: int, n_layer: int, seed: int):
 
 
 def build_sweep(meta) -> list[tuple]:
-    """Derive (config, label) cells from prep's tokenizer; cheap + deterministic,
-    so each cell's memo key is stable and re-runs only if its own config changes.
+    """Derive (config, label) cells from the prep tokenizer; cheap + deterministic,
+    so the memo key of each cell is stable and re-runs only if its own config changes.
     """
     from sca.utils import align
 
@@ -300,12 +300,12 @@ experiment = Experiment(
     main=main,
     roles={
         "prep": {},  # CPU-only: corpus generation + tokenize
-        # These cells are smaller than ngpt-scaling's (≤1M params, ~2k steps on a
+        # These cells are smaller than those of ngpt-scaling (≤1M params, ~2k steps on a
         # ~750k-char corpus), so an L4 clears one in a few minutes.
         "train": dict(gpu="L4", timeout=1500),
         "eval": dict(gpu="L4", timeout=900),
-        # CPU, but needs real cores and headroom: importing jax on Modal's
-        # default 0.125-core slice alone can blow the default 5-min timeout.
+        # CPU, but needs real cores and headroom: importing jax on the default
+        # Modal 0.125-core slice alone can blow the default 5-min timeout.
         "surprisal": dict(cpu=2, timeout=900),
     },
 )

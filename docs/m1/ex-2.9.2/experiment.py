@@ -1,10 +1,10 @@
 """
 Experiment 2.9.2: fallback control for deleting *red*.
 
-Ex-2.9.1 reproduced M1's headline result and also its variance: the ablation
+Ex-2.9.1 reproduced the M1 headline result and also its variance: the ablation
 score (R² between post-ablation reconstruction error and similarity to red)
 swings widely across seeds, so getting a clean deletion means sweeping seeds
-and picking a winner. The SCA paper's discussion attributes this to unreliable
+and picking a winner. The discussion in the SCA paper attributes this to unreliable
 redistribution — zeroing the anchored axis and renormalizing sends *red*
 somewhere random — and points at optimal ablation (Li & Janson 2024,
 arXiv:2409.09951) as a possible fix. This experiment tests that suggestion,
@@ -13,13 +13,13 @@ trained to map the anti-anchor point −e₀ (kept empty by the anti-anchor
 regularizer) to mid-gray, so an intervention can redirect red somewhere with a
 *defined* response.
 
-Two training variants share ex-2.9.1's model, data, and dopesheet
-(`sca.colorcube` has the testbed): `base` (w_fb = 0) is ex-2.9.1's loss
+Two training variants share the ex-2.9.1 model, data, and dopesheet
+(`sca.colorcube` has the testbed): `base` (w_fb = 0) is the ex-2.9.1 loss
 unchanged; `fallback` (w_fb = 0.05) adds a decoder-only term
 MSE(dec(−e₀), 0.5). Each trains 32 seeds. Every trained model is then scored
 under five weight-level interventions on latent axis 0:
 
-- zero: zero encoder row 0 + bias (ex-2.9.1's ablation; the baseline).
+- zero: zero encoder row 0 + bias (the ex-2.9.1 ablation; the baseline).
 - oa: zero row 0, set the bias to the constant minimizing mean reconstruction
   error over the full RGB grid — optimal ablation as defined by Li & Janson.
 - oa-nontarget: same, but the constant is optimized over non-red colors only —
@@ -28,9 +28,9 @@ under five weight-level interventions on latent axis 0:
   true deletion (a sign flip restores it) but a clean redirect.
 - redirect: zero row 0, set the bias to −γ (γ = 1) — a true deletion (the
   redness computation is gone) plus a constant redirect toward −e₀, felt in
-  proportion to how much of an input's pre-norm activation the deletion removed.
+  proportion to how much of the pre-norm activation of an input the deletion removed.
 
-Per run we record each intervention's score, damage to red, and collateral
+Per run we record the score of each intervention, damage to red, and collateral
 damage, plus the trained fallback color dec(−e₀) and axis-0 leakage. The
 comparison is distributional across seeds: fallback control should collapse
 the variance of the intervention response, not shift the mean.
@@ -176,7 +176,7 @@ def publish_results(results: list[dict]) -> dict:
     metrics = [{k: v for k, v in r.items() if k != "eval"} for r in results]
     set_ref(METRICS_REF, put(json.dumps(metrics, indent=2).encode(), name="ex-2.9.2-metrics.json"))
 
-    # Exemplar = the median run of each variant, ranked by its headline intervention's score.
+    # Exemplar = the median run of each variant, ranked by the score of its headline intervention.
     headline = {"base": "zero", "fallback": "reflect"}
     out = {}
     for variant, ref in EXEMPLAR_REFS.items():
