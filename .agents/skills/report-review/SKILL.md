@@ -12,9 +12,7 @@ model: sonnet
 
 Let's iteratively improve this report.
 
-Your job is to route and decide, not to review. Don't read the report yourself
-— a fresh reader is the whole point, and your context is already full of the
-reasoning that produced it.
+Your job is to route and decide, not to review. Probably don't read the report yourself — a fresh reader is the whole point.
 
 For up to 3 rounds:
 
