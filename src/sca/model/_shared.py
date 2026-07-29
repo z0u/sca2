@@ -127,6 +127,10 @@ class LanguageModel(eqx.Module):
         """The residual stream at every depth (embedding + after each block)."""
         raise NotImplementedError
 
+    def stream_and_logits(self, idx: Int[Array, "B T"]) -> tuple[Float[Array, "L1 B T C"], Float[Array, "B T V"]]:
+        """Both of the above from one pass, for losses that read the stream."""
+        raise NotImplementedError
+
     def get_num_params(self) -> int:
         """Calculate the number of parameters in the model."""
         return sum(x.size for x in jax.tree.leaves(eqx.filter(self, eqx.is_array)))

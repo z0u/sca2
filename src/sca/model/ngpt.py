@@ -208,6 +208,23 @@ class NGPT(LanguageModel):
             states.append(x)
         return jnp.stack(states)
 
+    def stream_and_logits(self, idx: Int[Array, "B T"]) -> tuple[Float[Array, "L1 B T C"], Float[Array, "B T V"]]:
+        """The residual stream at every depth *and* the logits, from one pass.
+
+        What a training step needs when the loss reads the stream directly, as
+        concept anchoring does (`sca.anchoring`): running ``__call__`` and
+        ``residual_stream`` separately would forward twice. Blocks stay
+        gradient-checkpointed, as in ``__call__``.
+        """
+        x = normalize(self.transformer.wte[idx])
+        states = [x]
+        enc = self.transformer.rotary_enc
+        run_block = eqx.filter_checkpoint(lambda block, h: block(h, enc))
+        for block in self.transformer.blocks:
+            x = run_block(block, x)
+            states.append(x)
+        return jnp.stack(states), (x @ self.transformer.wte.T) * self.s_z()
+
     def normalize_weights(self) -> "NGPT":
         """Project every hidden-dim matrix back onto the unit hypersphere.
 

@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
 
+from sca.anchoring import AnchorSpec, alignment, make_anchored_train_step, margin, sample_anchored_batches
 from sca.compute.data_pipelines import load_data
 from sca.compute.model import save_checkpoint
 from sca.config import TrainingConfig
@@ -91,3 +92,122 @@ def train_model(
         save_checkpoint(model, config, all_metrics[-1], checkpoint_dir)
 
     return model, all_metrics
+
+
+def train_anchored(
+    config: TrainingConfig,
+    data_dir: Path,
+    *,
+    anchor: AnchorSpec,
+    label_p: np.ndarray,
+    probe_tokens: np.ndarray,
+    probe_weights: np.ndarray,
+    checkpoint_dir: Path,
+    checkpoint_every: int | None = None,
+    traj_stride: int = 50,
+    n_val_batches: int = 4,
+) -> tuple[LanguageModel, list[TrainingMetrics], dict[str, np.ndarray]]:
+    """Train with a concept anchor, recording the alignment trajectory as it goes.
+
+    `train_model` with two additions: the loss carries the scheduled anchor term
+    (`sca.anchoring`), and every *traj_stride* steps we measure the alignment
+    margin at op1 on *probe_tokens* — one line per color, weighted by
+    *probe_weights*. A flat loss curve does not mean learning is done, so that
+    trajectory is the evidence to consult before trusting an endpoint.
+
+    Args:
+        config: Full training configuration.
+        data_dir: Directory to load the tokenized corpus from.
+        anchor: Peak weight and schedule for the pull.
+        label_p: (vocab,) probability that a line draws a label, by its first
+            operand's token; redrawn per visit.
+        probe_tokens: (C, T) one line per color, that color as first operand.
+        probe_weights: (C,) label-affinity weights, summing to 1.
+        checkpoint_dir: Where to write checkpoints; sweep cells sharing a volume
+            must each pass their own.
+        checkpoint_every: Save a checkpoint every N epochs. None = about 50 in all.
+        traj_stride: Steps between alignment measurements.
+        n_val_batches: fixed validation crops behind the trajectory's loss curve,
+            drawn once so the curve moves with the model rather than the sample.
+    """
+    data, metadata = load_data(data_dir)
+    assert metadata.tokenizer_config.vocab_size <= config.model.vocab_size, "Vocab size mismatch"
+
+    model = build_model(config.model, key=jr.key(config.seed))
+    rng = np.random.default_rng(config.seed)
+
+    train_data, val_data = split_data(data, config.data.train_split)
+    epoch_length = batches_per_epoch(len(train_data), config.data, config.model)
+    val_length = batches_per_epoch(len(val_data), config.data, config.model, oversample=1)
+
+    if checkpoint_every is None:
+        checkpoint_every = max(1, config.scheduler.epochs // 50)
+
+    schedule = configure_schedule(config.scheduler, config.optimizer.learning_rate, epoch_length)
+    optimizer = configure_optimizer(model, config.optimizer, schedule)
+    opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+    train_step = make_anchored_train_step(optimizer)
+
+    # A fixed validation sample, drawn off its own stream so the training crops
+    # stay identical to what an unanchored run of the same seed would see.
+    val_rng = np.random.default_rng(config.seed + 10_000)
+    val_batches = list(sample_batches(val_data, config.data, config.model, max(n_val_batches, val_length), val_rng))
+    total_steps = config.scheduler.epochs * epoch_length
+    tokens_per_epoch = epoch_length * config.data.batch_size * config.model.block_size
+    all_metrics: list[TrainingMetrics] = []
+    keys = ("step", "epoch", "lr", "weight", "m_op1", "alpha_op1", "val_loss", "anchor")
+    traj: dict[str, list[float]] = {k: [] for k in keys}
+    step = 0
+
+    def record(step: int, weight: float, anchor_loss: float) -> None:
+        alpha = alignment(model, probe_tokens)[:, :, :1]  # (L1, C, 1): op1 only
+        m_op1 = float(margin(alpha, probe_weights).mean())
+        # The margin is a contrast, so it is blind to the whole cube drifting onto
+        # the axis together. Carrying the plain mean beside it keeps the two apart.
+        traj["alpha_op1"].append(float(alpha.mean()))
+        traj["step"].append(step)
+        traj["epoch"].append(step / epoch_length)
+        traj["lr"].append(float(jnp.asarray(schedule(step))))
+        traj["weight"].append(weight)
+        traj["m_op1"].append(m_op1)
+        traj["val_loss"].append(float(np.mean([float(eval_step(model, x, y)) for x, y in val_batches])))
+        traj["anchor"].append(anchor_loss)
+        emit_metrics(m_op1=m_op1)
+
+    expect_metrics(loss="down", anchor="down", m_op1="up")
+    for epoch in range(config.scheduler.epochs):
+        train_losses, anchor_losses = [], []
+        for x, y, mask in sample_anchored_batches(
+            train_data, config.data, config.model, epoch_length, rng, label_p, anchor.span
+        ):
+            weight = float(anchor(epoch + len(train_losses) / epoch_length))
+            model, opt_state, loss, anchor_loss = train_step(model, opt_state, x, y, mask, jnp.asarray(weight))
+            train_losses.append(float(loss))
+            anchor_losses.append(float(anchor_loss))
+            step += 1
+            emit_metrics(loss=float(loss), anchor=float(anchor_loss), anchor_weight=weight)
+            emit_progress(step, total_steps)
+            if step % traj_stride == 0:
+                record(step, weight, float(anchor_loss))
+
+        val_losses = [
+            float(eval_step(model, x, y))
+            for x, y in sample_batches(val_data, config.data, config.model, val_length, rng)
+        ]
+        all_metrics.append(
+            TrainingMetrics(
+                epoch=epoch,
+                learning_rate=float(jnp.asarray(schedule(step))),
+                val_loss=float(np.mean(val_losses)),
+                training_tokens=(epoch + 1) * tokens_per_epoch,
+                train_loss=float(np.mean(train_losses)),
+            )
+        )
+        if epoch > 0 and epoch % checkpoint_every == 0:
+            save_checkpoint(model, config, all_metrics[-1], checkpoint_dir)
+
+    record(step, float(anchor(config.scheduler.epochs)), float(np.mean(anchor_losses)))
+    if all_metrics:
+        save_checkpoint(model, config, all_metrics[-1], checkpoint_dir)
+
+    return model, all_metrics, {k: np.asarray(v, dtype=np.float32) for k, v in traj.items()}

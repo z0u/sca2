@@ -138,6 +138,15 @@ def _():
     identical lines, drawn from seen and held-out pairs alike. Per-color
     alignment statistics average over op2 rather than conditioning on it.
 
+    At op1 that average is over identical values, and deliberately so: a
+    causal model's first position attends to itself alone, so a color's op1
+    alignment is the same on all 27 of its lines. The statistic H2 and H4
+    score is therefore a property of the token, measured without sampling
+    error from the partner — but also without any averaging to quiet the
+    measurement, which is what sets the noise floor quoted under H2(b) and H4.
+    Averaging over partners does its usual work at the later positions, which
+    H3 reads.
+
     ### Labels
 
     A line is labeled *red* by a coin flip weighted by the redness of its first
@@ -704,12 +713,12 @@ def _():
     intended reading.* The direct pull is proportional to `redness⁸`, and a
     response that stayed proportional to it cannot clear a rank gate.
     Unrelated directions in a 64-dimensional stream put a floor of about
-    0.011 on the measured $\alpha_c$ (a spread of $1/\sqrt{{64}}$ per
-    cosine, averaged over 27 probe lines × 5 residual slices), or ≈0.006
-    after the three-seed mean the gate is scored on, and
+    0.056 on the measured $\alpha_c$ (a spread of $1/\sqrt{{64}}$ per
+    cosine, averaged over the 5 residual slices), or ≈0.032 after the
+    three-seed mean the gate is scored on, and
     {int((ex.LABEL_P < 1e-6).sum())} colors have expected pull below
     $10^{{-6}}$. So most of the cube ranks at random; simulation at that
-    floor puts ρ near 0.4, and its R² against `sim^1.5` is
+    floor puts ρ near 0.21, and its R² against `sim^1.5` is
     {ex.r2_sim(ex.REDNESS**8):.2f}, far under the gate on both tracks. A
     response confined to the pull means the anchor caught the labeled tokens
     rather than *red*, which is the memorized-exemplar outcome (b) exists to
@@ -718,27 +727,37 @@ def _():
 
     *The two tracks name two families a generalized response could take*,
     one from each side of the milestone. Track 1 is ρ against `redness`. It
-    accepts any response that rises monotonically with the label-generating
-    variable: a linear `redness` response scores ≈0.99 at the seed-mean
-    noise floor, and `redness³` scores ≈0.89. Track 2 is R² against
-    `sim^1.5`, M1's ablation result mapped from damage to alignment
-    (damage ∝ `sim³` and damage quadratic in alignment give alignment ∝
-    `sim^1.5`; the suppression result maps to `sim¹` the same way). The 3/2
-    power also maximizes coverage of the family: R² ≥ 0.86 against every
-    power of `sim` from 1 to 3, and `redness³` scores
-    {ex.r2_sim(ex.REDNESS**3):.2f}. (These simulated scores assume a
-    unit-amplitude response; at half amplitude, roughly the least H2(a)
-    accepts, `redness³` scores ≈0.83 on track 1 and ≈0.90 on track 2.)
+    accepts a response rising with the label-generating variable itself: a
+    linear `redness` response scores ≈0.98 at the seed-mean noise floor.
+    Track 2 is R² against `sim^1.5`, M1's ablation result mapped from damage
+    to alignment (damage ∝ `sim³` and damage quadratic in alignment give
+    alignment ∝ `sim^1.5`; the suppression result maps to `sim¹` the same
+    way). The 3/2 power also maximizes coverage of the family: R² ≥ 0.86
+    against every power of `sim` from 1 to 3, and `redness³` scores
+    {ex.r2_sim(ex.REDNESS**3):.2f} noise-free, ≈0.86 at the floor.
     Each track is robust where the other is marginal. `sim` orders the cube
     by hue rather than by the `redness` formula, and it takes only 23
     distinct values on this grid, so a sim-family response of any power
-    scores ρ ≈ 0.71 on track 1 at the seed-mean floor, under the gate; its
+    scores ρ ≈ 0.76 on track 1 at the seed-mean floor, under the gate; its
     noise-free ceiling of {ex.SIM_RHO_CEILING:.2f} sits just over it,
     because midranks credit the ties. In the other direction, a linear
     `redness` response scores R² = {ex.r2_sim(ex.REDNESS):.2f} on track 2,
     right at the gate, while clearing track 1 with room to spare. Passing
     on either track accepts every graded shape above; requiring both tracks
     would fail most of them.
+
+    *The floor is looser than the first draft of this gate assumed*, and the
+    numbers above are the corrected ones. The earlier estimate divided the
+    per-cosine spread by 27 probe lines as well as 5 residual slices, which
+    the measurement cannot do: at op1 the 27 lines of a color share a state,
+    as the method notes. Correcting it (0.011 → 0.056 per seed) leaves both
+    thresholds where they were frozen and changes what each track covers.
+    Track 2 now carries the graded shapes that are not linear in `redness`:
+    `redness³` scores ρ ≈ 0.70 on track 1 against R² ≈ 0.86 on track 2, and
+    the `sim` family likewise. Track 1 carries the `redness`-linear family.
+    A response at half amplitude — roughly the least H2(a) accepts — clears
+    neither track unless it is close to linear in `redness`, so the gate is
+    stricter than we first estimated rather than looser.
 
     *A pure step clears neither gate.* The measured alignment is continuous,
     so a step orders the colors within each of its two levels arbitrarily.
@@ -781,9 +800,10 @@ def _():
     running maximum of $m_{\text{op1}}$ reaches 0.2, the end-of-training
     value is at least 0.8× that maximum. The 0.2 floor keeps the gate from
     resolving on noise. In a simulation of unrelated 64-d states, the
-    per-checkpoint noise in the margin is near 0.004, the maximum of a
-    noise-only trajectory is near 0.014, and a ratio of noise-level margins
-    fails the 0.8× gate about as often as not.
+    per-checkpoint noise in the margin is near 0.021, the maximum of a
+    noise-only trajectory is near 0.06, and a ratio of noise-level margins
+    fails the 0.8× gate about as often as not. The floor is therefore about
+    3× a noise-only trajectory's peak, and well under H2(a)'s 0.5.
     Runs below the floor are reported but not scored.
     Partial: violations confined to the $\lambda{=}0.3$ condition.
     """)
