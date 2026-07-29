@@ -14,6 +14,13 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Pre-push `ty` check scans nested worktrees (2026-07-29).** Pushing from a
+  `.claude/worktrees/<name>` worktree runs `ty check` from the parent checkout,
+  which picks up the worktree's copy of `src/mini` as a separate tree with the
+  wrong first-party roots — 23 spurious unresolved-import/type errors on a
+  Markdown-only change. The hook (or ty config) should exclude
+  `.claude/worktrees/`, or run from the repo root of the tree being pushed.
+
 - **`./go site` downloads every report's assets and throws them away
   (2026-07-28).** The CI Pages build takes ~45s for 10 reports, of which only
   ~3s is CPU — it is almost entirely network wait, and it grows linearly with
