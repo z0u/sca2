@@ -58,8 +58,17 @@ Prefer paragraphs for nuanced or complex explanations; use lists for
 summarizing steps, or when clarity would genuinely benefit from structure —
 and use them sparingly.
 
-Use italics for concepts like _red_. Never use bold and italics for emphasis,
-because they are distracting to read. The user will add them if necessary.
+Emphasis can be distracting to read, so follow these guidelines for where and
+how often to use it:
+
+- Use italics for concepts like _red_. When: usually.
+- Use italics for named terms like _anchor_. When: on the first use in a
+  section, and then if the role of the word would otherwise be ambiguous, e.g.
+  to distinguish "anchor" the regularizer term from "the anchor point".
+- Never use bold or italics for other emphasis, because they are distracting to
+  read. The user will add them if necessary.
+
+### Prose in Marimo
 
 In Marimo, consider using `details` markup for asides, which render unobtrusively.
 
@@ -72,6 +81,12 @@ Some backstory.
 ///
 """)
 ```
+
+Plain Markdown cells are visible as soon as the notebook opens, and contribute to the
+TOC. But Markdown cells that use string interpolation, or anything other than a plain
+`mo.md("literal string")`, are not rendered until it's their turn in the DAG. Therefore,
+headings and their following introductory paragraph should be placed in plain Markdown
+cells; otherwise the document will be hard to navigate.
 
 Don't hard-wrap a line inside an inline code span or math expression. A wrapped
 span can start the next line with block syntax — a hex code like `#f78` at the

@@ -91,4 +91,11 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   over strong nulls; hex 0.996); the cross-form alignment sections are still
   in their preregistered form, with the analysis round in progress.
 
+- [Experiment 2.1.6](./m2/ex-2.1.6/report.py): anchoring *red* — the first
+  anchored transformer run. A preregistered skeleton so far: one anchor term
+  (no anti terms, no intervention), sequence-level noisy labels driven by the
+  first operand's redness, applied at every layer and position of the
+  word-level `v216` testbed. Hypotheses cover task cost, graded alignment,
+  condensation vs broadcast, and schedule stability.
+
 More reports will appear here as the M2 experiments land.
