@@ -31,6 +31,15 @@ REPO = Path(__file__).resolve().parents[2]
 DEMOS = sorted(REPO.glob("docs/**/experiment.py"))
 
 
+def _design_only(path: Path) -> bool:
+    """A preregistered design: constants its report imports, with the DAG still to come.
+
+    Marked in the module itself (`DESIGN_ONLY = True`) so the opt-out lives beside
+    the file it describes, and disappears when the experiment is implemented.
+    """
+    return "DESIGN_ONLY = True" in path.read_text()
+
+
 @pytest.fixture(autouse=True)
 def _local_store_only(monkeypatch: pytest.MonkeyPatch):
     """Exercise the *local* project store, hermetically.
@@ -61,6 +70,8 @@ def test_every_demo_experiment_loads(path: Path):
 
     Cheap guard for the heavy demos: catches import errors and the module-level
     ``experiment = Experiment(...)`` contract without running any training."""
+    if _design_only(path):
+        pytest.skip("preregistered design; no DAG yet")
     exp = load_experiment(path)
     assert exp.name == path.parent.name  # the dir is the experiment name by convention
     assert callable(exp.main)  # main(ctx), or a sweep lowered to one map

@@ -21,6 +21,9 @@ from sca.data.colors import N_LEVELS
 from sca.data.named_colors import GRIDS
 from sca.training.scheduler import configure_schedule
 
+DESIGN_ONLY = True
+"""No DAG here yet, so the e2e loader test skips this module. Remove it with the sweep."""
+
 GRID = "v216"  # the ex-2.1.3 cell this builds on: 216 colors, one word each
 SEEDS = [0, 1, 2]
 PEAK_LR = 1e-2  # carried from ex-2.1.3, unchanged
@@ -49,9 +52,20 @@ LABEL_P = REDNESS**8 * RED_RATE
 LABEL_W = LABEL_P / LABEL_P.sum()
 """The same distribution normalized: each color's share of all labeled lines.
 
-Also the sampling weight for label-balanced batching, and the weight $u_c$ that
-H2's $\\Delta\\alpha_{op1}$ scores with.
+Also the weight $u_c$ that every alignment statistic scores with.
 """
+
+BLOCK, BATCH = 64, 64  # ex-2.1.3's DataConfig, unchanged
+LINE_TOKENS = 6  # `name + name = name ⏎` at word level
+LINES_PER_BATCH = BLOCK * BATCH / LINE_TOKENS
+"""Lines a batch carries. Samples are packed token blocks, so a batch is ~680 equations, not 64."""
+
+LABELED_PER_BATCH = float(LINES_PER_BATCH * LABEL_P.mean())
+BATCHES_WITH_A_LABEL = float(1.0 - np.exp(-LABELED_PER_BATCH))
+"""Poisson approximation; the exact per-line draws are independent."""
+
+ANCHOR_SPAN = ("op1", "+", "op2", "=")
+"""Positions the anchor term pulls: the prompt span. The answer and newline are measured, not pulled."""
 
 
 EFFECTIVE_COLORS = float(np.exp(-(LABEL_W[LABEL_W > 0] * np.log(LABEL_W[LABEL_W > 0])).sum()))
