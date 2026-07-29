@@ -348,18 +348,23 @@ def _():
     contribute nothing, and no other term is added.
 
     The answer token and the newline are inside the labeled equation but
-    outside $\mathcal{P}$. We exclude them for two reasons, both about
-    keeping results readable. First, the answer of a red-labeled line is
-    itself reddish, since a red op1 drags the mix. An anchored answer
-    position would therefore align for two reasons at once, and we could not
-    tell them apart. Second, the answer position is where the task is
-    decided. Pulling it directly would mix the capacity cost that H1 is
-    trying to measure (what it costs to carry an anchored concept) with the
-    much blunter cost of distorting the state that emits the answer.
-    Excluding both costs nothing that we are measuring: the four pulled
-    positions still receive an identical, undifferentiated pull, so the
-    condensation question of H3 stands, and the answer position becomes a
-    clean read of how far alignment spreads on its own.
+    outside $\mathcal{P}$. We exclude them because of a confound: the
+    answer of a red-labeled line is itself reddish, since a red op1 drags
+    the mix. An anchored answer position would therefore align for two
+    reasons at once, and we could not tell them apart. The exclusion costs
+    nothing that we are measuring: the four pulled positions still receive
+    an identical, undifferentiated pull, so the condensation question of
+    H3 stands, and the answer position becomes a clean read of how far
+    alignment spreads on its own.
+
+    What the exclusion does not do is spare the state that emits the
+    answer. The model is causal, so the answer token is predicted from the
+    state at `=`, a position inside $\mathcal{P}$ that is pulled at every
+    layer, including the final one the logits are read from. The task cost
+    H1 measures therefore includes pressure on the answer logits
+    themselves, alongside the cost of carrying an anchored concept through
+    the rest of the prompt. Any pull that covers the prompt has this
+    property; we state it here so H1 is read as measuring both together.
 
     In a full language model, the analogue of this label would pull the
     whole span between document boundaries, answer-like positions included,
@@ -835,7 +840,10 @@ def _():
     can see rather than infer from color. The step-plateau form is right here:
     positions are ordinal and the tokens between landmarks are not measured.
     Annotate the layer-mean panel with the 2× threshold verdict against `+`,
-    op2, and `=`.
+    op2, and `=`. The last-layer panel is also where the pressure on answer
+    emission noted in the method would surface: at `=` the pull and the
+    answer logits share a state, so a dip there relative to earlier layers
+    is worth a caption note if it appears.
 
     Expected: a dominant op1 column. Contrary: a uniformly warm map, meaning
     broadcast. The answer column is shown but excluded from scoring, since it is
