@@ -168,14 +168,19 @@ def _():
     of batches.
 
     At that density we skip the label balancing that issue #10 recommends.
-    Labels are plain independent draws, one per line, and the anchor term is
-    normalized by however many labels a batch happens to hold. This makes the
-    gradient of the term noisy between batches, but that noise is inherent to
-    sparse labels. If the H4 trajectories show the term failing to take hold,
-    balancing is still available as a variance-reduction step.
+    Labels are plain independent draws, one per line. The anchor term is
+    normalized by however many labels a batch happens to hold; that
+    normalization is inherited from M1. Both the original implementation and
+    our reproduction (`sca.colorcube.loss_terms`) take a label-weighted mean
+    with a small ε in the denominator. So the
+    {1 - ex.BATCHES_WITH_A_LABEL:.0%} of batches holding no label contribute
+    nothing rather than a 0/0. The gradient of the term is therefore noisy
+    between batches, but that noise is inherent to sparse labels. If the H4
+    trajectories show the term failing to take hold, balancing is still
+    available as a variance-reduction step.
 
     Skipping it also keeps the comparison clean. Balanced batching
-    over-represents red first operands. The anchored conditions would then
+    over-represents red first operands, so the anchored conditions would
     train on a different corpus from the control, and every accuracy
     difference in H1 would carry an alternative explanation. As it stands,
     the control and the anchored conditions see identical batches in
@@ -489,14 +494,25 @@ def _():
     ### Scoring
 
     Hypotheses resolve on the middle rung $\lambda{=}0.1$, which is where the
-    numbers in the results sections come from. But the claim of H2 is that
-    anchoring works, and that claim shouldn't fail because we guessed a
-    coefficient wrong, so its gates read *some anchored rung clears the threshold while
-    also clearing H1*. H1 is what keeps this from being cherry-picking: a rung
-    earns nothing by reaching alignment if it broke the task getting there. The
-    ladder is only four rungs, so the multiple-comparisons cost of reading
-    across it is small. If the passing rung is not $\lambda{=}0.1$, we say so
-    and report both.
+    numbers in the results sections come from. Call a rung **task-clean** if
+    its `named_holdout` exact match is within 0.02 (absolute) of the seed mean
+    of the $\lambda{=}0$ control. H1 asks whether *every* anchored rung is
+    task-clean. H2 claims that anchoring works, and that claim shouldn't fail
+    just because we guessed a coefficient wrong. So its gates read *some
+    task-clean rung clears the threshold*: a rung can carry H2 even if H1
+    fails because a different rung broke the task. The task-clean requirement
+    is what keeps this from being cherry-picking, because a rung earns nothing
+    by reaching alignment if it broke the task getting there. The ladder is
+    only four rungs, so the multiple-comparisons cost of reading across it is
+    small. If the rung H2 resolves on is not $\lambda{=}0.1$, we say so and
+    report both.
+
+    H3 follows H2: it is scored on the rung H2 resolves on, and only if H2(a)
+    passed there. That restriction matters because the H3 gate is a ratio of
+    margins; a 2× ratio between noise-level margins would read as condensation
+    where nothing condensed. H4 applies to every anchored run, but it is read
+    alongside H2: a run whose alignment never rises keeps its running maximum
+    trivially, so H4 can only be *informative* where the anchor took.
 
     ### Measurements
 
@@ -583,51 +599,71 @@ def _():
     mo.md(r"""
     ## Hypotheses
 
-    Reported on the $\lambda{=}0.1$ condition (seed-averaged) unless stated; the
-    other rungs are context. The H2 gates read *some anchored rung*, per the
-    scoring rule above.
+    Unless stated otherwise, results are reported on the $\lambda{=}0.1$
+    condition (seed-averaged); the other rungs are context. Per the scoring
+    rule above, the H2 gates read *some task-clean rung*, and H3 follows H2.
 
-    **H1.** Anchoring does not harm the task. Every anchored condition has
-    `named_holdout` exact match within 0.02 (absolute) of the seed mean of the
-    $\lambda{=}0$ control. Partial: the gate passes at $\lambda \le 0.1$ but
-    fails at $0.3$.
+    **H1.** Anchoring does not harm the task. Every anchored condition is
+    task-clean: `named_holdout` exact match within 0.02 (absolute) of the seed
+    mean of the $\lambda{=}0$ control. Partial: the gate passes at
+    $\lambda \le 0.1$ but fails at $0.3$.
 
     **H2.** The concept lands on the anchor, and does so in a graded way, at
-    some rung that also clears H1. (a) $m_{\text{op1}} \ge 0.5$.
+    some task-clean rung. (a) $m_{\text{op1}} \ge 0.5$.
     (b) Redder colors sit closer to the anchor: over the 216 colors, $\alpha_c$
     increases with the redness of $c$, at Spearman
     $\rho \ge 0.8$.[^spearman] (c) The control condition shows
     $|m_{\text{op1}}| \le 0.1$.
 
-    Partial: (a) and (c) hold, but the response turns out to be a step rather
-    than a grade — the reds all sit at one alignment and the non-reds at
-    another, with no ordering within either. Spearman ρ can clear 0.8 on that
-    shape, since two well-separated clumps rank correctly, so the grading
-    figure is what distinguishes the two readings.
+    [^spearman]: Spearman ρ is a correlation coefficient computed on ranks
+    rather than values, so it measures whether the ordering agrees and doesn't
+    care about the shape of the curve.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(rf"""
+    Partial: (a) and (c) hold but (b) fails, with the grading figure showing a
+    step rather than a grade. In a step, the reds all sit at one alignment,
+    the non-reds at another, and there is no ordering within either group. We
+    checked how the ρ gate behaves on that shape. The measured alignment is
+    continuous, so a pure step orders the colors within each of its two levels
+    arbitrarily. Its expected ρ against this redness grid is at most
+    {ex.STEP_RHO_CEILING:.2f}, for a step placed near the middle of the cube;
+    a step at redness 0.5, the shape a memorized red exemplar would produce,
+    scores {ex.step_rho(0.5):.2f}. So a step cannot clear the 0.8 gate on its
+    own. What *would* carry a steppy response over the gate is residual
+    ordering within the levels, which is some grading after all. That is why
+    the figure, and the windowed mean drawn through it, is the arbiter for
+    shapes in between.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     **H3.** The concept condenses at the position that carries it.
     $m_{\text{op1}}$ is at least 2× the same layer mean at each of
     `+`, op2, and `=`. Those four positions are pulled identically, so the
     comparison is between sites that differ only in what the task does with
-    them. The answer and newline are outside the pull and are reported without
-    being scored.
+    them. The answer and newline are outside the pull; they are reported but
+    not scored. Per the scoring rule, H3 resolves on the rung H2 does, and
+    only if H2(a) passed there.
 
     We also anticipate a specific alternative outcome: broadcast, where all
     positions of a labeled line move toward $\hat v_{\text{red}}$ roughly
-    equally. That would
-    fail H3 while H2 passes. It would tell us something about sequence-level
-    labeling rather than about anchoring itself, and a logsumexp
-    position-pooling variant is the queued response.
+    equally. That would fail H3 while H2 passes. It would tell us something
+    about sequence-level labeling rather than about anchoring itself; a
+    logsumexp position-pooling variant is the queued response.
 
     **H4.** The late-instability mechanism of ex-2.9.3 does not reappear under
     the anneal-to-floor schedule. For every anchored run, the end-of-training
     $m_{\text{op1}}$ is at least 0.8× its running maximum over
     training.
     Partial: violations confined to the $\lambda{=}0.3$ condition.
-
-    [^spearman]: Spearman ρ is a correlation coefficient computed on ranks
-    rather than values, so it measures whether the ordering agrees and doesn't
-    care about the shape of the curve.
     """)
     return
 
@@ -691,7 +727,8 @@ def _():
 
     /// admonition | TODO
     $m(\ell, t)$ over the six line positions (op1, `+`, op2, `=`,
-    answer, newline), primary condition, seed mean, with the four pulled
+    answer, newline), on the rung H2 resolves on ($\lambda{=}0.1$ unless the
+    scoring rule moved it), seed mean, with the four pulled
     positions marked off from the two that are only measured. Drawn as stacked `smooth_step`
     panels in the manner of ex-2.1.5 rather than a heat map: positions on x,
     one panel per layer, the layer mean shaded under the line and the min and

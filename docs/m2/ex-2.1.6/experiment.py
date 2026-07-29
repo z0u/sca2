@@ -72,6 +72,34 @@ EFFECTIVE_COLORS = float(np.exp(-(LABEL_W[LABEL_W > 0] * np.log(LABEL_W[LABEL_W 
 """Perplexity of the label distribution — how many colors it behaves like, against 216 real ones."""
 
 
+def _midranks(v: np.ndarray) -> np.ndarray:
+    """Ranks 1..n, ties sharing the mean rank of their group."""
+    _, inv, counts = np.unique(v, return_inverse=True, return_counts=True)
+    return (np.cumsum(counts) - (counts - 1) / 2.0)[inv]
+
+
+def step_rho(threshold: float) -> float:
+    """Expected Spearman ρ of a pure step response `α = [redness > threshold]` against redness.
+
+    The measured α is continuous (a mean of cosines), so a pure step orders the
+    colors within each of its two levels arbitrarily: each α's expected rank is
+    its level's midrank, while its rank variance is that of a full untied
+    ranking. The expectation is over that arbitrary ordering — deterministic,
+    no RNG — and Monte Carlo with within-level noise agrees to 3 decimals.
+    """
+    n = REDNESS.size
+    rx, ry = _midranks(REDNESS), _midranks(REDNESS > threshold)
+    return float(np.cov(rx, ry)[0, 1] / (np.std(rx, ddof=1) * np.sqrt(n * (n + 1) / 12.0)))
+
+
+STEP_RHO_CEILING = max(step_rho(t) for t in np.unique(REDNESS)[:-1])
+"""The best expected Spearman ρ any pure step response can score, over all step locations.
+
+Below the H2(b) gate of 0.8, so a step cannot pass as a grade unless it also
+carries residual within-level ordering — see the H2 partial in the report.
+"""
+
+
 def smoothstep(tau) -> np.ndarray:
     """Minimum-jerk interpolation from 0 to 1 over the unit interval, clamped outside it.
 
