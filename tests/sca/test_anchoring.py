@@ -44,12 +44,12 @@ def corpus() -> np.ndarray:
     return lines.reshape(-1).astype(np.int32)
 
 
-def data_config(**overrides) -> DataConfig:
-    return DataConfig(**{"batch_size": 16, "oversample": 64, "train_split": 0.9, "padding_chance": 0.1, **overrides})
+def data_config(padding_chance: float = 0.1) -> DataConfig:
+    return DataConfig(batch_size=16, oversample=64, train_split=0.9, padding_chance=padding_chance)
 
 
-def model_config(**overrides) -> ModelConfig:
-    return ModelConfig(vocab_size=64, block_size=64, n_embd=32, n_head=8, n_head_dim=8, n_ff=32, n_layer=2, **overrides)
+def model_config() -> ModelConfig:
+    return ModelConfig(vocab_size=64, block_size=64, n_embd=32, n_head=8, n_head_dim=8, n_ff=32, n_layer=2)
 
 
 def test_smoothstep_starts_and_ends_at_rest():
@@ -79,7 +79,7 @@ def test_mask_covers_the_prompt_of_labeled_lines_only(corpus):
     # Label every line whose first operand is COLORS[0], and no other.
     label_p = np.zeros(64)
     label_p[COLORS[0]] = 1.0
-    mc, dc = model_config(), data_config(padding_chance=0.0)
+    mc, dc = model_config(), data_config(0.0)
     x, _, mask = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(0), label_p))
 
     assert mask.shape == x.shape
@@ -94,7 +94,7 @@ def test_mask_covers_the_prompt_of_labeled_lines_only(corpus):
 
 
 def test_mask_is_empty_without_labels_and_full_with_them(corpus):
-    mc, dc = model_config(), data_config(padding_chance=0.0)
+    mc, dc = model_config(), data_config(0.0)
     never = np.zeros(64)
     always = np.ones(64)
     rng = np.random.default_rng(1)
@@ -107,7 +107,7 @@ def test_mask_is_empty_without_labels_and_full_with_them(corpus):
 
 
 def test_padded_positions_are_never_pulled(corpus):
-    mc, dc = model_config(), data_config(padding_chance=1.0)
+    mc, dc = model_config(), data_config(1.0)
     _, _, mask = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(2), np.ones(64)))
     x, _, _ = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(2), np.ones(64)))
     assert mask[x == 0].sum() == 0
