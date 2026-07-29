@@ -26,4 +26,4 @@ disk="$(df -h / 2>/dev/null | awk 'NR==2 {print $4" free / "$2" total ("$5" used
 echo "## Environment"
 echo
 echo "RAM: $mem · Swap: $swap · Disk (/): $disk"
-echo "This machine has limited RAM/swap headroom — if a subagent needs to load large models/data, check available memory first and consider Modal for heavy workloads."
+echo "Consider the available resources before launching jobs on this machine."
