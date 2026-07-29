@@ -36,9 +36,9 @@ RED_RATE = 0.08
 
 SCHEDULER = SchedulerConfig(epochs=100, warmup_epochs=10, min_lr_factor=0.01)
 ANNEAL_START = 90.0  # epoch at which the anchor weight starts coming down
-ANNEAL_EPOCHS = 10.0  # how long it takes to reach the floor
+ANNEAL_END = 100.0  # and reaches the floor — the end of training, for every condition
 ANNEAL_FLOOR = 0.1  # fraction of peak it settles at; never zero (M1/ex-2.9.3)
-STAR_ANNEAL_START = 50.0  # the λ=0.1* star arm: same anneal, 40 epochs earlier
+STAR_ANNEAL_START = 50.0  # the λ=0.1* star arm: starts down 40 epochs earlier, lands in the same place
 
 LEVELS = np.asarray(GRIDS[GRID], dtype=float) / (N_LEVELS - 1)
 GRID_RGB = np.stack(np.meshgrid(LEVELS, LEVELS, LEVELS, indexing="ij"), axis=-1).reshape(-1, 3)
@@ -61,10 +61,15 @@ def anchor_weight(epoch, *, peak: float = 1.0, anneal_start: float = ANNEAL_STAR
     optimizer rather than ahead of it. The anneal is linear and stops at
     `ANNEAL_FLOOR` of peak — the M1/ex-2.9.3 lesson that protection withdrawn
     entirely lets the task loss reclaim the axis.
+
+    Every condition reaches the floor at `ANNEAL_END`, so moving *anneal_start*
+    stretches the anneal rather than sliding a fixed window: protection comes
+    off gradually, roughly in step with the cooling LR, instead of dropping
+    away while the optimizer is still hot.
     """
     e = np.asarray(epoch, dtype=float)
     ramp = np.clip(e / SCHEDULER.warmup_epochs, 0.0, 1.0)
-    anneal = np.clip((e - anneal_start) / ANNEAL_EPOCHS, 0.0, 1.0)
+    anneal = np.clip((e - anneal_start) / (ANNEAL_END - anneal_start), 0.0, 1.0)
     return peak * ramp * (1.0 - (1.0 - ANNEAL_FLOOR) * anneal)
 
 

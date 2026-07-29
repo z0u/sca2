@@ -297,7 +297,8 @@ def _():
     the dose–response.
 
     One **star arm** joins them: $\lambda{=}0.1^{*}$, identical except that the
-    anneal starts at epoch 50 rather than 90. Star arm is our shorthand, not a
+    anneal starts at epoch 50 rather than 90, still reaching the floor at 100.
+    Star arm is our shorthand, not a
     term of art — it borrows the *star point* of a central composite design,
     where one factor moves off the design centre while everything else holds.
     It varies one thing off the scoring rung instead of crossing the whole
@@ -307,9 +308,10 @@ def _():
     every labeled line for 90 epochs, and leakage is the secondary measurement
     we most expect to be sensitive to that. Against it stands the lesson of
     ex-2.9.3, that withdrawing protection while the optimizer is still hot lets
-    the task loss reclaim the axis, and epoch 50 puts this condition much
-    closer to that edge than the default does — see the figure below. Annealing
-    to a floor rather than to zero is what makes it worth trying at all. It is
+    the task loss reclaim the axis, and epoch 50 is a good deal hotter than
+    epoch 90 — see the figure below. Spreading the withdrawal over the
+    remaining 50 epochs, and stopping at a floor rather than zero, is what
+    makes it worth trying at all. It is
     a diagnostic, not a scored condition; if it shows lower leakage at equal
     alignment, the anneal window becomes a design question for the next
     experiment.
@@ -328,15 +330,16 @@ def _():
         name="schedules",
         alt_text="""
             The anchor weight holds at peak until epoch 90, by which point the
-            learning rate has decayed to 4% of peak; the star arm lets go at
-            epoch 50, while the learning rate is still around 60%.
+            learning rate has decayed to 4% of peak; the star arm starts down
+            at epoch 50, while the learning rate is still around 60%, and takes
+            the rest of training to reach the same floor.
         """,
         caption="""
             The two schedules on one axis, each as a fraction of its own peak —
             the LR peak is fixed at 1e-2, the anchor weight's is the swept
-            $\\lambda$. Both anneal windows are 10 epochs long and both stop at
-            a floor of 10% rather than zero. Dots mark the learning rate at the
-            moment each anneal begins.
+            $\\lambda$. Both anneals end at epoch 100 on a floor of 10% rather
+            than zero, so the star arm's is the longer and gentler of the two.
+            Dots mark the learning rate at the moment each anneal begins.
         """,
     )
     def _plot() -> plt.Figure:
@@ -375,22 +378,30 @@ def _():
     mo.md(rf"""
     Drawing the two together settles something the prose was vague about, and
     not in the direction we assumed. A cosine decay spends most of its range
-    late, so at epoch {ex.STAR_ANNEAL_START:.0f} the LR is still
+    late, so at epoch {ex.STAR_ANNEAL_START:.0f}, where the star arm begins
+    coming down, the LR is still
     {ex.learning_rate(ex.STAR_ANNEAL_START) / ex.PEAK_LR:.0%} of peak — over
-    half of it, so "well down" was wrong. By epoch {ex.ANNEAL_START:.0f} it is
-    {ex.learning_rate(ex.ANNEAL_START) / ex.PEAK_LR:.0%}. The star arm is
-    therefore a sharper test than we intended: it withdraws most of the anchor
-    into an optimizer still moving quickly, which is close to the setting that
-    produced the late collapses of M1/Ex-2.9.3. That makes it a good probe of
-    the mechanism and a poor candidate for a default schedule, and it is why
-    the star arm stays a diagnostic.
+    half of it. By epoch {ex.ANNEAL_START:.0f}, where the default begins, it is
+    {ex.learning_rate(ex.ANNEAL_START) / ex.PEAK_LR:.0%}. The two conditions
+    are therefore not withdrawing protection into comparable optimizers, and
+    that is the thing to keep in view when reading the star arm's result.
 
-    It anneals over the same 10-epoch window as the default, reaching the floor
-    at epoch {ex.STAR_ANNEAL_START + ex.ANNEAL_EPOCHS:.0f} and holding there.
-    The alternative reading — stretch the anneal from epoch
-    {ex.STAR_ANNEAL_START:.0f} to the end of training — would move the rate of
-    the anneal along with its start, and the point of a star arm is to move one
-    thing.
+    It is also why the anneal stretches rather than slides. Both conditions
+    reach the floor at epoch {ex.ANNEAL_END:.0f}, so the star arm's anneal
+    takes {ex.ANNEAL_END - ex.STAR_ANNEAL_START:.0f} epochs against the
+    default's {ex.ANNEAL_END - ex.ANNEAL_START:.0f}, and λ comes off roughly in
+    step with the cooling LR instead of dropping away underneath a hot one.
+    The alternative — a fixed 10-epoch window sliding to 50–60 — reaches the
+    floor while the LR is still around
+    {ex.learning_rate(ex.STAR_ANNEAL_START + 10) / ex.PEAK_LR:.0%} of peak,
+    which is close to the setting that produced M1/Ex-2.9.3's late collapses.
+    That would be a fine stress test of the mechanism and a poor candidate for
+    a schedule we might adopt, and the star arm is here to propose a schedule.
+
+    The moved factor is the *start* of the anneal, with its endpoint pinned to
+    the end of training. The rate follows from those two, so it is one factor
+    in the sense that matters — the design has one knob, not two set
+    independently.
     """)
     return
 
@@ -710,11 +721,10 @@ def _():
     $\lambda{=}0.1$, but H2 passes on any rung that also clears H1, so the
     claim doesn't rest on having guessed the coefficient.
     4. Three seeds.
-    5. The anneal window is epochs 90–100, down to a 10% floor, with the
-    $\lambda{=}0.1^{*}$ star arm running the same 10-epoch window from epoch 50
-    to test whether the long hold at peak costs leakage. The schedule figure
-    shows what that costs: the star arm lets go while the LR is still near 60%
-    of peak.
+    5. The anneal runs epochs 90–100, down to a 10% floor, with the
+    $\lambda{=}0.1^{*}$ star arm starting down at epoch 50 instead and taking
+    until 100 to reach the same floor, to test whether the long hold at peak
+    costs leakage. Both anneals end with training; only the start moves.
     6. The anchor term averages over all non-padding positions, including the
     answer and newline.
     ///
