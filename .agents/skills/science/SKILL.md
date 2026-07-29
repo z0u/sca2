@@ -46,9 +46,15 @@ When results arrive, fill the report in order of stakes rather than all at once.
 
 The publishing mechanics — exporting the report as a bundle, wiring result refs, verifying the render — are a separate concern, covered by the `mi-ni` skill.
 
-### Simplification pass
+### Review passes
 
-Text should be reviewed before handing back to the human. In one turn:
+Before freezing the hypotheses — and again before running — put the draft
+through the `report-review` skill. It runs the whole design past fresh readers
+who haven't seen the conversation that produced it, and comes back with a
+run/freeze/discuss recommendation.
+
+For prose alone, the pass is lighter. Text should be reviewed before handing
+back to the human. In one turn:
 
 1. Write
 2. Stage changes (unless you have another way to see what the agent changes)
