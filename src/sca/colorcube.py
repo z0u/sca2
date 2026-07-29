@@ -83,7 +83,7 @@ def redness(rgb: np.ndarray) -> np.ndarray:
     return r * (1 - g / 2 - b / 2)
 
 
-def _sim_to_red(rgb: np.ndarray, power: float = 3.0) -> np.ndarray:
+def sim_to_red(rgb: np.ndarray, power: float = 3.0) -> np.ndarray:
     """Angular HSV similarity to pure red, weighted by vibrancy (ports ex-preppy's `hsv_similarity`)."""
     h, s, v = mcolors.rgb_to_hsv(rgb).T
     angle = 360.0 * np.minimum(h, 1.0 - h)  # hue distance to red, in degrees
@@ -95,7 +95,7 @@ def _sim_to_red(rgb: np.ndarray, power: float = 3.0) -> np.ndarray:
 
 GRID_RGB = _grid(np.linspace(0, 1, 8))  # train set and scoring grid: 512 corner points
 RED_PROB = (redness(GRID_RGB) ** 8 * 0.08).astype(np.float32)  # sparse, noisy label: P(labeled red)
-SIM3 = _sim_to_red(GRID_RGB)
+SIM3 = sim_to_red(GRID_RGB)
 REDS = SIM3 > 0.5  # "damage to red" group
 OTHERS = SIM3 < 0.01  # "collateral damage" group (404 of 512 grid points)
 VAL_RGB = np.concatenate([_grid(np.linspace(1 / 16, 15 / 16, 7)), _grid(np.array([0.0, 1.0]))])  # centers + corners

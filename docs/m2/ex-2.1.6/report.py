@@ -130,15 +130,13 @@ def _():
     `named_seen`, `named_holdout`, and `open` (pairs whose mix has no name).
 
     We add one thing: an alignment probe set. For each of the 216 colors, it
-    builds 8 probe lines with that color as the first operand. The second
-    operand is drawn at random from the closed pairs of that color, i.e.
-    pairs whose mix has a name. Using closed pairs means every probe line has
-    a named answer, so the measured answer position corresponds to a real
-    token. Per-color alignment statistics therefore average over op2 rather
-    than conditioning on it. The draw is made once with a fixed seed and
-    shared by every run, so all cells are measured on identical lines. It
-    draws from seen and held-out pairs alike. (Every color has 27 closed
-    partners on this grid, so 8 is a real subsample.)
+    builds one probe line per closed partner of that color, meaning the 27
+    pairs whose mix has a name, with the color as the first operand. Closed
+    pairs guarantee every probe line has a named answer, so the measured
+    answer position corresponds to a real token. Using all 27 makes the probe
+    set exhaustive: no sampling, no seed, and every cell measured on
+    identical lines, drawn from seen and held-out pairs alike. Per-color
+    alignment statistics average over op2 rather than conditioning on it.
 
     ### Labels
 
@@ -151,8 +149,16 @@ def _():
     follow-up.
 
     Labels are redrawn per visit, as in M1, so they differ from epoch to
-    epoch. The expected pull on a color is therefore proportional to its label
-    affinity, which is where we expect the graded response of H2 to come from.
+    epoch, and the expected pull on a color is proportional to its label
+    affinity. The graded response of H2 is a further claim on top of that.
+    The affinity spans four orders of magnitude, so a response that stayed
+    proportional to it would be measurable on only the reddest few dozen
+    colors. The grading H2(b) predicts comes instead from generalization:
+    colors partway red moving partway. M1 is the precedent. With labels
+    drawn from this same affinity, the damage it measured under intervention
+    graded as low powers of its HSV similarity-to-red — `sim³` for ablation,
+    `sim²` for suppression — far flatter than `redness⁸`. The ceilings under
+    the hypotheses make this quantitative.
 
     [^bern]: A Bernoulli draw: one biased coin flip per line, independent of
     every other line.
@@ -284,11 +290,17 @@ def _():
     {ex.LABEL_P.mean():.2%} of lines, which is where the empty-batch problem
     above comes from.
 
-    The right panel is the shape the grading prediction of H2 rests on. The
-    pull a color feels is graded over four orders of magnitude, so if alignment
-    tracks label affinity we should see a curve rather than a step. But the
-    model only ever sees Bernoulli draws from this, and nothing stops it from
-    treating "red enough to be labeled sometimes" as a threshold.
+    The right panel also bounds what the pull alone can produce.
+    {int((ex.LABEL_P < 1e-6).sum())} colors are labeled less than once in a
+    million lines, so a response that tracked label affinity would sit under
+    any achievable measurement floor across most of the cube. It would read
+    as a step, and it clears neither gate of H2(b). So the curve H2(b) predicts
+    is a claim about generalization: the anchor catching *red* rather than
+    the labeled tokens, with colors partway red moving partway whether or
+    not they were ever labeled. The model only ever sees Bernoulli draws
+    from this distribution, and nothing stops it from treating "red enough
+    to be labeled sometimes" as a threshold. That outcome is what (b)
+    scores against.
 
     /// admonition | The concentration is a risk we are choosing to accept
     The weights behave like about {ex.EFFECTIVE_COLORS:.0f} distinct colors
@@ -336,18 +348,23 @@ def _():
     contribute nothing, and no other term is added.
 
     The answer token and the newline are inside the labeled equation but
-    outside $\mathcal{P}$. We exclude them for two reasons, both about
-    keeping results readable. First, the answer of a red-labeled line is
-    itself reddish, since a red op1 drags the mix. An anchored answer
-    position would therefore align for two reasons at once, and we could not
-    tell them apart. Second, the answer position is where the task is
-    decided. Pulling it directly would mix the capacity cost that H1 is
-    trying to measure (what it costs to carry an anchored concept) with the
-    much blunter cost of distorting the state that emits the answer.
-    Excluding both costs nothing that we are measuring: the four pulled
-    positions still receive an identical, undifferentiated pull, so the
-    condensation question of H3 stands, and the answer position becomes a
-    clean read of how far alignment spreads on its own.
+    outside $\mathcal{P}$. We exclude them because of a confound: the
+    answer of a red-labeled line is itself reddish, since a red op1 drags
+    the mix. An anchored answer position would therefore align for two
+    reasons at once, and we could not tell them apart. The exclusion costs
+    nothing that we are measuring: the four pulled positions still receive
+    an identical, undifferentiated pull, so the condensation question of
+    H3 stands, and the answer position becomes a clean read of how far
+    alignment spreads on its own.
+
+    What the exclusion does not do is spare the state that emits the
+    answer. The model is causal, so the answer token is predicted from the
+    state at `=`, a position inside $\mathcal{P}$ that is pulled at every
+    layer, including the final one the logits are read from. The task cost
+    H1 measures therefore includes pressure on the answer logits
+    themselves, alongside the cost of carrying an anchored concept through
+    the rest of the prompt. Any pull that covers the prompt has this
+    property; we state it here so H1 is read as measuring both together.
 
     In a full language model, the analogue of this label would pull the
     whole span between document boundaries, answer-like positions included,
@@ -500,24 +517,36 @@ def _():
     mo.md(r"""
     ### Scoring
 
-    Hypotheses resolve on the middle rung $\lambda{=}0.1$, which is where the
-    numbers in the results sections come from. Call a rung **task-clean** if
+    Hypotheses resolve on the middle rung, $\lambda{=}0.1$; the numbers in
+    the results sections come from that rung. Call a rung **task-clean** if
     its `named_holdout` exact match is within 0.02 (absolute) of the seed mean
     of the $\lambda{=}0$ control. H1 asks whether *every* anchored rung is
-    task-clean. H2 claims that anchoring works, and that claim shouldn't fail
-    just because we guessed a coefficient wrong. So its gates read *some
-    task-clean rung clears the threshold*: a rung can carry H2 even if H1
+    task-clean.
+
+    H2 claims that anchoring works, and that claim shouldn't fail just
+    because we guessed a coefficient wrong. So its gates ask whether *some*
+    task-clean rung clears the threshold: a rung can carry H2 even if H1
     fails because a different rung broke the task. The task-clean requirement
-    is what keeps this from being cherry-picking, because a rung earns nothing
-    by reaching alignment if it broke the task getting there. The ladder is
-    only four rungs, so the multiple-comparisons cost of reading across it is
+    keeps this from being cherry-picking: a rung earns nothing by reaching
+    alignment if it broke the task getting there. And the ladder has only
+    four rungs, so the multiple-comparisons cost of reading across it is
     small. If the rung H2 resolves on is not $\lambda{=}0.1$, we say so and
-    report both.
+    report both. If more than one other task-clean rung clears the gates, H2
+    resolves on the one with the highest $m_{\text{op1}}$; the choice is
+    mechanical rather than ours. If no rung is task-clean, H2 fails on the
+    gate it is scored against, and we report the alignment numbers anyway.
+    The star arm is not a rung: it is reported alongside the ladder, but it
+    takes no part in the "every anchored rung" test of H1 or in the search
+    for a rung for H2 to resolve on.
+
+    Every hypothesis except H4 is scored on the final checkpoint of each run;
+    H4 is the one that reads the trajectory, and its end-of-training value is
+    that same final checkpoint.
 
     H3 is scored on the same rung H2 resolves on, and only if H2(a) passed
     there. That restriction matters because the H3 gate is a ratio of
-    margins: if both margins are at noise level, a 2× ratio between them
-    would read as condensation where nothing condensed. H4 applies to every
+    margins. If both margins are at noise level, a 2× ratio between them
+    would look like condensation where nothing condensed. H4 applies to every
     anchored run whose alignment ever clears a floor of 0.2. Where the
     anchor never took, the running maximum is itself at noise level, and a
     ratio of noise-level margins says nothing about stability. Runs below
@@ -540,28 +569,34 @@ def _():
     \frac{1}{216}\sum_c \alpha_c(\ell, t),
     \qquad u_c \propto \texttt{redness}(c)^8,\ \ \textstyle\sum_c u_c = 1$$
 
-    That is the affinity-weighted mean alignment minus the plain mean: how
-    much closer to the anchor a color sits for being the kind of color the
-    anchor pulls. The weights $u_c$ are the label probabilities themselves,
-    normalized, so the statistic asks about precisely the lines that felt the
-    term. A margin of 0 means the anchor axis is indifferent to redness. As a
-    difference of cosines it runs from $-2$ to $2$, but the ends are out of
-    reach: $2$ would need the red-weighted colors to sit exactly on the
-    anchor while the cube average sits at the antipode. In a 64-dimensional
-    stream, unrelated directions sit near $\cos = 0$, so the unweighted mean
-    should stay close to zero, and complete success looks like $m \approx 1$.
+    In words: take the mean alignment weighted by label affinity, and subtract the
+    plain mean over all colors. The margin measures how much closer a color
+    sits to the anchor for being the kind of color the anchor pulls. The
+    weights $u_c$ are the label probabilities themselves, normalized, so the
+    statistic asks about precisely the lines that felt the anchor term. A
+    margin of 0 means the anchor axis is indifferent to redness. Since $m$
+    is a difference of cosines, it runs from $-2$ to $2$, but the ends are
+    out of reach: $2$ would need the red-weighted colors to sit exactly on
+    the anchor while the cube average sits at the exact opposite direction.
+    In a 64-dimensional stream, unrelated directions sit near $\cos = 0$, so
+    the unweighted mean should stay close to zero, and complete success
+    looks like $m \approx 1$.
 
     /// details | Why weight by redness rather than group colors
-    An alternative we considered groups colors into red (`SIM3 > 0.5`) and
-    other (`SIM3 < 0.01`, both from `sca.colorcube`) and scores a
-    red-minus-other contrast. We weight by `redness` instead, for one reason:
-    `redness` is what generates the labels, so weighting by it means the
-    measurement and the supervision use the same notion of red. Under the
-    grouping they are two different notions, and a disagreement between them
-    would show up as a weak result with no way to attribute it. Weighting
-    also sets no threshold and discards no color. The grouped version throws
-    away the ambiguous middle (pinks, oranges, dark reds), which is exactly
-    the range where a graded response would be visible.
+    We considered an alternative: group colors into red (`SIM3 > 0.5`) and
+    other (`SIM3 < 0.01`, both from `sca.colorcube`), and score a
+    red-minus-other contrast. We weight by `redness` instead, for one
+    reason: `redness` is what generates the labels, so weighting by it means
+    the measurement and the supervision use the same notion of red. The
+    grouped version uses two different notions, and a disagreement between
+    them would show up as a weak result with no way to tell which notion was
+    responsible. Weighting also sets no threshold and discards no color. The
+    grouped version throws away the ambiguous middle (pinks, oranges, dark
+    reds), which is exactly the range where a graded response would be
+    visible. Both notions of red do appear in the H2(b) grading gate, but as
+    separate, named tracks; there, a disagreement between them can be traced
+    to one notion or the other, which it couldn't inside a single blended
+    statistic.
     ///
 
     H2 scores the layer mean at op1,
@@ -570,20 +605,32 @@ def _():
     m(\ell, \text{op1})$$
 
     We average over anchored sites because the anchor applies to all of them
-    equally, so there is no site selection to make. Alongside it we report the
-    min and max over layers as unscored diagnostics; a wide min–max gap tells
-    us which depths resist the anchor. H3 compares the same layer mean across
-    positions, and H4 tracks $m_{\text{op1}}$ over training.
+    equally, so there is no site selection to make. Alongside the mean we
+    report the min and max over layers as unscored diagnostics; a wide
+    min–max gap tells us which depths resist the anchor. H3 compares the
+    same layer mean across positions, and H4 tracks $m_{\text{op1}}$ over
+    training.
 
-    Grading: for each op1 color, the layer mean of $\alpha_c$ at the op1
-    position, plotted against the redness of that color. This is the same
-    quantity that $m_{\text{op1}}$ summarizes, shown per color instead of
-    contracted to a number.
+    Grading: for each op1 color, we take the layer mean of $\alpha_c$ at the
+    op1 position and plot it against the redness of that color. This is the
+    same quantity that $m_{\text{op1}}$ summarizes, shown per color instead
+    of contracted to a number. We read two statistics off this plot:
+    Spearman ρ against `redness`, and Pearson R² against `sim^1.5`. Here
+    `sim` is the angular similarity-to-red used by the intervention scoring
+    in M1 (`sca.colorcube.sim_to_red`, restricted to this grid). The
+    exponent comes from mapping the M1 ablation result from damage to
+    alignment: damage graded as `sim³` and is quadratic in alignment, so
+    alignment should grade as `sim^1.5`. H2(b) reads both statistics.
 
-    Leakage (secondary, no threshold): a ridge probe for redness, fit on the
-    residual stream at op1 with the $\hat v_{\text{red}}$-component projected
-    out. High off-axis R² means red is also encoded elsewhere; we expect this
-    to be low.
+    Leakage (secondary, no threshold): we fit a ridge probe for redness on
+    the residual stream at op1, one probe per layer, after projecting out
+    the $\hat v_{\text{red}}$ component. A high R² here would mean red is
+    also encoded somewhere other than the anchor axis; we expect it to be
+    low. R² is read on held-out colors, using a 5-fold split over the 216
+    op1 colors, so no color is scored by a probe that saw it. The ridge
+    penalty is chosen within each training fold by an inner
+    cross-validation, so no setting is picked by looking at the number we
+    report.
 
     Trajectories: every ~50 steps we record $m_{\text{op1}}$ and
     validation loss, along
@@ -612,21 +659,30 @@ def _():
     condition (seed-averaged); the other rungs are context. Per the scoring
     rule above, the H2 gates read *some task-clean rung*, and H3 follows H2.
 
-    **H1.** Anchoring does not harm the task. Every anchored condition is
+    **H1.** Anchoring does not harm the task. Every anchored rung is
     task-clean: `named_holdout` exact match within 0.02 (absolute) of the seed
     mean of the $\lambda{=}0$ control. Partial: the gate passes at
-    $\lambda \le 0.1$ but fails at $0.3$.
+    $\lambda \le 0.1$ but fails at $0.3$. The star arm is reported in the
+    same table but scored only descriptively, per the scoring rule.
 
     **H2.** The concept lands on the anchor, and does so in a graded way, at
     some task-clean rung. (a) $m_{\text{op1}} \ge 0.5$.
-    (b) Redder colors sit closer to the anchor. The grading statistic for a
-    color $c$ is the layer mean of $\alpha_c$ at op1; over the 216 colors, it
-    increases with the redness of $c$, at Spearman $\rho \ge 0.8$.[^spearman] (c) The control condition shows
+    (b) Redder colors sit closer to the anchor, on either of two pre-named
+    notions of *redder*. The grading statistic for a color $c$ is the layer
+    mean of $\alpha_c$ at op1, averaged over seeds before anything is ranked
+    or correlated; over the 216 colors, it clears at least one of
+    Spearman $\rho \ge 0.8$ against `redness`,[^spearman] or Pearson
+    $R^2 \ge 0.8$ against `sim^1.5`.[^pearson] (c) The control condition shows
     $|m_{\text{op1}}| \le 0.1$.
 
     [^spearman]: Spearman ρ is a correlation coefficient computed on ranks
     rather than values, so it measures whether the ordering agrees and doesn't
     care about the shape of the curve.
+
+    [^pearson]: The squared Pearson correlation: the share of variance in the
+    response explained by a linear function of `sim^1.5`. It is scale- and
+    offset-invariant, so it tests proportionality to the shape M1 implies
+    for alignment with no tuned constant.
     """)
     return
 
@@ -634,19 +690,68 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    Partial: (a) and (c) hold but (b) fails, with the grading figure showing a
-    step rather than a grade. In a step, the reds all sit at one alignment,
-    the non-reds at another, and there is no ordering within either group. We
-    checked how the ρ gate behaves on that shape. The measured alignment is
-    continuous, so a pure step orders the colors within each of its two levels
-    arbitrarily. Its expected ρ against this redness grid is at most
-    {ex.STEP_RHO_CEILING:.2f}, for a step placed near the middle of the cube;
-    a step at redness 0.5, the shape a memorized red exemplar would produce,
-    scores {ex.step_rho(0.5):.2f}. So a step cannot clear the 0.8 gate on its
-    own. What *would* carry a steppy response over the gate is residual
-    ordering within the levels, which is some grading after all. That is why
-    the figure, and the windowed mean drawn through it, is the arbiter for
-    shapes in between.
+    Partial: (a) and (c) hold but (b) fails on both tracks, with the grading
+    figure showing a step rather than a grade. In a step, the reds all sit at
+    one alignment, the non-reds at another, and there is no ordering within
+    either group.
+
+    /// admonition | Why (b) is two tracks, and how the gates were placed
+    This gate went through several review rounds before freezing, so the
+    reasoning is recorded here in full, with the response shapes we checked
+    and what each scores.
+
+    *The shape of the pull itself fails both tracks, and that is the
+    intended reading.* The direct pull is proportional to `redness⁸`, and a
+    response that stayed proportional to it cannot clear a rank gate.
+    Unrelated directions in a 64-dimensional stream put a floor of about
+    0.011 on the measured $\alpha_c$ (a spread of $1/\sqrt{{64}}$ per
+    cosine, averaged over 27 probe lines × 5 residual slices), or ≈0.006
+    after the three-seed mean the gate is scored on, and
+    {int((ex.LABEL_P < 1e-6).sum())} colors have expected pull below
+    $10^{{-6}}$. So most of the cube ranks at random; simulation at that
+    floor puts ρ near 0.4, and its R² against `sim^1.5` is
+    {ex.r2_sim(ex.REDNESS**8):.2f}, far under the gate on both tracks. A
+    response confined to the pull means the anchor caught the labeled tokens
+    rather than *red*, which is the memorized-exemplar outcome (b) exists to
+    catch. M1 sets the expectation for success: with labels drawn from this
+    same affinity, its measured damage graded as low powers of `sim`.
+
+    *The two tracks name two families a generalized response could take*,
+    one from each side of the milestone. Track 1 is ρ against `redness`. It
+    accepts any response that rises monotonically with the label-generating
+    variable: a linear `redness` response scores ≈0.99 at the seed-mean
+    noise floor, and `redness³` scores ≈0.89. Track 2 is R² against
+    `sim^1.5`, M1's ablation result mapped from damage to alignment
+    (damage ∝ `sim³` and damage quadratic in alignment give alignment ∝
+    `sim^1.5`; the suppression result maps to `sim¹` the same way). The 3/2
+    power also maximizes coverage of the family: R² ≥ 0.86 against every
+    power of `sim` from 1 to 3, and `redness³` scores
+    {ex.r2_sim(ex.REDNESS**3):.2f}. (These simulated scores assume a
+    unit-amplitude response; at half amplitude, roughly the least H2(a)
+    accepts, `redness³` scores ≈0.83 on track 1 and ≈0.90 on track 2.)
+    Each track is robust where the other is marginal. `sim` orders the cube
+    by hue rather than by the `redness` formula, and it takes only 23
+    distinct values on this grid, so a sim-family response of any power
+    scores ρ ≈ 0.71 on track 1 at the seed-mean floor, under the gate; its
+    noise-free ceiling of {ex.SIM_RHO_CEILING:.2f} sits just over it,
+    because midranks credit the ties. In the other direction, a linear
+    `redness` response scores R² = {ex.r2_sim(ex.REDNESS):.2f} on track 2,
+    right at the gate, while clearing track 1 with room to spare. Passing
+    on either track accepts every graded shape above; requiring both tracks
+    would fail most of them.
+
+    *A pure step clears neither gate.* The measured alignment is continuous,
+    so a step orders the colors within each of its two levels arbitrarily.
+    Its expected ρ is at most {ex.STEP_RHO_CEILING:.2f} over all placements
+    (a step at redness 0.5, the memorized-exemplar shape, scores
+    {ex.step_rho(0.5):.2f}), and its R² against `sim^1.5` is at most
+    {ex.STEP_R2_CEILING:.2f} over placements in either variable. The margins
+    between those ceilings and the 0.8 gates are a few hundredths, which is
+    one more reason the figure stays in charge. What would carry a steppy
+    response over a gate is residual ordering within the levels, which is
+    some grading after all; for shapes in between, the arbiter is the
+    windowed mean drawn through the scatter.
+    ///
     """)
     return
 
@@ -654,13 +759,16 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    **H3.** The concept condenses at the position that carries it.
-    $m_{\text{op1}}$ is at least 2× the same layer mean at each of
-    `+`, op2, and `=`. Those four positions are pulled identically, so the
-    comparison is between sites that differ only in what the task does with
-    them. The answer and newline are outside the pull; they are reported but
-    not scored. Per the scoring rule, H3 resolves on the rung H2 does, and
-    only if H2(a) passed there.
+    **H3.** The concept condenses at the position that carries it: that is,
+    $m_{\text{op1}}$ is at least 2× the same layer mean at each of `+`, op2,
+    and `=`. If the margin at a comparison position is zero or negative, the
+    2× test has no content, so we treat it as met. (H3 is scored only when
+    H2(a) has already put $m_{\text{op1}}$ above 0.5, so a comparison site
+    at or below zero is dominated outright.) The anchor pulls those four
+    positions identically, so the comparison is between sites that differ
+    only in what the task does with them. The answer and newline positions
+    are outside the pull; they are reported but not scored. Per the scoring
+    rule, H3 resolves on the rung H2 does, and only if H2(a) passed there.
 
     We also anticipate a specific alternative outcome: broadcast, where all
     positions of a labeled line move toward $\hat v_{\text{red}}$ roughly
@@ -673,8 +781,8 @@ def _():
     running maximum of $m_{\text{op1}}$ reaches 0.2, the end-of-training
     value is at least 0.8× that maximum. The 0.2 floor keeps the gate from
     resolving on noise. In a simulation of unrelated 64-d states, the
-    per-checkpoint noise in the margin is near 0.02, the maximum of a
-    noise-only trajectory is near 0.05, and a ratio of noise-level margins
+    per-checkpoint noise in the margin is near 0.004, the maximum of a
+    noise-only trajectory is near 0.014, and a ratio of noise-level margins
     fails the 0.8× gate about as often as not.
     Runs below the floor are reported but not scored.
     Partial: violations confined to the $\lambda{=}0.3$ condition.
@@ -714,12 +822,15 @@ def _():
     color-swatch marks per the figure conventions — with a windowed mean over
     redness drawn through it, since 216 points with op2 averaged out will
     carry real spread and the eye should be reading the trend rather than the
-    scatter. Control condition greyed underneath, one panel per rung, Spearman ρ
-    annotated, and $m_{\text{op1}}$ with it. Expected: monotone and
+    scatter. Control condition greyed underneath, one panel per rung, both
+    grading statistics annotated (Spearman ρ vs `redness`, R² vs `sim^1.5`),
+    and $m_{\text{op1}}$ with them. Expected: monotone and
     graded, with the labeled-red corner near
     $\cos = 1$ and the far side of the cube near the control baseline.
     Contrary: flat, meaning the anchor didn't take; or a binary step at the
-    label threshold, meaning it took but without grading.
+    label threshold, meaning it took but without grading; or a response
+    confined to the handful of labeled colors, meaning the pull was
+    memorized rather than generalized.
 
     2. Per-layer decomposition of $m_{\text{op1}}$: $m$
     by layer at op1, all rungs, control band behind. A plain line chart, layer depth on x —
@@ -752,7 +863,10 @@ def _():
     can see rather than infer from color. The step-plateau form is right here:
     positions are ordinal and the tokens between landmarks are not measured.
     Annotate the layer-mean panel with the 2× threshold verdict against `+`,
-    op2, and `=`.
+    op2, and `=`. The last-layer panel is also where the pressure on answer
+    emission noted in the method would surface: at `=` the pull and the
+    answer logits share a state, so a dip there relative to earlier layers
+    is worth a caption note if it appears.
 
     Expected: a dominant op1 column. Contrary: a uniformly warm map, meaning
     broadcast. The answer column is shown but excluded from scoring, since it is
