@@ -37,11 +37,13 @@ SCORING_LAMBDA = 0.1
 H4_FLOOR = 0.2
 """Running-max floor below which an H4 run is reported but not scored.
 
-A run the anchor never took hold of has a noise-level running maximum: the
-margin's per-checkpoint noise is ≈0.02 (simulated: unrelated 64-d unit states,
-α_c a mean of ~8 effective draws), so the maximum over ~200 checkpoints sits
-near 0.05, and a ratio of noise-level margins fails the 0.8× gate about as
-often as not. The floor is ~3× that maximum and well under H2(a)'s 0.5.
+A run the anchor never took hold of has a noise-level running maximum. Simulated
+on unrelated 64-d unit states — α_c a mean over 8 probe lines, m_op1 then a mean
+over the 5 residual slices — the margin's per-checkpoint noise is ≈0.007 and the
+maximum over ~200 checkpoints sits near 0.025, so a ratio of noise-level margins
+fails the 0.8× gate about as often as not. The floor is ~8× that maximum and well
+under H2(a)'s 0.5. (A single layer is √5 noisier: sd ≈0.016, running max ≈0.05.
+The gated statistic is the layer mean, so the tighter pair is the relevant one.)
 """
 
 RED_RATE = 0.08

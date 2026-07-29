@@ -673,8 +673,8 @@ def _():
     running maximum of $m_{\text{op1}}$ reaches 0.2, the end-of-training
     value is at least 0.8× that maximum. The 0.2 floor keeps the gate from
     resolving on noise. In a simulation of unrelated 64-d states, the
-    per-checkpoint noise in the margin is near 0.02, the maximum of a
-    noise-only trajectory is near 0.05, and a ratio of noise-level margins
+    per-checkpoint noise in the margin is near 0.007, the maximum of a
+    noise-only trajectory is near 0.025, and a ratio of noise-level margins
     fails the 0.8× gate about as often as not.
     Runs below the floor are reported but not scored.
     Partial: violations confined to the $\lambda{=}0.3$ condition.
