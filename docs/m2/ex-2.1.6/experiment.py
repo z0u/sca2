@@ -32,7 +32,17 @@ LAMBDAS = [0.0, 0.03, 0.1, 0.3]
 """Peak anchor weight, the swept hyperparameter. λ=0 is the in-experiment control."""
 
 SCORING_LAMBDA = 0.1
-"""The rung hypotheses are reported on; H2's gates read *any* rung that also clears H1."""
+"""The rung hypotheses are reported on; H2's gates read *any* task-clean rung."""
+
+H4_FLOOR = 0.2
+"""Running-max floor below which an H4 run is reported but not scored.
+
+A run the anchor never took hold of has a noise-level running maximum: the
+margin's per-checkpoint noise is ≈0.02 (simulated: unrelated 64-d unit states,
+α_c a mean of ~8 effective draws), so the maximum over ~200 checkpoints sits
+near 0.05, and a ratio of noise-level margins fails the 0.8× gate about as
+often as not. The floor is ~3× that maximum and well under H2(a)'s 0.5.
+"""
 
 RED_RATE = 0.08
 """P(labeled) for a pure-red first operand — the ceiling of the label distribution."""

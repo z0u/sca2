@@ -129,9 +129,16 @@ def _():
     20% of distinct closed pairs held out. The eval sets are the same three:
     `named_seen`, `named_holdout`, and `open` (pairs whose mix has no name).
 
-    We add one thing: an alignment probe set of all 216 colors as operand 1,
-    each mixed with 8 random second operands. That way per-color alignment
-    statistics average over op2 rather than conditioning on it.
+    We add one thing: an alignment probe set. For each of the 216 colors, it
+    builds 8 probe lines with that color as the first operand. The second
+    operand is drawn at random from the closed pairs of that color, i.e.
+    pairs whose mix has a name. Using closed pairs means every probe line has
+    a named answer, so the measured answer position corresponds to a real
+    token. Per-color alignment statistics therefore average over op2 rather
+    than conditioning on it. The draw is made once with a fixed seed and
+    shared by every run, so all cells are measured on identical lines. It
+    draws from seen and held-out pairs alike. (Every color has 27 closed
+    partners on this grid, so 8 is a real subsample.)
 
     ### Labels
 
@@ -507,12 +514,14 @@ def _():
     small. If the rung H2 resolves on is not $\lambda{=}0.1$, we say so and
     report both.
 
-    H3 follows H2: it is scored on the rung H2 resolves on, and only if H2(a)
-    passed there. That restriction matters because the H3 gate is a ratio of
-    margins; a 2× ratio between noise-level margins would read as condensation
-    where nothing condensed. H4 applies to every anchored run, but it is read
-    alongside H2: a run whose alignment never rises keeps its running maximum
-    trivially, so H4 can only be *informative* where the anchor took.
+    H3 is scored on the same rung H2 resolves on, and only if H2(a) passed
+    there. That restriction matters because the H3 gate is a ratio of
+    margins: if both margins are at noise level, a 2× ratio between them
+    would read as condensation where nothing condensed. H4 applies to every
+    anchored run whose alignment ever clears a floor of 0.2. Where the
+    anchor never took, the running maximum is itself at noise level, and a
+    ratio of noise-level margins says nothing about stability. Runs below
+    the floor are reported but not scored.
 
     ### Measurements
 
@@ -610,9 +619,9 @@ def _():
 
     **H2.** The concept lands on the anchor, and does so in a graded way, at
     some task-clean rung. (a) $m_{\text{op1}} \ge 0.5$.
-    (b) Redder colors sit closer to the anchor: over the 216 colors, $\alpha_c$
-    increases with the redness of $c$, at Spearman
-    $\rho \ge 0.8$.[^spearman] (c) The control condition shows
+    (b) Redder colors sit closer to the anchor. The grading statistic for a
+    color $c$ is the layer mean of $\alpha_c$ at op1; over the 216 colors, it
+    increases with the redness of $c$, at Spearman $\rho \ge 0.8$.[^spearman] (c) The control condition shows
     $|m_{\text{op1}}| \le 0.1$.
 
     [^spearman]: Spearman ρ is a correlation coefficient computed on ranks
@@ -660,9 +669,14 @@ def _():
     logsumexp position-pooling variant is the queued response.
 
     **H4.** The late-instability mechanism of ex-2.9.3 does not reappear under
-    the anneal-to-floor schedule. For every anchored run, the end-of-training
-    $m_{\text{op1}}$ is at least 0.8× its running maximum over
-    training.
+    the anneal-to-floor schedule. Concretely: for every anchored run whose
+    running maximum of $m_{\text{op1}}$ reaches 0.2, the end-of-training
+    value is at least 0.8× that maximum. The 0.2 floor keeps the gate from
+    resolving on noise. In a simulation of unrelated 64-d states, the
+    per-checkpoint noise in the margin is near 0.02, the maximum of a
+    noise-only trajectory is near 0.05, and a ratio of noise-level margins
+    fails the 0.8× gate about as often as not.
+    Runs below the floor are reported but not scored.
     Partial: violations confined to the $\lambda{=}0.3$ condition.
     """)
     return
@@ -757,9 +771,10 @@ def _():
     ## Training stability (H4)
 
     /// admonition | TODO
-    Trajectory figure: $m_{\text{op1}}$ vs step for every anchored run (rows are rungs,
-    lines are seeds), with the LR and anchor-weight schedules as background
-    bands, and the running-max ratio reported for each run.
+    Trajectory figure: $m_{\text{op1}}$ vs step for every anchored run.
+    Rows are rungs; lines are seeds. The LR and anchor-weight schedules
+    appear as background bands. Each run is annotated with its running-max
+    ratio, and runs under the 0.2 floor are marked unscored.
 
     Expected: a rise early (either during or shortly after LR warmup), a hold through the plateau, and no sag
     after the anneal below 0.8× the running max. Contrary: the signature from
