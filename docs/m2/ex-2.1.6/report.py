@@ -8,6 +8,10 @@ app = marimo.App(
 )
 
 with app.setup(hide_code=True):
+    import json
+    import tempfile
+    from pathlib import Path
+
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
@@ -16,14 +20,29 @@ with app.setup(hide_code=True):
     # from the experiment module rather than a copy of them in the prose.
     import experiment as ex
     from mini.reports import report_bundle, use_publisher
+    from mini.store import project_store
     from mini.vis import light_dark, themed
     from sca import vis as sv
 
     use_publisher(report_bundle(__file__))
 
+    def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
+        """Resolve metrics and the stacked per-cell arrays from the store, or None if unpublished."""
+        store = project_store()
+        arts = store.get_refs([ex.METRICS_REF, ex.ARRAYS_REF])
+        m_art, a_art = arts[ex.METRICS_REF], arts[ex.ARRAYS_REF]
+        if m_art is None or a_art is None:
+            return None
+        with tempfile.TemporaryDirectory() as d:
+            m_path, a_path = store.get_many([(m_art, Path(d) / "metrics.json"), (a_art, Path(d) / "arrays.npz")])
+            with np.load(a_path) as z:
+                arrays = {k: z[k] for k in z.files}
+            metrics = json.loads(m_path.read_text())
+        return metrics, arrays
+
 
 @app.cell(hide_code=True)
-def _():
+def _(cells, metrics):
     mo.md(r"""
     # Ex 2.1.6: anchoring *red* in a transformer
 
@@ -106,18 +125,28 @@ def _():
 def _():
     mo.md(r"""
     /// admonition | How to read this draft
-    This is a preregistered skeleton. The method, hypotheses, and decision
-    thresholds below were written and frozen before the experiment ran.
-    Results will replace the `TODO` placeholders in place, so reviewing it
-    reads as a prediction → observation diff. Anything conceived after seeing
-    the data goes under *Exploratory analyses*, marked post hoc.
+    This was a preregistered skeleton. The method, hypotheses, and decision
+    thresholds below were written and frozen before the experiment ran, and
+    the results replaced the placeholders in place, so reading it is a
+    prediction → observation diff. Anything conceived after seeing the data is
+    under *Exploratory analyses*, marked post hoc.
+
+    Two amendments were made after the freeze and before the run, neither
+    touching a threshold. The noise floors quoted under H2(b) and H4 were
+    corrected — the first draft divided the per-cosine spread by the 27 probe
+    lines of a color as well as the 5 residual slices, which the measurement
+    cannot do; the passage under H2(b) says what the correction changes. And
+    the mean alignment over colors was added beside the margin as a recorded
+    diagnostic, on the reasoning that a margin is a contrast and so cannot
+    distinguish "nothing moved" from "everything moved". It carries no gate,
+    but it turned out to be what the results are about.
     ///
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _():
+def _(grading):
     mo.md(r"""
     ## Method
 
@@ -289,7 +318,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _():
+def _(grading):
     mo.md(rf"""
     The eighth power is what makes this a *concept* label rather than a redness
     readout. Pure red alone takes {ex.LABEL_W.max():.0%} of all labeled lines,
@@ -333,7 +362,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _():
+def _(cells):
     mo.md(r"""
     ### Model and anchor term
 
@@ -522,7 +551,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _():
+def _(grading, metrics):
     mo.md(r"""
     ### Scoring
 
@@ -660,7 +689,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _():
+def _(grading):
     mo.md(r"""
     ## Hypotheses
 
@@ -697,7 +726,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _():
+def _(grading):
     mo.md(rf"""
     Partial: (a) and (c) hold but (b) fails on both tracks, with the grading
     figure showing a step rather than a grade. In a step, the reds all sit at
@@ -812,55 +841,314 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(r"""
-    ## Task cost (H1)
+    _res = load_results()
+    mo.stop(_res is None, mo.md("_Results are not published yet; the analysis cells below render once they are._"))
+    assert _res is not None
+    metrics, arrays = _res
+    cells = {c["label"]: c for c in metrics["cells"]}
+    stats = metrics["corpus_stats"]
 
-    /// admonition | TODO
-    Table: exact match by condition ($\lambda$ rows, star arm last) × eval set (`named_seen`,
-    `named_holdout`, `open` distance), seed mean ± range. The $\lambda{=}0$ control
-    row goes on top, with the published `v216` numbers from ex-2.1.3 quoted
-    beside it as an external reference. Include the `sca.baselines` nulls for
-    the `open` distance row.
+    RUNGS = [f"lam{lam:g}" for lam in ex.LAMBDAS]
+    STAR = "lam0.1-star"
+    CONDS = [*RUNGS, STAR]
+    # Matplotlib titles render LaTeX; an authored HTML table does not, so it takes the
+    # plain-text pair rather than showing a reader the markup.
+    LABELS = {**{f"lam{lam:g}": rf"$\lambda={lam:g}$" for lam in ex.LAMBDAS}, STAR: r"$\lambda=0.1^{*}$"}
+    LABELS_TXT = {**{f"lam{lam:g}": f"λ = {lam:g}" for lam in ex.LAMBDAS}, STAR: "λ = 0.1*"}
 
-    Expected: a flat column, within 0.02 of control at every rung. Contrary: a
-    monotone drop with $\lambda$, which we would read together with the
-    dose–response of H2 to see what alignment level the lost accuracy bought.
-    ///
-    """)
-    return
+    def over_seeds(cond: str, fn) -> np.ndarray:
+        """One value per seed for a condition, in seed order."""
+        return np.array([fn(cells[f"{cond}-s{s}"]) for s in ex.SEEDS])
+
+    def acc(cond: str, set_name: str = "named_holdout", key: str = "accuracy") -> np.ndarray:
+        return over_seeds(cond, lambda c: c["sets"][set_name][key])
+
+    def alpha_map(cond: str) -> np.ndarray:
+        """Seed-mean alignment map for a condition: (layers, colors, positions)."""
+        return np.mean([arrays[f"{cond}-s{s}/alpha"] for s in ex.SEEDS], axis=0)
+
+    def margin_map(cond: str) -> np.ndarray:
+        """Seed-mean margin map: (layers, positions)."""
+        return np.mean([arrays[f"{cond}-s{s}/margin"] for s in ex.SEEDS], axis=0)
+
+    def m_op1(cond: str) -> np.ndarray:
+        """Per-seed layer-mean margin at op1 — the statistic H2(a), H3 and H4 read."""
+        return over_seeds(cond, lambda c: c["m_op1"])
+
+    def grading(cond: str) -> tuple[np.ndarray, float, float]:
+        """The per-color response at op1 (seed-mean, layer-mean) with its two H2(b) statistics."""
+        a = alpha_map(cond)[:, :, 0].mean(axis=0)
+        return a, ex.spearman(a, ex.REDNESS), ex.r2_sim(a)
+
+    CONTROL_ACC = float(acc("lam0").mean())
+    TASK_CLEAN = {c: bool(abs(acc(c).mean() - CONTROL_ACC) <= 0.02) for c in CONDS}
+    return (
+        CONDS,
+        CONTROL_ACC,
+        LABELS,
+        LABELS_TXT,
+        RUNGS,
+        STAR,
+        TASK_CLEAN,
+        acc,
+        alpha_map,
+        arrays,
+        cells,
+        grading,
+        m_op1,
+        margin_map,
+        metrics,
+        over_seeds,
+        stats,
+    )
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    ## Task cost (H1)
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
+    # ex-2.1.3's published v216 cell, the external reference for the control row.
+    _REF = {"named_seen": 1.000, "named_holdout": 0.9948, "nll": 0.0245, "open": 0.1414}
+
+    def _cell(cond: str, set_name: str, key: str, fmt: str = "{:.3f}") -> str:
+        v = acc(cond, set_name, key)
+        return f"{fmt.format(v.mean())} <span class='range'>±{(v.max() - v.min()) / 2:.3f}</span>"
+
+    _rows = "".join(
+        f"<tr><th>{LABELS_TXT[c]}</th>"
+        f"<td class='num'>{_cell(c, 'named_seen', 'accuracy')}</td>"
+        f"<td class='num'>{_cell(c, 'named_holdout', 'accuracy')}</td>"
+        f"<td class='num'>{_cell(c, 'named_holdout', 'nll')}</td>"
+        f"<td class='num'>{_cell(c, 'open', 'guess_dist')}</td>"
+        f"<td class='num'>{acc(c).mean() - CONTROL_ACC:+.3f}</td>"
+        f"<td>{'clean' if TASK_CLEAN[c] else 'not clean'}</td></tr>"
+        for c in CONDS
+    )
+    _ref = (
+        f"<tr class='ref'><th>ex-2.1.3 <code>v216</code></th>"
+        f"<td class='num'>{_REF['named_seen']:.3f}</td><td class='num'>{_REF['named_holdout']:.3f}</td>"
+        f"<td class='num'>{_REF['nll']:.3f}</td><td class='num'>{_REF['open']:.3f}</td>"
+        f"<td class='num'>—</td><td>reference</td></tr>"
+    )
+    mo.Html(f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr>
+        <th>condition</th><th class="num">seen EM</th><th class="num">holdout EM</th>
+        <th class="num">holdout NLL</th><th class="num"><code>open</code> dist</th>
+        <th class="num">Δ holdout EM</th><th>H1 gate</th>
+      </tr></thead>
+      <tbody>{_ref}{_rows}</tbody>
+    </table></div>
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, CONTROL_ACC, acc, stats):
+    mo.md(rf"""
+    **H1 holds, with room to spare.** Every anchored rung is task-clean: the
+    largest gap to the control on `named_holdout` exact match is
+    {max(abs(acc(c).mean() - CONTROL_ACC) for c in CONDS):.4f}, against a gate
+    of 0.02, and that includes $\lambda{{=}}0.3$. Seen pairs are at 1.000
+    everywhere. The finer scoring agrees: answer NLL stays inside
+    {min(acc(c, "named_holdout", "nll").mean() for c in CONDS):.3f}–{max(acc(c, "named_holdout", "nll").mean() for c in CONDS):.3f}
+    nats with no trend in $\lambda$, so there is no sign of capacity being
+    spent quietly while the argmax holds. The `open`-pair distances sit
+    together near {np.mean([acc(c, "open", "guess_dist").mean() for c in CONDS]):.3f},
+    a little above the {stats["nulls"]["open"]["floor_dist"]:.3f} floor, well
+    under the {stats["nulls"]["open"]["k2"]["dist"]:.3f} of a guesser that has
+    located the answer but cannot break the tie, and far under the
+    {stats["nulls"]["open"]["blind"]["dist"]:.3f} of one that ignores the
+    prompt — the same picture ex-2.1.3 reported for this cell, unchanged by
+    the anchor.
+
+    So the dose–response we set out to chart has no cost side to it at these
+    weights. What that buys is read next.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(grading):
+    mo.md(r"""
     ## Alignment and grading (H2)
 
-    /// admonition | TODO
-    Two figures.
+    The concept moved onto the anchor, and so did everything else. The figure
+    below shows the per-color response at op1: the whole cube lifts off the
+    control baseline together, and the reddest colors sit above the rest by
+    about a quarter of a cosine.
+    """)
+    return
 
-    1. Grading curve: $\alpha_c$ against the redness of $c$. A scatter — one point per color,
-    color-swatch marks per the figure conventions — with a windowed mean over
-    redness drawn through it, since 216 points with op2 averaged out will
-    carry real spread and the eye should be reading the trend rather than the
-    scatter. Control condition greyed underneath, one panel per rung, both
-    grading statistics annotated (Spearman ρ vs `redness`, R² vs `sim^1.5`),
-    and $m_{\text{op1}}$ with them. Expected: monotone and
-    graded, with the labeled-red corner near
-    $\cos = 1$ and the far side of the cube near the control baseline.
-    Contrary: flat, meaning the anchor didn't take; or a binary step at the
-    label threshold, meaning it took but without grading; or a response
-    confined to the handful of labeled colors, meaning the pull was
-    memorized rather than generalized.
 
-    2. Per-layer decomposition of $m_{\text{op1}}$: $m$
-    by layer at op1, all rungs, control band behind. A plain line chart, layer depth on x —
-    depths are evenly spaced and every one is measured, so there is nothing for
-    the step-plateau convention of ex-2.1.5 to guard against here (it exists
-    because grammar landmarks are *not* evenly spaced). Expected:
-    $m$ above zero at every depth. A sag in the last layer would suggest next-token pressure
-    competing at op1, though the target at op1 is always `+`, so there should
-    be slack to spare.
-    ///
+@app.cell(hide_code=True)
+def _(LABELS, RUNGS, grading, m_op1):
+    _rungs = [c for c in RUNGS if c != "lam0"]
+    _resp = {c: grading(c) for c in [*_rungs, "lam0"]}
+    _order = np.argsort(ex.REDNESS)
+
+    def _windowed(y: np.ndarray, k: int = 25) -> np.ndarray:
+        """Mean of *y* over a sliding window of the redness ordering."""
+        pad = np.pad(y[_order], (k // 2, k // 2), mode="edge")
+        return np.convolve(pad, np.ones(k) / k, mode="valid")
+
+    @themed(
+        name="grading",
+        alt_text="""
+            Three panels, one per anchored rung. In each, the 216 colors sit in a
+            broad band well above the flat control at zero, and the band rises
+            gently with redness — from about 0.4 at the grey end to about 0.7 at
+            the red end — rather than separating the reds from the rest.
+        """,
+        caption=r"""
+            The per-color response at op1: $\alpha_c$, the layer mean of
+            $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the
+            redness of the color. One mark per color, drawn in that color; the
+            heavy line is a 25-color sliding mean over the redness ordering, and
+            the flat grey band underneath is the $\lambda{=}0$ control's own
+            sliding mean. The grading statistics and $m_{\text{op1}}$ are quoted
+            per panel; both H2(b) gates sit at 0.8.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, len(_rungs), figsize=(8.4, 3.0), sharey=True)
+        _ctrl = _windowed(_resp["lam0"][0])
+        for ax, cond in zip(axes, _rungs, strict=True):
+            a, rho, r2 = _resp[cond]
+            ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
+            ax.plot(
+                ex.REDNESS[_order], _ctrl, color=light_dark("#999", "#777"), lw=3, alpha=0.5, zorder=1,
+                solid_capstyle="round",
+            )  # fmt: skip
+            ax.scatter(ex.REDNESS, a, c=ex.GRID_RGB, s=18, lw=0.4, zorder=3,
+                       edgecolors=light_dark("#00000033", "#ffffff55"))  # fmt: skip
+            ax.plot(ex.REDNESS[_order], _windowed(a), color=light_dark("#222", "#eee"), lw=1.6, zorder=4)
+            ax.set_title(LABELS[cond], fontsize=10)
+            ax.set_xlabel("redness of op1")
+            ax.annotate(
+                f"ρ = {rho:.2f}\nR² = {r2:.2f}\n$m$ = {m_op1(cond).mean():.2f}",
+                (0.03, 0.97), xycoords="axes fraction", va="top", fontsize=8,
+                color=light_dark("#444", "#bbb"),
+            )  # fmt: skip
+        axes[0].set_ylabel(r"$\alpha_c$ at op1")
+        axes[0].set_ylim(-0.15, 1.2)  # headroom for the per-panel statistics
+        fig.suptitle("Alignment at op1, per color")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(RUNGS, cells, grading, m_op1):
+    mo.md(rf"""
+    **H2 fails on (a) and (b); (c) holds.** No rung reaches the 0.5 margin:
+    $m_{{\text{{op1}}}}$ is {m_op1("lam0.03").mean():.2f}, {m_op1("lam0.1").mean():.2f}
+    and {m_op1("lam0.3").mean():.2f} at $\lambda = 0.03$, $0.1$ and $0.3$, and the
+    seeds agree to within {max(m_op1(c).max() - m_op1(c).min() for c in RUNGS if c != "lam0"):.3f}.
+    Every rung is task-clean, so the "some task-clean rung" search had the whole
+    ladder to work with and none of it clears the gate. The grading statistics
+    land in the same place: the best of them is
+    R² = {max(grading(c)[2] for c in RUNGS):.2f} at $\lambda{{=}}0.1$ against a
+    gate of 0.8, with ρ ≈ {np.mean([grading(c)[1] for c in RUNGS if c != "lam0"]):.2f}
+    on the rank track. The control clears (c) comfortably at
+    $|m_{{\text{{op1}}}}| = {abs(m_op1("lam0").mean()):.3f}$, well inside 0.1 and
+    about the size of the per-checkpoint noise (0.021), so the axis carries
+    nothing about redness until we put it there.
+
+    The reason the margin stays low is the figure's first reading rather than
+    an inference: the whole cube moved. Mean alignment at op1 goes from
+    {np.mean([cells[f"lam0-s{s}"]["alpha_mean_op1"] for s in ex.SEEDS]):.3f} in the
+    control to {np.mean([cells[f"lam0.03-s{s}"]["alpha_mean_op1"] for s in ex.SEEDS]):.2f},
+    {np.mean([cells[f"lam0.1-s{s}"]["alpha_mean_op1"] for s in ex.SEEDS]):.2f} and
+    {np.mean([cells[f"lam0.3-s{s}"]["alpha_mean_op1"] for s in ex.SEEDS]):.2f} up the
+    ladder — a color-independent shift that climbs with $\lambda$ while the
+    margin does not. The margin is a contrast, so it does not count that shift;
+    the anchor term does, which is why the term can be well optimized and the
+    hypothesis still fail.
+
+    That the shift is available at all follows from what the pull can see. A
+    label is a coin flip the model cannot observe, so nothing distinguishes a
+    labeled line from an unlabeled one in the input; the model can only respond
+    to the *expected* pull. At op1 that expectation is proportional to the
+    color's label affinity, which is red-specific. At `+`, op2 and `=` it is
+    proportional to the label affinity of *op1*, which says nothing about the
+    token sitting there — op2 is uniform over the cube. Three of the four
+    pulled positions therefore ask for an undifferentiated move, and the model
+    supplies one.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, LABELS, RUNGS, arrays, margin_map):
+    _by_layer = {c: margin_map(c)[:, 0] for c in CONDS}
+    _seeds = {c: np.array([arrays[f"{c}-s{s}/margin"][:, 0] for s in ex.SEEDS]) for c in CONDS}
+    _depths = np.arange(len(_by_layer["lam0"]))
+
+    @themed(
+        name="margin-by-layer",
+        alt_text="""
+            The margin at op1 falls with depth at every anchored weight. At the
+            largest weight it starts near 0.56 in the embedding and decays to
+            below 0.1 by the last layer; at the smallest it starts lower, near
+            0.35, and decays less. The control is flat and slightly negative.
+        """,
+        caption=r"""
+            The alignment margin at op1 by residual-stream slice — the
+            per-depth terms whose mean is $m_{\text{op1}}$. Depth 0 is the token
+            embedding, depth 4 the last block's output. Lines are seed means;
+            the shaded band around the control is its seed min–max, as the scale
+            of a null. The anchor pulls all five slices equally, so the slope is
+            the network's doing rather than the schedule's.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, ax = plt.subplots(figsize=(7.0, 3.2))
+        _c = dict(zip(CONDS, light_dark(
+            ["#999", "#f2b134", "#c1332a", "#7a2320", "#3d7ea6"],
+            ["#888", "#ffcc66", "#f0665a", "#b8564d", "#6ab0d4"],
+        ), strict=True))  # fmt: skip
+        band = _seeds["lam0"]
+        ax.fill_between(_depths, band.min(0), band.max(0), color=_c["lam0"], alpha=0.25, lw=0)
+        for cond in CONDS:
+            ax.plot(
+                _depths, _by_layer[cond], color=_c[cond], lw=2.0 if cond in RUNGS else 1.4,
+                ls="-" if cond in RUNGS else (0, (4, 3)), label=LABELS[cond], marker="o", ms=4,
+            )  # fmt: skip
+        ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
+        ax.set_xticks(_depths)
+        ax.set_xlabel("residual-stream slice (0 = embedding)")
+        ax.set_ylabel(r"$m$ at op1")
+        ax.set_title("Where the margin lives in the stack")
+        ax.legend(fontsize=8, frameon=False, ncols=5)
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(margin_map):
+    mo.md(rf"""
+    The per-depth view says where the little selectivity there is sits, and it
+    is the opposite of a sag in the last layer. The margin is largest in the
+    embedding and decays monotonically with depth at every weight, and raising
+    $\lambda$ steepens that decay rather than lifting the curve: at
+    $\lambda{{=}}0.3$ it runs {margin_map("lam0.3")[0, 0]:.2f} → {margin_map("lam0.3")[-1, 0]:.2f}
+    from embedding to last layer, against {margin_map("lam0.03")[0, 0]:.2f} →
+    {margin_map("lam0.03")[-1, 0]:.2f} at $\lambda{{=}}0.03$. So a heavier pull
+    buys selectivity in the token embedding and gives it back through the
+    stack, which is consistent with the deeper slices being where the
+    undifferentiated shift is cheapest to produce: the embedding is shared
+    across positions, and moving it moves op2 too, while a block's output can
+    depend on position and context.
     """)
     return
 
@@ -870,31 +1158,125 @@ def _():
     mo.md(r"""
     ## Condensation vs broadcast (H3)
 
-    /// admonition | TODO
-    $m(\ell, t)$ over the six line positions (op1, `+`, op2, `=`,
-    answer, newline), on the rung H2 resolves on ($\lambda{=}0.1$ unless the
-    scoring rule moved it), seed mean, with the four pulled
-    positions marked off from the two that are only measured. Drawn as stacked `smooth_step`
-    panels in the manner of ex-2.1.5 rather than a heat map: positions on x,
-    one panel per layer, the layer mean shaded under the line and the min and
-    max over seeds as hairlines. That keeps what a heat map gives — a column
-    of panels reads as a column of cells — and adds a shared vertical scale, so
-    the 2× comparison between op1 and its neighbours is something the reader
-    can see rather than infer from color. The step-plateau form is right here:
-    positions are ordinal and the tokens between landmarks are not measured.
-    Annotate the layer-mean panel with the 2× threshold verdict against `+`,
-    op2, and `=`. The last-layer panel is also where the pressure on answer
-    emission noted in the method would surface: at `=` the pull and the
-    answer logits share a state, so a dip there relative to earlier layers
-    is worth a caption note if it appears.
+    H3 is not scored. Per the scoring rule it resolves on the rung H2 does,
+    and only if H2(a) passed there; it didn't, at any rung. The map is
+    reported below because the position profile is what the condensation
+    question was about, and a low margin still has a shape.
+    """)
+    return
 
-    Expected: a dominant op1 column. Contrary: a uniformly warm map, meaning
-    broadcast. The answer column is shown but excluded from scoring, since it is
-    unpulled and a red op1 gives a reddish mix regardless. Note in the caption
-    (or below) whatever it does show: alignment there is spillover, which
-    previews both the either-slot follow-up and how far an anchor reaches on its
-    own.
-    ///
+
+@app.cell(hide_code=True)
+def _(arrays):
+    _cond = "lam0.1"
+    _POS = ["op1", "+", "op2", "=", "ans", "⏎"]
+    _seeds = np.array([arrays[f"{_cond}-s{s}/margin"] for s in ex.SEEDS])  # (S, L1, T)
+    _mean = _seeds.mean(axis=0)
+    _panels = [*range(_mean.shape[0])][::-1]  # last layer on top, embedding at the bottom
+    _layer_mean = _mean.mean(axis=0)
+    _ratios = [_layer_mean[0] / _layer_mean[i] if _layer_mean[i] > 0 else np.inf for i in (1, 2, 3)]
+
+    @themed(
+        name="positions",
+        alt_text="""
+            Six panels stacked by depth, each showing the margin across the six
+            line positions. op1 is the tallest column in every panel, but only by
+            a factor under two against the plus and equals positions; op2 is the
+            shortest of the pulled positions, and the newline is near zero
+            throughout.
+        """,
+        caption=r"""
+            The margin $m(\ell, t)$ across the six positions of a line, on
+            $\lambda{=}0.1$, seed mean. One panel per residual-stream slice with
+            depth 0 at the bottom, and the seed mean over slices in the bottom
+            panel, drawn heavier. The shaded area runs from zero to the seed
+            mean; the hairlines are the seed minimum and maximum. Positions are
+            ordinal, so the risers are drawn as steps: nothing is measured
+            between them. The four pulled positions sit left of the dashed rule;
+            the answer and newline are measured only.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        from mini.vis import smooth_step, smooth_step_area
+
+        fig, axes = plt.subplots(
+            len(_panels) + 1, 1, figsize=(7.0, 4.4), sharex=True, sharey=True,
+            gridspec_kw={"hspace": 0.08},
+        )  # fmt: skip
+        _ink = light_dark("#c1332a", "#f0665a")
+        _hair = light_dark("#00000055", "#ffffff55")
+        x = np.arange(len(_POS))
+        rows = [(ax, _mean[d], _seeds[:, d], f"{d}") for ax, d in zip(axes[:-1], _panels, strict=True)]
+        rows.append((axes[-1], _layer_mean, _seeds.mean(axis=1), "mean"))
+        for ax, y, spread, name in rows:
+            heavy = name == "mean"
+            smooth_step_area(ax, x, y, ramp=0.5, color=_ink, alpha=light_dark(0.18, 0.24))
+            smooth_step(ax, x, y, ramp=0.5, color=_ink, lw=1.8 if heavy else 1.1)
+            for edge in (spread.min(0), spread.max(0)):
+                smooth_step(ax, x, edge, ramp=0.5, color=_hair, lw=0.5)
+            ax.axhline(0, color=light_dark("#ccc", "#444"), lw=0.6, zorder=0)
+            ax.axvline(3.5, color=light_dark("#bbb", "#555"), lw=0.8, ls=(0, (3, 3)), zorder=0)
+            ax.set_ylabel(name, fontsize=8)
+            ax.tick_params(labelsize=8)
+            for side in ("top", "right", "bottom"):
+                ax.spines[side].set_visible(False)
+        axes[0].set_ylim(-0.05, 0.55)
+        axes[-1].set_xticks(x, _POS)
+        axes[-1].annotate(
+            f"op1 : + = {_ratios[0]:.1f}×    op1 : op2 = {_ratios[1]:.1f}×    op1 : = = {_ratios[2]:.1f}×",
+            (0.98, 0.9), xycoords="axes fraction", ha="right", va="top", fontsize=8,
+            color=light_dark("#444", "#bbb"),
+        )  # fmt: skip
+        axes[0].set_title(r"Margin by position and depth ($\lambda{=}0.1$)", fontsize=10)
+        fig.supylabel("residual-stream slice", fontsize=9)
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(margin_map):
+    _lm = margin_map("lam0.1").mean(axis=0)
+    _r = [_lm[0] / _lm[i] for i in (1, 2, 3)]
+    mo.md(rf"""
+    op1 does lead, but not by the factor H3 named: {_r[0]:.1f}× against `+`,
+    {_r[2]:.1f}× against `=`, and {_r[1]:.1f}× against op2. Had the gate been
+    live, the op2 comparison would have passed and the other two would not, so
+    the outcome sits between condensation and the broadcast alternative rather
+    than at either. The ordering is informative in itself: op2 is the position
+    whose *expected* pull carries no information about the token there, and it
+    is the position with the least margin; `+` and `=` are constant tokens
+    whose states can encode the line's context, and they carry
+    {_lm[1] / _lm[0]:.0%} and {_lm[3] / _lm[0]:.0%} of op1's margin.
+
+    The layer mean also hides an inversion the panels above it show plainly.
+    In the embedding and the first block, op1 is the only position with much
+    margin at all ({margin_map("lam0.1")[0, 0]:.2f} against
+    {margin_map("lam0.1")[0, 1]:.2f} at `+`). By the last block the ordering
+    has reversed: op1 sits at {margin_map("lam0.1")[-1, 0]:.2f} while `+` and
+    `=` carry {margin_map("lam0.1")[-1, 1]:.2f} and
+    {margin_map("lam0.1")[-1, 3]:.2f}. So *red* enters at the token that
+    denotes it and, with depth, moves to the positions that follow it in the
+    line — which is what a model with attention would do with a fact about the
+    line, and is not a distinction the condensation/broadcast pair anticipated.
+    Whether that is worth reserving an axis for is an intervention question,
+    not one this experiment answers.
+
+    The answer position, which the pull never touches, still shows
+    {_lm[4]:.2f} — about {_lm[4] / _lm[0]:.0%} of op1's. That is the confounded
+    quantity the method set aside: a red op1 drags the mix red, so some of it
+    is spillover from an anchored operand and some is the answer's own redness
+    finding the axis. The newline is at {_lm[5]:.2f}, which is where a position
+    that neither carries a color nor feels the pull should sit, and is a useful
+    check that the map is not simply warm everywhere.
+
+    On the last-layer note the method asked for: the margin at `=` does not dip
+    in the last slice relative to the earlier ones — it is
+    {margin_map("lam0.1")[-1, 3]:.2f} there against {margin_map("lam0.1")[1, 3]:.2f}
+    at slice 1 — so we see no sign of the answer logits pushing back on the
+    pull at that position. With the task cost of H1 at zero, that is the
+    consistent reading.
     """)
     return
 
@@ -903,20 +1285,110 @@ def _():
 def _():
     mo.md(r"""
     ## Training stability (H4)
+    """)
+    return
 
-    /// admonition | TODO
-    Trajectory figure: $m_{\text{op1}}$ vs step for every anchored run.
-    Rows are rungs; lines are seeds. The LR and anchor-weight schedules
-    appear as background bands. Each run is annotated with its running-max
-    ratio, and runs under the 0.2 floor are marked unscored.
 
-    Expected: a rise early (either during or shortly after LR warmup), a hold through the plateau, and no sag
-    after the anneal below 0.8× the running max. Contrary: the signature from
-    ex-2.9.3, where alignment forms early and then collapses, either while the
-    LR is still hot or once the anneal begins. If collapses appear, note when
-    they happen relative to both schedules. That timing was the useful
-    diagnostic in M1.
-    ///
+@app.cell(hide_code=True)
+def _(CONDS, LABELS, cells, m_op1):
+    def _traj(cond: str, seed: int, key: str) -> np.ndarray:
+        return np.asarray(cells[f"{cond}-s{seed}"]["traj"][key], dtype=float)
+
+    _ratio = {
+        (c, s): float(_traj(c, s, "m_op1")[-1] / _traj(c, s, "m_op1").max())
+        for c in CONDS
+        for s in ex.SEEDS
+        if _traj(c, s, "m_op1").max() >= ex.H4_FLOOR
+    }
+    _scored = [c for c in CONDS if c != "lam0"]
+
+    @themed(
+        name="trajectories",
+        alt_text="""
+            Four panels of alignment against epoch. In every anchored condition
+            the margin rises through the learning-rate warmup to a peak between
+            epochs 9 and 17, then slides back to about 0.27 and stays there; the
+            slide happens while the anchor weight is still at its peak, not at
+            the anneal. The control stays flat at zero.
+        """,
+        caption=r"""
+            $m_{\text{op1}}$ over training, measured every 50 steps. One panel
+            per condition, one line per seed; the pale band behind is the anchor
+            weight as a fraction of its peak and the dotted line is the learning
+            rate, both on the right-hand scale. The dashed horizontal rule is
+            H4's 0.2 floor, below which a run is reported but not scored, and
+            the shaded strip marks each condition's anneal window. Ratios are
+            each seed's end-of-training value over its running maximum.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, len(_scored), figsize=(9.0, 3.0), sharey=True)
+        _ink = light_dark(["#f2b134", "#c1332a", "#7a2320"], ["#ffcc66", "#f0665a", "#b8564d"])
+        _grey = light_dark("#999", "#777")
+        for ax, cond in zip(axes, _scored, strict=True):
+            epochs = _traj(cond, 0, "epoch")
+            twin = ax.twinx()
+            twin.fill_between(
+                epochs, _traj(cond, 0, "weight") / max(_traj(cond, 0, "weight").max(), 1e-9),
+                color=light_dark("#0000000d", "#ffffff12"), lw=0,
+            )  # fmt: skip
+            twin.plot(epochs, _traj(cond, 0, "lr") / ex.PEAK_LR, color=_grey, lw=0.8, ls=(0, (1, 2)))
+            twin.set_ylim(0, 1.05)
+            twin.set_yticks([])
+            color = _ink[min(_scored.index(cond), 2)] if cond != "lam0.1-star" else _ink[1]
+            for seed in ex.SEEDS:
+                ax.plot(epochs, _traj(cond, seed, "m_op1"), color=color, lw=1.2, alpha=0.85)
+            ax.axhline(ex.H4_FLOOR, color=_grey, lw=0.8, ls=(0, (4, 3)))
+            ratios = [_ratio[(cond, s)] for s in ex.SEEDS if (cond, s) in _ratio]
+            ax.annotate(
+                "ratios " + ", ".join(f"{r:.2f}" for r in ratios) if ratios else "all below floor",
+                (0.5, 0.04), xycoords="axes fraction", ha="center", fontsize=7.5, color=light_dark("#444", "#bbb"),
+            )  # fmt: skip
+            ax.set_title(LABELS[cond], fontsize=10)
+            ax.set_xlabel("epoch")
+            ax.set_xlim(0, ex.SCHEDULER.epochs)
+        axes[0].set_ylabel(r"$m_{\text{op1}}$")
+        axes[0].set_ylim(-0.08, 0.5)
+        fig.suptitle("Alignment over training")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, cells, m_op1):
+    _m = {(c, s): np.asarray(cells[f"{c}-s{s}"]["traj"]["m_op1"], dtype=float) for c in CONDS for s in ex.SEEDS}
+    _ratios = {k: float(v[-1] / v.max()) for k, v in _m.items() if v.max() >= ex.H4_FLOOR}
+    _fails = [k for k, r in _ratios.items() if r < 0.8]
+    _peak_epoch = [float(cells[f"{c}-s{s}"]["traj"]["epoch"][int(_m[(c, s)].argmax())]) for (c, s) in _ratios]
+    mo.md(rf"""
+    **H4 fails, and not in the way it was written to catch.** All
+    {len(_ratios)} anchored runs clear the 0.2 floor, so all of them are
+    scored, and {len(_fails)} of them end below 0.8× their running maximum —
+    {len({c for c, _ in _fails})} of the four anchored conditions, including
+    $\lambda{{=}}0.1$. The partial (violations confined to $\lambda{{=}}0.3$)
+    does not apply. The control runs peak at
+    {max(_m[("lam0", s)].max() for s in ex.SEEDS):.3f}, under the floor and in
+    line with the 0.06 a noise-only trajectory reaches, so they are reported
+    and not scored, as designed.
+
+    The trajectories show a slide rather than a collapse. Every anchored run
+    rises through the LR warmup to a peak between epochs
+    {min(_peak_epoch):.0f} and {max(_peak_epoch):.0f}, then loses about a
+    quarter of it over the following forty or so epochs and holds flat from
+    there. The anneal is not the trigger: the loss of margin is complete long
+    before epoch 90, the $\lambda{{=}}0.1^{{*}}$ arm's earlier anneal does not
+    move it, and the end value is the same
+    ({min(m_op1(c).mean() for c in CONDS if c != "lam0"):.2f}–{max(m_op1(c).mean() for c in CONDS if c != "lam0"):.2f})
+    across a tenfold range of $\lambda$. So the ex-2.9.3 mechanism — protection
+    withdrawn while the optimizer is still hot, and the task loss reclaiming
+    the axis — is not what we are looking at. The schedule did the job it was
+    designed for; the margin settles at a level the pull does not set.
+
+    Read with the growing mean alignment of H2, the slide is the drift catching
+    up: the peak is early selectivity, and what erodes it is the rest of the
+    cube arriving on the axis afterwards.
     """)
     return
 
@@ -925,21 +1397,94 @@ def _():
 def _():
     mo.md(r"""
     ## Secondary measurements
+    """)
+    return
 
-    /// admonition | TODO
-    Leakage: off-axis redness probe R² at op1, per layer, primary condition against
-    control, reported without a threshold. Low values would mean the anchor
-    concentrated redness onto $\hat v_{\text{red}}$. Values matching the
-    control would mean it added an aligned copy while leaving the natural
-    encoding in place. Either reading is useful for designing an intervention
-    experiment later, since this number is effectively the power analysis for
-    one.
 
-    The $\lambda{=}0.1^{*}$ star arm goes on the same axes, since the shorter
-    hold at peak was proposed as the lower-leakage schedule and this is where
-    that would show. Report its $m_{\text{op1}}$ beside it, because
-    less leakage at less alignment is no bargain.
-    ///
+@app.cell(hide_code=True)
+def _(CONDS, LABELS, RUNGS, cells):
+    _leak = {c: np.mean([cells[f"{c}-s{s}"]["leak_r2"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    _axis = {c: np.mean([cells[f"{c}-s{s}"]["axis_r2"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    _depths = np.arange(len(_leak["lam0"]))
+
+    @themed(
+        name="leakage",
+        alt_text="""
+            Two panels. On the left, the off-axis redness probe scores about 0.8
+            at every depth in every condition including the control, dipping
+            slightly at depth with the anchor on. On the right, the redness
+            variance carried by the anchor axis alone rises from near zero in the
+            control to between 0.2 and 0.5 with the anchor on.
+        """,
+        caption=r"""
+            Left: held-out R² for a ridge probe predicting redness from the
+            residual stream at op1 with the $\hat v_{\text{red}}$ component
+            removed — how well *red* is still readable off the other 63
+            directions. Right: the same target from the anchor component alone,
+            as squared correlation. Both are per residual-stream slice, seed
+            means, with the 216 op1 colors as the sample and a 5-fold split so no
+            color is scored by a probe that saw it. Neither has a threshold.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, 2, figsize=(8.0, 3.0), sharey=True)
+        _c = dict(zip(CONDS, light_dark(
+            ["#999", "#f2b134", "#c1332a", "#7a2320", "#3d7ea6"],
+            ["#888", "#ffcc66", "#f0665a", "#b8564d", "#6ab0d4"],
+        ), strict=True))  # fmt: skip
+        for ax, data, title in ((axes[0], _leak, "off the anchor axis"), (axes[1], _axis, "on the anchor axis")):
+            for cond in CONDS:
+                ax.plot(
+                    _depths, data[cond], color=_c[cond], marker="o", ms=4,
+                    lw=2.0 if cond in RUNGS else 1.4, ls="-" if cond in RUNGS else (0, (4, 3)),
+                    label=LABELS[cond],
+                )  # fmt: skip
+            ax.set_title(title, fontsize=10)
+            ax.set_xticks(_depths)
+            ax.set_xlabel("residual-stream slice")
+            ax.set_ylim(-0.05, 1.0)
+        axes[0].set_ylabel("R² for redness")
+        axes[0].legend(fontsize=8, frameon=False, ncols=2, loc="lower left")
+        fig.suptitle("Where redness is readable at op1")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, cells, m_op1):
+    _leak = {c: np.mean([cells[f"{c}-s{s}"]["leak_r2"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    _axis = {c: np.mean([cells[f"{c}-s{s}"]["axis_r2"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    mo.md(rf"""
+    **Leakage is essentially undiminished.** With the anchor direction
+    projected out, redness is still readable off the remaining 63 directions at
+    R² ≈ {_leak["lam0.1"].mean():.2f} on $\lambda{{=}}0.1$, against
+    {_leak["lam0"].mean():.2f} for the control — a difference of a few
+    hundredths, concentrated in the deeper slices. Meanwhile the anchor axis
+    itself goes from carrying {_axis["lam0"].mean():.2f} of redness variance to
+    {_axis["lam0.1"].mean():.2f}. So the anchor added an aligned copy and left
+    the natural encoding where it was, which is the second of the two readings
+    the method laid out.
+
+    This is the number that would size an intervention experiment, and it sizes
+    it discouragingly: deleting $\hat v_{{\text{{red}}}}$ from this model would
+    remove one copy of *red* and leave a nearly intact one behind. It also says
+    what the missing terms were doing in M1. An anti-subspace term is a
+    constraint on this quantity — it pushes the unlabeled cube *off*
+    the axis — and without it neither the leakage nor the
+    undifferentiated drift of H2 has anything to hold it in check.
+
+    **The star arm changes nothing measurable.** $\lambda{{=}}0.1^{{*}}$ tracks
+    $\lambda{{=}}0.1$ on every measurement: $m_{{\text{{op1}}}}$
+    {m_op1("lam0.1-star").mean():.3f} against {m_op1("lam0.1").mean():.3f},
+    off-axis R² {_leak["lam0.1-star"].mean():.2f} against
+    {_leak["lam0.1"].mean():.2f}, holdout accuracy identical to three decimals.
+    The hypothesis behind it was that a long hold at peak is what leaks; forty
+    epochs less of it leaves the same leakage, so on this evidence the hold
+    length is not the knob. The two arms are the same run up to epoch 50, and
+    their trajectories are still together at 100, which also makes them a check
+    that the pipeline is deterministic where it should be.
     """)
     return
 
@@ -949,12 +1494,21 @@ def _():
     mo.md(r"""
     ## Exploratory analyses
 
-    Reserved for post-hoc work. Anything here was conceived after seeing the
-    data and is marked as such. A few candidates we can anticipate now:
-    per-seed variability in condensation, how far alignment spills into the
-    two unpulled positions, alignment on `open`-pair lines, and whether the
-    batch-to-batch noise in the anchor gradient (no balancing) shows up in the
-    trajectories of H4.
+    None were needed. The preregistered figures answered the questions the
+    hypotheses asked and the one they didn't ask — why the margin stops where
+    it does — so nothing here is post hoc beyond the readings marked in place:
+    the depth inversion under H3, and the drift reading under H2, which uses a
+    diagnostic added before the run.
+
+    The candidates the skeleton anticipated are either answered or moot. Seed
+    variability is small everywhere (the H4 panels show three lines that
+    converge to the same value, and $m_{\text{op1}}$ varies by under 0.02
+    across seeds). Spill into the unpulled positions is in the H3 map. The
+    batch-to-batch noise from skipping label balancing left no visible mark on
+    the trajectories, which are smooth after the first ten epochs. Alignment
+    on `open`-pair lines is the one we did not look at, and it is a question
+    about the answer position rather than about anchoring, so it can wait for
+    the experiment that pulls the whole span.
     """)
     return
 
@@ -964,14 +1518,57 @@ def _():
     mo.md(r"""
     ## Discussion
 
-    /// admonition | TODO
-    Written after the analysis round, with the human. Questions to address:
-    which of H1–H4 cleared; what the dose–response says about where the
-    capacity cost begins; whether we saw condensation or broadcast, and what
-    that implies for sequence-level labeling in natural language; and what the
-    leakage number says about how to design an intervention experiment, in
-    particular whether an anti-subspace term is needed.
-    ///
+    **The scoreboard.** H1 passed and H2, H3 and H4 did not. The anchor is
+    free — no rung cost measurable accuracy, NLL or open-pair distance — and it
+    does move the residual stream a long way onto the chosen direction. What it
+    did not do is move *red* there selectively. The margin settles near 0.27
+    against a gate of 0.5, the grading statistics reach 0.64 against 0.8, and
+    both are flat across a tenfold range of $\lambda$ while the
+    color-independent part of the response climbs with it.
+
+    **What the mechanism appears to be.** The anchor term rewards absolute
+    alignment at the pulled positions, and three of the four pulled positions
+    cannot tell the model anything about which color sits there — the label is
+    an unobservable coin flip, so only the expected pull is visible, and at
+    `+`, op2 and `=` that expectation depends on op1 rather than on the token
+    present. An undifferentiated shift satisfies most of the term, costs the
+    task nothing measurable here, and is what we observe. That reading is
+    consistent across the results rather than resting on one: it explains why
+    the margin is flat in $\lambda$ while the mean is not, why the margin is
+    largest in the shared embedding and decays through the position-aware
+    blocks, and why the trajectory peaks early and then slides — the peak is
+    the selective response arriving first, the slide is the rest of the cube
+    catching up.
+
+    **What this says about the M1 → M2 transfer.** M1's loss carried an
+    anti-subspace term alongside the anchor, at a weight two orders of
+    magnitude below it, and this experiment deliberately left it out to ask
+    whether one attractive term suffices. On this evidence it does not, and the
+    reason is now concrete rather than a guess: the anti-subspace term
+    constrains the very quantity that ran away here, and the leakage
+    measurement shows the cost of its absence — redness is as readable off the
+    anchor axis as in the control, so the axis holds a copy rather than the
+    concept. An intervention on this model would remove that copy and leave the
+    original. Whether adding the term recovers M1's result on a transformer is
+    the obvious next experiment, and the cleanest possible follow-up: same
+    testbed, same schedule, one more term.
+
+    **What stays open.** We cannot yet separate "the bare term is
+    insufficient" from "the *span* pull is what dilutes it", because this run
+    changed both against M1 at once: M1 labeled atomic samples, and every
+    pulled position there carried the labeled thing. The queued
+    position-pooling variant (logsumexp instead of a mean over positions) is
+    the direct test, and pulling op1 alone would be the cleaner one — it would
+    make every pulled position label-informative and leave the term itself
+    unchanged. Two smaller questions the results raise: whether the drift is
+    bounded by the task or would keep climbing at larger $\lambda$, and what to
+    make of the depth inversion under H3, where the concept enters at its own
+    token and migrates to the positions downstream of it.
+
+    A note on the schedule work: the star arm found nothing, and the H4 failure
+    was a slide rather than the ex-2.9.3 collapse. So the anneal design carried
+    over from M1 looks sound on this testbed, and schedule tuning is not where
+    the next gain is.
     """)
     return
 

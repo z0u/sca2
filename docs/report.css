@@ -72,6 +72,17 @@ figure.report-figure > figcaption {
   padding-left: 2ex;
 }
 
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
 /* Wide tables (e.g. the per-seed completions grid) scroll horizontally inside their own
  * box rather than wrapping cell contents — which detaches a swatch from its word — or
  * forcing the whole page to scroll sideways. */

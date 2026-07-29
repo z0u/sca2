@@ -291,7 +291,64 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   as the queued answer to a broadcast result, so it wants to exist as an item
   either way. #[D2.1] #anchoring #ex-2.1.6
 
+- [ ] **Add the anti-subspace term and re-run ex-2.1.6.** The clear next step
+  from that result: one attractive term is satisfied largely by a
+  color-independent shift of the whole cube onto the axis, so the margin stalls
+  at 0.27 while the mean alignment climbs with λ. M1's loss carried
+  anti-subspace (`mean(cos²)` over all points) at 3% of the anchor weight, and
+  it constrains exactly that quantity. Same testbed, same schedule, one more
+  term — the cheapest experiment that could turn the M2 transfer result around.
+  Anti-anchor (the hemisphere gate) is the second candidate. #[D2.1] #anchoring
+  #ex-2.1.6
+
+- [ ] **Pull op1 alone**, as the counterpart to the position-pooling item below.
+  Ex-2.1.6 pulls four prompt positions, and three of them (`+`, op2, `=`) carry
+  no information about which color sits there — the label is an unobservable
+  coin flip, so only the expected pull is visible, and at those positions it
+  depends on op1 rather than the token present. That is a mechanism for the
+  drift, separate from the missing repulsive terms, and pulling op1 alone
+  separates the two. #[D2.1] #anchoring #ex-2.1.6
+
+- [ ] Is the anchor drift bounded by the task or by λ? Ex-2.1.6's mean alignment
+  at op1 went 0.42 → 0.53 → 0.62 over λ ∈ {0.03, 0.1, 0.3} with no measurable
+  task cost at any of them, so we never found the ceiling. A rung or two higher
+  would say whether the task eventually pushes back, which is also the
+  power analysis for how much anchor weight is available to spend. #[D2.1]
+  #anchoring #ex-2.1.6
+
 ## Findings & notes to carry forward
+
+- **A bare anchor term buys alignment without selectivity (ex-2.1.6,
+  2026-07-29).** First anchored transformer. One cosine term pulling the prompt
+  span of red-labeled equations toward e₀, λ ∈ {0, 0.03, 0.1, 0.3} × 3 seeds on
+  the ex-2.1.3 `v216` cell. H1 passed with room to spare: held-out exact match
+  within 0.003 of control at every weight, NLL and open-pair distances flat, so
+  the anchor is free at these weights. H2 and H3 failed and H4 failed in an
+  unexpected way. The margin (label-affinity-weighted alignment minus the cube
+  mean) settles at 0.27 against a 0.5 gate and is flat across a tenfold range of
+  λ, while the *mean* alignment over all colors climbs 0.42 → 0.62 with λ: the
+  term is satisfied by moving everything onto the axis. Consistent with that,
+  the margin is largest in the shared token embedding and decays through the
+  position-aware blocks; the trajectory peaks near epoch 10 and slides back a
+  quarter (an H4 failure that is a slide, not the ex-2.9.3 late collapse — the
+  anneal is not the trigger, and the star arm with a 40-epoch-earlier anneal
+  changed nothing measurable). Leakage: redness is as readable off the anchor
+  axis as in the control (R² ≈ 0.8 both), so the axis holds a *copy* of red and
+  an intervention on it would leave the original. Two mechanisms are confounded
+  in this design and both have queued follow-ups: the missing repulsive terms
+  (M1 carried anti-subspace at 3% of the anchor weight) and the span pull, three
+  of whose four positions cannot see which color sits there. #[D2.1] #anchoring
+  #ex-2.1.6
+
+- **A causal model's first position is context-free, so op1 alignment is a
+  property of the token (ex-2.1.6, 2026-07-29).** Position 0 attends to itself
+  alone, so every probe line sharing an op1 gives the same op1 measurement.
+  Consequences for probe design: averaging over partners buys nothing at op1
+  (it does at later positions), the measurement carries no sampling error from
+  the partner, and the noise floor is set by the residual slices alone — 0.056
+  per seed on this architecture rather than the 0.011 a 27-line average would
+  give. Pinned by a test in `tests/sca/test_anchoring.py`. #methodology
+  #anchoring
 
 - **A principal angle between probe subspaces needs a dimension-matched null
   (ex-2.1.5, 2026-07-27).** The angle between two 3-dimensional row-spaces
