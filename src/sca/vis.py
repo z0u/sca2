@@ -171,7 +171,7 @@ def plot_rgb_cube(
     *,
     truth: np.ndarray | None = None,
     s: float = 20,
-    diameter: float | None = None,
+    diameter: float | np.ndarray | None = None,
     view: ViewName = "solid",
     bound: bool = True,
 ) -> None:
@@ -189,7 +189,8 @@ def plot_rgb_cube(
     the vocabulary did. Pass *diameter* instead to size them in panel units,
     where the cube spans 2 from black to white: marks then hold their size
     relative to the cube under any figure resize, and a plot of a whole grid can
-    ask for `grid_diameter(levels)` and tile it with no trial and error.
+    ask for `grid_diameter(levels)` and tile it with no trial and error. It also
+    takes one diameter per point, for a panel that reads a scalar as mark area.
     """
     from matplotlib.collections import EllipseCollection
     from matplotlib.colors import to_rgba_array
@@ -215,10 +216,12 @@ def plot_rgb_cube(
     if diameter is not None:
         # Sized in data units, so the collection rescales with the axes rather than the figure.
         # No edge here: at tiling sizes it would draw a mesh of outlines over the solid.
+        dia = np.asarray(diameter, dtype=float)
+        dia = dia[order] if dia.ndim else dia  # per-point sizes follow the depth sort
         ax.add_collection(
             EllipseCollection(
-                widths=diameter,
-                heights=diameter,
+                widths=dia,
+                heights=dia,
                 angles=0,
                 units="xy",
                 offsets=xy,

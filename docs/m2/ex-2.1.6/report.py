@@ -9,6 +9,17 @@ app = marimo.App(
 
 with app.setup(hide_code=True):
     import marimo as mo
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Marimo puts the notebook directory on sys.path, so the design constants come
+    # from the experiment module rather than a copy of them in the prose.
+    import experiment as ex
+    from mini.reports import report_bundle, use_publisher
+    from mini.vis import light_dark, themed
+    from sca import vis as sv
+
+    use_publisher(report_bundle(__file__))
 
 
 @app.cell(hide_code=True)
@@ -55,7 +66,6 @@ def _():
 
     The labels are sparse, noisy, and binary, following M1/Ex-1.7 via
     M1/Ex-2.9.1. Each line is labeled *red* with probability
-    <!-- We should probably visualize this distribution, as a line chart and on the color cube (using marker size, perhaps). Let's do that before running the experiment. -->
     `redness(op1)⁸ × 0.08`. Only strongly red first operands are ever labeled,
     and even they usually aren't.
 
@@ -154,7 +164,101 @@ def _():
     can infer from sparse fixed evidence, so both would be easier to read once
     the baseline mechanism is understood.
     ///
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _():
+    # Mark area reads the share of labels, so the floor is what keeps a color that is
+    # never labeled on the panel at all.
+    _dia = np.maximum(sv.grid_diameter(6) * np.sqrt(ex.LABEL_W / ex.LABEL_W.max()), 0.035)
+    _by_redness = np.argsort(ex.REDNESS)
+    # Closed with a final (x, 1.0) so the last step — pure red, a third of the mass on its own —
+    # is drawn rather than trailing off the right edge.
+    _cum_x = np.append(ex.REDNESS[_by_redness], 1.03)
+    _cum_y = np.append(np.cumsum(ex.LABEL_W[_by_redness]), 1.0)
+
+    @themed(
+        name="labels",
+        alt_text="""
+            The labels concentrate hard on the red corner: on the color cube only a
+            handful of marks near pure red are large, and label probability climbs
+            four orders of magnitude between redness 0.3 and 1.
+        """,
+        caption="""
+            The label distribution over the 216 colors. Left: the cube with mark
+            area proportional to a color's share of all labeled lines, floored so
+            that never-labeled colors still show. Right: per-color label
+            probability against redness (log scale, the eighth-power curve
+            behind it), with the dashed line at the corpus mean and the grey
+            area giving the cumulative share of labels below each redness.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, 2, figsize=(7.6, 3.4), gridspec_kw={"width_ratios": [1, 1.25]})
+        sv.plot_rgb_cube(axes[0], ex.GRID_RGB, diameter=_dia)
+        axes[0].set_title("share of labels (mark area)")
+
+        _grey = light_dark("#888", "#888")
+        ax = axes[1]
+        _x = np.linspace(0, 1, 400)
+        ax.plot(_x, ex.RED_RATE * _x**8, color=_grey, lw=1, zorder=1)
+        ax.axhline(ex.LABEL_P.mean(), ls=(0, (4, 3)), lw=1, color=_grey, zorder=1)
+        ax.scatter(
+            ex.REDNESS,
+            np.maximum(ex.LABEL_P, 1e-9),  # keep the exact zeros off the log axis
+            c=ex.GRID_RGB,
+            s=26,
+            edgecolors=light_dark("#00000033", "#ffffff55"),
+            lw=0.5,
+            zorder=3,
+        )
+        ax.set_yscale("log")
+        ax.set_ylim(1e-6, 0.3)
+        ax.set_xlim(-0.03, 1.03)
+        ax.set_xlabel("redness of op1")
+        ax.set_ylabel("P(labeled)")
+        ax.set_title("per-color label probability")
+        ax.annotate(f"{int((ex.LABEL_P < 1e-6).sum())} colors below", (0.02, 1.4e-6), fontsize=7, color=_grey)
+        ax.annotate("corpus mean", (1.0, ex.LABEL_P.mean() * 1.3), fontsize=7, ha="right", color=_grey)
+
+        cum = ax.twinx()
+        cum.fill_between(_cum_x, _cum_y, step="post", lw=0, color=light_dark("#0000000f", "#ffffff0f"), zorder=0)
+        cum.set_ylim(0, 1.02)
+        cum.set_xlim(-0.03, 1.03)
+        cum.set_ylabel("cumulative share", color=_grey)
+        cum.tick_params(colors=_grey)
+        fig.suptitle("Label distribution over the 216 colors")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(rf"""
+    The eighth power is what makes this a *concept* label rather than a redness
+    readout. Pure red alone takes {ex.LABEL_W.max():.0%} of all labeled lines,
+    the ten reddest colors take {np.sort(ex.LABEL_W)[-10:].sum():.0%} between
+    them, and {int((ex.LABEL_P < 1e-6).sum())} of the 216 colors are labeled
+    less than once in a million lines. Averaged over the cube the rate is
+    {ex.LABEL_P.mean():.2%} of lines, which is where the empty-batch problem
+    above comes from.
+
+    The right panel is the shape H2's grading prediction rests on. The pull a
+    color feels is graded over four orders of magnitude, so if alignment tracks
+    label affinity we should see a curve rather than a step — but the model
+    only ever sees Bernoulli draws from this, and nothing stops it from
+    treating "red enough to be labeled sometimes" as a threshold.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ### Model and anchor term
 
     The d64-L4 simplified nGPT as used from ex-2.1.1 onward, unchanged. The
@@ -177,8 +281,6 @@ def _():
     added.
 
     ### Schedule and conditions
-
-    <!-- it would be nice to visualize the schedule; if the LR schedule is not done with a dopesheet we should materialize both and plot them together. -->
 
     The LR schedule is the one from ex-2.1.3: 100 epochs, 10 warmup, cosine to
     1%. The anchor weight ramps to its peak alongside the LR warmup, holds at
@@ -205,13 +307,97 @@ def _():
     every labeled line for 90 epochs, and leakage is the secondary measurement
     we most expect to be sensitive to that. Against it stands the lesson of
     ex-2.9.3, that withdrawing protection while the optimizer is still hot lets
-    the task loss reclaim the axis — at epoch 50 the LR is well down but not
-    spent, so this condition sits nearer that edge than the default does. Annealing
+    the task loss reclaim the axis, and epoch 50 puts this condition much
+    closer to that edge than the default does — see the figure below. Annealing
     to a floor rather than to zero is what makes it worth trying at all. It is
     a diagnostic, not a scored condition; if it shows lower leakage at equal
     alignment, the anneal window becomes a design question for the next
     experiment.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _():
+    _epochs = np.linspace(0, ex.SCHEDULER.epochs, 2001)
+    _lr = ex.learning_rate(_epochs) / ex.PEAK_LR
+    _weight = ex.anchor_weight(_epochs)
+    _star = ex.anchor_weight(_epochs, anneal_start=ex.STAR_ANNEAL_START)
+
+    @themed(
+        name="schedules",
+        alt_text="""
+            The anchor weight holds at peak until epoch 90, by which point the
+            learning rate has decayed to 4% of peak; the star arm lets go at
+            epoch 50, while the learning rate is still around 60%.
+        """,
+        caption="""
+            The two schedules on one axis, each as a fraction of its own peak —
+            the LR peak is fixed at 1e-2, the anchor weight's is the swept
+            $\\lambda$. Both anneal windows are 10 epochs long and both stop at
+            a floor of 10% rather than zero. Dots mark the learning rate at the
+            moment each anneal begins.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        _lr_c, _an_c = light_dark("#888", "#999"), light_dark("#c1332a", "#f0665a")
+        fig, ax = plt.subplots(figsize=(7.6, 3.2))
+        ax.plot(_epochs, _lr, color=_lr_c, lw=1.5, label="learning rate")
+        ax.plot(_epochs, _weight, color=_an_c, lw=2.0, label=r"anchor weight $\lambda$")
+        ax.plot(_epochs, _star, color=_an_c, lw=1.5, ls=(0, (4, 3)), label=r"$\lambda{=}0.1^{*}$ (star arm)")
+        for _start, _text_at in ((ex.STAR_ANNEAL_START, (40, 0.40)), (ex.ANNEAL_START, (82, 0.26))):
+            _at = float(ex.learning_rate(_start) / ex.PEAK_LR)
+            ax.plot([_start], [_at], "o", ms=4, color=_lr_c)
+            ax.annotate(
+                f"LR {_at:.0%} of peak\nwhen the anneal starts",
+                (_start, _at),
+                xytext=_text_at,
+                fontsize=7,
+                ha="right",
+                va="top",
+                color=light_dark("#666", "#999"),
+                arrowprops=dict(arrowstyle="-", lw=0.6, color=light_dark("#aaa", "#666")),
+            )
+        ax.set_xlim(0, ex.SCHEDULER.epochs)
+        ax.set_ylim(0, 1.28)
+        ax.set_xlabel("epoch")
+        ax.set_ylabel("fraction of peak")
+        ax.set_title("Learning rate and anchor weight over training")
+        ax.legend(loc="upper right", fontsize=8, frameon=False, ncols=3)
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(rf"""
+    Drawing the two together settles something the prose was vague about, and
+    not in the direction we assumed. A cosine decay spends most of its range
+    late, so at epoch {ex.STAR_ANNEAL_START:.0f} the LR is still
+    {ex.learning_rate(ex.STAR_ANNEAL_START) / ex.PEAK_LR:.0%} of peak — over
+    half of it, so "well down" was wrong. By epoch {ex.ANNEAL_START:.0f} it is
+    {ex.learning_rate(ex.ANNEAL_START) / ex.PEAK_LR:.0%}. The star arm is
+    therefore a sharper test than we intended: it withdraws most of the anchor
+    into an optimizer still moving quickly, which is close to the setting that
+    produced the late collapses of M1/Ex-2.9.3. That makes it a good probe of
+    the mechanism and a poor candidate for a default schedule, and it is why
+    the star arm stays a diagnostic.
+
+    It anneals over the same 10-epoch window as the default, reaching the floor
+    at epoch {ex.STAR_ANNEAL_START + ex.ANNEAL_EPOCHS:.0f} and holding there.
+    The alternative reading — stretch the anneal from epoch
+    {ex.STAR_ANNEAL_START:.0f} to the end of training — would move the rate of
+    the anneal along with its start, and the point of a star arm is to move one
+    thing.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ### Scoring
 
     Hypotheses resolve on the middle rung $\lambda{=}0.1$, which is where the
@@ -525,8 +711,10 @@ def _():
     claim doesn't rest on having guessed the coefficient.
     4. Three seeds.
     5. The anneal window is epochs 90–100, down to a 10% floor, with the
-    $\lambda{=}0.1^{*}$ star arm annealing from epoch 50 to test whether the
-    long hold at peak costs leakage.
+    $\lambda{=}0.1^{*}$ star arm running the same 10-epoch window from epoch 50
+    to test whether the long hold at peak costs leakage. The schedule figure
+    shows what that costs: the star arm lets go while the LR is still near 60%
+    of peak.
     6. The anchor term averages over all non-padding positions, including the
     answer and newline.
     ///
