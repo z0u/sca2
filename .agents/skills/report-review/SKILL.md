@@ -6,7 +6,6 @@ description: >-
   whether it is ready to run or to freeze.
 argument-hint: <path to report.py>
 context: fork
-background: false
 model: sonnet
 ---
 
