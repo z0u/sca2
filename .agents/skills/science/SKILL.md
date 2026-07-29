@@ -45,3 +45,12 @@ The human wants to be involved in the writing, so the skeleton is a review artif
 When results arrive, fill the report in order of stakes rather than all at once. The mechanical sections — where the number either clears its threshold or it doesn't — can be filled in one pass. Pause for a discussion round before writing the prose where interpretation lives, since that is the part the human most wants a hand in, and the part most likely to over-reach.
 
 The publishing mechanics — exporting the report as a bundle, wiring result refs, verifying the render — are a separate concern, covered by the `mi-ni` skill.
+
+### Simplification pass
+
+Text should be reviewed before handing back to the human. In one turn:
+
+1. Write
+2. Stage changes (unless you have another way to see what the agent changes)
+3. Hand it to the `prose-simplifier` agent on the same turn
+4. Review the agent's changes; check for correctness
