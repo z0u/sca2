@@ -22,6 +22,6 @@ mem="$(free -h | awk '/^Mem:/ {print $7" free / "$2" total"}')"
 swap="$(free -h | awk '/^Swap:/ {print $3" used / "$2" total"}')"
 disk="$(df -h / 2>/dev/null | awk 'NR==2 {print $4" free / "$2" total ("$5" used)"}')"
 
-note="Environment: RAM $mem · Swap $swap · Disk (/) $disk. This machine has limited RAM/swap headroom — if you need to load large models/data, check available memory first and consider Modal for heavy workloads."
+note="Environment: RAM $mem · Swap $swap · Disk (/) $disk. Consider the available resources before launching jobs on this machine."
 
 jq -n --arg note "$note" '{hookSpecificOutput: {hookEventName: "SubagentStart", additionalContext: $note}}'
