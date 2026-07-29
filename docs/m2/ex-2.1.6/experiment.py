@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from sca.colorcube import redness
+from sca.colorcube import redness, sim_to_red
 from sca.config import SchedulerConfig
 from sca.data.colors import N_LEVELS
 from sca.data.named_colors import GRIDS
@@ -38,12 +38,13 @@ H4_FLOOR = 0.2
 """Running-max floor below which an H4 run is reported but not scored.
 
 A run the anchor never took hold of has a noise-level running maximum. Simulated
-on unrelated 64-d unit states — α_c a mean over 8 probe lines, m_op1 then a mean
-over the 5 residual slices — the margin's per-checkpoint noise is ≈0.007 and the
-maximum over ~200 checkpoints sits near 0.025, so a ratio of noise-level margins
-fails the 0.8× gate about as often as not. The floor is ~8× that maximum and well
-under H2(a)'s 0.5. (A single layer is √5 noisier: sd ≈0.016, running max ≈0.05.
-The gated statistic is the layer mean, so the tighter pair is the relevant one.)
+on unrelated 64-d unit states — α_c a mean over the 27 probe lines, m_op1 then a
+mean over the 5 residual slices — the margin's per-checkpoint noise is ≈0.004 and
+the maximum over ~200 checkpoints sits near 0.014, so a ratio of noise-level
+margins fails the 0.8× gate about as often as not. The floor is ~15× that maximum
+and well under H2(a)'s 0.5. (A single layer is √5 noisier: sd ≈0.009, running max
+≈0.03. The gated statistic is the layer mean, so the tighter pair is the
+relevant one.)
 """
 
 RED_RATE = 0.08
@@ -66,6 +67,21 @@ LABEL_W = LABEL_P / LABEL_P.sum()
 
 Also the weight $u_c$ that every alignment statistic scores with.
 """
+
+SIM_TARGET = sim_to_red(GRID_RGB, power=1.5)
+"""M1's response shape mapped to alignment: angular HSV similarity to red, power 3/2.
+
+M1's labels used the same `redness⁸` affinity as ours, yet the damage it
+measured graded as sim³ under ablation and sim² under suppression — far
+flatter than the affinity. Damage is quadratic in alignment (MSE ∝ align²),
+so those map to alignment ∝ sim^1.5 and sim¹. The 3/2 power is the ablation
+result on the alignment side, and it is also the family-covering choice:
+R² ≥ 0.86 against every power of sim from 1 to 3, ≥ 0.96 against both
+M1-derived alignment shapes. H2(b)'s second track scores against it.
+"""
+
+N_PROBE = 27
+"""Probe lines per color: all 27 closed partners, so the probe set is exhaustive."""
 
 BLOCK, BATCH = 64, 64  # ex-2.1.3's DataConfig, unchanged
 LINE_TOKENS = 6  # `name + name = name ⏎` at word level
@@ -109,6 +125,45 @@ STEP_RHO_CEILING = max(step_rho(t) for t in np.unique(REDNESS)[:-1])
 
 Below the H2(b) gate of 0.8, so a step cannot pass as a grade unless it also
 carries residual within-level ordering — see the H2 partial in the report.
+"""
+
+
+def _spearman(a: np.ndarray, b: np.ndarray) -> float:
+    """Spearman ρ with midranks for ties: Pearson correlation of the rank vectors."""
+    return float(np.corrcoef(_midranks(a), _midranks(b))[0, 1])
+
+
+SIM_RHO_CEILING = _spearman(SIM_TARGET, REDNESS)
+"""The noiseless Spearman ρ of a sim-family-shaped response against redness.
+
+Every positive power of sim shares one ranking, so this ceiling covers the
+whole family. The two notions of red order the 216 colors differently, so a
+sim-graded response grades poorly on the rank track. Note this constant is
+noise-free and uses midranks: sim takes only 23 distinct values here, and
+crediting the ties lifts it just over the 0.8 gate. Break the ties at random
+and it is ≈0.81; with measurement noise (unit amplitude, sd ≈0.011 per seed or
+≈0.006 on the three-seed mean the gate is scored on) it is ≈0.66 or ≈0.71.
+This is why H2(b) has a second track.
+"""
+
+
+def r2_sim(alpha: np.ndarray) -> float:
+    """Pearson R² between a per-color response and SIM_TARGET — M1's proportionality score.
+
+    M1 scored interventions with `corrcoef(SIM3, mse)²` (`sca.colorcube
+    .score_interventions`); this is the same statistic read on alignment
+    instead of damage, with the target's exponent mapped accordingly (see
+    `SIM_TARGET`). Pearson is scale- and offset-invariant, so "∝" needs no
+    tuned constant, only the shape.
+    """
+    return float(np.corrcoef(alpha, SIM_TARGET)[0, 1] ** 2)
+
+
+STEP_R2_CEILING = max(r2_sim((v > t).astype(float)) for v in (REDNESS, SIM_TARGET) for t in np.unique(v)[:-1])
+"""The best R² any pure step response can score against SIM_TARGET, over step
+locations in either redness or similarity order. Below the H2(b) gate of 0.8,
+as with `STEP_RHO_CEILING`. (Pearson ignores within-level ordering, so this
+one is deterministic with no expectation to take.)
 """
 
 
