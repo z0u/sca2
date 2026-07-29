@@ -252,6 +252,24 @@ def _():
     label affinity we should see a curve rather than a step — but the model
     only ever sees Bernoulli draws from this, and nothing stops it from
     treating "red enough to be labeled sometimes" as a threshold.
+
+    /// admonition | The concentration is a risk we are choosing to accept
+    The weights behave like about {ex.EFFECTIVE_COLORS:.0f} distinct colors
+    rather than 216, and balanced batching draws pure red a little over once
+    per batch of 64. So the anchor's evidence is a dozen-odd first operands,
+    repeated for 100 epochs. An axis could learn *this token* instead of *red*
+    and still clear H2(a) and (c).
+
+    We keep M1's exponent anyway. Ex-2.1.6 asks whether the M1 result transfers
+    to a transformer, and moving the label distribution at the same time as the
+    architecture would leave nothing to attribute a difference to. It is also
+    the more honest analogue of a document-level label in natural language,
+    which fires on a small and unrepresentative slice of the corpus. H2(b), the
+    grading test, is the measurement that separates a memorized exemplar from a
+    generalized concept, which is a good part of why it is a gate rather than a
+    diagnostic. A flatter exponent is queued in `todo-science.md` as the
+    follow-up that would settle it.
+    ///
     """)
     return
 
@@ -285,9 +303,23 @@ def _():
     The LR schedule is the one from ex-2.1.3: 100 epochs, 10 warmup, cosine to
     1%. The anchor weight ramps to its peak alongside the LR warmup, holds at
     peak through epoch 90 (by which point the LR has decayed to a few percent
-    of peak), then anneals linearly to a 10% floor at epoch 100. It never
+    of peak), then anneals to a 10% floor at epoch 100. It never
     reaches zero, which is the lesson of ex-2.9.3 applied as issue #10
     prescribes.
+
+    Both moves are minimum-jerk — the quintic that starts and ends at rest —
+    rather than linear. That is what M1 used: the ex-2.9.x dopesheets take
+    mini's default interpolator, which is `minjerk`, so every regularizer ramp
+    and anneal in those experiments had this shape.
+
+    Whether the smoothness earns anything is untested. M1 never compared linear
+    against smooth. It did test a *stepped* anneal, which worked only when the
+    LR warmup restarted from zero at each step — so the one discontinuity
+    anyone measured needed an accommodation to survive. A kink is the milder
+    version of the same event, a jump in $\lambda$'s derivative rather than in
+    $\lambda$ itself, and it may well cost nothing. We take the M1 default
+    because this experiment has no budget to find out, and record the
+    assumption here rather than in the code.
 
     The sweep conditions are peak anchor weight
     $\lambda \in \{0,\ 0.03,\ 0.1,\ 0.3\}$ crossed with seeds $\{0, 1, 2\}$, so
@@ -337,9 +369,10 @@ def _():
         caption="""
             The two schedules on one axis, each as a fraction of its own peak —
             the LR peak is fixed at 1e-2, the anchor weight's is the swept
-            $\\lambda$. Both anneals end at epoch 100 on a floor of 10% rather
-            than zero, so the star arm's is the longer and gentler of the two.
-            Dots mark the learning rate at the moment each anneal begins.
+            $\\lambda$. The anchor weight's ramp and anneal are minimum-jerk;
+            both anneals end at epoch 100 on a floor of 10% rather than zero,
+            so the star arm's is the longer and gentler of the two. Dots mark
+            the learning rate at the moment each anneal begins.
         """,
     )
     def _plot() -> plt.Figure:

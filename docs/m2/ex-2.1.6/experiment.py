@@ -54,13 +54,31 @@ H2's $\\Delta\\alpha_{op1}$ scores with.
 """
 
 
+EFFECTIVE_COLORS = float(np.exp(-(LABEL_W[LABEL_W > 0] * np.log(LABEL_W[LABEL_W > 0])).sum()))
+"""Perplexity of the label distribution — how many colors it behaves like, against 216 real ones."""
+
+
+def smoothstep(tau) -> np.ndarray:
+    """Minimum-jerk interpolation from 0 to 1 over the unit interval, clamped outside it.
+
+    The quintic 6τ⁵ − 15τ⁴ + 10τ³, which is what
+    `mini.temporal.MinimumJerkTimingFunction` reduces to for a move that starts
+    and ends at rest — so this is the shape M1's dopesheets used for every
+    regularizer ramp and anneal, in closed form and vectorized.
+    """
+    t = np.clip(np.asarray(tau, dtype=float), 0.0, 1.0)
+    return t**3 * (10.0 - 15.0 * t + 6.0 * t**2)
+
+
 def anchor_weight(epoch, *, peak: float = 1.0, anneal_start: float = ANNEAL_START) -> np.ndarray:
     """The anchor weight λ at (fractional) *epoch*: ramp, hold, anneal to a floor.
 
     The ramp shares the LR warmup window, so the anchor arrives with the
-    optimizer rather than ahead of it. The anneal is linear and stops at
-    `ANNEAL_FLOOR` of peak — the M1/ex-2.9.3 lesson that protection withdrawn
-    entirely lets the task loss reclaim the axis.
+    optimizer rather than ahead of it. Both moves are minimum-jerk, which is
+    what M1's dopesheets defaulted to; linear was never compared against it, so
+    this is inheritance rather than a measured choice (see the report). The
+    anneal stops at `ANNEAL_FLOOR` of peak — the M1/ex-2.9.3 lesson that
+    protection withdrawn entirely lets the task loss reclaim the axis.
 
     Every condition reaches the floor at `ANNEAL_END`, so moving *anneal_start*
     stretches the anneal rather than sliding a fixed window: protection comes
@@ -68,8 +86,8 @@ def anchor_weight(epoch, *, peak: float = 1.0, anneal_start: float = ANNEAL_STAR
     away while the optimizer is still hot.
     """
     e = np.asarray(epoch, dtype=float)
-    ramp = np.clip(e / SCHEDULER.warmup_epochs, 0.0, 1.0)
-    anneal = np.clip((e - anneal_start) / (ANNEAL_END - anneal_start), 0.0, 1.0)
+    ramp = smoothstep(e / SCHEDULER.warmup_epochs)
+    anneal = smoothstep((e - anneal_start) / (ANNEAL_END - anneal_start))
     return peak * ramp * (1.0 - (1.0 - ANNEAL_FLOOR) * anneal)
 
 

@@ -254,6 +254,24 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   the fixed scalar α = 1/n_layer trains flat across the width × depth grid we can
   afford. #model-arch
 
+- [ ] Does the *shape* of the anchor anneal matter — linear vs minimum-jerk? M1
+  compared neither; it did test a stepped anneal, which held only when the LR
+  warmup restarted from zero at each step, so the one discontinuity we measured
+  needed an accommodation. Whether the milder discontinuity of a linear ramp
+  (a jump in λ's derivative) costs anything is unknown. Ex-2.1.6 takes minjerk
+  by inheritance. Cheap to settle later as a two-condition arm on whatever
+  anchored experiment is running anyway. #[D2.1] #anchoring #ex-2.1.6
+
+- [ ] Flatten the label affinity and see whether grading survives. `redness⁸`
+  puts 31% of all labels on pure red and ~95% on 20 of the 216 colors, an
+  effective 12 distinct first operands, so an anchored axis could carry "this
+  token" rather than "red" and still pass most of ex-2.1.6's gates except the
+  Spearman one. A `redness³`-ish exponent spreads the pull over most of the
+  warm half of the cube; run it against the ex-2.1.6 result to separate
+  memorized exemplars from a generalized concept. Keep the M1 exponent as the
+  reference condition — changing it is what makes the transfer claim
+  comparable. #[D2.1] #anchoring #ex-2.1.6
+
 ## Findings & notes to carry forward
 
 - **A principal angle between probe subspaces needs a dimension-matched null
