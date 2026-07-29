@@ -38,14 +38,13 @@ def _():
     reserved for the operands, as in ex-2.1.3 and ex-2.1.4. The anchor
     direction takes M1's symbol for it, $\hat{v}_c$ for concept $c$, written
     here as $\hat v_{\text{red}}$ since *red* is the only concept in play. The
-    regularizer weight is $\lambda$, also from M1. One symbol does change
-    meaning: M1 wrote the label indicator $\ell^{(i)}_{c}$, but M2 is
-    transformer work and layer subscripts are everywhere, so from here $\ell$
-    indexes layers, and a label indicator — should a later experiment need to
-    write one, e.g. for multiple concepts or per-token labels — is
-    $y^{(i)}_{c}$.
+    regularizer weight is $\lambda$, also from M1. One symbol changes meaning:
+    M1 wrote the label indicator $\ell^{(i)}_{c}$, but layer subscripts are
+    everywhere in transformer work, so from here $\ell$ indexes layers. If a
+    later experiment needs a label indicator (say, for multiple concepts or
+    per-token labels), it is $y^{(i)}_{c}$.
 
-    For the sweep, ex-2.1.5's three-tiered vocabulary carries over. A
+    For the sweep, the three-tiered vocabulary of ex-2.1.5 carries over. A
     **condition** is one setting of the swept hyperparameter; a **cell** is one
     run, a condition crossed with a seed, which is what `metrics["cells"]`
     holds; an **arm** is a named group of conditions with a purpose of its own.
@@ -70,14 +69,13 @@ def _():
     and even they usually aren't.
 
     Samples were atomic in the autoencoder experiments, but now that each sample
-    is a sequence, we need to decide _what_ to label. For this experiment,
-    labels will be attached to sequences, and the anchor term applies uniformly
-    to every position and layer of a labeled line. That matches the shape of
-    natural language, where a document is labeled rather than a token. It also
-    leaves an interesting question for the training dynamics to answer. The pull
-    is undifferentiated, but the task loss resists it unevenly. So does the
-    concept condense at the position that computes it, or smear into a broadcast
-    "this line mentions red" feature?
+    is a sequence, we need to decide _what_ to label. Here, labels attach to
+    sequences, and the anchor term applies uniformly to every position and
+    layer of a labeled line. That matches the shape of natural language, where
+    a document is labeled rather than a token. It also leaves a question for
+    the training dynamics to answer: the pull is undifferentiated but the task
+    loss resists it unevenly, so does the concept condense at the position that
+    computes it, or smear into a broadcast "this line mentions red" feature?
 
     The schedule comes from [issue #10] and M1/Ex-2.9.3: regularizer protection
     has to outlive the heat of the optimizer. So the *anchor* weight holds at peak
@@ -90,13 +88,11 @@ def _():
     companion term with its own weight to keep activation scale in hand — one
     more coefficient to tune. Norms pinned at 1 remove that question.
 
-    Several things are left out: the *anti-anchor*, *anti-subspace*, and
-    *separate* terms, and any intervention (suppression, ablation, or redirect).
-    One anchor term only. So this experiment asks whether the anchor axis
-    *happens* to carry red alone, having done nothing to keep other concepts
-    off it — the repulsive terms are what would reserve it, and they earn their
-    place once we intervene and a stray concept sharing the axis would show up
-    as a side-effect.
+    We leave out the *anti-anchor*, *anti-subspace*, and *separate* terms, and
+    any intervention (suppression, ablation, or redirect): one anchor term
+    only. Nothing reserves the axis, so this experiment asks whether it
+    *happens* to carry red alone. The repulsive terms matter once we intervene,
+    when a stray concept sharing the axis would show up as a side-effect.
 
     [issue #10]: https://github.com/z0u/sca2/issues/10
     """)
@@ -137,16 +133,16 @@ def _():
     ### Labels
 
     A line is labeled *red* by a coin flip weighted by the redness of its first
-    operand: `p = redness(op1)⁸ × 0.08`, where `redness = r·(1 − g/2 − b/2)`
-    (a Bernoulli draw, i.e. one biased coin flip per line, independent of every
-    other line). This is the `RED_PROB` of M1, applied to the color of the
-    first operand only. A red op2 or a red answer never triggers a label. That keeps the ground
-    truth unambiguous for the question of *where* the concept should condense.
-    An either-slot labeling scheme is queued as a follow-up.
+    operand: `p = redness(op1)⁸ × 0.08`, where `redness = r·(1 − g/2 − b/2)`,
+    one independent draw per line.[^bern] This is the `RED_PROB` of M1, applied to the
+    color of the first operand only. A red op2 or a red answer never triggers a
+    label, which keeps the ground truth unambiguous for the question of *where*
+    the concept should condense. An either-slot labeling scheme is queued as a
+    follow-up.
 
-    Labels are redrawn per visit, as in M1, i.e. the labels will differ from epoch to epoch. So the expected pull on a color is
-    proportional to its label affinity, and that is where we expect the graded
-    response of H2 to come from.
+    Labels are redrawn per visit, as in M1, so they differ from epoch to
+    epoch. The expected pull on a color is therefore proportional to its label
+    affinity, which is where we expect the graded response of H2 to come from.
 
     Under a plain Bernoulli draw only ≈ 0.1% of lines would be labeled, and
     ~93% of batches would carry none at all. So batches are label-balanced,
@@ -164,6 +160,9 @@ def _():
     can infer from sparse fixed evidence, so both would be easier to read once
     the baseline mechanism is understood.
     ///
+
+    [^bern]: A Bernoulli draw: one biased coin flip per line, independent of
+    every other line.
     """)
     return
 
@@ -247,10 +246,10 @@ def _():
     {ex.LABEL_P.mean():.2%} of lines, which is where the empty-batch problem
     above comes from.
 
-    The right panel is the shape H2's grading prediction rests on. The pull a
-    color feels is graded over four orders of magnitude, so if alignment tracks
-    label affinity we should see a curve rather than a step — but the model
-    only ever sees Bernoulli draws from this, and nothing stops it from
+    The right panel is the shape the grading prediction of H2 rests on. The
+    pull a color feels is graded over four orders of magnitude, so if alignment
+    tracks label affinity we should see a curve rather than a step. But the
+    model only ever sees Bernoulli draws from this, and nothing stops it from
     treating "red enough to be labeled sometimes" as a threshold.
 
     /// admonition | The concentration is a risk we are choosing to accept
@@ -263,12 +262,12 @@ def _():
     We keep M1's exponent anyway. Ex-2.1.6 asks whether the M1 result transfers
     to a transformer, and moving the label distribution at the same time as the
     architecture would leave nothing to attribute a difference to. It is also
-    the more honest analogue of a document-level label in natural language,
-    which fires on a small and unrepresentative slice of the corpus. H2(b), the
-    grading test, is the measurement that separates a memorized exemplar from a
-    generalized concept, which is a good part of why it is a gate rather than a
-    diagnostic. A flatter exponent is queued in `todo-science.md` as the
-    follow-up that would settle it.
+    the closer analogue of a document-level label in natural language, which
+    fires on a small and unrepresentative slice of the corpus. H2(b), the
+    grading test, separates a memorized exemplar from a generalized concept,
+    which is a good part of why it is a gate rather than a diagnostic. A
+    flatter exponent is queued in `todo-science.md` as the follow-up that
+    would settle it.
     ///
     """)
     return
@@ -312,14 +311,14 @@ def _():
     mini's default interpolator, which is `minjerk`, so every regularizer ramp
     and anneal in those experiments had this shape.
 
-    Whether the smoothness earns anything is untested. M1 never compared linear
-    against smooth. It did test a *stepped* anneal, which worked only when the
-    LR warmup restarted from zero at each step — so the one discontinuity
-    anyone measured needed an accommodation to survive. A kink is the milder
-    version of the same event, a jump in $\lambda$'s derivative rather than in
-    $\lambda$ itself, and it may well cost nothing. We take the M1 default
-    because this experiment has no budget to find out, and record the
-    assumption here rather than in the code.
+    Whether the smoothness earns anything is untested; M1 never compared
+    linear against smooth. It did test a *stepped* anneal, which worked only
+    when the LR warmup restarted from zero at each step, so the one
+    discontinuity anyone measured needed an accommodation to survive. A kink
+    is the milder version of the same event (a jump in the derivative of
+    $\lambda$ rather than in $\lambda$ itself) and may well cost nothing. We
+    take the M1 default because this experiment has no budget to find out, and
+    record the assumption here rather than in the code.
 
     The sweep conditions are peak anchor weight
     $\lambda \in \{0,\ 0.03,\ 0.1,\ 0.3\}$ crossed with seeds $\{0, 1, 2\}$, so
@@ -330,22 +329,19 @@ def _():
 
     One **star arm** joins them: $\lambda{=}0.1^{*}$, identical except that the
     anneal starts at epoch 50 rather than 90, still reaching the floor at 100.
-    Star arm is our shorthand, not a
-    term of art — it borrows the *star point* of a central composite design,
-    where one factor moves off the design centre while everything else holds.
-    It varies one thing off the scoring rung instead of crossing the whole
-    grid, so it costs 3 cells rather than 12 and answers a single question.
-    Here the question is whether
-    a long hold at peak buys alignment or just leaks: the anchor keeps pulling
-    every labeled line for 90 epochs, and leakage is the secondary measurement
-    we most expect to be sensitive to that. Against it stands the lesson of
-    ex-2.9.3, that withdrawing protection while the optimizer is still hot lets
-    the task loss reclaim the axis, and epoch 50 is a good deal hotter than
-    epoch 90 — see the figure below. Spreading the withdrawal over the
-    remaining 50 epochs, and stopping at a floor rather than zero, is what
-    makes it worth trying at all. It is
-    a diagnostic, not a scored condition; if it shows lower leakage at equal
-    alignment, the anneal window becomes a design question for the next
+    Star arm is our shorthand, borrowed from the *star points* of a central
+    composite design: it moves one factor off the scoring rung instead of
+    crossing the whole grid, so it costs 3 cells rather than 12 and answers a
+    single question. The question here is whether the long hold at peak buys
+    alignment or just leaks: the anchor keeps pulling every labeled line for
+    90 epochs, and leakage is the secondary measurement we most expect to be
+    sensitive to that. Against it stands the lesson of ex-2.9.3, that
+    withdrawing protection while the optimizer is still hot lets the task loss
+    reclaim the axis, and epoch 50 is a good deal hotter than epoch 90 (see
+    the figure below). Spreading the withdrawal over the remaining 50 epochs,
+    and stopping at a floor rather than zero, is what makes it worth trying.
+    It is an unscored diagnostic; if it shows lower leakage at equal
+    alignment, the anneal window becomes a design question for a later
     experiment.
     """)
     return
@@ -417,10 +413,10 @@ def _():
     half of it. By epoch {ex.ANNEAL_START:.0f}, where the default begins, it is
     {ex.learning_rate(ex.ANNEAL_START) / ex.PEAK_LR:.0%}. The two conditions
     are therefore not withdrawing protection into comparable optimizers, and
-    that is the thing to keep in view when reading the star arm's result.
+    that is the thing to keep in view when reading the star-arm result.
 
     It is also why the anneal stretches rather than slides. Both conditions
-    reach the floor at epoch {ex.ANNEAL_END:.0f}, so the star arm's anneal
+    reach the floor at epoch {ex.ANNEAL_END:.0f}, so the star-arm anneal
     takes {ex.ANNEAL_END - ex.STAR_ANNEAL_START:.0f} epochs against the
     default's {ex.ANNEAL_END - ex.ANNEAL_START:.0f}, and λ comes off roughly in
     step with the cooling LR instead of dropping away underneath a hot one.
@@ -431,10 +427,9 @@ def _():
     That would be a fine stress test of the mechanism and a poor candidate for
     a schedule we might adopt, and the star arm is here to propose a schedule.
 
-    The moved factor is the *start* of the anneal, with its endpoint pinned to
-    the end of training. The rate follows from those two, so it is one factor
-    in the sense that matters — the design has one knob, not two set
-    independently.
+    The moved factor is the *start* of the anneal, with the endpoint pinned to
+    the end of training. The rate follows from those two, so the design has
+    one knob.
     """)
     return
 
@@ -445,9 +440,9 @@ def _():
     ### Scoring
 
     Hypotheses resolve on the middle rung $\lambda{=}0.1$, which is where the
-    numbers in the results sections come from. But H2's claim is that anchoring
-    works, and that claim shouldn't fail because we guessed a coefficient
-    wrong, so its gates read *some anchored rung clears the threshold while
+    numbers in the results sections come from. But the claim of H2 is that
+    anchoring works, and that claim shouldn't fail because we guessed a
+    coefficient wrong, so its gates read *some anchored rung clears the threshold while
     also clearing H1*. H1 is what keeps this from being cherry-picking: a rung
     earns nothing by reaching alignment if it broke the task getting there. The
     ladder is only four rungs, so the multiple-comparisons cost of reading
@@ -456,16 +451,11 @@ def _():
 
     ### Measurements
 
-    Behavioral: exact match, NLL, and the distance metrics of ex-2.1.3 on all
-    eval sets, with the usual nulls from `sca.baselines`. NLL is the negative
-    log-likelihood the model assigns to the correct answer token — how
-    surprised it is by the truth, in nats, with 0 meaning certain and correct.
-    Exact match is the coarser scoring of the two: it counts the argmax, so a
-    run can hold accuracy while NLL drifts, and that drift is the earlier
-    warning of capacity being spent elsewhere. The nulls are the reference
-    scores from `sca.baselines`: what the same metric gives for degenerate
-    predictors (the corpus-mean color, a uniform draw, the identity of op1),
-    which is what makes a distance number readable as good or bad.
+    Behavioral: exact match, NLL,[^nll] and the distance metrics of ex-2.1.3
+    on all eval sets, with the usual nulls from `sca.baselines`.[^nulls] Exact
+    match is the coarser scoring of the two: it counts the argmax, so a run
+    can hold accuracy while NLL drifts, and that drift is the earlier warning
+    of capacity being spent elsewhere.
 
     Alignment maps: $\cos(h_{\ell,t}, \hat v_{\text{red}})$ on the alignment
     probe set, per layer × position. We group lines by how red op1 is, reusing
@@ -478,7 +468,7 @@ def _():
     then the red-group mean minus the other-group mean.
 
     Grouping earns its place where we need one number per layer × position
-    cell, which is what H3's 2× ratio compares and what H4 tracks over
+    cell, which is what the H3 2× ratio compares and what H4 tracks over
     training. The layer-mean of it at op1 is
 
     $$\bar{C}_{\text{op1}} = \frac{1}{L+1}\sum_{\ell=0}^{L} C(\ell,
@@ -526,6 +516,14 @@ def _():
     ex-2.9.3, carried over as the first queue item of issue #10. A flat loss
     curve does not mean learning is done, so the alignment trajectory is the
     evidence to consult before any decision to shorten the schedule.
+
+    [^nll]: Negative log-likelihood: the surprise, in nats, of the probability
+    the model assigns to the correct answer token, with 0 meaning certain and
+    correct.
+
+    [^nulls]: Reference scores for degenerate predictors (the corpus-mean
+    color, a uniform draw, the identity of op1), which make a distance number
+    readable as good or bad.
     """)
     return
 
@@ -536,7 +534,7 @@ def _():
     ## Hypotheses
 
     Reported on the $\lambda{=}0.1$ condition (seed-averaged) unless stated; the
-    other rungs are context. H2's gates read *some anchored rung*, per the
+    other rungs are context. The H2 gates read *some anchored rung*, per the
     scoring rule above.
 
     **H1.** Anchoring does not harm the task. Every anchored condition has
@@ -547,10 +545,8 @@ def _():
     **H2.** The concept lands on the anchor, and does so in a graded way, at
     some rung that also clears H1. (a) $\Delta\alpha_{\text{op1}} \ge 0.5$.
     (b) Redder colors sit closer to the anchor: over the 216 colors, $\alpha_c$
-    rises monotonically with the redness of $c$, at Spearman $\rho \ge 0.8$.
-    (Spearman ρ is a correlation coefficient computed on ranks rather than
-    values, so it measures whether the ordering agrees and doesn't care about
-    the shape of the curve.) (c) The control condition shows
+    rises monotonically with the redness of $c$, at Spearman
+    $\rho \ge 0.8$.[^spearman] (c) The control condition shows
     $|\Delta\alpha_{\text{op1}}| \le 0.1$.
 
     Partial: (a) and (c) hold, but the response turns out to be a step rather
@@ -576,6 +572,10 @@ def _():
     the anneal-to-floor schedule. For every anchored run, the end-of-training
     $\bar{C}_{\text{op1}}$ is at least 0.8× its running maximum over training.
     Partial: violations confined to the $\lambda{=}0.3$ condition.
+
+    [^spearman]: Spearman ρ is a correlation coefficient computed on ranks
+    rather than values, so it measures whether the ordering agrees and doesn't
+    care about the shape of the curve.
     """)
     return
 
