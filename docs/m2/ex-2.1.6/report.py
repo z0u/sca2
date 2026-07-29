@@ -185,11 +185,34 @@ def _():
     $\lambda \in \{0,\ 0.03,\ 0.1,\ 0.3\}$ crossed with seeds $\{0, 1, 2\}$, so
     12 cells. ($\lambda$ is M1's symbol for a regularizer weight, $\Omega$ being
     the regularizer itself.) The $\lambda{=}0$ arm is the in-experiment control:
-    same corpus, labels ignored. We score every
-    <!-- I wonder if we need to specify this in advance? Our hypothesis is that "anchoring works"; should it resolve as "unsupported" just because we didn't predict the value of this coefficient? (honest question; I'm unsure) -->
-    hypothesis on the middle rung $\lambda{=}0.1$, prespecified here so the
-    ladder can't be cherry-picked afterward. The other rungs chart the
-    dose–response.
+    same corpus, labels ignored. The other rungs chart the dose–response.
+
+    One **star arm** joins them: $\lambda{=}0.1^{*}$, identical except that the
+    anneal starts at epoch 50 rather than 90. A star arm varies one thing off
+    the scoring rung instead of crossing the whole grid, so it costs 3 cells
+    rather than 12 and answers a single question. Here the question is whether
+    a long hold at peak buys alignment or just leaks: the anchor keeps pulling
+    every labeled line for 90 epochs, and leakage is the secondary measurement
+    we most expect to be sensitive to that. Against it stands the lesson of
+    ex-2.9.3, that withdrawing protection while the optimizer is still hot lets
+    the task loss reclaim the axis — at epoch 50 the LR is well down but not
+    spent, so this arm sits nearer that edge than the default does. Annealing
+    to a floor rather than to zero is what makes it worth trying at all. It is
+    a diagnostic, not a scored arm; if it shows lower leakage at equal
+    alignment, the anneal window becomes a design question for the next
+    experiment.
+
+    ### Scoring
+
+    Hypotheses resolve on the middle rung $\lambda{=}0.1$, which is where the
+    numbers in the results sections come from. But H2's claim is that anchoring
+    works, and that claim shouldn't fail because we guessed a coefficient
+    wrong, so its gates read *some anchored rung clears the threshold while
+    also clearing H1*. H1 is what keeps this from being cherry-picking: a rung
+    earns nothing by reaching alignment if it broke the task getting there. The
+    ladder is only four rungs, so the multiple-comparisons cost of reading
+    across it is small. If the passing rung is not $\lambda{=}0.1$, we say so
+    and report both.
 
     ### Measurements
 
@@ -210,15 +233,13 @@ def _():
     weighted by vibrancy and cubed, so it lands near 1 only for colors that
     read as red to a person and near 0 for everything else. Red is
     `SIM3 > 0.5`, other is `SIM3 < 0.01`.
-    <!-- Do we need to group them at all, or can we set a pass threshold on some scalar? -->
-    The gap between the two is deliberate: cubing already pushes most of the
-    cube toward 0, and dropping the ambiguous middle (pinks, oranges, dark
-    reds) keeps each group unambiguous at the cost of scoring on fewer colors.
-    The contrast $C(\ell, t)$ is then the red-group mean minus the other-group
-    mean.
+    The gap between the two drops the ambiguous middle (pinks, oranges, dark
+    reds) at the cost of scoring on fewer colors. The contrast $C(\ell, t)$ is
+    then the red-group mean minus the other-group mean.
 
-    The headline statistic $\bar{C}_{\text{op1}}$ is that contrast at the
-    position of op1, averaged over layers:
+    Grouping earns its place where we need one number per layer × position
+    cell, which is what H3's 2× ratio compares and what H4 tracks over
+    training. The layer-mean of it at op1 is
 
     $$\bar{C}_{\text{op1}} = \frac{1}{L+1}\sum_{\ell=0}^{L} C(\ell,
     \text{op1})$$
@@ -232,6 +253,23 @@ def _():
     them equally, so there is no site selection to make. Alongside it we report
     the min and max over layers as unscored diagnostics. A wide min–max gap
     tells us which depths resist the anchor.
+
+    For H2 there is no such constraint — the question is about colors, not
+    cells — so we score it group-free, over all 216 colors. Write $\alpha_c$
+    for the per-color layer-mean $\cos(h, \hat v_{\text{red}})$ at op1 and
+    $u_c \propto \texttt{redness}(c)^8$ for label affinity, normalized to sum
+    to 1. Then
+
+    $$\Delta\alpha_{\text{op1}} = \sum_c u_c\,\alpha_c \;-\;
+    \frac{1}{216}\sum_c \alpha_c$$
+
+    the affinity-weighted mean alignment minus the plain one: how much closer
+    to the anchor a color sits for being the kind of color the anchor pulls.
+    The weights are the label probabilities themselves, so this asks about
+    precisely the lines that felt the term, with no threshold to place and no
+    color discarded. It reduces to the group difference when the weights are
+    indicator-shaped and the cube is mostly non-red, so it reads on a
+    comparable scale, and 0 still means the axis is indifferent to redness.
 
     Grading: for each op1 color, the layer-mean
     $\cos(h, \hat v_{\text{red}})$ at the position of op1, plotted against the
@@ -257,22 +295,23 @@ def _():
     mo.md(r"""
     ## Hypotheses
 
-    Scored on the $\lambda{=}0.1$ arm (seed-averaged) unless stated; the other
-    rungs are context.
+    Reported on the $\lambda{=}0.1$ arm (seed-averaged) unless stated; the
+    other rungs are context. H2's gates read *some anchored rung*, per the
+    scoring rule above.
 
     **H1.** Anchoring does not harm the task. Every anchored arm has
     `named_holdout` exact match within 0.02 (absolute) of the seed mean of the
     $\lambda{=}0$ control. Partial: the gate passes at $\lambda \le 0.1$ but
     fails at $0.3$.
 
-    **H2.** The concept lands on the anchor, and does so in a graded way.
-    (a) $\bar{C}_{\text{op1}} \ge 0.5$. (b) Redder colors sit closer to the
-    anchor: over the 216 colors, the per-color layer-mean
-    $\cos(h, \hat v_{\text{red}})$ at op1 rises monotonically with op1
-    redness, at Spearman $\rho \ge 0.8$. (Spearman ρ is a correlation
-    coefficient computed on ranks rather than values, so it measures whether
-    the ordering agrees and doesn't care about the shape of the curve.) (c)
-    The control arm shows $|\bar{C}_{\text{op1}}| \le 0.1$.
+    **H2.** The concept lands on the anchor, and does so in a graded way, at
+    some rung that also clears H1. (a) $\Delta\alpha_{\text{op1}} \ge 0.5$.
+    (b) Redder colors sit closer to the anchor: over the 216 colors, $\alpha_c$
+    rises monotonically with the redness of $c$, at Spearman $\rho \ge 0.8$.
+    (Spearman ρ is a correlation coefficient computed on ranks rather than
+    values, so it measures whether the ordering agrees and doesn't care about
+    the shape of the curve.) (c) The control arm shows
+    $|\Delta\alpha_{\text{op1}}| \le 0.1$.
 
     Partial: (a) and (c) hold, but the response turns out to be a step rather
     than a grade — the reds all sit at one alignment and the non-reds at
@@ -307,14 +346,14 @@ def _():
     ## Task cost (H1)
 
     /// admonition | TODO
-    Table: exact match by arm ($w$ rows) × eval set (`named_seen`,
+    Table: exact match by arm ($\lambda$ rows, star arm last) × eval set (`named_seen`,
     `named_holdout`, `open` distance), seed mean ± range. The $\lambda{=}0$ control
     row goes on top, with the published `v216` numbers from ex-2.1.3 quoted
     beside it as an external reference. Include the `sca.baselines` nulls for
     the `open` distance row.
 
     Expected: a flat column, within 0.02 of control at every rung. Contrary: a
-    monotone drop with $w$, which we would read together with the
+    monotone drop with $\lambda$, which we would read together with the
     dose–response of H2 to see what alignment level the lost accuracy bought.
     ///
     """)
@@ -329,13 +368,13 @@ def _():
     /// admonition | TODO
     Two figures.
 
-    1. Grading curve: per-color layer-mean $\cos(h, \hat v_{\text{red}})$ at
-    the position of op1 against op1 redness. A scatter — one point per color,
+    1. Grading curve: $\alpha_c$ against the redness of $c$. A scatter — one point per color,
     color-swatch marks per the figure conventions — with a windowed mean over
     redness drawn through it, since 216 points with op2 averaged out will
     carry real spread and the eye should be reading the trend rather than the
     scatter. Control arm greyed underneath, one panel per rung, Spearman ρ
-    annotated. Expected: monotone and graded, with the labeled-red corner near
+    annotated, and $\Delta\alpha_{\text{op1}}$ with it. Expected: monotone and
+    graded, with the labeled-red corner near
     $\cos = 1$ and the far side of the cube near the control baseline.
     Contrary: flat, meaning the anchor didn't take; or a binary step at the
     label threshold, meaning it took but without grading.
@@ -409,10 +448,16 @@ def _():
     /// admonition | TODO
     Leakage: off-axis redness probe R² at op1, per layer, primary arm against
     control, reported without a threshold. Low values would mean the anchor
-    concentrated redness onto $\hat v_{\text{red}}$. Values matching the control would mean it
-    added an aligned copy while leaving the natural encoding in place. Either
-    reading is useful for designing an intervention experiment later, since
-    this number is effectively the power analysis for one.
+    concentrated redness onto $\hat v_{\text{red}}$. Values matching the
+    control would mean it added an aligned copy while leaving the natural
+    encoding in place. Either reading is useful for designing an intervention
+    experiment later, since this number is effectively the power analysis for
+    one.
+
+    The $\lambda{=}0.1^{*}$ star arm goes on the same axes, since the shorter
+    hold at peak was proposed as the lower-leakage schedule and this is where
+    that would show. Report its $\Delta\alpha_{\text{op1}}$ beside it, because
+    less leakage at less alignment is no bargain.
     ///
     """)
     return
@@ -459,16 +504,20 @@ def _():
     These are defaults chosen for drafting, so flag disagreement before the
     freeze.
 
-    1. H2 scores the layer-mean alignment $\bar{C}_{\text{op1}}$, with min and max reported as
-    diagnostics only.
+    1. H2 scores the group-free $\Delta\alpha_{\text{op1}}$ over all 216
+    colors; the `SIM3` group contrast $C$ is kept for H3 and H4, which need one
+    number per layer × position cell, with its min and max over layers reported
+    as diagnostics only.
     2. Labels are redrawn per visit, as in M1, via balanced batching at 4
     affinity-sampled lines per batch of 64.
-    3. The weight ladder is $\{0, 0.03, 0.1, 0.3\}$, with $\lambda{=}0.1$ as the
-    prespecified scoring rung.
+    3. The weight ladder is $\{0, 0.03, 0.1, 0.3\}$. Results are reported at
+    $\lambda{=}0.1$, but H2 passes on any rung that also clears H1, so the
+    claim doesn't rest on having guessed the coefficient.
     4. Three seeds.
-    5. The grading groups in H2 reuse the `SIM3` red/other split from M1.
-    6. The anneal window is epochs 90–100, down to a 10% floor. <!-- I actually think we could start annealing much earlier, like from epoch 20 or 50. Starting the anneal late might increase the chance of leakage due to the persistent pull toward $a$. I guess we could add this as a sweep arm if the initial sweep fails with high leakage? -->
-    7. The anchor term averages over all non-padding positions, including the
+    5. The anneal window is epochs 90–100, down to a 10% floor, with the
+    $\lambda{=}0.1^{*}$ star arm annealing from epoch 50 to test whether the
+    long hold at peak costs leakage.
+    6. The anchor term averages over all non-padding positions, including the
     answer and newline.
     ///
     """)
