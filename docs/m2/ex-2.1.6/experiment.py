@@ -125,6 +125,7 @@ ARRAYS_REF = "reports/m2/ex-2.1.6/arrays"
 EVALS_REF = "reports/m2/ex-2.1.6/evals"
 PROBE_REF = "reports/m2/ex-2.1.6/probes"
 CKPT_REF = "reports/m2/ex-2.1.6/checkpoints"  # + f"/{label}"
+GEOMETRY_REF = "reports/m2/ex-2.1.6/geometry"  # post-hoc, published beside the preregistered metrics
 
 
 EFFECTIVE_COLORS = float(np.exp(-(LABEL_W[LABEL_W > 0] * np.log(LABEL_W[LABEL_W > 0])).sum()))
@@ -597,6 +598,82 @@ def _cv_ridge_r2(x, y, n_folds: int = 5, penalties=(1e-4, 1e-3, 1e-2, 1e-1, 1.0,
     return 1.0 - ss_res / max(ss_tot, 1e-12)
 
 
+def explore_geometry(checkpoints: dict, probes, grid: str) -> dict:
+    """Post-hoc (added after the results): the shape of the color cloud, and what is
+    special about redness off the anchor axis.
+
+    Two questions the preregistered measurements left open.
+
+    *Did the cube compress?* M1 needed a `separate` term to stop the latent
+    collapsing into a small region of the sphere, and this experiment left that
+    term out too. Here `|mean|` is how concentrated the 216 op1 states are
+    (1 = all identical) and `spread` is what extent they keep; a cloud whose
+    centroid swung onto the anchor keeps its spread, a collapsing one does not.
+
+    *Is the off-axis leakage about red?* The report's number is a redness probe
+    with the anchor direction removed. Redness is a function of color, and the
+    task needs the color cube, so a high score may say only that the cube
+    survived. Running the same probe for greenness, blueness and the raw
+    channels is what tells those apart.
+    """
+    import numpy as np
+
+    from sca.anchoring import ANCHOR_AXIS
+    from sca.colorcube import redness as colorcube_redness
+    from sca.compute.model import load_checkpoint
+    from sca.data.colors import N_LEVELS
+    from sca.data.named_colors import GRIDS, grid_palette
+    from mini.store import get
+
+    palette = grid_palette(GRIDS[grid])
+    rgb = np.array(list(palette.values()), dtype=np.float64) / (N_LEVELS - 1)
+    roll = lambda k: colorcube_redness(np.roll(rgb, -k, axis=1))  # noqa: E731 — same formula, other corner
+    targets = {
+        "redness": roll(0),
+        "greenness": roll(1),  # [r,g,b] -> [g,b,r], so the same formula reads green
+        "blueness": roll(2),
+        "R": rgb[:, 0],
+        "G": rgb[:, 1],
+        "B": rgb[:, 2],
+        "sim^1.5": SIM_TARGET.astype(np.float64),
+    }
+
+    workdir = get_data_dir() / "explore"
+    with np.load(get(probes, workdir / "probes.npz")) as z:
+        probe_tokens = z["probe_tokens"]
+    per_color = probe_tokens[:: len(probe_tokens) // len(rgb)]
+
+    out: dict[str, dict] = {}
+    for label, ckpt in checkpoints.items():
+        get(ckpt, workdir / label / "model")
+        model, _, _ = load_checkpoint(workdir / label)
+        h = _op1_states(model, per_color).astype(np.float64)  # (L1, C, D)
+        off = np.delete(h, ANCHOR_AXIS, axis=2)
+        on = h[:, :, ANCHOR_AXIS]
+        centre = h.mean(axis=1)  # (L1, D)
+        centred = h - centre[:, None]
+        out[label] = {
+            "mean_norm": np.linalg.norm(centre, axis=1).tolist(),
+            "spread": (np.einsum("lcd,lcd->l", centred, centred) / h.shape[1]).tolist(),
+            "centre_dot_anchor": (centre[:, ANCHOR_AXIS] / np.linalg.norm(centre, axis=1)).tolist(),
+            "off_axis_r2": {t: [_cv_ridge_r2(off[d], y) for d in range(off.shape[0])] for t, y in targets.items()},
+            "on_axis_r2": {
+                t: [float(np.corrcoef(on[d], y)[0, 1] ** 2) for d in range(on.shape[0])] for t, y in targets.items()
+            },
+        }
+    return out
+
+
+def publish_geometry(geometry: dict) -> dict:
+    """Publish the post-hoc geometry under its own ref, beside the preregistered metrics."""
+    import json
+
+    from mini.store import put, set_ref
+
+    set_ref(GEOMETRY_REF, put(json.dumps(geometry, indent=2).encode(), name="ex-2.1.6-geometry.json"))
+    return {"n_cells": len(geometry)}
+
+
 def publish_results(results: list[dict], stats: dict, checkpoints: dict, evals, probes) -> dict:
     """Publish metrics (JSON), stacked per-cell arrays (npz), the eval and probe sets."""
     import io
@@ -658,6 +735,9 @@ def main(ctx: Ctx) -> dict:
     )
     ckpts = dict(zip(labels, [t["checkpoint"] for t in trained], strict=True))
     summary = ctx.run(publish_results, evaled, prep["stats"], ckpts, prep["evals"], prep["probes"], role="prep")
+    # Post-hoc, added after the results came in; see the report's exploratory section.
+    geometry = ctx.run(explore_geometry, ckpts, prep["probes"], GRID, role="eval")
+    ctx.run(publish_geometry, geometry, role="prep")
 
     def by_condition(fn) -> dict:
         return {

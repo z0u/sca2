@@ -298,8 +298,30 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   anti-subspace (`mean(cos²)` over all points) at 3% of the anchor weight, and
   it constrains exactly that quantity. Same testbed, same schedule, one more
   term — the cheapest experiment that could turn the M2 transfer result around.
-  Anti-anchor (the hemisphere gate) is the second candidate. #[D2.1] #anchoring
-  #ex-2.1.6
+  Anti-anchor (the hemisphere gate) is the second candidate; `separate` is the
+  third — ex-2.1.6's exploratory section found the cube swinging bodily onto
+  the axis while keeping ~68% of its extent at the scoring rung, which is a
+  common-component problem, though the extent does fall to ~50% at λ=0.3, so
+  `separate` would start to matter at weights past the ones we swept. #[D2.1]
+  #anchoring #ex-2.1.6
+
+- [ ] **An off-axis probe R² does not bound an intervention.** Ex-2.1.6 reported
+  redness still readable at R² ≈ 0.83 with the anchor direction removed, and
+  the post-hoc check showed greenness and blueness score the same: it is the
+  color cube the task needs, not a red-specific copy. So probe recoverability
+  answers "can a linear readout still find it", while the intervention question
+  is what the *model's own* computation does under an edit — which is what M1
+  measured as damage. Worth a methodology note wherever we quote leakage: the
+  number sizes the concentration achieved, not the intervention's headroom.
+  #methodology #anchoring #ex-2.1.6
+
+- [ ] This testbed concentrates its color cloud with depth on its own: the
+  un-anchored control's 216 op1 states go from extent 0.91 at the embedding to
+  0.12 at the last slice, because every one of them is being turned into the
+  same next-token prediction (`+`). Worth knowing before reading any
+  "the anchor compressed the representation" claim on a sequence model, and
+  worth checking whether it holds at positions whose next token varies.
+  #representations #ex-2.1.6
 
 - [ ] **Pull op1 alone**, as the counterpart to the position-pooling item below.
   Ex-2.1.6 pulls four prompt positions, and three of them (`+`, op2, `=`) carry
@@ -337,8 +359,12 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   an intervention on it would leave the original. Two mechanisms are confounded
   in this design and both have queued follow-ups: the missing repulsive terms
   (M1 carried anti-subspace at 3% of the anchor weight) and the span pull, three
-  of whose four positions cannot see which color sits there. #[D2.1] #anchoring
-  #ex-2.1.6
+  of whose four positions cannot see which color sits there. Post-hoc: the cube
+  *swung* onto the axis rather than collapsing onto it (centroid·anchor 0.02 →
+  0.89 at mid-stack, extent 0.63 → 0.43), and the off-axis leakage is
+  undifferentiated across greenness and blueness, so it is the color cube
+  rather than a red copy — the on-axis score is red-selective (0.35 vs 0.06),
+  which is the part of the claim that stands. #[D2.1] #anchoring #ex-2.1.6
 
 - **A causal model's first position is context-free, so op1 alignment is a
   property of the token (ex-2.1.6, 2026-07-29).** Position 0 attends to itself

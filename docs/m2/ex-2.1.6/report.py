@@ -40,6 +40,15 @@ with app.setup(hide_code=True):
             metrics = json.loads(m_path.read_text())
         return metrics, arrays
 
+    def load_geometry() -> dict | None:
+        """The post-hoc cloud shape and per-target probes, or None if unpublished."""
+        store = project_store()
+        art = store.get_refs([ex.GEOMETRY_REF])[ex.GEOMETRY_REF]
+        if art is None:
+            return None
+        with tempfile.TemporaryDirectory() as d:
+            return json.loads(store.get(art, Path(d) / "geometry.json").read_text())
+
 
 @app.cell(hide_code=True)
 def _(cells, metrics):
@@ -882,7 +891,9 @@ def _():
 
     CONTROL_ACC = float(acc("lam0").mean())
     TASK_CLEAN = {c: bool(abs(acc(c).mean() - CONTROL_ACC) <= 0.02) for c in CONDS}
+    geometry = load_geometry() or {}
     return (
+        geometry,
         CONDS,
         CONTROL_ACC,
         LABELS,
@@ -1464,15 +1475,17 @@ def _(CONDS, cells, m_op1):
     hundredths, concentrated in the deeper slices. Meanwhile the anchor axis
     itself goes from carrying {_axis["lam0"].mean():.2f} of redness variance to
     {_axis["lam0.1"].mean():.2f}. So the anchor added an aligned copy and left
-    the natural encoding where it was, which is the second of the two readings
-    the method laid out.
+    the rest of the stream as readable as it was, which is the second of the
+    two readings the method laid out.
 
-    This is the number that would size an intervention experiment, and it sizes
-    it discouragingly: deleting $\hat v_{{\text{{red}}}}$ from this model would
-    remove one copy of *red* and leave a nearly intact one behind. It also says
-    what the missing terms were doing in M1. An anti-subspace term is a
-    constraint on this quantity — it pushes the unlabeled cube *off*
-    the axis — and without it neither the leakage nor the
+    How much that bounds an intervention is a narrower question than it looks,
+    and the exploratory section takes it up: redness is a function of color, and
+    a model that answers `red + blue = purple` has to represent color, so a
+    high off-axis score may be the color cube rather than a second copy of the
+    concept. What the number does establish is that anchoring did not
+    *concentrate* redness onto the axis at the expense of elsewhere. An
+    anti-subspace term is a constraint on this quantity — it pushes the
+    unlabeled cube *off* the axis — and without it neither the leakage nor the
     undifferentiated drift of H2 has anything to hold it in check.
 
     **The star arm changes nothing measurable.** $\lambda{{=}}0.1^{{*}}$ tracks
@@ -1494,21 +1507,208 @@ def _():
     mo.md(r"""
     ## Exploratory analyses
 
-    None were needed. The preregistered figures answered the questions the
-    hypotheses asked and the one they didn't ask — why the margin stops where
-    it does — so nothing here is post hoc beyond the readings marked in place:
-    the depth inversion under H3, and the drift reading under H2, which uses a
-    diagnostic added before the run.
+    Everything below is post hoc: conceived after seeing the results, in
+    response to two questions put to the primary reading. It reads the
+    published checkpoints rather than the preregistered measurements, and it
+    scores no hypothesis.
 
-    The candidates the skeleton anticipated are either answered or moot. Seed
-    variability is small everywhere (the H4 panels show three lines that
-    converge to the same value, and $m_{\text{op1}}$ varies by under 0.02
-    across seeds). Spill into the unpulled positions is in the H3 map. The
-    batch-to-batch noise from skipping label balancing left no visible mark on
-    the trajectories, which are smooth after the first ten epochs. Alignment
-    on `open`-pair lines is the one we did not look at, and it is a question
-    about the answer position rather than about anchoring, so it can wait for
-    the experiment that pulls the whole span.
+    ### Did the cube collapse, or did it swing? (post hoc)
+
+    The first question was whether the missing term is M1's *separate* rather
+    than *anti-subspace*. In M1 the latent cube ended up in a small region of
+    the sphere without `separate` to keep near-duplicates apart, and this
+    experiment left that term out too. If the anchor squeezed the 216 colors
+    together, `separate` is the candidate; if it moved them as a body onto the
+    axis while they kept their extent, `anti-subspace` is.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, LABELS, RUNGS, geometry):
+    _spread = {c: np.mean([geometry[f"{c}-s{s}"]["spread"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    _dot = {c: np.mean([geometry[f"{c}-s{s}"]["centre_dot_anchor"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    _depths = np.arange(len(_spread["lam0"]))
+
+    @themed(
+        name="cloud",
+        alt_text="""
+            Two panels. On the left, the extent of the 216-color cloud falls
+            steeply with depth in every condition, control included, from about
+            0.92 at the embedding to near 0.1 at the last layer; the anchored
+            conditions sit a little below the control in the middle of the
+            stack. On the right, the direction of the cloud's centre is
+            unrelated to the anchor in the control and almost parallel to it
+            from the first block onward once the anchor is on.
+        """,
+        caption=r"""
+            The shape of the 216 op1 states, seed means, per residual-stream
+            slice. Left: the cloud's extent, the mean squared distance of a
+            color from the centre of the cloud (states are unit-norm, so this
+            runs from 0 for a collapsed cloud to 1 for a spread one). Right: the
+            cosine between the cloud's centre and the anchor direction — where
+            the cloud sits, as opposed to how big it is. The control's value
+            there is the scale of an unrelated direction in 64 dimensions.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, 2, figsize=(8.0, 3.0))
+        _c = dict(zip(CONDS, light_dark(
+            ["#999", "#f2b134", "#c1332a", "#7a2320", "#3d7ea6"],
+            ["#888", "#ffcc66", "#f0665a", "#b8564d", "#6ab0d4"],
+        ), strict=True))  # fmt: skip
+        for ax, data, title in ((axes[0], _spread, "extent of the cloud"), (axes[1], _dot, "centre · anchor")):
+            for cond in CONDS:
+                ax.plot(
+                    _depths, data[cond], color=_c[cond], marker="o", ms=4,
+                    lw=2.0 if cond in RUNGS else 1.4, ls="-" if cond in RUNGS else (0, (4, 3)),
+                    label=LABELS[cond],
+                )  # fmt: skip
+            ax.set_title(title, fontsize=10)
+            ax.set_xticks(_depths)
+            ax.set_xlabel("residual-stream slice")
+        axes[0].set_ylim(0, 1.0)
+        axes[1].set_ylim(-0.1, 1.0)
+        axes[1].axhline(0, color=light_dark("#ccc", "#444"), lw=0.8, zorder=0)
+        axes[0].legend(fontsize=8, frameon=False, ncols=2, loc="upper right")
+        fig.suptitle("Where the color cloud is, and how big")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(geometry):
+    def _at(cond: str, key: str, slice_: int) -> float:
+        return float(np.mean([geometry[f"{cond}-s{s}"][key][slice_] for s in ex.SEEDS]))
+
+    mo.md(rf"""
+    The answer is mostly *swing*, and the surprise is in the control. Even
+    un-anchored, this model concentrates the color cloud hard with depth: its
+    extent runs {_at("lam0", "spread", 0):.2f} at the embedding to
+    {_at("lam0", "spread", 4):.2f} at the last slice, so by the top of the
+    stack the 216 colors already sit within a small cap. That is the task's own
+    doing — the state at op1 is being turned into a prediction, and the
+    prediction is the same token (`+`) for every color. Whatever `separate`
+    would be protecting against here, the network arrives at it without help.
+
+    Against that baseline the anchor changes position far more than size. The
+    cloud's centre goes from {_at("lam0", "centre_dot_anchor", 2):.2f} of the
+    way onto the anchor in the control — the scale of an unrelated direction —
+    to {_at("lam0.1", "centre_dot_anchor", 2):.2f} at $\lambda{{=}}0.1$ and
+    {_at("lam0.3", "centre_dot_anchor", 2):.2f} at $\lambda{{=}}0.3$, while its
+    extent at the same slice goes {_at("lam0", "spread", 2):.2f} →
+    {_at("lam0.1", "spread", 2):.2f} → {_at("lam0.3", "spread", 2):.2f}. So at
+    the scoring rung the cube kept about
+    {_at("lam0.1", "spread", 2) / _at("lam0", "spread", 2):.0%} of its extent
+    and swung bodily onto the axis. That is the shape a missing anti-subspace
+    term predicts: nothing was constraining the *common* component, and the
+    common component is what moved.
+
+    The compression is real at the top of the ladder, though. At
+    $\lambda{{=}}0.3$ the mid-stack extent is down to
+    {_at("lam0.3", "spread", 2) / _at("lam0", "spread", 2):.0%} of control, and
+    the trend across rungs is monotone, so a `separate`-style term would start
+    to matter at a weight this experiment did not go past. On the present
+    evidence it is the second term to reach for, not the first — and the
+    anti-subspace term, by pushing unlabeled colors off the axis, would
+    relieve some of the same pressure.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### Is the off-axis leakage about *red*? (post hoc)
+
+    The second question was whether "an intervention would leave a copy behind"
+    is the only reading of the leakage number. It is not, and the check is
+    cheap: run the same off-axis probe for colors the anchor never touched.
+    Redness is a function of color, and a model that answers `red + blue =
+    purple` must represent color, so redness might be recoverable off the axis
+    for a reason that has nothing to do with anchoring.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(geometry):
+    _TARGETS = ["redness", "greenness", "blueness", "R", "G", "B", "sim^1.5"]
+    _shown = ["lam0", "lam0.1"]
+
+    def _score(cond: str, key: str, target: str) -> float:
+        return float(np.mean([geometry[f"{cond}-s{s}"][key][target] for s in ex.SEEDS]))
+
+    _rows = "".join(
+        f"<tr><th>{t}</th>"
+        + "".join(f"<td class='num'>{_score(c, 'off_axis_r2', t):.3f}</td>" for c in _shown)
+        + "".join(f"<td class='num'>{_score(c, 'on_axis_r2', t):.3f}</td>" for c in _shown)
+        + "</tr>"
+        for t in _TARGETS
+    )
+    mo.Html(f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead>
+        <tr><th></th><th class="num" colspan="2">off the anchor axis</th>
+            <th class="num" colspan="2">on the anchor axis</th></tr>
+        <tr><th>target</th><th class="num">λ = 0</th><th class="num">λ = 0.1</th>
+            <th class="num">λ = 0</th><th class="num">λ = 0.1</th></tr>
+      </thead>
+      <tbody>{_rows}</tbody>
+    </table></div>
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(geometry):
+    def _score(cond: str, key: str, target: str) -> float:
+        return float(np.mean([geometry[f"{cond}-s{s}"][key][target] for s in ex.SEEDS]))
+
+    mo.md(rf"""
+    Off the axis, redness is not special. Greenness scores
+    {_score("lam0.1", "off_axis_r2", "greenness"):.2f} and blueness
+    {_score("lam0.1", "off_axis_r2", "blueness"):.2f} against redness's
+    {_score("lam0.1", "off_axis_r2", "redness"):.2f} on the anchored model, and
+    the raw channels score around {_score("lam0.1", "off_axis_r2", "R"):.2f}.
+    The control looks the same. So the off-axis number is the color cube: every
+    corner of it is recoverable, because the task needs it to be, and redness
+    rides along as one function of the colors among many. It is not evidence of
+    a second, red-specific encoding.
+
+    On the axis, redness *is* special, which is the part of the primary reading
+    that survives. The anchor component carries
+    {_score("lam0.1", "on_axis_r2", "redness"):.2f} of redness variance against
+    {_score("lam0.1", "on_axis_r2", "greenness"):.2f} for greenness and
+    {_score("lam0.1", "on_axis_r2", "blueness"):.2f} for blueness, from
+    {_score("lam0", "on_axis_r2", "redness"):.2f} in the control. The anchor put
+    red — and rather more of `sim^1.5`, at
+    {_score("lam0.1", "on_axis_r2", "sim^1.5"):.2f} — where we asked for it, and
+    nothing else came with it.
+
+    What this costs the primary reading is the sentence about intervention. The
+    leakage measurement says a linear probe can still recover redness after the
+    axis is removed; it does not say the *model* would still behave red-ly, and
+    those are different claims. M1's damage was measured on the model's own
+    output under an edit, not on a probe. So the honest version is narrower:
+    anchoring here added a red-selective direction without concentrating red
+    onto it, and what an edit to that direction would do to behavior is a
+    question this experiment cannot answer. It is the reason to run the
+    intervention rather than a prediction of its result.
+
+    ### The candidates the skeleton anticipated
+
+    Either answered or moot. Seed variability is small everywhere (the H4
+    panels show three lines converging to the same value, and
+    $m_{{\text{{op1}}}}$ varies by under 0.02 across seeds). Spill into the
+    unpulled positions is in the H3 map. The batch-to-batch noise from skipping
+    label balancing left no visible mark on the trajectories, which are smooth
+    after the first ten epochs. Alignment on `open`-pair lines is the one we
+    did not look at, and it is a question about the answer position rather than
+    about anchoring, so it can wait for the experiment that pulls the whole
+    span.
     """)
     return
 
@@ -1545,13 +1745,23 @@ def _():
     magnitude below it, and this experiment deliberately left it out to ask
     whether one attractive term suffices. On this evidence it does not, and the
     reason is now concrete rather than a guess: the anti-subspace term
-    constrains the very quantity that ran away here, and the leakage
-    measurement shows the cost of its absence — redness is as readable off the
-    anchor axis as in the control, so the axis holds a copy rather than the
-    concept. An intervention on this model would remove that copy and leave the
-    original. Whether adding the term recovers M1's result on a transformer is
-    the obvious next experiment, and the cleanest possible follow-up: same
-    testbed, same schedule, one more term.
+    constrains the very quantity that ran away here. The exploratory section
+    supports that over the alternative — the cube swung bodily onto the axis at
+    the scoring rung and kept most of its extent, which is a common-component
+    problem rather than the near-duplicate collapse `separate` guards against.
+    (It also shows this testbed concentrating the cloud hard with depth on its
+    own, anchor or no anchor, so `separate`'s job here is partly done by the
+    task.) Whether adding the anti-subspace term recovers M1's result on a
+    transformer is the obvious next experiment, and the cleanest possible
+    follow-up: same testbed, same schedule, one more term.
+
+    What we should *not* conclude is that an intervention would find a spare
+    copy of red waiting. The leakage number says a linear probe can still
+    recover redness with the axis removed, and the exploratory check shows
+    greenness and blueness score the same — it is the color cube the task
+    needs, not a red-specific second encoding. What an edit to the anchored
+    direction would do to the model's behavior is a separate measurement, and
+    the reason to run the intervention rather than a prediction of its outcome.
 
     **What stays open.** We cannot yet separate "the bare term is
     insufficient" from "the *span* pull is what dilutes it", because this run
