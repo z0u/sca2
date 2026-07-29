@@ -23,7 +23,7 @@ Characteristics:
 Anti-patterns:
 
 - ~~Business jargon and bombast~~. Avoid buzzwords, corporate-speak, and baseball metaphors.
-- ~~Adversarial framing~~. Don't cast the object of study as an opponent to beat, convict, or punish. No combat metaphors (*casualties*, *fighting back*, *hauled back*, *the fight is not free*), no crime or interrogation framing (*the culprit*, *names the suspect*, *guilty*/*innocent*, *the hypothesis is dead*), no coercion or punishment (*making composition pay*, *make the model pay for*, *punish memorization*). A result can be vivid without being violent; describe what happened, not who won. Prefer plain cause: "the LR peak was the cause" over "the LR peak was the culprit".
+- ~~Adversarial framing~~. Don't cast the object of study as an opponent to beat, convict, or punish. No combat metaphors (_casualties_, _fighting back_, _hauled back_, _the fight is not free_), no crime or interrogation framing (_the culprit_, _names the suspect_, _guilty_/_innocent_, _the hypothesis is dead_), no coercion or punishment (_making composition pay_, _make the model pay for_, _punish memorization_). A result can be vivid without being violent; describe what happened, not who won. Prefer plain cause: "the LR peak was the cause" over "the LR peak was the culprit".
 - ~~All the lists~~. Mostly use paragraphs, but use lists sparingly when they are the clearest way to present the information.
 - ~~Heavy-handed transitions~~. Avoid "Furthermore", "In conclusion", "The honest answer is", etc. Just continue the thought.
 - ~~Narrated paragraph openers~~. Don't spend a sentence announcing what the paragraph will do ("The answer-schedule probe is worth a word of motivation.", "That distribution feeds a new measurement.", "Then the probes."). That move suits verbal teaching but is heavy in text; start with the content and let its role be apparent. Declaring intent for a whole section is still fine.
@@ -31,7 +31,7 @@ Anti-patterns:
 - ~~Excessive use of bold and italic text~~. List items should not be bolded. 1-2 callouts (bold) per page or section; italics only for references & borrowed words, or when it's truly unobvious which phrase should be emphasized (usually the reader can infer without it).
 - ~~Contrastive conclusions~~. Avoid "... is a feature, not a confound", etc. Instead of `A, ~A`, just say `A`.
 - ~~Verdict kickers~~. Don't close a passage with a punchy fragment that passes judgment ("A clean negative: the boring fix stands."). Readers pattern-match these as AI and stop reading. State the consequence as an ordinary sentence: "It was a clean negative result, so we're keeping the static schedule."
-- ~~Committing to unplanned future work~~. Don't state plans we haven't made as if they are settled. "The next experiment will test X", "the anchored runs will use Y as an early warning" — written in the present indicative, these read as established facts, when usually the follow-up isn't scheduled and the property isn't demonstrated. Prefer to say what *this* report shows and stop there. If a follow-up genuinely belongs in the text, mark it as a possibility, not a promise ("this could be tested by..."), and keep the claim to what we actually know. When in doubt, say nothing about what comes next.
+- ~~Committing to unplanned future work~~. Don't state plans we haven't made as if they are settled. "The next experiment will test X", "the anchored runs will use Y as an early warning" — written in the present indicative, these read as established facts, when usually the follow-up isn't scheduled and the property isn't demonstrated. Prefer to say what _this_ report shows and stop there. If a follow-up genuinely belongs in the text, mark it as a possibility, not a promise ("this could be tested by..."), and keep the claim to what we actually know. When in doubt, say nothing about what comes next.
 - ~~Evocative headings~~. Headings name what the section contains, not what it means. Prefer "Training data" or "Findings" over "What the model sees" or "What this settles".
 - ~~Possessives~~. Especially for terms we've introduced (like "named form"), appending `'s` forces the reader to first mentally bracket the whole term as a unit before parsing the possession, which slows things down and can look like personification of an abstract label ("hex's staircase" reads as though hex is a character in a story). Prefer an "of" construction or an adjunct: "the geometry of the named form" rather than "the named form's own geometry", "the hex staircase" rather than "hex's staircase", "the named-form operand rows" rather than "the named form's operand rows", "the H2 headline" rather than "H2's headline", "the verdict of H5" rather than "H5's verdict".
 
@@ -78,8 +78,17 @@ Prefer paragraphs for nuanced or complex explanations; use lists for
 summarizing steps, or when clarity would genuinely benefit from structure —
 and use them sparingly.
 
-Use italics for concepts like _red_. Never use bold and italics for emphasis,
-because they are distracting to read. The user will add them if necessary.
+Emphasis can be distracting to read, so follow these guidelines for where and
+how often to use it:
+
+- Use italics for concepts like _red_. When: usually.
+- Use italics for named terms like _anchor_. When: on the first use in a
+  section, and then if the role of the word would otherwise be ambiguous, e.g.
+  to distinguish "anchor" the regularizer term from "the anchor point".
+- Never use bold or italics for other emphasis, because they are distracting to
+  read. The user will add them if necessary.
+
+### Prose in Marimo
 
 In Marimo, consider using `details` markup for asides, which render unobtrusively.
 
@@ -92,6 +101,12 @@ Some backstory.
 ///
 """)
 ```
+
+Plain Markdown cells are visible as soon as the notebook opens, and contribute to the
+TOC. But Markdown cells that use string interpolation, or anything other than a plain
+`mo.md("literal string")`, are not rendered until it's their turn in the DAG. Therefore,
+headings and their following introductory paragraph should be placed in plain Markdown
+cells; otherwise the document will be hard to navigate.
 
 Don't hard-wrap a line inside an inline code span or math expression. A wrapped
 span can start the next line with block syntax — a hex code like `#f78` at the
