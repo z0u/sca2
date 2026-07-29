@@ -33,6 +33,12 @@ def _():
     indexes layers, and a label indicator — should a later experiment need to
     write one, e.g. for multiple concepts or per-token labels — is
     $y^{(i)}_{c}$.
+
+    For the sweep, ex-2.1.5's three-tiered vocabulary carries over. A
+    **condition** is one setting of the swept hyperparameter; a **cell** is one
+    run, a condition crossed with a seed, which is what `metrics["cells"]`
+    holds; an **arm** is a named group of conditions with a purpose of its own.
+    Since $\lambda$ here is a ladder, its conditions are also called **rungs**.
     ///
 
     As the first anchored experiment, it opens D2.1 proper. M1 established
@@ -170,7 +176,7 @@ def _():
     block outputs). Unlabeled lines contribute nothing, and no other term is
     added.
 
-    ### Schedule and arms
+    ### Schedule and conditions
 
     <!-- it would be nice to visualize the schedule; if the LR schedule is not done with a dopesheet we should materialize both and plot them together. -->
 
@@ -181,24 +187,28 @@ def _():
     reaches zero, which is the lesson of ex-2.9.3 applied as issue #10
     prescribes.
 
-    The sweep arms are peak anchor weight
+    The sweep conditions are peak anchor weight
     $\lambda \in \{0,\ 0.03,\ 0.1,\ 0.3\}$ crossed with seeds $\{0, 1, 2\}$, so
-    12 cells. ($\lambda$ is M1's symbol for a regularizer weight, $\Omega$ being
-    the regularizer itself.) The $\lambda{=}0$ arm is the in-experiment control:
-    same corpus, labels ignored. The other rungs chart the dose–response.
+    12 cells. ($\lambda$ is M1's symbol for a regularizer weight, $\Omega$
+    being the regularizer itself.) The $\lambda{=}0$ condition is the
+    in-experiment control: same corpus, labels ignored. The other rungs chart
+    the dose–response.
 
     One **star arm** joins them: $\lambda{=}0.1^{*}$, identical except that the
-    anneal starts at epoch 50 rather than 90. A star arm varies one thing off
-    the scoring rung instead of crossing the whole grid, so it costs 3 cells
-    rather than 12 and answers a single question. Here the question is whether
+    anneal starts at epoch 50 rather than 90. Star arm is our shorthand, not a
+    term of art — it borrows the *star point* of a central composite design,
+    where one factor moves off the design centre while everything else holds.
+    It varies one thing off the scoring rung instead of crossing the whole
+    grid, so it costs 3 cells rather than 12 and answers a single question.
+    Here the question is whether
     a long hold at peak buys alignment or just leaks: the anchor keeps pulling
     every labeled line for 90 epochs, and leakage is the secondary measurement
     we most expect to be sensitive to that. Against it stands the lesson of
     ex-2.9.3, that withdrawing protection while the optimizer is still hot lets
     the task loss reclaim the axis — at epoch 50 the LR is well down but not
-    spent, so this arm sits nearer that edge than the default does. Annealing
+    spent, so this condition sits nearer that edge than the default does. Annealing
     to a floor rather than to zero is what makes it worth trying at all. It is
-    a diagnostic, not a scored arm; if it shows lower leakage at equal
+    a diagnostic, not a scored condition; if it shows lower leakage at equal
     alignment, the anneal window becomes a design question for the next
     experiment.
 
@@ -295,11 +305,11 @@ def _():
     mo.md(r"""
     ## Hypotheses
 
-    Reported on the $\lambda{=}0.1$ arm (seed-averaged) unless stated; the
+    Reported on the $\lambda{=}0.1$ condition (seed-averaged) unless stated; the
     other rungs are context. H2's gates read *some anchored rung*, per the
     scoring rule above.
 
-    **H1.** Anchoring does not harm the task. Every anchored arm has
+    **H1.** Anchoring does not harm the task. Every anchored condition has
     `named_holdout` exact match within 0.02 (absolute) of the seed mean of the
     $\lambda{=}0$ control. Partial: the gate passes at $\lambda \le 0.1$ but
     fails at $0.3$.
@@ -310,7 +320,7 @@ def _():
     rises monotonically with the redness of $c$, at Spearman $\rho \ge 0.8$.
     (Spearman ρ is a correlation coefficient computed on ranks rather than
     values, so it measures whether the ordering agrees and doesn't care about
-    the shape of the curve.) (c) The control arm shows
+    the shape of the curve.) (c) The control condition shows
     $|\Delta\alpha_{\text{op1}}| \le 0.1$.
 
     Partial: (a) and (c) hold, but the response turns out to be a step rather
@@ -335,7 +345,7 @@ def _():
     **H4.** The late-instability mechanism of ex-2.9.3 does not reappear under
     the anneal-to-floor schedule. For every anchored run, the end-of-training
     $\bar{C}_{\text{op1}}$ is at least 0.8× its running maximum over training.
-    Partial: violations confined to the $\lambda{=}0.3$ arm.
+    Partial: violations confined to the $\lambda{=}0.3$ condition.
     """)
     return
 
@@ -346,7 +356,7 @@ def _():
     ## Task cost (H1)
 
     /// admonition | TODO
-    Table: exact match by arm ($\lambda$ rows, star arm last) × eval set (`named_seen`,
+    Table: exact match by condition ($\lambda$ rows, star arm last) × eval set (`named_seen`,
     `named_holdout`, `open` distance), seed mean ± range. The $\lambda{=}0$ control
     row goes on top, with the published `v216` numbers from ex-2.1.3 quoted
     beside it as an external reference. Include the `sca.baselines` nulls for
@@ -372,7 +382,7 @@ def _():
     color-swatch marks per the figure conventions — with a windowed mean over
     redness drawn through it, since 216 points with op2 averaged out will
     carry real spread and the eye should be reading the trend rather than the
-    scatter. Control arm greyed underneath, one panel per rung, Spearman ρ
+    scatter. Control condition greyed underneath, one panel per rung, Spearman ρ
     annotated, and $\Delta\alpha_{\text{op1}}$ with it. Expected: monotone and
     graded, with the labeled-red corner near
     $\cos = 1$ and the far side of the cube near the control baseline.
@@ -399,7 +409,7 @@ def _():
 
     /// admonition | TODO
     Contrast $C(\ell, t)$ over the six line positions (op1, `+`, op2, `=`,
-    answer, newline), primary arm, seed mean. Drawn as stacked `smooth_step`
+    answer, newline), primary condition, seed mean. Drawn as stacked `smooth_step`
     panels in the manner of ex-2.1.5 rather than a heat map: positions on x,
     one panel per layer, the layer mean shaded under the line and the min and
     max over seeds as hairlines. That keeps what a heat map gives — a column
@@ -446,7 +456,7 @@ def _():
     ## Secondary measurements
 
     /// admonition | TODO
-    Leakage: off-axis redness probe R² at op1, per layer, primary arm against
+    Leakage: off-axis redness probe R² at op1, per layer, primary condition against
     control, reported without a threshold. Low values would mean the anchor
     concentrated redness onto $\hat v_{\text{red}}$. Values matching the
     control would mean it added an aligned copy while leaving the natural
