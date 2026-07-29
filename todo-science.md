@@ -272,6 +272,17 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   reference condition — changing it is what makes the transfer claim
   comparable. #[D2.1] #anchoring #ex-2.1.6
 
+- [ ] Labeling and pull-span variants for ex-2.1.6, queued behind the baseline
+  read: (a) either-slot labels, where a red op2 can also trigger one; (b) labels
+  drawn once at corpus build rather than per visit, so the pull comes from fixed
+  sparse evidence, like labeled internet text; (c) a whole-span pull that
+  includes the answer and newline — the shape a document-level label takes in
+  natural language, where nothing marks a position as safe to exclude. Ex-2.1.6
+  pulls the prompt span only as a measurement instrument (the answer position
+  has a known redness confound, and unpulled it doubles as a spillover read),
+  so (c) is what says whether the exclusion matters rather than a premise of
+  the method. #[D2.1] #anchoring #ex-2.1.6
+
 ## Findings & notes to carry forward
 
 - **A principal angle between probe subspaces needs a dimension-matched null

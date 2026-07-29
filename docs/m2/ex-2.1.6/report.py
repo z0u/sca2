@@ -42,7 +42,9 @@ def _():
     M1 wrote the label indicator $\ell^{(i)}_{c}$, but layer subscripts are
     everywhere in transformer work, so from here $\ell$ indexes layers. If a
     later experiment needs a label indicator (say, for multiple concepts or
-    per-token labels), it is $y^{(i)}_{c}$.
+    per-token labels), it is $y^{(i)}_{c}$. New here: $m$ is reserved for the
+    alignment margin defined under Measurements, so a counter alongside $n$
+    should be spelled some other way.
 
     For the sweep, the three-tiered vocabulary of ex-2.1.5 carries over. A
     **condition** is one setting of the swept hyperparameter; a **cell** is one
@@ -116,7 +118,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(rf"""
+    mo.md(r"""
     ## Method
 
     ### Task and corpus
@@ -145,46 +147,48 @@ def _():
     epoch. The expected pull on a color is therefore proportional to its label
     affinity, which is where we expect the graded response of H2 to come from.
 
-    ### What a batch actually contains
-
-    An earlier draft of this section had batches label-balanced, following
-    issue #10, on the grounds that the labels are far too sparse to land in a
-    batch by chance. That was an arithmetic error, and correcting it removes
-    the machinery.
-
-    The mistake was counting one sample as one equation. Samples are packed
-    token blocks: an equation is {ex.LINE_TOKENS} tokens at word level and a
-    block is {ex.BLOCK}, so a batch of {ex.BATCH} blocks carries about
-    {ex.LINES_PER_BATCH:.0f} equations rather than 64. At the corpus-mean rate
-    of {ex.LABEL_P.mean():.2%} that is {ex.LABELED_PER_BATCH:.2f} labeled lines
-    per batch, so {ex.BATCHES_WITH_A_LABEL:.0%} of batches carry at least one.
-    That is denser supervision than M1 ran with, where the term fired on
-    roughly 6% of batches.
-
-    So there is no balancing: labels are plain independent draws, one per
-    line, and the anchor term is normalized by however many a batch happens to
-    hold. The gradient of the term is noisy between batches, which is what
-    sparse labels *are*; issue #10 recommends balancing as variance reduction,
-    and it remains available if the trajectories of H4 show the term failing to
-    take hold.
-
-    Dropping it buys something we would otherwise have had to caveat. Balanced
-    batching over-represents red first operands, so the anchored conditions
-    would have trained on a different corpus from the control, and every
-    accuracy difference in H1 would carry an alternative explanation. Now the
-    control and the anchored conditions see identical batches in identical
-    order for a given seed, and the only difference between them is $\lambda$.
-
-    /// details | A more realistic labeling variant
-    Labels could instead be drawn once at corpus build, making them a property
-    of a line, much like labeled internet text. That variant is queued beside
-    either-slot labeling. Both replace expected pull with whatever the model
-    can infer from sparse fixed evidence, so both would be easier to read once
-    the baseline mechanism is understood.
-    ///
-
     [^bern]: A Bernoulli draw: one biased coin flip per line, independent of
     every other line.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(rf"""
+    ### Batch composition
+
+    Samples are packed token blocks, not single equations. An equation is
+    {ex.LINE_TOKENS} tokens at word level and a block is {ex.BLOCK} tokens,
+    so a batch of {ex.BATCH} blocks carries about {ex.LINES_PER_BATCH:.0f}
+    equations. The corpus-mean label rate is {ex.LABEL_P.mean():.2%}, which
+    works out to {ex.LABELED_PER_BATCH:.2f} labeled lines per batch, with
+    {ex.BATCHES_WITH_A_LABEL:.0%} of batches carrying at least one. That is
+    denser supervision than M1 ran with, where the term fired on roughly 6%
+    of batches.
+
+    At that density we skip the label balancing that issue #10 recommends.
+    Labels are plain independent draws, one per line, and the anchor term is
+    normalized by however many labels a batch happens to hold. This makes the
+    gradient of the term noisy between batches, but that noise is inherent to
+    sparse labels. If the H4 trajectories show the term failing to take hold,
+    balancing is still available as a variance-reduction step.
+
+    Skipping it also keeps the comparison clean. Balanced batching
+    over-represents red first operands. The anchored conditions would then
+    train on a different corpus from the control, and every accuracy
+    difference in H1 would carry an alternative explanation. As it stands,
+    the control and the anchored conditions see identical batches in
+    identical order for a given seed; the only difference between them is
+    $\lambda$.
+
+    /// details | A more realistic labeling variant
+    Labels could instead be drawn once when the corpus is built, making them
+    a fixed property of a line, much like labeled internet text. That variant
+    is queued beside either-slot labeling. Both replace the expected pull
+    with whatever the model can infer from sparse fixed evidence, so both
+    would be easier to read once the baseline mechanism is understood.
+    ///
     """)
     return
 
@@ -277,7 +281,7 @@ def _():
     /// admonition | The concentration is a risk we are choosing to accept
     The weights behave like about {ex.EFFECTIVE_COLORS:.0f} distinct colors
     rather than 216, and pure red alone takes {ex.LABEL_W.max():.0%} of the
-    labels. So the anchor's evidence is a dozen-odd first operands, repeated
+    labels. So the anchor's evidence is a dozen or so first operands, repeated
     for 100 epochs. An axis could learn *this token* instead of *red* and
     still clear H2(a) and (c).
 
@@ -320,18 +324,27 @@ def _():
     contribute nothing, and no other term is added.
 
     The answer token and the newline are inside the labeled equation but
-    outside $\mathcal{P}$, which is a departure from the uniform pull an
-    earlier draft described. Two reasons, both about keeping results readable.
-    The answer of a red-labeled line is itself reddish, since a red op1 drags
-    the mix, so an anchored answer position would align for two reasons at
-    once and we could not tell them apart. It is also the position where the
-    task is decided, so pulling it directly would mix the capacity cost that
-    H1 is trying to measure — what it costs to *carry* an anchored concept —
-    with the much blunter cost of distorting the state that emits the answer.
-    Leaving both out costs nothing that we are measuring: the four pulled
-    positions still receive an identical, undifferentiated pull, so H3's
-    condensation question is asked exactly as before, and the answer position
-    becomes a clean read of how far alignment spreads on its own.
+    outside $\mathcal{P}$. We exclude them for two reasons, both about
+    keeping results readable. First, the answer of a red-labeled line is
+    itself reddish, since a red op1 drags the mix. An anchored answer
+    position would therefore align for two reasons at once, and we could not
+    tell them apart. Second, the answer position is where the task is
+    decided. Pulling it directly would mix the capacity cost that H1 is
+    trying to measure (what it costs to carry an anchored concept) with the
+    much blunter cost of distorting the state that emits the answer.
+    Excluding both costs nothing that we are measuring: the four pulled
+    positions still receive an identical, undifferentiated pull, so the
+    condensation question of H3 stands, and the answer position becomes a
+    clean read of how far alignment spreads on its own.
+
+    In a full language model, the analogue of this label would pull the
+    whole span between document boundaries, answer-like positions included,
+    since nothing there marks a position as safe to exclude. So the
+    prompt-only pull is a measurement instrument for this testbed, where the
+    answer has a known confound; it is not a claim that the exclusion is
+    needed. The unpulled answer position doubles as a first read on what a
+    whole-span pull would change, and a whole-span variant is queued with
+    the other labeling follow-ups.
 
     ### Schedule and conditions
 
@@ -489,51 +502,57 @@ def _():
 
     Behavioral: exact match, NLL,[^nll] and the distance metrics of ex-2.1.3
     on all eval sets, with the usual nulls from `sca.baselines`.[^nulls] Exact
-    match is the coarser scoring of the two: it counts the argmax, so a run
-    can hold accuracy while NLL drifts, and that drift is the earlier warning
-    of capacity being spent elsewhere.
+    match is the coarser scoring of the two: it only counts the argmax. So a
+    run can hold accuracy while NLL drifts, and that drift is the earlier
+    warning that capacity is being spent elsewhere.
 
     Alignment maps: $\cos(h_{\ell,t}, \hat v_{\text{red}})$ on the alignment
     probe set, per layer × position. Write $\alpha_c(\ell, t)$ for the mean of
-    that cosine over probe lines whose first operand is color $c$. All three
-    of H2, H3 and H4 then read one statistic off it,
+    that cosine over probe lines whose first operand is color $c$. H2, H3,
+    and H4 all read one statistic off this map, the alignment margin
 
-    $$\Delta\alpha(\ell, t) = \sum_c u_c\,\alpha_c(\ell, t) \;-\;
+    $$m(\ell, t) = \sum_c u_c\,\alpha_c(\ell, t) \;-\;
     \frac{1}{216}\sum_c \alpha_c(\ell, t),
     \qquad u_c \propto \texttt{redness}(c)^8,\ \ \textstyle\sum_c u_c = 1$$
 
-    the affinity-weighted mean alignment minus the plain one: how much closer
-    to the anchor a color sits for being the kind of color the anchor pulls.
-    The weights $u_c$ are the label probabilities themselves, normalized, so
-    the statistic asks about precisely the lines that felt the term. It is a
-    difference of cosines, so it runs from $-2$ to $2$, and 0 means the anchor
-    axis is indifferent to redness.
+    That is the affinity-weighted mean alignment minus the plain mean: how
+    much closer to the anchor a color sits for being the kind of color the
+    anchor pulls. The weights $u_c$ are the label probabilities themselves,
+    normalized, so the statistic asks about precisely the lines that felt the
+    term. A margin of 0 means the anchor axis is indifferent to redness. As a
+    difference of cosines it runs from $-2$ to $2$, but the ends are out of
+    reach: $2$ would need the red-weighted colors to sit exactly on the
+    anchor while the cube average sits at the antipode. In a 64-dimensional
+    stream, unrelated directions sit near $\cos = 0$, so the unweighted mean
+    should stay close to zero, and complete success looks like $m \approx 1$.
 
-    An earlier draft grouped colors instead — `SIM3 > 0.5` against
-    `SIM3 < 0.01`, from `sca.colorcube` — and scored a red-minus-other
-    contrast. We have dropped that in favor of weighting by `redness`, for one
-    reason: `redness` is what generates the labels, so weighting by it means
-    the measurement and the supervision are the same notion of red. Under the
-    grouping they were two, and a disagreement between them would have shown
-    up as a weak result with no way to attribute it. Weighting also places no
-    threshold and discards no color, where the grouped version threw away the
-    ambiguous middle — pinks, oranges, dark reds — which is exactly the range
-    where a graded response would be visible.
+    /// details | Why weight by redness rather than group colors
+    An alternative we considered groups colors into red (`SIM3 > 0.5`) and
+    other (`SIM3 < 0.01`, both from `sca.colorcube`) and scores a
+    red-minus-other contrast. We weight by `redness` instead, for one reason:
+    `redness` is what generates the labels, so weighting by it means the
+    measurement and the supervision use the same notion of red. Under the
+    grouping they are two different notions, and a disagreement between them
+    would show up as a weak result with no way to attribute it. Weighting
+    also sets no threshold and discards no color. The grouped version throws
+    away the ambiguous middle (pinks, oranges, dark reds), which is exactly
+    the range where a graded response would be visible.
+    ///
 
     H2 scores the layer mean at op1,
 
-    $$\Delta\alpha_{\text{op1}} = \frac{1}{L+1}\sum_{\ell=0}^{L}
-    \Delta\alpha(\ell, \text{op1})$$
+    $$m_{\text{op1}} = \frac{1}{L+1}\sum_{\ell=0}^{L}
+    m(\ell, \text{op1})$$
 
-    averaging over anchored sites because the anchor applies to all of them
+    We average over anchored sites because the anchor applies to all of them
     equally, so there is no site selection to make. Alongside it we report the
     min and max over layers as unscored diagnostics; a wide min–max gap tells
     us which depths resist the anchor. H3 compares the same layer mean across
-    positions, and H4 tracks $\Delta\alpha_{\text{op1}}$ over training.
+    positions, and H4 tracks $m_{\text{op1}}$ over training.
 
-    Grading: for each op1 color, the layer mean of $\alpha_c$ at the position
-    of op1, plotted against the redness of that color. This is the same
-    quantity $\Delta\alpha_{\text{op1}}$ summarizes, shown per color instead of
+    Grading: for each op1 color, the layer mean of $\alpha_c$ at the op1
+    position, plotted against the redness of that color. This is the same
+    quantity that $m_{\text{op1}}$ summarizes, shown per color instead of
     contracted to a number.
 
     Leakage (secondary, no threshold): a ridge probe for redness, fit on the
@@ -541,7 +560,7 @@ def _():
     out. High off-axis R² means red is also encoded elsewhere; we expect this
     to be low.
 
-    Trajectories: every ~50 steps we record $\Delta\alpha_{\text{op1}}$ and
+    Trajectories: every ~50 steps we record $m_{\text{op1}}$ and
     validation loss, along
     with the LR and anchor-weight schedules. This is the apparatus from
     ex-2.9.3, carried over as the first queue item of issue #10. A flat loss
@@ -574,11 +593,11 @@ def _():
     fails at $0.3$.
 
     **H2.** The concept lands on the anchor, and does so in a graded way, at
-    some rung that also clears H1. (a) $\Delta\alpha_{\text{op1}} \ge 0.5$.
+    some rung that also clears H1. (a) $m_{\text{op1}} \ge 0.5$.
     (b) Redder colors sit closer to the anchor: over the 216 colors, $\alpha_c$
-    rises monotonically with the redness of $c$, at Spearman
+    increases with the redness of $c$, at Spearman
     $\rho \ge 0.8$.[^spearman] (c) The control condition shows
-    $|\Delta\alpha_{\text{op1}}| \le 0.1$.
+    $|m_{\text{op1}}| \le 0.1$.
 
     Partial: (a) and (c) hold, but the response turns out to be a step rather
     than a grade — the reds all sit at one alignment and the non-reds at
@@ -587,7 +606,7 @@ def _():
     figure is what distinguishes the two readings.
 
     **H3.** The concept condenses at the position that carries it.
-    $\Delta\alpha_{\text{op1}}$ is at least 2× the same layer mean at each of
+    $m_{\text{op1}}$ is at least 2× the same layer mean at each of
     `+`, op2, and `=`. Those four positions are pulled identically, so the
     comparison is between sites that differ only in what the task does with
     them. The answer and newline are outside the pull and are reported without
@@ -602,7 +621,7 @@ def _():
 
     **H4.** The late-instability mechanism of ex-2.9.3 does not reappear under
     the anneal-to-floor schedule. For every anchored run, the end-of-training
-    $\Delta\alpha_{\text{op1}}$ is at least 0.8× its running maximum over
+    $m_{\text{op1}}$ is at least 0.8× its running maximum over
     training.
     Partial: violations confined to the $\lambda{=}0.3$ condition.
 
@@ -646,18 +665,18 @@ def _():
     redness drawn through it, since 216 points with op2 averaged out will
     carry real spread and the eye should be reading the trend rather than the
     scatter. Control condition greyed underneath, one panel per rung, Spearman ρ
-    annotated, and $\Delta\alpha_{\text{op1}}$ with it. Expected: monotone and
+    annotated, and $m_{\text{op1}}$ with it. Expected: monotone and
     graded, with the labeled-red corner near
     $\cos = 1$ and the far side of the cube near the control baseline.
     Contrary: flat, meaning the anchor didn't take; or a binary step at the
     label threshold, meaning it took but without grading.
 
-    2. Per-layer decomposition of $\Delta\alpha_{\text{op1}}$: $\Delta\alpha$
+    2. Per-layer decomposition of $m_{\text{op1}}$: $m$
     by layer at op1, all rungs, control band behind. A plain line chart, layer depth on x —
     depths are evenly spaced and every one is measured, so there is nothing for
     the step-plateau convention of ex-2.1.5 to guard against here (it exists
     because grammar landmarks are *not* evenly spaced). Expected:
-    $\Delta\alpha$ above zero at every depth. A sag in the last layer would suggest next-token pressure
+    $m$ above zero at every depth. A sag in the last layer would suggest next-token pressure
     competing at op1, though the target at op1 is always `+`, so there should
     be slack to spare.
     ///
@@ -671,7 +690,7 @@ def _():
     ## Condensation vs broadcast (H3)
 
     /// admonition | TODO
-    $\Delta\alpha(\ell, t)$ over the six line positions (op1, `+`, op2, `=`,
+    $m(\ell, t)$ over the six line positions (op1, `+`, op2, `=`,
     answer, newline), primary condition, seed mean, with the four pulled
     positions marked off from the two that are only measured. Drawn as stacked `smooth_step`
     panels in the manner of ex-2.1.5 rather than a heat map: positions on x,
@@ -685,10 +704,11 @@ def _():
     op2, and `=`.
 
     Expected: a dominant op1 column. Contrary: a uniformly warm map, meaning
-    broadcast. The answer column is shown but excluded from scoring, since it
-    is unpulled and a red op1 gives a reddish mix regardless. Note in the
-    caption whatever it does show: alignment there is spillover, which previews
-    both the either-slot follow-up and how far an anchor reaches on its own.
+    broadcast. The answer column is shown but excluded from scoring, since it is
+    unpulled and a red op1 gives a reddish mix regardless. Note in the caption
+    (or below) whatever it does show: alignment there is spillover, which
+    previews both the either-slot follow-up and how far an anchor reaches on its
+    own.
     ///
     """)
     return
@@ -700,7 +720,7 @@ def _():
     ## Training stability (H4)
 
     /// admonition | TODO
-    Trajectory figure: $\Delta\alpha_{\text{op1}}$ vs step for every anchored run (rows are rungs,
+    Trajectory figure: $m_{\text{op1}}$ vs step for every anchored run (rows are rungs,
     lines are seeds), with the LR and anchor-weight schedules as background
     bands, and the running-max ratio reported for each run.
 
@@ -731,7 +751,7 @@ def _():
 
     The $\lambda{=}0.1^{*}$ star arm goes on the same axes, since the shorter
     hold at peak was proposed as the lower-leakage schedule and this is where
-    that would show. Report its $\Delta\alpha_{\text{op1}}$ beside it, because
+    that would show. Report its $m_{\text{op1}}$ beside it, because
     less leakage at less alignment is no bargain.
     ///
     """)
@@ -765,40 +785,6 @@ def _():
     that implies for sequence-level labeling in natural language; and what the
     leakage number says about how to design an intervention experiment, in
     particular whether an anti-subspace term is needed.
-    ///
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    ---
-
-    /// admonition | Open decisions for review (pre-freeze)
-    These are defaults chosen for drafting, so flag disagreement before the
-    freeze.
-
-    1. One statistic throughout: $\Delta\alpha$, weighted by the same
-    `redness` that generates the labels, scored over all 216 colors. The
-    `SIM3` grouping is gone. Min and max over layers are reported as
-    diagnostics only.
-    2. Labels are redrawn per visit, as in M1, as plain independent draws
-    with no balancing — a batch carries ~{ex.LABELED_PER_BATCH:.1f} labeled
-    lines because samples are packed blocks, so the control and anchored
-    conditions train on identical batches.
-    3. The weight ladder is $\{0, 0.03, 0.1, 0.3\}$. Results are reported at
-    $\lambda{=}0.1$, but H2 passes on any rung that also clears H1, so the
-    claim doesn't rest on having guessed the coefficient.
-    4. Three seeds.
-    5. The anneal runs epochs 90–100, down to a 10% floor, with the
-    $\lambda{=}0.1^{*}$ star arm starting down at epoch 50 instead and taking
-    until 100 to reach the same floor, to test whether the long hold at peak
-    costs leakage. Both anneals end with training; only the start moves.
-    6. The anchor term pulls the prompt span only — `op1`, `+`, `op2`, `=` —
-    leaving the answer and newline unpulled, so H1 measures the cost of
-    carrying the concept rather than of distorting the answer state, and the
-    answer position reads as spillover.
     ///
     """)
     return
