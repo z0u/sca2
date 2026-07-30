@@ -44,14 +44,52 @@ The human wants to be involved in the writing, so the skeleton is a review artif
 
 When results arrive, fill the report in order of stakes rather than all at once. The mechanical sections — where the number either clears its threshold or it doesn't — can be filled in one pass. Pause for a discussion round before writing the prose where interpretation lives, since that is the part the human most wants a hand in, and the part most likely to over-reach.
 
+Whatever you have written, run a review round over it before handing back to the human — the sections that are done, not the whole report. Say in the request which sections are in scope, so a `TODO` in a section whose turn hasn't come isn't read as an omission.
+
 The publishing mechanics — exporting the report as a bundle, wiring result refs, verifying the render — are a separate concern, covered by the `mi-ni` skill.
 
 ### Review passes
 
-Before freezing the hypotheses — and again before running — put the draft
-through the `report-review` skill. It runs the whole design past fresh readers
-who haven't seen the conversation that produced it, and comes back with a
-run/freeze/discuss recommendation.
+The `report-review` skill runs the report past fresh readers who haven't seen
+the conversation that produced it. Use it twice, for two different questions:
+
+- **Before freezing the hypotheses, and again before running.** The
+  `prereg-reviewer` asks whether the design is sound and worth running as
+  specified, and comes back with a run/freeze/discuss recommendation.
+- **Once the results are in and the report is filled, before publishing.** The
+  `results-reviewer` asks whether the results support the claims and whether a
+  fresh reader can follow the report — every hypothesis scored against its frozen
+  threshold, post-hoc readings kept out of the primary sections, figures and
+  tables captioned and legible.
+
+Reviewers see the report and nothing else, which is what makes them useful and
+also what makes rounds oscillate: two readers can each be locally right about a
+claim and correct it in opposite directions, round after round. The fix is to
+record decisions in the artifact, where the next reader will find them.
+
+**Leave a `REVIEW` note wherever a review changes a claim.** Not for typos or
+prose polish — for a threshold, a verdict, a scope, or a wording that changes
+what is being asserted. Say what the change was, why, and what a later reader
+should check to disagree with it. Usually a Python comment in the cell:
+
+```python
+# REVIEW: narrowed "anchoring transfers" to "transfers at layer 4" — H2 only
+# measures layer 4, so the broader claim outruns the data. Verify: if the sweep
+# in the exploratory section covers other layers, this can widen again.
+```
+
+An HTML comment inside a Markdown string works when the note has to sit beside
+one specific paragraph; it stays invisible in the render. Make it a visible
+admonition only when a reader of the published report benefits from it. The
+marker is greppable either way, so a review pass can find every prior decision
+before touching the same text.
+
+**A note you would reverse is a finding, not an edit.** Wanting to undo a
+recorded decision usually means the claim is doing two jobs at once, and each
+reviewer is right about a different one. Say so, name both readings, and stop —
+the resolution is structural (split the hypothesis into two tracks, drop one,
+or state the scope that separates them) and it needs the human, because it
+changes what the experiment claims.
 
 For prose alone, the pass is lighter. Text should be reviewed before handing
 back to the human. In one turn:

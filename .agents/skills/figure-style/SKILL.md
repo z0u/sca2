@@ -1,6 +1,6 @@
 ---
 name: figure-style
-description: Figure conventions for experiment reports. Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs and RGB-cube bounds as hexagons, data-colored marks, theming, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, or building a results table, in a notebook.
+description: Figure conventions for experiment reports. Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs and RGB-cube bounds as hexagons, data-colored marks, theming, captions and nested sub-figures, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, writing a figure or table caption, or building a results table, in a notebook.
 ---
 
 The M1 reports and the GRaM workshop poster set the house style. Match them:
@@ -130,6 +130,8 @@ Authored HTML tables (built by hand and wrapped in `mo.Html`, not marimo's
 - When a column's cells hold `swatch(...)` squares, give its header a ghost
   swatch — `swatch(None)`, a transparent `.sw-ghost` placeholder — so the
   header text starts at the same indent as the swatched values below it.
+- Caption the table the same way you would a figure (see below), by wrapping it
+  in `figure_html(..., caption=..., class_="report-figure")`.
 
 ## Theming and annotation
 
@@ -139,16 +141,36 @@ Overlay lines that must survive a busy background use `gapcolor` — e.g.
 black dashes with a light gap color in light mode, white with dark in dark
 mode — rather than a heavier stroke.
 
-Give every figure alt text (see the alt-text skill), and set titles on the
-figure, not in surrounding Markdown, so exported PNGs are self-contained.
+Give every figure alt text (see the alt-text skill).
 
-A caption decodes the ink: what the rows, columns, marks, and shading mean,
-and how to read an unusual encoding. Findings, controls, and interpretation
-belong in prose cells near the figure, not in the caption — a result quoted
-only in a caption is easy to miss and hard to cross-reference. When an
-encoding needs a word of interpretation to be readable at all (say, what a
-step across an elided region signifies), keep one clause in the caption and
-put the supporting evidence in prose.
+## Captions
+
+The title goes in the caption, as its opening phrase — not drawn inside the
+figure with `fig.suptitle`. A caption then decodes the ink: what the rows,
+columns, marks, and shading mean, and how to read an unusual encoding.
+Findings, controls, and interpretation belong in prose cells near the figure,
+in paragraph form — a result quoted only in a caption is easy to miss and hard
+to cross-reference. When an encoding needs a word of interpretation to be
+readable at all (say, what a step across an elided region signifies), keep one
+clause in the caption and put the supporting evidence in prose.
+
+Tables get a caption on the same terms — see the wrapper above.
+
+`ax.set_title` is still how you name a panel *within* one figure — see the
+hidden-axes note above. What moves to the caption is the figure-level title.
+
+## Sub-figures
+
+Panels only need to live in one matplotlib figure when they share axes, a
+colorbar, or a scale the reader is meant to compare across. Otherwise prefer
+separate nested figures: render each panel as its own `themed` figure with a
+short caption naming just that panel, then wrap the group in
+`figure_html(body, caption=..., aria_label=...)`, whose outer `<figcaption>`
+carries the shared decoding. Each panel then keeps its own size and the row
+reflows to a stack on a narrow viewport, rather than every panel shrinking
+together. `report.css` styles `figure:has(> figure)` for exactly this; use
+`aria_label` rather than `role="img"` on the outer figure, or the sub-captions
+stop being navigable.
 
 Sequential/heatmap palettes must be theme-adaptive too: `@themed` renders a
 light and a dark variant, so pick the colormap itself with `light_dark(...)`
