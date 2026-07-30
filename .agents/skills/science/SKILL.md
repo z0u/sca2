@@ -46,26 +46,14 @@ When results arrive, fill the report in order of stakes rather than all at once.
 
 Whatever you have written, run a review round over it before handing back to the human — the sections that are done, not the whole report. Say in the request which sections are in scope, so a `TODO` in a section whose turn hasn't come isn't read as an omission.
 
+Any prose you write also gets a `prose-simplifier` pass on the same turn, whether or not a review round is warranted — stage your changes first so you can see what it did, then read its edits for correctness. It gets the path and line range and nothing else. This applies to a single filled-in section as much as to a whole draft, so it is a habit of writing rather than a step in the review; the sequence is in [references/review-passes.md](references/review-passes.md).
+
 The publishing mechanics — exporting the report as a bundle, wiring result refs, verifying the render — are a separate concern, covered by the `mi-ni` skill.
 
-### Review passes
+### Recording a review decision
 
-The `report-review` skill runs the report past fresh readers who haven't seen
-the conversation that produced it. Use it twice, for two different questions:
-
-- **Before freezing the hypotheses, and again before running.** The
-  `prereg-reviewer` asks whether the design is sound and worth running as
-  specified, and comes back with a run/freeze/discuss recommendation.
-- **Once the results are in and the report is filled, before publishing.** The
-  `results-reviewer` asks whether the results support the claims and whether a
-  fresh reader can follow the report — every hypothesis scored against its frozen
-  threshold, post-hoc readings kept out of the primary sections, figures and
-  tables captioned and legible.
-
-Reviewers see the report and nothing else, which is what makes them useful and
-also what makes rounds oscillate: two readers can each be locally right about a
-claim and correct it in opposite directions, round after round. The fix is to
-record decisions in the artifact, where the next reader will find them.
+Reports go through several fresh-eyes review rounds, each reader starting from
+the report alone. `REVIEW` notes are how one round's decisions reach the next.
 
 **Leave a `REVIEW` note wherever a review changes a claim.** Not for typos or
 prose polish — for a threshold, a verdict, a scope, or a wording that changes
@@ -79,10 +67,19 @@ should check to disagree with it. Usually a Python comment in the cell:
 ```
 
 An HTML comment inside a Markdown string works when the note has to sit beside
-one specific paragraph; it stays invisible in the render. Make it a visible
-admonition only when a reader of the published report benefits from it. The
-marker is greppable either way, so a review pass can find every prior decision
-before touching the same text.
+one specific paragraph; it stays invisible in the render. Make it visible only
+when a reader of the published report benefits from it. The marker is greppable
+either way, so a review pass can find every prior decision before touching the
+same text.
+
+**A note records the change and its warrant, and nothing else.** It says what
+the report now claims and why that follows from the data — the same category of
+thing as a code comment explaining a non-obvious invariant, which is why the
+next round may read it. It never carries a judgment of the report's quality, a
+round's confidence, or anything phrased as "I suspect" or "this felt weak":
+that primes the next reader instead of informing them. Observations of that kind
+go in the round's own report, under `Tensions`, where they reach the supervisor
+and stop.
 
 **A note you would reverse is a finding, not an edit.** Wanting to undo a
 recorded decision usually means the claim is doing two jobs at once, and each
@@ -91,10 +88,7 @@ the resolution is structural (split the hypothesis into two tracks, drop one,
 or state the scope that separates them) and it needs the human, because it
 changes what the experiment claims.
 
-For prose alone, the pass is lighter. Text should be reviewed before handing
-back to the human. In one turn:
-
-1. Write
-2. Stage changes (unless you have another way to see what the agent changes)
-3. Hand it to the `prose-simplifier` agent on the same turn
-4. Review the agent's changes; check for correctness
+Commissioning the rounds — which pass to run when, how to brief a reviewer, when
+to stop and escalate, and the lighter pass for prose alone — is in
+[references/review-passes.md](references/review-passes.md). Always read this if
+you are the lead.

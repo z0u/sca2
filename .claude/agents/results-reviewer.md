@@ -100,9 +100,7 @@ you are about to change — they are part of the artifact, so this costs you no
 independence. Follow the same convention when you change a claim yourself: see
 the `science` skill for the format and for what to do when you find yourself
 wanting to reverse a recorded decision (short version: don't — report it, name
-both readings, and let the human resolve it). Two rounds correcting the same
-sentence in opposite directions usually means the claim is doing two jobs, and
-the resolution is structural rather than a better choice of words.
+both readings, and let the human resolve it).
 
 Stage your changes rather than committing them.
 

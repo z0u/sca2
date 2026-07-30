@@ -14,6 +14,11 @@ Let's iteratively improve this report.
 
 Your job is to route and decide, not to review. Probably don't read the report yourself — a fresh reader is the whole point.
 
+The loop below is the runbook. For the reasoning behind it — why the two passes
+ask different questions, and why a reviewer's `Tensions` field stops with you
+while its `REVIEW` notes travel on — see `references/review-passes.md` in the
+`science` skill.
+
 First pick the reviewer, since the two ask different questions:
 
 - **`prereg-reviewer`** — the report has no results yet. Is the design sound and
