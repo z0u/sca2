@@ -317,7 +317,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 - [ ] This testbed concentrates its color cloud with depth on its own: the
   un-anchored control's 216 op1 states go from extent 0.91 at the embedding to
-  0.12 at the last slice, because every one of them is being turned into the
+  0.12 at the last layer, because every one of them is being turned into the
   same next-token prediction (`+`). Worth knowing before reading any
   "the anchor compressed the representation" claim on a sequence model, and
   worth checking whether it holds at positions whose next token varies.
@@ -338,6 +338,61 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   power analysis for how much anchor weight is available to spend. #[D2.1]
   #anchoring #ex-2.1.6
 
+- [ ] **Is the alignment decay worth chasing on its own?** Read as a gate, the
+  H4 slide in ex-2.1.6 is just a failure; read as a phenomenon it is the more
+  interesting half. The margin peaks near epoch 10 and loses about a quarter
+  over the next forty epochs *at constant λ*, so the optimizer walks away from
+  selectivity under steady pressure rather than losing it when protection is
+  withdrawn. One reading is that the selective response arrives first and the
+  rest of the cube follows it onto the axis, which the mean alignment climbing
+  over the same window is consistent with; ex-2.1.6 cannot separate that from
+  the alternatives. Note that stopping early is not a rescue — the peak (≈0.36)
+  never cleared the 0.5 gate either, so there is no epoch at which selectivity
+  was demonstrated, and picking a stopping point from these trajectories would
+  be selecting on noise. #[D2.1] #anchoring #ex-2.1.6
+
+- [ ] Is 100 epochs more than this testbed needs? Ex-2.1.6's margin is flat from
+  roughly epoch 50 in every anchored condition, and validation loss settles
+  earlier still, so half the schedule may be buying nothing. Purely a budget
+  question — it does not interact with the alignment decay above, and it should
+  be settled by a length arm rather than by reading a stopping point off runs we
+  have already scored. Worth doing before the sweeps get wider in D2.2.
+  #[D2.1] #ex-2.1.6
+
+- [ ] **Can an anchor be confined to part of the stream?** Ex-2.1.6 pulls all
+  five layers and all four prompt positions equally, and the margin came out
+  with a shape nobody asked for: *red* enters at its own token and migrates with
+  depth to the positions after it (op1 leads in the embedding and first block,
+  `+` and `=` lead by the last). That is probably a transformer behaving as
+  transformers do, and for an across-the-board intervention on *red* it may not
+  matter — we would want the edit at every (layer, position) site anyway. It
+  matters for [D2.3], which asks for suppression that degrades completion while
+  leaving verification intact: that needs the concept localized somewhere we can
+  reach, and nothing so far says whether the anchor term can be *confined* to a
+  chosen region rather than merely applied there. #[D2.3] #anchoring
+  #representations #ex-2.1.6
+
+- [ ] Shaped suppression, rather than projecting the whole axis out. Every
+  intervention we have specified for M2 removes the anchor direction outright,
+  which is the crudest edit available and the one most exposed to the drift
+  ex-2.1.6 found: if the whole cube has a common component on the axis, taking
+  the axis away moves everything. A suppression shaped to act on the
+  red-selective *part* of the response — a function of the component rather than
+  its deletion — might degrade red behavior while leaving the color cube intact,
+  and it would still have side-effects boundable from the geometry beforehand,
+  which is the property the method is for. Design question to settle before the
+  first transformer intervention.
+
+  We already tried this in M1 (autoencoders): the "intervention lobes" work in
+  `scratch-m1-code/docs/m2-control/ex-2.1-intervention-lobe.ipynb` and the
+  paper appendix `references/sca1-paper/asec_intervention_lobes.tex` define a
+  bounded falloff $h(\alpha)$ — zero below an alignment threshold $a$, ramping
+  to max strength $b$ with shape controlled by power $p$ (plus a Bézier
+  variant for the rotation-based "repulsion" intervention) — instead of the
+  aggressive $h(\alpha)=\alpha$ used in the main M1 text. Worth pulling
+  forward as a starting point rather than re-deriving. #[D2.2] #[D2.3]
+  #anchoring #ex-2.1.6
+
 ## Findings & notes to carry forward
 
 - **A bare anchor term buys alignment without selectivity (ex-2.1.6,
@@ -355,8 +410,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   quarter (an H4 failure that is a slide, not the ex-2.9.3 late collapse — the
   anneal is not the trigger, and the star arm with a 40-epoch-earlier anneal
   changed nothing measurable). Leakage: redness is as readable off the anchor
-  axis as in the control (R² ≈ 0.8 both), so the axis holds a *copy* of red and
-  an intervention on it would leave the original. Two mechanisms are confounded
+  axis as in the control (R² ≈ 0.8 both): the axis became readable for redness
+  without redness leaving anywhere else. Two mechanisms are confounded
   in this design and both have queued follow-ups: the missing repulsive terms
   (M1 carried anti-subspace at 3% of the anchor weight) and the span pull, three
   of whose four positions cannot see which color sits there. Post-hoc: the cube
