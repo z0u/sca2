@@ -22,16 +22,36 @@ while its `REVIEW` notes travel on — see `references/review-passes.md` in the
 First pick the reviewer, since the two ask different questions:
 
 - **`prereg-reviewer`** — the report has no results yet. Is the design sound and
-  worth running as specified? A quick `grep -c TODO` on the file usually settles
-  it: a skeleton is mostly placeholders.
+  worth running as specified?
 - **`results-reviewer`** — the results have landed. Do they support the claims,
   and can a fresh reader follow the report? This one also looks at the rendered
   figures.
 
-If the user said which pass they want, believe them. A part-filled report — some
-analysis sections written, others still placeholders — gets the
-`results-reviewer` over the sections that are done; that is the normal case
-while a report is being written, not an ambiguity to ask about.
+The experiment run leaves a signal:
+
+- **No `experiment.py` beside the report, or one marked `DESIGN_ONLY = True`** →
+  prereg. The skeleton is written before the DAG by design, and a design module
+  that holds only constants declares itself with that marker.
+- **The report resolves no refs** (no `get_refs` / `load_results` in the setup
+  cell) → prereg. There is nothing for it to read yet.
+- **Otherwise, resolve the refs.** From the report's directory:
+
+  ```bash
+  uv run python -c "
+  import experiment as ex
+  from mini.store import project_store
+  s = project_store()
+  print({k: v is not None for k, v in s.get_refs([ex.METRICS_REF]).items()})"
+  ```
+
+  Present → the run published, so `results-reviewer`. Use the ref names the
+  report's own loader uses. Don't substitute `bin/mini ls`: it reads local
+  launch state only, so a run made in another checkout reads as absent.
+
+Placeholders left in a report whose refs resolve mean it is mid-fill, not
+mid-prereg — reports get written one hypothesis at a time. That case gets the
+`results-reviewer` over the sections that are done; it is the normal state while
+a report is being written.
 
 Then, for up to 3 rounds:
 
