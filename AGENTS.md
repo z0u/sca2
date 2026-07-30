@@ -45,16 +45,44 @@ except A, B:  # PEP 758
     pass
 ```
 
-Do not get distracted by such things. If the linters say it's fine, it's probably fine, so move on.
+Do not get distracted by such things. If the linters and type checkers say it's
+fine, it's probably fine, so move on.
 
 ### Typing
 
-Use type hints.
+Use type hints, to give the type-checker something to catch.
 Use `T | None` instead of `Optional[T]`.
 
 ```diff
 - foo: Optional[int] = None
 + foo: int | None = None
+```
+
+Hints also allow IDE completion, so put them wherever inference would otherwise
+stall: one annotation at the point a value enters the code usually carries
+through everything downstream.
+
+Marimo generates the cell signature and leaves the parameters bare, so
+everything arriving from another cell starts out `Unknown`. Annotate the first
+local binding, and the rest of the cell infers from there:
+
+```python
+@app.cell()
+def _(RUNGS, grading):
+    _rungs: list[str] = [c for c in RUNGS if c != "lam0"]
+    _resp: dict[str, tuple[np.ndarray, float, float]] = {c: grading(c) for c in _rungs}
+```
+
+`plt.subplots()` returns `tuple[Figure, Any]`, so `cast()` it:
+
+```python
+from mini.vis import AxesRow
+fig, axes = plt.subplots(1, 3, ...)  # 1D
+axes = cast(AxesRow, axes)
+
+from mini.vis import AxesGrid
+fig, axes = plt.subplots(2, 3, ...)  # 2D
+axes = cast(AxesGrid, axes)
 ```
 
 ## Notebooks
