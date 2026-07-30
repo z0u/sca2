@@ -32,34 +32,8 @@ Be proactive. Fix little things as you go, and create todos for larger things â€
 
 ## Code style & conventions
 
-- Even in Python, prefer JavaScript-style method chaining (newline before the dot, use outer parentheses as necessary).
-- Use cutting-edge syntax.
-- Prefer brevity.
-
-This is valid syntax in Python 3.14:
-
-```python
-try:
-    pass
-except A, B:  # PEP 758
-    pass
-```
-
-Do not get distracted by such things. If the linters say it's fine, it's probably fine, so move on.
-
-### Typing
-
-Use type hints.
-Use `T | None` instead of `Optional[T]`.
-
-```diff
-- foo: Optional[int] = None
-+ foo: int | None = None
-```
-
-## Notebooks
-
-Iterate on both the code (Python) and the prose (Markdown). Aim for a literate programming style.
+Python style, typing, and notebook conventions live in the `code-style` skill.
+Read it before writing Python.
 
 ## Environment
 

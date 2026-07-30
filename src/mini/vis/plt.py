@@ -2,24 +2,34 @@
 Utilities for working with matplotlib stylesheets, and drawing primitives it lacks.
 """
 
+from collections.abc import Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Mapping
+from typing import TYPE_CHECKING, Literal, Mapping, TypeAlias
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path as MplPath
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from matplotlib.axes import Axes
     from numpy.typing import ArrayLike
 
 
 Stylesheet = Literal["base", "light", "dark", "transparent"] | Mapping[str, str]
+
+# Plain assignment aliases, not PEP 695 ``type``: as of ty 0.0.x, a ``type`` alias
+# resolves for reveal_type but drops to Unknown when inference has to push it
+# through a generic call such as ``zip(axes, ...)``. See todo-eng.md.
+AxesRow: TypeAlias = Sequence[Axes]
+"""The axes array from ``plt.subplots(1, n)``, or a flattened grid — ``cast`` to it."""
+
+AxesGrid: TypeAlias = Sequence[Sequence[Axes]]
+"""The axes array from ``plt.subplots(m, n)`` — ``cast`` to it to keep ``axes[i][j]`` typed."""
 
 
 @contextmanager
