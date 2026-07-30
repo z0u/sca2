@@ -21,7 +21,7 @@ with app.setup(hide_code=True):
     import experiment as ex
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
-    from mini.vis import light_dark, themed
+    from mini.vis import figure_html, light_dark, themed
     from sca import vis as sv
 
     use_publisher(report_bundle(__file__))
@@ -60,6 +60,16 @@ def _():
     equations toward a fixed direction $\hat v_{\text{red}}$. Then we ask two
     questions: did the concept land where we put it, and what did that cost the
     task?
+
+    /// admonition | tl;dr
+    The anchor cost the task nothing measurable, and it moved the residual
+    stream a long way onto the chosen direction. But it moved the whole color
+    cube there, not *red* in particular. The margin we scored reached about
+    half its threshold, and a tenfold increase in the regularizer weight did
+    not improve it. The discussion argues that the missing ingredient is a
+    repulsive term: one that pushes non-red activations away from the anchor.
+    M1 had such a term, and this experiment deliberately left it out.
+    ///
 
     /// details | Notation
     Equations are `a + b = mix(a, b)` throughout M2, so $a$ and $b$ stay
@@ -133,7 +143,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    /// admonition | How to read this draft
+    /// admonition | How to read this report
     This was a preregistered skeleton. The method, hypotheses, and decision
     thresholds below were written and frozen before the experiment ran, and
     the results replaced the placeholders in place, so reading it is a
@@ -319,7 +329,6 @@ def _():
         cum.set_xlim(-0.03, 1.03)
         cum.set_ylabel("cumulative share", color=_grey)
         cum.tick_params(colors=_grey)
-        fig.suptitle("Label distribution over the 216 colors")
         return fig
 
     mo.Html(_plot())
@@ -488,7 +497,7 @@ def _():
             the rest of training to reach the same floor.
         """,
         caption="""
-            The two schedules on one axis, each as a fraction of its own peak —
+            Learning rate and anchor weight over training, each as a fraction of its own peak —
             the LR peak is fixed at 1e-2, the anchor weight's is the swept
             $\\lambda$. The anchor weight's ramp and anneal are minimum-jerk;
             both anneals end at epoch 100 on a floor of 10% rather than zero,
@@ -519,7 +528,6 @@ def _():
         ax.set_ylim(0, 1.28)
         ax.set_xlabel("epoch")
         ax.set_ylabel("fraction of peak")
-        ax.set_title("Learning rate and anchor weight over training")
         ax.legend(loc="upper right", fontsize=8, frameon=False, ncols=3)
         return fig
 
@@ -943,7 +951,7 @@ def _(CONDS, CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
         f"<td class='num'>{_REF['nll']:.3f}</td><td class='num'>{_REF['open']:.3f}</td>"
         f"<td class='num'>—</td><td>reference</td></tr>"
     )
-    mo.Html(f"""
+    _table = f"""
     <div class="report-table-scroll"><table class="report-table">
       <thead><tr>
         <th>condition</th><th class="num">seen EM</th><th class="num">holdout EM</th>
@@ -952,7 +960,18 @@ def _(CONDS, CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
       </tr></thead>
       <tbody>{_ref}{_rows}</tbody>
     </table></div>
-    """)
+    """
+    _caption = """
+    Behavior by condition. Each cell is the seed mean, with half the seed range
+    beside it. EM is exact match on the answer token. NLL is the surprise of
+    that token in nats. <code>open</code> dist is the RGB distance from the
+    guessed color to the true mix, on pairs with no named answer. Δ holdout EM
+    is the signed gap to the λ = 0 control, and the last column reports the H1
+    gate, which passes when that gap is within 0.02. The first row is the
+    published ex-2.1.3 <code>v216</code> cell; it is an external reference, not
+    a condition of this sweep.
+    """
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
 
 
@@ -1016,11 +1035,12 @@ def _(LABELS, RUNGS, grading, m_op1):
         alt_text="""
             Three panels, one per anchored rung. In each, the 216 colors sit in a
             broad band well above the flat control at zero, and the band rises
-            gently with redness — from about 0.4 at the grey end to about 0.7 at
-            the red end — rather than separating the reds from the rest.
+            gently with redness — from roughly 0.4–0.5 at the grey end to
+            0.7–0.9 at the red end — rather than separating the reds from the
+            rest.
         """,
         caption=r"""
-            The per-color response at op1: $\alpha_c$, the layer mean of
+            Alignment at op1, per color: $\alpha_c$, the layer mean of
             $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the
             redness of the color. One mark per color, drawn in that color; the
             heavy line is a 25-color sliding mean over the redness ordering, and
@@ -1051,7 +1071,6 @@ def _(LABELS, RUNGS, grading, m_op1):
             )  # fmt: skip
         axes[0].set_ylabel(r"$\alpha_c$ at op1")
         axes[0].set_ylim(-0.15, 1.2)  # headroom for the per-panel statistics
-        fig.suptitle("Alignment at op1, per color")
         return fig
 
     mo.Html(_plot())
@@ -1121,11 +1140,12 @@ def _(CONDS, LABELS, RUNGS, arrays, margin_map):
         alt_text="""
             The margin at op1 falls with depth at every anchored weight. At the
             largest weight it starts near 0.56 in the embedding and decays to
-            below 0.1 by the last layer; at the smallest it starts lower, near
-            0.35, and decays less. The control is flat and slightly negative.
+            below 0.1 by the last layer; at the smallest it starts near 0.35,
+            peaks in the first block, and decays less thereafter. The control is
+            flat and slightly negative.
         """,
         caption=r"""
-            The alignment margin at op1 by layer — the
+            Where the margin lives in the stack: the alignment margin at op1 by layer — the
             per-depth terms whose mean is $m_{\text{op1}}$. Depth 0 is the token
             embedding, depth 4 the last block's output. Lines are seed means;
             the shaded band around the control is its seed min–max, as the scale
@@ -1150,7 +1170,6 @@ def _(CONDS, LABELS, RUNGS, arrays, margin_map):
         ax.set_xticks(_depths)
         ax.set_xlabel("layer (0 = embedding)")
         ax.set_ylabel(r"$m$ at op1")
-        ax.set_title("Where the margin lives in the stack")
         ax.legend(fontsize=8, frameon=False, ncols=5)
         return fig
 
@@ -1161,10 +1180,10 @@ def _(CONDS, LABELS, RUNGS, arrays, margin_map):
 @app.cell(hide_code=True)
 def _(margin_map):
     mo.md(rf"""
-    The per-depth view shows where the little selectivity there is sits, and it
-    is not a sag in the last layer. The margin is largest in the embedding and
-    decays monotonically with depth at every weight. Raising $\lambda$ steepens
-    that decay rather than lifting the curve: at $\lambda{{=}}0.3$ it runs
+    The per-depth view shows where what little selectivity exists is located,
+    and it is not a sag in the last layer. At every weight, the margin peaks in
+    the embedding or the first block and falls away with depth. Raising
+    $\lambda$ steepens that decay rather than lifting the curve: at $\lambda{{=}}0.3$ it runs
     {margin_map("lam0.3")[0, 0]:.2f} → {margin_map("lam0.3")[-1, 0]:.2f} from
     embedding to last layer, against {margin_map("lam0.03")[0, 0]:.2f} →
     {margin_map("lam0.03")[-1, 0]:.2f} at $\lambda{{=}}0.03$. So a heavier pull
@@ -1210,14 +1229,13 @@ def _(arrays):
     @themed(
         name="positions",
         alt_text="""
-            Six panels stacked by depth, each showing the margin across the six
-            line positions. op1 is the tallest column in every panel, but only by
-            a factor under two against the plus and equals positions; op2 is the
-            shortest of the pulled positions, and the newline is near zero
-            throughout.
+            Six panels stacked by depth. op1 dominates in the embedding and the
+            first block, but by the last two blocks the plus and equals
+            positions overtake it; op2 stays the smallest of the pulled
+            positions, and the newline is near zero throughout.
         """,
         caption=r"""
-            The margin $m(\ell, t)$ across the six positions of a line, on
+            Margin by position and depth: $m(\ell, t)$ across the six positions of a line, on
             $\lambda{=}0.1$, seed mean. One panel per layer, and the
             seed mean over layers in the bottom panel, drawn heavier. The
             shaded area runs from zero to the seed mean; the hairlines are the seed
@@ -1275,7 +1293,6 @@ def _(arrays):
             (0.98, 0.9), xycoords="axes fraction", ha="right", va="top", fontsize=8,
             color=light_dark("#444", "#bbb"),
         )  # fmt: skip
-        axes[0].set_title(r"Margin by position and depth ($\lambda{=}0.1$)", fontsize=10)
         fig.supylabel("layer", fontsize=9)
         return fig
 
@@ -1361,7 +1378,7 @@ def _(CONDS, LABELS, cells):
             the anneal. The control stays flat at zero.
         """,
         caption=r"""
-            $m_{\text{op1}}$ over training, measured every 50 steps. One panel
+            Alignment over training: $m_{\text{op1}}$ measured every 50 steps. One panel
             per condition, one line per seed. The pale band behind is the
             anchor weight as a fraction of its peak, so its descent marks the
             anneal window; the dotted line is the learning rate. Both use the
@@ -1402,7 +1419,6 @@ def _(CONDS, LABELS, cells):
             ax.set_xlim(0, ex.SCHEDULER.epochs)
         axes[0].set_ylabel(r"$m_{\text{op1}}$")
         axes[0].set_ylim(-0.08, 0.5)
-        fig.suptitle("Alignment over training")
         return fig
 
     mo.Html(_plot())
@@ -1471,7 +1487,7 @@ def _(CONDS, LABELS, RUNGS, cells):
             control to between 0.2 and 0.5 with the anchor on.
         """,
         caption=r"""
-            Left: held-out R² for a ridge probe that predicts redness from the
+            Where redness is readable at op1. Left: held-out R² for a ridge probe that predicts redness from the
             residual stream at op1, with the $\hat v_{\text{red}}$ component
             removed first. This measures how well *red* can still be read from
             the other 63 directions. Right: the same target predicted from the
@@ -1500,7 +1516,6 @@ def _(CONDS, LABELS, RUNGS, cells):
             ax.set_ylim(-0.05, 1.0)
         axes[0].set_ylabel("R² for redness")
         axes[0].legend(fontsize=8, frameon=False, ncols=2, loc="lower left")
-        fig.suptitle("Where redness is readable at op1")
         return fig
 
     mo.Html(_plot())
@@ -1583,14 +1598,15 @@ def _(CONDS, LABELS, RUNGS, geometry):
         alt_text="""
             Two panels. On the left, the extent of the 216-color cloud falls
             steeply with depth in every condition, control included, from about
-            0.92 at the embedding to near 0.1 at the last layer; the anchored
-            conditions sit a little below the control in the middle of the
-            stack. On the right, the direction of the cloud's centre is
+            0.92 at the embedding to near 0.1 at the last layer; mid-stack the
+            anchored conditions sit clearly below the control, at roughly 70% of
+            it at λ=0.1 and 50% at λ=0.3. On the right, the direction of the cloud's centre is
             unrelated to the anchor in the control and almost parallel to it
             from the first block onward once the anchor is on.
         """,
         caption=r"""
-            The shape of the 216 op1 states, seed means, per layer. Left: the
+            Where the color cloud is, and how big: the shape of the 216 op1
+            states, seed means, per layer. Left: the
             extent of the cloud, the mean squared distance of a color from the
             centre (states are unit-norm, so this runs from 0 for a collapsed
             cloud to 1 for a spread one). Right: the cosine between that centre
@@ -1619,7 +1635,6 @@ def _(CONDS, LABELS, RUNGS, geometry):
         axes[1].set_ylim(-0.1, 1.0)
         axes[1].axhline(0, color=light_dark("#ccc", "#444"), lw=0.8, zorder=0)
         axes[0].legend(fontsize=8, frameon=False, ncols=2, loc="upper right")
-        fig.suptitle("Where the color cloud is, and how big")
         return fig
 
     mo.Html(_plot())
@@ -1703,7 +1718,7 @@ def _(geometry):
         + "</tr>"
         for t in _TARGETS
     )
-    mo.Html(f"""
+    _table = f"""
     <div class="report-table-scroll"><table class="report-table">
       <thead>
         <tr><th></th><th class="num" colspan="2">off the anchor axis</th>
@@ -1713,7 +1728,18 @@ def _(geometry):
       </thead>
       <tbody>{_rows}</tbody>
     </table></div>
-    """)
+    """
+    _caption = """
+    What is recoverable from the op1 residual stream, per target. Each cell is
+    the seed mean, with half the seed range beside it. Rows are the property
+    being predicted: redness; the same formula rotated onto the green and blue
+    corners; the raw channels; and the sim¹·⁵ shape that H2(b) scores against.
+    The left pair of columns is held-out ridge R² with the anchor direction
+    removed, averaged over layers. The right pair is squared correlation with
+    the anchor component alone. Reading down a column compares redness against
+    targets the anchor never pulled.
+    """
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
 
 
@@ -1773,14 +1799,15 @@ def _():
     mo.md(r"""
     ## Discussion
 
-    **Summary of results.** H1 passed; H2, H3, and H4 did not. The anchor is
-    free: no rung cost measurable accuracy, NLL, or open-pair distance. And it
-    does move the residual stream a long way onto the chosen direction. What it
-    did not do is move *red* there selectively. The margin settles near 0.27
-    against a gate of 0.5, and the best of the grading statistics reaches 0.64
-    against 0.8.
-    Both are flat across a tenfold range of $\lambda$, while the
-    color-independent part of the response climbs with it.
+    **Summary of results.** H1 passed; H2 and H4 failed. H3 was not scored,
+    because its frozen precondition, H2(a), did not hold at any rung. The
+    anchor is free: no rung cost measurable accuracy, NLL, or open-pair
+    distance. And it does move the residual stream a long way onto the chosen
+    direction. What it did not do is move *red* there selectively. The margin
+    settles near 0.27 against a gate of 0.5, and the best of the grading
+    statistics reaches 0.64 against 0.8. Both are flat across a tenfold range
+    of $\lambda$, while the color-independent part of the response climbs with
+    it.
 
     **A mechanism that fits.** The term is selective about which *lines* it
     fires on, but says nothing about *positions*. It fires only when op1 is
