@@ -34,8 +34,11 @@ readable cold without re-deriving code state.
   looks separate and unfiled. Worth filing upstream, and re-testing later so the
   aliases can go back to `type`.
 
-- **Bump `ty` past 0.0.49 (2026-07-30).** 0.0.65 is out; we haven't looked at
-  what's between. Noticed while testing the alias issue above.
+- **Bumped `ty` 0.0.49 -> 0.0.63 (2026-07-30).** `exclude-newer = "3 days"`
+  in pyproject.toml capped us below 0.0.64/0.0.65. `ty check` is clean at
+  0.0.63. Notable in the gap: uv workspace-root discovery, several PEP 695
+  generic-type-alias fixes (0.0.63/0.0.64) — didn't fix the supertype-widening
+  bug above though — and ongoing inference-performance work every release.
 
 - **Pre-push `ty` check scans nested worktrees (2026-07-29).** Pushing from a
   `.claude/worktrees/<name>` worktree runs `ty check` from the parent checkout,
