@@ -91,4 +91,16 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   over strong nulls; hex 0.996); the cross-form alignment sections are still
   in their preregistered form, with the analysis round in progress.
 
+- [Experiment 2.1.6](./m2/ex-2.1.6/report.py): anchoring *red* — the first
+  anchored transformer run. One anchor term (no anti terms, no intervention),
+  sequence-level noisy labels driven by the first operand's redness, applied at
+  every layer and prompt position of the word-level `v216` testbed. The anchor
+  is free — no rung cost measurable accuracy at any weight — and it moves the
+  residual stream a long way onto the chosen direction, but it moves the whole
+  color cube rather than *red*: the alignment margin settles at 0.27 against a
+  0.5 gate while the color-independent shift grows with λ. Redness stays as
+  readable off the anchor axis as in the control, so the axis holds a copy.
+  The reading is that a bare attractive term needs the repulsive company M1
+  gave it.
+
 More reports will appear here as the M2 experiments land.

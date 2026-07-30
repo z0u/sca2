@@ -6,6 +6,15 @@ report will claim *before* the experiment runs — the preregistration disciplin
 a methodological concern that lives in the science skill — and publishing it as a
 self-contained bundle once results land. This file covers the publishing half.
 
+### Simplification pass
+
+Whenever you write prose, unless your changes are _very_ minor, the text should be reviewed before handing back to the human. In one turn:
+
+1. Write
+2. Stage changes (unless you have another way to see what the agent changes)
+3. Hand it to the `prose-simplifier` agent on the same turn
+4. Review the agent's changes; check for correctness
+
 ## Report bundles
 
 Externalizing a report's figures and data so the exported HTML stays light and
