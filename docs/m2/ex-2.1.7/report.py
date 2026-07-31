@@ -61,7 +61,7 @@ def _():
     We tested two mechanisms to improve anchor selectivity:
     **1.** Apply the anchor term only to operand 1 (no other tokens), and
     **2.** Add a repulsive term to clear the target subspace.
-    Both work, but 1. worked better, and their effects stack.
+    Both work, but 1. worked better, and their effects stack somewhat.
     ///
 
     Ex-2.1.6 anchored *red* with a single attractive term and got alignment
@@ -626,9 +626,9 @@ def _(CONDS: list[str], CONTROL_ACC, acc, stats):
     ordering by condition. The `open`-pair distances cluster near
     {np.mean([acc(c, "open", "guess_dist").mean() for c in CONDS]):.3f}, and the
     spread from best to worst condition is only
-    {max(acc(c, "open", "guess_dist").mean() for c in CONDS) - min(acc(c, "open", "guess_dist").mean() for c in CONDS):.3f}.
+    {max(acc(c, "open", "guess_dist").mean() for c in CONDS) - min(acc(c, "open", "guess_dist").mean() for c in CONDS):.3f}.[^open-good]
 
-    How good is that `open`-pair number in absolute terms? Not very, though the
+    [^open-good]: How good is that `open`-pair number in absolute terms? Not very, though the
     shortfall has nothing to do with the anchor. The floor (the best score any
     guesser could reach) is {stats["nulls"]["open"]["floor_dist"]:.3f}, and a
     guesser that flips a coin between the two names bracketing the true mix
@@ -651,8 +651,6 @@ def _(CONDS: list[str], CONTROL_ACC, acc, stats):
     {acc("span-anti-hi").mean():.4f}, indistinguishable from control. So we
     still have not found the weight at which the task starts to suffer, and the
     budget available for the D2.2 operation anchors is at least this large.
-    Whether more weight is *useful* is a different question, and the answer
-    below is no.
     """)
     return
 
@@ -830,9 +828,8 @@ def _(alpha_bar, grading, m_op1):
     at $|m_{{\text{{op1}}}}| = {abs(m_op1("lam0").mean()):.3f}$, inside its 0.1
     ceiling.
 
-    The preregistered primary condition is not among the passes. That condition
-    is `span-anti`: the pull from ex-2.1.6 plus the repulsive term from M1,
-    which the ex-2.1.6 discussion named as the next experiment. It reaches
+    The preregistered primary condition `span-anti` is not among the passes. That condition
+    is the pull from ex-2.1.6 plus the repulsive term from M1. It reaches
     {m_op1("span-anti").mean():.3f}. That is comfortably into the partial band
     (0.35) and well clear of the ex-2.1.6 result of {_EX216_M:.2f}, but short of
     the gate. The repulsive term alone was the predicted fix, and alone it gets
@@ -900,7 +897,7 @@ def _(m_op1):
       </tbody>
     </table></div>
     """
-    _caption = f"""
+    _caption = mo.md(f"""
     The factorial on $m_{{\\text{{op1}}}}$. Body cells are seed means with half
     the seed range beside them. A main effect is the mean of the two conditions
     carrying a factor minus the mean of the two without it, so the anti effect
@@ -910,8 +907,8 @@ def _(m_op1):
     H3 asks the anti effect to reach {ex.MAIN_EFFECT_GATE:g} and to be at least
     as large as the op1-only effect; the noise on a main effect is about
     {ex.NOISE_SEED_MEAN:g}.
-    """
-    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
+    """)
+    mo.Html(figure_html(_table, caption=_caption.text, class_="report-figure"))
     return
 
 
@@ -928,7 +925,7 @@ def _(cells, m_op1):
         return (sa + oa) / 2 - (sb + ob) / 2, (ob + oa) / 2 - (sb + sa) / 2
 
     mo.md(rf"""
-    **H3 fails, on the first of its two named contrary readings.** Both main
+    **H3 fails, and implies the first of its two named contrary readings.** Both main
     effects clear {ex.MAIN_EFFECT_GATE:g}: the repulsive term is worth
     {_anti:+.3f} of margin, and the narrower pull is worth {_op1:+.3f}, against
     a noise floor of about {ex.NOISE_SEED_MEAN:g} on a main effect. But H3 asked
@@ -945,12 +942,11 @@ def _(cells, m_op1):
     which cancels the seed. Done that way, the op1-only effect is the larger on
     every seed, with no overlap between the two sets
     ({", ".join(f"{_per_seed(s)[1]:.2f} vs {_per_seed(s)[0]:.2f}" for s in ex.SEEDS)}),
-    so the ordering is not carried by one lucky run. Still, the two factors are
+    so the ordering is not due to one lucky run. Still, the two factors are
     not on a common scale: one changes how many positions are pulled, and the
     other adds a term at a weight copied from another experiment. So this says
     the *particular* settings tried favor the span, not that repulsion is
-    intrinsically the weaker lever. The timing arm below makes that concrete:
-    the same term on a different schedule is worth considerably more.
+    intrinsically the weaker lever.
 
     The interaction is {_int:+.3f}, so the two are mildly sub-additive: together
     they buy about {abs(_int):.2f} less than their separate effects would
@@ -981,15 +977,19 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
     @themed(
         name="trajectories",
         alt_text="""
-            Two panels against epoch. Left: the mean alignment over all colors,
+            Two panels against epoch, sharing one y scale. Left: the mean alignment over all colors,
             with the containment gate at 0.1, the partial level at 0.25, and the
             ex-2.1.6 bare-term endpoint at 0.53. Right: the alignment margin,
             with the 0.2 scoring floor. One line per condition, averaged over
-            seeds.
+            seeds, each with a tinted band covering the spread of its three
+            seeds. A grey band behind both panels traces the anchor weight and
+            a blue band traces the anti-subspace weight, each as a fraction of
+            its own peak.
         """,
         caption=rf"""
             How the two quantities move during training, measured every
-            {ex.TRAJ_STRIDE} steps and averaged over seeds. Left:
+            {ex.TRAJ_STRIDE} steps and averaged over seeds. Both are cosines on
+            the anchor axis, so the panels share a y scale. Left:
             $\bar\alpha$, the mean alignment over all 216 colors at op1 — what ran
             away in ex-2.1.6, and what H4(a) asks the repulsive term to contain
             below {ex.MEAN_ALIGN_GATE:g} (solid rule). The dashed rule is the
@@ -997,9 +997,13 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
             ex-2.1.6 endpoint of {_EX216_ALPHA:.2f}. Right:
             $m_{{\text{{op1}}}}$, with the H4(b) scoring floor of {ex.H4_FLOOR:g}
             dashed; a run whose running maximum never reaches it is reported but
-            not scored. The pale band behind both panels is the anchor weight as
-            a fraction of its peak, so its descent marks the end-of-training
-            anneal.
+            not scored. Each condition's tinted band spans its lowest to highest
+            seed at that checkpoint — with {len(ex.SEEDS)} seeds that is the full
+            observed range rather than an interval estimate, so read it as a
+            rough sense of run-to-run variation. The two separate bands behind
+            both panels are the anchor weight (grey) and the anti-subspace
+            weight (blue), each as a fraction of its own peak, so their
+            descents mark the annealing schedule.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1007,7 +1011,7 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
 
         from mini.vis import AxesRow
 
-        fig, axes = plt.subplots(1, 2, figsize=(9.0, 3.4))
+        fig, axes = plt.subplots(1, 2, figsize=(9.0, 3), sharey=True)
         axes = cast(AxesRow, axes)
         _ink = dict(zip(CONDS, light_dark(
             ["#999", "#f2b134", "#c1332a", "#e08a2e", "#7a2320", "#3d7ea6", "#5c3d8f"],
@@ -1016,15 +1020,27 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
         _grey = light_dark("#999", "#777")
         epochs = _mean_traj("span-anti", "epoch")
         weight = _mean_traj("span-anti", "weight")
+        anti_weight = _mean_traj("span-anti", "anti_weight")
         for ax, key, ylabel in (
             (axes[0], "alpha_op1", r"$\bar\alpha$ at op1"),
             (axes[1], "m_op1", r"$m_{\text{op1}}$"),
         ):
             twin = ax.twinx()
             twin.fill_between(epochs, weight / weight.max(), color=light_dark("#0000000d", "#ffffff12"), lw=0)
+            twin.fill_between(epochs, anti_weight / anti_weight.max(), color=light_dark("#3366cc0d", "#77aaff12"), lw=0)
             twin.set_ylim(0, 1.05)
             twin.set_yticks([])
             for cond in CONDS:
+                _seeds = np.array([traj(cond, s, key) for s in ex.SEEDS])
+                ax.fill_between(
+                    epochs,
+                    _seeds.min(axis=0),
+                    _seeds.max(axis=0),
+                    color=_ink[cond],
+                    alpha=light_dark(0.13, 0.07),
+                    lw=0,
+                    zorder=2,
+                )
                 ax.plot(
                     epochs, _mean_traj(cond, key), color=_ink[cond], lw=1.6 if cond in ex.FACTORIAL else 1.2,
                     ls="-" if cond in ex.FACTORIAL or cond == "lam0" else (0, (4, 3)), label=LABELS[cond], zorder=3,
@@ -1038,8 +1054,11 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
         axes[0].axhline(_EX216_ALPHA, color=_grey, lw=0.9, ls=(0, (1, 2)))
         axes[1].axhline(ex.H4_FLOOR, color=_grey, lw=0.9, ls=(0, (4, 3)))
         axes[0].legend(fontsize=7.5, frameon=False, ncols=2, loc="upper left")
-        _top = max(np.max(_mean_traj(c, "alpha_op1")) for c in ANCHORED)
-        axes[0].set_ylim(-0.1, max(0.75, _top * 1.35))  # headroom for the legend
+        # Shared scale: both panels are cosine quantities on the anchor axis. The left
+        # one carries the legend, so it asks for more headroom above its curves.
+        _top_a = max(np.max(_mean_traj(c, "alpha_op1")) for c in ANCHORED)
+        _top_m = max(np.max(_mean_traj(c, "m_op1")) for c in ANCHORED)
+        axes[0].set_ylim(-0.1, max(0.75, _top_a * 1.35, _top_m * 1.06))
         return fig
 
     mo.Html(_plot())

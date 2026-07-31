@@ -76,6 +76,12 @@ A chart (loss curve, score sweep, schedule) keeps its axes. Use the
 stylesheet defaults from `mini.vis` and prefer meaningful ticks: a hue axis
 gets named ticks (Red, Green, Blue), not 0–1.
 
+A range band (e.g. `fill_between` showing a min/max or confidence spread)
+must sit behind every summary line, not just the line it belongs to —
+draw all bands first, then all lines, or give the bands a lower `zorder`
+explicitly. A band drawn after a neighboring condition's line covers that
+line and drowns it out.
+
 For an *ordinal* series (depth, size), encode order as ordered shades of one
 colormap rather than categorical hues — but pick the stops with `light_dark`:
 a colormap's dark end vanishes on a dark background (e.g. viridis
@@ -99,6 +105,19 @@ def draw_latent_panel(ax, z, facecolors, edgecolors=None):
     ax.set_ylim(-1.1, 1.1)
     ax.set_axis_off()
 ```
+
+## Sharing an axis across panels
+
+Decide `sharex`/`sharey` from the *units*, not from the ranges the run happened
+to produce. Panels measuring the same quantity share; panels measuring different
+quantities get their own scale, however close the numbers land. A level and a
+contrast built from the same measurement (mean alignment and the alignment
+margin, say) count as the same units — sharing lets the reader compare their
+sizes by eye, which is usually the point of putting them side by side.
+
+Two panels with nearly-but-not-quite equal limits read as a bug. That is the
+symptom to check for; the fix is to share, or to make the scales visibly
+different, whichever the units call for.
 
 ## Color is data
 
