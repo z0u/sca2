@@ -1004,46 +1004,30 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
     @themed(
         name="trajectories",
         alt_text="""
-            Six small panels of training curves in a three-by-two grid, with a
-            short weight-schedule panel under each column, all on a shared epoch
-            axis. Every condition panel plots two lines in that condition's
-            color on one shared y scale — mean alignment solid, the alignment
-            margin dashed — over a grey pair of control lines and the other
-            conditions repeated faintly in grey behind. Shaded steps along the
-            bottom of each panel mark the 0.1 containment gate and the 0.25
-            partial level; a dashed rule marks the 0.2 margin floor and a dotted
-            rule the 0.53 ex-2.1.6 endpoint. The schedule panels are on a log
-            axis: the first column carries the anchor weight alone, the second
-            adds the annealing anti-subspace weight, and the third overlays the
-            two arms, whose curves sit a decade apart.
+            Six panels of training curves in a three-by-two grid, one per
+            condition, with a log-scale weight-schedule panel under each
+            column, all sharing the epoch axis. Each panel draws the
+            condition's mean alignment solid and its margin dashed, over a
+            grey control pair and faint traces of the other conditions. Rules
+            mark the containment gates at 0.1 and 0.25, the margin floor at
+            0.2, and the ex-2.1.6 endpoint at 0.53. In the anti conditions the
+            margin climbs early, while the repulsion is strong; mean alignment
+            stays near the control until the anneal hands the repulsion down,
+            then climbs — latest in the late arm.
         """,
         caption=rf"""
-            How the two quantities move during training, one panel per
-            condition, measured every {ex.TRAJ_STRIDE} steps and averaged over
-            seeds. Both are cosines on the anchor axis, so every panel shares
-            one y scale and the two lines within a panel can be read against
-            each other: solid is $\bar\alpha$, the mean alignment over all 216
-            colors at op1, and dashed is $m_{{\text{{op1}}}}$, the alignment
-            margin. The grey pair in every panel is the control, in the same two
-            styles; the fainter lines behind repeat the other five conditions,
-            so each panel can be placed against the whole set without a legend
-            of near-identical colors. Reference levels: the shaded steps are
-            H4(a)'s grading zones for $\bar\alpha$ — contained below
-            {ex.MEAN_ALIGN_GATE:g}, the named partial up to
-            {ex.MEAN_ALIGN_PARTIAL:g} — the dashed rule is H4(b)'s scoring floor
-            of {ex.H4_FLOOR:g} for $m_{{\text{{op1}}}}$, and the dotted rule the
-            published ex-2.1.6 endpoint of {_EX216_ALPHA:.2f}. Run-to-run spread
-            is not drawn; the H4 table below carries it, per condition. Bottom
-            row: the weight schedule each column was trained under, on the log
-            axis and in the colors of the schedules figure above, at the same
-            width and epoch axis as the panels over it — so a descent can be
-            lined up against the epochs where the metrics respond to it. The
-            first column has no repulsive term at all
-            ($\lambda_{{\bar{{\mathrm{{s}}}}}} = 0$, so nothing to draw on a log
-            axis). The third holds two schedules, one per arm — solid for the
-            ceiling arm, which runs a decade above the scoring rung, and dashed
-            for the late arm, which reaches the hold ratio at epoch
-            {ex.ANTI_ANNEAL_END_LATE:g} rather than {ex.ANTI_ANNEAL_END:g}.
+            Training dynamics, one panel per condition: seed means of the two
+            cosines on the anchor axis, on one shared scale. Solid is
+            $\bar\alpha$, the mean alignment over all 216 colors at op1;
+            dashed is the margin $m_{{\text{{op1}}}}$. The grey pair is the
+            control and the faint lines are the other conditions. The
+            caret-marked rules are H4(a)'s grading levels for $\bar\alpha$,
+            the dashed rule is H4(b)'s floor for $m_{{\text{{op1}}}}$, and the
+            dotted rule is the published ex-2.1.6 endpoint of
+            {_EX216_ALPHA:.2f}. Seed spread is carried by the H4 table below.
+            Bottom row: the weight schedules each column trained under, in the
+            colors of the schedules figure above; in the third column, solid
+            is the ceiling arm and dashed the late arm.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1054,7 +1038,9 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
         ), strict=True))  # fmt: skip
         _grey = light_dark("#999", "#777")
         _ghost = light_dark("#e2e2e2", "#333")
-        _zone = light_dark("#dfe8ef", "#1b2733")
+        # The ᾱ gates, in a pale steel blue: solid but quieter than any data line,
+        # and apart from the grey rules (dashed margin floor, dotted endpoint).
+        _gate = light_dark("#a4bdd1", "#41607a")
         _term = {"anchor": light_dark("#c33", "#e66"), "anti": light_dark("#36c", "#7af")}
         _dash = (0, (4, 2))
         # One scale for every panel: a condition's height should mean the same thing everywhere.
@@ -1065,8 +1051,12 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
                 if other != cond:
                     ax.plot(_EPOCHS, _MEAN[other]["alpha_op1"], color=_ghost, lw=0.7, zorder=1)
                     ax.plot(_EPOCHS, _MEAN[other]["m_op1"], color=_ghost, lw=0.7, zorder=1)
-            ax.axhspan(-0.08, ex.MEAN_ALIGN_GATE, color=_zone, zorder=0)
-            ax.axhspan(ex.MEAN_ALIGN_GATE, ex.MEAN_ALIGN_PARTIAL, color=_zone, alpha=0.45, zorder=0)
+            for _level in (ex.MEAN_ALIGN_GATE, ex.MEAN_ALIGN_PARTIAL):
+                ax.axhline(_level, color=_gate, lw=0.8, zorder=2)
+                # A caret on the spine names the level as a gate; marker 9 has its
+                # base at the point, so it protrudes into the panel from the axis.
+                ax.plot(0, _level, marker=9, ms=6, color=_gate, clip_on=False, zorder=6,
+                        transform=ax.get_yaxis_transform())  # fmt: skip
             ax.axhline(_EX216_ALPHA, color=_grey, lw=0.8, ls=(0, (1, 2.5)), zorder=2)
             ax.axhline(ex.H4_FLOOR, color=_grey, lw=0.8, ls=_dash, zorder=2)
             ax.plot(_EPOCHS, _MEAN["lam0"]["alpha_op1"], color=_grey, lw=1.1, zorder=3)
@@ -1080,17 +1070,19 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
         axd["span-bare"].set_ylabel("cosine")
         axd["op1-bare"].set_ylabel("cosine")
         # The control is named where it runs, once; elsewhere the grey pair is enough.
-        # The label sits on its own line, so it carries a patch of background with it.
+        # The label sits on its own line, so a halo keeps it legible over the ink.
+        import matplotlib.patheffects as pe
+
         axd["span-bare"].annotate(
             "control", (55, _MEAN["lam0"]["alpha_op1"][-1]), fontsize=7.5, color=_grey, va="center", ha="center",
-            bbox=dict(facecolor=_zone, edgecolor="none", pad=0.8),
+            path_effects=[pe.withStroke(linewidth=2.5, foreground=light_dark("#ffffff", "#000000"))],
         )  # fmt: skip
         # The two line styles are keyed once, above the grid, in neutral ink: within
         # a panel the color says only which condition it is.
         fig.legend(
             [plt.Line2D([], [], color=_grey, lw=1.7), plt.Line2D([], [], color=_grey, lw=1.5, ls=_dash)],
             [
-                rf"$\bar\alpha$ (shaded zones at {ex.MEAN_ALIGN_GATE:g} and {ex.MEAN_ALIGN_PARTIAL:g})",
+                rf"$\bar\alpha$ (axis carets at {ex.MEAN_ALIGN_GATE:g} and {ex.MEAN_ALIGN_PARTIAL:g})",
                 rf"$m_{{\text{{op1}}}}$ (dashed rule at {ex.H4_FLOOR:g})",
             ],
             fontsize=8.5, frameon=False, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.0),
@@ -1121,14 +1113,6 @@ def _(ANCHORED, CONDS: list[str], LABELS, traj):
         return fig
 
     mo.Html(_plot())
-    return
-
-
-@app.cell(hide_code=True)
-def _():
-    mo.md(r"""
-    <!-- Looking at these trajectories, I get the impression that the term weights are unbalanced. Anti-subspace dominates decisively for the first half, so _red_ can't align with the anchor; then when it anneals, alignment climbs to too little. I think it may work better if  -->
-    """)
     return
 
 
@@ -1214,11 +1198,14 @@ def _(ANCHORED, alpha_bar, traj):
     {1 - alpha_bar("span-anti").mean() / alpha_bar("span-bare").mean():.0%}
     reduction. But at the weight ratio carried over from M1, it only weakens the
     cube-wide drift; it does not contain it. The trajectory shows when the
-    containment is lost. For the first forty epochs, while the repulsion is
-    still strong, $\bar\alpha$ sits near the control. It climbs once the anneal
-    has reduced the repulsion to {ex.ANTI_HOLD_RATIO:g}$\lambda_\text{{a}}$.
-    That is the contrary outcome the preregistration flagged for this figure,
-    and the timing arm was positioned to test it.
+    containment is lost. While the repulsion outweighs the pull,
+    $\bar\alpha$ sits near the control; it climbs once the anneal has brought
+    $\lambda_{{\bar{{\mathrm{{s}}}}}}$ to about a tenth of
+    $\lambda_\text{{a}}$, and each condition breaks on its own schedule —
+    around epoch 40 on the default anneal, epoch 75 on the late one. That is
+    the contrary outcome the preregistration flagged for this figure, and the
+    timing arm was positioned to test it. The exploratory section takes up
+    what this timing says about the balance between the two weights.
 
     (b) Retention. {len(_held)} of the six anchored conditions hold
     {ex.H4_RETENTION:g}× their peak
@@ -1646,6 +1633,16 @@ def _(arrays):
     _dall = _alpha("span-anti").mean() - _alpha("span-anti-late").mean()
     _span_ratio = ex.LIVE_PER_BATCH / ex.PULLED_PER_BATCH[ex.SPAN_FULL]
     _op1_ratio = ex.LIVE_PER_BATCH / ex.PULLED_PER_BATCH[ex.SPAN_OP1]
+
+    # For the balance subsection: the first post-warmup epoch at which the
+    # anti/anchor weight ratio falls below a level, from the run's own schedules.
+    _sched_e = np.linspace(0, ex.SCHEDULER.epochs, 4001)
+
+    def _ratio_below(level: float, anneal_end: float = ex.ANTI_ANNEAL_END) -> float:
+        r = ex.anti_subspace_weight(_sched_e, anneal_end=anneal_end) / np.maximum(ex.anchor_weight(_sched_e), 1e-9)
+        past = _sched_e > ex.SCHEDULER.warmup_epochs
+        return float(_sched_e[past][np.argmax(r[past] < level)])
+
     mo.md(rf"""
     Stretching the anneal costs the reddest colors {_dred:.3f} of alignment.
     It costs the cube as a whole {_dall:.3f}, which is {_dall / _dred:.0f}
@@ -1676,6 +1673,37 @@ def _(arrays):
     also insensitive to *how many* labels a batch happens to carry: a batch with
     one labeled line pulls its positions as hard as a batch with three. The
     label rate only sets how often the term fires at all.
+
+    ### The two weights are in balance only in passing (post hoc)
+
+    The trajectories figure leaves the impression that the two term weights
+    are unbalanced, and the schedule panels say in which direction: both, at
+    different times. $\lambda_{{\bar{{\text{{s}}}}}}$ opens at
+    {ex.ANTI_PEAK_RATIO:g}$\lambda_\text{{a}}$ — effectively higher through
+    the warmup, before the anchor has ramped in — and finishes
+    {1 / ex.ANTI_HOLD_RATIO:.0f}× *smaller*, at the hold ratio. The two
+    weights match only in passing, near epoch
+    {_ratio_below(1):.0f} on the default anneal and
+    {_ratio_below(1, ex.ANTI_ANNEAL_END_LATE):.0f} on the late one.
+
+    Containment reads off this schedule. In every anti condition,
+    $\bar\alpha$ hugs the control while
+    $\lambda_{{\bar{{\text{{s}}}}}} \gtrsim \lambda_\text{{a}}$ and starts to
+    climb once the anneal brings the ratio to about a tenth — epoch
+    {_ratio_below(0.1):.0f} on the default anneal,
+    {_ratio_below(0.1, ex.ANTI_ANNEAL_END_LATE):.0f} on the late one, which
+    is where the trajectories inflect. The ceiling arm scales both weights
+    together, so it inflects with the default schedule despite its tenfold
+    strength. The margin, by contrast, does its climbing during the
+    strong-repulsion phase: at the per-position ratios above, the pull
+    dominates wherever it applies, so the labeled reds reach the axis early
+    even under peak repulsion. The second half of the schedule therefore buys
+    little margin and gives up the containment, which puts the M1 hold ratio
+    of {ex.ANTI_HOLD_RATIO:g} on the wrong side of the balance point. The
+    timing arm shortens the time spent there and improves every scored
+    statistic; holding $\lambda_{{\bar{{\text{{s}}}}}}$ near
+    $\lambda_\text{{a}}$ to the end of training is the natural extrapolation,
+    and a point the queued anneal-endpoint × hold-ratio grid should include.
 
     ### A confound in the second factor of H3, and why the ceiling arm resolves it (post hoc)
 
@@ -1775,7 +1803,9 @@ def _(alpha_bar, grading, m_op1):
     **Where this leaves the open questions.** The best-supported next
     measurement is a grid sweep of the anti-subspace anneal endpoint against
     its hold ratio. The timing arm confounds "when the repulsion acts" with
-    "how much of it there is"; a grid separates them. The position question is
+    "how much of it there is"; a grid separates them, and the balance reading
+    in the exploratory section says where to look — hold ratios near 1 rather
+    than M1's {ex.ANTI_HOLD_RATIO:g}. The position question is
     harder and more interesting: it calls for a pull that finds the concept
     inside a labeled span rather than being told where it is, perhaps by
     pooling over the span or by weighting positions with an attention-derived
