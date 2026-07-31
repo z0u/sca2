@@ -1,6 +1,6 @@
 """Figure helpers for the RGB-cube domain, shared by the ex-2.1.x reports.
 
-The conventions themselves are written down in the figure-style skill; this is
+The conventions themselves are written down in the style-fig skill; this is
 where the cube half of them is implemented, so panels stay comparable across
 reports. The hypersphere counterpart is
 :func:`sca.colorcube.plot_latent_disc`.
@@ -175,7 +175,7 @@ def plot_rgb_cube(
     view: ViewName = "solid",
     bound: bool = True,
 ) -> None:
-    """One color-cube panel, per the repo's figure conventions (see the figure-style skill).
+    """One color-cube panel, per the repo's figure conventions (see the style-fig skill).
 
     The cube bound as a background hexagon, data-colored points, fixed domain
     limits, no axes. Pass *truth* (the same points' true RGB) to also draw each

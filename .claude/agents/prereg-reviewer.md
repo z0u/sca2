@@ -2,7 +2,7 @@
 name: prereg-reviewer
 description: Fresh-eyes review pass over a preregistration draft — a report skeleton or design doc, before the experiment has been run.
 tools: Read, Edit, Bash, Grep, Glob, Agent, Skill
-skills: science, writing
+skills: science, writing, style-md
 model: opus
 effort: low
 ---
@@ -30,6 +30,12 @@ as specified?** Concretely, that usually means:
 - Confounds worth naming are named, and the measurement site is chosen by a
   criterion independent of the statistic being judged.
 - The report and the code agree about what the experiment does.
+
+Check the scope. The report should not prescribe future work, nor state plans we
+haven't made as if they are settled. "The next experiment will test X" — written
+in the present indicative, these read as established facts, when usually the
+follow-up isn't scheduled and the property isn't demonstrated. Prefer to say
+what _this_ report will cover and stop there.
 
 Numbers verified by a prior round are probably fine; re-check one only if the
 plan looks unsound and that number is load-bearing. Small throwaway prototypes

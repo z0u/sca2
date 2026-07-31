@@ -1,5 +1,5 @@
 ---
-name: code-style
+name: style-py
 description: Python style and typing conventions for this repo — method chaining, modern syntax, type hints that survive Marimo's bare cell signatures, and the literate programming standard for notebooks. Use when writing or reviewing any Python.
 ---
 
@@ -103,5 +103,5 @@ prose ship together. Iterate on both. Aim for literate programming: the
 Markdown should explain what the next cell does and why, so the notebook reads
 as an argument rather than a script with captions.
 
-See the `figure-style` skill for figure and results-table conventions, and
+See the `style-fig` skill for figure and results-table conventions, and
 `docs/README.md` for file-type and publishing rules.

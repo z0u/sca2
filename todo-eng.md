@@ -14,6 +14,17 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Glossary of preferred terms for the science skill (2026-07-30).** Reports
+  have accreted near-synonyms with drifting meanings: "condition" vs "cell"
+  (ex-2.1.7 settled on condition for the seven treatments, cell only for
+  condition × seed), plus "arm", "rung", "gate", "partial" vs "named contrary
+  reading" (ex-2.1.7's H3 distinguishes these: a partial is a weaker pass, a
+  contrary reading is a preregistered interpretation of a miss). A short
+  glossary in `.claude/skills/science/SKILL.md` would keep future reports and
+  reviews from re-negotiating them. Also note the loss-weight symbol scheme
+  adopted in ex-2.1.7: λ subscripted by term (λ_a anchor, λ_s̄ anti-subspace;
+  bar = repulsive), replacing the one-off μ.
+
 - **`ty` loses a PEP 695 `type` alias when solving widens it to a supertype
   (2026-07-30).** Reproduced on 0.0.49 (our pin) and 0.0.65 (latest):
 

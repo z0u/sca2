@@ -305,6 +305,22 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   `separate` would start to matter at weights past the ones we swept. #[D2.1]
   #anchoring #ex-2.1.6
 
+- [ ] Sweep the anti-subspace weight λ_s̄, conditioned on the ex-2.1.7 read.
+  Ex-2.1.7 runs the M1 schedule (2.5 → 0.03 of the anchor weight) at one
+  setting; its timing arm probes how long the weight stays high but nothing
+  probes the hold level itself. The sweep earns its runs in one outcome: the
+  anti factor matters but under-delivers (H4 partial at the 0.25 halving level,
+  or ᾱ climbing after the anneal ends). If ex-2.1.7 passes or the factor does
+  nothing, skip it. #[D2.1] #anchoring #ex-2.1.7
+
+- [ ] If the blind span is what caps the margin (ex-2.1.7 H3's op1-only
+  contrary reading), M3 needs a compensation mechanism, because natural
+  language only offers document-level labels — no position is marked as the
+  relevant one. The affinity-softmax / logsumexp pooling item above is the
+  leading candidate; this item exists so a blind-span result gets read as
+  "prioritize pooling" rather than "narrow the pull", which M3 cannot do.
+  #[D2.1] #anchoring #ex-2.1.7
+
 - [ ] **An off-axis probe R² does not bound an intervention.** Ex-2.1.6 reported
   redness still readable at R² ≈ 0.83 with the anchor direction removed, and
   the post-hoc check showed greenness and blueness score the same: it is the
