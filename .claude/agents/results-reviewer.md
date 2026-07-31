@@ -86,6 +86,7 @@ fresh reader follow it?**
 - The reading order works: a reader arriving cold gets the question, the method,
   and how to read the report before the results.
 - The abstract or intro says what was found, not only what was attempted.
+- The tl;dr is a lede, not a summary.
 - Section headings match what the sections now contain — skeletons often keep
   headings that the results outgrew.
 

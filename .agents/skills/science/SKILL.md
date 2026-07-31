@@ -51,6 +51,34 @@ Any prose you write also gets a `prose-simplifier` pass on the same turn, whethe
 
 The publishing mechanics — exporting the report as a bundle, wiring result refs, verifying the render — are a separate concern, covered by the `mi-ni` skill.
 
+### The tl;dr
+
+A report opens with one, directly under the title and above the intro prose:
+
+```md
+# Ex 2.1.7: a repulsive term and a narrower pull
+
+/// tip |
+<!-- tl;dr -->
+We tested two mechanisms to improve anchor selectivity:
+**1.** Apply the anchor term only to operand 1 (no other tokens), and
+**2.** Add a repulsive term to clear the target subspace.
+Both work, but 1. worked better, and their effects stack.
+///
+```
+
+Four lines or so (two when reflowed): what we tried, and which way it came out.
+It orients someone deciding whether to read on, so keep numbers, hypothesis IDs,
+thresholds and caveats out of it — the analysis sections and the discussion are
+where a reader who stayed gets the full accounting. Left to itself this box
+grows into a second conclusion; if a sentence in it would also belong in the
+discussion, cut it.
+
+The title is empty (`/// tip |`) so the box reads as a lede rather than a
+labelled aside, and the `<!-- tl;dr -->` comment keeps the marker greppable. In
+a preregistration draft, write the "what we tried" half and leave the outcome
+line for later.
+
 ### Recording a review decision
 
 Reports go through several fresh-eyes review rounds, each reader starting from
