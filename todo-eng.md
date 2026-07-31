@@ -14,6 +14,21 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **The watchdog fires during a task's post-loop artifact upload (2026-07-31).**
+  Four of ex-2.1.7's 21 training cells aborted with `WatchdogStall` at step
+  3300/3300 — training had finished, and the stall was `put(workdir / "model")`
+  pushing a checkpoint to the HF store, which took over 300s with eight
+  containers uploading at once. The role's `watchdog` covers the gap between
+  step emissions, so a long tail *after* the last step reads as a stall no
+  matter how healthy the loop was. `watchdog_grace` already solves the
+  mirror-image case at the start of a task, so the shape of a fix exists: either
+  a matching teardown grace, or have `put` emit liveness while it uploads (it
+  knows the byte count, so it could emit real progress). Worked around in
+  ex-2.1.7 by sizing the watchdog for the upload rather than the loop, which
+  makes the number mean something different per experiment — worth fixing
+  properly, since the failure costs a full re-train of a finished run. #storage
+  #cli
+
 - **Glossary of preferred terms for the science skill (2026-07-30).** Reports
   have accreted near-synonyms with drifting meanings: "condition" vs "cell"
   (ex-2.1.7 settled on condition for the seven treatments, cell only for

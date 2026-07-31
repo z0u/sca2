@@ -804,7 +804,13 @@ experiment = Experiment(
         # ~3.3k steps of 64×64 tokens. Both regularizer terms read every residual
         # slice, so a step costs more than ex-2.1.3's, and the trajectory adds a
         # probe pass every 50.
-        "train": dict(gpu="L4", timeout=3600, watchdog=300, watchdog_grace=900),
+        #
+        # The watchdog is sized for the gap *after* the last step, not between
+        # steps: the loop emits at ~450 steps/min, so a wedged run is caught in
+        # seconds either way, but the checkpoint upload that follows emits no
+        # step progress and took over 300s when eight containers pushed to the
+        # store at once.
+        "train": dict(gpu="L4", timeout=3600, watchdog=900, watchdog_grace=900),
         # Three teacher-forced eval sets, one probe pass, and 5 × 5-fold ridge probes on 216 rows.
         # The geometry step runs the same probes over all 21 checkpoints, so it needs longer.
         "eval": dict(gpu="L4", timeout=2700),
