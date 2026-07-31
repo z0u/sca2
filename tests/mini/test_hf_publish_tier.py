@@ -18,7 +18,8 @@ from mini.store import Artifact, LocalStore, _hash_bytes
 
 
 class _Info:
-    def __init__(self, xet_hash: str):
+    def __init__(self, path: str = "", xet_hash: str = "xhash"):
+        self.path = path
         self.xet_hash = xet_hash
 
 
@@ -31,15 +32,21 @@ FAKE_OID = "c0ffee" * 6 + "beef"  # 40 hex chars, like a real commit sha
 
 
 class FakeApi:
-    """Records calls; ``present`` toggles whether the CAS claims to hold the blob."""
+    """Records calls; ``present`` toggles whether the bucket claims to hold the path."""
 
     def __init__(self):
         self.calls: list[tuple] = []
         self.present = True
+        self.contents: dict[str, bytes] = {}  # bucket path → bytes, for download_bucket_files
 
     def get_bucket_paths_info(self, bucket, paths):
         self.calls.append(("get_bucket_paths_info", bucket, tuple(paths)))
-        return [_Info("xhash")] if self.present else []
+        return [_Info(p) for p in paths] if self.present else []
+
+    def download_bucket_files(self, bucket, files):
+        self.calls.append(("download_bucket_files", bucket, tuple(info.path for info, _ in files)))
+        for info, dest in files:
+            Path(dest).write_bytes(self.contents.get(info.path, b""))
 
     def batch_bucket_files(self, bucket, **kw):
         self.calls.append(("batch_bucket_files", bucket, kw))
@@ -51,10 +58,6 @@ class FakeApi:
     def upload_folder(self, **kw):
         self.calls.append(("upload_folder", kw))
         return _Commit(FAKE_OID)
-
-    def file_exists(self, **kw):
-        self.calls.append(("file_exists", kw))
-        return True
 
 
 def _store(tmp_path: Path, *, publish_repo: str | None = None) -> HFStore:
@@ -128,22 +131,53 @@ def test_export_base_pins_to_a_revision(tmp_path: Path):
     )
 
 
-def test_fetch_export_reads_at_the_pinned_revision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    store = _store(tmp_path, publish_repo="ns/pub")
+def _fake_download(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str | None) -> dict:
+    """Stand in for ``hf_hub_download``: serve *body*, or 404 when it's ``None``."""
+    from huggingface_hub.errors import EntryNotFoundError
+
     seen: dict = {}
 
-    def fake_snapshot(**kw):
+    def fake(**kw):
         seen.update(kw)
-        (tmp_path / "snap" / "exports" / "k").mkdir(parents=True, exist_ok=True)
-        (tmp_path / "snap" / "exports" / "k" / "index.html").write_text("pinned")
-        return str(tmp_path / "snap")
+        if body is None:
+            raise EntryNotFoundError("404")
+        out = tmp_path / "dl" / Path(kw["filename"]).name
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(body)
+        return str(out)
 
-    monkeypatch.setattr("huggingface_hub.snapshot_download", fake_snapshot)
-    assert store.fetch_export("k", tmp_path / "out", revision=FAKE_OID) is True
-    assert (tmp_path / "out" / "index.html").read_text() == "pinned"
-    assert seen["revision"] == FAKE_OID
-    exists = [c[1] for c in store._api.calls if c[0] == "file_exists"]
-    assert exists[0]["revision"] == FAKE_OID  # existence is probed at the same revision it serves
+    monkeypatch.setattr("huggingface_hub.hf_hub_download", fake)
+    return seen
+
+
+def test_read_export_html_pulls_one_file_at_the_pinned_revision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    # The build rewrites index.html and leaves the assets on the CDN behind a <base>, so
+    # the read asks for that one file — pulling the bundle would fetch figures to discard.
+    store = _store(tmp_path, publish_repo="ns/pub")
+    seen = _fake_download(tmp_path, monkeypatch, "pinned")
+    assert store.read_export_html("k", revision=FAKE_OID) == "pinned"
+    assert seen["filename"] == "exports/k/index.html"
+    assert seen["revision"] == FAKE_OID  # read at the same revision the <base> will serve
+    assert seen["repo_id"] == "ns/pub"
+
+
+def test_read_export_html_is_none_when_nothing_is_published(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    # Not-found is the answer to "is it published?", so it costs no extra round trip.
+    store = _store(tmp_path, publish_repo="ns/pub")
+    _fake_download(tmp_path, monkeypatch, None)
+    assert store.read_export_html("k") is None
+    assert store._api.calls == []  # no separate existence probe against the repo
+
+
+def test_read_export_html_from_the_bucket(tmp_path: Path):
+    store = _store(tmp_path)  # no publish repo: exports live in the bucket
+    store._api.contents["exports/k/index.html"] = b"<html>bucketed</html>"
+    assert store.read_export_html("k") == "<html>bucketed</html>"
+    pulled = [c for c in store._api.calls if c[0] == "download_bucket_files"]
+    assert pulled == [("download_bucket_files", "ns/bkt", ("exports/k/index.html",))]  # just the HTML
+
+    store._api.present = False  # nothing synced under the key
+    assert store.read_export_html("k") is None
 
 
 def test_export_base_uses_bucket_without_repo(tmp_path: Path):

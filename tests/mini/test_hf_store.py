@@ -135,23 +135,25 @@ def test_publish_serves_with_content_type_from_extension(hf):
 
 
 def test_export_round_trips_over_the_bucket(hf, tmp_path: Path):
-    """A report bundle syncs as-is and fetches back — the publish→build handoff."""
+    """A report bundle syncs as-is; the HTML reads back and the assets serve — the publish→build handoff."""
     store, tag, created = hf
     key = f"_test/{tag}/report"
     src = tmp_path / "export"
     (src / "_assets").mkdir(parents=True)
     (src / "index.html").write_text(f'<img src="_assets/fig.png"> {tag}')
-    (src / "_assets" / "fig.png").write_bytes(b"\x89PNG\r\n\x1a\n" + tag.encode())
+    png = b"\x89PNG\r\n\x1a\n" + tag.encode()
+    (src / "_assets" / "fig.png").write_bytes(png)
 
-    assert store.fetch_export(key, tmp_path / "miss") is False  # nothing synced yet
+    assert store.read_export_html(key) is None  # nothing synced yet
     store.sync_export(src, key)
     created += [f"exports/{key}/index.html", f"exports/{key}/_assets/fig.png"]
 
-    dest = tmp_path / "pulled"
-    assert store.fetch_export(key, dest) is True
-    assert (dest / "index.html").read_text().endswith(tag)
-    assert (dest / "_assets" / "fig.png").read_bytes().endswith(tag.encode())
+    assert (store.read_export_html(key) or "").endswith(tag)
     assert store.export_base(key) == f"https://huggingface.co/buckets/{BUCKET}/resolve/exports/{key}/"
+    # The read pulls only the HTML, but the sync still has to have put the whole bundle
+    # up there — that's what the <base> points at. (Whether it serves *anonymously*
+    # depends on the bucket being public; see bucket_publish.)
+    assert store._remote_has(f"exports/{key}/_assets/fig.png")
 
 
 # -- publish tier on a dataset repo (the private-CAS / public-publish split, #38) -----
@@ -215,20 +217,20 @@ def test_export_round_trips_over_the_repo(hf_repo, tmp_path: Path):
     (src / "index.html").write_text(f'<img src="_assets/fig.png"> {tag}')
     (src / "_assets" / "fig.png").write_bytes(b"\x89PNG\r\n\x1a\n" + tag.encode())
 
-    assert store.fetch_export(key, tmp_path / "miss") is False  # nothing committed yet
+    assert store.read_export_html(key) is None  # nothing committed yet
     rev = store.sync_export(src, key)
     repo_paths += [f"exports/{key}/index.html", f"exports/{key}/_assets/fig.png"]
     assert rev is not None and re.fullmatch("[0-9a-f]{40}", rev)  # the revision a build pins to
 
-    dest = tmp_path / "pulled"
-    assert store.fetch_export(key, dest) is True
-    assert (dest / "index.html").read_text().endswith(tag)
-    assert (dest / "_assets" / "fig.png").read_bytes().endswith(tag.encode())
+    assert (store.read_export_html(key) or "").endswith(tag)
     assert store.export_base(key) == f"https://huggingface.co/datasets/{PUBLISH_REPO}/resolve/main/exports/{key}/"
-    assert (
-        store.export_base(key, revision=rev)
-        == f"https://huggingface.co/datasets/{PUBLISH_REPO}/resolve/{rev}/exports/{key}/"
-    )
+    pinned_base = f"https://huggingface.co/datasets/{PUBLISH_REPO}/resolve/{rev}/exports/{key}/"
+    assert store.export_base(key, revision=rev) == pinned_base
+    # The build never copies the assets, so the <base> has to reach them where they sit.
+    import requests
+
+    r = requests.get(f"{pinned_base}_assets/fig.png", timeout=30)
+    assert r.status_code == 200 and r.content.endswith(tag.encode())
 
 
 @repo_publish
@@ -250,8 +252,5 @@ def test_pinned_export_survives_a_republish(hf_repo, tmp_path: Path):
     rev2 = store.sync_export(src, key)
     assert rev1 != rev2
 
-    pinned, head = tmp_path / "pinned", tmp_path / "head"
-    assert store.fetch_export(key, pinned, revision=rev1) is True
-    assert (pinned / "index.html").read_text() == f"v1 {tag}"  # the pin still serves v1
-    assert store.fetch_export(key, head) is True
-    assert (head / "index.html").read_text() == f"v2 {tag}"  # only the mutable head moved
+    assert store.read_export_html(key, revision=rev1) == f"v1 {tag}"  # the pin still serves v1
+    assert store.read_export_html(key) == f"v2 {tag}"  # only the mutable head moved
