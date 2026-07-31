@@ -40,6 +40,16 @@ with app.setup(hide_code=True):
             metrics = json.loads(m_path.read_text())
         return metrics, arrays
 
+    def load_geometry() -> dict | None:
+        """The per-cell geometry pass, published under its own ref."""
+        store = project_store()
+        art = store.get_refs([ex.GEOMETRY_REF])[ex.GEOMETRY_REF]
+        if art is None:
+            return None
+        with tempfile.TemporaryDirectory() as d:
+            path = store.get_many([(art, Path(d) / "geometry.json")])[0]
+            return json.loads(path.read_text())
+
 
 @app.cell(hide_code=True)
 def _():
@@ -453,26 +463,137 @@ def _():
     mo.stop(_res is None, mo.md("_Results are not published yet; the analysis cells below render once they are._"))
     assert _res is not None
     metrics, arrays = _res
-    return
+    cells = {c["label"]: c for c in metrics["cells"]}
+    stats = metrics["corpus_stats"]
+
+    CONDS: list[str] = [c["name"] for c in ex.CONDITIONS]
+    ANCHORED = [c for c in CONDS if c != "lam0"]
+    # Matplotlib titles render LaTeX; an authored HTML table does not, so each
+    # condition carries a plain-text label as well as a marked-up one.
+    LABELS = {
+        "lam0": r"control",
+        "span-bare": r"span $\cdot$ bare",
+        "span-anti": r"span $\cdot$ anti",
+        "op1-bare": r"op1 $\cdot$ bare",
+        "op1-anti": r"op1 $\cdot$ anti",
+        "span-anti-late": r"late arm",
+        "span-anti-hi": r"ceiling arm",
+    }
+    LABELS_TXT = {k: v.replace(r"$\cdot$", "·") for k, v in LABELS.items()}
+
+    def over_seeds(cond: str, fn) -> np.ndarray:
+        """One value per seed for a condition, in seed order."""
+        return np.array([fn(cells[f"{cond}-s{s}"]) for s in ex.SEEDS])
+
+    def acc(cond: str, set_name: str = "named_holdout", key: str = "accuracy") -> np.ndarray:
+        return over_seeds(cond, lambda c: c["sets"][set_name][key])
+
+    def alpha_map(cond: str) -> np.ndarray:
+        """Seed-mean alignment map for a condition: (layers, colors, positions)."""
+        return np.mean([arrays[f"{cond}-s{s}/alpha"] for s in ex.SEEDS], axis=0)
+
+    def margin_map(cond: str) -> np.ndarray:
+        """Seed-mean margin map: (layers, positions)."""
+        return np.mean([arrays[f"{cond}-s{s}/margin"] for s in ex.SEEDS], axis=0)
+
+    def m_op1(cond: str) -> np.ndarray:
+        """Per-seed layer-mean margin at op1 — the statistic H2(a), H3 and H4 read."""
+        return over_seeds(cond, lambda c: c["m_op1"])
+
+    def alpha_bar(cond: str) -> np.ndarray:
+        """Per-seed mean alignment over all 216 colors at op1 — H4(a)'s containment statistic."""
+        return over_seeds(cond, lambda c: c["alpha_mean_op1"])
+
+    def traj(cond: str, seed: int, key: str) -> np.ndarray:
+        return np.asarray(cells[f"{cond}-s{seed}"]["traj"][key], dtype=float)
+
+    def grading(cond: str) -> tuple[np.ndarray, float, float]:
+        """The per-color response at op1 (seed-mean, layer-mean) with its two H2(b) statistics."""
+        a = alpha_map(cond)[:, :, 0].mean(axis=0)
+        return a, ex.spearman(a, ex.REDNESS), ex.r2_sim(a)
+
+    CONTROL_ACC = float(acc("lam0").mean())
+    TASK_CLEAN = {c: bool(abs(acc(c).mean() - CONTROL_ACC) <= ex.TASK_GATE) for c in CONDS}
+    geometry = load_geometry() or {}
+    return (
+        ANCHORED,
+        CONDS,
+        CONTROL_ACC,
+        LABELS,
+        LABELS_TXT,
+        TASK_CLEAN,
+        acc,
+        alpha_bar,
+        arrays,
+        cells,
+        geometry,
+        grading,
+        m_op1,
+        margin_map,
+        stats,
+        traj,
+    )
 
 
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
     ## Task cost (H1)
-
-    /// admonition | TODO: behavior table
-    The H1 table from ex-2.1.6, one row per condition plus the ex-2.1.3
-    `v216` reference and the published ex-2.1.6 λ=0.1 row: seen and
-    held-out exact match, held-out NLL, `open` guess distance, the signed
-    gap to control, and the gate verdict. Expected: every λ=0.1 row within
-    0.02 of control, replicating H1. The ceiling arm is where a cost would
-    first appear, and a clean ceiling arm would say the task tolerates the
-    recipe at 10× the scoring weight. Contrary: a cost in the anti
-    conditions but not `span-bare` would mean the repulsive term, not the
-    anchor, is what the task feels.
-    ///
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
+    # Two external references, both published: ex-2.1.3's v216 cell (the un-anchored
+    # testbed this is all built on) and ex-2.1.6's λ=0.1 condition, which `span-bare`
+    # re-runs. Neither is a condition of this sweep.
+    _REFS = [
+        ("ex-2.1.3 <code>v216</code>", {"seen": 1.000, "hold": 0.9948, "nll": 0.0245, "open": 0.1414}),
+        ("ex-2.1.6 λ<sub>a</sub> = 0.1", {"seen": 1.000, "hold": 0.9974, "nll": 0.0167, "open": 0.1295}),
+    ]
+
+    def _cell(cond: str, set_name: str, key: str, fmt: str = "{:.3f}") -> str:
+        v = acc(cond, set_name, key)
+        return f"{fmt.format(v.mean())} <span class='range'>±{(v.max() - v.min()) / 2:.3f}</span>"
+
+    _rows = "".join(
+        f"<tr><th>{LABELS_TXT[c]}</th>"
+        f"<td class='num'>{_cell(c, 'named_seen', 'accuracy')}</td>"
+        f"<td class='num'>{_cell(c, 'named_holdout', 'accuracy')}</td>"
+        f"<td class='num'>{_cell(c, 'named_holdout', 'nll')}</td>"
+        f"<td class='num'>{_cell(c, 'open', 'guess_dist')}</td>"
+        f"<td class='num'>{acc(c).mean() - CONTROL_ACC:+.3f}</td>"
+        f"<td>{'clean' if TASK_CLEAN[c] else 'not clean'}</td></tr>"
+        for c in CONDS
+    )
+    _ref_rows = "".join(
+        f"<tr class='ref'><th>{name}</th>"
+        f"<td class='num'>{r['seen']:.3f}</td><td class='num'>{r['hold']:.3f}</td>"
+        f"<td class='num'>{r['nll']:.3f}</td><td class='num'>{r['open']:.3f}</td>"
+        f"<td class='num'>—</td><td>reference</td></tr>"
+        for name, r in _REFS
+    )
+    _table = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr>
+        <th>condition</th><th class="num">seen EM</th><th class="num">holdout EM</th>
+        <th class="num">holdout NLL</th><th class="num"><code>open</code> dist</th>
+        <th class="num">Δ holdout EM</th><th>H1 gate</th>
+      </tr></thead>
+      <tbody>{_ref_rows}{_rows}</tbody>
+    </table></div>
+    """
+    _caption = f"""
+    Behavior by condition. Each cell is the seed mean, with half the seed range
+    beside it. EM is exact match on the answer token. NLL is the surprise of
+    that token in nats. <code>open</code> dist is the RGB distance from the
+    guessed color to the true mix, on pairs with no named answer. Δ holdout EM
+    is the signed gap to the in-experiment control, and the last column reports
+    the H1 gate, which passes when that gap is within {ex.TASK_GATE:g}. The two
+    top rows are published cells from earlier experiments, shown for comparison.
+    """
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
 
 
@@ -480,26 +601,129 @@ def _():
 def _():
     mo.md(r"""
     ## Selectivity (H2)
-
-    /// admonition | TODO: margin by condition
-    A dot-and-range plot of $m_{\text{op1}}$ per condition (per-seed dots,
-    seed-mean bar), with the 0.5 gate, the 0.35 partial line, and the
-    published ex-2.1.6 value of 0.27 as a reference line. Expected: `span-anti` at
-    or above the gate; `span-bare` reproducing 0.27. Contrary: all four
-    conditions in a band around 0.27, meaning neither mechanism was the
-    bottleneck.
-    ///
-
-    /// admonition | TODO: grading scatter
-    Per-color response at op1 against redness for the passing condition (or
-    the best one, if none passes), colored by the colors themselves, with the
-    windowed mean and the two track statistics (ρ, R²) beside their gates.
-    Expected: a graded rise, not a step at the label threshold. Contrary: a
-    step would say the anchor caught the labeled exemplars rather than
-    *red*; in that case the flattened-affinity follow-up already queued in
-    `todo-science.md` becomes more pressing.
-    ///
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, LABELS, m_op1):
+    _EX216_MARGIN = 0.2732  # the published ex-2.1.6 λ=0.1 value `span-bare` re-runs
+    _m: dict[str, np.ndarray] = {c: m_op1(c) for c in CONDS}
+
+    @themed(
+        name="margin-by-condition",
+        alt_text="""
+            Per-seed margin at op1 for each of the seven conditions, with the
+            seed mean drawn as a bar. Reference rules mark the 0.5 gate, the
+            0.35 partial level, and the published ex-2.1.6 value of 0.27.
+        """,
+        caption=rf"""
+            The statistic H2(a) scores: $m_{{\text{{op1}}}}$, the layer-mean
+            alignment margin at the first operand. One dot per seed, with the
+            seed mean as the heavy bar. The solid rule is the H2(a) gate of
+            {ex.MARGIN_GATE:g} and the dashed rule the {0.35:g} partial; the dotted
+            rule is the published ex-2.1.6 value of {_EX216_MARGIN:.2f}, which the
+            <code>span-bare</code> condition re-runs. The four factorial
+            conditions are drawn solid, the two arms hollow, and the control grey.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, ax = plt.subplots(figsize=(7.2, 3.4))
+        _ink = dict(zip(CONDS, light_dark(
+            ["#999", "#f2b134", "#c1332a", "#e08a2e", "#7a2320", "#3d7ea6", "#5c3d8f"],
+            ["#888", "#ffcc66", "#f0665a", "#ffab5e", "#b8564d", "#6ab0d4", "#a78bd6"],
+        ), strict=True))  # fmt: skip
+        for i, cond in enumerate(CONDS):
+            v, color = _m[cond], _ink[cond]
+            arm = cond in ("span-anti-late", "span-anti-hi")
+            ax.plot([i - 0.28, i + 0.28], [v.mean()] * 2, color=color, lw=3, solid_capstyle="round", zorder=3)
+            ax.scatter(
+                np.full(len(v), i), v, s=26, zorder=4, color="none" if arm else color,
+                edgecolors=color, lw=1.4,
+            )  # fmt: skip
+        _grey = light_dark("#999", "#777")
+        ax.axhline(ex.MARGIN_GATE, color=_grey, lw=1.0)
+        ax.axhline(0.35, color=_grey, lw=0.9, ls=(0, (4, 3)))
+        ax.axhline(_EX216_MARGIN, color=_grey, lw=0.9, ls=(0, (1, 2)))
+        ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
+        ax.annotate("H2(a) gate", (len(CONDS) - 0.4, ex.MARGIN_GATE), fontsize=7.5, va="bottom", ha="right",
+                    color=light_dark("#444", "#bbb"))  # fmt: skip
+        ax.annotate("ex-2.1.6", (len(CONDS) - 0.4, _EX216_MARGIN), fontsize=7.5, va="bottom", ha="right",
+                    color=light_dark("#444", "#bbb"))  # fmt: skip
+        ax.set_xticks(range(len(CONDS)), [LABELS[c] for c in CONDS], fontsize=8.5)
+        ax.set_xlim(-0.6, len(CONDS) - 0.4)
+        ax.set_ylabel(r"$m_{\text{op1}}$")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(LABELS, grading, m_op1):
+    _factorial: list[str] = list(ex.FACTORIAL)
+    _resp: dict[str, tuple[np.ndarray, float, float]] = {c: grading(c) for c in [*_factorial, "lam0"]}
+    _order = np.argsort(ex.REDNESS)
+
+    def _windowed(y: np.ndarray, k: int = 25) -> np.ndarray:
+        """Mean of *y* over a sliding window of the redness ordering."""
+        pad = np.pad(y[_order], (k // 2, k // 2), mode="edge")
+        return np.convolve(pad, np.ones(k) / k, mode="valid")
+
+    @themed(
+        name="grading",
+        alt_text="""
+            Four panels, one per factorial condition, showing the per-color
+            alignment at the first operand against the redness of that color.
+            The two bare conditions lift the whole cube well above the control;
+            the two anti conditions hold most colors near the control and raise
+            only the reddest ones.
+        """,
+        caption=r"""
+            Alignment at op1, per color: $\alpha_c$, the layer mean of
+            $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the
+            redness of the color. One mark per color, drawn in that color; the
+            heavy line is a 25-color sliding mean over the redness ordering, and
+            the flat grey band underneath is the same sliding mean for the
+            control. The grading statistics and $m_{\text{op1}}$ are quoted per
+            panel; both H2(b) gates sit at 0.8. The panels are the 2×2: pull
+            span across, repulsive term down.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        from typing import cast
+
+        from mini.vis import AxesGrid
+
+        fig, axes = plt.subplots(2, 2, figsize=(7.4, 5.4), sharey=True, sharex=True)
+        axes = cast(AxesGrid, axes)
+        _ctrl = _windowed(_resp["lam0"][0])
+        _grid = [["span-bare", "span-anti"], ["op1-bare", "op1-anti"]]
+        for row, conds in zip(axes, _grid, strict=True):
+            for ax, cond in zip(row, conds, strict=True):
+                a, rho, r2 = _resp[cond]
+                ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
+                ax.plot(
+                    ex.REDNESS[_order], _ctrl, color=light_dark("#999", "#777"), lw=3, alpha=0.5, zorder=1,
+                    solid_capstyle="round",
+                )  # fmt: skip
+                ax.scatter(ex.REDNESS, a, c=ex.GRID_RGB, s=18, lw=0.4, zorder=3,
+                           edgecolors=light_dark("#00000033", "#ffffff55"))  # fmt: skip
+                ax.plot(ex.REDNESS[_order], _windowed(a), color=light_dark("#222", "#eee"), lw=1.6, zorder=4)
+                ax.set_title(LABELS[cond], fontsize=10)
+                ax.annotate(
+                    f"ρ = {rho:.2f}\nR² = {r2:.2f}\n$m$ = {m_op1(cond).mean():.2f}",
+                    (0.03, 0.97), xycoords="axes fraction", va="top", fontsize=8,
+                    color=light_dark("#444", "#bbb"),
+                )  # fmt: skip
+        for ax in axes[1]:
+            ax.set_xlabel("redness of op1")
+        for ax in axes[:, 0]:
+            ax.set_ylabel(r"$\alpha_c$ at op1")
+        axes[0, 0].set_ylim(-0.25, 1.25)  # headroom for the per-panel statistics
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -507,17 +731,59 @@ def _():
 def _():
     mo.md(r"""
     ## Attribution (H3)
-
-    /// admonition | TODO: the 2×2
-    The factorial as a 2×2 table of $m_{\text{op1}}$ (seed mean ± half range per
-    condition) with the two main effects and the interaction in the margins.
-    Expected: the anti-subspace main effect ≥ 0.1 and ≥ the op1-only effect. H3
-    names a reading for the pass and for each contrary outcome; state which one
-    obtained and carry it to the discussion. If the outcome is none of them
-    (both effects below 0.1 with no interaction), that is the null: neither
-    mechanism was the bottleneck.
-    ///
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(m_op1):
+    def _effects(stat) -> dict[str, float]:
+        """The 2×2 read as main effects and an interaction, on any per-condition statistic."""
+        sb, sa, ob, oa = (float(np.mean(stat(c))) for c in ("span-bare", "span-anti", "op1-bare", "op1-anti"))
+        return {
+            "span-bare": sb, "span-anti": sa, "op1-bare": ob, "op1-anti": oa,
+            "anti": (sa + oa) / 2 - (sb + ob) / 2,   # adding the repulsive term, averaged over spans
+            "op1": (ob + oa) / 2 - (sb + sa) / 2,    # narrowing the pull, averaged over terms
+            "interaction": (sb + oa) - (sa + ob),
+        }  # fmt: skip
+
+    _e: dict[str, float] = _effects(m_op1)
+
+    def _c(cond: str) -> str:
+        v = m_op1(cond)
+        return f"{v.mean():.3f} <span class='range'>±{(v.max() - v.min()) / 2:.3f}</span>"
+
+    _table = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr>
+        <th></th><th class="num">bare</th><th class="num">+ anti-subspace</th>
+        <th class="num">span effect</th>
+      </tr></thead>
+      <tbody>
+        <tr><th>span pull</th><td class="num">{_c("span-bare")}</td>
+            <td class="num">{_c("span-anti")}</td><td class="num">—</td></tr>
+        <tr><th>op1-only pull</th><td class="num">{_c("op1-bare")}</td>
+            <td class="num">{_c("op1-anti")}</td><td class="num">—</td></tr>
+        <tr class="ref"><th>anti effect</th><td class="num">—</td><td class="num">—</td>
+            <td class="num">interaction</td></tr>
+        <tr class="ref"><th>main effects</th><td class="num" colspan="2">
+            anti {_e["anti"]:+.3f} &nbsp;&nbsp; op1-only {_e["op1"]:+.3f}</td>
+            <td class="num">{_e["interaction"]:+.3f}</td></tr>
+      </tbody>
+    </table></div>
+    """
+    _caption = f"""
+    The factorial on $m_{{\\text{{op1}}}}$. Body cells are seed means with half
+    the seed range beside them. A main effect is the mean of the two conditions
+    carrying a factor minus the mean of the two without it, so the anti effect
+    is how much the repulsive term is worth averaged over both pull spans, and
+    the op1-only effect is how much narrowing the pull is worth averaged over
+    both terms. The interaction is what the two together buy beyond their sum.
+    H3 asks the anti effect to reach {ex.MAIN_EFFECT_GATE:g} and to be at least
+    as large as the op1-only effect; the noise on a main effect is about
+    {ex.NOISE_SEED_MEAN:g}.
+    """
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
 
 
@@ -525,31 +791,269 @@ def _():
 def _():
     mo.md(r"""
     ## Containment and dynamics (H4)
-
-    /// admonition | TODO: mean alignment and margin trajectories
-    Two panels per condition family, x = epoch.
-    Left: $\bar\alpha$ at op1 with the 0.1 containment gate, the 0.25 partial
-    level, and the ex-2.1.6 bare-term endpoint (0.53) marked.
-    Right: $m_{\text{op1}}$ with its running maximum, the 0.8× retention band,
-    and both weight schedules behind it.
-    Expected: anti conditions hold $\bar\alpha$ low from the start (the term
-    opens at $2.5\lambda_\text{a}$), and the margin holds its peak instead of
-    sliding.
-    Contrary: $\bar\alpha$ climbing after epoch 50 would say the
-    $0.03\lambda_\text{a}$ hold ratio is too weak once the anneal ends. The
-    timing arm is positioned to test that, since it keeps the weight up through
-    epoch 90.
-    ///
-
-    /// admonition | TODO: per-layer and geometry read
-    The margin by layer × position for `span-anti` beside `span-bare` (the
-    ex-2.1.6 figure, with one new column), and the preregistered geometry:
-    centroid·anchor and extent per layer.
-    Expected: centroid alignment near the control value (0.02 in ex-2.1.6)
-    rather than the bare-term 0.89 at mid-stack. No gate; this is the mechanism
-    picture behind H4(a).
-    ///
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ANCHORED, CONDS, LABELS, traj):
+    _EX216_ALPHA = 0.5257  # the published ex-2.1.6 λ=0.1 endpoint for ᾱ
+
+    def _mean_traj(cond: str, key: str) -> np.ndarray:
+        return np.mean([traj(cond, s, key) for s in ex.SEEDS], axis=0)
+
+    @themed(
+        name="trajectories",
+        alt_text="""
+            Two panels against epoch. Left: the mean alignment over all colors,
+            with the containment gate at 0.1, the partial level at 0.25, and the
+            ex-2.1.6 bare-term endpoint at 0.53. Right: the alignment margin,
+            with the 0.2 scoring floor. One line per condition, averaged over
+            seeds.
+        """,
+        caption=rf"""
+            How the two quantities move during training, measured every
+            {ex.TRAJ_STRIDE} steps and averaged over seeds. Left:
+            $\bar\alpha$, the mean alignment over all 216 colors at op1 — what ran
+            away in ex-2.1.6, and what H4(a) asks the repulsive term to contain
+            below {ex.MEAN_ALIGN_GATE:g} (solid rule). The dashed rule is the
+            {ex.MEAN_ALIGN_PARTIAL:g} partial and the dotted one the published
+            ex-2.1.6 endpoint of {_EX216_ALPHA:.2f}. Right:
+            $m_{{\text{{op1}}}}$, with the H4(b) scoring floor of {ex.H4_FLOOR:g}
+            dashed; a run whose running maximum never reaches it is reported but
+            not scored. The pale band behind both panels is the anchor weight as
+            a fraction of its peak, so its descent marks the end-of-training
+            anneal.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        from typing import cast
+
+        from mini.vis import AxesRow
+
+        fig, axes = plt.subplots(1, 2, figsize=(9.0, 3.4))
+        axes = cast(AxesRow, axes)
+        _ink = dict(zip(CONDS, light_dark(
+            ["#999", "#f2b134", "#c1332a", "#e08a2e", "#7a2320", "#3d7ea6", "#5c3d8f"],
+            ["#888", "#ffcc66", "#f0665a", "#ffab5e", "#b8564d", "#6ab0d4", "#a78bd6"],
+        ), strict=True))  # fmt: skip
+        _grey = light_dark("#999", "#777")
+        epochs = _mean_traj("span-anti", "epoch")
+        weight = _mean_traj("span-anti", "weight")
+        for ax, key, ylabel in (
+            (axes[0], "alpha_op1", r"$\bar\alpha$ at op1"),
+            (axes[1], "m_op1", r"$m_{\text{op1}}$"),
+        ):
+            twin = ax.twinx()
+            twin.fill_between(epochs, weight / weight.max(), color=light_dark("#0000000d", "#ffffff12"), lw=0)
+            twin.set_ylim(0, 1.05)
+            twin.set_yticks([])
+            for cond in CONDS:
+                ax.plot(
+                    epochs, _mean_traj(cond, key), color=_ink[cond], lw=1.6 if cond in ex.FACTORIAL else 1.2,
+                    ls="-" if cond in ex.FACTORIAL or cond == "lam0" else (0, (4, 3)), label=LABELS[cond], zorder=3,
+                )  # fmt: skip
+            ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
+            ax.set_xlabel("epoch")
+            ax.set_ylabel(ylabel)
+            ax.set_xlim(0, ex.SCHEDULER.epochs)
+        axes[0].axhline(ex.MEAN_ALIGN_GATE, color=_grey, lw=1.0)
+        axes[0].axhline(ex.MEAN_ALIGN_PARTIAL, color=_grey, lw=0.9, ls=(0, (4, 3)))
+        axes[0].axhline(_EX216_ALPHA, color=_grey, lw=0.9, ls=(0, (1, 2)))
+        axes[1].axhline(ex.H4_FLOOR, color=_grey, lw=0.9, ls=(0, (4, 3)))
+        axes[0].legend(fontsize=7.5, frameon=False, ncols=2, loc="upper left")
+        _top = max(np.max(_mean_traj(c, "alpha_op1")) for c in ANCHORED)
+        axes[0].set_ylim(-0.1, max(0.75, _top * 1.35))  # headroom for the legend
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(ANCHORED, LABELS_TXT, alpha_bar, traj):
+    # H4 as a scored table: containment per condition, retention per run. The
+    # retention gate is per *run*, so its column counts runs rather than averaging.
+    def _retention(cond: str) -> tuple[list[float], int]:
+        ratios, below = [], 0
+        for s in ex.SEEDS:
+            m = traj(cond, s, "m_op1")
+            if m.max() >= ex.H4_FLOOR:
+                ratios.append(float(m[-1] / m.max()))
+            else:
+                below += 1
+        return ratios, below
+
+    def _row(cond: str) -> str:
+        a = alpha_bar(cond)
+        ratios, below = _retention(cond)
+        anti = any(c["name"] == cond and c["anti"] for c in ex.CONDITIONS)
+        scored = anti and cond != "span-anti-hi"  # H4(a) scopes to the λ_a = 0.1 anti conditions
+        gate = "—" if not scored else ("pass" if a.mean() <= ex.MEAN_ALIGN_GATE else "fail")
+        if scored and gate == "fail" and a.mean() <= ex.MEAN_ALIGN_PARTIAL:
+            gate = "partial"
+        r_txt = ", ".join(f"{r:.2f}" for r in ratios) if ratios else f"below floor ({below}/{len(ex.SEEDS)})"
+        r_gate = "—" if not ratios else ("pass" if min(ratios) >= ex.H4_RETENTION else "fail")
+        return (
+            f"<tr><th>{LABELS_TXT[cond]}</th>"
+            f"<td class='num'>{a.mean():.3f} <span class='range'>±{(a.max() - a.min()) / 2:.3f}</span></td>"
+            f"<td>{gate}</td><td class='num'>{r_txt}</td><td>{r_gate}</td></tr>"
+        )
+
+    _table = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr>
+        <th>condition</th><th class="num">ᾱ at op1</th><th>H4(a)</th>
+        <th class="num">retention, per seed</th><th>H4(b)</th>
+      </tr></thead>
+      <tbody>{"".join(_row(c) for c in ANCHORED)}</tbody>
+    </table></div>
+    """
+    _caption = f"""
+    The two H4 gates. ᾱ is the end-of-training mean alignment over all 216
+    colors at op1, seed mean with half the seed range. H4(a) scores the
+    λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} anti conditions against a ceiling of
+    {ex.MEAN_ALIGN_GATE:g}, with <em>partial</em> marking a condition that clears
+    the {ex.MEAN_ALIGN_PARTIAL:g} level without reaching it. Retention is each
+    run's final margin over its running maximum; runs whose maximum never
+    reaches {ex.H4_FLOOR:g} are reported but not scored, and H4(b) passes when
+    every scored run holds {ex.H4_RETENTION:g}× its peak.
+    """
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, LABELS, arrays, geometry, margin_map):
+    _by_layer = {c: margin_map(c)[:, 0] for c in CONDS}
+    _seeds = {c: np.array([arrays[f"{c}-s{s}/margin"][:, 0] for s in ex.SEEDS]) for c in CONDS}
+    _dot = {c: np.mean([geometry[f"{c}-s{s}"]["centre_dot_anchor"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    _spread = {c: np.mean([geometry[f"{c}-s{s}"]["spread"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    _depths = np.arange(len(_by_layer["lam0"]))
+
+    @themed(
+        name="by-layer",
+        alt_text="""
+            Three panels against layer depth. Left: the margin at the first
+            operand by layer, one line per condition. Middle: the cosine between
+            the centre of the 216-color cloud and the anchor direction. Right:
+            the extent of that cloud.
+        """,
+        caption=r"""
+            The mechanism picture behind H4(a), per layer, seed means. Depth 0 is
+            the token embedding and depth 4 the last block's output. Left: the
+            margin at op1 by layer — the per-depth terms whose mean is
+            $m_{\text{op1}}$; the shaded band around the control is its seed
+            min–max, as the scale of a null. Middle: the cosine between the
+            centre of the 216 op1 states and the anchor direction — where the
+            cloud sits. Right: the extent of that cloud, the mean squared
+            distance of a color from the centre (states are unit-norm, so this
+            runs from 0 for a collapsed cloud to 1 for a spread one). The
+            repulsive term acts on the middle panel by construction; the right
+            panel is what it costs.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        from typing import cast
+
+        from mini.vis import AxesRow
+
+        fig, axes = plt.subplots(1, 3, figsize=(9.6, 3.2))
+        axes = cast(AxesRow, axes)
+        _ink = dict(zip(CONDS, light_dark(
+            ["#999", "#f2b134", "#c1332a", "#e08a2e", "#7a2320", "#3d7ea6", "#5c3d8f"],
+            ["#888", "#ffcc66", "#f0665a", "#ffab5e", "#b8564d", "#6ab0d4", "#a78bd6"],
+        ), strict=True))  # fmt: skip
+        band = _seeds["lam0"]
+        axes[0].fill_between(_depths, band.min(0), band.max(0), color=_ink["lam0"], alpha=0.25, lw=0)
+        panels = ((axes[0], _by_layer, r"$m$ at op1"), (axes[1], _dot, "centre · anchor"),
+                  (axes[2], _spread, "extent of the cloud"))  # fmt: skip
+        for ax, data, title in panels:
+            for cond in CONDS:
+                ax.plot(
+                    _depths, data[cond], color=_ink[cond], marker="o", ms=3.5,
+                    lw=1.8 if cond in ex.FACTORIAL else 1.3,
+                    ls="-" if cond in ex.FACTORIAL or cond == "lam0" else (0, (4, 3)), label=LABELS[cond],
+                )  # fmt: skip
+            ax.set_title(title, fontsize=10)
+            ax.set_xticks(_depths)
+            ax.set_xlabel("layer (0 = embedding)")
+            ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
+        axes[2].set_ylim(0, 1.0)
+        axes[0].legend(fontsize=7, frameon=False, ncols=2, loc="upper right")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ## Secondary measurements
+
+    Where redness is readable is carried over from ex-2.1.6 without a gate.
+    The question it answers is whether the anchor axis holds a *copy* of the
+    concept or the concept itself: in ex-2.1.6, projecting the anchor direction
+    out left redness as readable from the other 63 directions as in the control,
+    which is what a copy looks like. The repulsive term pushes unlabeled colors
+    off the axis, so it acts on exactly this quantity.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, LABELS, cells):
+    _leak = {c: np.mean([cells[f"{c}-s{s}"]["leak_r2"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    _axis = {c: np.mean([cells[f"{c}-s{s}"]["axis_r2"] for s in ex.SEEDS], axis=0) for c in CONDS}
+    _depths = np.arange(len(_leak["lam0"]))
+
+    @themed(
+        name="leakage",
+        alt_text="""
+            Two panels against layer depth. Left: how well redness can be read
+            from the residual stream once the anchor direction is projected out,
+            for each condition. Right: how much of the redness variance the
+            anchor component carries on its own.
+        """,
+        caption=r"""
+            Where redness is readable at op1. Left: held-out R² for a ridge probe
+            that predicts redness from the residual stream at op1, with the
+            $\hat v_{\text{red}}$ component removed first — how well *red* can
+            still be read from the other 63 directions. Right: the same target
+            predicted from the anchor component alone, as squared correlation.
+            Per-layer seed means. The sample is the 216 op1 colors, with a 5-fold
+            split so no color is scored by a probe that saw it during fitting.
+            Neither panel has a pass/fail threshold.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        from typing import cast
+
+        from mini.vis import AxesRow
+
+        fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.0), sharey=True)
+        axes = cast(AxesRow, axes)
+        _ink = dict(zip(CONDS, light_dark(
+            ["#999", "#f2b134", "#c1332a", "#e08a2e", "#7a2320", "#3d7ea6", "#5c3d8f"],
+            ["#888", "#ffcc66", "#f0665a", "#ffab5e", "#b8564d", "#6ab0d4", "#a78bd6"],
+        ), strict=True))  # fmt: skip
+        for ax, data, title in ((axes[0], _leak, "off the anchor axis"), (axes[1], _axis, "on the anchor axis")):
+            for cond in CONDS:
+                ax.plot(
+                    _depths, data[cond], color=_ink[cond], marker="o", ms=3.5,
+                    lw=1.8 if cond in ex.FACTORIAL else 1.3,
+                    ls="-" if cond in ex.FACTORIAL or cond == "lam0" else (0, (4, 3)), label=LABELS[cond],
+                )  # fmt: skip
+            ax.set_title(title, fontsize=10)
+            ax.set_xticks(_depths)
+            ax.set_xlabel("layer (0 = embedding)")
+            ax.set_ylim(-0.05, 1.0)
+        axes[0].set_ylabel("R² for redness")
+        axes[0].legend(fontsize=7, frameon=False, ncols=2, loc="lower left")
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -557,22 +1061,6 @@ def _():
 def _():
     mo.md(r"""
     ## Arms
-
-    /// admonition | TODO: timing arm
-    `span-anti-late` against `span-anti`, on the H2 margin and the H4
-    trajectories. If they agree within noise, the M1 recipe is robust to a
-    2× stretch of its anneal and the timing question can rest. A gap in
-    either direction says schedule timing matters, and its size would size
-    the dedicated sweep. Report descriptively; no gate.
-    ///
-
-    /// admonition | TODO: ceiling arm
-    `span-anti-hi` ($\lambda_\text{a} = 1$, $\lambda_{\bar{\text{s}}}$
-    scaled with it) in the H1 table and on the margin plot. The first rung at
-    which the task pushes back sets the weight budget for the D2.2 operation
-    anchors. If this rung is still free, note that the ceiling remains unfound
-    and leave chasing it to a dedicated sweep.
-    ///
     """)
     return
 
