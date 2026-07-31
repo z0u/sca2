@@ -163,18 +163,26 @@ CONTROL_MARGIN_GATE = 0.1
 MAIN_EFFECT_GATE = 0.1
 """H3: the smallest margin main effect scored as real — ~3× the noise on a main effect.
 
-A main effect is a difference of two two-cell means, so its noise is about the
-same as a single three-seed mean (`NOISE_SEED_MEAN`), and 0.1 / 0.032 ≈ 3.
+A main effect is a difference of two two-condition means, so its noise is about
+the same as a single three-seed mean (`NOISE_SEED_MEAN`), and 0.1 / 0.032 ≈ 3.
 """
 
-MEAN_ALIGN_GATE = 0.25
-"""H4(a): ceiling on the mean alignment over all colors at op1 in the anti cells.
+MEAN_ALIGN_GATE = 0.1
+"""H4(a): ceiling on the mean alignment over all colors at op1 in the anti conditions.
 
-Ex-2.1.6's bare term reached 0.53 at this rung, against 0.008 in its control —
-this statistic averages over 216 colors and 5 layers, so an unanchored cloud
-sits near zero rather than at the 1/8 spread of a single cosine. The gate asks
-the anti-subspace term to hold the drift to about half the bare value while
-leaving room for a genuinely red-selective component to lift the mean a little.
+Ex-2.1.6's bare term reached 0.53 at this rung, against 0.008 in its control
+(seed spread ≈ 0.02) — this statistic averages over 216 colors and 5 layers,
+so an unanchored cloud sits near zero rather than at the 1/8 spread of a
+single cosine. Working repulsion should push the mean to near-control levels:
+0.1 is a fifth of the bare value and still five noise units above control, so
+a working mechanism passes comfortably and a merely-weakened runaway does not.
+"""
+
+MEAN_ALIGN_PARTIAL = 0.25
+"""H4(a) partial: the earlier halving-level gate, kept as a named partial.
+
+Clearing 0.25 without reaching `MEAN_ALIGN_GATE` reads as repulsion weakening
+the runaway without containing it.
 """
 
 H4_FLOOR = 0.2

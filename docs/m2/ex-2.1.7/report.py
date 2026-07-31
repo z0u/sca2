@@ -1,7 +1,8 @@
 import marimo
 
-__generated_with = "0.23.14"
+__generated_with = "0.23.15"
 app = marimo.App(
+    width="medium",
     app_title="Ex 2.1.7: a repulsive term and a narrower pull",
     css_file="../../report.css",
     auto_download=["html"],
@@ -53,19 +54,21 @@ def _():
     tell them apart.
 
     First, nothing repelled the rest of the cube. M1 never ran its anchor
-    bare: it also used an *anti-subspace* term, at a few percent of the
-    anchor weight, which constrained the mean-square alignment of every
-    point. That is exactly the quantity that ran away in ex-2.1.6.
+    bare: it also used an indiscriminate *anti-subspace* term, at a few
+    percent of the anchor weight, which penalized the average squared
+    alignment between the anchor direction and every representation in the
+    batch — a gentle, global pressure keeping the cloud as a whole off the
+    axis. That average is exactly the quantity that ran away in ex-2.1.6.
 
     Second, most of the pull was blind. The anchor pulled four prompt
     positions of each labeled equation, and three of them (`+`, op2, `=`)
     carry no information about which color sits at op1. At those positions
     the label is an unobservable coin flip. Only the expected pull is
     visible to the optimizer, and the expected pull is nearly
-    color-independent: a drift toward the anchor by construction.
+    color-independent.
 
     This experiment separates the two with a 2×2 factorial at the ex-2.1.6
-    scoring rung ($\lambda = 0.1$): {bare anchor, anchor + anti-subspace} ×
+    scoring rung ($\lambda_\text{a} = 0.1$): {bare anchor, anchor + anti-subspace} ×
     {four-position span pull, op1-only pull}. If the anti-subspace factor
     restores the margin, missing repulsion was the problem; if the op1-only
     factor does, the blind span was; if only the combination does, they
@@ -78,11 +81,20 @@ def _():
     ///
 
     /// details | Notation
-    Notation carries over from ex-2.1.6: $\hat v_{\text{red}}$ is the anchor
-    direction, $\lambda$ the anchor weight, $\ell$ indexes layers, $m$ is the
-    alignment margin, and a **condition** crossed with a seed is a **cell**.
-    New here: $\mu$ is the anti-subspace weight, always given relative to
-    $\lambda$ as the ratio $\mu / \lambda$.
+    Notation carries over from ex-2.1.6, with loss weights now subscripted
+    by their term. New here: the bar in $\lambda_{\bar{\text{s}}}$ marks a
+    repulsive term, whose weight is always given relative to the anchor as
+    the ratio $\lambda_{\bar{\text{s}}} / \lambda_\text{a}$.
+
+    | symbol | meaning |
+    | --- | --- |
+    | $\hat v_{\text{red}}$ | the anchor direction |
+    | $\lambda_\text{a}$ | anchor weight (ex-2.1.6's bare $\lambda$) |
+    | $\lambda_{\bar{\text{s}}}$ | anti-subspace weight |
+    | $\ell$ | layer index |
+    | $m$, $m_{\text{op1}}$ | alignment margin; its layer mean at op1 |
+    | $\bar\alpha$ | mean alignment with $\hat v_{\text{red}}$ over all 216 colors, layer-averaged at op1 |
+    | **cell** | a **condition** crossed with a seed |
     ///
     """)
     return
@@ -118,37 +130,46 @@ def _():
     set. The measurements are also the same: the alignment map over layers ×
     positions, the label-affinity-weighted margin, off-axis leakage probes,
     and the margin trajectory every 50 steps. The [ex-2.1.6
-    report](../ex-2.1.6/report.py) documents each; only what changes is
+    report](../ex-2.1.6/report.py) documents each; only the changes are
     described below.
 
-    One measurement is promoted rather than new. The exploratory geometry
-    pass from ex-2.1.6 (per layer: the centroid of the 216 op1 states, its
-    alignment with the anchor, and the extent of the cloud) is preregistered
-    here, because H4 scores part of it. The mean alignment over all colors,
-    $\bar\alpha$, is likewise recorded at every trajectory checkpoint beside
-    the margin. In ex-2.1.6 it was added as an unscored diagnostic and
-    turned out to be what the result was about.
+    One measurement is promoted: The exploratory geometry pass from ex-2.1.6
+    (per layer: the centroid of the 216 op1 states, its alignment with the
+    anchor, and the extent of the cloud) is preregistered here, because H4
+    scores part of it. The mean alignment over all colors, $\bar\alpha$, is
+    likewise recorded at every trajectory checkpoint beside the margin. In
+    ex-2.1.6 it was added as an unscored diagnostic, and it turned out to be
+    important.
 
-    ### The factorial
+    ### The sweep
 
-    All four cells run at $\lambda = 0.1$, the scoring rung of ex-2.1.6,
-    chosen there because every rung was task-clean and 0.1 sat in the middle
-    of the swept range. The control ($\lambda = 0$) and the `span-bare` cell
-    reproduce the ex-2.1.6 control and its λ=0.1 condition. So every
-    comparison in this report is between cells that went through identical
-    code, and the published ex-2.1.6 numbers double as a replication check.
+    All four conditions run at $\lambda_\text{a} = 0.1$, the scoring rung
+    of ex-2.1.6, reused here by default: every rung was task-clean and 0.1
+    sat in the middle of the swept range. The control
+    ($\lambda_\text{a} = 0$) and the `span-bare` condition reproduce the
+    ex-2.1.6 control and its $\lambda_\text{a} = 0.1$ condition. So every
+    comparison in this report is between conditions that went through
+    identical code, and the published ex-2.1.6 numbers double as a
+    replication check.
 
-    **Factor one: the anti-subspace term.** The `anti` cells add the M1
-    repulsive term to the loss at weight $\mu$:
+    **Factor one: the anti-subspace term.** The `anti` conditions add the
+    M1 repulsive term to the loss at weight $\lambda_{\bar{\text{s}}}$:
 
-    $$L_{\text{anti}} = \operatorname{mean}\,\cos^2(h, \hat v_{\text{red}})$$
+    $$\lambda_{\bar{\text{s}}}\, \mathcal{L}_{\bar{\text{s}}}, \qquad
+    \mathcal{L}_{\bar{\text{s}}} = \operatorname{mean}\,\cos^2(h, \hat v_{\text{red}})$$
 
     where the mean runs over every residual-stream slice and every non-pad
-    position of the batch: every line, labeled or not. The term penalizes
-    the mean-square alignment of everything, so the labeled pull has to buy
-    alignment against a headwind. That is the selectivity pressure ex-2.1.6
-    lacked. Note what the term does not do: it never asks any particular
-    point to leave the axis, only that the cloud as a whole not sit on it.
+    position of the batch: every line, labeled or not. This is M1's term with
+    the reserved coordinate axis replaced by an arbitrary unit direction: M1
+    penalized $\sum_{i} \hat z_i^2$ over the reserved axes of the *normalized*
+    representation, and each $\hat z_i^2$ is a $\cos^2$ against a basis vector.
+    A higher-dimensional reserved subspace would sum $\cos^2$ over an
+    orthonormal basis of it; here the subspace is the one-dimensional span of
+    the anchor. The term penalizes the mean-square alignment of everything, so
+    the labeled pull has to buy alignment against a headwind. That is, we
+    expect, the selectivity pressure ex-2.1.6 lacked. Note what the term does
+    not do: it never asks any particular point to leave the axis, only that the
+    cloud as a whole not sit on it.
 
     Capacity is worth a sentence. In the 4- and 5-dimensional bottlenecks of
     M1, keeping the cloud off one axis surrendered a fifth or a quarter of
@@ -159,15 +180,15 @@ def _():
     cheap here. The live question is whether, at 3% of the anchor weight,
     it is strong enough to matter, not whether the task can afford it.
 
-    **Factor two: the pull span.** The `span` cells pull the four prompt
-    positions (op1, `+`, op2, `=`) of a labeled equation, as ex-2.1.6 did.
-    The `op1` cells pull op1 alone, so every pulled state belongs to the
-    token that carries the labeled color. If the color-independent drift
-    came from the three blind positions, narrowing the pull removes it with
-    no repulsive term at all. Note that the span pull is still the shape
-    natural language forces, because a document label marks no position as
-    the relevant one. So if op1-only wins, the lesson is about what
-    sequence-level labeling costs, not a design we can keep for M3.
+    **Factor two: the pull span.** The `span` conditions pull the four prompt
+    positions (op1, `+`, op2, `=`) of a labeled equation, as ex-2.1.6 did. The
+    `op1` conditions pull op1 alone, so every pulled state belongs to the token
+    that carries the labeled color. If the color-independent drift came from the
+    three blind positions, narrowing the pull removes it with no repulsive term
+    at all. Note that the span pull is still the shape natural language forces,
+    because a document label marks no position as the relevant one. So if
+    op1-only wins, the lesson is about what sequence-level labeling costs, not
+    necessarily a design we can keep for M3.
     """)
     return
 
@@ -178,21 +199,23 @@ def _():
     ### Schedule
 
     The anchor schedule is unchanged from ex-2.1.6: ramp over the 10-epoch
-    LR warmup, hold at $\lambda$, anneal from epoch 90 to a floor of
-    $0.1\lambda$ at 100.
+    LR warmup, hold at $\lambda_\text{a}$, anneal from epoch 90 to a floor
+    of $0.1\lambda_\text{a}$ at 100.
 
-    The anti-subspace schedule is copied from M1/ex-2.9.1 and stretched to
+    The anti-subspace schedule is copied from M1/Ex-2.9.1 and stretched to
     our 100 epochs by fraction of training. M1 balanced the attractive and
     repulsive terms in time rather than by a single ratio. Anti-subspace
-    opened at 2.5× the anchor peak weight, meaning it was at full strength
-    from step 0, before the anchor had ramped in. It then annealed to 3% of
-    the anchor by the halfway point and held there. Mapped onto our frame:
-    $\mu / \lambda$ starts at 2.5 at epoch 0, anneals (minimum-jerk) to
-    0.03 by epoch 50, and holds; from epoch 90 both terms share the
-    end-of-training anneal, so their ratio is constant from the midpoint on.
+    opened at 2.5× the anchor peak weight, meaning it was at full weight
+    from step 0 (its effective push still scaled by the warming-up learning
+    rate, like every term), before the anchor had ramped in. It then
+    annealed to 3% of the anchor by the halfway point and held there.
+    Mapped onto our frame: $\lambda_{\bar{\text{s}}} / \lambda_\text{a}$
+    starts at 2.5 at epoch 0, anneals (minimum-jerk) to 0.03 by epoch 50,
+    and holds; from epoch 90 both terms share the end-of-training anneal,
+    so their ratio is constant from the midpoint on.
 
     Nobody has measured how robust that timing is. The M1 schedules varied
-    by experiment: ex-2.4.1, a gentler condition that confined vibrant
+    by experiment: Ex-2.4.1, a gentler condition that confined vibrant
     colors to a two-axis subspace rather than clearing an axis, ran its
     terms *up* over training instead. So one arm probes the timing:
     `span-anti-late` stretches the anneal endpoint from epoch 50 to 90,
@@ -201,12 +224,12 @@ def _():
     a dedicated sweep is warranted; if they agree, the recipe is forgiving
     on this axis and we can stop worrying about it.
 
-    The second arm, `span-anti-hi`, runs the full recipe at $\lambda = 1$,
-    one rung above the maximum ex-2.1.6 swept, with $\mu$ scaled in
-    proportion. Ex-2.1.6 never found the weight at which the task pushes
-    back, so this is the power analysis for how much anchor weight is
-    available to spend. Both terms scale together, so it probes the
-    headroom of the recipe, not of the bare anchor.
+    The second arm, `span-anti-hi`, runs the full recipe at
+    $\lambda_\text{a} = 1$, one rung above the maximum Ex-2.1.6 swept, with
+    $\lambda_{\bar{\text{s}}}$ scaled in proportion. Ex-2.1.6 never found the
+    weight at which the task pushes back, so this is the power analysis for how
+    much anchor weight is available to spend. Both terms scale together, so it
+    probes the headroom of the recipe, not of the bare anchor.
     """)
     return
 
@@ -221,8 +244,8 @@ def _():
         span = "—" if c["lam"] == 0 else f"<code>{pulled}</code>"  # no anchor, so nothing is pulled
         role = {
             "lam0": "control",
-            "span-bare": "the ex-2.1.6 λ=0.1 cell, re-run",
-            "span-anti": "primary scoring cell",
+            "span-bare": "the Ex-2.1.6 λ<sub>a</sub>=0.1 condition, re-run",
+            "span-anti": "primary scoring condition",
             "op1-bare": "factorial",
             "op1-anti": "factorial",
             "span-anti-late": "timing arm",
@@ -236,17 +259,17 @@ def _():
     _table = f"""
     <div class="report-table-scroll"><table class="report-table">
       <thead><tr>
-        <th>condition</th><th class="num">λ</th><th>pulled positions</th>
-        <th class="num">μ/λ schedule</th><th>role</th>
+        <th>condition</th><th class="num">λ<sub>a</sub></th><th>pulled positions</th>
+        <th class="num">λ<sub>s̄</sub>/λ<sub>a</sub> schedule</th><th>role</th>
       </tr></thead>
       <tbody>{"".join(_row(c) for c in ex.CONDITIONS)}</tbody>
     </table></div>
     """
     _caption = f"""
     The seven conditions, each run at seeds {ex.SEEDS} — {len(ex.CONDITIONS) * len(ex.SEEDS)}
-    cells. The four factorial cells share λ = {ex.SCORING_LAMBDA:g}; the two arms are
-    reported descriptively rather than gated. μ/λ is the anti-subspace weight relative
-    to the anchor peak.
+    cells. The four factorial conditions share λ<sub>a</sub> = {ex.SCORING_LAMBDA:g}; the
+    two arms are reported descriptively rather than gated. λ<sub>s̄</sub>/λ<sub>a</sub> is
+    the anti-subspace weight relative to the anchor peak.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -267,14 +290,16 @@ def _():
             epoch 90 instead.
         """,
         caption=f"""
-            The three schedules at the scoring rung (λ = {ex.SCORING_LAMBDA:g}), log
-            scale. The anti-subspace term opens at {ex.ANTI_PEAK_RATIO:g}λ, dominant
-            before the anchor arrives, and anneals to {ex.ANTI_HOLD_RATIO:g}λ by epoch
-            {ex.ANTI_ANNEAL_END:g} (the M1/ex-2.9.1 keyframes, mapped by fraction of
-            training). The dashed line is the <code>span-anti-late</code> arm, which
-            reaches the hold ratio at epoch {ex.ANTI_ANNEAL_END_LATE:g} instead. From
-            epoch {ex.ANNEAL_START:g} the anchor and anti-subspace weights share the
-            end-of-training anneal to a floor of {ex.ANNEAL_FLOOR:g}× their held values.
+            The three schedules at the scoring rung (λ<sub>a</sub> = {ex.SCORING_LAMBDA:g}),
+            log scale. The anti-subspace term opens at {ex.ANTI_PEAK_RATIO:g}λ<sub>a</sub>,
+            dominant before the anchor arrives, and anneals to
+            {ex.ANTI_HOLD_RATIO:g}λ<sub>a</sub> by epoch {ex.ANTI_ANNEAL_END:g}
+            (the M1/ex-2.9.1 keyframes, mapped by fraction of training). The
+            dashed line is the `span-anti-late` arm, which reaches the hold
+            ratio at epoch {ex.ANTI_ANNEAL_END_LATE:g} instead. From epoch
+            {ex.ANNEAL_START:g} the anchor and anti-subspace weights share the
+            end-of-training anneal to a floor of {ex.ANNEAL_FLOOR:g}× their held
+            values.
         """,
     )
     def _plot() -> plt.Figure:
@@ -283,14 +308,18 @@ def _():
         _grey = light_dark("#888", "#888")
         ax.plot(_epochs, ex.learning_rate(_epochs), color=_grey, lw=1, label="learning rate")
         ax.plot(
-            _epochs, ex.anchor_weight(_epochs, peak=lam), color=light_dark("#c33", "#e66"), lw=1.5, label="anchor λ"
+            _epochs,
+            ex.anchor_weight(_epochs, peak=lam),
+            color=light_dark("#c33", "#e66"),
+            lw=1.5,
+            label=r"anchor $\lambda_\mathrm{a}$",
         )
         ax.plot(
             _epochs,
             ex.anti_subspace_weight(_epochs, lam=lam),
             color=light_dark("#36c", "#7af"),
             lw=1.5,
-            label="anti-subspace μ",
+            label=r"anti-subspace $\lambda_{\bar{\mathrm{s}}}$",
         )
         ax.plot(
             _epochs,
@@ -298,7 +327,7 @@ def _():
             color=light_dark("#36c", "#7af"),
             lw=1.2,
             ls=(0, (4, 3)),
-            label="μ, late arm",
+            label=r"$\lambda_{\bar{\mathrm{s}}}$, late arm",
         )
         ax.set_yscale("log")
         ax.set_xlim(0, 100)
@@ -308,7 +337,7 @@ def _():
         ax.legend(loc="lower left", fontsize=8, frameon=False)
         return fig
 
-    _plot()
+    mo.Html(_plot())
     return
 
 
@@ -320,18 +349,19 @@ def _():
     # alpha-bar averages over 216 colors and 5 layers, and ex-2.1.6's control
     # measured 0.008 (seeds: 0.019, -0.015, 0.021). Replaced with the measured
     # control value. Verify: ex-2.1.6 metrics, `alpha_mean_op1` on the lam0 cells.
-    # The 0.25 gate itself is unchanged and still stated relative to the bare
-    # term's 0.53.
+    # The gate was subsequently tightened to 0.1 (near-control containment),
+    # with the old 0.25 halving level kept as a named partial.
     #
     # REVIEW: H3's "about 4× the three-seed noise floor" is 3×: 0.1 / 0.032. A main
     # effect is a difference of two two-cell means, so its noise is about the same
     # 0.032 as a single seed-mean (0.032/sqrt(2) per side, combined in quadrature).
     # Corrected in the text and in `MAIN_EFFECT_GATE`; the gate value is unchanged.
     #
-    # REVIEW: added the both-effects-clear ordering to H3's partials. The gate is a
-    # conjunction (anti effect >= 0.1 and >= the op1 effect), so the case where both
-    # clear 0.1 with op1-only larger failed H3 without a named reading, and the
-    # analysis section claimed all four orderings were named.
+    # REVIEW: added the both-effects-clear ordering to H3's contrary readings.
+    # The gate is a conjunction (anti effect >= 0.1 and >= the op1 effect), so
+    # the case where both clear 0.1 with op1-only larger failed H3 without a
+    # named reading, and the analysis section claimed all four orderings were
+    # named.
     mo.md(r"""
     ## Hypotheses
 
@@ -339,58 +369,78 @@ def _():
     rationale. The noise floors quoted there (margin ≈ 0.056 per seed,
     ≈ 0.032 on a three-seed mean) apply unchanged, since the architecture
     and the measurement are the same. Unless stated otherwise, results are
-    reported on the `span-anti` cell (seed-averaged), the condition the
+    reported on the `span-anti` condition (seed-averaged), the one the
     ex-2.1.6 discussion named as the next experiment. The other factorial
-    cells are what H3 reads, and the two arms are descriptive.
+    conditions are used by H3, and the two arms are just descriptive.
 
-    **H1.** The added term and the narrower pull are as free as the bare
-    anchor was: every $\lambda = 0.1$ condition (the four factorial cells
-    and the timing arm) is task-clean, meaning `named_holdout` exact match
-    within 0.02 (absolute) of the seed mean of the in-experiment control.
-    The ceiling arm is reported in the same table but scored only
-    descriptively; finding its cost is what it is for. Partial: the
-    factorial is clean but the timing arm is not, which would itself be
-    evidence that sustained repulsion has a price.
+    **H1.** The added term and the resulting narrower pull are as free as the
+    lone anchor was: every $\lambda_\text{a} = 0.1$ condition (the four
+    factorial conditions and the timing arm) is task-clean, meaning
+    `named_holdout` exact match within 0.02 (absolute) of the seed mean of the
+    in-experiment control. Partial: the factorial is clean but the timing arm is
+    not, which would itself be evidence that sustained repulsion has a price.
 
     **H2.** With the missing ingredient restored, the concept lands
-    selectively. On some task-clean factorial cell: (a) the layer-mean
+    selectively. On some task-clean factorial condition: (a) the layer-mean
     margin at op1 reaches $m_{\text{op1}} \ge 0.5$; (b) the response is
     graded, meaning that over the 216 colors, the seed-mean layer-mean
     alignment at op1 clears Spearman $\rho \ge 0.8$ against `redness` or
     Pearson $R^2 \ge 0.8$ against `sim¹·⁵` (both tracks, thresholds, and
     step ceilings as justified at length in ex-2.1.6); (c) the control
-    shows $|m_{\text{op1}}| \le 0.1$. Partial: some cell clears 0.35
+    shows $|m_{\text{op1}}| \le 0.1$. Partial: some condition clears 0.35
     without reaching 0.5; 0.35 is above the ex-2.1.6 value of 0.27 by more
-    than the seed-mean noise. One caution on the partial: "some cell" takes
-    a maximum over the four factorial cells, and the maximum of four noisy
-    means sits about one noise unit above any single one. So a bare-partial
-    result resting on exactly one cell at 0.35 is weaker than the same
-    number on the pre-named primary cell.
+    than the seed-mean noise.[^h2max]
 
     **H3.** The margin failure in ex-2.1.6 was mostly the missing
     repulsion, not the blind span. This is scored on the main effects of
     the factorial on $m_{\text{op1}}$ (for each factor: the mean over its
-    two cells, differenced): the anti-subspace main effect is at least 0.1
-    and at least as large as the op1-only main effect. A main effect is a
-    difference of two-cell means, so its noise is about the three-seed
-    floor of 0.032, and 0.1 is about 3× that. Partials: the op1-only effect
+    two conditions, differenced): the anti-subspace main effect is at least 0.1
+    and at least as large as the op1-only main effect.[^h3noise]
+    Two outcomes that fail H3 are
+    named in advance so a miss stays readable; unlike the partials elsewhere,
+    they are contrary readings rather than weaker passes. The op1-only effect
     clears 0.1 and is the larger of the two, which reads as the blind-span
-    account winning, whether or not the anti-subspace effect also clears
-    it; or neither main effect clears 0.1 but the `op1-anti` cell alone
-    does (an interaction: each mechanism blocks the margin on its own).
+    interpretation of ex-2.1.6 was correct (whether or not the anti-subspace
+    effect also clears it); or neither main effect clears 0.1 but the `op1-anti`
+    condition alone does (an interaction: each mechanism blocks the margin on
+    its own).
 
-    **H4.** The dynamics behave as the term dictates. (a) Containment: in
-    every anti cell at $\lambda = 0.1$, the end-of-training mean alignment
-    over all colors at op1 satisfies $\bar\alpha \le 0.25$. For reference,
-    the bare term in ex-2.1.6 ended at 0.53, and the control in that
-    experiment at 0.008. (b) Retention: the ex-2.1.6 trajectory gate,
-    unchanged: for every anchored run whose running maximum of
-    $m_{\text{op1}}$ reaches 0.2, the final value is at least 0.8× that
-    maximum. In ex-2.1.6 the margin peaked near epoch 10 and slid back a
-    quarter under steady pressure; if the slide was the rest of the cube
-    catching up to a selective early response, repulsion should hold the
-    peak. Partial: (a) holds and (b) fails only in the timing arm, whose
-    sustained repulsion changes the trajectory most.
+    **H4.** The repulsive term visibly does its two jobs: it keeps the cube
+    as a whole off the axis, and the margin holds its early peak instead of
+    sliding back.
+    (a) Containment: in every anti condition at $\lambda_\text{a} = 0.1$, the
+    end-of-training mean alignment over all colors at op1 satisfies
+    $\bar\alpha \le 0.1$.[^h4gate]
+    (b) Retention: the ex-2.1.6 trajectory gate, unchanged: for every anchored
+    run whose running maximum of $m_{\text{op1}}$ reaches 0.2, the final value
+    is at least 0.8× that maximum.[^h4slide]
+    Partials, in decreasing strength: every anti condition clears the old
+    halving level $\bar\alpha \le 0.25$ without all reaching 0.1, which reads as
+    repulsion weakening the runaway without containing it; or (a) holds and (b)
+    fails only in the timing arm, whose sustained repulsion changes the
+    trajectory most.
+
+    [^h2max]: One caution: "some condition" takes a maximum over the four
+        factorial conditions, and the maximum of four noisy means sits about
+        one noise unit above any single one. So a bare-partial result resting
+        on exactly one condition at 0.35 is weaker than the same number on
+        the pre-named primary condition.
+
+    [^h3noise]: A main effect is a difference of two-condition means, so its
+        noise is about the three-seed floor of 0.032, and 0.1 is about 3×
+        that.
+
+    [^h4gate]: Why 0.1: the ex-2.1.6 reference points are 0.53 for the bare
+        term and 0.008 for the control, with a seed spread of about 0.02.
+        Working repulsion should push $\bar\alpha$ to near-control levels;
+        0.1 is a fifth of the bare term and still five noise units above
+        control, so a working mechanism passes comfortably and a
+        merely-weakened runaway does not.
+
+    [^h4slide]: In ex-2.1.6 the margin peaked near epoch 10 and slid back a
+        quarter under steady pressure. If the slide was the rest of the cube
+        catching up to a selective early response, repulsion should hold the
+        peak.
     """)
     return
 
@@ -401,7 +451,7 @@ def _():
     mo.stop(_res is None, mo.md("_Results are not published yet; the analysis cells below render once they are._"))
     assert _res is not None
     metrics, arrays = _res
-    return metrics, arrays
+    return
 
 
 @app.cell(hide_code=True)
@@ -416,9 +466,9 @@ def _():
     gap to control, and the gate verdict. Expected: every λ=0.1 row within
     0.02 of control, replicating H1. The ceiling arm is where a cost would
     first appear, and a clean ceiling arm would say the task tolerates the
-    recipe at 10× the scoring weight. Contrary: a cost in the anti cells
-    but not `span-bare` would mean the repulsive term, not the anchor, is
-    what the task feels.
+    recipe at 10× the scoring weight. Contrary: a cost in the anti
+    conditions but not `span-bare` would mean the repulsive term, not the
+    anchor, is what the task feels.
     ///
     """)
     return
@@ -434,18 +484,18 @@ def _():
     seed-mean bar), with the 0.5 gate, the 0.35 partial line, and the
     published ex-2.1.6 value of 0.27 as a reference line. Expected: `span-anti` at
     or above the gate; `span-bare` reproducing 0.27. Contrary: all four
-    cells in a band around 0.27, meaning neither mechanism was the
+    conditions in a band around 0.27, meaning neither mechanism was the
     bottleneck.
     ///
 
     /// admonition | TODO: grading scatter
-    Per-color response at op1 against redness for the passing cell (or the
-    best cell, if none passes), colored by the colors themselves, with the
+    Per-color response at op1 against redness for the passing condition (or
+    the best one, if none passes), colored by the colors themselves, with the
     windowed mean and the two track statistics (ρ, R²) beside their gates.
     Expected: a graded rise, not a step at the label threshold. Contrary: a
     step would say the anchor caught the labeled exemplars rather than
     *red*; in that case the flattened-affinity follow-up already queued in
-    `todo-science.md` becomes the next experiment.
+    `todo-science.md` becomes more pressing.
     ///
     """)
     return
@@ -457,13 +507,13 @@ def _():
     ## Attribution (H3)
 
     /// admonition | TODO: the 2×2
-    The factorial as a 2×2 table of $m_{\text{op1}}$ (seed mean ± half
-    range per cell) with the two main effects and the interaction in the
-    margins. Expected: the anti-subspace main effect ≥ 0.1 and ≥ the
-    op1-only effect. H3 names a reading for the pass and for each partial;
-    state which one obtained and carry it to the discussion. If the outcome
-    is none of them (both effects below 0.1 with no interaction), that is
-    the null: neither mechanism was the bottleneck.
+    The factorial as a 2×2 table of $m_{\text{op1}}$ (seed mean ± half range per
+    condition) with the two main effects and the interaction in the margins.
+    Expected: the anti-subspace main effect ≥ 0.1 and ≥ the op1-only effect. H3
+    names a reading for the pass and for each contrary outcome; state which one
+    obtained and carry it to the discussion. If the outcome is none of them
+    (both effects below 0.1 with no interaction), that is the null: neither
+    mechanism was the bottleneck.
     ///
     """)
     return
@@ -475,23 +525,27 @@ def _():
     ## Containment and dynamics (H4)
 
     /// admonition | TODO: mean alignment and margin trajectories
-    Two panels per condition family, x = epoch. Left: $\bar\alpha$ at op1
-    with the 0.25 containment gate and the ex-2.1.6 bare-term endpoint
-    (0.53) marked. Right: $m_{\text{op1}}$ with its running maximum, the
-    0.8× retention band, and both weight schedules behind it. Expected: anti
-    cells hold $\bar\alpha$ low from the start (the term opens at 2.5λ),
-    and the margin holds its peak instead of sliding. Contrary: $\bar\alpha$
-    climbing after epoch 50 would say the 0.03λ hold ratio is too weak once
-    the anneal ends. The timing arm is positioned to confirm exactly that,
-    since it keeps the weight up through epoch 90.
+    Two panels per condition family, x = epoch.
+    Left: $\bar\alpha$ at op1 with the 0.1 containment gate, the 0.25 partial
+    level, and the ex-2.1.6 bare-term endpoint (0.53) marked.
+    Right: $m_{\text{op1}}$ with its running maximum, the 0.8× retention band,
+    and both weight schedules behind it.
+    Expected: anti conditions hold $\bar\alpha$ low from the start (the term
+    opens at $2.5\lambda_\text{a}$), and the margin holds its peak instead of
+    sliding.
+    Contrary: $\bar\alpha$ climbing after epoch 50 would say the
+    $0.03\lambda_\text{a}$ hold ratio is too weak once the anneal ends. The
+    timing arm is positioned to test that, since it keeps the weight up through
+    epoch 90.
     ///
 
     /// admonition | TODO: per-layer and geometry read
     The margin by layer × position for `span-anti` beside `span-bare` (the
     ex-2.1.6 figure, with one new column), and the preregistered geometry:
-    centroid·anchor and extent per layer. Expected: centroid alignment near
-    the control value (0.02 in ex-2.1.6) rather than the bare-term 0.89 at
-    mid-stack. No gate; this is the mechanism picture behind H4(a).
+    centroid·anchor and extent per layer.
+    Expected: centroid alignment near the control value (0.02 in ex-2.1.6)
+    rather than the bare-term 0.89 at mid-stack. No gate; this is the mechanism
+    picture behind H4(a).
     ///
     """)
     return
@@ -511,11 +565,11 @@ def _():
     ///
 
     /// admonition | TODO: ceiling arm
-    `span-anti-hi` (λ=1, μ scaled with it) in the H1 table and on the
-    margin plot. The first rung at which the task pushes back sets the
-    weight budget for the D2.2 operation anchors. If this rung is still
-    free, note that the ceiling remains unfound and leave chasing it to a
-    dedicated sweep.
+    `span-anti-hi` ($\lambda_\text{a} = 1$, $\lambda_{\bar{\text{s}}}$
+    scaled with it) in the H1 table and on the margin plot. The first rung at
+    which the task pushes back sets the weight budget for the D2.2 operation
+    anchors. If this rung is still free, note that the ceiling remains unfound
+    and leave chasing it to a dedicated sweep.
     ///
     """)
     return
@@ -541,10 +595,10 @@ def _():
     To write after the results: what the factorial attributed, what that
     means for the D2.1 claim ("SCA transfers to transformers" needs a
     selective anchor, not just a free one), and which queued follow-up is
-    next: the flattened label affinity if selectivity appeared, or the
+    prioritized: the flattened label affinity if selectivity appeared, or the
     remaining repulsive terms (anti-anchor, separate) or position pooling
-    if it did not. Keep interpretation within what the four cells and two
-    arms measured. One trap to avoid: if the margin moves nowhere, the H3
+    if it did not. Keep interpretation within what the four conditions and
+    two arms measured. One trap to avoid: if the margin moves nowhere, the H3
     null and the H2 contrary reading are the same finding reached twice;
     report it once, not as two lines of evidence.
     ///
