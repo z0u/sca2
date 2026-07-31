@@ -234,6 +234,28 @@ def r2_sim(alpha: np.ndarray) -> float:
     return float(np.corrcoef(alpha, SIM_TARGET)[0, 1] ** 2)
 
 
+def step_rho(threshold: float) -> float:
+    """Expected Spearman ρ of a pure step response `α = [redness > threshold]` against redness.
+
+    Carried from ex-2.1.6, which derives it: the measured α is continuous, so a
+    pure step orders the colors within each of its two levels arbitrarily, and
+    the expectation is over that ordering.
+    """
+    n = REDNESS.size
+    rx, ry = _midranks(REDNESS), _midranks(REDNESS > threshold)
+    return float(np.cov(rx, ry)[0, 1] / (np.std(rx, ddof=1) * np.sqrt(n * (n + 1) / 12.0)))
+
+
+STEP_RHO_CEILING = max(step_rho(t) for t in np.unique(REDNESS)[:-1])
+STEP_R2_CEILING = max(r2_sim((v > t).astype(float)) for v in (REDNESS, SIM_TARGET) for t in np.unique(v)[:-1])
+"""The best either H2(b) track can score for a pure step response, over all step locations.
+
+Both sit below the 0.8 gates, so a step cannot pass as a grade — the check that
+makes H2(b) a claim about gradedness rather than about magnitude. Derivations
+and the ties caveat are in ex-2.1.6, whose values these reproduce.
+"""
+
+
 LINES_PER_BATCH = BLOCK * BATCH / LINE_TOKENS
 """Lines a batch carries; batch composition is ex-2.1.6's, unchanged."""
 
