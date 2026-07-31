@@ -718,9 +718,9 @@ def _(LABELS, grading, m_op1):
                 )  # fmt: skip
         for ax in axes[1]:
             ax.set_xlabel("redness of op1")
-        for ax in axes[:, 0]:
-            ax.set_ylabel(r"$\alpha_c$ at op1")
-        axes[0, 0].set_ylim(-0.25, 1.25)  # headroom for the per-panel statistics
+        for row in axes:
+            row[0].set_ylabel(r"$\alpha_c$ at op1")
+        axes[0][0].set_ylim(-0.25, 1.25)  # headroom for the per-panel statistics
         return fig
 
     mo.Html(_plot())
