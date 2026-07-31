@@ -267,8 +267,10 @@ def _():
     """
     _caption = f"""
     The seven conditions, each run at seeds {ex.SEEDS} — {len(ex.CONDITIONS) * len(ex.SEEDS)}
-    cells. The four factorial conditions share λ<sub>a</sub> = {ex.SCORING_LAMBDA:g}; the
-    two arms are reported descriptively rather than gated. λ<sub>s̄</sub>/λ<sub>a</sub> is
+    cells. The four factorial conditions share λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} and carry the H2
+    and H3 gates; the two arms add none of their own, though H1 and H4 reach them by their
+    stated scopes — the timing arm is a λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} anti condition,
+    and H4(b) covers every anchored run. λ<sub>s̄</sub>/λ<sub>a</sub> is
     the anti-subspace weight relative to the anchor peak.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))

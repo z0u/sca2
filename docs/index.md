@@ -103,4 +103,13 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   The reading is that a bare attractive term needs the repulsive company M1
   gave it.
 
+- [Experiment 2.1.7](./m2/ex-2.1.7/report.py): a repulsive term and a narrower
+  pull. Ex-2.1.6 left two candidate explanations for its flat margin, and this
+  experiment separates them with a 2×2 factorial at the same scoring rung:
+  {bare anchor, anchor + M1's anti-subspace term} × {four-position prompt-span
+  pull, op1-only pull}, plus a schedule-timing arm and a weight-ceiling arm.
+  Preregistered: the method, hypotheses, and decision thresholds are frozen;
+  the run has not happened yet, so every results section is still a placeholder
+  saying what it will show.
+
 More reports will appear here as the M2 experiments land.
