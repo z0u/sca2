@@ -1,5 +1,5 @@
 ---
-name: figure-style
+name: style-fig
 description: Figure conventions for experiment reports. Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs and RGB-cube bounds as hexagons, data-colored marks, theming, captions and nested sub-figures, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, writing a figure or table caption, or building a results table, in a notebook.
 ---
 

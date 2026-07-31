@@ -30,10 +30,7 @@ Don't hesitate to disagree or point out potential issues. The human values techn
 
 Be proactive. Fix little things as you go, and create todos for larger things — in [todo-eng.md](/todo-eng.md) for infrastructure/tooling, or [todo-science.md](/todo-science.md) for experiment questions and findings.
 
-## Code style & conventions
-
-Python style, typing, and notebook conventions live in the `code-style` skill.
-Read it before writing Python.
+Code style & conventions: see the `style-*` skills.
 
 ## Environment
 

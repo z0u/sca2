@@ -158,7 +158,7 @@ For a quick check you often don't need a browser at all:
   embedded in the HTML too, so grep for rendered output, not code.
 - **Figures:** `Read` the exported `_assets/<name>-{light,dark}.png` directly —
   faster and more faithful than a screenshot when you only care about one figure.
-  Judge the dark variant composited over `#111` (see the figure-style skill).
+  Judge the dark variant composited over `#111` (see the style-fig skill).
 - **Inline SVG output** (e.g. subline): if the report wraps the chunk in
   `externalize_html(html, name=…)` (mini.reports), the same markup is also a
   plain file at `_assets/<name>.html` — `Read` it instead of digging through

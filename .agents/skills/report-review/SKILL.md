@@ -12,7 +12,8 @@ model: sonnet
 
 Let's iteratively improve this report.
 
-Your job is to route and decide, not to review. Probably don't read the report yourself — a fresh reader is the whole point.
+Your job is to route and decide, not to review. Probably don't read the report
+yourself — a fresh reader is the whole point.
 
 The loop below is the runbook. For the reasoning behind it — why the two passes
 ask different questions, and why a reviewer's `Tensions` field stops with you
@@ -25,7 +26,7 @@ First pick the reviewer, since the two ask different questions:
   worth running as specified?
 - **`results-reviewer`** — the results have landed. Do they support the claims,
   and can a fresh reader follow the report? This one also looks at the rendered
-  figures.
+  figures unless you tell it not to.
 
 The experiment run leaves a signal:
 

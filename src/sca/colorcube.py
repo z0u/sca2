@@ -255,7 +255,7 @@ def classify(r: dict) -> str:
 
 
 def plot_latent_disc(ax: Axes, z: np.ndarray, colors: np.ndarray, *, s: float = 20) -> None:
-    """One latent-space panel, per the repo's figure conventions (see the figure-style skill).
+    """One latent-space panel, per the repo's figure conventions (see the style-fig skill).
 
     The unit-hypersphere bound as a background disc, data-colored points at
     (z₁, z₀) — the anchored axis points up — fixed domain limits, no axes.
