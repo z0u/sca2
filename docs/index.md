@@ -104,12 +104,17 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   gave it.
 
 - [Experiment 2.1.7](./m2/ex-2.1.7/report.py): a repulsive term and a narrower
-  pull. Ex-2.1.6 left two candidate explanations for its flat margin, and this
-  experiment separates them with a 2×2 factorial at the same scoring rung:
+  pull — the first *selective* anchor. Ex-2.1.6 left two candidate explanations
+  for its flat margin, and this preregistered 2×2 factorial separates them:
   {bare anchor, anchor + M1's anti-subspace term} × {four-position prompt-span
   pull, op1-only pull}, plus a schedule-timing arm and a weight-ceiling arm.
-  Preregistered: the method, hypotheses, and decision thresholds are frozen;
-  the run has not happened yet, so every results section is still a placeholder
-  saying what it will show.
+  Both mechanisms are real and the blind span is the larger: narrowing the pull
+  is worth +0.22 of margin against the repulsive term's +0.14, and together they
+  reach 0.64 over a 0.5 gate, graded at R² = 0.88, at no measurable task cost.
+  So H2 passes and H3 lands on its named contrary reading. H4 fails both parts —
+  at M1's weight ratio the repulsion weakens the cube-wide drift without
+  containing it. The surprise is an arm: holding the repulsion near peak instead
+  of annealing it at the halfway point beats the M1 schedule on every
+  measurement.
 
 More reports will appear here as the M2 experiments land.

@@ -13,6 +13,50 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Open questions
 
+- [ ] **Sweep the anti-subspace anneal endpoint — the highest-value open knob
+  after ex-2.1.7.** The `span-anti-late` arm changed exactly one number, the
+  epoch at which the repulsive term finishes annealing to its hold ratio (50 →
+  90), and improved margin (0.46 → 0.60), containment (ᾱ 0.33 → 0.13),
+  retention (0.73 → 0.94) and grading (R² 0.62 → 0.78) together — a bigger
+  margin gain than adding the term was worth in the first place. The M1
+  keyframes were inherited from a 5-d autoencoder bottleneck and mapped onto
+  our 100 epochs by fraction of training, so there was never a reason to expect
+  them to be right for a 64-d residual stream. Two things the single arm cannot
+  separate: *when* the repulsion acts and *how much* of it there is, since
+  holding near peak for longer also delivers more of it. A sweep over
+  (`anneal_end`, `hold_ratio`) on a grid separates them; ex-2.4.1's ramp-*up*
+  schedule is worth including as a third shape. Cheap — training only, no new
+  measurements. #ex-2.1.7 #schedules #anchoring
+
+- [ ] **Locating the concept inside a labeled span, without being told where it
+  is.** Ex-2.1.7's largest single effect is narrowing the pull from four prompt
+  positions to op1 alone (+0.22 margin, and it is what stops the trajectory
+  sliding). But that remedy is only available because this synthetic language
+  has a known position carrying the concept, which is exactly what a labeled
+  span of real text does not give you — so the finding is about what
+  sequence-level labeling costs, not a design M3 can keep. Candidates: pool the
+  pull over the span (pull the *mean* state rather than each state, so a
+  color-independent shift no longer satisfies it); weight positions by an
+  attention-derived estimate of where the concept sits; or pull only the
+  position whose state is already most alignable, an EM-flavored scheme. The
+  margin-by-position profile is the encouraging part — under the op1 pull the
+  margin concentrates at op1 (0.63) with `+`/op2 near 0.08, so the model does
+  distinguish these positions when the pull lets it. #ex-2.1.7 #labels #m3
+
+- [ ] **A heavier anchor buys alignment and loses selectivity.** Ex-2.1.7's
+  ceiling arm ran the full recipe at λ_a = 1, ten times the scoring rung. The
+  task never pushed back (holdout EM within 0.0013 of control), so the *task*
+  ceiling is still unfound — but the margin *fell* to 0.43 against 0.46 at a
+  tenth of the weight, with ᾱ back up to 0.46, retention down to 0.58, and the
+  colour cube compressed even in the token embedding (0.77 against 0.91). So
+  there is a selectivity optimum in λ_a somewhere below 1, and the useful sweep
+  is the one that finds it rather than the one that finds where the task
+  breaks. Worth doing before D2.2 fixes an operating point. Note this also
+  answers ex-2.1.6's open question about a `separate`-style term: the
+  compression it would address appears only at weights past the selectivity
+  optimum, and the anti-subspace term restores the cube's extent at the scoring
+  rung (91–103% of control against the bare pull's 67%). #ex-2.1.7 #anchoring
+
 - [x] **Refit the probe maps holding out one target *value* at a time, not one
   equation.** Done in ex-2.1.5: `geometry.strict_r2` reports both estimators
   side by side, the report shows the strict figure with a disagreement table,
