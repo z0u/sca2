@@ -992,13 +992,15 @@ def _(CONDS, CONTROL_ACC, acc, stats):
 
     The `open`-pair distances sit together near
     {np.mean([acc(c, "open", "guess_dist").mean() for c in CONDS]):.3f}. That
-    is a little above the floor of
-    {stats["nulls"]["open"]["floor_dist"]:.3f}; well under the
-    {stats["nulls"]["open"]["k2"]["dist"]:.3f} expected of a guesser that has
-    located the answer but cannot break the tie; and far under the
-    {stats["nulls"]["open"]["blind"]["dist"]:.3f} of a guesser that ignores
-    the prompt. This is the same picture ex-2.1.3 reported for this cell,
-    unchanged by the anchor.
+    is above the floor of {stats["nulls"]["open"]["floor_dist"]:.3f}, and also
+    above the {stats["nulls"]["open"]["k2"]["dist"]:.3f} expected of a guesser
+    that flips a coin between the two names bracketing the true mix — so on
+    this metric the models do not quite reach that null, though they are far
+    under the {stats["nulls"]["open"]["blind"]["dist"]:.3f} of a guesser that
+    ignores the prompt. The shortfall is in the last step of resolving between
+    two adjacent names, and it is a property of this testbed rather than of the
+    anchor: the control sits with the rest, and this is the same picture
+    ex-2.1.3 reported for this cell.
 
     So at these weights, the dose–response curve has no cost side. The next
     section looks at what the anchor buys.

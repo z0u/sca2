@@ -94,8 +94,8 @@ def _():
     times the anchor weight. So H2 passes, and H3 lands on its preregistered
     contrary reading rather than its hypothesis. H4 fails on both parts: at
     M1's weight ratio the repulsive term reduces the cube-wide drift without
-    containing it, and the margin still slides in the conditions that pull
-    the whole span. The unexpected result is in an arm — holding the
+    containing it, and half the anchored conditions still give back more than
+    a fifth of their peak margin. The unexpected result is in an arm — holding the
     repulsion near peak through training, instead of annealing it at the
     halfway point as M1 did, beats the M1 schedule on every measurement.
     ///
@@ -630,11 +630,25 @@ def _(CONDS, CONTROL_ACC, acc, stats):
     {min(acc(c, "named_holdout", "nll").mean() for c in CONDS):.3f} and
     {max(acc(c, "named_holdout", "nll").mean() for c in CONDS):.3f} nats with no
     ordering by condition, and the `open`-pair distances sit together near
-    {np.mean([acc(c, "open", "guess_dist").mean() for c in CONDS]):.3f} — above
-    the floor of {stats["nulls"]["open"]["floor_dist"]:.3f}, well under the
-    {stats["nulls"]["open"]["k2"]["dist"]:.3f} of a guesser that has located the
-    answer but cannot break the tie, and far under the
-    {stats["nulls"]["open"]["blind"]["dist"]:.3f} of one that ignores the prompt.
+    {np.mean([acc(c, "open", "guess_dist").mean() for c in CONDS]):.3f}, spanning
+    {max(acc(c, "open", "guess_dist").mean() for c in CONDS) - min(acc(c, "open", "guess_dist").mean() for c in CONDS):.3f}
+    from end to end.
+
+    Where that sits against the nulls needs stating carefully, because it is not
+    flattering and it is not about the anchor. The floor is
+    {stats["nulls"]["open"]["floor_dist"]:.3f} and a guesser that flips a coin
+    between the two names bracketing the true mix scores
+    {stats["nulls"]["open"]["k2"]["dist"]:.3f} — so at
+    {np.mean([acc(c, "open", "guess_dist").mean() for c in CONDS]):.3f} these
+    models are *worse* than that bracketing guesser, picking the nearest name
+    about {np.mean([acc(c, "open", "nearest_acc").mean() for c in CONDS]):.0%} of
+    the time against its 50%. They are far better than the
+    {stats["nulls"]["open"]["blind"]["dist"]:.3f} of a guesser that ignores the
+    prompt, so the color is being read; it is the last step of resolving between
+    two adjacent names that is imperfect. That is a property of the `v216`
+    testbed, not of anchoring: the control sits at
+    {acc("lam0", "open", "guess_dist").mean():.3f} with everything else. H1 asks
+    whether the anchor moved this number, and it did not.
 
     The ceiling arm is the interesting row. At $\lambda_\text{{a}} = 1$, ten
     times the scoring rung and three times the largest weight ex-2.1.6 swept,
@@ -729,9 +743,13 @@ def _(LABELS, grading, m_op1):
         alt_text="""
             Four panels, one per factorial condition, showing the per-color
             alignment at the first operand against the redness of that color.
-            The two bare conditions lift the whole cube well above the control;
-            the two anti conditions hold most colors near the control and raise
-            only the reddest ones.
+            The panels grade progressively from top left to bottom right. Span
+            with a bare anchor is a nearly flat band near 0.5 across every
+            color, barely rising with redness. Adding the repulsive term drops
+            the grey and green end to about 0.25 while the red end stays near
+            0.9. Narrowing the pull to op1 drops the low end further, to about
+            0.15 bare and 0.05 with the repulsive term, giving a clean rise from
+            near the control baseline up to about 0.9 at the reddest colors.
         """,
         caption=r"""
             Alignment at op1, per color: $\alpha_c$, the layer mean of
@@ -794,14 +812,25 @@ def _(alpha_bar, grading, m_op1):
     any single one; `op1-anti` clears the gate by
     {m_op1("op1-anti").mean() - ex.MARGIN_GATE:.2f}, roughly four seed-mean noise
     units, so the pass does not rest on that maximum. (b) The response is graded
-    on both conditions and on both tracks-of-record: `op1-bare` reaches
-    ρ = {grading("op1-bare")[1]:.3f} against `redness` and `op1-anti` reaches
-    R² = {grading("op1-anti")[2]:.3f} against `sim¹·⁵`, each clearing its 0.8
-    gate. The scatter shows why: a rise across the whole cube rather than a step
-    at the label threshold, so the anchor caught *red* and not merely the
-    exemplars that happened to be labeled. Both are also far above the
-    step-response ceilings ex-2.1.6 derived ({ex.STEP_RHO_CEILING:.2f} on the
-    rank track), which is the check that rules a step out. (c) The control sits
+    on both conditions — but each clears a different one of the two tracks, and
+    neither clears both. `op1-bare` reaches ρ = {grading("op1-bare")[1]:.3f}
+    against `redness` with R² = {grading("op1-bare")[2]:.3f}; `op1-anti` reaches
+    R² = {grading("op1-anti")[2]:.3f} against `sim¹·⁵` with
+    ρ = {grading("op1-anti")[1]:.3f}. The gate is a disjunction, so one track is
+    what it asks for and both conditions pass as written. Still, `op1-bare`
+    clears the rank track by {grading("op1-bare")[1] - ex.GRADE_RHO_GATE:.3f},
+    which is thin enough that the pass should be read as resting on `op1-anti`'s
+    R², which clears by {grading("op1-anti")[2] - ex.GRADE_R2_GATE:.2f}.
+
+    The step ceilings are the check that makes this a claim about gradedness
+    rather than magnitude: a pure step response can score at most
+    {ex.STEP_RHO_CEILING:.2f} on the rank track and {ex.STEP_R2_CEILING:.2f} on
+    the proportionality track. `op1-anti`'s R² clears its ceiling by
+    {grading("op1-anti")[2] - ex.STEP_R2_CEILING:.2f}, `op1-bare`'s ρ by only
+    {grading("op1-bare")[1] - ex.STEP_RHO_CEILING:.2f}. The scatter is the more
+    convincing evidence in any case: a rise across the whole cube rather than a
+    step at the label threshold, so the anchor caught *red* and not merely the
+    exemplars that happened to be labeled. (c) The control sits
     at $|m_{{\text{{op1}}}}| = {abs(m_op1("lam0").mean()):.3f}$, inside its 0.1
     ceiling.
 
@@ -814,14 +843,19 @@ def _(alpha_bar, grading, m_op1):
     was the predicted fix, and alone it gets most of the way rather than all of
     it.
 
-    **The replication is exact.** `span-bare` re-runs ex-2.1.6's
-    $\lambda = 0.1$ condition through this experiment's code, which now carries
-    a second regularizer term at weight zero. It returns
-    $m_{{\text{{op1}}}} = {m_op1("span-bare").mean():.3f}$ against a published
-    {_EX216_M:.4f}, and $\bar\alpha = {alpha_bar("span-bare").mean():.3f}$
-    against a published {_EX216_A:.4f}. So the comparisons in this report are
-    between conditions that went through identical code, and the ex-2.1.6
-    numbers they are read against are reproduced rather than assumed.
+    **The replication is bit-identical, which is the useful kind here.**
+    `span-bare` re-runs ex-2.1.6's $\lambda = 0.1$ condition through this
+    experiment's code, which now carries a second regularizer term at weight
+    zero. It returns $m_{{\text{{op1}}}} = {m_op1("span-bare").mean():.3f}$
+    against a published {_EX216_M:.4f} and
+    $\bar\alpha = {alpha_bar("span-bare").mean():.3f}$ against
+    {_EX216_A:.4f} — and the agreement is digit-for-digit per seed, not merely
+    within noise. That is worth reading as what it is. It does not independently
+    corroborate ex-2.1.6, since nothing stochastic was re-rolled; what it
+    verifies is that adding a zero-weighted term perturbed neither the numerics
+    nor the RNG stream. So the ex-2.1.6 comparisons this report leans on are
+    reproduced rather than assumed, and the four factorial conditions differ from
+    each other only in the two factors.
     """)
     return
 
@@ -887,11 +921,17 @@ def _(m_op1):
 
 
 @app.cell(hide_code=True)
-def _(m_op1):
+def _(cells, m_op1):
     _sb, _sa, _ob, _oa = (float(m_op1(c).mean()) for c in ("span-bare", "span-anti", "op1-bare", "op1-anti"))
     _anti = (_sa + _oa) / 2 - (_sb + _ob) / 2
     _op1 = (_ob + _oa) / 2 - (_sb + _sa) / 2
     _int = (_sb + _oa) - (_sa + _ob)
+
+    def _per_seed(seed: int) -> tuple[float, float]:
+        """(anti, op1) main effects computed within one seed, so the seed cancels."""
+        sb, sa, ob, oa = (cells[f"{c}-s{seed}"]["m_op1"] for c in ("span-bare", "span-anti", "op1-bare", "op1-anti"))
+        return (sa + oa) / 2 - (sb + ob) / 2, (ob + oa) / 2 - (sb + sa) / 2
+
     mo.md(rf"""
     **H3 fails, on the first of its two named contrary readings.** Both main
     effects clear {ex.MAIN_EFFECT_GATE:g}: the repulsive term is worth
@@ -905,7 +945,12 @@ def _(m_op1):
 
     Some care about what "larger" is worth here. The gap between the two effects
     is {abs(_op1 - _anti):.3f}, about {abs(_op1 - _anti) / ex.NOISE_SEED_MEAN:.0f}
-    noise units, so the ordering is not a coin flip. But the two factors are not
+    noise units on the generic seed-mean floor — but that floor understates the
+    case, because both effects can be computed within a seed and then compared
+    pairwise, which cancels the seed. Done that way the op1-only effect is the
+    larger on every seed, with no overlap between the two sets
+    ({", ".join(f"{_per_seed(s)[1]:.2f} vs {_per_seed(s)[0]:.2f}" for s in ex.SEEDS)}),
+    so the ordering is not carried by one lucky run. But the two factors are not
     on a common scale — one changes how many positions are pulled, the other adds
     a term at a weight copied from another experiment — so this says the
     *particular* settings tried favor the span, and not that repulsion is
@@ -1066,6 +1111,10 @@ def _(ANCHORED, alpha_bar, traj):
     def _ratios(cond: str) -> list[float]:
         return [float(t[-1] / t.max()) for s in ex.SEEDS if (t := traj(cond, s, "m_op1")).max() >= ex.H4_FLOOR]
 
+    def _peak(cond: str) -> list[float]:
+        """The epoch at which each seed's margin trajectory peaks."""
+        return [float(traj(cond, s, "epoch")[traj(cond, s, "m_op1").argmax()]) for s in ex.SEEDS]
+
     _held = [c for c in ANCHORED if _ratios(c) and min(_ratios(c)) >= ex.H4_RETENTION]
     _slid = [c for c in ANCHORED if _ratios(c) and min(_ratios(c)) < ex.H4_RETENTION]
     mo.md(rf"""
@@ -1093,22 +1142,32 @@ def _(ANCHORED, alpha_bar, traj):
     {ex.H4_RETENTION:g}× their peak
     ({", ".join(f"`{c}`" for c in _held)}), and {len(_slid)} slide below it
     ({", ".join(f"`{c}`" for c in _slid)}). The gate is written over every
-    anchored run, so H4(b) fails — but the split is clean and it runs along the
-    same seam as H3. The conditions that pull the whole prompt span slide; the
-    conditions that pull op1 alone hold, at
+    anchored run, so H4(b) fails.
+
+    The split is informative, but it does not run purely along H3's seam. Both
+    op1 conditions hold, at
     {min(min(_ratios(c)) for c in ("op1-bare", "op1-anti")):.2f} or better across
-    all six runs. The peak also arrives later once the pull is narrow: around
-    epoch 10 in the span conditions, and between epochs 12 and 62 in the op1
-    ones, which is a slower climb to a higher place rather than an early peak
-    that erodes.
+    all six runs — and so does `span-anti-late`, which pulls the full span. What
+    the three holding conditions have in common is that something kept the
+    color-independent shift down for most of training: a narrow pull in two of
+    them, a repulsion held near peak through epoch
+    {ex.ANTI_ANNEAL_END_LATE:g} in the third. The three that slide are the ones
+    where $\bar\alpha$ was free to climb. The peak moves later wherever that
+    happens too — epochs
+    {min(_peak("span-bare")):.0f}–{max(_peak("span-bare")):.0f} in `span-bare`,
+    {min(_peak("span-anti")):.0f}–{max(_peak("span-anti")):.0f} once the
+    repulsive term is added, and
+    {min(_peak("span-anti-late")):.0f}–{max(_peak("span-anti-late")):.0f} in the
+    timing arm — a slower climb to a higher place rather than an early peak that
+    erodes.
 
     Read with H2 and H3, that is one story rather than three. In ex-2.1.6 the
     margin rose early and then gave back a quarter of itself, and the reading
     offered there was that the rest of the cube was catching up. This experiment
-    supports that reading and identifies what was doing the catching up: the
-    three blind positions. Remove them from the pull and the slide goes with
-    them, without any repulsive term at all — `op1-bare` retains
-    {min(_ratios("op1-bare")):.2f} while carrying no anti-subspace term.
+    supports that reading and identifies the shift as the thing doing the
+    catching up. Either way of suppressing it — removing the blind positions, or
+    keeping the repulsion strong — stops the slide, and `op1-bare` does it
+    carrying no repulsive term at all.
     """)
     return
 
@@ -1182,6 +1241,11 @@ def _(geometry, margin_map):
     def _at(cond: str, key: str, layer: int) -> float:
         return float(np.mean([geometry[f"{cond}-s{s}"][key][layer] for s in ex.SEEDS]))
 
+    def _eff(key: str, factor: str = "op1", layer: int = 2) -> float:
+        """A factorial main effect read on a geometry statistic rather than on the margin."""
+        sb, sa, ob, oa = (_at(c, key, layer) for c in ("span-bare", "span-anti", "op1-bare", "op1-anti"))
+        return (ob + oa) / 2 - (sb + sa) / 2 if factor == "op1" else (sa + oa) / 2 - (sb + ob) / 2
+
     mo.md(rf"""
     The per-layer view says where the improvement lives, and it is not a uniform
     lift. In ex-2.1.6 the margin peaked in the embedding and decayed through the
@@ -1213,17 +1277,24 @@ def _(geometry, margin_map):
     The extent panel answers a question ex-2.1.6 left open. It found the bare
     anchor compressing the cube mid-stack, to
     {_at("span-bare", "spread", 2) / _at("lam0", "spread", 2):.0%} of the control
-    extent, and suggested a `separate`-style term might eventually be needed. The
-    repulsive term turns out to address it: `span-anti` keeps
-    {_at("span-anti", "spread", 2) / _at("lam0", "spread", 2):.0%} of the control
-    extent and `op1-anti` {_at("op1-anti", "spread", 2) / _at("lam0", "spread", 2):.0%}.
-    Pushing the cloud off the axis and keeping it spread are evidently related
-    here, which is worth knowing before reaching for a third term. The ceiling arm
-    is where compression does show up: at $\lambda_\text{{a}} = 1$ the cube is
-    narrower even in the token embedding
+    extent, and suggested a `separate`-style term might eventually be needed here
+    as it was in M1. On this evidence it is not. Every other factorial condition
+    recovers most of the extent, and reading the same 2×2 on spread gives the
+    same ordering H3 found on the margin: narrowing the pull is worth
+    {_eff("spread"):+.2f} and the repulsive term {_eff("spread", "anti"):+.2f}.
+    So this is not a job the repulsion does specifically — `op1-bare` reaches
+    {_at("op1-bare", "spread", 2) / _at("lam0", "spread", 2):.0%} of the control
+    extent carrying no repulsive term at all, and `op1-anti`
+    {_at("op1-anti", "spread", 2) / _at("lam0", "spread", 2):.0%}. Whatever was
+    compressing the cube, it was the color-independent shift, and anything that
+    reduces the shift restores the extent along with it.
+
+    The ceiling arm is where compression does show up: at
+    $\lambda_\text{{a}} = 1$ the cube is narrower even in the token embedding
     ({_at("span-anti-hi", "spread", 0):.2f} against
     {_at("lam0", "spread", 0):.2f} everywhere else), which the pull reaches
-    directly.
+    directly. So a `separate`-style term would start to matter past the
+    selectivity optimum, not at it.
     """)
     return
 
@@ -1335,9 +1406,12 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(CONTROL_ACC, acc, alpha_bar, grading, m_op1, traj):
+def _(CONTROL_ACC, acc, alpha_bar, cells, grading, m_op1, traj):
     def _ret(cond: str) -> float:
         return float(np.mean([traj(cond, s, "m_op1")[-1] / traj(cond, s, "m_op1").max() for s in ex.SEEDS]))
+
+    def _leak(cond: str) -> float:
+        return float(np.mean([cells[f"{cond}-s{s}"]["leak_r2"] for s in ex.SEEDS]))
 
     _dm = m_op1("span-anti-late").mean() - m_op1("span-anti").mean()
     mo.md(rf"""
@@ -1347,18 +1421,28 @@ def _(CONTROL_ACC, acc, alpha_bar, grading, m_op1, traj):
     the repulsive term finishes annealing down to its hold ratio, moved from
     {ex.ANTI_ANNEAL_END:g} to {ex.ANTI_ANNEAL_END_LATE:g}. Nothing else changes —
     same anchor, same span, same peak and hold ratios, same seeds. It beats the
-    M1 schedule on every measurement we took:
+    M1 schedule on every statistic H2 and H4 score:
 
     - margin {m_op1("span-anti-late").mean():.3f} against
       {m_op1("span-anti").mean():.3f}, a gap of {_dm:.2f} — about
-      {_dm / ex.NOISE_SEED_MEAN:.0f} noise units, and larger than the entire
+      {_dm / ex.NOISE_SEED_MEAN:.0f} noise units, and about the size of the whole
       anti-subspace main effect;
-    - containment {alpha_bar("span-anti-late").mean():.3f} against
-      {alpha_bar("span-anti").mean():.3f}, the lowest of any anchored condition;
     - retention {_ret("span-anti-late"):.2f} against {_ret("span-anti"):.2f},
       moving it from the sliding group to the holding one;
     - grading R² {grading("span-anti-late")[2]:.2f} against
-      {grading("span-anti")[2]:.2f}.
+      {grading("span-anti")[2]:.2f};
+    - containment {alpha_bar("span-anti-late").mean():.3f} against
+      {alpha_bar("span-anti").mean():.3f}, the lowest of any anchored condition —
+      listed last because it is the least surprising of the four. More repulsion
+      for longer lowering the quantity the repulsion penalizes is close to
+      definitional; the margin and retention rows are what make it a result.
+
+    The one measurement that does not improve is off-axis leakage, where the arm
+    is the highest of any condition ({_leak("span-anti-late"):.2f} against
+    {_leak("span-anti"):.2f}) — a direction this report treats elsewhere as one
+    you would rather not see grow. It is a small difference on a measurement with
+    no gate, but it is the reason to say "every scored statistic" rather than
+    "everything".
 
     The arm was written to ask whether the M1 recipe is forgiving on this axis,
     with either answer acceptable and no gate attached. It is not forgiving: a
@@ -1385,11 +1469,14 @@ def _(CONTROL_ACC, acc, alpha_bar, grading, m_op1, traj):
     ceiling would need a dedicated sweep well above $\lambda_\text{{a}} = 1$.
 
     But the selectivity ceiling has been passed. At ten times the weight the
-    margin is {m_op1("span-anti-hi").mean():.3f} — *below* `span-anti`'s
-    {m_op1("span-anti").mean():.3f} at a tenth of it — with
+    margin is {m_op1("span-anti-hi").mean():.3f}, level with `span-anti`'s
+    {m_op1("span-anti").mean():.3f} at a tenth of it — the gap is
+    {abs(m_op1("span-anti-hi").mean() - m_op1("span-anti").mean()):.3f}, inside
+    the seed-mean noise floor, so read it as "no better" rather than "worse". The
+    other three measurements are outside the noise and all point one way:
     $\bar\alpha$ back up to {alpha_bar("span-anti-hi").mean():.3f}, retention
     down to {_ret("span-anti-hi"):.2f}, and the cube compressed even in the token
-    embedding. So a heavier pull buys more alignment and less selectivity: it
+    embedding. So a heavier pull buys more alignment and no more selectivity: it
     reaches the point where moving everything is the cheapest way to satisfy the
     term, which is ex-2.1.6's failure mode arrived at from a different direction.
     The practical consequence is that the anchor weight is not the knob to turn
@@ -1403,8 +1490,107 @@ def _():
     mo.md(r"""
     ## Exploratory analyses
 
-    Anything conceived after the results were seen lands here, marked post
-    hoc. Reserved.
+    Post hoc: conceived after seeing the results, scoring no hypothesis. It reads
+    the preregistered measurements rather than anything new.
+
+    ### Why doesn't the repulsive term push *red* off the anchor too? (post hoc)
+
+    The anti-subspace term is indiscriminate by construction — it penalizes
+    $\cos^2(h, \hat v_{\text{red}})$ over every position of every line, labeled
+    or not. So the timing arm should be alarming: holding that penalty near peak
+    for another forty epochs ought to push the anchored concept off the anchor
+    along with everything else, and instead it produces the best margin in the
+    experiment. Either the term is somehow sparing the labeled lines, or the two
+    effects are not the same size.
+
+    It is the second. Decomposing the margin into its two halves shows the term
+    does reach *red* — it just loses the race.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS, arrays, stats):
+    _top = np.argsort(ex.REDNESS)[-10:]  # the ten reddest colors, carrying 85% of the label mass
+
+    def _alpha(cond: str) -> np.ndarray:
+        return np.mean([arrays[f"{cond}-s{s}/alpha"] for s in ex.SEEDS], axis=0)[:, :, 0].mean(axis=0)
+
+    def _row(cond: str) -> str:
+        a = _alpha(cond)
+        return (
+            f"<tr><th>{cond}</th><td class='num'>{a[_top].mean():.3f}</td>"
+            f"<td class='num'>{a.mean():.3f}</td><td class='num'>{float(ex.LABEL_W @ a) - a.mean():.3f}</td></tr>"
+        )
+
+    _table = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr><th>condition</th><th class="num">ᾱ, ten reddest</th>
+      <th class="num">ᾱ, all 216</th><th class="num">margin</th></tr></thead>
+      <tbody>{"".join(_row(c) for c in CONDS)}</tbody>
+    </table></div>
+    """
+    _caption = f"""
+    The margin split into the two quantities it differences. The first column is
+    the mean alignment of the ten reddest colors — the ones carrying
+    {ex.LABEL_W[_top].sum():.0%} of the label mass, so effectively "where the
+    anchored concept sits". The second is the mean over all 216, the quantity the
+    repulsive term penalizes. Comparing <code>span-anti</code> with
+    <code>span-anti-late</code> is the case of interest: sustained repulsion costs
+    the reddest colors a little and the rest of the cube a great deal.
+    """
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays, stats):
+    _top = np.argsort(ex.REDNESS)[-10:]
+
+    def _alpha(cond: str) -> np.ndarray:
+        return np.mean([arrays[f"{cond}-s{s}/alpha"] for s in ex.SEEDS], axis=0)[:, :, 0].mean(axis=0)
+
+    _dred = _alpha("span-anti")[_top].mean() - _alpha("span-anti-late")[_top].mean()
+    _dall = _alpha("span-anti").mean() - _alpha("span-anti-late").mean()
+    # Per-batch position counts, from the design constants and the measured label rate.
+    _live = ex.BLOCK * ex.BATCH
+    _pulled = ex.LINES_PER_BATCH * stats["label_rate"] * ex.SPAN_FULL
+    mo.md(rf"""
+    Stretching the anneal costs the reddest colors
+    {_dred:.3f} of alignment and the cube as a whole {_dall:.3f} —
+    {_dall / _dred:.0f} times as much. So the term is doing exactly what its
+    definition says, *red* included; the margin improves because the same
+    indiscriminate push is far more consequential for the unlabeled bulk than
+    for the labeled reds.
+
+    The reason is in how the two terms are normalized, and it is worth spelling
+    out because it is a design detail rather than a fact about concepts. Both
+    terms are means, but over different denominators: the anchor divides by the
+    number of *pulled* positions, the repulsion by the number of *live* ones. At
+    this label rate ({stats["label_rate"]:.4f} per line) a batch carries about
+    {_pulled:.1f} pulled positions against {_live:,} live ones, so a labeled
+    state feels a pull scaled by $1/{_pulled:.1f}$ and a push scaled by
+    $1/{_live:,}$ — a per-position ratio of roughly
+    {_live / _pulled:,.0f}:1 before the weights are applied. Even at the
+    opening ratio of $\lambda_{{\bar{{\text{{s}}}}}} = {ex.ANTI_PEAK_RATIO:g}
+    \lambda_\text{{a}}$, the pull wins at a pulled position by two to three
+    orders of magnitude. An *unlabeled* state has no pull at all, so it feels
+    only the push, and goes wherever the task will let it.
+
+    Two consequences worth carrying forward. First, the repulsive term's
+    effective strength on the concept is set by the label rate, not only by
+    $\lambda_{{\bar{{\text{{s}}}}}}$ — sparser labels make the same weight
+    gentler on the anchored concept and no gentler on everything else, so the
+    two knobs interact in a way neither this experiment nor M1 has mapped.
+    Second, it explains why the timing arm has room to improve at all: at these
+    ratios the term is nowhere near strong enough to threaten the anchored
+    concept, so "more repulsion for longer" was almost free. That also predicts
+    a limit — push $\lambda_{{\bar{{\text{{s}}}}}}$ far enough and the reddest
+    colors should start to come off the axis in earnest. Finding where that
+    happens is what the queued anneal sweep should look for, and it is the point
+    at which the cos² gradient (which is proportional to $\cos$, so strongest
+    exactly on the states nearest the axis) would start to bite on *red*
+    specifically.
     """)
     return
 
@@ -1462,17 +1648,20 @@ def _(alpha_bar, grading, m_op1):
     for a 64-dimensional residual stream. That makes the anneal endpoint the
     best-supported next sweep.
 
-    **What we would do next, in order.** (1) Sweep the anti-subspace anneal
-    endpoint and hold ratio, which the timing arm makes the highest-value open
-    knob, and which separates "when the repulsion acts" from "how much of it
-    there is" — the two are confounded in the single arm run here. (2) Take the
-    position question to something that does not presume a known concept
-    position: pooling the pull over a span, or weighting positions by an
-    attention-derived estimate of where the concept sits. (3) The flattened
-    label-affinity follow-up already queued in `todo-science.md` becomes more
-    interesting now that a graded response exists to compare against, since the
-    current grading is measured under a `redness⁸` label distribution that is
-    nearly one-hot on the reddest colors.
+    **Where this leaves the open questions.** The best-supported next
+    measurement is a sweep of the anti-subspace anneal endpoint against its hold
+    ratio, since the timing arm confounds "when the repulsion acts" with "how
+    much of it there is" and a grid separates them. The position question is
+    harder and more interesting: it wants a pull that finds the concept inside a
+    labeled span rather than being told where it is — pooling over the span, or
+    weighting positions by an attention-derived estimate. And the flattened
+    label-affinity question raised in earlier experiments reads differently now
+    that a graded response exists to compare against, since the grading here is
+    measured under a `redness⁸` distribution that puts
+    {ex.LABEL_W[np.argsort(ex.REDNESS)[-10:]].sum():.0%} of its mass on ten
+    colors. The exploratory section adds a fourth: the repulsive term's strength
+    relative to the anchored concept turns out to be set by the label rate as
+    much as by its weight, and that interaction is unmapped.
 
     One thing this experiment does *not* license. The off-axis leakage is
     unchanged from ex-2.1.6 in every condition: redness stays as readable from

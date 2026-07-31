@@ -14,6 +14,25 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Teach the skills and review agents to check for tautologies (2026-07-31).**
+  Ex-2.1.7's H4(a) scored the containment of ᾱ in conditions carrying a term
+  that is *defined* as a penalty on ᾱ, so "the repulsive term lowers ᾱ" was
+  never going to be news — the gate could only ever measure whether the weight
+  was large enough, not whether the mechanism explains anything. It went
+  unnoticed through preregistration and a prereg review round, and was caught
+  only when writing up the results. The general shape: a hypothesis whose
+  statistic is the quantity a treatment directly optimizes, or a metric that
+  shares its definition with the intervention. Two places to fix it. (1) The
+  `science` skill should name the failure mode when discussing how to choose a
+  scored statistic, with the rule of thumb that a gate is informative only if a
+  reader cannot predict its direction from the method section alone. (2) The
+  `prereg-reviewer` agent should carry an explicit check — for each hypothesis,
+  ask what the treatment optimizes and whether the scored statistic is that
+  quantity, a monotone function of it, or independent of it; only the third is
+  a real test. `results-reviewer` should carry the mirror check for claims
+  built on such a gate. Worth a look at whether earlier reports have the same
+  shape. #skills #agents #methodology
+
 - **The watchdog fires during a task's post-loop artifact upload (2026-07-31).**
   Four of ex-2.1.7's 21 training cells aborted with `WatchdogStall` at step
   3300/3300 — training had finished, and the stall was `put(workdir / "model")`
