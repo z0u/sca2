@@ -11,6 +11,9 @@ Three pieces, kept separate so an experiment can use them independently:
   folds it into a training step at a scheduled weight, and `anchor_weight` is
   that schedule (ramp, hold, anneal to a floor above zero — the M1/ex-2.9.3
   lesson that protection withdrawn entirely lets the task loss reclaim the axis).
+  `anti_subspace_term` is its repulsive companion from M1: an indiscriminate
+  penalty on the mean-square alignment of *every* state, labeled or not, so the
+  pull has to buy alignment against a headwind.
 - **The labels.** `sample_anchored_batches` crops packed token blocks exactly as
   `sca.data.batches.sample_batches` does, and adds the (B, T) mask of positions
   the term pulls: the prompt span of lines whose first operand drew a label this
@@ -110,6 +113,57 @@ def anchor_weight(
     return peak * ramp * (1.0 - (1.0 - floor) * anneal)
 
 
+@dataclass(frozen=True)
+class AntiSpec:
+    """The repulsive companion to the pull, and the schedule it moves on.
+
+    M1 balanced its attractive and repulsive terms in time rather than by a
+    single ratio, so the weight is given relative to the anchor peak `lam`:
+    `peak_ratio` at epoch 0 — full strength before the anchor has ramped in —
+    annealing (minimum-jerk) to `hold_ratio` by `anneal_end` and holding there.
+    From `anchor_anneal_start` both terms share the anchor's end-of-training
+    anneal, so their ratio is constant from the hold point on.
+    """
+
+    lam: float
+    peak_ratio: float
+    hold_ratio: float
+    anneal_end: float
+    anchor_anneal_start: float
+    anchor_anneal_end: float
+    floor: float = 0.1
+
+    def __call__(self, epoch) -> np.ndarray:
+        return anti_subspace_weight(
+            epoch,
+            lam=self.lam,
+            peak_ratio=self.peak_ratio,
+            hold_ratio=self.hold_ratio,
+            anneal_end=self.anneal_end,
+            anchor_anneal_start=self.anchor_anneal_start,
+            anchor_anneal_end=self.anchor_anneal_end,
+            floor=self.floor,
+        )
+
+
+def anti_subspace_weight(
+    epoch,
+    *,
+    lam: float,
+    peak_ratio: float,
+    hold_ratio: float,
+    anneal_end: float,
+    anchor_anneal_start: float,
+    anchor_anneal_end: float,
+    floor: float,
+) -> np.ndarray:
+    """The anti-subspace weight at (fractional) *epoch*: see `AntiSpec`."""
+    e = np.asarray(epoch, dtype=float)
+    ratio = peak_ratio + (hold_ratio - peak_ratio) * smoothstep(e / anneal_end)
+    end = 1.0 - (1.0 - floor) * smoothstep((e - anchor_anneal_start) / (anchor_anneal_end - anchor_anneal_start))
+    return lam * ratio * end
+
+
 def anchor_term(states: Float[Array, "L1 B T C"], mask: Float[Array, "B T"]) -> Float[Array, ""]:
     """Mean of (1 − cos(h, e₀)) over pulled positions and residual-stream slices.
 
@@ -122,12 +176,27 @@ def anchor_term(states: Float[Array, "L1 B T C"], mask: Float[Array, "B T"]) -> 
     return jnp.sum((1.0 - cos) * mask) / (states.shape[0] * (jnp.sum(mask) + 1e-8))
 
 
-def make_anchored_train_step(optimizer: optax.GradientTransformation):
-    """Build a jitted training step for cross-entropy plus the weighted anchor term.
+def anti_subspace_term(states: Float[Array, "L1 B T C"], live: Float[Array, "B T"]) -> Float[Array, ""]:
+    """Mean of cos²(h, e₀) over every residual-stream slice and every live position.
 
-    The weight is an argument rather than a closure, so the schedule moves
-    without recompiling. Returns the two loss terms separately: the anchor term
-    is the training-side view of what the alignment measurements read later.
+    M1's anti-subspace penalty with the reserved coordinate axis replaced by our
+    anchor direction: it asks that the cloud as a whole not sit on the axis,
+    without asking any particular point to leave it. *live* selects the non-pad
+    positions — the ones the model is actually shown — and every line counts,
+    labeled or not, which is what makes the term indiscriminate.
+    """
+    cos = states[..., ANCHOR_AXIS]  # (L1, B, T)
+    return jnp.sum(cos**2 * live) / (states.shape[0] * (jnp.sum(live) + 1e-8))
+
+
+def make_anchored_train_step(optimizer: optax.GradientTransformation):
+    """Build a jitted training step for cross-entropy plus the two weighted anchor terms.
+
+    The weights are arguments rather than closures, so the schedules move
+    without recompiling. Returns the three loss terms separately: the anchor
+    term is the training-side view of what the alignment measurements read
+    later, and the anti-subspace term is the same view of the mean alignment
+    H4 scores. Pass `anti_weight=0` for a bare anchor.
     """
 
     @eqx.filter_jit
@@ -138,16 +207,19 @@ def make_anchored_train_step(optimizer: optax.GradientTransformation):
         y: Int[Array, "B T"],
         mask: Float[Array, "B T"],
         weight: Float[Array, ""],
-    ) -> tuple[LanguageModel, PyTree, Float[Array, ""], Float[Array, ""]]:
+        anti_weight: Float[Array, ""],
+    ) -> tuple[LanguageModel, PyTree, Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
         def loss_fn(model: LanguageModel):
             states, logits = model.stream_and_logits(x)
+            live = (x != 0).astype(states.dtype)
             task, anchor = cross_entropy(logits, y), anchor_term(states, mask)
-            return task + weight * anchor, (task, anchor)
+            anti = anti_subspace_term(states, live)
+            return task + weight * anchor + anti_weight * anti, (task, anchor, anti)
 
-        (_, (task, anchor)), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(model)
+        (_, (task, anchor, anti)), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(model)
         updates, opt_state = optimizer.update(grads, opt_state, eqx.filter(model, eqx.is_inexact_array))
         model = eqx.apply_updates(model, updates)
-        return model.normalize_weights(), opt_state, task, anchor
+        return model.normalize_weights(), opt_state, task, anchor, anti
 
     return train_step
 

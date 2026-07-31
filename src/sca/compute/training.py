@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
 
-from sca.anchoring import AnchorSpec, alignment, make_anchored_train_step, margin, sample_anchored_batches
+from sca.anchoring import AnchorSpec, AntiSpec, alignment, make_anchored_train_step, margin, sample_anchored_batches
 from sca.compute.data_pipelines import load_data
 from sca.compute.model import save_checkpoint
 from sca.config import TrainingConfig
@@ -99,6 +99,7 @@ def train_anchored(
     data_dir: Path,
     *,
     anchor: AnchorSpec,
+    anti: AntiSpec | None = None,
     label_p: np.ndarray,
     probe_tokens: np.ndarray,
     probe_weights: np.ndarray,
@@ -110,15 +111,19 @@ def train_anchored(
     """Train with a concept anchor, recording the alignment trajectory as it goes.
 
     `train_model` with two additions: the loss carries the scheduled anchor term
-    (`sca.anchoring`), and every *traj_stride* steps we measure the alignment
-    margin at op1 on *probe_tokens* — one line per color, weighted by
-    *probe_weights*. A flat loss curve does not mean learning is done, so that
-    trajectory is the evidence to consult before trusting an endpoint.
+    and its optional repulsive companion (`sca.anchoring`), and every
+    *traj_stride* steps we measure the alignment margin at op1 on *probe_tokens*
+    — one line per color, weighted by *probe_weights*. A flat loss curve does not
+    mean learning is done, so that trajectory is the evidence to consult before
+    trusting an endpoint.
 
     Args:
         config: Full training configuration.
         data_dir: Directory to load the tokenized corpus from.
         anchor: Peak weight and schedule for the pull.
+        anti: Weight and schedule for the anti-subspace term, or None for a bare
+            anchor. The term runs at weight zero when absent, so the loss is the
+            same function either way.
         label_p: (vocab,) probability that a line draws a label, by its first
             operand's token; redrawn per visit.
         probe_tokens: (C, T) one line per color, that color as first operand.
@@ -155,11 +160,11 @@ def train_anchored(
     total_steps = config.scheduler.epochs * epoch_length
     tokens_per_epoch = epoch_length * config.data.batch_size * config.model.block_size
     all_metrics: list[TrainingMetrics] = []
-    keys = ("step", "epoch", "lr", "weight", "m_op1", "alpha_op1", "val_loss", "anchor")
+    keys = ("step", "epoch", "lr", "weight", "anti_weight", "m_op1", "alpha_op1", "val_loss", "anchor", "anti")
     traj: dict[str, list[float]] = {k: [] for k in keys}
     step = 0
 
-    def record(step: int, weight: float, anchor_loss: float) -> None:
+    def record(step: int, weight: float, anti_weight: float, anchor_loss: float, anti_loss: float) -> None:
         alpha = alignment(model, probe_tokens)[:, :, :1]  # (L1, C, 1): op1 only
         m_op1 = float(margin(alpha, probe_weights).mean())
         # The margin is a contrast, so it is blind to the whole cube drifting onto
@@ -169,26 +174,33 @@ def train_anchored(
         traj["epoch"].append(step / epoch_length)
         traj["lr"].append(float(jnp.asarray(schedule(step))))
         traj["weight"].append(weight)
+        traj["anti_weight"].append(anti_weight)
         traj["m_op1"].append(m_op1)
         traj["val_loss"].append(float(np.mean([float(eval_step(model, x, y)) for x, y in val_batches])))
         traj["anchor"].append(anchor_loss)
+        traj["anti"].append(anti_loss)
         emit_metrics(m_op1=m_op1)
 
     expect_metrics(loss="down", anchor="down", m_op1="up")
     for epoch in range(config.scheduler.epochs):
-        train_losses, anchor_losses = [], []
+        train_losses, anchor_losses, anti_losses = [], [], []
         for x, y, mask in sample_anchored_batches(
             train_data, config.data, config.model, epoch_length, rng, label_p, anchor.span
         ):
-            weight = float(anchor(epoch + len(train_losses) / epoch_length))
-            model, opt_state, loss, anchor_loss = train_step(model, opt_state, x, y, mask, jnp.asarray(weight))
+            at = epoch + len(train_losses) / epoch_length
+            weight = float(anchor(at))
+            anti_weight = float(anti(at)) if anti is not None else 0.0
+            model, opt_state, loss, anchor_loss, anti_loss = train_step(
+                model, opt_state, x, y, mask, jnp.asarray(weight), jnp.asarray(anti_weight)
+            )
             train_losses.append(float(loss))
             anchor_losses.append(float(anchor_loss))
+            anti_losses.append(float(anti_loss))
             step += 1
             emit_metrics(loss=float(loss), anchor=float(anchor_loss), anchor_weight=weight)
             emit_progress(step, total_steps)
             if step % traj_stride == 0:
-                record(step, weight, float(anchor_loss))
+                record(step, weight, anti_weight, float(anchor_loss), float(anti_loss))
 
         val_losses = [
             float(eval_step(model, x, y))
@@ -206,7 +218,14 @@ def train_anchored(
         if epoch > 0 and epoch % checkpoint_every == 0:
             save_checkpoint(model, config, all_metrics[-1], checkpoint_dir)
 
-    record(step, float(anchor(config.scheduler.epochs)), float(np.mean(anchor_losses)))
+    end = config.scheduler.epochs
+    record(
+        step,
+        float(anchor(end)),
+        float(anti(end)) if anti is not None else 0.0,
+        float(np.mean(anchor_losses)),
+        float(np.mean(anti_losses)),
+    )
     if all_metrics:
         save_checkpoint(model, config, all_metrics[-1], checkpoint_dir)
 

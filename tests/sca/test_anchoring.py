@@ -1,5 +1,7 @@
 """Concept anchoring: the pull lands on the right positions, and it moves the stream."""
 
+from dataclasses import replace
+
 import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
@@ -9,8 +11,10 @@ from sca.anchoring import (
     LINE_TOKENS,
     PROMPT_SPAN,
     AnchorSpec,
+    AntiSpec,
     alignment,
     anchor_term,
+    anti_subspace_term,
     margin,
     sample_anchored_batches,
     smoothstep,
@@ -123,6 +127,82 @@ def test_anchor_term_is_zero_when_aligned_and_two_when_opposed():
     assert float(anchor_term(jnp.asarray(states), jnp.zeros_like(jnp.asarray(mask)))) == 0.0
 
 
+def test_anti_subspace_term_reads_the_mean_square_alignment_of_live_positions():
+    # Half the positions on the axis, half orthogonal to it: mean cos² = 1/2.
+    states = np.zeros((3, 2, 4, 8), dtype=np.float32)
+    states[:, 0, :, 0] = 1.0  # first sequence sits on the anchor
+    states[:, 1, :, 1] = 1.0  # second sits orthogonal to it
+    live = np.ones((2, 4), dtype=np.float32)
+    np.testing.assert_allclose(anti_subspace_term(jnp.asarray(states), jnp.asarray(live)), 0.5, rtol=1e-6, atol=0)
+
+    # It is blind to sign, where the anchor term is not: -e₀ is as penalized as +e₀.
+    np.testing.assert_allclose(
+        anti_subspace_term(jnp.asarray(-states), jnp.asarray(live)),
+        anti_subspace_term(jnp.asarray(states), jnp.asarray(live)),
+        rtol=1e-6,
+        atol=0,
+    )
+
+    # Dead positions are excluded, so masking out the aligned sequence leaves zero.
+    dead = np.array([[0, 0, 0, 0], [1, 1, 1, 1]], dtype=np.float32)
+    np.testing.assert_allclose(anti_subspace_term(jnp.asarray(states), jnp.asarray(dead)), 0.0, rtol=0, atol=1e-6)
+    assert float(anti_subspace_term(jnp.asarray(states), jnp.zeros_like(jnp.asarray(live)))) == 0.0
+
+
+def test_anti_subspace_schedule_opens_high_and_holds_at_its_ratio():
+    spec = AntiSpec(
+        lam=0.1,
+        peak_ratio=2.5,
+        hold_ratio=0.03,
+        anneal_end=50,
+        anchor_anneal_start=90,
+        anchor_anneal_end=100,
+        floor=0.1,
+    )
+    np.testing.assert_allclose(spec(0), 0.25, rtol=1e-12, atol=0)  # full strength before the anchor ramps in
+    np.testing.assert_allclose(spec(50), 0.003, rtol=1e-12, atol=0)  # the hold ratio
+    np.testing.assert_allclose(spec(90), 0.003, rtol=1e-12, atol=0)  # and it holds
+    np.testing.assert_allclose(spec(100), 0.0003, rtol=1e-12, atol=0)  # shares the anchor's end anneal
+    # Stretching the anneal holds the repulsion higher for longer, same endpoints.
+    late = replace(spec, anneal_end=90)
+    assert late(50) > spec(50)
+    np.testing.assert_allclose(late(0), spec(0), rtol=1e-12, atol=0)
+    np.testing.assert_allclose(late(90), spec(90), rtol=1e-9, atol=0)
+
+
+def test_the_anti_subspace_term_pushes_the_cloud_off_the_axis(data_dir, tmp_path):
+    """The repulsive term works on unlabeled lines too, so it lowers the mean alignment.
+
+    Run with no labels at all, so the pull never fires and the only thing acting
+    on the axis is the repulsion.
+    """
+    tokens, weights = probe_set()
+    ends = {}
+    for ratio in (0.0, 2.5):
+        anchor = AnchorSpec(peak=0.1, warmup_epochs=2, anneal_start=13, anneal_end=15)
+        _, _, traj = train_anchored(
+            training_config(),
+            data_dir,
+            anchor=anchor,
+            anti=AntiSpec(
+                lam=0.1,
+                peak_ratio=ratio,
+                hold_ratio=ratio,
+                anneal_end=8,
+                anchor_anneal_start=13,
+                anchor_anneal_end=15,
+            ),
+            label_p=np.zeros(64),  # nothing is ever labeled
+            probe_tokens=tokens,
+            probe_weights=weights,
+            checkpoint_dir=tmp_path / f"ckpt{ratio}",
+            traj_stride=5,
+        )
+        ends[ratio] = traj
+    assert abs(float(ends[0.0]["anti"][-1])) > abs(float(ends[2.5]["anti"][-1]))
+    assert float(ends[2.5]["anti_weight"][0]) > 0
+
+
 def test_margin_is_the_weighted_minus_the_plain_mean():
     alpha = np.array([[[0.0], [1.0], [2.0], [3.0]]], dtype=np.float32).transpose(0, 1, 2)  # (1, 4, 1)
     weights = np.array([0.0, 0.0, 0.0, 1.0])
@@ -199,7 +279,11 @@ def test_anchoring_moves_the_labeled_color_toward_the_axis(data_dir, tmp_path):
             traj_stride=5,
         )
         assert len(metrics) == 15
-        assert set(traj) == {"step", "epoch", "lr", "weight", "m_op1", "alpha_op1", "val_loss", "anchor"}
+        assert set(traj) == {
+            *("step", "epoch", "lr", "weight", "anti_weight", "m_op1"),
+            *("alpha_op1", "val_loss", "anchor", "anti"),
+        }
+        assert not any(traj["anti_weight"])  # no repulsive term in this pair
         trajectories[peak] = traj
 
     anchored, control = trajectories[1.0], trajectories[0.0]
