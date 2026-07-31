@@ -968,148 +968,195 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(ANCHORED, CONDS: list[str], LABELS, traj):
+def _():
+    # Weight schedules for the figure, computed from `CONDITIONS` via the same
+    # functions the training loop calls. That way the figure cannot show a
+    # schedule the runs did not actually train under. These are sampled finely;
+    # the recorded trajectories, by contrast, are coarse and start after the
+    # warmup.
+    SCHED_E = np.linspace(0, ex.SCHEDULER.epochs, 1001)
+
+    def _curves(c: dict) -> list[tuple[str, np.ndarray]]:
+        curves = [("anchor", ex.anchor_weight(SCHED_E, peak=c["lam"]))]
+        if c["anti"]:
+            curves.append(("anti", ex.anti_subspace_weight(
+                SCHED_E, lam=c["lam"], anneal_end=c.get("anti_anneal_end", ex.ANTI_ANNEAL_END),
+            )))  # fmt: skip
+        return curves
+
+    SCHEDULES = {c["name"]: _curves(c) for c in ex.CONDITIONS}
+    """(term, weight) curves per condition, `term` being one of anchor, anti, ghost."""
+
+    # Each arm is a variation on the primary schedule, so wherever an arm is
+    # drawn, the primary schedule is also drawn in ghost ink. This mirrors the
+    # faint traces in the trajectory panels.
+    _GHOST = [("ghost", w) for _, w in SCHEDULES[ex.PRIMARY]]
+    SCHEDULES |= {c: _GHOST + SCHEDULES[c] for c in ("span-anti-late", "span-anti-hi")}
+    return SCHEDULES, SCHED_E
+
+
+@app.cell(hide_code=True)
+def _(ANCHORED, CONDS: list[str], LABELS, SCHEDULES, SCHED_E, traj):
     _EX216_ALPHA = 0.5257  # the published ex-2.1.6 λ=0.1 endpoint for ᾱ
     _KEYS = ("alpha_op1", "m_op1")
-    # Seed means, once: @themed draws the figure a second time for the dark variant.
+    # Compute seed means once, outside the plot function: @themed calls it
+    # twice (light and dark variants).
     _MEAN = {c: {k: np.mean([traj(c, s, k) for s in ex.SEEDS], axis=0) for k in _KEYS} for c in CONDS}
     _EPOCHS = np.mean([traj("span-anti", s, "epoch") for s in ex.SEEDS], axis=0)
-    # A column per weight schedule, so the schedule can be drawn once beneath the
-    # conditions that share it: no repulsion, annealed repulsion, and the two arms.
-    # Rows are the two anchor widths in the first two columns. The control is not a
-    # column of its own — it is drawn into every panel as the reference pair.
+    # Each condition gets a pair of axes: the trajectory on top, and directly
+    # under it the weight schedule that condition trained under. The spacer row
+    # separates the two blocks while keeping each pair together. In the first
+    # two columns, rows are the two anchor widths; the third column holds the
+    # two arms. The control has no column of its own; instead it is drawn into
+    # every panel as a grey reference pair.
     _GRID = [
         ["span-bare", "span-anti", "span-anti-late"],
+        ["w-span-bare", "w-span-anti", "w-span-anti-late"],
+        [".", ".", "."],
         ["op1-bare", "op1-anti", "span-anti-hi"],
-        ["w-bare", "w-anti", "w-arms"],
+        ["w-op1-bare", "w-op1-anti", "w-span-anti-hi"],
     ]
-    _PANELS = [c for row in _GRID[:2] for c in row]
-    # The schedules are design curves, so they come from the functions rather than
-    # from the recorded trajectories, which start after the warmup and are coarse.
-    _e = np.linspace(0, ex.SCHEDULER.epochs, 1001)
-    _SCHED = {
-        "w-bare": [(r"$\lambda_\mathrm{a}$", "anchor", ex.anchor_weight(_e))],
-        "w-anti": [
-            (r"$\lambda_\mathrm{a}$", "anchor", ex.anchor_weight(_e)),
-            (r"$\lambda_{\bar{\mathrm{s}}}$", "anti", ex.anti_subspace_weight(_e)),
-        ],
-        "w-arms": [
-            ("ceiling", "anchor", ex.anchor_weight(_e, peak=ex.CEILING_LAMBDA)),
-            ("ceiling", "anti", ex.anti_subspace_weight(_e, lam=ex.CEILING_LAMBDA)),
-            ("late", "anchor", ex.anchor_weight(_e)),
-            ("late", "anti", ex.anti_subspace_weight(_e, anneal_end=ex.ANTI_ANNEAL_END_LATE)),
-        ],
-    }
+    _PANELS = [c for r in (0, 3) for c in _GRID[r]]
+    _LEFT = ("span-bare", "op1-bare")
 
     @themed(
         name="trajectories",
         alt_text="""
-            Six panels of training curves in a three-by-two grid, one per
-            condition, with a log-scale weight-schedule panel under each
-            column, all sharing the epoch axis. Each panel draws the
-            condition's mean alignment solid and its margin dashed, over a
-            grey control pair and faint traces of the other conditions. Rules
-            mark the containment gates at 0.1 and 0.25, the margin floor at
-            0.2, and the ex-2.1.6 endpoint at 0.53. In the anti conditions the
+            Six pairs of panels in a three-by-two grid, one pair per condition,
+            sharing the epoch axis. In each pair, the upper panel shows mean
+            alignment (solid) and margin (dashed) over a grey control pair and
+            faint traces of the other conditions; the shorter log-scale panel
+            below shows that condition's weight schedule, anchor in red and
+            repulsion in blue. Carets on the left spine mark the containment
+            gates at 0.1 and 0.25; one on the right marks the margin floor at
+            0.2. A dotted rule at the ex-2.1.6 endpoint of 0.53, labeled in the
+            first panel, meets the solid line there. In the anti conditions the
             margin climbs early, while the repulsion is strong; mean alignment
-            stays near the control until the anneal hands the repulsion down,
-            then climbs — latest in the late arm.
+            stays near the control until the anneal lowers the repulsion, then
+            climbs, latest in the late arm, whose blue curve descends latest.
         """,
         caption=rf"""
-            Training dynamics, one panel per condition: seed means of the two
-            cosines on the anchor axis, on one shared scale. Solid is
-            $\bar\alpha$, the mean alignment over all 216 colors at op1;
-            dashed is the margin $m_{{\text{{op1}}}}$. The grey pair is the
-            control and the faint lines are the other conditions. The
-            caret-marked rules are H4(a)'s grading levels for $\bar\alpha$,
-            the dashed rule is H4(b)'s floor for $m_{{\text{{op1}}}}$, and the
-            dotted rule is the published ex-2.1.6 endpoint of
-            {_EX216_ALPHA:.2f}. Seed spread is carried by the H4 table below.
-            Bottom row: the weight schedules each column trained under, in the
-            colors of the schedules figure above; in the third column, solid
-            is the ceiling arm and dashed the late arm.
+            Training dynamics, one pair of panels per condition. Above: seed
+            means of the two cosines on the anchor axis, on one shared scale.
+            Solid is $\bar\alpha$, the mean alignment over all 216 colors at
+            op1; dashed is the margin $m_{{\text{{op1}}}}$. The grey pair is
+            the control; the faint lines are the other conditions. The carets
+            on the left spine are the H4(a) grading levels for $\bar\alpha$,
+            and the one on the right is the H4(b) floor for
+            $m_{{\text{{op1}}}}$. The dotted rule is the published ex-2.1.6
+            endpoint of {_EX216_ALPHA:.2f}. Since span-bare re-runs that cell,
+            its solid line landing on the rule is the reproduction check. Seed
+            spread is given in the H4 table below.
+            Below each: the weight schedule that condition trained under, in
+            the colors of the schedules figure above: anchor $\lambda_\mathrm{{a}}$
+            in red, repulsion $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue (absent
+            in the bare conditions). The two arms in the third column also show
+            the primary schedule in ghost ink, since each is a variation on it.
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axd = plt.subplot_mosaic(_GRID, figsize=(7.5, 5.6), height_ratios=[3, 3, 1.7], sharex=True)
+        # A tall mosaic: trajectory row, schedule row, spacer, then both again.
+        fig, axd = plt.subplot_mosaic(
+            _GRID, figsize=(7.5, 6), height_ratios=[3, 1.5, 0.45, 3, 1.5], sharex=True,
+        )  # fmt: skip
         _ink = dict(zip(CONDS, light_dark(
             ["#999", "#f2b134", "#c1332a", "#e08a2e", "#7a2320", "#3d7ea6", "#5c3d8f"],
             ["#888", "#ffcc66", "#f0665a", "#ffab5e", "#b8564d", "#6ab0d4", "#a78bd6"],
         ), strict=True))  # fmt: skip
         _grey = light_dark("#999", "#777")
         _ghost = light_dark("#e2e2e2", "#333")
-        # The ᾱ gates, in a pale steel blue: solid but quieter than any data line,
-        # and apart from the grey rules (dashed margin floor, dotted endpoint).
-        _gate = light_dark("#a4bdd1", "#41607a")
-        _term = {"anchor": light_dark("#c33", "#e66"), "anti": light_dark("#36c", "#7af")}
-        _dash = (0, (4, 2))
-        # One scale for every panel: a condition's height should mean the same thing everywhere.
+        # The H4 levels, in a pale steel blue: quiet against the data, and
+        # distinct from the grey of the control and the ex-2.1.6 rule.
+        # _gate = light_dark("#a4bdd1", "#41607a")
+        _gate = light_dark("#555", "#bbb")
+        _term = {"anchor": light_dark("#c33", "#e66"), "anti": light_dark("#36c", "#7af"), "ghost": _ghost}
+        _dash = (0, (6, 1))
+        # One y-scale for every panel, so a line's height means the same thing everywhere.
         top = max(max(np.max(_MEAN[c]["alpha_op1"]), np.max(_MEAN[c]["m_op1"])) for c in ANCHORED)
         for cond in _PANELS:
             ax = axd[cond]
             for other in _PANELS:
                 if other != cond:
-                    ax.plot(_EPOCHS, _MEAN[other]["alpha_op1"], color=_ghost, lw=0.7, zorder=1)
-                    ax.plot(_EPOCHS, _MEAN[other]["m_op1"], color=_ghost, lw=0.7, zorder=1)
+                    ax.plot(_EPOCHS, _MEAN[other]["alpha_op1"], color=_ghost, lw=0.4, zorder=1)
+                    ax.plot(_EPOCHS, _MEAN[other]["m_op1"], color=_ghost, lw=0.4, zorder=1)
+            # Mark each level with a caret on the spine, rather than a rule
+            # across the whole panel. Under this transform, x is in axes
+            # coordinates: 0 is the left spine and 1 the right. Markers 9 and 8
+            # have their base at the point, so each protrudes inward. The gates
+            # for ᾱ go on the left spine and the floor for m on the right,
+            # which tells them apart without needing a second color.
             for _level in (ex.MEAN_ALIGN_GATE, ex.MEAN_ALIGN_PARTIAL):
-                ax.axhline(_level, color=_gate, lw=0.8, zorder=2)
-                # A caret on the spine names the level as a gate; marker 9 has its
-                # base at the point, so it protrudes into the panel from the axis.
-                ax.plot(0, _level, marker=9, ms=6, color=_gate, clip_on=False, zorder=6,
+                ax.plot(0, _level, marker=9, ms=3, color=_gate, clip_on=False, zorder=6,
                         transform=ax.get_yaxis_transform())  # fmt: skip
+            ax.plot(1, ex.H4_FLOOR, marker=8, ms=3, color=_gate, clip_on=False, zorder=6,
+                    transform=ax.get_yaxis_transform())  # fmt: skip
+            # The one full-width rule: it marks an outside result, not a level
+            # on our own axis, so a caret would be the wrong device.
             ax.axhline(_EX216_ALPHA, color=_grey, lw=0.8, ls=(0, (1, 2.5)), zorder=2)
-            ax.axhline(ex.H4_FLOOR, color=_grey, lw=0.8, ls=_dash, zorder=2)
             ax.plot(_EPOCHS, _MEAN["lam0"]["alpha_op1"], color=_grey, lw=1.1, zorder=3)
             ax.plot(_EPOCHS, _MEAN["lam0"]["m_op1"], color=_grey, lw=1.1, ls=_dash, zorder=3)
-            ax.plot(_EPOCHS, _MEAN[cond]["m_op1"], color=_ink[cond], lw=1.5, ls=_dash, zorder=4)
+            ax.plot(_EPOCHS, _MEAN[cond]["m_op1"], color=_ink[cond], lw=1.4, ls=_dash, zorder=4)
             ax.plot(_EPOCHS, _MEAN[cond]["alpha_op1"], color=_ink[cond], lw=1.7, zorder=5)
             ax.set_title(LABELS[cond], fontsize=9.5, color=_ink[cond])
             ax.set_xlim(0, ex.SCHEDULER.epochs)
             ax.set_ylim(-0.08, top * 1.08)
-            ax.tick_params(labelbottom=False, labelleft=cond in ("span-bare", "op1-bare"))
-        axd["span-bare"].set_ylabel("cosine")
-        axd["op1-bare"].set_ylabel("cosine")
-        # The control is named where it runs, once; elsewhere the grey pair is enough.
-        # The label sits on its own line, so a halo keeps it legible over the ink.
+            ax.tick_params(labelbottom=False, labelleft=cond in _LEFT)
+        axd["span-bare"].set_ylabel("cosine", fontsize="x-small")
+        axd["op1-bare"].set_ylabel("cosine", fontsize="x-small")
+        # Label the control once, next to its line; elsewhere the grey pair is
+        # recognizable on its own. The label sits over other ink, so a white
+        # halo keeps it legible.
         import matplotlib.patheffects as pe
 
+        _halo = [pe.withStroke(linewidth=2.5, foreground=light_dark("#ffffff", "#000000"))]
         axd["span-bare"].annotate(
             "control", (55, _MEAN["lam0"]["alpha_op1"][-1]), fontsize=7.5, color=_grey, va="center", ha="center",
-            path_effects=[pe.withStroke(linewidth=2.5, foreground=light_dark("#ffffff", "#000000"))],
+            path_effects=_halo,
         )  # fmt: skip
-        # The two line styles are keyed once, above the grid, in neutral ink: within
-        # a panel the color says only which condition it is.
+        # Label the dotted rule in the panel that re-runs it. span-bare repeats
+        # the λ=0.1 cell of ex-2.1.6, so its solid line landing on the rule is
+        # the reproduction check; labeling it there makes that point without a
+        # legend entry.
+        axd["span-bare"].annotate(
+            "ex-2.1.6", (72, _EX216_ALPHA), fontsize=7.5, color=_grey, va="bottom", ha="center",
+            path_effects=_halo,
+        )  # fmt: skip
+        # Key the two line styles once, above the grid, in neutral ink. Within
+        # a panel, color only distinguishes conditions.
         fig.legend(
             [plt.Line2D([], [], color=_grey, lw=1.7), plt.Line2D([], [], color=_grey, lw=1.5, ls=_dash)],
             [
-                rf"$\bar\alpha$ (axis carets at {ex.MEAN_ALIGN_GATE:g} and {ex.MEAN_ALIGN_PARTIAL:g})",
-                rf"$m_{{\text{{op1}}}}$ (dashed rule at {ex.H4_FLOOR:g})",
+                rf"$\bar\alpha$, graded at the left carets ({ex.MEAN_ALIGN_GATE:g}, {ex.MEAN_ALIGN_PARTIAL:g})",
+                rf"$m_{{\text{{op1}}}}$, floored at the right caret ({ex.H4_FLOOR:g})",
             ],
             fontsize=8.5, frameon=False, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.0),
             labelcolor=_grey, handlelength=2.4,
         )  # fmt: skip
 
-        for key, curves in _SCHED.items():
-            ax = axd[key]
-            for label, term, w in curves:
-                ax.plot(_e, w, color=_term[term], lw=1.4, ls=_dash if label == "late" else "-")
+        # Weight schedules, one under each condition, all on the same log scale
+        # so schedules can be compared across columns as well as down a pair.
+        for cond in _PANELS:
+            ax = axd[f"w-{cond}"]
+            for term, w in SCHEDULES[cond]:
+                ax.plot(SCHED_E, w, color=_term[term], lw=1.0 if term == "ghost" else 1.4)
             ax.set_yscale("log")
             ax.set_xlim(0, ex.SCHEDULER.epochs)
             ax.set_ylim(2e-4, 4)
             ax.set_yticks([1e-3, 1e-2, 1e-1, 1e0])
             ax.minorticks_off()  # a decade of unlabelled minor ticks is a smear at this height
-            ax.set_xlabel("epoch")
-            ax.tick_params(labelleft=key == "w-bare", labelsize=7.5)
-        axd["w-bare"].set_ylabel("weight")
-        axd["w-bare"].annotate(
-            r"$\lambda_{\bar{\mathrm{s}}} = 0$", (50, 4e-4), fontsize=8, color=_term["anti"], va="bottom"
-        )
+            ax.tick_params(labelbottom=True, labelleft=cond in _LEFT, labelsize=7.5)
+        axd["w-span-bare"].set_ylabel("weight", fontsize="x-small")
+        axd["w-op1-bare"].set_ylabel("weight", fontsize="x-small")
+        for _c in _GRID[-1]:
+            axd[_c].set_xlabel("epoch", fontsize="x-small")
+        # Label the two terms once, on the panel where both are at full
+        # strength. The bare panels get a note that the repulsion is zero,
+        # so it doesn't read as merely off-scale.
+        _zero = r"$\lambda_{\bar{\mathrm{s}}} = 0$"
         for _x, _y, _txt, _k in ((62, 0.13, r"$\lambda_\mathrm{a}$", "anchor"), (36, 0.4, r"$\lambda_{\bar{\mathrm{s}}}$", "anti")):  # fmt: skip
-            axd["w-anti"].annotate(_txt, (_x, _y), fontsize=9, color=_term[_k], va="bottom")
-        # Solid is the ceiling arm and dashed the late arm, so each label sits on its own pair.
-        for _x, _y, _txt, _va in ((97, 1.2, "ceiling arm", "bottom"), (97, 4e-4, "late arm", "bottom")):
-            axd["w-arms"].annotate(_txt, (_x, _y), fontsize=7.5, color=_grey, va=_va, ha="right")
-        fig.tight_layout()
+            axd["w-span-anti"].annotate(_txt, (_x, _y), fontsize=9, color=_term[_k], va="bottom")
+        axd["w-span-bare"].annotate(_zero, (50, 4e-4), fontsize=8, color=_term["anti"], va="bottom")
+        axd["w-op1-bare"].annotate(_zero, (50, 4e-4), fontsize=8, color=_term["anti"], va="bottom")
         return fig
 
     mo.Html(_plot())
@@ -1183,7 +1230,7 @@ def _(ANCHORED, alpha_bar, traj):
     _held = [c for c in ANCHORED if _ratios(c) and min(_ratios(c)) >= ex.H4_RETENTION]
     _slid = [c for c in ANCHORED if _ratios(c) and min(_ratios(c)) < ex.H4_RETENTION]
     mo.md(rf"""
-    **H4 fails on both parts, and the pattern of failure is the finding.**
+    **H4 fails on both parts,** but the pattern of failures is interesting.
 
     (a) Containment. No anti condition at the scoring rung reaches
     $\bar\alpha \le {ex.MEAN_ALIGN_GATE:g}$:
@@ -1197,15 +1244,16 @@ def _(ANCHORED, alpha_bar, traj):
     condition down to {alpha_bar("span-anti").mean():.2f}, about a
     {1 - alpha_bar("span-anti").mean() / alpha_bar("span-bare").mean():.0%}
     reduction. But at the weight ratio carried over from M1, it only weakens the
-    cube-wide drift; it does not contain it. The trajectory shows when the
-    containment is lost. While the repulsion outweighs the pull,
-    $\bar\alpha$ sits near the control; it climbs once the anneal has brought
-    $\lambda_{{\bar{{\mathrm{{s}}}}}}$ to about a tenth of
-    $\lambda_\text{{a}}$, and each condition breaks on its own schedule —
-    around epoch 40 on the default anneal, epoch 75 on the late one. That is
-    the contrary outcome the preregistration flagged for this figure, and the
-    timing arm was positioned to test it. The exploratory section takes up
-    what this timing says about the balance between the two weights.
+    cube-wide drift; it does not contain it. The trajectory shows when
+    containment is lost. While the repulsion outweighs the pull, $\bar\alpha$
+    sits near the control. It climbs once the anneal has brought
+    $\lambda_{{\bar{{\mathrm{{s}}}}}}$ down to about a tenth of
+    $\lambda_\text{{a}}$, so each condition breaks at a time set by its own
+    schedule: around epoch 40 on the default anneal, epoch 75 on the late one.
+    The preregistration flagged this contrary outcome as a possibility for
+    this figure, and the timing arm was positioned to test it. The exploratory
+    section takes up what this timing says about the balance between the two
+    weights.
 
     (b) Retention. {len(_held)} of the six anchored conditions hold
     {ex.H4_RETENTION:g}× their peak
@@ -1213,8 +1261,8 @@ def _(ANCHORED, alpha_bar, traj):
     ({", ".join(f"`{c}`" for c in _slid)}). The gate applies to every anchored
     run, so H4(b) fails.
 
-    The split is informative, but it does not fall purely along the same line
-    as H3. Both op1 conditions hold, at
+    The split does not fall purely along the same line as H3. Both op1
+    conditions hold, at
     {min(min(_ratios(c)) for c in ("op1-bare", "op1-anti")):.2f} or better
     across all six runs. So does `span-anti-late`, which pulls the full span.
     What the three holding conditions have in common is that something kept the
@@ -1230,14 +1278,14 @@ def _(ANCHORED, alpha_bar, traj):
     the timing arm. That looks like a slower climb to a higher place, rather
     than an early peak that erodes.
 
-    Read alongside H2 and H3, this is one story rather than three. In ex-2.1.6
-    the margin rose early and then gave back a quarter of itself, and the
-    reading offered there was that the rest of the cube was catching up. This
-    experiment supports that reading, and identifies the color-independent
-    shift as the thing doing the catching up. Suppressing it either way stops
-    the slide: removing the blind positions works, and so does keeping the
-    repulsion strong. Notably, `op1-bare` stops the slide while carrying no
-    repulsive term at all.
+    This result fits together with H2 and H3. In ex-2.1.6 the margin rose
+    early and then gave back a quarter of itself, and the reading offered
+    there was that the rest of the cube was catching up. This experiment
+    supports that reading, and identifies the color-independent shift as the
+    thing doing the catching up. Suppressing it either way stops the slide:
+    removing the blind positions works, and so does keeping the repulsion
+    strong. Notably, `op1-bare` stops the slide while carrying no repulsive
+    term at all.
     """)
     return
 
@@ -1361,7 +1409,7 @@ def _(geometry, margin_map):
     color-independent shift was what compressed the cube, so anything that
     reduces the shift restores the extent along with it.
 
-    The ceiling arm is where compression does show up. At
+    Compression does show up in the ceiling arm. At
     $\lambda_\text{{a}} = 1$ the cube is narrower even in the token embedding
     ({_at("span-anti-hi", "spread", 0):.2f} against
     {_at("lam0", "spread", 0):.2f} everywhere else), and the token embedding is
@@ -1462,9 +1510,10 @@ def _(CONDS: list[str], cells):
     there still stands: redness is a function of color, the task needs the color
     cube, so a probe reading redness off the cube is not evidence of a second
     copy of the concept. What the number does establish is that anchoring
-    *concentrated* redness onto the axis without removing it from anywhere else.
-    For an intervention that is the relevant caveat — suppressing the axis will
-    not remove the model's access to redness — and it is the question D2.2 is for.
+    *concentrated* redness onto the axis without removing it from anywhere
+    else. For an intervention, the caveat is that suppressing the axis will
+    not remove the model's access to redness. That is the question D2.2 is
+    built to ask.
     """)
     return
 
@@ -1489,12 +1538,12 @@ def _(CONTROL_ACC, acc, alpha_bar, cells, grading, m_op1, traj):
     mo.md(rf"""
     ### The timing arm
 
-    This is where the surprise is. `span-anti-late` differs from `span-anti` in
-    one number: the epoch at which the repulsive term finishes annealing down to
-    its hold ratio, moved from {ex.ANTI_ANNEAL_END:g} to
-    {ex.ANTI_ANNEAL_END_LATE:g}. Nothing else changes: same anchor, same span,
-    same peak and hold ratios, same seeds. It improves on the M1 schedule on
-    every statistic that H2 and H4 score:
+    `span-anti-late` differs from `span-anti` in one number: the epoch at
+    which the repulsive term finishes annealing down to its hold ratio, moved
+    from {ex.ANTI_ANNEAL_END:g} to {ex.ANTI_ANNEAL_END_LATE:g}. Nothing else
+    changes: same anchor, same span, same peak and hold ratios, same seeds.
+    That one change improves on the M1 schedule on every statistic that H2 and
+    H4 score, which we did not expect:
 
     - margin {m_op1("span-anti-late").mean():.3f} against
       {m_op1("span-anti").mean():.3f}. The gap of {_dm:.2f} is about
@@ -1511,40 +1560,40 @@ def _(CONTROL_ACC, acc, alpha_bar, cells, grading, m_op1, traj):
       penalizes, which is close to definitional. The margin and retention rows
       are what make it a result.
 
-    The one measurement that does not improve is off-axis leakage. There the arm
-    is the highest of any condition ({_leak("span-anti-late"):.2f} against
-    {_leak("span-anti"):.2f}), and elsewhere in this report growth on that
-    measurement is treated as unwelcome. The difference is small and the
-    measurement has no gate, but it is why the claim above says "every scored
-    statistic" rather than "everything".
+    Off-axis leakage is the one measurement that does not improve: the arm is
+    the highest of any condition ({_leak("span-anti-late"):.2f} against
+    {_leak("span-anti"):.2f}). Elsewhere in this report we treat growth on
+    that measurement as unwelcome. The difference is small and the measurement
+    has no gate, but it is why the claim above is scoped to the scored
+    statistics rather than to everything we measured.
 
-    The arm was written to ask whether the M1 recipe is forgiving on this axis.
-    Either answer was acceptable, and no gate was attached. It is not forgiving:
-    stretching one anneal by 2× was worth more than adding the term in the first
-    place. Nobody had measured this before. The M1 schedules varied by
-    experiment, and ex-2.4.1 ran its terms *up* over training rather than down,
-    so the value was inherited rather than chosen. It now looks worth choosing
-    deliberately, and a dedicated sweep over the anneal endpoint is the obvious
-    next step. Two limits on that claim. First, this is one alternative timing
-    rather than a curve. Second, it is confounded with total repulsive strength,
-    since holding near peak for longer also delivers more repulsion overall.
-    Separating "when" from "how much" needs the sweep, not this arm.
+    The arm was written to ask whether the M1 recipe is forgiving on this
+    axis; either answer was acceptable, and no gate was attached. It is not
+    forgiving: stretching one anneal by 2× was worth more than adding the term
+    in the first place. Nobody had measured this before. The M1 schedules
+    varied by experiment, and ex-2.4.1 ran its terms *up* over training rather
+    than down, so the value was inherited rather than chosen. It now looks
+    worth choosing deliberately, and a dedicated sweep over the anneal
+    endpoint is the obvious next step. Two limits on that claim. First, this
+    is one alternative timing rather than a curve. Second, it is confounded
+    with total repulsive strength, since holding near peak for longer also
+    delivers more repulsion overall. Separating "when" from "how much" needs
+    the sweep, not this arm.
 
     ### The ceiling arm
 
-    Here, more weight turns out not to be better. `span-anti-hi` runs the full
+    More weight turns out not to be better. `span-anti-hi` runs the full
     recipe at $\lambda_\text{{a}} = {ex.CEILING_LAMBDA:g}$, ten times the
-    scoring rung, with the repulsive term scaled in proportion. Two things
-    follow.
+    scoring rung, with the repulsive term scaled in proportion.
 
-    The task ceiling remains unfound. Holdout accuracy is within
-    {abs(acc("span-anti-hi").mean() - CONTROL_ACC):.4f} of control, so at ten
-    times the scoring weight the task still pays nothing. Whatever bounds the
+    We still have not found the task ceiling. Holdout accuracy is within
+    {abs(acc("span-anti-hi").mean() - CONTROL_ACC):.4f} of control, so even at
+    ten times the scoring weight the task shows no cost. Whatever bounds the
     anchor weight for D2.2, it is not the task loss at this scale, and finding
     the real ceiling would need a dedicated sweep well above
     $\lambda_\text{{a}} = 1$.
 
-    But the selectivity ceiling has been passed. At ten times the weight the
+    But we have passed the selectivity ceiling. At ten times the weight the
     margin is {m_op1("span-anti-hi").mean():.3f}, level with the
     {m_op1("span-anti").mean():.3f} of `span-anti` at a tenth of the weight. The
     gap is {abs(m_op1("span-anti-hi").mean() - m_op1("span-anti").mean()):.3f},
@@ -1676,34 +1725,38 @@ def _(arrays):
 
     ### The two weights are in balance only in passing (post hoc)
 
-    The trajectories figure leaves the impression that the two term weights
-    are unbalanced, and the schedule panels say in which direction: both, at
-    different times. $\lambda_{{\bar{{\text{{s}}}}}}$ opens at
-    {ex.ANTI_PEAK_RATIO:g}$\lambda_\text{{a}}$ — effectively higher through
-    the warmup, before the anchor has ramped in — and finishes
-    {1 / ex.ANTI_HOLD_RATIO:.0f}× *smaller*, at the hold ratio. The two
-    weights match only in passing, near epoch
-    {_ratio_below(1):.0f} on the default anneal and
-    {_ratio_below(1, ex.ANTI_ANNEAL_END_LATE):.0f} on the late one.
+    The trajectories figure suggests the two term weights are unbalanced,
+    and the schedule panels show in which direction: both, at different
+    times. $\lambda_{{\bar{{\text{{s}}}}}}$ starts at
+    {ex.ANTI_PEAK_RATIO:g}$\lambda_\text{{a}}$, and is effectively even
+    higher through the warmup, before the anchor has ramped in. By the end it
+    is {1 / ex.ANTI_HOLD_RATIO:.0f}× *smaller* than $\lambda_\text{{a}}$, at
+    the hold ratio. So the two weights are equal only momentarily as the
+    anneal crosses over: near epoch {_ratio_below(1):.0f} on the default
+    anneal and {_ratio_below(1, ex.ANTI_ANNEAL_END_LATE):.0f} on the late
+    one.
 
-    Containment reads off this schedule. In every anti condition,
-    $\bar\alpha$ hugs the control while
-    $\lambda_{{\bar{{\text{{s}}}}}} \gtrsim \lambda_\text{{a}}$ and starts to
-    climb once the anneal brings the ratio to about a tenth — epoch
-    {_ratio_below(0.1):.0f} on the default anneal,
+    Containment follows this schedule. In every anti condition, $\bar\alpha$
+    hugs the control for as long as
+    $\lambda_{{\bar{{\text{{s}}}}}} \gtrsim \lambda_\text{{a}}$. It starts
+    to climb once the anneal brings the ratio down to about a tenth: epoch
+    {_ratio_below(0.1):.0f} on the default anneal and
     {_ratio_below(0.1, ex.ANTI_ANNEAL_END_LATE):.0f} on the late one, which
     is where the trajectories inflect. The ceiling arm scales both weights
-    together, so it inflects with the default schedule despite its tenfold
-    strength. The margin, by contrast, does its climbing during the
-    strong-repulsion phase: at the per-position ratios above, the pull
+    together, so its ratio follows the default schedule, and it inflects at
+    the same epoch despite its tenfold strength.
+
+    The margin behaves differently: it does its climbing during the
+    strong-repulsion phase. At the per-position ratios above, the pull
     dominates wherever it applies, so the labeled reds reach the axis early
-    even under peak repulsion. The second half of the schedule therefore buys
-    little margin and gives up the containment, which puts the M1 hold ratio
+    even under peak repulsion. So the second half of the schedule buys
+    little margin and gives up the containment. That puts the M1 hold ratio
     of {ex.ANTI_HOLD_RATIO:g} on the wrong side of the balance point. The
-    timing arm shortens the time spent there and improves every scored
-    statistic; holding $\lambda_{{\bar{{\text{{s}}}}}}$ near
-    $\lambda_\text{{a}}$ to the end of training is the natural extrapolation,
-    and a point the queued anneal-endpoint × hold-ratio grid should include.
+    timing arm shortens the time spent past that point and improves every
+    scored statistic. The natural extrapolation is to hold
+    $\lambda_{{\bar{{\text{{s}}}}}}$ near $\lambda_\text{{a}}$ to the end of
+    training, and the queued anneal-endpoint × hold-ratio grid should
+    include that point.
 
     ### A confound in the second factor of H3, and why the ceiling arm resolves it (post hoc)
 
@@ -1793,7 +1846,7 @@ def _(alpha_bar, grading, m_op1):
     {ex.ANTI_HOLD_RATIO:g}$\lambda_\text{{a}}$. But the timing arm changed just
     one number, stretching the anneal endpoint from epoch
     {ex.ANTI_ANNEAL_END:g} to {ex.ANTI_ANNEAL_END_LATE:g}, and that improves
-    margin, containment, retention, and grading together — by more than adding
+    margin, containment, retention, and grading together, by more than adding
     the term was worth in the first place. This is less surprising than it
     sounds: the M1 keyframes were inherited from a 5-dimensional autoencoder
     bottleneck and mapped onto our 100 epochs by fraction of training, so there
@@ -1804,8 +1857,8 @@ def _(alpha_bar, grading, m_op1):
     measurement is a grid sweep of the anti-subspace anneal endpoint against
     its hold ratio. The timing arm confounds "when the repulsion acts" with
     "how much of it there is"; a grid separates them, and the balance reading
-    in the exploratory section says where to look — hold ratios near 1 rather
-    than M1's {ex.ANTI_HOLD_RATIO:g}. The position question is
+    in the exploratory section says where to look: hold ratios near 1 rather
+    than the M1 value of {ex.ANTI_HOLD_RATIO:g}. The position question is
     harder and more interesting: it calls for a pull that finds the concept
     inside a labeled span rather than being told where it is, perhaps by
     pooling over the span or by weighting positions with an attention-derived
