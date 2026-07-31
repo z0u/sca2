@@ -1510,7 +1510,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(CONDS, arrays, stats):
+def _(CONDS, arrays):
     _top = np.argsort(ex.REDNESS)[-10:]  # the ten reddest colors, carrying 85% of the label mass
 
     def _alpha(cond: str) -> np.ndarray:
@@ -1544,7 +1544,7 @@ def _(CONDS, arrays, stats):
 
 
 @app.cell(hide_code=True)
-def _(arrays, stats):
+def _(arrays):
     _top = np.argsort(ex.REDNESS)[-10:]
 
     def _alpha(cond: str) -> np.ndarray:
@@ -1552,9 +1552,8 @@ def _(arrays, stats):
 
     _dred = _alpha("span-anti")[_top].mean() - _alpha("span-anti-late")[_top].mean()
     _dall = _alpha("span-anti").mean() - _alpha("span-anti-late").mean()
-    # Per-batch position counts, from the design constants and the measured label rate.
-    _live = ex.BLOCK * ex.BATCH
-    _pulled = ex.LINES_PER_BATCH * stats["label_rate"] * ex.SPAN_FULL
+    _span_ratio = ex.LIVE_PER_BATCH / ex.PULLED_PER_BATCH[ex.SPAN_FULL]
+    _op1_ratio = ex.LIVE_PER_BATCH / ex.PULLED_PER_BATCH[ex.SPAN_OP1]
     mo.md(rf"""
     Stretching the anneal costs the reddest colors
     {_dred:.3f} of alignment and the cube as a whole {_dall:.3f} —
@@ -1563,34 +1562,64 @@ def _(arrays, stats):
     indiscriminate push is far more consequential for the unlabeled bulk than
     for the labeled reds.
 
-    The reason is in how the two terms are normalized, and it is worth spelling
-    out because it is a design detail rather than a fact about concepts. Both
-    terms are means, but over different denominators: the anchor divides by the
-    number of *pulled* positions, the repulsion by the number of *live* ones. At
-    this label rate ({stats["label_rate"]:.4f} per line) a batch carries about
-    {_pulled:.1f} pulled positions against {_live:,} live ones, so a labeled
-    state feels a pull scaled by $1/{_pulled:.1f}$ and a push scaled by
-    $1/{_live:,}$ — a per-position ratio of roughly
-    {_live / _pulled:,.0f}:1 before the weights are applied. Even at the
-    opening ratio of $\lambda_{{\bar{{\text{{s}}}}}} = {ex.ANTI_PEAK_RATIO:g}
-    \lambda_\text{{a}}$, the pull wins at a pulled position by two to three
-    orders of magnitude. An *unlabeled* state has no pull at all, so it feels
-    only the push, and goes wherever the task will let it.
+    The reason is in how the two terms are normalized, which is a design detail
+    rather than a fact about concepts. Neither weight depends on the labels —
+    $\lambda_\text{{a}}$ and $\lambda_{{\bar{{\text{{s}}}}}}$ are functions of
+    the epoch alone, identical in every batch. What differs is the denominator
+    *inside* each term. Both are means; the anchor averages over the positions
+    it pulls, the repulsion over every live position. Measured on the real
+    sampler, a batch has {ex.LIVE_PER_BATCH:,.0f} live positions, while the
+    anchor fires in {ex.FIRING_RATE[ex.SPAN_FULL]:.0%} of batches and averages
+    {ex.PULLED_PER_BATCH[ex.SPAN_FULL]:.1f} pulled positions when it does. So a
+    labeled state feels a pull scaled by
+    $1/{ex.PULLED_PER_BATCH[ex.SPAN_FULL]:.1f}$ against a push scaled by
+    $1/{ex.LIVE_PER_BATCH:,.0f}$ — about {_span_ratio:,.0f}:1 before weights.
+    Even at the opening $\lambda_{{\bar{{\text{{s}}}}}} =
+    {ex.ANTI_PEAK_RATIO:g}\lambda_\text{{a}}$, and after the $2\cos$ factor from
+    differentiating $\cos^2$, the pull wins at a pulled position by a couple of
+    hundred to one. An *unlabeled* state has no pull at all, so it feels only the
+    push and goes wherever the task will let it.
 
-    Two consequences worth carrying forward. First, the repulsive term's
-    effective strength on the concept is set by the label rate, not only by
+    Because the anchor is a mean rather than a sum, the per-position pull is also
+    insensitive to *how many* labels a batch happens to carry: a batch with one
+    labeled line pulls its positions as hard as a batch with three. What the
+    label rate sets is how often the term fires at all.
+
+    ### A confound in H3's second factor, and why the ceiling arm resolves it (post hoc)
+
+    That same normalization means the op1-only pull is not purely a narrowing.
+    Dividing the same $\lambda_\text{{a}}$ among
+    {ex.PULLED_PER_BATCH[ex.SPAN_OP1]:.1f} positions instead of
+    {ex.PULLED_PER_BATCH[ex.SPAN_FULL]:.1f} makes each surviving position's pull
+    about {ex.PULLED_PER_BATCH[ex.SPAN_FULL] / ex.PULLED_PER_BATCH[ex.SPAN_OP1]:.1f}×
+    stronger ({_op1_ratio:,.0f}:1 against the repulsion, rather than
+    {_span_ratio:,.0f}:1). So H3's op1 factor changes two things at once: which
+    positions are pulled, and how hard each one is pulled. Read on its own, its
+    main effect could be either.
+
+    The ceiling arm separates them, which is not what it was put there for. It
+    multiplies $\lambda_\text{{a}}$ by ten — every pulled position's gradient
+    scaled by 10, well past the ~4× that narrowing delivers — and selectivity
+    got *worse*, not better. If per-position pull strength were what buys margin,
+    the ceiling arm should be the best condition in the experiment and it is
+    among the worst. So the op1 effect is carried by which positions are pulled,
+    not by how hard, and H3's reading stands. A cleaner design would still fix
+    this: normalizing by a fixed count rather than by the realized mask would
+    make span a pure narrowing, and that is worth doing before the factor is
+    used again.
+
+    Two things to carry forward. The repulsive term's strength *relative to the
+    anchored concept* is set by the label rate as much as by
     $\lambda_{{\bar{{\text{{s}}}}}}$ — sparser labels make the same weight
-    gentler on the anchored concept and no gentler on everything else, so the
-    two knobs interact in a way neither this experiment nor M1 has mapped.
-    Second, it explains why the timing arm has room to improve at all: at these
-    ratios the term is nowhere near strong enough to threaten the anchored
-    concept, so "more repulsion for longer" was almost free. That also predicts
-    a limit — push $\lambda_{{\bar{{\text{{s}}}}}}$ far enough and the reddest
-    colors should start to come off the axis in earnest. Finding where that
-    happens is what the queued anneal sweep should look for, and it is the point
-    at which the cos² gradient (which is proportional to $\cos$, so strongest
-    exactly on the states nearest the axis) would start to bite on *red*
-    specifically.
+    gentler on the concept and no gentler on everything else, an interaction
+    neither this experiment nor M1 has mapped. And it explains why the timing arm
+    had room to improve at all: at these ratios the term is nowhere near strong
+    enough to threaten the concept, so "more repulsion for longer" was nearly
+    free. That predicts a limit — push $\lambda_{{\bar{{\text{{s}}}}}}$ far
+    enough and the reddest colors should come off the axis in earnest, and the
+    $2\cos$ gradient means it bites hardest on the states nearest the axis, which
+    are exactly the anchored ones. Finding that point is what the queued anneal
+    sweep should look for.
     """)
     return
 

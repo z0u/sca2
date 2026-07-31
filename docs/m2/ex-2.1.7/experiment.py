@@ -259,6 +259,69 @@ and the ties caveat are in ex-2.1.6, whose values these reproduce.
 LINES_PER_BATCH = BLOCK * BATCH / LINE_TOKENS
 """Lines a batch carries; batch composition is ex-2.1.6's, unchanged."""
 
+# --- How the two terms divide their batches (post hoc; see the report) ------
+#
+# Both terms are means, but over different denominators: the anchor over the
+# positions it pulls, the anti-subspace over every live position. So the
+# per-position gradient each delivers depends on counts that the design fixes
+# but never states. These are measured by `measure_pull_dilution` below, over
+# 3000 batches of the real corpus at seed 0; they are recorded rather than
+# computed at import because getting them needs the corpus built.
+
+LIVE_PER_BATCH = 4029.0
+"""Non-pad positions in a batch — the anti-subspace term's denominator. Label-independent."""
+
+PULLED_PER_BATCH = {SPAN_FULL: 5.75, SPAN_OP1: 1.47}
+"""The anchor term's denominator, averaged over the batches where it fires.
+
+Conditional on firing, because the term is a mean: a batch with no labeled line
+contributes nothing at all, and one with a single labeled line pulls its
+positions exactly as hard as one with three. Note the op1 pull divides the same
+weight among ~4x fewer positions, so it is also ~4x stronger per position — a
+confound in H3's second factor, which the ceiling arm happens to resolve.
+"""
+
+FIRING_RATE = {SPAN_FULL: 0.571, SPAN_OP1: 0.559}
+"""Fraction of batches carrying at least one labeled line, so the anchor acts at all."""
+
+
+def measure_pull_dilution(span: int, n_batches: int = 3000, seed: int = 0) -> dict:
+    """Re-derive the constants above by drawing batches exactly as training does.
+
+    Not called by the DAG — it is here so the numbers the report quotes can be
+    checked without reimplementing the sampler.
+    """
+    import numpy as np
+
+    from sca.anchoring import sample_anchored_batches
+    from sca.config import DataConfig, ModelConfig, TokenizerConfig
+    from sca.data import named_colors as nc
+
+    levels = GRIDS[GRID]
+    palette = nc.grid_palette(levels)
+    corpus = nc.sample_corpus(20_000, CORPUS_SEED, levels, HOLDOUT_FRAC)
+    tokenizer = nc.WordTokenizer(TokenizerConfig(vocabulary=[*nc.SYNTAX, *palette]))
+    data = np.asarray(tokenizer.encode_words([w for e in corpus for w in nc.as_words(e)]), dtype=np.int32)
+    label_p = np.zeros(tokenizer.vocab_size)
+    for name, p in zip(palette, LABEL_P, strict=True):
+        label_p[tokenizer.stoi[name]] = p
+
+    data_config = DataConfig(batch_size=BATCH, oversample=16, train_split=0.9, padding_chance=0.1)
+    model_config = ModelConfig(vocab_size=256, block_size=BLOCK, n_embd=64, n_head=8, n_head_dim=8, n_ff=256, n_layer=4)
+    counts = [
+        (m.sum(), (x != 0).sum())
+        for x, _, m in sample_anchored_batches(
+            data, data_config, model_config, n_batches, np.random.default_rng(seed), label_p, span
+        )
+    ]
+    mask, live = np.array([c[0] for c in counts]), np.array([c[1] for c in counts])
+    return {
+        "live_per_batch": float(live.mean()),
+        "pulled_per_batch": float(mask[mask > 0].mean()),
+        "firing_rate": float((mask > 0).mean()),
+    }
+
+
 __all__ = ["experiment"]
 
 
