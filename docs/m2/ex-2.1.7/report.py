@@ -970,98 +970,165 @@ def _():
 @app.cell(hide_code=True)
 def _(ANCHORED, CONDS: list[str], LABELS, traj):
     _EX216_ALPHA = 0.5257  # the published ex-2.1.6 λ=0.1 endpoint for ᾱ
-
-    def _mean_traj(cond: str, key: str) -> np.ndarray:
-        return np.mean([traj(cond, s, key) for s in ex.SEEDS], axis=0)
+    _KEYS = ("alpha_op1", "m_op1")
+    # Seed means, once: @themed draws the figure a second time for the dark variant.
+    _MEAN = {c: {k: np.mean([traj(c, s, k) for s in ex.SEEDS], axis=0) for k in _KEYS} for c in CONDS}
+    _EPOCHS = np.mean([traj("span-anti", s, "epoch") for s in ex.SEEDS], axis=0)
+    # A column per weight schedule, so the schedule can be drawn once beneath the
+    # conditions that share it: no repulsion, annealed repulsion, and the two arms.
+    # Rows are the two anchor widths in the first two columns. The control is not a
+    # column of its own — it is drawn into every panel as the reference pair.
+    _GRID = [
+        ["span-bare", "span-anti", "span-anti-late"],
+        ["op1-bare", "op1-anti", "span-anti-hi"],
+        ["w-bare", "w-anti", "w-arms"],
+    ]
+    _PANELS = [c for row in _GRID[:2] for c in row]
+    # The schedules are design curves, so they come from the functions rather than
+    # from the recorded trajectories, which start after the warmup and are coarse.
+    _e = np.linspace(0, ex.SCHEDULER.epochs, 1001)
+    _SCHED = {
+        "w-bare": [(r"$\lambda_\mathrm{a}$", "anchor", ex.anchor_weight(_e))],
+        "w-anti": [
+            (r"$\lambda_\mathrm{a}$", "anchor", ex.anchor_weight(_e)),
+            (r"$\lambda_{\bar{\mathrm{s}}}$", "anti", ex.anti_subspace_weight(_e)),
+        ],
+        "w-arms": [
+            ("ceiling", "anchor", ex.anchor_weight(_e, peak=ex.CEILING_LAMBDA)),
+            ("ceiling", "anti", ex.anti_subspace_weight(_e, lam=ex.CEILING_LAMBDA)),
+            ("late", "anchor", ex.anchor_weight(_e)),
+            ("late", "anti", ex.anti_subspace_weight(_e, anneal_end=ex.ANTI_ANNEAL_END_LATE)),
+        ],
+    }
 
     @themed(
         name="trajectories",
         alt_text="""
-            Two panels against epoch, sharing one y scale. Left: the mean alignment over all colors,
-            with the containment gate at 0.1, the partial level at 0.25, and the
-            ex-2.1.6 bare-term endpoint at 0.53. Right: the alignment margin,
-            with the 0.2 scoring floor. One line per condition, averaged over
-            seeds, each with a tinted band covering the spread of its three
-            seeds. A grey band behind both panels traces the anchor weight and
-            a blue band traces the anti-subspace weight, each as a fraction of
-            its own peak.
+            Six small panels of training curves in a three-by-two grid, with a
+            short weight-schedule panel under each column, all on a shared epoch
+            axis. Every condition panel plots two lines in that condition's
+            color on one shared y scale — mean alignment solid, the alignment
+            margin dashed — over a grey pair of control lines and the other
+            conditions repeated faintly in grey behind. Shaded steps along the
+            bottom of each panel mark the 0.1 containment gate and the 0.25
+            partial level; a dashed rule marks the 0.2 margin floor and a dotted
+            rule the 0.53 ex-2.1.6 endpoint. The schedule panels are on a log
+            axis: the first column carries the anchor weight alone, the second
+            adds the annealing anti-subspace weight, and the third overlays the
+            two arms, whose curves sit a decade apart.
         """,
         caption=rf"""
-            How the two quantities move during training, measured every
-            {ex.TRAJ_STRIDE} steps and averaged over seeds. Both are cosines on
-            the anchor axis, so the panels share a y scale. Left:
-            $\bar\alpha$, the mean alignment over all 216 colors at op1 — what ran
-            away in ex-2.1.6, and what H4(a) asks the repulsive term to contain
-            below {ex.MEAN_ALIGN_GATE:g} (solid rule). The dashed rule is the
-            {ex.MEAN_ALIGN_PARTIAL:g} partial and the dotted one the published
-            ex-2.1.6 endpoint of {_EX216_ALPHA:.2f}. Right:
-            $m_{{\text{{op1}}}}$, with the H4(b) scoring floor of {ex.H4_FLOOR:g}
-            dashed; a run whose running maximum never reaches it is reported but
-            not scored. Each condition's tinted band spans its lowest to highest
-            seed at that checkpoint — with {len(ex.SEEDS)} seeds that is the full
-            observed range rather than an interval estimate, so read it as a
-            rough sense of run-to-run variation. The two separate bands behind
-            both panels are the anchor weight (grey) and the anti-subspace
-            weight (blue), each as a fraction of its own peak, so their
-            descents mark the annealing schedule.
+            How the two quantities move during training, one panel per
+            condition, measured every {ex.TRAJ_STRIDE} steps and averaged over
+            seeds. Both are cosines on the anchor axis, so every panel shares
+            one y scale and the two lines within a panel can be read against
+            each other: solid is $\bar\alpha$, the mean alignment over all 216
+            colors at op1, and dashed is $m_{{\text{{op1}}}}$, the alignment
+            margin. The grey pair in every panel is the control, in the same two
+            styles; the fainter lines behind repeat the other five conditions,
+            so each panel can be placed against the whole set without a legend
+            of near-identical colors. Reference levels: the shaded steps are
+            H4(a)'s grading zones for $\bar\alpha$ — contained below
+            {ex.MEAN_ALIGN_GATE:g}, the named partial up to
+            {ex.MEAN_ALIGN_PARTIAL:g} — the dashed rule is H4(b)'s scoring floor
+            of {ex.H4_FLOOR:g} for $m_{{\text{{op1}}}}$, and the dotted rule the
+            published ex-2.1.6 endpoint of {_EX216_ALPHA:.2f}. Run-to-run spread
+            is not drawn; the H4 table below carries it, per condition. Bottom
+            row: the weight schedule each column was trained under, on the log
+            axis and in the colors of the schedules figure above, at the same
+            width and epoch axis as the panels over it — so a descent can be
+            lined up against the epochs where the metrics respond to it. The
+            first column has no repulsive term at all
+            ($\lambda_{{\bar{{\mathrm{{s}}}}}} = 0$, so nothing to draw on a log
+            axis). The third holds two schedules, one per arm — solid for the
+            ceiling arm, which runs a decade above the scoring rung, and dashed
+            for the late arm, which reaches the hold ratio at epoch
+            {ex.ANTI_ANNEAL_END_LATE:g} rather than {ex.ANTI_ANNEAL_END:g}.
         """,
     )
     def _plot() -> plt.Figure:
-        from typing import cast
-
-        from mini.vis import AxesRow
-
-        fig, axes = plt.subplots(1, 2, figsize=(9.0, 3), sharey=True)
-        axes = cast(AxesRow, axes)
+        fig, axd = plt.subplot_mosaic(_GRID, figsize=(7.5, 5.6), height_ratios=[3, 3, 1.7], sharex=True)
         _ink = dict(zip(CONDS, light_dark(
             ["#999", "#f2b134", "#c1332a", "#e08a2e", "#7a2320", "#3d7ea6", "#5c3d8f"],
             ["#888", "#ffcc66", "#f0665a", "#ffab5e", "#b8564d", "#6ab0d4", "#a78bd6"],
         ), strict=True))  # fmt: skip
         _grey = light_dark("#999", "#777")
-        epochs = _mean_traj("span-anti", "epoch")
-        weight = _mean_traj("span-anti", "weight")
-        anti_weight = _mean_traj("span-anti", "anti_weight")
-        for ax, key, ylabel in (
-            (axes[0], "alpha_op1", r"$\bar\alpha$ at op1"),
-            (axes[1], "m_op1", r"$m_{\text{op1}}$"),
-        ):
-            twin = ax.twinx()
-            twin.fill_between(epochs, weight / weight.max(), color=light_dark("#0000000d", "#ffffff12"), lw=0)
-            twin.fill_between(epochs, anti_weight / anti_weight.max(), color=light_dark("#3366cc0d", "#77aaff12"), lw=0)
-            twin.set_ylim(0, 1.05)
-            twin.set_yticks([])
-            for cond in CONDS:
-                _seeds = np.array([traj(cond, s, key) for s in ex.SEEDS])
-                ax.fill_between(
-                    epochs,
-                    _seeds.min(axis=0),
-                    _seeds.max(axis=0),
-                    color=_ink[cond],
-                    alpha=light_dark(0.13, 0.07),
-                    lw=0,
-                    zorder=2,
-                )
-                ax.plot(
-                    epochs, _mean_traj(cond, key), color=_ink[cond], lw=1.6 if cond in ex.FACTORIAL else 1.2,
-                    ls="-" if cond in ex.FACTORIAL or cond == "lam0" else (0, (4, 3)), label=LABELS[cond], zorder=3,
-                )  # fmt: skip
-            ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
-            ax.set_xlabel("epoch")
-            ax.set_ylabel(ylabel)
+        _ghost = light_dark("#e2e2e2", "#333")
+        _zone = light_dark("#dfe8ef", "#1b2733")
+        _term = {"anchor": light_dark("#c33", "#e66"), "anti": light_dark("#36c", "#7af")}
+        _dash = (0, (4, 2))
+        # One scale for every panel: a condition's height should mean the same thing everywhere.
+        top = max(max(np.max(_MEAN[c]["alpha_op1"]), np.max(_MEAN[c]["m_op1"])) for c in ANCHORED)
+        for cond in _PANELS:
+            ax = axd[cond]
+            for other in _PANELS:
+                if other != cond:
+                    ax.plot(_EPOCHS, _MEAN[other]["alpha_op1"], color=_ghost, lw=0.7, zorder=1)
+                    ax.plot(_EPOCHS, _MEAN[other]["m_op1"], color=_ghost, lw=0.7, zorder=1)
+            ax.axhspan(-0.08, ex.MEAN_ALIGN_GATE, color=_zone, zorder=0)
+            ax.axhspan(ex.MEAN_ALIGN_GATE, ex.MEAN_ALIGN_PARTIAL, color=_zone, alpha=0.45, zorder=0)
+            ax.axhline(_EX216_ALPHA, color=_grey, lw=0.8, ls=(0, (1, 2.5)), zorder=2)
+            ax.axhline(ex.H4_FLOOR, color=_grey, lw=0.8, ls=_dash, zorder=2)
+            ax.plot(_EPOCHS, _MEAN["lam0"]["alpha_op1"], color=_grey, lw=1.1, zorder=3)
+            ax.plot(_EPOCHS, _MEAN["lam0"]["m_op1"], color=_grey, lw=1.1, ls=_dash, zorder=3)
+            ax.plot(_EPOCHS, _MEAN[cond]["m_op1"], color=_ink[cond], lw=1.5, ls=_dash, zorder=4)
+            ax.plot(_EPOCHS, _MEAN[cond]["alpha_op1"], color=_ink[cond], lw=1.7, zorder=5)
+            ax.set_title(LABELS[cond], fontsize=9.5, color=_ink[cond])
             ax.set_xlim(0, ex.SCHEDULER.epochs)
-        axes[0].axhline(ex.MEAN_ALIGN_GATE, color=_grey, lw=1.0)
-        axes[0].axhline(ex.MEAN_ALIGN_PARTIAL, color=_grey, lw=0.9, ls=(0, (4, 3)))
-        axes[0].axhline(_EX216_ALPHA, color=_grey, lw=0.9, ls=(0, (1, 2)))
-        axes[1].axhline(ex.H4_FLOOR, color=_grey, lw=0.9, ls=(0, (4, 3)))
-        axes[0].legend(fontsize=7.5, frameon=False, ncols=2, loc="upper left")
-        # Shared scale: both panels are cosine quantities on the anchor axis. The left
-        # one carries the legend, so it asks for more headroom above its curves.
-        _top_a = max(np.max(_mean_traj(c, "alpha_op1")) for c in ANCHORED)
-        _top_m = max(np.max(_mean_traj(c, "m_op1")) for c in ANCHORED)
-        axes[0].set_ylim(-0.1, max(0.75, _top_a * 1.35, _top_m * 1.06))
+            ax.set_ylim(-0.08, top * 1.08)
+            ax.tick_params(labelbottom=False, labelleft=cond in ("span-bare", "op1-bare"))
+        axd["span-bare"].set_ylabel("cosine")
+        axd["op1-bare"].set_ylabel("cosine")
+        # The control is named where it runs, once; elsewhere the grey pair is enough.
+        # The label sits on its own line, so it carries a patch of background with it.
+        axd["span-bare"].annotate(
+            "control", (55, _MEAN["lam0"]["alpha_op1"][-1]), fontsize=7.5, color=_grey, va="center", ha="center",
+            bbox=dict(facecolor=_zone, edgecolor="none", pad=0.8),
+        )  # fmt: skip
+        # The two line styles are keyed once, above the grid, in neutral ink: within
+        # a panel the color says only which condition it is.
+        fig.legend(
+            [plt.Line2D([], [], color=_grey, lw=1.7), plt.Line2D([], [], color=_grey, lw=1.5, ls=_dash)],
+            [
+                rf"$\bar\alpha$ (shaded zones at {ex.MEAN_ALIGN_GATE:g} and {ex.MEAN_ALIGN_PARTIAL:g})",
+                rf"$m_{{\text{{op1}}}}$ (dashed rule at {ex.H4_FLOOR:g})",
+            ],
+            fontsize=8.5, frameon=False, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.0),
+            labelcolor=_grey, handlelength=2.4,
+        )  # fmt: skip
+
+        for key, curves in _SCHED.items():
+            ax = axd[key]
+            for label, term, w in curves:
+                ax.plot(_e, w, color=_term[term], lw=1.4, ls=_dash if label == "late" else "-")
+            ax.set_yscale("log")
+            ax.set_xlim(0, ex.SCHEDULER.epochs)
+            ax.set_ylim(2e-4, 4)
+            ax.set_yticks([1e-3, 1e-2, 1e-1, 1e0])
+            ax.minorticks_off()  # a decade of unlabelled minor ticks is a smear at this height
+            ax.set_xlabel("epoch")
+            ax.tick_params(labelleft=key == "w-bare", labelsize=7.5)
+        axd["w-bare"].set_ylabel("weight")
+        axd["w-bare"].annotate(
+            r"$\lambda_{\bar{\mathrm{s}}} = 0$", (50, 4e-4), fontsize=8, color=_term["anti"], va="bottom"
+        )
+        for _x, _y, _txt, _k in ((62, 0.13, r"$\lambda_\mathrm{a}$", "anchor"), (36, 0.4, r"$\lambda_{\bar{\mathrm{s}}}$", "anti")):  # fmt: skip
+            axd["w-anti"].annotate(_txt, (_x, _y), fontsize=9, color=_term[_k], va="bottom")
+        # Solid is the ceiling arm and dashed the late arm, so each label sits on its own pair.
+        for _x, _y, _txt, _va in ((97, 1.2, "ceiling arm", "bottom"), (97, 4e-4, "late arm", "bottom")):
+            axd["w-arms"].annotate(_txt, (_x, _y), fontsize=7.5, color=_grey, va=_va, ha="right")
+        fig.tight_layout()
         return fig
 
     mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    <!-- Looking at these trajectories, I get the impression that the term weights are unbalanced. Anti-subspace dominates decisively for the first half, so _red_ can't align with the anchor; then when it anneals, alignment climbs to too little. I think it may work better if  -->
+    """)
     return
 
 
