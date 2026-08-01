@@ -14,6 +14,28 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **A cheap in-place mode for `writing-lint` (2026-08-01).** #skills #agents
+  #reports The lint now runs on every prose turn, paired behind
+  `prose-simplifier`, which means a section-sized edit pays for the whole
+  five-step round trip: run the notebook, export to Markdown, copy, lint,
+  word-diff, hand-port every change back into f-strings in `report.py`. Most of
+  that cost buys something only the assembled document needs — cross-section
+  duplication and rendered proportion — so it is disproportionate while
+  drafting.
+  The optimization is to point `text-linter` straight at `report.py` with a line
+  range, the way `prose-simplifier` is already invoked, and skip the export and
+  the port-back. Step 6 of the round trip disappears with them: the linter would
+  see `{ex.MEAN_ALIGN_PARTIAL:g}` as an opaque token instead of `0.25`, so it
+  cannot flatten an expression it never resolved. Keep the full round trip for
+  the freeze and publish gates.
+  Two things to check before switching. The linter runs on haiku with no style
+  skills beyond `style-md`, and in-place mode has it editing Python string
+  literals inside `mo.md()` rather than the Markdown it prefers — it would need
+  a section telling it to preserve the `f` prefix, the braces, and the quoting,
+  and possibly a stronger model. And the interpolated values do carry some
+  signal about length that the source form hides, so compare a few sections
+  linted both ways before committing to it.
+
 - **Teach the skills and review agents to check for tautologies (2026-07-31).**
   Ex-2.1.7's H4(a) scored the containment of ᾱ in conditions carrying a term
   that is *defined* as a penalty on ᾱ, so "the repulsive term lowers ᾱ" was

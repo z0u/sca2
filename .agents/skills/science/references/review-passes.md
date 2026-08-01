@@ -55,13 +55,34 @@ scope. That call changes what the experiment claims, so it is theirs.
 Also stop and escalate for anything structural a reviewer couldn't fix itself,
 and for a disagreement about how a result should be read.
 
-## The prose pass
+## The prose passes
 
-Prose gets a simplification pass regardless of whether a review round runs —
-see "Collaborating on a report" in SKILL.md for when it applies. No reviewer
-agent is involved. In one turn:
+Prose gets two passes regardless of whether a review round runs — see
+"Collaborating on a report" in SKILL.md for when they apply. No reviewer agent
+is involved. In one turn:
 
 1. Write
-2. Stage changes (unless you have another way to see what the agent changes)
-3. Hand it to the `prose-simplifier` agent on the same turn
-4. Review the agent's changes; check for correctness
+2. Stage changes (unless you have another way to see what the agents change)
+3. Hand the file and line range to the `prose-simplifier` agent
+4. Run the `writing-lint` skill over the same text
+5. Review both sets of changes; check for correctness
+
+That order, and only that order. The simplifier expands: it unstacks dense
+sentences, splits appositives that smuggle in a definition, and surfaces buried
+verbs. The lint cuts. Simplify-then-trim settles; the reverse may re-inflate
+what the lint just removed.
+
+The lint is also the pass most likely to change a claim without looking like it
+has, because the things it drops — a scope qualifier, the reason attached to a
+verdict, the name of a threshold — may read as fluff to a reader with no
+context. Two checks are yours rather than the agent's:
+
+- Read the word diff for qualifiers and numbers that went missing. The lint is
+  told the text is correct and works from a copy, so it will not catch this.
+- Confirm every template expression survived the port back. The linter sees
+  `0.25`, not `{ex.MEAN_ALIGN_PARTIAL:g}`, so a flattened literal renders fine
+  and is still wrong in the source.
+
+The same lint runs over the whole document at the freeze and publish gates,
+where duplication across sections and the rendered proportion of a tl;dr first
+become visible.

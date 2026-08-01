@@ -85,7 +85,15 @@ Then, for up to 3 rounds:
       scope. Only the human can make that call, since it changes what the
       experiment claims.
     - Otherwise (substantive fixes, not yet at "no blockers"): another round.
-4. After the loop ends (converged, escalated, or 3 rounds reached), summarize
+4. If the loop converged and the report is heading for a freeze or a publish,
+   run the `writing-lint` skill over the whole document. Reviewers edit one
+   section at a time, so duplication between sections and a tl;dr that has
+   grown into a second conclusion only show up in the assembled render. Then do
+   the two checks the lint leaves to you — dropped qualifiers, and template
+   expressions flattened to literals — described in `references/review-passes.md`
+   in the `science` skill. Skip this step when you escalated: the text will move
+   again.
+5. After the loop ends (converged, escalated, or 3 rounds reached), summarize
    for the user: what changed across all rounds, any open questions, and the
    final recommendation. Include `git diff --stat` for the report so they can
    see the size of the change, and list any `REVIEW` notes the rounds added —

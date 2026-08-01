@@ -47,7 +47,7 @@ When results arrive, fill the report in order of stakes rather than all at once.
 
 Whatever you have written, run a review round over it before handing back to the human — the sections that are done, not the whole report. Say in the request which sections are in scope, so a `TODO` in a section whose turn hasn't come isn't read as an omission.
 
-Any prose you write also gets a `prose-simplifier` pass on the same turn, whether or not a review round is warranted — stage your changes first so you can see what it did, then read its edits for correctness. It gets the path and line range and nothing else. This applies to a single filled-in section as much as to a whole draft, so it is a habit of writing rather than a step in the review; the sequence is in [references/review-passes.md](references/review-passes.md).
+Any prose you write gets two passes on the same turn, whether or not a review round is warranted: `prose-simplifier` to lower reader effort, then the `writing-lint` skill to cut what is left over. Run them in that order — the simplifier expands to make sentences easier to parse, so running it second re-inflates whatever the lint removed. Stage your changes first so you can see what each pass did, then read the edits for correctness. The simplifier gets the path and line range and nothing else. This applies to a single filled-in section as much as to a whole draft, so it is a habit of writing rather than a step in the review; the sequence, and the two correctness checks the lint leaves to you, are in [references/review-passes.md](references/review-passes.md).
 
 The publishing mechanics — exporting the report as a bundle, wiring result refs, verifying the render — are a separate concern, covered by the `mi-ni` skill.
 

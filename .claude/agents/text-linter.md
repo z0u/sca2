@@ -6,6 +6,7 @@ description: |
   `prose-simplifier`, passing only the file path (and span, if applicable).
 argument-hint: <document> [section] [line range]
 tools: Read, Edit
+skills: style-md
 model: haiku
 effort: low
 ---
