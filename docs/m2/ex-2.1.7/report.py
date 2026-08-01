@@ -795,6 +795,16 @@ def _(LABELS, grading, m_op1):
 
 @app.cell(hide_code=True)
 def _(alpha_bar, grading, m_op1):
+    # TODO: this cell renders nothing. The exported document runs the two H2
+    # figures (@output:Hstk, @output:nWHF) straight into the H3 factorial table
+    # (@output:ROlb) with no output between them, so the H2 verdict and every
+    # number that decides it are missing from the published report. Reproduced
+    # on two independent exports; no error is reported and the cell raises
+    # nothing. H2 carries D2.1, so this is the one hypothesis a reader cannot
+    # resolve from its own section: m_op1("op1-anti") first reaches the reader
+    # in the H3 table, and the grading R2 only in the discussion. Cause not yet
+    # found — the cell's signature, its inputs, and the surrounding structure
+    # all match cells that do render. Tracked in todo-eng.md.
     _EX216_M, _EX216_A = 0.2732, 0.5257
     mo.md(rf"""
     **H2 passes, on the op1 conditions.** (a) The margin reaches
@@ -1239,18 +1249,21 @@ def _(ANCHORED, alpha_bar, traj):
     and the timing arm at {alpha_bar("span-anti-late").mean():.3f}. The named
     partial asked all of them to clear the looser bar of
     {ex.MEAN_ALIGN_PARTIAL:g}, and `span-anti` misses that too. So H4(a) fails
-    outright rather than partially. The repulsive term does reduce the quantity
-    it is defined on: from {alpha_bar("span-bare").mean():.2f} in the bare
-    condition down to {alpha_bar("span-anti").mean():.2f}, about a
+    outright rather than partially.
+
+    The repulsive term does reduce the quantity it is defined on. $\bar\alpha$
+    ends at {alpha_bar("span-bare").mean():.2f} in the bare condition and
+    {alpha_bar("span-anti").mean():.2f} with the term, about a
     {1 - alpha_bar("span-anti").mean() / alpha_bar("span-bare").mean():.0%}
-    reduction. But at the weight ratio carried over from M1, it only weakens the
-    cube-wide drift; it does not contain it. The trajectory shows when
-    containment is lost. While the repulsion outweighs the pull, $\bar\alpha$
-    sits near the control. It climbs once the anneal has brought
-    $\lambda_{{\bar{{\mathrm{{s}}}}}}$ down to about a tenth of
-    $\lambda_\text{{a}}$, so each condition breaks at a time set by its own
-    schedule: around epoch 40 on the default anneal, epoch 75 on the late one.
-    The preregistration flagged this contrary outcome as a possibility for
+    reduction. But at the weight ratio carried over from M1, the term only
+    weakens the cube-wide drift; it does not contain it.
+
+    The trajectory shows when containment is lost. While the repulsion
+    outweighs the pull, $\bar\alpha$ sits near the control. It climbs once the
+    anneal has brought $\lambda_{{\bar{{\mathrm{{s}}}}}}$ down to about a tenth
+    of $\lambda_\text{{a}}$. So each condition breaks at a time set by its own
+    schedule: around epoch 40 on the default anneal, and epoch 75 on the late
+    one. The preregistration flagged this contrary outcome as a possibility for
     this figure, and the timing arm was positioned to test it. The exploratory
     section takes up what this timing says about the balance between the two
     weights.
@@ -1265,12 +1278,12 @@ def _(ANCHORED, alpha_bar, traj):
     conditions hold, at
     {min(min(_ratios(c)) for c in ("op1-bare", "op1-anti")):.2f} or better
     across all six runs. So does `span-anti-late`, which pulls the full span.
-    What the three holding conditions have in common is that something kept the
-    color-independent shift down for most of training: a narrow pull in two of
-    them, and in the third a repulsion held near peak through epoch
-    {ex.ANTI_ANNEAL_END_LATE:g}. The three that slide are the ones where
-    $\bar\alpha$ was free to climb. Wherever that happens, the peak also moves
-    later: epochs
+    What the three holding conditions have in common is that something held the
+    color-independent shift down. In two of them a narrow pull lowers the level
+    $\bar\alpha$ settles at; in the third, a repulsion held near peak through
+    epoch {ex.ANTI_ANNEAL_END_LATE:g} delays the climb. The three that slide
+    are the ones where $\bar\alpha$ was free to climb. Wherever that happens,
+    the peak also moves later: epochs
     {min(_peak("span-bare")):.0f}–{max(_peak("span-bare")):.0f} in `span-bare`,
     {min(_peak("span-anti")):.0f}–{max(_peak("span-anti")):.0f} once the
     repulsive term is added, and
@@ -1279,10 +1292,10 @@ def _(ANCHORED, alpha_bar, traj):
     than an early peak that erodes.
 
     This result fits together with H2 and H3. In ex-2.1.6 the margin rose
-    early and then gave back a quarter of itself, and the reading offered
-    there was that the rest of the cube was catching up. This experiment
-    supports that reading, and identifies the color-independent shift as the
-    thing doing the catching up. Suppressing it either way stops the slide:
+    early and then gave back a quarter of itself. The reading offered there
+    was that the rest of the cube was catching up. This experiment supports
+    that reading, and points to the color-independent shift as the thing doing
+    the catching up. Suppressing that shift either way stops the slide:
     removing the blind positions works, and so does keeping the repulsion
     strong. Notably, `op1-bare` stops the slide while carrying no repulsive
     term at all.
@@ -1301,13 +1314,15 @@ def _(CONDS: list[str], LABELS, arrays, geometry, margin_map):
     @themed(
         name="by-layer",
         alt_text="""
-            Three panels against layer depth. Left: the margin at the first
-            operand by layer, one line per condition. Middle: the cosine between
-            the centre of the 216-color cloud and the anchor direction. Right:
-            the extent of that cloud.
+            Three panels against layer depth, one line per condition. The margin
+            decays with depth in every condition, least in the timing arm; the
+            cloud centre swings far onto the anchor direction under the bare
+            span pull and much less under every other condition; and the cloud's
+            extent shrinks with depth, with the bare span pull and the ceiling
+            arm the narrowest.
         """,
         caption=r"""
-            The mechanism picture behind H4(a), per layer, seed means. Depth 0 is
+            Margin and cloud geometry by layer, seed means. Depth 0 is
             the token embedding and depth 4 the last block's output. Left: the
             margin at op1 by layer — the per-depth terms whose mean is
             $m_{\text{op1}}$; the shaded band around the control is its seed
@@ -1364,45 +1379,66 @@ def _(geometry, margin_map):
         sb, sa, ob, oa = (_at(c, key, layer) for c in ("span-bare", "span-anti", "op1-bare", "op1-anti"))
         return (ob + oa) / 2 - (sb + sa) / 2 if factor == "op1" else (sa + oa) / 2 - (sb + ob) / 2
 
+    # REVIEW: three changes in the prose below, all narrowing claims to what the
+    # per-layer numbers show.
+    # (1) "Both factors flatten that decay rather than raising the starting
+    #     point" -> "act mostly on that decay rather than on the starting
+    #     point": the op1 factor does raise layer 0, from 0.448 (span-bare) to
+    #     0.740 (op1-bare), which the next sentence then quotes as 1.6x. The
+    #     depth claim survives because the end-of-stack ratio is 4x.
+    # (2) The timing arm "gaining through the stack where every other condition
+    #     loses" -> rises mid-stack and finishes about where it started: it runs
+    #     0.450 -> 0.428, a slight net loss, with the gain confined to layers
+    #     1-2. Verify: `margin_map("span-anti-late")[:, 0]`.
+    # (3) The control's centre-anchor cosine of 0.02 was glossed as "about what
+    #     an unrelated direction gives in 64 dimensions". A random direction in
+    #     d64 gives |cos| ~ 1/8, so 0.02 is well below that, not typical of it;
+    #     replaced with a plain statement of what the number means. (Same class
+    #     of slip as the H4(a) note in the Hypotheses cell.) The layer these
+    #     geometry numbers are read at (2) was also unstated, and is now named.
+
     mo.md(rf"""
     The per-layer view shows where the improvement happens, and it is not a
     uniform lift. In ex-2.1.6 the margin peaked in the embedding and decayed
     through the stack; we reproduce that here
     ({margin_map("span-bare")[0, 0]:.2f} → {margin_map("span-bare")[-1, 0]:.2f}).
-    Both factors flatten that decay rather than raising the starting point.
+    Both factors act mostly on that decay rather than on the starting point.
     `op1-anti` runs {margin_map("op1-anti")[0, 0]:.2f} →
-    {margin_map("op1-anti")[-1, 0]:.2f}: it starts only
+    {margin_map("op1-anti")[-1, 0]:.2f}: it starts
     {margin_map("op1-anti")[0, 0] / margin_map("span-bare")[0, 0]:.1f}× as high
     as the bare span condition, but ends the last layer with
     {margin_map("op1-anti")[-1, 0] / margin_map("span-bare")[-1, 0]:.0f}× its
-    margin. The timing arm is the clearest case. It leaves the embedding level
-    with the bare span condition ({margin_map("span-anti-late")[0, 0]:.2f}
-    against {margin_map("span-bare")[0, 0]:.2f}) and finishes highest of any
-    condition ({margin_map("span-anti-late")[-1, 0]:.2f}), gaining through the
-    stack where every other condition loses. So selectivity was being lost at
-    depth, and depth is where these interventions act.
+    margin. The timing arm shows this most plainly. It leaves the embedding
+    level with the bare span condition ({margin_map("span-anti-late")[0, 0]:.2f}
+    against {margin_map("span-bare")[0, 0]:.2f}), rises through the middle of
+    the stack, and finishes highest of any condition
+    ({margin_map("span-anti-late")[-1, 0]:.2f}), about where it started. Every
+    other condition ends well below its own embedding value. So selectivity was
+    being lost at depth, and depth is where these interventions act.
 
-    The middle and right panels show the mechanism behind H4(a). In the control,
-    the centre of the color cloud has a projection of
-    {_at("lam0", "centre_dot_anchor", 2):.2f} onto the anchor direction; that is
-    about what an unrelated direction gives in 64 dimensions. The bare span pull
-    swings it to {_at("span-bare", "centre_dot_anchor", 2):.2f}, which is the
-    whole-cube movement ex-2.1.6 diagnosed. Each factor reduces that shift:
-    {_at("span-anti", "centre_dot_anchor", 2):.2f} with the repulsive term,
-    {_at("op1-anti", "centre_dot_anchor", 2):.2f} with both, and
-    {_at("span-anti-late", "centre_dot_anchor", 2):.2f} in the timing arm, which
-    is nearest the control of any anchored condition.
+    The middle and right panels show the mechanism behind H4(a). The numbers
+    below are read mid-stack, at layer 2, where the control cloud is still
+    broad. In the control, the cosine between the centre of the color cloud and
+    the anchor direction is {_at("lam0", "centre_dot_anchor", 2):.2f}: the
+    anchor axis carries essentially nothing about where the cloud sits. The bare
+    span pull swings it to {_at("span-bare", "centre_dot_anchor", 2):.2f}, which
+    is the whole-cube movement ex-2.1.6 diagnosed. Either factor reduces that
+    shift on its own: {_at("span-anti", "centre_dot_anchor", 2):.2f} with the
+    repulsive term, {_at("op1-bare", "centre_dot_anchor", 2):.2f} with the
+    narrower pull, and {_at("op1-anti", "centre_dot_anchor", 2):.2f} with both.
+    The timing arm reaches {_at("span-anti-late", "centre_dot_anchor", 2):.2f},
+    nearest the control of any anchored condition.
 
     The extent panel answers a question ex-2.1.6 left open. That experiment
     found the bare anchor compressing the cube mid-stack, to
     {_at("span-bare", "spread", 2) / _at("lam0", "spread", 2):.0%} of the control
-    extent, and suggested a `separate`-style term might eventually be needed
-    here, as it was in M1. On this evidence it is not. Every other factorial
-    condition recovers most of the extent. Reading the same 2×2 on spread gives
-    the same ordering H3 found on the margin: narrowing the pull is worth
-    {_eff("spread"):+.2f} and the repulsive term {_eff("spread", "anti"):+.2f}.
-    So restoring the extent is not something the repulsion does specifically.
-    `op1-bare` reaches
+    extent. It suggested a `separate`-style term might eventually be needed
+    here, as it was in M1. On this evidence it is not needed: every other
+    factorial condition recovers most of the extent. Reading the same 2×2 on
+    spread gives the same ordering H3 found on the margin. Narrowing the pull
+    is worth {_eff("spread"):+.2f} and the repulsive term
+    {_eff("spread", "anti"):+.2f}. So restoring the extent is not something the
+    repulsion does specifically. `op1-bare` reaches
     {_at("op1-bare", "spread", 2) / _at("lam0", "spread", 2):.0%} of the control
     extent with no repulsive term at all, and `op1-anti` reaches
     {_at("op1-anti", "spread", 2) / _at("lam0", "spread", 2):.0%}. It seems the
