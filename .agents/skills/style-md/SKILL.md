@@ -53,10 +53,14 @@ cells; otherwise the document will be hard to navigate.
 Math expressions, for consistency with formulas. Unicode can be used where it's
 cumbersome to use math mode, e.g. in embedded HTML.
 
-Don't hard-wrap a line inside an inline code span  `` ` `` or math expression
-`$`. A wrapped span might start the next line with block syntax, so a hex code
-in an expression like ` #f78` renders as a heading, and some renderers break the
-span entirely. Rewrap the surrounding prose so the whole span sits on one line.
+Text-wrapping.
+- Beware of interpolated f-strings that would put special syntax at the start of a line.
+  A line that starts with `{value:d}. Next sentence` will render as an ordered list,
+  even if `value` is not 1.
+- Don't hard-wrap a line inside an inline code span  `` ` `` or math expression `$`. A
+  wrapped span might start the next line with block syntax, so a hex code in an
+  expression like ` #f78` renders as a heading, and some renderers break the span
+  entirely. Rewrap the surrounding prose so the whole span sits on one line.
 
 But _do_ use multiline strings; these are automatically `dedent`ed:
 

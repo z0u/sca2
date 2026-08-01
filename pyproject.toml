@@ -38,6 +38,8 @@ mini = "mini.__main__:main"
 #     image = modal.Image.debian_slim().pip_install(*deps)
 #
 dev = [
+    "marimo-md-export>=0.8.0",
+    "markdownify>=1.2.3",
     "pandas-stubs",
     "pytest-asyncio>=0.25.3",
     "pytest-xdist>=3.6",
