@@ -14,6 +14,16 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
+- **Method prose hardcodes constants that live in the experiment module
+  (2026-08-01).** #reports Ex-2.1.7's `### Schedule` cell is a literal
+  `mo.md(r"...")`, so its numbers — anneal endpoints 50 and 90, the 2.5 opening
+  ratio, the 0.03 hold, epochs 10/90/100 — are typed rather than interpolated
+  from `ex`. Change a scheduler constant and the Method section silently
+  describes a run that never happened. `check-templates` cannot see this: it
+  tracks expressions that go missing, not literals that were never expressions.
+  Worth a lint that flags numeric literals in report prose which match a
+  module-level constant, or simply converting the cell to an f-string.
+
 - **Done: a prose cell rendered nothing in ex-2.1.7 (2026-08-01).** #reports
   #publishing The H2 verdict cell was dropped from the Markdown export, so the
   published report stated no verdict for H2 and carried none of the numbers that

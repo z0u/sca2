@@ -133,14 +133,16 @@ def _(CONDS: list[str], CONTROL_ACC, acc, alpha_bar, grading, m_op1, traj):
     # already appeared in an analysis section; nothing here is new, and no gate
     # or verdict changed. Verify against the H1 table, the margin figure, the H3
     # factorial table, and the H4 table, in that order.
-    _sb, _sa, _ob, _oa = (float(m_op1(c).mean()) for c in ("span-bare", "span-anti", "op1-bare", "op1-anti"))
-    _held = sum(
-        1
-        for c in CONDS
-        if c != "lam0"
-        and (_r := [t[-1] / t.max() for s in ex.SEEDS if (t := traj(c, s, "m_op1")).max() >= ex.H4_FLOOR])
-        and min(_r) >= ex.H4_RETENTION
+    _sb, _sa, _ob, _oa, _la = (
+        float(m_op1(c).mean()) for c in ("span-bare", "span-anti", "op1-bare", "op1-anti", "span-anti-late")
     )
+
+    def _ret(cond: str) -> float:
+        """Lowest final-over-peak margin across the seeds that reached the floor; 0 if none did."""
+        r = [t[-1] / t.max() for s in ex.SEEDS if (t := traj(cond, s, "m_op1")).max() >= ex.H4_FLOOR]
+        return min(r) if r else 0.0
+
+    _held = sum(1 for c in CONDS if c != "lam0" and _ret(c) >= ex.H4_RETENTION)
     mo.md(rf"""
     **H1 (task cost) — holds.** Largest `named_holdout` exact-match gap from the
     control, across all seven conditions:
@@ -160,8 +162,7 @@ def _(CONDS: list[str], CONTROL_ACC, acc, alpha_bar, grading, m_op1, traj):
     {ex.MAIN_EFFECT_GATE:g}, but the anti-subspace effect
     ({(_sa + _oa) / 2 - (_sb + _ob) / 2:+.3f}) is smaller than the op1-only
     effect ({(_ob + _oa) / 2 - (_sb + _sa) / 2:+.3f}), not larger; the ordering
-    holds within every seed. That is the first of the two contrary readings named
-    in advance.
+    holds within every seed.
 
     **H4 (containment and dynamics) — fails on both parts.** (a) No anti
     condition at the scoring rung falls to
@@ -170,6 +171,17 @@ def _(CONDS: list[str], CONTROL_ACC, acc, alpha_bar, grading, m_op1, traj):
     {ex.MEAN_ALIGN_PARTIAL:g} partial too. (b) {_held} of the six anchored
     conditions hold {ex.H4_RETENTION:g}× their peak margin; the gate asks for
     all of them.
+
+    **The timing arm scores nothing and did best on containment.**
+    `span-anti-late` stretches the anti-subspace anneal from epoch
+    {ex.ANTI_ANNEAL_END:g} to {ex.ANTI_ANNEAL_END_LATE:g} and changes nothing
+    else. It improves on `span-anti`, the schedule it varies, on every statistic
+    H2 and H4 score: margin {_sa:.3f} → {_la:.3f}, $\bar\alpha$
+    {alpha_bar("span-anti").mean():.3f} →
+    {alpha_bar("span-anti-late").mean():.3f} (the lowest of any anchored
+    condition), and on retention it crosses from the sliding group to the
+    holding one. Its margin still sits below `op1-anti`'s {_oa:.3f}. See
+    *Arms*.
     """)
     return
 
@@ -184,13 +196,6 @@ def _():
     prediction → observation diff. No threshold was amended after the freeze.
     Anything conceived after seeing the data is under *Exploratory analyses*,
     marked post hoc.
-
-    When reading H3 and H4, keep in mind: the anti-subspace term penalizes the
-    mean-square alignment of the whole cloud, which is the quantity H4(a)
-    scores. So "the repulsive term lowers $\bar\alpha$" is close to a tautology,
-    and on its own not evidence that this mechanism explains ex-2.1.6. The
-    load-bearing question is H3: does lowering $\bar\alpha$ gain margin, a
-    quantity neither factor acts on directly?
     ///
     """)
     return
@@ -213,7 +218,7 @@ def _():
     report](../ex-2.1.6/report.py) documents each; only the changes are
     described below.
 
-    One measurement is promoted: The exploratory geometry pass from ex-2.1.6
+    One measurement is promoted: the exploratory geometry pass from ex-2.1.6
     (per layer: the centroid of the 216 op1 states, its alignment with the
     anchor, and the extent of the cloud) is preregistered here, because H4
     scores part of it. The mean alignment over all colors, $\bar\alpha$, is
@@ -229,8 +234,7 @@ def _():
     ($\lambda_\text{a} = 0$) and the `span-bare` condition reproduce the
     ex-2.1.6 control and its $\lambda_\text{a} = 0.1$ condition. So every
     comparison in this report is between conditions that went through
-    identical code, and the published ex-2.1.6 numbers double as a
-    replication check.
+    identical code.
 
     **Factor one: the anti-subspace term.** The `anti` conditions add the
     M1 repulsive term to the loss at weight $\lambda_{\bar{\text{s}}}$:
@@ -251,24 +255,21 @@ def _():
     not do: it never asks any particular point to leave the axis, only that the
     cloud as a whole not sit on it.
 
-    Capacity is worth a sentence. In the 4- and 5-dimensional bottlenecks of
-    M1, keeping the cloud off one axis surrendered a fifth or a quarter of
-    the space, and the harder M1 conditions (ex-2.9.1) needed the dimension
-    cleared outright. Our stream is 64-dimensional: an isotropic cloud has a
-    mean $\cos^2$ of 1/64 per slice, and the three color dimensions of the
-    task fit in the remaining 63 with room to spare. So the term should be
-    cheap here. The live question is whether, at 3% of the anchor weight,
-    it is strong enough to matter, not whether the task can afford it.
+    The term should be cheap in a 64-dimensional stream: an isotropic cloud
+    (one with no preferred direction) has a mean $\cos^2$ of 1/64 per slice,
+    and the task's three color dimensions fit in the remaining 63 with room to
+    spare. In M1's 4- and 5-dimensional bottlenecks it cost a fifth or a
+    quarter of the space, and its harder conditions (ex-2.9.1) needed the
+    dimension cleared outright. The live question is whether, at 3% of the
+    anchor weight, it is strong enough to matter, not whether the task can
+    afford it.
 
     **Factor two: the pull span.** The `span` conditions pull the four prompt
     positions (op1, `+`, op2, `=`) of a labeled equation, as ex-2.1.6 did. The
     `op1` conditions pull op1 alone, so every pulled state belongs to the token
     that carries the labeled color. If the color-independent drift came from the
     three blind positions, narrowing the pull removes it with no repulsive term
-    at all. Note that the span pull is still the shape natural language forces,
-    because a document label marks no position as the relevant one. So if
-    op1-only wins, the lesson is about what sequence-level labeling costs, not
-    necessarily a design we can keep for M3.
+    at all.
     """)
     return
 
@@ -294,22 +295,14 @@ def _():
     and holds; from epoch 90 both terms share the end-of-training anneal,
     so their ratio is constant from the midpoint on.
 
-    Nobody has measured how robust that timing is. The M1 schedules varied
-    by experiment: Ex-2.4.1, a gentler condition that confined vibrant
-    colors to a two-axis subspace rather than clearing an axis, ran its
-    terms *up* over training instead. So one arm probes the timing:
-    `span-anti-late` stretches the anneal endpoint from epoch 50 to 90,
-    holding the repulsion near peak through most of training. If default
-    and late disagree by more than the noise floor, the timing matters and
-    a dedicated sweep is warranted; if they agree, the recipe is forgiving
-    on this axis and we can stop worrying about it.
+    One arm probes the timing: `span-anti-late` stretches the anneal endpoint
+    from epoch 50 to 90, holding the repulsion near peak through most of
+    training.
 
     The second arm, `span-anti-hi`, runs the full recipe at
     $\lambda_\text{a} = 1$, one rung above the maximum Ex-2.1.6 swept, with
-    $\lambda_{\bar{\text{s}}}$ scaled in proportion. Ex-2.1.6 never found the
-    weight at which the task pushes back, so this is the power analysis for how
-    much anchor weight is available to spend. Both terms scale together, so it
-    probes the headroom of the recipe, not of the bare anchor.
+    $\lambda_{\bar{\text{s}}}$ scaled in proportion. Both terms scale together,
+    so it probes the headroom of the recipe, not of the bare anchor.
     """)
     return
 
@@ -447,13 +440,11 @@ def _():
     mo.md(r"""
     ## Hypotheses
 
-    Gates carried over from ex-2.1.6 keep their thresholds and their
-    rationale. The noise floors quoted there (margin ≈ 0.056 per seed,
-    ≈ 0.032 on a three-seed mean) apply unchanged, since the architecture
-    and the measurement are the same. Unless stated otherwise, results are
-    reported on the `span-anti` condition (seed-averaged), the one the
-    ex-2.1.6 discussion named as the next experiment. The other factorial
-    conditions are used by H3, and the two arms are just descriptive.
+    Gates carry over from ex-2.1.6 with their thresholds and rationale, as do
+    its noise floors (margin ≈ 0.056 per seed, ≈ 0.032 on a three-seed mean):
+    same architecture, same measurement. Unless stated otherwise, results are
+    reported on `span-anti` (seed-averaged), the condition the ex-2.1.6
+    discussion named as the next experiment.
 
     **H1.** The added term and the resulting narrower pull are as free as the
     lone anchor was: every $\lambda_\text{a} = 0.1$ condition (the four
@@ -705,13 +696,6 @@ def _(CONDS: list[str], CONTROL_ACC, acc, stats):
     {acc("lam0", "open", "guess_dist").mean():.3f}, right alongside the
     anchored conditions. H1 asks whether the anchor moved this number, and it
     did not.
-
-    The ceiling arm is interesting. It uses $\lambda_\text{{a}} = 1$, which is
-    ten times the weight used for scoring and three times the largest weight
-    ex-2.1.6 swept. Even there, holdout accuracy is
-    {acc("span-anti-hi").mean():.4f}, indistinguishable from control. So we
-    still have not found the weight at which the task starts to suffer, and the
-    budget available for the D2.2 operation anchors is at least this large.
     """)
     return
 
@@ -1021,6 +1005,12 @@ def _(cells, m_op1):
 def _():
     mo.md(r"""
     ## Containment and dynamics (H4)
+
+    The anti-subspace term penalizes the mean-square alignment of the whole
+    cloud, which is the quantity H4(a) scores. So "the repulsive term lowers
+    $\bar\alpha$" is close to a tautology, and on its own not evidence that this
+    mechanism explains ex-2.1.6. H3 carries the load: does lowering $\bar\alpha$
+    gain margin, a quantity neither factor acts on directly?
     """)
     return
 
@@ -1415,6 +1405,43 @@ def _(CONDS: list[str], LABELS, arrays, geometry, margin_map):
 
 
 @app.cell(hide_code=True)
+def _(CONDS: list[str], LABELS_TXT, geometry, margin_map):
+    def _at(cond: str, key: str, layer: int) -> float:
+        return float(np.mean([geometry[f"{cond}-s{s}"][key][layer] for s in ex.SEEDS]))
+
+    _ctrl_spread = _at("lam0", "spread", 2)
+
+    def _row(cond: str) -> str:
+        cls = ' class="ref"' if cond == "lam0" else ""
+        return (
+            f"<tr{cls}><th>{LABELS_TXT[cond]}</th>"
+            f'<td class="num">{margin_map(cond)[0, 0]:.2f}</td>'
+            f'<td class="num">{margin_map(cond)[-1, 0]:.2f}</td>'
+            f'<td class="num">{_at(cond, "centre_dot_anchor", 2):.2f}</td>'
+            f'<td class="num">{_at(cond, "spread", 2) / _ctrl_spread:.0%}</td></tr>'
+        )
+
+    _table = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr>
+        <th></th><th class="num">m, embedding</th><th class="num">m, last layer</th>
+        <th class="num">centre · anchor</th><th class="num">extent</th>
+      </tr></thead>
+      <tbody>{"".join(_row(c) for c in CONDS)}</tbody>
+    </table></div>
+    """
+    _caption = mo.md(r"""
+    Per-layer geometry at op1, seed-averaged, decoding the three panels above.
+    First two columns: the margin at the token embedding and at the last layer.
+    Last two, read mid-stack at layer 2 where the control cloud is still broad:
+    the cosine between the centre of the color cloud and the anchor direction,
+    and the extent of the cloud as a fraction of the control's.
+    """)
+    mo.Html(figure_html(_table, caption=_caption.text, class_="report-figure"))
+    return
+
+
+@app.cell(hide_code=True)
 def _(geometry, margin_map):
     def _at(cond: str, key: str, layer: int) -> float:
         return float(np.mean([geometry[f"{cond}-s{s}"][key][layer] for s in ex.SEEDS]))
@@ -1443,58 +1470,39 @@ def _(geometry, margin_map):
     #     geometry numbers are read at (2) was also unstated, and is now named.
 
     mo.md(rf"""
-    The improvement is not a uniform lift. In ex-2.1.6 the margin peaked in the
-    embedding and decayed through the stack; we reproduce that decay here
-    ({margin_map("span-bare")[0, 0]:.2f} → {margin_map("span-bare")[-1, 0]:.2f}).
-    Both factors act mostly on the decay rather than on the starting point.
-    `op1-anti` runs {margin_map("op1-anti")[0, 0]:.2f} →
-    {margin_map("op1-anti")[-1, 0]:.2f}: it starts
-    {margin_map("op1-anti")[0, 0] / margin_map("span-bare")[0, 0]:.1f}× as high
-    as the bare span condition, but ends the last layer with
+    **Selectivity was being lost at depth, and depth is where these
+    interventions act.** Ex-2.1.6's margin peaked in the embedding and decayed
+    through the stack, and that decay reproduces here. Both factors act mostly
+    on the decay rather than on the starting point: `op1-anti` starts
+    {margin_map("op1-anti")[0, 0] / margin_map("span-bare")[0, 0]:.1f}× the bare
+    span condition and ends the stack at
     {margin_map("op1-anti")[-1, 0] / margin_map("span-bare")[-1, 0]:.0f}× its
     margin.
 
-    The timing arm shows this most plainly. It leaves the embedding level with
-    the bare span condition ({margin_map("span-anti-late")[0, 0]:.2f} against
-    {margin_map("span-bare")[0, 0]:.2f}), rises through the middle of the stack,
-    and finishes highest of any condition
-    ({margin_map("span-anti-late")[-1, 0]:.2f}), about where it started. Every
-    other condition ends well below its own embedding value. So selectivity was
-    being lost at depth, and depth is where these interventions act.
+    The timing arm makes that plainest. It leaves the embedding level with
+    `span-bare`, rises through the middle of the stack, and finishes highest of
+    any condition — about where it started, while every other condition ends
+    well below its own embedding value.
 
-    The middle and right panels show the mechanism behind H4(a), read mid-stack
-    at layer 2, where the control cloud is still broad. In the control, the
-    cosine between the centre of the color cloud and the anchor direction is
-    {_at("lam0", "centre_dot_anchor", 2):.2f}: the anchor axis carries
-    essentially nothing about where the cloud sits. The bare span pull swings it
-    to {_at("span-bare", "centre_dot_anchor", 2):.2f}, the whole-cube movement
-    ex-2.1.6 diagnosed.
+    **Either factor reduces the whole-cube shift on its own**, the mechanism
+    behind H4(a). The anchor axis carries essentially nothing about where the
+    control cloud sits, and the bare span pull swings it most of the way over:
+    the movement ex-2.1.6 diagnosed. The timing arm lands nearest the control of
+    any anchored condition.
 
-    Either factor reduces that shift on its own:
-    {_at("span-anti", "centre_dot_anchor", 2):.2f} with the repulsive term,
-    {_at("op1-bare", "centre_dot_anchor", 2):.2f} with the narrower pull, and
-    {_at("op1-anti", "centre_dot_anchor", 2):.2f} with both. The timing arm
-    reaches {_at("span-anti-late", "centre_dot_anchor", 2):.2f}, nearest the
-    control of any anchored condition.
+    **The extent column answers a question ex-2.1.6 left open.** That experiment
+    found the bare anchor compressing the cube mid-stack, and suggested a
+    `separate`-style term might eventually be needed here, as it was in M1. On
+    this evidence it is not: every other factorial condition recovers most of
+    the extent.
 
-    The extent panel answers a question ex-2.1.6 left open. That experiment
-    found the bare anchor compressing the cube mid-stack, to
-    {_at("span-bare", "spread", 2) / _at("lam0", "spread", 2):.0%} of the control
-    extent, and suggested a `separate`-style term might eventually be needed
-    here, as it was in M1. On this evidence it is not needed: every other
-    factorial condition recovers most of the extent.
+    Restoring the extent is not something the repulsion does specifically.
+    Reading the same 2×2 on spread gives the ordering H3 found on the margin:
+    narrowing the pull is worth {_eff("spread"):+.2f}, the repulsive term
+    {_eff("spread", "anti"):+.2f}. It seems the color-independent shift was what
+    compressed the cube, so anything that reduces the shift restores it.
 
-    Reading the same 2×2 on spread gives the same ordering H3 found on the
-    margin: narrowing the pull is worth {_eff("spread"):+.2f} and the repulsive
-    term {_eff("spread", "anti"):+.2f}. So restoring the extent is not something
-    the repulsion does specifically. `op1-bare` reaches
-    {_at("op1-bare", "spread", 2) / _at("lam0", "spread", 2):.0%} of the control
-    extent with no repulsive term at all, and `op1-anti` reaches
-    {_at("op1-anti", "spread", 2) / _at("lam0", "spread", 2):.0%}. It seems the
-    color-independent shift was what compressed the cube, so anything that
-    reduces the shift restores the extent.
-
-    Compression does show up in the ceiling arm. At
+    **Compression does show up in the ceiling arm.** At
     $\lambda_\text{{a}} = 1$ the cube is narrower even in the token embedding
     ({_at("span-anti-hi", "spread", 0):.2f} against
     {_at("lam0", "spread", 0):.2f} everywhere else), a layer the pull reaches
@@ -1511,10 +1519,8 @@ def _():
 
     Where redness is readable is carried over from ex-2.1.6 without a gate. It
     asks whether the anchor axis holds a *copy* of the concept or the concept
-    itself: in ex-2.1.6, projecting the anchor direction out left redness as
-    readable from the other 63 directions as in the control, which is what a
-    copy looks like. The repulsive term pushes unlabeled colors off the axis, so
-    it acts on this quantity.
+    itself. The repulsive term pushes unlabeled colors off the axis, so it acts
+    on this quantity.
     """)
     return
 
@@ -1595,10 +1601,7 @@ def _(CONDS: list[str], cells):
     there still stands: redness is a function of color, the task needs the color
     cube, so a probe reading redness off the cube is not evidence of a second
     copy of the concept. What the number does establish is that anchoring
-    *concentrated* redness onto the axis without removing it from anywhere
-    else. For an intervention, the caveat is that suppressing the axis will
-    not remove the model's access to redness. That is the question D2.2 is
-    built to ask.
+    *concentrated* redness onto the axis without removing it from anywhere else.
     """)
     return
 
@@ -1712,9 +1715,9 @@ def _():
     position of every line, labeled or not. That makes the timing arm look
     puzzling. Holding that penalty near its peak for another forty epochs ought
     to push the anchored concept off the anchor along with everything else.
-    Instead, that arm produces the best margin in the experiment. So either the
-    term somehow spares the labeled lines, or the push and the pull are not the
-    same size.
+    Instead, that arm has the highest margin of any `span` condition. So either
+    the term somehow spares the labeled lines, or the push and the pull are not
+    the same size.
 
     It is the second. Splitting the margin into its two halves shows the term
     does act on *red*; the pull toward the anchor is simply stronger.
@@ -1884,7 +1887,7 @@ def _(arrays):
 
 
 @app.cell(hide_code=True)
-def _(alpha_bar, grading, m_op1):
+def _(alpha_bar):
     # REVIEW: two narrowings in the discussion below.
     # (1) "That fills the gap in D2.1" now names its scope (three seeds, one
     #     synthetic testbed), since every margin number in this report comes
@@ -1902,14 +1905,12 @@ def _(alpha_bar, grading, m_op1):
     D2.1's claim that "SCA transfers to transformers" needs that second part
     too.
 
-    This experiment supplies it. `op1-anti` reaches a margin of
-    {m_op1("op1-anti").mean():.2f} against a preregistered gate of
-    {ex.MARGIN_GATE:g}, with a graded response
-    (R² = {grading("op1-anti")[2]:.2f} against the M1-derived shape) and no
-    measurable task cost, on three seeds of one synthetic testbed. That fills
-    the gap in D2.1 for this testbed, and it did so without either of the two
-    obvious next steps: a heavier pull (the ceiling arm shows that makes
-    matters worse) or the remaining M1 repulsive terms (they were not needed).
+    This experiment supplies it, on three seeds of one synthetic testbed:
+    `op1-anti` clears the margin gate with a graded response against the
+    M1-derived shape and no measurable task cost. That fills the gap in D2.1 for
+    this testbed, and it did so without either of the two obvious next steps —
+    a heavier pull (the ceiling arm shows that makes matters worse) or the
+    remaining M1 repulsive terms (they were not needed).
 
     **What the factorial attributed.** Both candidate mechanisms from the
     ex-2.1.6 discussion turn out to be real, but their relative sizes are the
@@ -1963,9 +1964,7 @@ def _(alpha_bar, grading, m_op1):
     differently now that there is a graded response to compare against; note
     the grading here is measured under a `redness⁸` distribution that puts
     {ex.LABEL_W[np.argsort(ex.REDNESS)[-10:]].sum():.0%} of its mass on ten
-    colors. The exploratory section adds a fourth question: the strength of the
-    repulsive term relative to the anchored concept turns out to depend on the
-    label rate as much as on its weight, and that interaction is unmapped.
+    colors.
 
     One thing this experiment does *not* license. The off-axis leakage is
     unchanged from ex-2.1.6 in every condition: redness stays as readable from

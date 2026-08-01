@@ -13,6 +13,16 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Open questions
 
+- [ ] **Decide which retention statistic the reports quote.** #reports Ex-2.1.7
+  computes "retention" two ways in two cells: the Findings section takes the
+  *minimum* final-over-peak margin across seeds, matching H4(b)'s per-run gate
+  ("for every anchored run … at least 0.8× that maximum"), while the Arms
+  section takes the *mean* across seeds. For `span-anti-late` those read 0.92
+  and 0.94; for `span-anti-hi`, 0.55 and 0.58. Both are defensible, but one
+  report should not quote both under one name. The min is the gate-relevant
+  one; the mean is the one already carried into the anneal-endpoint item below.
+  Pick one and make the other follow.
+
 - [ ] **Sweep the anti-subspace anneal endpoint — the highest-value open knob
   after ex-2.1.7.** The `span-anti-late` arm changed exactly one number, the
   epoch at which the repulsive term finishes annealing to its hold ratio (50 →
