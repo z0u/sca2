@@ -9,7 +9,9 @@ Write with a clear, correct, and understated style: considered but conversationa
 Characteristics:
 
 - Oxford comma; straight (not "smart") quotes, em-dashes sparingly (prefer other punctuation).
-- Calibrate confidence to the evidence: plain declaratives for what was measured or observed.
+- Calibrate confidence to the evidence: plain declaratives for what was measured or observed. Hedges and tense carry how strongly a claim is made, so they survive editing: "would start to matter" is weaker than "matters".
+- Verbs agree with which direction is good. Containment, decay and retention run downward, so "no condition reaches 0.1" reads backwards; "falls to" does not.
+- A term the reader may not know gets one short plain-English gloss on first use, in a footnote or a `details` block. Figure captions stay pure legend.
 - Plain connectives to continue a thought: "So", "But", etc.
 - American spelling and double quotes to match the convention in scientific literature.
 - Alt text for all images: aids vision-impaired people and LLMs alike (see the alt-text skill).

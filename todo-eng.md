@@ -14,27 +14,42 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- **A cheap in-place mode for `writing-lint` (2026-08-01).** #skills #agents
-  #reports The lint now runs on every prose turn, paired behind
-  `prose-simplifier`, which means a section-sized edit pays for the whole
-  five-step round trip: run the notebook, export to Markdown, copy, lint,
-  word-diff, hand-port every change back into f-strings in `report.py`. Most of
-  that cost buys something only the assembled document needs — cross-section
-  duplication and rendered proportion — so it is disproportionate while
-  drafting.
-  The optimization is to point `text-linter` straight at `report.py` with a line
-  range, the way `prose-simplifier` is already invoked, and skip the export and
-  the port-back. Step 6 of the round trip disappears with them: the linter would
-  see `{ex.MEAN_ALIGN_PARTIAL:g}` as an opaque token instead of `0.25`, so it
-  cannot flatten an expression it never resolved. Keep the full round trip for
-  the freeze and publish gates.
-  Two things to check before switching. The linter runs on haiku with no style
-  skills beyond `style-md`, and in-place mode has it editing Python string
-  literals inside `mo.md()` rather than the Markdown it prefers — it would need
-  a section telling it to preserve the `f` prefix, the braces, and the quoting,
-  and possibly a stronger model. And the interpolated values do carry some
-  signal about length that the source form hides, so compare a few sections
-  linted both ways before committing to it.
+- **A prose cell renders nothing in ex-2.1.7 (2026-08-01).** #reports #publishing
+  The H2 verdict cell ([`docs/m2/ex-2.1.7/report.py:796`](./docs/m2/ex-2.1.7/report.py))
+  produces no output. The export goes `@output:nWHF` (H2's second figure) →
+  `@output:ROlb` (H3's factorial table) with nothing between them, so the
+  published report states no verdict for H2 and carries none of the numbers that
+  decide it. Reproduced on two independent `marimo-md-export` runs; no error is
+  raised and nothing appears in the export to mark the gap.
+  This matters beyond one report: a cell can go missing silently, and the only
+  reason we caught it was a structural reviewer reading the rendered document
+  rather than the source. Worth a publish-time check that every `mo.md()` cell
+  appears in the export — the count is cheap (19 `@output:` markers against the
+  number of output-producing cells) and would have failed loudly here.
+  Cause unknown. The cell's decorator, signature, inputs and shape all match
+  cells that do render, so start by bisecting its body.
+
+- **Done: in-place mode for the prose pass (2026-08-01).** #skills #agents
+  #reports Kept here for the measurements, which are the reason the pass was
+  redesigned rather than optimized. Seven candidate designs ran over one section
+  whose failure modes were known, varying model, substrate and instructions.
+  Results: told what is load-bearing, an agent finds 2 to 5% of a section to cut,
+  not the 48% the old lint appeared to deliver — that figure came from cutting
+  figure captions by 67%, which is content loss rather than trimming. Instructions
+  dominate; the model barely matters (Sonnet and Opus given the same spec made
+  identical cuts). Achievable reduction is set by how much of a section is
+  protected material, so 40% captions and tables caps a section near 7% while
+  unbroken prose reaches 20%.
+  Source-native won on both counts asked of it. Markdown does not corrupt
+  f-strings, but every edit becomes manual reconciliation that scales with the
+  cut; and `ast.parse` validates template expressions for free, since Python
+  compiles f-strings and a dropped or undoubled brace is a SyntaxError. Opus
+  editing source cut slightly deeper than the same prompt on Markdown, so
+  handling the code cost nothing.
+  Shipped as the `report-restructure` skill and agent, with
+  `scripts/check-templates` as the gate. `text-linter` and `writing-lint` are
+  gone. Structural work — where the real length is, roughly five times the prose
+  pass — went to the new `report-structure` agent.
 
 - **Teach the skills and review agents to check for tautologies (2026-07-31).**
   Ex-2.1.7's H4(a) scored the containment of ᾱ in conditions carrying a term

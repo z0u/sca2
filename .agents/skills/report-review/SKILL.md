@@ -86,13 +86,16 @@ Then, for up to 3 rounds:
       experiment claims.
     - Otherwise (substantive fixes, not yet at "no blockers"): another round.
 4. If the loop converged and the report is heading for a freeze or a publish,
-   run the `writing-lint` skill over the whole document. Reviewers edit one
-   section at a time, so duplication between sections and a tl;dr that has
-   grown into a second conclusion only show up in the assembled render. Then do
-   the two checks the lint leaves to you — dropped qualifiers, and template
-   expressions flattened to literals — described in `references/review-passes.md`
-   in the `science` skill. Skip this step when you escalated: the text will move
-   again.
+   export the document and give it to the `report-structure` agent. Reviewers
+   edit one section at a time, so duplication between sections, a tl;dr that has
+   grown into a second conclusion, and a findings section that a result never
+   reached only show up in the assembled render. It proposes rather than edits,
+   so bring its cut list to the user rather than acting on it — deleting a
+   paragraph is their call. Skip this step when you escalated: the text will
+   move again.
+
+   Read the render, not the source. A cell can fail to render and leave no trace
+   in `report.py`; ex-2.1.7 published without its H2 verdict that way.
 5. After the loop ends (converged, escalated, or 3 rounds reached), summarize
    for the user: what changed across all rounds, any open questions, and the
    final recommendation. Include `git diff --stat` for the report so they can

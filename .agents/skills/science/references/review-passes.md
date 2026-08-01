@@ -64,25 +64,46 @@ is involved. In one turn:
 1. Write
 2. Stage changes (unless you have another way to see what the agents change)
 3. Hand the file and line range to the `prose-simplifier` agent
-4. Run the `writing-lint` skill over the same text
+4. Run the `report-restructure` skill over the same range
 5. Review both sets of changes; check for correctness
 
-That order, and only that order. The simplifier expands: it unstacks dense
-sentences, splits appositives that smuggle in a definition, and surfaces buried
-verbs. The lint cuts. Simplify-then-trim settles; the reverse may re-inflate
-what the lint just removed.
+That order, and only that order. The simplifier unstacks dense sentences, splits
+appositives that smuggle in a definition, and surfaces buried verbs. The
+restructure pass then groups the result into short paragraphs that open on their
+findings, and cuts what the document already says elsewhere. Reversed, the
+simplifier would unpick the grouping.
 
-The lint is also the pass most likely to change a claim without looking like it
-has, because the things it drops — a scope qualifier, the reason attached to a
-verdict, the name of a threshold — may read as fluff to a reader with no
-context. Two checks are yours rather than the agent's:
+Both edit `report.py` directly, so template expressions stay live and there is
+nothing to port back. Run the check afterwards:
 
-- Read the word diff for qualifiers and numbers that went missing. The lint is
-  told the text is correct and works from a copy, so it will not catch this.
-- Confirm every template expression survived the port back. The linter sees
-  `0.25`, not `{ex.MEAN_ALIGN_PARTIAL:g}`, so a flattened literal renders fine
-  and is still wrong in the source.
+```bash
+.agents/skills/report-restructure/scripts/check-templates docs/m2/ex-2.1.7/report.py
+```
 
-The same lint runs over the whole document at the freeze and publish gates,
-where duplication across sections and the rendered proportion of a tl;dr first
-become visible.
+It parses the file — which catches a dropped brace, a stray brace, or an
+undoubled LaTeX brace — and lists any expression that went missing.
+
+One check stays yours, because no script finds it: read the diff for a
+qualifier, a hedge, or a modal that went quiet, and for a referring expression
+whose antecedent left with a deleted sentence. Both agents are told the text is
+correct, so neither will notice that "would start to matter" became "matters",
+or that "that decay" no longer has a decay to point at.
+
+Do not take either agent's summary of its own work. Agents doing this
+consistently misjudge how much they changed and overstate what they preserved.
+`git diff --stat` and the template check settle both in a second.
+
+## What each pass is worth
+
+Worth knowing before reaching for one. The prose passes recover roughly 2 to 20%
+of a section, and most of their value is in shape rather than length: a section
+that is 40% figure captions, alt text and tables has little that can move, since
+all three are protected.
+
+Real length comes off at the structural level — duplication across sections,
+front matter that runs before the first result, a discussion that re-derives
+results the findings section already gave. That is several times larger, and it
+is only visible in the assembled document. The `report-structure` agent does
+that pass at the freeze and publish gates, reading the render rather than the
+source: a cell that fails to render is invisible in the source, and we have had
+one go missing.

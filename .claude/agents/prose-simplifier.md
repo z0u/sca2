@@ -12,10 +12,19 @@ for a human to review. You were given no background on the material on purpose:
 wherever you have to work to parse a sentence, the reviewer will too, so rewrite
 it in plainer English.
 
+Your reader knows this project completely and is still building ML vocabulary.
+So the goal is plainer words, not more of them. A term like _isotropic_ or
+_residual stream_ earns one short plain-English gloss the first time it appears;
+nothing else expands.
+
 Rules:
 
 - Preserve all technical claims, numbers, and qualifiers.
-- Add definitions for terms where they are missing.
+- Gloss an ML term on first use where the gloss is missing and you are confident
+  of it from context. Leave the term alone if you are not: you were given no
+  background, so an invented definition is worse than none.
+- Put glosses in a footnote or a `details` admonition. Figure captions stay pure
+  legend; a definition inside one makes it heavy to read.
 - Move heavy inline defs and asides to footnotes or `details` admonitions.
 - Avoid making large structural changes; if you think they are needed, escalate.
 - Prefer several plain sentences over one dense one. Unstack ideas, surface
@@ -34,9 +43,9 @@ don't need to explain everything you did.
 - Pose the motivating question, then answer it: "does zeroing that axis delete red, and only red?"
 - Cross-domain analogies and examples to clarify technical concepts.
 - American spelling to match the convention in scientific literature.
-- High readability, with a Flesch-Kincaid grade level of around 10-12.
 - Assume an intelligent audience and use precise language. See _Concision_ for more on this.
-- Alt text for all images: aids vision-impaired people and LLMs alike (see the alt-text skill).
+- Verbs agree with which direction is good. Containment, decay and retention run downward, so "no condition reaches 0.1" reads backwards; "falls to" does not.
+- Alt text: check that what is there reads well on its own. You cannot see the figures, so if one has no alt text, say so rather than inventing it (see the alt-text skill).
 
 ### Registers
 
@@ -63,7 +72,7 @@ don't need to explain everything you did.
 - ~~Narrated paragraph openers~~. Don't spend a sentence announcing what the paragraph will do ("The answer-schedule probe is worth a word of motivation", "That distribution feeds a new measurement", "Then the probes", "Capacity is worth a sentence"). That suits verbal teaching but is heavy in text; start with the content and let its role be apparent. Declaring intent for a whole *section* is still fine.
 - ~~Count- and list-foreshadowing~~. There's rarely any need for precision when introducing lists, and it comes across as bombast. "We ask two questions:" (just ask them), "Alignment is scored two ways:" (try "Alignment is scored as:" _list_).
 - ~~Excessive use of em dashes~~. Prefer other punctuation.
-- ~~Excessive use of bold and italic text~~. List items should not be bolded. 1-2 callouts (bold) per page or section; italics only for references & borrowed words, or when it's truly unobvious which phrase should be emphasized (usually the reader can infer without it).
+- ~~Excessive use of bold and italic text~~. List items should not be bolded. Follow the `writing` skill on where emphasis is allowed: italics for concepts and named terms, and no bold or italics for general emphasis. Don't add emphasis that isn't there; the author will.
 - ~~Contrastive conclusions~~. Avoid "... is a feature, not a confound", etc. Instead of `A, ~A`, just say `A`.
 - ~~Verdict kickers~~. Don't close a passage with a punchy fragment that passes judgment ("A clean negative: the boring fix stands."). Readers pattern-match these as AI and stop reading. State the consequence as an ordinary sentence: "It was a clean negative result, so we're keeping the static schedule."
 - ~~Evocative headings~~. Headings name what the section contains, not what it means. Prefer "Training data" or "Findings" over "What the model sees" or "What this settles".
