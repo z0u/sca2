@@ -72,26 +72,32 @@ def _():
     tell them apart.
 
     First, nothing repelled the rest of the cube. M1 never ran its anchor
-    bare: it also used an indiscriminate *anti-subspace* term, at a few
-    percent of the anchor weight, which penalized the average squared
-    alignment between the anchor direction and every representation in the
-    batch — a gentle, global pressure keeping the cloud as a whole off the
-    axis. That average is exactly the quantity that ran away in ex-2.1.6.
+    bare: it added an indiscriminate *anti-subspace* term, at a few percent
+    of the anchor weight, penalizing the average squared alignment between
+    the anchor direction and every representation in the batch. That is a
+    gentle, global pressure that keeps the cloud as a whole off the axis,
+    and that average is the quantity that ran away in ex-2.1.6.
 
     Second, most of the pull was blind. The anchor pulled four prompt
     positions of each labeled equation, and three of them (`+`, op2, `=`)
-    carry no information about which color sits at op1. At those positions
-    the label is an unobservable coin flip. Only the expected pull is
-    visible to the optimizer, and the expected pull is nearly
-    color-independent.
+    carry no information about which color sits at op1. There the label is
+    an unobservable coin flip, so only the expected pull is visible to the
+    optimizer, and that is nearly color-independent.
 
-    This experiment separates the two with a 2×2 factorial at the ex-2.1.6
-    scoring rung ($\lambda_\text{a} = 0.1$): {bare anchor, anchor + anti-subspace} ×
+    This experiment separates the two with a 2×2 factorial[^factorial] at
+    the ex-2.1.6 scoring rung ($\lambda_\text{a} = 0.1$):
+    {bare anchor, anchor + anti-subspace} ×
     {four-position span pull, op1-only pull}. If the anti-subspace factor
-    restores the margin, missing repulsion was the problem; if the op1-only
-    factor does, the blind span was; if only the combination does, they
-    compound. Two extra arms ride along: a schedule-timing variant of the
+    restores the margin, missing repulsion was the problem. If the op1-only
+    factor does, the blind span was. If only the combination does, they
+    compound.
+
+    Two extra arms ride along: a schedule-timing variant of the
     anti-subspace anneal, and a weight-ceiling rung at $\lambda = 1$.
+
+    [^factorial]: A design that runs every combination of two on/off
+    factors, four conditions here, so each factor's effect can be measured
+    on its own.
 
     /// details | Notation
     Notation carries over from ex-2.1.6, with loss weights now subscripted
@@ -116,6 +122,61 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    ## Findings
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(CONDS: list[str], CONTROL_ACC, acc, alpha_bar, grading, m_op1, traj):
+    # REVIEW: added the Findings section. Every verdict and its deciding number
+    # already appeared in an analysis section; nothing here is new, and no gate
+    # or verdict changed. Verify against the H1 table, the margin figure, the H3
+    # factorial table, and the H4 table, in that order.
+    _sb, _sa, _ob, _oa = (float(m_op1(c).mean()) for c in ("span-bare", "span-anti", "op1-bare", "op1-anti"))
+    _held = sum(
+        1
+        for c in CONDS
+        if c != "lam0"
+        and (_r := [t[-1] / t.max() for s in ex.SEEDS if (t := traj(c, s, "m_op1")).max() >= ex.H4_FLOOR])
+        and min(_r) >= ex.H4_RETENTION
+    )
+    mo.md(rf"""
+    **H1 (task cost) — holds.** Largest `named_holdout` exact-match gap from the
+    control, across all seven conditions:
+    {max(abs(acc(c).mean() - CONTROL_ACC) for c in CONDS):.4f}. Gate:
+    {ex.TASK_GATE:g}.
+
+    **H2 (selectivity) — holds, on the op1 conditions.** `op1-anti` reaches
+    $m_{{\text{{op1}}}} = {_oa:.3f}$ and `op1-bare` {_ob:.3f}, against a gate of
+    {ex.MARGIN_GATE:g}. Both are graded (`op1-anti` R² =
+    {grading("op1-anti")[2]:.2f}; `op1-bare` ρ = {grading("op1-bare")[1]:.2f},
+    gates {ex.GRADE_R2_GATE:g}), and the control sits at
+    $|m_{{\text{{op1}}}}| = {abs(m_op1("lam0").mean()):.3f}$ against a ceiling of
+    {ex.CONTROL_MARGIN_GATE:g}. The preregistered primary condition `span-anti`
+    reaches {_sa:.3f}, a partial.
+
+    **H3 (attribution) — fails.** Both main effects clear
+    {ex.MAIN_EFFECT_GATE:g}, but the anti-subspace effect
+    ({(_sa + _oa) / 2 - (_sb + _ob) / 2:+.3f}) is smaller than the op1-only
+    effect ({(_ob + _oa) / 2 - (_sb + _sa) / 2:+.3f}), not larger; the ordering
+    holds within every seed. That is the first of the two contrary readings named
+    in advance.
+
+    **H4 (containment and dynamics) — fails on both parts.** (a) No anti
+    condition at the scoring rung falls to
+    $\bar\alpha \le {ex.MEAN_ALIGN_GATE:g}$; `span-anti` ends at
+    {alpha_bar("span-anti").mean():.3f}, missing the
+    {ex.MEAN_ALIGN_PARTIAL:g} partial too. (b) {_held} of the six anchored
+    conditions hold {ex.H4_RETENTION:g}× their peak margin; the gate asks for
+    all of them.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     /// admonition | How to read this report
     This report started as a preregistered skeleton. We wrote and froze the
     method, hypotheses, and decision thresholds before running the experiment,
@@ -124,12 +185,12 @@ def _():
     Anything conceived after seeing the data is under *Exploratory analyses*,
     marked post hoc.
 
-    When reading H3 and H4, keep in mind: The anti-subspace term is a penalty on
-    the mean-square alignment of the whole cloud, and that is the quantity H4(a)
+    When reading H3 and H4, keep in mind: the anti-subspace term penalizes the
+    mean-square alignment of the whole cloud, which is the quantity H4(a)
     scores. So "the repulsive term lowers $\bar\alpha$" is close to a tautology,
-    and on its own, it is not evidence that this mechanism explains ex-2.1.6.
-    The load-bearing question is H3: does lowering $\bar\alpha$ actually gain
-    margin? Margin is a quantity neither factor acts on directly.
+    and on its own not evidence that this mechanism explains ex-2.1.6. The
+    load-bearing question is H3: does lowering $\bar\alpha$ gain margin, a
+    quantity neither factor acts on directly?
     ///
     """)
     return
@@ -898,12 +959,11 @@ def _(m_op1):
     </table></div>
     """
     _caption = mo.md(f"""
-    The factorial on $m_{{\\text{{op1}}}}$. Body cells are seed means with half
-    the seed range beside them. A main effect is the mean of the two conditions
-    carrying a factor minus the mean of the two without it, so the anti effect
-    is how much the repulsive term is worth averaged over both pull spans, and
-    the op1-only effect is how much narrowing the pull is worth averaged over
-    both terms. The interaction is what the two together buy beyond their sum.
+    The factorial on $m_{{\\text{{op1}}}}$. Body cells are seed means, with
+    half the seed range beside them. Anti effect: margin gained by adding the
+    repulsive term, averaged over both pull spans; op1-only effect: margin
+    gained by narrowing the pull, averaged over both terms; interaction: what
+    the two together buy beyond their sum.
     H3 asks the anti effect to reach {ex.MAIN_EFFECT_GATE:g} and to be at least
     as large as the op1-only effect; the noise on a main effect is about
     {ex.NOISE_SEED_MEAN:g}.
@@ -929,32 +989,30 @@ def _(cells, m_op1):
     effects clear {ex.MAIN_EFFECT_GATE:g}: the repulsive term is worth
     {_anti:+.3f} of margin, and the narrower pull is worth {_op1:+.3f}, against
     a noise floor of about {ex.NOISE_SEED_MEAN:g} on a main effect. But H3 asked
-    for the anti-subspace effect to be *at least as large*, and it is about
-    {_op1 / _anti:.1f} times smaller. That is the reading the preregistration
-    named: the blind-span interpretation of ex-2.1.6 was correct. The mechanism
-    that the ex-2.1.6 discussion put second had the larger effect in this
-    experiment.
+    for the anti-subspace effect to be *at least as large*, and instead the
+    op1-only effect is the larger, by a factor of about {_op1 / _anti:.1f}. That
+    is the reading the preregistration named: the blind-span interpretation of
+    ex-2.1.6 was correct.
 
-    How much weight should "larger" carry here? The gap between the two effects
-    is {abs(_op1 - _anti):.3f}, about {abs(_op1 - _anti) / ex.NOISE_SEED_MEAN:.0f}
-    noise units on the generic seed-mean floor. But that floor understates the
-    case. Both effects can be computed within a seed and then compared pairwise,
-    which cancels the seed. Done that way, the op1-only effect is the larger on
-    every seed, with no overlap between the two sets
+    The gap between the two effects is {abs(_op1 - _anti):.3f}, about
+    {abs(_op1 - _anti) / ex.NOISE_SEED_MEAN:.0f} noise units on the generic
+    seed-mean floor, and that floor understates the case. Computed within a
+    seed, which cancels seed-to-seed variation, the op1-only effect is the
+    larger on every seed, with no overlap between the two sets
     ({", ".join(f"{_per_seed(s)[1]:.2f} vs {_per_seed(s)[0]:.2f}" for s in ex.SEEDS)}),
-    so the ordering is not due to one lucky run. Still, the two factors are
-    not on a common scale: one changes how many positions are pulled, and the
-    other adds a term at a weight copied from another experiment. So this says
-    the *particular* settings tried favor the span, not that repulsion is
-    intrinsically the weaker lever.
+    so the ordering is not due to one lucky run.
 
-    The interaction is {_int:+.3f}, so the two are mildly sub-additive: together
-    they buy about {abs(_int):.2f} less than their separate effects would
-    suggest. That is the expected shape if they are two routes to one place.
-    Both ultimately reduce how much of the pull can be satisfied by a
-    color-independent shift, so whichever is applied second has less left to do.
-    It also means the interaction outcome H3 named (neither main effect clearing
-    while `op1-anti` alone does) is the opposite of what happened.
+    Still, the two factors are not on a common scale: one changes how many
+    positions are pulled, and the other adds a term at a weight copied from
+    another experiment. So this says the *particular* settings tried favor the
+    span, not that repulsion is intrinsically the weaker lever.
+
+    The interaction is {_int:+.3f}: mildly sub-additive, the expected shape if
+    the two are routes to one place. Both reduce how much of the pull can be
+    satisfied by a color-independent shift, so whichever is applied second has
+    less left to do. It also means the interaction outcome H3 named (neither
+    main effect clearing while `op1-anti` alone does) is the opposite of what
+    happened.
     """)
     return
 
@@ -1827,76 +1885,87 @@ def _(arrays):
 
 @app.cell(hide_code=True)
 def _(alpha_bar, grading, m_op1):
+    # REVIEW: two narrowings in the discussion below.
+    # (1) "That fills the gap in D2.1" now names its scope (three seeds, one
+    #     synthetic testbed), since every margin number in this report comes
+    #     from `v216` at d64-L4.
+    # (2) Dropped "the margin-by-position profile suggests the model itself
+    #     knows where it is": `m_by_position` is recorded by `eval_one` but no
+    #     figure or table in this report shows it, so a reader cannot check the
+    #     claim. Verify: if a per-position panel is added, this can come back.
     mo.md(rf"""
     ## Discussion
 
     **A selective anchor in a transformer.** Ex-2.1.6 showed that an anchor was
-    free (the task tolerated the regularizer), but not that it was selective
-    (that the concept actually landed where it was put). The claim behind D2.1,
-    "SCA transfers to transformers", needs the second part too. This experiment
-    supplies it. `op1-anti` reaches a margin of
+    free: the task tolerated the regularizer. It did not show that the anchor
+    was selective, meaning the concept actually landed where it was put, and
+    D2.1's claim that "SCA transfers to transformers" needs that second part
+    too.
+
+    This experiment supplies it. `op1-anti` reaches a margin of
     {m_op1("op1-anti").mean():.2f} against a preregistered gate of
     {ex.MARGIN_GATE:g}, with a graded response
     (R² = {grading("op1-anti")[2]:.2f} against the M1-derived shape) and no
-    measurable task cost. That fills the gap in D2.1. Notably, it did so
-    without either of the two obvious next steps: a heavier pull (the ceiling
-    arm shows that makes matters worse) or the remaining M1 repulsive terms
-    (they were not needed).
+    measurable task cost, on three seeds of one synthetic testbed. That fills
+    the gap in D2.1 for this testbed, and it did so without either of the two
+    obvious next steps: a heavier pull (the ceiling arm shows that makes
+    matters worse) or the remaining M1 repulsive terms (they were not needed).
 
     **What the factorial attributed.** Both candidate mechanisms from the
     ex-2.1.6 discussion turn out to be real, but their relative sizes are the
     reverse of what that discussion expected. Narrowing the pull to the one
     position that carries the labeled color helps more than adding the M1
-    repulsive term. And the conditions that pull the whole span are exactly the
-    ones whose margin keeps sliding during training. The preregistration named
-    an interpretation for this outcome: the blind-span reading of ex-2.1.6 was
-    correct. When three of the four pulled positions cannot see which color
-    they are being pulled toward, the optimizer supplies a color-independent
-    shift, and that shift is what dilutes the margin.
+    repulsive term, and the conditions that pull the whole span are exactly the
+    ones whose margin keeps sliding during training. When three of the four
+    pulled positions cannot see which color they are being pulled toward, the
+    optimizer supplies a color-independent shift, and that shift is what
+    dilutes the margin.
 
     **A caution about how far that generalizes.** The span pull is not an
-    arbitrary choice we can simply drop. Sequence-level labeling forces it: a
-    document label marks no position as the relevant one. Our op1-only pull is
-    possible only because this synthetic language has a known position that
-    carries the concept, and that is exactly what a real corpus does not give
-    you. So the finding is really a statement about what sequence-level
-    labeling costs, not a design M3 can keep. The diagnosis transfers; the
-    remedy needs a mechanism for locating the concept within a labeled span.
-    The margin-by-position profile suggests the model itself knows where it
-    is.
+    arbitrary choice we can simply drop. Sequence-level labeling forces it,
+    because a document label marks no position as the relevant one. Our
+    op1-only pull is possible only because this synthetic language has a known
+    position that carries the concept, which is what a real corpus does not
+    give you.
+
+    So the finding is really a statement about what sequence-level labeling
+    costs, not a design M3 can keep. The diagnosis transfers; the remedy needs
+    a mechanism for locating the concept within a labeled span.
 
     **The repulsive term is worth keeping, on a different schedule.** At the M1
     weight ratio it fails H4(a). It reduces the cube-wide drift by about
     {1 - alpha_bar("span-anti").mean() / alpha_bar("span-bare").mean():.0%}
     but does not contain it, and $\bar\alpha$ climbs again once the anneal
-    hands the weight down to
-    {ex.ANTI_HOLD_RATIO:g}$\lambda_\text{{a}}$. But the timing arm changed just
-    one number, stretching the anneal endpoint from epoch
-    {ex.ANTI_ANNEAL_END:g} to {ex.ANTI_ANNEAL_END_LATE:g}, and that improves
-    margin, containment, retention, and grading together, by more than adding
-    the term was worth in the first place. This is less surprising than it
-    sounds: the M1 keyframes were inherited from a 5-dimensional autoencoder
-    bottleneck and mapped onto our 100 epochs by fraction of training, so there
-    was never a reason to expect them to be right for a 64-dimensional residual
-    stream. That makes the anneal endpoint the best-supported next sweep.
+    hands the weight down to {ex.ANTI_HOLD_RATIO:g}$\lambda_\text{{a}}$.
+
+    The timing arm changed just one number: it stretched the anneal endpoint
+    from epoch {ex.ANTI_ANNEAL_END:g} to {ex.ANTI_ANNEAL_END_LATE:g}. That
+    alone improves margin, containment, retention, and grading together, by
+    more than adding the term was worth in the first place. This is less
+    surprising than it sounds: the M1 keyframes were inherited from a
+    5-dimensional autoencoder bottleneck and mapped onto our 100 epochs by
+    fraction of training, so there was never a reason to expect them to be
+    right for a 64-dimensional residual stream.
 
     **Where this leaves the open questions.** The best-supported next
     measurement is a grid sweep of the anti-subspace anneal endpoint against
     its hold ratio. The timing arm confounds "when the repulsion acts" with
-    "how much of it there is"; a grid separates them, and the balance reading
-    in the exploratory section says where to look: hold ratios near 1 rather
-    than the M1 value of {ex.ANTI_HOLD_RATIO:g}. The position question is
-    harder and more interesting: it calls for a pull that finds the concept
-    inside a labeled span rather than being told where it is, perhaps by
-    pooling over the span or by weighting positions with an attention-derived
-    estimate. The flattened label-affinity question from earlier experiments
-    also reads differently now that there is a graded response to compare
-    against; note the grading here is measured under a `redness⁸` distribution
-    that puts {ex.LABEL_W[np.argsort(ex.REDNESS)[-10:]].sum():.0%} of its mass
-    on ten colors. The exploratory section adds a fourth question: the
-    strength of the repulsive term relative to the anchored concept turns out
-    to depend on the label rate as much as on its weight, and that interaction
-    is unmapped.
+    "how much of it there is"; a grid separates them. The balance reading in
+    the exploratory section says where to look: hold ratios near 1 rather
+    than the M1 value of {ex.ANTI_HOLD_RATIO:g}.
+
+    The position question is harder and more interesting. It calls for a pull
+    that finds the concept inside a labeled span rather than being told where
+    it is, perhaps by pooling over the span or by weighting positions with an
+    attention-derived estimate.
+
+    The flattened label-affinity question from earlier experiments also reads
+    differently now that there is a graded response to compare against; note
+    the grading here is measured under a `redness⁸` distribution that puts
+    {ex.LABEL_W[np.argsort(ex.REDNESS)[-10:]].sum():.0%} of its mass on ten
+    colors. The exploratory section adds a fourth question: the strength of the
+    repulsive term relative to the anchored concept turns out to depend on the
+    label rate as much as on its weight, and that interaction is unmapped.
 
     One thing this experiment does *not* license. The off-axis leakage is
     unchanged from ex-2.1.6 in every condition: redness stays as readable from
