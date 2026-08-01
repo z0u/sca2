@@ -118,6 +118,12 @@ These are the specific ways that goes wrong:
 - A number that loses its unit, denominator, or baseline.
 - A "two of them ... the third" split flattened to "or", losing both the counts
   and the distinction between them.
+- A general claim narrowed to a particular set, when the list that follows it
+  reaches outside that set. "Wherever it climbs, the peak moves later: A, B, C"
+  is not the same as "the ones that slide are A and B, and there the peak moves
+  later: A, B, C" — the second says C slides, and C may be listed precisely
+  because it does not. Check what the list contains before tightening the claim
+  above it.
 - A verb that disagrees with which direction is good. Containment, decay and
   retention run downward, so "no condition reaches 0.1" reads backwards;
   "no condition falls to 0.1" does not.
