@@ -142,10 +142,9 @@ Before:
 After:
 
 > That normalization also means that targeting op1 only doesn't just narrow the
-> pull. Dividing the same $\lambda_\text{a}$ among 1.5 positions instead of 5.8
-> makes the pull on each surviving position about 3.9x stronger. So the op1
-> factor changes both which positions are pulled, and how hard each one is
-> pulled.
+> pull. Dividing $\lambda_\text{a}$ among 1.5 positions instead of 5.8 makes
+> the pull on each surviving position about 3.9x stronger. So the op1 factor
+> changes both which positions are pulled, and how hard each one is pulled.
 
 Two moves at once. The ratios go because `3.9x` is the finding and the rest is
 the arithmetic behind it, with `701:1` already derived earlier in the section.
