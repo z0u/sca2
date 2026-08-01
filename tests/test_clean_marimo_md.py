@@ -1,4 +1,4 @@
-"""Paragraph reflow in the marimo-export cleaner."""
+"""Paragraph reflow and HTML-island conversion in the marimo-export cleaner."""
 
 import importlib.util
 import re
@@ -12,6 +12,8 @@ clean_marimo_md = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(clean_marimo_md)
 
 reflow = clean_marimo_md.reflow
+to_md = clean_marimo_md.to_md
+convert_admonitions = clean_marimo_md.convert_admonitions
 
 
 def test_joins_soft_wrapped_paragraphs():
@@ -46,6 +48,15 @@ def test_structural_line_breaks_the_join():
 
 def test_keeps_hard_line_breaks():
     assert reflow("line one\\\nline two") == "line one\\\nline two"
+
+
+def test_details_and_admonition_agree():
+    # A `/// details | Title` aside arrives as an `!!! details` block when marimo
+    # unwrapped the cell to markdown, and as <details>/<summary> when it stayed a
+    # code cell (an interpolated `mo.md(f"...")`). Same source, same rendering.
+    from_html = to_md("<details><summary>Title</summary><span class='paragraph'>Body.</span></details>")
+    from_markdown = convert_admonitions('!!! details "Title"\n    Body.\n').strip()
+    assert from_html == from_markdown == "> **Title**\n>\n> Body."
 
 
 def test_reflow_preserves_content():

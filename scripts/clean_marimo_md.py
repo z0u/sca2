@@ -13,7 +13,8 @@ are inlined as base64 PNGs. This script re-processes that output:
   files, referenced with normal ``![alt](...)`` Markdown
 - converts ``<marimo-tex>`` spans to ``$...$`` / ``$$...$$``
 - converts footnote refs/definitions to Markdown footnote syntax
-- converts ``!!! type "Title"`` admonitions to GFM blockquotes
+- converts ``!!! type "Title"`` admonitions, and the ``<details>`` elements
+  the same source produces from an interpolated cell, to GFM blockquotes
 - converts the remaining HTML islands (``mo.md`` output, result tables) to
   Markdown via ``markdownify``, treating ``span.paragraph`` as a block
 - keeps ``<figure>``/``<figcaption>`` tags, blank-line-separated so the
@@ -26,6 +27,12 @@ are inlined as base64 PNGs. This script re-processes that output:
 Usage: ``uv run scripts/clean_marimo_md.py <in.md> [out.md]`` (defaults to
 overwriting in place). Images are written beside the output file, under
 ``<output-stem>.assets/`` unless ``--assets-dir`` is given.
+
+To go from a notebook to a cleaned document in one step, use
+``scripts/export_report_md.py``, which runs the export itself and then this
+pass. Prefer it over the ``marimo-md-export`` console script, which drops
+cells silently in a case that comes up in our reports — see that script's
+docstring.
 """
 
 from __future__ import annotations
@@ -80,6 +87,18 @@ class ReportConverter(MarkdownConverter):
         if "paragraph" in classes:
             return "\n\n" + text.strip() + "\n\n"
         return text
+
+    def convert_details(self, el, text, parent_tags=None):
+        # A `/// details | Title` aside reaches us two ways: as an `!!! details`
+        # block when marimo unwrapped the cell to plain Markdown, and as
+        # <details>/<summary> when it couldn't (an interpolated `mo.md(f"...")`
+        # stays a code cell, so we get its rendered HTML instead). Both become
+        # the same blockquote, so the same source reads the same either way.
+        body = re.sub(r"\n{3,}", "\n\n", text.strip())
+        return "\n\n" + "\n".join(f"> {ln}" if ln else ">" for ln in body.splitlines()) + "\n\n"
+
+    def convert_summary(self, el, text, parent_tags=None):
+        return f"**{text.strip()}**\n\n"
 
     def convert_sub(self, el, text, parent_tags=None):
         # No Markdown syntax for subscript/superscript; unlike the figure/

@@ -795,16 +795,6 @@ def _(LABELS, grading, m_op1):
 
 @app.cell(hide_code=True)
 def _(alpha_bar, grading, m_op1):
-    # TODO: this cell renders nothing. The exported document runs the two H2
-    # figures (@output:Hstk, @output:nWHF) straight into the H3 factorial table
-    # (@output:ROlb) with no output between them, so the H2 verdict and every
-    # number that decides it are missing from the published report. Reproduced
-    # on two independent exports; no error is reported and the cell raises
-    # nothing. H2 carries D2.1, so this is the one hypothesis a reader cannot
-    # resolve from its own section: m_op1("op1-anti") first reaches the reader
-    # in the H3 table, and the grading R2 only in the discussion. Cause not yet
-    # found — the cell's signature, its inputs, and the surrounding structure
-    # all match cells that do render. Tracked in todo-eng.md.
     _EX216_M, _EX216_A = 0.2732, 0.5257
     mo.md(rf"""
     **H2 passes, on the op1 conditions.** (a) The margin reaches

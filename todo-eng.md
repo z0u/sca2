@@ -14,20 +14,29 @@ readable cold without re-deriving code state.
 
 ## Scratch
 
-- **A prose cell renders nothing in ex-2.1.7 (2026-08-01).** #reports #publishing
-  The H2 verdict cell ([`docs/m2/ex-2.1.7/report.py:796`](./docs/m2/ex-2.1.7/report.py))
-  produces no output. The export goes `@output:nWHF` (H2's second figure) →
-  `@output:ROlb` (H3's factorial table) with nothing between them, so the
-  published report states no verdict for H2 and carries none of the numbers that
-  decide it. Reproduced on two independent `marimo-md-export` runs; no error is
-  raised and nothing appears in the export to mark the gap.
-  This matters beyond one report: a cell can go missing silently, and the only
-  reason we caught it was a structural reviewer reading the rendered document
-  rather than the source. Worth a publish-time check that every `mo.md()` cell
-  appears in the export — the count is cheap (19 `@output:` markers against the
-  number of output-producing cells) and would have failed loudly here.
-  Cause unknown. The cell's decorator, signature, inputs and shape all match
-  cells that do render, so start by bisecting its body.
+- **Done: a prose cell rendered nothing in ex-2.1.7 (2026-08-01).** #reports
+  #publishing The H2 verdict cell was dropped from the Markdown export, so the
+  published report stated no verdict for H2 and carried none of the numbers that
+  decide it. Cause: `marimo-md-export` rewrites `/// type | Title` admonitions to
+  `!!! type "Title"` across the whole document *before* collecting cells, so it
+  also rewrites `///` blocks sitting inside a cell's Python source. Cells are
+  matched to their rendered output by MD5 of that source, so the rewrite costs
+  the cell its output — and a hidden-code cell with no output is deleted. Only
+  interpolated `mo.md(f"...")` cells are exposed: literal `mo.md("...")` cells
+  are unwrapped to plain Markdown, where the transform is correct. The three
+  other `///` blocks in that report are all in literal cells, which is why one
+  cell went and the rest stayed.
+  Fixed in [`scripts/export_report_md.py`](./scripts/export_report_md.py), which
+  drives the `marimo_md_export` library directly rather than its CLI: it converts
+  admonitions outside fenced code only, and hard-fails if any fence in the
+  Markdown carries a source no notebook cell has. That check catches the class,
+  not the instance — any future transform that rewrites a fence trips it. Still
+  worth reporting upstream (MIT, ~1k lines,
+  [jmarshrossney/marimo-md-export](https://github.com/jmarshrossney/marimo-md-export));
+  `inject_outputs` also builds a `warnings` list it never appends to.
+  Worth remembering how this was caught: a structural reviewer reading the
+  rendered document, not the source. Nothing in the source review could have
+  found it.
 
 - **Done: in-place mode for the prose pass (2026-08-01).** #skills #agents
   #reports Kept here for the measurements, which are the reason the pass was
