@@ -22,20 +22,20 @@ while its `REVIEW` notes travel on — see `references/review-passes.md` in the
 
 First pick the reviewer, since the two ask different questions:
 
-- **`prereg-reviewer`** — the report has no results yet. Is the design sound and
+- `prereg-reviewer`: the report has no results yet. Is the design sound and
   worth running as specified?
-- **`results-reviewer`** — the results have landed. Do they support the claims,
-  and can a fresh reader follow the report? This one also looks at the rendered
+- `results-reviewer`: the results have landed. Do they support the claims, and
+  can a fresh reader follow the report? This one also looks at the rendered
   figures unless you tell it not to.
 
 The experiment run leaves a signal:
 
-- **No `experiment.py` beside the report, or one marked `DESIGN_ONLY = True`** →
+- No `experiment.py` beside the report, or one marked `DESIGN_ONLY = True` →
   prereg. The skeleton is written before the DAG by design, and a design module
   that holds only constants declares itself with that marker.
-- **The report resolves no refs** (no `get_refs` / `load_results` in the setup
+- The report resolves no refs (no `get_refs` / `load_results` in the setup
   cell) → prereg. There is nothing for it to read yet.
-- **Otherwise, resolve the refs.** From the report's directory:
+- Otherwise, resolve the refs. From the report's directory:
 
   ```bash
   uv run python -c "
@@ -75,12 +75,12 @@ Then, for up to 3 rounds:
     - No blockers, and only minor or no changes: stop, this has converged.
     - Real fixes, but it recommends running, freezing, or publishing as-is:
       stop, this also counts as converged.
-    - Something structural it couldn't fix itself, a genuine design question, or
-      a disagreement about how a result should be read: stop and escalate to the
+    - Something structural it couldn't fix itself, a design question, or a
+      disagreement about how a result should be read: stop and escalate to the
       user.
     - It reversed something an earlier round decided, or it reports a claim
       pulling in two directions: stop and escalate. Another round will flip it
-      back. Put both readings to the user and say what would separate them —
+      back. Put both readings to the user and say what would separate them:
       splitting the hypothesis into two tracks, dropping one, or narrowing its
       scope. Only the human can make that call, since it changes what the
       experiment claims.

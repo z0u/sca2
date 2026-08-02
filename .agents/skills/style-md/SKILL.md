@@ -35,7 +35,7 @@ Some backstory.
 ```
 
 Other admonition types and their icons:
-`details` (folds, unobtrustive),
+`details` (folds, unobtrusive),
 `admonition` (unadorned),
 `note` ℹ️,
 `tip` 💡,

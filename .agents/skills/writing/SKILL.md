@@ -35,9 +35,7 @@ Anti-patterns:
 
 ## Clarity
 
-Write as though explaining to an intelligent person with technical skill who is _not_ an expert in machine learning. Allow the reader to infer information from figures, context, and a few exemplar results; draw their attention to key details.
-
-So write in plain English, with respect for the reader's intelligence.
+Write plain English, as though explaining to an intelligent person with technical skill who is _not_ an expert in machine learning. Allow the reader to infer information from figures, context, and a few exemplar results; draw their attention to key details.
 
 ## Formatting and structure
 
@@ -52,18 +50,14 @@ Use normal-weight sentence case for headings and descriptive lists.
 + - Foo bar: baz
 ```
 
-Prefer paragraphs for nuanced or complex explanations; use lists for summarizing
-steps, or when clarity would genuinely benefit from structure, but use them
-sparingly.
+Prefer paragraphs for nuanced or complex explanations; use lists sparingly, for
+summarizing steps or where clarity benefits from the structure.
 
-Emphasis can be distracting to read, so follow these guidelines for where and
-how often to use it:
-
-- Use italics for concepts like _red_. When: usually.
-- Use italics for named terms like _anchor_. When: on the first use in a
-  section, and then if the role of the word would otherwise be ambiguous, e.g.
-  to distinguish "anchor" the regularizer term from "the anchor point".
-- Never use bold or italics for other emphasis, because they are distracting to
-  read. The user will add them if necessary.
+Emphasis is distracting to read, so it is reserved for two jobs, both in
+italics. Concepts like _red_ take italics whenever they appear. Named terms like
+_anchor_ take italics on first use in a section, and again later only if the
+role of the word would otherwise be ambiguous — to distinguish "anchor" the
+regularizer term from "the anchor point", say. Never use bold, and never use
+italics for other emphasis. The user will add them if necessary.
 
 For syntax conventions, refer to the relevant `style-*` skill.

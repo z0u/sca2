@@ -27,11 +27,11 @@ claims.
    .agents/skills/report-restructure/scripts/check-templates docs/m2/ex-2.1.7/report.py
    ```
 
-   It parses the file, which catches a dropped brace, a stray brace or an
+   It parses the file, which catches a dropped brace, a stray brace, or an
    undoubled LaTeX brace, and it lists every template expression that went
-   missing. A lost expression is not automatically wrong — deleting a sentence
-   takes its expressions with it — but each one is a place to confirm the value
-   was removed rather than frozen.
+   missing. A lost expression is not automatically wrong, since deleting a
+   sentence takes its expressions with it, but each one is a place to confirm
+   the value was removed rather than frozen.
 4. Read the diff for correctness. Two things the agent cannot catch:
    - A qualifier or a hedge that went quiet. It is told the text is correct, so
      it will not notice that "would start to matter" became "matters".
@@ -39,14 +39,14 @@ claims.
 5. Measure, rather than reading the agent's summary. Agents doing this work
    consistently misjudge how much they changed, in both directions, and
    consistently overstate what they preserved. `git diff --stat` and the
-   template check take a second each and are not opinions.
+   template check take a second each.
 6. Report the flavor of the changes, not the details; those are in the diff.
 
-## What it will and will not buy you
+## What this pass is worth
 
 Roughly 2 to 20% of a section's words, and most of the gain is in shape rather
 than length. How much depends on what the section is made of: a section that is
-40% figure captions, alt text and tables has little that can move, because all
+40% figure captions, alt text, and tables has little that can move, because all
 three are protected. A section of unbroken prose has more.
 
 If a report needs to lose real weight, this is the wrong pass. Duplication
@@ -59,7 +59,7 @@ is the `report-structure` agent's job.
 The house register for these sections is lab notes, written up: short
 paragraphs opening on their findings, colons carrying figure keys, lists kept
 inline. The agent's spec describes it, along with the rule that decides how far
-to compress — against the immediate context, never against the sentence being
+to compress: against the immediate context, never against the sentence being
 deleted.
 
 That rule was worked out by running several designs over one section whose

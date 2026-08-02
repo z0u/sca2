@@ -5,7 +5,7 @@ description: |
 argument-hint: <document> [section] [line range]
 ---
 
-We're doing science, so we need rigor, but we need to move fast. We can tolerate a little imprecision in exchange for speed.
+We're doing science, so we need rigor, but we also need to move fast: a little imprecision is an acceptable price for speed.
 
 This is the quick, inline pass: run it as you write, or when asked to lint a
 document, with whatever context you already have. For a full reshaping of a
@@ -133,7 +133,7 @@ Keep signposts. A sentence that changes how the reader weights a number ("The
 margin and retention rows are what make it a result") is information; a
 sentence that narrates the document ("Capacity is worth a sentence") is not.
 
-Keep (but trim) first-use definitions of terms, but move them to footnotes or
+Keep first-use definitions of terms, trimmed, and move them to footnotes or
 `/// details` admonitions.
 
 Compress against the immediate context: after a cut, everything needed to

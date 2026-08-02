@@ -13,11 +13,11 @@ This project uses pytest.
 ## Tests run in parallel
 
 The suite runs under `pytest-xdist` (`-n auto` by default). New tests must be
-**parallel-safe**: isolate all state via `tmp_path`/`monkeypatch`, never write to
+parallel-safe: isolate all state via `tmp_path`/`monkeypatch`, never write to
 a shared path or the cwd without `monkeypatch.chdir(tmp_path)`, and give any
 shared external resource a unique per-test prefix (see `test_hf_store.py`'s
 `secrets.token_hex` tags). Don't rely on test execution order. A test that
-genuinely can't be isolated should share an `xdist_group` (e.g.
+can't be isolated should share an `xdist_group` (e.g.
 `@pytest.mark.xdist_group("name")`) so its group pins to one worker — but prefer
 fixing the isolation. Run serially when debugging with `uv run pytest -n0`.
 
@@ -28,7 +28,7 @@ Prefer specialized testing utilities, and specify tolerances.
 + np.testing.assert_allclose(x, y, rtol=1e-7, atol=0)  # ✅
 + torch.testing.assert_close(a, b, rtol=1e-7, atol=0)  # ✅
 ```
-Reason: Specialized testing utilities will give you better error messages when assertions fail, and they often have additional features that make them more powerful and flexible than generic assertions. Tolerances are highly context-dependent, so choose them based on principle.
+Reason: Specialized testing utilities give better error messages when assertions fail, and they often have features that generic assertions lack. Tolerances are highly context-dependent, so choose them based on principle.
 
 Use structural assertions.
 ```diff
@@ -66,15 +66,15 @@ Use `pytest.mark.parametrize` to test multiple cases without repetition.
 
 ## What to test?
 
-**We only write valuable tests.** We test for behavioral verification under uncertainty:
+We only write valuable tests. We test for behavioral verification under uncertainty:
 
 - Exercise meaningful state transitions and invariants: Tests that verify your system maintains its promises; Boundary condition handling; State consistency across operations (e.g., after a series of mutations, derived state still makes sense)
 - Capture domain logic and business rules: Scenarios that encode actual user workflows or data processing pipelines; Edge cases that reflect real-world complexity your system needs to handle
 - Reveal integration assumptions: How your code behaves when dependencies return unexpected (but valid) responses; Error propagation and recovery behavior; Resource cleanup and lifecycle management
 - Executable documentation: Tests that demonstrate intended usage patterns, with clear naming that explains the "given/when/then" story
 
-Valuable tests fail _for interesting reasons_ — they break when you've actually broken something that matters to users. We rely on linters and type-checkers for everything else.
+Valuable tests fail for interesting reasons: they break when you've broken something that matters to users. We rely on linters and type-checkers for everything else.
 
 ## Wrapping up
 
-When you have finished, review your work with a critical eye. Ask yourself: Does this test actually verify something meaningful? Is it clear what the test is doing and why? Could it be simplified without losing value?
+When you have finished, review your work: does this test verify something meaningful? Is it clear what the test is doing and why? Could it be simplified without losing value?

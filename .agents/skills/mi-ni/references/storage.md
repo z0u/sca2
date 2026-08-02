@@ -1,8 +1,8 @@
 # Artifacts and the content-addressed store
 
-A memo result is the *small* thing — a dict of metrics, a handle. The *large*
+A memo result is the *small* thing: a dict of metrics, a handle. The *large*
 bytes a step produces (an activation cache, an eval dump, a figure) belong in the
-**artifact store**, not in the result and not as a bare volume `Path`.
+_artifact store_, not in the result and not as a bare volume `Path`.
 
 Returning a `Path` pickles a *location* into the result, and that location lives
 in a volume that may have evaporated by the time another process, another
@@ -21,27 +21,27 @@ def extract(cfg) -> dict:
     return {"cfg": cfg.id, "activations": art}
 ```
 
-`put`/`get` resolve an **ambient store** the worker enters around the step — the
+`put`/`get` resolve an _ambient store_ the worker enters around the step, the
 same pattern as `get_data_dir()`. They work inside any step with no plumbing;
 outside a step (a notebook/report), get the store from the apparatus:
 `store = LocalApparatus(NAME).store()` and call `store.get(...)` directly.
 
 ## Why a handle, not a path
 
-- **Durable results.** A handle carries no location, so the result pickles
+- Durable results. A handle carries no location, so the result pickles
   durably and resolves from anywhere that can reach the store.
-- **Stable downstream keys.** Passing a `Path` into the next step fingerprints it
+- Stable downstream keys. Passing a `Path` into the next step fingerprints it
   by location; passing an `Artifact` fingerprints it by *content*, so a
   consumer's memo key only moves when the bytes actually change.
-- **Dedup for free.** Blobs are keyed by content (`cas/<sha256>`), so identical
+- Dedup for free. Blobs are keyed by content (`cas/<sha256>`), so identical
   bytes coincide and `put` is idempotent (hash first, skip if present).
 
 ## Files and trees
 
-`put(bytes | Path, name=...)`. A directory becomes a **tree** artifact: each file
+`put(bytes | Path, name=...)`. A directory becomes a _tree_ artifact: each file
 is its own blob (so a directory of many small shards dedups per-file and resolves
 one shard without pulling the set), and the handle carries the manifest. `name`
-is the logical name — carry the extension; it sets the served media type.
+is the logical name; carry the extension, since it sets the served media type.
 
 `get(art, dest)` materializes a file to `dest`, or a tree into the directory
 `dest` (children pull in one batched request). Reach for a tree when random
@@ -59,11 +59,11 @@ paths = store.get_many([(a, dest / a.name) for a in ...])  # one batched pull
 ## The store is project-scoped (sharing across experiments)
 
 Unlike the memo store and volume (one per experiment), the artifact store is
-**one per project** — it sits a `store/` beside the experiment volumes. So an
+one per project: it sits a `store/` beside the experiment volumes. So an
 artifact one experiment produces is visible to every experiment in the project,
 content-addressed.
 
-A small mutable **ref** layer names views over the immutable blobs (the git
+A small mutable _ref_ layer names views over the immutable blobs (the git
 objects-and-refs split). That's how one experiment hands an asset to another by a
 stable name, without the consumer knowing the producer's memo key:
 
@@ -78,24 +78,22 @@ local = get(art, get_data_dir() / "acts-in")
 
 See `docs/acts` (producer) and `docs/probe` (consumer) for a runnable pair.
 
-Refs carry **provenance** automatically. A `set_ref` inside a step stamps the
+Refs carry _provenance_ automatically. A `set_ref` inside a step stamps the
 writer's identity into the payload (experiment, task key, git sha/describe/dirty,
 run time), and a `get_ref` inside a step records the resolution on the task's
-record. Two things fall out with no code in the experiment:
-
-- A run that reads another experiment's ref gets that experiment recorded as an
-  upstream in its lineage (`mini lineage <name>` shows `⇐ <producer> … via <ref>`)
-  — `Experiment(deps=[...])` is only needed to *force* an upstream that isn't
-  read via a ref during the run (e.g. consumed through a memo hit from an earlier
-  wake, or via the volume).
-- A report that resolves refs gets a provenance footer citing the producing runs
-  ([reports.md](./reports.md)).
+record. Two things fall out with no code in the experiment. A run that reads
+another experiment's ref gets that experiment recorded as an upstream in its
+lineage (`mini lineage <name>` shows `⇐ <producer> … via <ref>`), so
+`Experiment(deps=[...])` is only needed to *force* an upstream that isn't read
+via a ref during the run (e.g. consumed through a memo hit from an earlier wake,
+or via the volume). And a report that resolves refs gets a provenance footer
+citing the producing runs ([reports.md](./reports.md)).
 
 Refs written *outside* a task worker (a notebook using the interactive
 `Apparatus`, a driver-side `set_ref` in `main`) are unstamped — consumers still
 resolve them fine, they just can't be attributed.
 
-Inside a step, ref writes are **fenced on the attempt generation**: if the task
+Inside a step, ref writes are fenced on the attempt generation: if the task
 was relaunched or cancelled while the worker ran, `set_ref`/`publish` raise
 `StaleWriteError` instead of silently overwriting the successor's name (blobs
 are immune — content-addressed writes are idempotent). Two consequences worth
@@ -103,7 +101,7 @@ knowing:
 
 - A `StaleWriteError` in a task's traceback means the attempt was superseded —
   nothing is wrong with the code; the current attempt owns the name.
-- A step's `set_ref` is a side effect, so it does **not** replay on a memo hit.
+- A step's `set_ref` is a side effect, so it does not replay on a memo hit.
   For final hand-offs, prefer returning the `Artifact` from the step and calling
   `set_ref`/`publish` in the driver (`main`), which runs every time. In-step
   refs are for incremental publication (e.g. best-checkpoint-so-far) — that's
@@ -114,9 +112,9 @@ knowing:
 The backend is configuration, not code — nothing in an experiment or report
 changes:
 
-- **No bucket configured** → `LocalStore`, a `cas/<ab>/<sha>` tree under
+- No bucket configured → `LocalStore`, a `cas/<ab>/<sha>` tree under
   `.mini/store`. The default; no network. Project-wide sharing works *locally*.
-- **A bucket configured** → `HFStore`, the same layout over a Xet-backed Hugging
+- A bucket configured → `HFStore`, the same layout over a Xet-backed Hugging
   Face bucket, shared across *machines and backends*: a Modal worker `put`s a
   blob; a local report or another experiment `get`s it back, no shared Volume.
   The local dir demotes to a warm cache (`.mini/store-cache/hf`).
@@ -141,8 +139,8 @@ the bucket). `hf` caches it; the store and the Modal Secret read it from there, 
 ## Upstream model caching (a separate tier)
 
 The artifact store holds bytes *you* produce. Upstream weights and datasets pulled
-via `from_pretrained`/`hf_hub_download` are a different tier: a **disposable read
-accelerator**, not a durable store. On Modal, every remote function mounts a shared
+via `from_pretrained`/`hf_hub_download` are a different tier: a disposable read
+accelerator. On Modal, every remote function mounts a shared
 `mini-hf-cache` Volume with `HF_HOME` pointing at it, so a multi-stage pipeline
 downloads a model once instead of once per container. Nothing to configure, nothing
 in your code changes, and deleting that Volume only costs re-downloads. Locally
@@ -166,7 +164,7 @@ extensioned path, served with a `Content-Type` from that extension.
 
 By default the CAS and the published views share one bucket, so persisting an
 artifact and publishing it land in the same (public-if-the-bucket-is) store. To keep
-the CAS **private** while published views stay public *and* gain version history, set
+the CAS private while published views stay public *and* gain version history, set
 a separate publish tier:
 
 ```toml
@@ -181,7 +179,7 @@ It costs no extra storage — Xet dedups chunks account-wide — so publishing i
 commit, not a byte re-transfer. See [`eng/publishing.md`](../../../../eng/publishing.md)
 and issue #38 for the design.
 
-**Reports don't call `publish` directly** — they go through a report bundle
+Reports don't call `publish` directly; they go through a report bundle
 (`use_publisher` + `asset_url`, and the publish/build split): [reports.md](./reports.md).
 
 ## Checkpoints are different

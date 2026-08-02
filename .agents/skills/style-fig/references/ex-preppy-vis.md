@@ -7,7 +7,7 @@ matplotlib idiom and worth copying. The pieces below are ranked by how much
 we want them in sca2. Everything leans on two ex-preppy types that sca2
 replaces: `ColorCube` (a labeled HSV/RGB grid; port alongside whichever
 JAX/NumPy equivalent M2 grows) and `Theme` (`theme.val(default, light=…,
-dark=…)` maps directly onto `mini.vis.light_dark`).
+dark=…)` maps onto `mini.vis.light_dark`).
 
 ## Port when needed
 
@@ -38,10 +38,10 @@ dark=…)` maps directly onto `mini.vis.light_dark`).
   already covers this; porting it would duplicate `mini.vis.nb`. Its alt-text
   strings are still useful as templates.
 - `draw_cone_3d` (in `plot_latent_slices.py`) — ~230 lines of root-finding
-  to draw a wireframe cone silhouette. This is the "possibly a bit heavy"
-  part. Since our views are axis-aligned orthographic, a fixed-view
-  approximation (ellipse + two tangent lines computed analytically) would do;
-  defer until an experiment needs conical annotations at all.
+  to draw a wireframe cone silhouette. Since our views are axis-aligned
+  orthographic, a fixed-view approximation (ellipse + two tangent lines
+  computed analytically) would do; defer until an experiment needs conical
+  annotations at all.
 - `plot_dopesheet.py` — superseded by `mini.temporal.vis.plot_timeline`,
   which sca2 already uses.
 - `prettify.py` — sympy-powered tick prettification (`1/3` instead of
