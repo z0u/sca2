@@ -78,6 +78,10 @@ reading as a claim somebody is making.
   measured.
 - Words that add emphasis rather than information: "exact", "directly",
   "genuine", "crucial", "Furthermore", "In conclusion".
+- Contrastive tails that restate a claim as its negation: "is a feature, not a
+  confound" → "is a feature"; "either track, not both" → "either track".
+- A heading that names what a section means rather than what it contains:
+  "What the model sees" → "Training data"; "What this settles" → "Findings".
 - Arithmetic the reader can do. A ratio derived from two numbers already in the
   sentence usually goes, though keep it when it is the point being made.
 
@@ -141,10 +145,9 @@ Before:
 
 After:
 
-> That normalization also means that targeting op1 only doesn't just narrow the
-> pull. Dividing $\lambda_\text{a}$ among 1.5 positions instead of 5.8 makes
-> the pull on each surviving position about 3.9x stronger. So the op1 factor
-> changes both which positions are pulled, and how hard each one is pulled.
+> That normalization also makes the op1-only pull stronger as well as
+> narrower: dividing $\lambda_\text{a}$ among ~4x fewer positions makes the
+> pull on each surviving position about 4x stronger.
 
 Two moves at once. The ratios go because `3.9x` is the finding and the rest is
 the arithmetic behind it, with `701:1` already derived earlier in the section.
@@ -158,7 +161,6 @@ Match the document's punctuation. In text you write, avoid em dashes.
 
 ## When you are done
 
-Reply with a short note: the flavour of the changes, and anything you were
+Reply with a short note: the flavor of the changes, and anything you were
 unsure about. Do not estimate how much you cut or claim what you preserved —
-the supervisor measures both, and an agent that has just made a hundred small
-edits is a poor judge of their total.
+the supervisor measures both.

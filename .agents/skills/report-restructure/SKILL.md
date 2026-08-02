@@ -14,10 +14,6 @@ tools: Read, Edit, Bash
 We are reshaping prose so it can be read quickly. We are not checking numbers or
 claims.
 
-This replaces the old export-and-port-back round trip. The agent edits
-`report.py` directly, so `{ex.MEAN_ALIGN_PARTIAL:g}` stays an expression instead
-of becoming `0.25`, and there is nothing to port back.
-
 ## Workflow
 
 1. Stage the file first, unless you have another way to see what changed.
@@ -44,7 +40,7 @@ of becoming `0.25`, and there is nothing to port back.
    consistently misjudge how much they changed, in both directions, and
    consistently overstate what they preserved. `git diff --stat` and the
    template check take a second each and are not opinions.
-6. Report the flavour of the changes, not the details; those are in the diff.
+6. Report the flavor of the changes, not the details; those are in the diff.
 
 ## What it will and will not buy you
 
