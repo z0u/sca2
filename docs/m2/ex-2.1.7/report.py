@@ -251,18 +251,17 @@ def _():
     orthonormal basis of it; here the subspace is the one-dimensional span of
     the anchor. The term penalizes the mean-square alignment of everything, so
     the labeled pull has to buy alignment against a headwind. That is, we
-    expect, the selectivity pressure ex-2.1.6 lacked. Note what the term does
-    not do: it never asks any particular point to leave the axis, only that the
-    cloud as a whole not sit on it.
+    expect, the selectivity pressure ex-2.1.6 lacked. It never asks any
+    particular point to leave the axis, only that the cloud as a whole not
+    sit on it.
 
     The term should be cheap in a 64-dimensional stream: an isotropic cloud
     (one with no preferred direction) has a mean $\cos^2$ of 1/64 per slice,
     and the task's three color dimensions fit in the remaining 63 with room to
     spare. In M1's 4- and 5-dimensional bottlenecks it cost a fifth or a
     quarter of the space, and its harder conditions (ex-2.9.1) needed the
-    dimension cleared outright. The live question is whether, at 3% of the
-    anchor weight, it is strong enough to matter, not whether the task can
-    afford it.
+    dimension cleared outright. The question is whether, at 3% of the anchor
+    weight, it is strong enough to matter.
 
     **Factor two: the pull span.** The `span` conditions pull the four prompt
     positions (op1, `+`, op2, `=`) of a labeled equation, as ex-2.1.6 did. The
@@ -694,8 +693,7 @@ def _(CONDS: list[str], CONTROL_ACC, acc, stats):
     choosing between two adjacent names. That is a property of the `v216`
     testbed, not of anchoring: the control sits at
     {acc("lam0", "open", "guess_dist").mean():.3f}, right alongside the
-    anchored conditions. H1 asks whether the anchor moved this number, and it
-    did not.
+    anchored conditions.
     """)
     return
 
@@ -845,18 +843,16 @@ def _(alpha_bar, grading, m_op1):
     **H2 passes, on the op1 conditions.** (a) The margin reaches
     $m_{{\text{{op1}}}} = {m_op1("op1-anti").mean():.3f}$ on `op1-anti` and
     {m_op1("op1-bare").mean():.3f} on `op1-bare`, both task-clean, against a gate
-    of {ex.MARGIN_GATE:g}. It matters that two conditions clear the gate rather
-    than one. The hypothesis takes a maximum over four noisy means, and its own
-    footnote warns that such a maximum sits about a noise unit above any single
-    mean. But `op1-anti` clears the gate by
+    of {ex.MARGIN_GATE:g}. The hypothesis takes a maximum over four noisy means,
+    but `op1-anti` clears the gate by
     {m_op1("op1-anti").mean() - ex.MARGIN_GATE:.2f}, roughly four seed-mean noise
     units, so the pass does not rest on that maximum. (b) The response is graded
     on both conditions, but each clears a different one of the two tracks, and
     neither clears both. `op1-bare` reaches ρ = {grading("op1-bare")[1]:.3f}
     against `redness` with R² = {grading("op1-bare")[2]:.3f}; `op1-anti` reaches
     R² = {grading("op1-anti")[2]:.3f} against `sim¹·⁵` with
-    ρ = {grading("op1-anti")[1]:.3f}. The gate asks for either track, not both,
-    so both conditions pass as written. Still, `op1-bare` clears the rank track
+    ρ = {grading("op1-anti")[1]:.3f}. The gate asks for either track, so both
+    conditions pass. Still, `op1-bare` clears the rank track
     by only {grading("op1-bare")[1] - ex.GRADE_RHO_GATE:.3f}. That is thin, so
     the pass is better read as resting on the R² of `op1-anti`, which clears by
     {grading("op1-anti")[2] - ex.GRADE_R2_GATE:.2f}.
@@ -873,12 +869,11 @@ def _(alpha_bar, grading, m_op1):
     at $|m_{{\text{{op1}}}}| = {abs(m_op1("lam0").mean()):.3f}$, inside its 0.1
     ceiling.
 
-    The preregistered primary condition `span-anti` is not among the passes. That condition
-    is the pull from ex-2.1.6 plus the repulsive term from M1. It reaches
-    {m_op1("span-anti").mean():.3f}. That is comfortably into the partial band
-    (0.35) and well clear of the ex-2.1.6 result of {_EX216_M:.2f}, but short of
-    the gate. The repulsive term alone was the predicted fix, and alone it gets
-    most but not all of the way there.
+    The preregistered primary condition `span-anti` is not among the passes.
+    It reaches {m_op1("span-anti").mean():.3f}: comfortably into the partial
+    band (0.35) and well clear of the ex-2.1.6 result of {_EX216_M:.2f}, but
+    short of the gate. The repulsive term alone was the predicted fix, and it
+    gets most of the way there.
 
     /// details | The replication is bit-identical
     `span-bare` re-runs the $\lambda = 0.1$ condition of ex-2.1.6 through this
@@ -886,8 +881,8 @@ def _(alpha_bar, grading, m_op1):
     zero. It returns $m_{{\text{{op1}}}} = {m_op1("span-bare").mean():.3f}$
     against a published {_EX216_M:.4f}, and
     $\bar\alpha = {alpha_bar("span-bare").mean():.3f}$ against
-    {_EX216_A:.4f}. The agreement is digit-for-digit per seed, not merely within
-    noise. This does not independently corroborate ex-2.1.6, since nothing
+    {_EX216_A:.4f}. The agreement is digit-for-digit per seed.
+    This does not independently corroborate ex-2.1.6, since nothing
     stochastic was re-rolled. What it verifies is that adding a zero-weighted
     term perturbed neither the numerics nor the RNG stream. So the ex-2.1.6
     comparisons this report leans on are reproduced rather than assumed, and the
@@ -1278,7 +1273,7 @@ def _(ANCHORED, alpha_bar, traj):
     _held = [c for c in ANCHORED if _ratios(c) and min(_ratios(c)) >= ex.H4_RETENTION]
     _slid = [c for c in ANCHORED if _ratios(c) and min(_ratios(c)) < ex.H4_RETENTION]
     mo.md(rf"""
-    **H4 fails on both parts,** but the pattern of failures is interesting.
+    **H4 fails on both parts.**
 
     (a) Containment. No anti condition at the scoring rung falls to
     $\bar\alpha \le {ex.MEAN_ALIGN_GATE:g}$:
@@ -1330,10 +1325,8 @@ def _(ANCHORED, alpha_bar, traj):
     In ex-2.1.6 the margin rose early and then gave back a quarter of itself,
     and the reading offered there was that the rest of the cube was catching
     up. This experiment supports that reading, and points to the
-    color-independent shift as the thing doing the catching up. Suppressing
-    that shift either way stops the slide: removing the blind positions works,
-    and so does keeping the repulsion strong. `op1-bare` stops the slide while
-    carrying no repulsive term at all.
+    color-independent shift as the thing doing the catching up. `op1-bare`
+    stops the slide while carrying no repulsive term at all.
     """)
     return
 
@@ -1591,7 +1584,7 @@ def _(CONDS: list[str], cells):
     conditions — double what the bare span pull achieved
     ({_axis["span-bare"]:.2f}), and tracking the margin ordering closely. So the
     conditions that score well on selectivity are also the ones that put the most
-    redness on the axis, which is the consistency check one would want.
+    redness on the axis.
 
     Off the axis, nothing moved. Project the anchor direction out and redness is
     still readable from the remaining 63 directions at
@@ -1643,26 +1636,23 @@ def _(CONTROL_ACC, acc, alpha_bar, cells, grading, m_op1, traj):
       {grading("span-anti")[2]:.2f};
     - containment {alpha_bar("span-anti-late").mean():.3f} against
       {alpha_bar("span-anti").mean():.3f}, the lowest of any anchored condition.
-      This one is listed last because it is the least surprising of the four:
-      applying more repulsion for longer lowers the very quantity the repulsion
-      penalizes, which is close to definitional. The margin and retention rows
-      are what make it a result.
+      Least surprising of the four: more repulsion for longer lowers the very
+      quantity it penalizes. The margin and retention rows are what make it a
+      result.
 
     Off-axis leakage is the one measurement that does not improve: the arm is
     the highest of any condition ({_leak("span-anti-late"):.2f} against
-    {_leak("span-anti"):.2f}). Elsewhere in this report we treat growth on
-    that measurement as unwelcome. The difference is small and the measurement
+    {_leak("span-anti"):.2f}). The difference is small and the measurement
     has no gate, but it is why the claim above is scoped to the scored
     statistics rather than to everything we measured.
 
-    The arm was written to ask whether the M1 recipe is forgiving on this
-    axis; either answer was acceptable, and no gate was attached. It is not
-    forgiving: stretching one anneal by 2× was worth more than adding the term
-    in the first place. Nobody had measured this before. The M1 schedules
-    varied by experiment, and ex-2.4.1 ran its terms *up* over training rather
-    than down, so the value was inherited rather than chosen. It now looks
-    worth choosing deliberately, and a dedicated sweep over the anneal
-    endpoint is the obvious next step. Two limits on that claim. First, this
+    The arm asked whether the M1 recipe is forgiving on this axis. It is not:
+    stretching one anneal by 2× was worth more than adding the term in the
+    first place. The M1 schedules varied by experiment, and ex-2.4.1 ran its
+    terms *up* over training rather than down, so the value was inherited
+    rather than chosen. It now looks worth choosing deliberately, and a
+    dedicated sweep over the anneal endpoint is the next step. Two limits on
+    that claim. First, this
     is one alternative timing rather than a curve. Second, it is confounded
     with total repulsive strength, since holding near peak for longer also
     delivers more repulsion overall. Separating "when" from "how much" needs
@@ -1783,7 +1773,7 @@ def _(arrays):
     mo.md(rf"""
     Stretching the anneal costs the reddest colors {_dred:.3f} of alignment.
     It costs the cube as a whole {_dall:.3f}, which is {_dall / _dred:.0f}
-    times as much. So the term is doing exactly what its definition says, *red*
+    times as much. So the term is doing what its definition says, *red*
     included. The margin improves because the same indiscriminate push matters
     far more for the unlabeled bulk than for the labeled reds.
 
@@ -1859,8 +1849,8 @@ def _(arrays):
     which positions are pulled, and how hard each one is pulled. Read on its
     own, its main effect could be either.
 
-    The ceiling arm separates them, though that is not what it was put there
-    for. It multiplies $\lambda_\text{{a}}$ by ten, scaling the gradient at
+    The ceiling arm separates them. It multiplies
+    $\lambda_\text{{a}}$ by ten, scaling the gradient at
     every pulled position by 10, well past the ~4× that narrowing delivers. Yet
     selectivity got *worse*, not better. If per-position pull strength were what
     buys margin, the ceiling arm should be the best condition in the experiment;
