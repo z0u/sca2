@@ -1,37 +1,37 @@
 # Engineering todo
 
-Scratchpad for deferred *infrastructure* work that isn't worth a tracking issue
-yet — tooling, storage, publishing, CLI, and the `mini` library. Science
+Scratchpad for deferred infrastructure work that isn't worth a tracking issue
+yet: tooling, storage, publishing, CLI, and the `mini` library. Science
 questions and experiment findings live in [`todo-science.md`](./todo-science.md).
 When something here grows real, promote it to a GitHub issue and remove it from
 this list.
 
-Scratch items sit under _Scratch_; everything below that is the prioritized
-index into GitHub issues. Durable design rationale and recorded
-decisions live in [`eng/`](./eng/README.md); each open issue
-also carries a grounding comment with current file:line refs, so it should be
-readable cold without re-deriving code state.
+Scratch items sit under Scratch; everything below that is the prioritized index
+into GitHub issues. Durable design rationale and recorded decisions live in
+[`eng/`](./eng/README.md); each open issue also carries a grounding comment with
+current file:line refs, so it should be readable cold without re-deriving code
+state.
 
 ## Scratch
 
-- **Method prose hardcodes constants that live in the experiment module
-  (2026-08-01).** #reports Ex-2.1.7's `### Schedule` cell is a literal
-  `mo.md(r"...")`, so its numbers — anneal endpoints 50 and 90, the 2.5 opening
-  ratio, the 0.03 hold, epochs 10/90/100 — are typed rather than interpolated
-  from `ex`. Change a scheduler constant and the Method section silently
-  describes a run that never happened. `check-templates` cannot see this: it
-  tracks expressions that go missing, not literals that were never expressions.
-  Worth a lint that flags numeric literals in report prose which match a
-  module-level constant, or simply converting the cell to an f-string.
+- Method prose hardcodes constants that live in the experiment module
+  (2026-08-01). #reports Ex-2.1.7's `### Schedule` cell is a literal
+  `mo.md(r"...")`, so its numbers (anneal endpoints 50 and 90, the 2.5 opening
+  ratio, the 0.03 hold, epochs 10/90/100) are typed rather than interpolated
+  from `ex`. Change a scheduler constant and the Method section describes a run
+  that never happened. `check-templates` cannot see this: it tracks expressions
+  that go missing, not literals that were never expressions. Worth a lint that
+  flags numeric literals in report prose which match a module-level constant, or
+  simply converting the cell to an f-string.
 
-- **Done: a prose cell rendered nothing in ex-2.1.7 (2026-08-01).** #reports
+- Done: a prose cell rendered nothing in ex-2.1.7 (2026-08-01). #reports
   #publishing The H2 verdict cell was dropped from the Markdown export, so the
   published report stated no verdict for H2 and carried none of the numbers that
   decide it. Cause: `marimo-md-export` rewrites `/// type | Title` admonitions to
-  `!!! type "Title"` across the whole document *before* collecting cells, so it
+  `!!! type "Title"` across the whole document before collecting cells, so it
   also rewrites `///` blocks sitting inside a cell's Python source. Cells are
   matched to their rendered output by MD5 of that source, so the rewrite costs
-  the cell its output — and a hidden-code cell with no output is deleted. Only
+  the cell its output, and a hidden-code cell with no output is deleted. Only
   interpolated `mo.md(f"...")` cells are exposed: literal `mo.md("...")` cells
   are unwrapped to plain Markdown, where the transform is correct. The three
   other `///` blocks in that report are all in literal cells, which is why one
@@ -44,14 +44,13 @@ readable cold without re-deriving code state.
   worth reporting upstream (MIT, ~1k lines,
   [jmarshrossney/marimo-md-export](https://github.com/jmarshrossney/marimo-md-export));
   `inject_outputs` also builds a `warnings` list it never appends to.
-  Worth remembering how this was caught: a structural reviewer reading the
-  rendered document, not the source. Nothing in the source review could have
-  found it.
+  Note how this was caught: a structural reviewer reading the rendered document,
+  not the source. Nothing in the source review could have found it.
 
-- **Done: in-place mode for the prose pass (2026-08-01).** #skills #agents
-  #reports Kept here for the measurements, which are the reason the pass was
-  redesigned rather than optimized. Seven candidate designs ran over one section
-  whose failure modes were known, varying model, substrate and instructions.
+- Done: in-place mode for the prose pass (2026-08-01). #skills #agents
+  #reports Kept here for the measurements, which are why the pass was redesigned
+  rather than optimized. Seven candidate designs ran over one section whose
+  failure modes were known, varying model, substrate and instructions.
   Results: told what is load-bearing, an agent finds 2 to 5% of a section to cut,
   not the 48% the old lint appeared to deliver — that figure came from cutting
   figure captions by 67%, which is content loss rather than trimming. Instructions
@@ -70,11 +69,11 @@ readable cold without re-deriving code state.
   gone. Structural work — where the real length is, roughly five times the prose
   pass — went to the new `report-structure` agent.
 
-- **Teach the skills and review agents to check for tautologies (2026-07-31).**
+- Teach the skills and review agents to check for tautologies (2026-07-31).
   Ex-2.1.7's H4(a) scored the containment of ᾱ in conditions carrying a term
-  that is *defined* as a penalty on ᾱ, so "the repulsive term lowers ᾱ" was
-  never going to be news — the gate could only ever measure whether the weight
-  was large enough, not whether the mechanism explains anything. It went
+  that is _defined_ as a penalty on ᾱ, so "the repulsive term lowers ᾱ" was
+  never going to be news: the gate could only measure whether the weight was
+  large enough, not whether the mechanism explains anything. It went
   unnoticed through preregistration and a prereg review round, and was caught
   only when writing up the results. The general shape: a hypothesis whose
   statistic is the quantity a treatment directly optimizes, or a metric that
@@ -89,23 +88,24 @@ readable cold without re-deriving code state.
   built on such a gate. Worth a look at whether earlier reports have the same
   shape. #skills #agents #methodology
 
-  **Same family, second instance, found the same day.** Ex-2.1.7's op1-only
+  Same family, second instance, found the same day. Ex-2.1.7's op1-only
   factor is not the pure narrowing H3 reads it as: the anchor term normalizes
-  by the *realized* mask, so pulling one position instead of four divides the
+  by the _realized_ mask, so pulling one position instead of four divides the
   same λ among ~3.9× fewer positions and makes each ~3.9× stronger. The factor
-  changes which positions are pulled *and* how hard, and nothing in the design
+  changes which positions are pulled and how hard, and nothing in the design
   said so. The reading survived only because the ceiling arm happens to
   disambiguate it (10× the per-position gradient made selectivity worse, so
   strength is not the active ingredient) — luck, not design. So the reviewer
-  check should be broader than tautology: **for each factor, enumerate
-  everything it changes, not just the thing it is named for**, and pay
-  particular attention to normalizers, denominators, and anything averaged over
-  a set whose size the factor alters. A useful prompt: "if I renamed this factor
-  after its side effect instead of its intent, would the hypothesis still read
-  as written?" The design-side fix here is to normalize by a fixed count rather
-  than the realized mask, which `sca.anchoring` should probably offer.
+  check should be broader than tautology: for each factor, enumerate everything
+  it changes, not just the thing it is named for, and pay particular attention
+  to normalizers, denominators, and anything averaged over a set whose size the
+  factor alters. A useful prompt: "if I renamed this factor after its side
+  effect instead of its intent, would the hypothesis still read as written?" The
+  design-side fix here is to normalize by a fixed count rather than the realized
+  mask, which `sca.anchoring` should probably offer.
 
-- **Cut the cost of a review round — but guard the right half (2026-07-31).** #reports #agents #review
+- Cut the cost of a review round, but guard the right half (2026-07-31).
+  #reports #agents #review
   Ex-2.1.7's `results-reviewer` pass spent ~97k tokens, and by its own account
   most of it went on recomputing every quoted number from the store: all seven
   conditions' margins, ᾱ, EM, NLL; every grading ρ and R²; per-seed retention
@@ -114,25 +114,26 @@ readable cold without re-deriving code state.
   found real defects — but the cost per round is mostly spent in the wrong
   place, and it scales with the report rather than with what changed.
 
-  The thing to notice is *which* half broke. Every quoted number was already
-  correct, because reports read them from the store through f-strings at render
-  time; there is no transcription step to get wrong. All four real defects were
-  natural-language relations wrapped around correct numbers: "well under" a null
-  the value sits above; a span/op1 seam the rendered list contradicts; "far
-  above" a ceiling cleared by 0.05; an effect attributed to the factor with the
-  smaller main effect. Re-deriving numbers catches none of these.
+  Which half broke: every quoted number was already correct, because reports
+  read them from the store through f-strings at render time, so there is no
+  transcription step to get wrong. All four real defects were natural-language
+  relations wrapped around correct numbers: "well under" a null the value sits
+  above; a span/op1 seam the rendered list contradicts; "far above" a ceiling
+  cleared by 0.05; an effect attributed to the factor with the smaller main
+  effect. Re-deriving numbers catches none of these.
 
-  Suggestions (but think carefuly before implementing):
+  Suggestions (but think carefully before implementing):
 
-  - **Make comparisons computed rather than asserted.** The deep fix, and the
-     same trick that made the numbers safe in the first place. A small helper in
-     the report layer — `rel(a, b, noise=...)` rendering "above" / "below" /
-     "level with", and "clears by {x}" in place of "far above" — turns an
-     inverted comparison from a prose bug into an impossibility. Every one of
-     the four defects above was a relation a helper could have rendered.
-  - **Make comparisons easy to check.** As above, but fail loudly if it's not
-    what is expected; an inline test. Probably easiest to have an
-    `assert <condition>` in the cell; if we want this inline in the prose we could use a matcher library, along the lines of:
+  - Make comparisons computed rather than asserted. The deep fix, and the same
+    trick that made the numbers safe in the first place. A small helper in the
+    report layer — `rel(a, b, noise=...)` rendering "above" / "below" / "level
+    with", and "clears by {x}" in place of "far above" — turns an inverted
+    comparison from a prose bug into an impossibility. Every one of the four
+    defects above was a relation a helper could have rendered.
+  - Make comparisons easy to check. As above, but fail loudly if it's not what
+    is expected; an inline test. Probably easiest to put an
+    `assert <condition>` in the cell; for something inline in the prose we could
+    use a matcher library, along the lines of:
 
     ```py
     mo.md(f"""
@@ -143,20 +144,20 @@ readable cold without re-deriving code state.
 
     ... but this needs more design and a cost/benefit analysis.
 
-  - **Single-source the cross-experiment constants.** These are the only
-     numbers a reviewer must visit *another* experiment's store to check, and
-     they are currently pasted and duplicated: `_EX216_MARGIN` = 0.2732 appears
-     in ex-2.1.7's report four times under three names, plus `_REFS` for
-     ex-2.1.3. They should live in `experiment.py` once, with provenance (ref,
-     cells, statistic) in the docstring. Then it is one block to verify instead
-     of a hunt, and it is the natural thing for a ledger to key on.
+  - Single-source the cross-experiment constants. These are the only numbers a
+    reviewer must visit another experiment's store to check, and they are
+    currently pasted and duplicated: `_EX216_MARGIN` = 0.2732 appears in
+    ex-2.1.7's report four times under three names, plus `_REFS` for ex-2.1.3.
+    They should live in `experiment.py` once, with provenance (ref, cells,
+    statistic) in the docstring. Then it is one block to verify instead of a
+    hunt, and it is the natural thing for a ledger to key on.
 
-- **The watchdog fires during a task's post-loop artifact upload (2026-07-31).**
+- The watchdog fires during a task's post-loop artifact upload (2026-07-31).
   Four of ex-2.1.7's 21 training cells aborted with `WatchdogStall` at step
   3300/3300 — training had finished, and the stall was `put(workdir / "model")`
   pushing a checkpoint to the HF store, which took over 300s with eight
   containers uploading at once. The role's `watchdog` covers the gap between
-  step emissions, so a long tail *after* the last step reads as a stall no
+  step emissions, so a long tail after the last step reads as a stall no
   matter how healthy the loop was. `watchdog_grace` already solves the
   mirror-image case at the start of a task, so the shape of a fix exists: either
   a matching teardown grace, or have `put` emit liveness while it uploads (it
@@ -166,7 +167,7 @@ readable cold without re-deriving code state.
   properly, since the failure costs a full re-train of a finished run. #storage
   #cli
 
-- **Glossary of preferred terms for the science skill (2026-07-30).** Reports
+- Glossary of preferred terms for the science skill (2026-07-30). Reports
   have accreted near-synonyms with drifting meanings: "condition" vs "cell"
   (ex-2.1.7 settled on condition for the seven treatments, cell only for
   condition × seed), plus "arm", "rung", "gate", "partial" vs "named contrary
@@ -177,8 +178,8 @@ readable cold without re-deriving code state.
   adopted in ex-2.1.7: λ subscripted by term (λ_a anchor, λ_s̄ anti-subspace;
   bar = repulsive), replacing the one-off μ.
 
-- **`ty` loses a PEP 695 `type` alias when solving widens it to a supertype
-  (2026-07-30).** Reproduced on 0.0.49 (our pin) and 0.0.65 (latest):
+- `ty` loses a PEP 695 `type` alias when solving widens it to a supertype
+  (2026-07-30). Reproduced on 0.0.49 (our pin) and 0.0.65 (latest):
 
   ```python
   type Alias = Sequence[int]
@@ -197,20 +198,21 @@ readable cold without re-deriving code state.
   looks separate and unfiled. Worth filing upstream, and re-testing later so the
   aliases can go back to `type`.
 
-- **Bumped `ty` 0.0.49 -> 0.0.63 (2026-07-30).** `exclude-newer = "3 days"`
+- Bumped `ty` 0.0.49 -> 0.0.63 (2026-07-30). `exclude-newer = "3 days"`
   in pyproject.toml capped us below 0.0.64/0.0.65. `ty check` is clean at
   0.0.63. Notable in the gap: uv workspace-root discovery, several PEP 695
-  generic-type-alias fixes (0.0.63/0.0.64) — didn't fix the supertype-widening
-  bug above though — and ongoing inference-performance work every release.
+  generic-type-alias fixes (0.0.63/0.0.64), which didn't fix the
+  supertype-widening bug above, and ongoing inference-performance work every
+  release.
 
-- **Pre-push `ty` check scans nested worktrees (2026-07-29).** Pushing from a
+- Pre-push `ty` check scans nested worktrees (2026-07-29). Pushing from a
   `.claude/worktrees/<name>` worktree runs `ty check` from the parent checkout,
   which picks up the worktree's copy of `src/mini` as a separate tree with the
   wrong first-party roots — 23 spurious unresolved-import/type errors on a
   Markdown-only change. The hook (or ty config) should exclude
   `.claude/worktrees/`, or run from the repo root of the tree being pushed.
 
-- **Ex-2.1.5 export time: what's left (2026-07-28).** Two fixes landed —
+- Ex-2.1.5 export time: what's left (2026-07-28). Two fixes landed —
   `baselines.precision_limited_acc` now finds the nearest candidate with a
   matmul, and `geometry.principal_angles` batches over leading dimensions so
   the report's 2000-sample null is one pair of LAPACK calls. Both are
@@ -220,21 +222,21 @@ readable cold without re-deriving code state.
   twice, and `base.mplstyle` sets `figure.constrained_layout.use: True`, so
   every save solves a layout: 9.4s across the 18 saves, with ~13s in
   `get_tightbbox` overall. Measured on a synthetic multi-panel figure, the
-  layout engine costs *about as much as drawing the figure again*, and it
-  scales with **panel count, not data volume** — +0.05s per panel (0.05s at 1
+  layout engine costs about as much as drawing the figure again, and it
+  scales with panel count rather than data volume: +0.05s per panel (0.05s at 1
   panel, 0.56s at 12, 1.23s at 24), and flat from 200 to 20,000 points per
   panel. It has to measure the rendered extent of every tick label, axis label
   and title to allocate margins, then iterate the solve; our figures are
   12-panel grids, so we pay it 12 times over.
 
   Two things to try, in order of bluntness:
-  - `themed_figure_html` passes `bbox_inches="tight"` *on top of* constrained
+  - `themed_figure_html` passes `bbox_inches="tight"` on top of constrained
     layout, which makes `print_figure` draw the figure a second time to measure
     the crop (the profile shows 36 `figure.draw` for 18 saves). Measured ~20%
     off a save with no visible change in what constrained layout already
     produced — the two are solving nearly the same problem.
-  - Beyond that it's the engine itself, and the honest options are fewer panels
-    per figure or a fixed layout for the grid-shaped figures that don't need
+  - Beyond that it's the engine itself, and the options are fewer panels per
+    figure or a fixed layout for the grid-shaped figures that don't need
     solving. Both change margins, so eyeball across a few reports rather than
     swapping blind.
 
@@ -243,15 +245,15 @@ readable cold without re-deriving code state.
   per-cell times. Beware absolute timings across container restarts — the box
   this was measured on drifted ~25% between sessions, so A/B interleaved.
 
-- **"Cell" vs "condition" terminology split (2026-07-27).** Report prose now
+- "Cell" vs "condition" terminology split (2026-07-27). Report prose now
   says "condition" for one sweep item, reserving "cell" for visual elements
   (heatmap/table cells). The `mini` library still says "cell" throughout
   (`orchestration.py`, `__main__.py` monitor output, docstrings). Decide whether
   to rename the library term to match — it touches CLI output and docs, so it's
   a deliberate rename, not a sweep-through.
 
-- **Published sweeps are one tick away from a full re-run after an evidence-scheme
-  change (2026-07-27).** Widening what the fingerprint tracks re-stamps every
+- Published sweeps are one tick away from a full re-run after an evidence-scheme
+  change (2026-07-27). Widening what the fingerprint tracks re-stamps every
   task's evidence, so the next `mini run` re-runs the whole DAG in place, even
   though no experiment code moved. Adding a small step to ex-2.1.5 tripped this:
   the deferred-import tracing from #58/#59 landed after the sweep, so the tick
@@ -261,7 +263,7 @@ readable cold without re-deriving code state.
   after that run too), so the report and the store would silently disagree.
   Nothing to fix in the mechanism itself — over-invalidation is the right bias —
   but two things would help. A read-only `mini plan <exp>` that lists what a tick
-  *would* launch and why, so the choice to re-run is made before the launch and
+  would launch and why, so the choice to re-run is made before the launch and
   not after; and something that records, per published ref, the evidence the run
   was produced under, so "this report's numbers predate the current scheme" is a
   fact the report can state rather than a thing you rediscover. The workaround
@@ -269,17 +271,17 @@ readable cold without re-deriving code state.
   checkpoints from a standalone script and write results back under their own
   ref, leaving the DAG alone.
 
-- **A settled state can land on a successor's attempt, and the reader then
-  trusts it (2026-07-26).** `merge_if` on Modal is read-check-write with a
+- A settled state can land on a successor's attempt, and the reader then
+  trusts it (2026-07-26). `merge_if` on Modal is read-check-write with a
   one-round-trip window (`ModalRecordStore.merge_if`), so a superseded worker
   can merge `state=DONE` onto a record its successor now owns. The record then
   reads `gen=B, state=DONE` while `result-B.pkl` doesn't exist yet, and
   `Ctx._classify` → `store.result` raises `FileNotFoundError` out of the map.
   Cosmetic for progress fields (overwritten a second later); real for the one
   terminal write per task. Long-standing — the previous three-round-trip
-  version had a *wider* window.
+  version had a wider window.
   Not fixable with `modal.Dict` primitives: `put(skip_if_exists=)` is
-  insert-if-absent, which arbitrates *creating* a key (`write_if` already uses
+  insert-if-absent, which arbitrates creating a key (`write_if` already uses
   it for the double-spawn race) but can't compare-and-swap a value. Building
   CAS from it means a lock — 4+ round-trips on the hottest write in the system,
   and a worker dying mid-lock wedges the record forever unless the value
@@ -288,14 +290,14 @@ readable cold without re-deriving code state.
   gen-qualified result. A missing one means "the current attempt hasn't
   finished", which is exactly true, and it covers the race however it arose.
   Care needed — a missing result can also be a swept blob or a Volume commit
-  that didn't land, and reading *that* as "still running" suspends the DAG
+  that didn't land, and reading that as "still running" suspends the DAG
   forever (`reap_dead` only settles records that say RUNNING), so it probably
   wants a record reset so the next tick relaunches. Touches `keep_stale`,
   `retry`, and the `settled` aggregates; worth its own change.
 
-- **Metric trends know a direction, not a rate (2026-07-27, PR #58 review).**
+- Metric trends know a direction, not a rate (2026-07-27, PR #58 review).
   `expect_metrics`, wrong-way window counting, and a sample floor on the window
-  all shipped; what's left is how coarse the judgement is. A window mean is
+  all shipped; what's left is how coarse the judgment is. A window mean is
   compared without reference to the within-window spread, so a metric with a
   genuinely wide spread can still string together three wrong-way windows by
   chance — if that starts crying wolf, judge the movement against the spread the
@@ -305,34 +307,33 @@ readable cold without re-deriving code state.
   reads as perfectly healthy. A projected-final-value flag would be the
   counterpart to the timeout projection.
 
-- **An unresolvable module leaves no evidence and says nothing (2026-07-26).**
+- An unresolvable module leaves no evidence and says nothing (2026-07-26).
   Deferred-import evidence is now symbol-granular, so the blast-radius half of
   this is done. What's left is the failure direction that can actually serve a
   stale hit: if the `sys.path` search doesn't find a module, `_module_index`
   returns `None` and the walk moves on — indistinguishable from the stdlib and
-  site-packages, which are *meant* to be skipped. A task importing something the
+  site-packages, which are meant to be skipped. A task importing something the
   driver process can't see would then depend on nothing and cache forever. Fixing
   it means telling "deliberately excluded" from "expected to resolve and didn't",
   which needs a notion of what should have been findable (an installed-distribution
   check, or a project-roots list). A warning would be enough. Related smaller
   assumption: `sys.path` order is taken as stable within a process.
 
-- **Science skill.** We have a fledgeling `science` skill that describes how to
-  collaborate on experiment design. There may be old descisions in
+- Science skill. We have a fledgeling `science` skill that describes how to
+  collaborate on experiment design. There may be old decisions in
   todo-science.md that could be moved there and polished.
 
-- **Document subline.** Describe subline in a skill: what it is, why we might
+- Document subline. Describe subline in a skill: what it is, why we might
   use it instead of a token heatmap, and how to use it.
 
-- **Document s_2.** Describe surprise-surprise in a skill: what it is, why we
+- Document s_2. Describe surprise-surprise in a skill: what it is, why we
   might use it instead of surprisal, and how to calculate it. The mean s_2 over
-  a sequence would be analogous to perplexity. It's probably more informative
-  than perplexity alone, since it would capture the _per-token_ difference from
-  what the model anticipated. Note that negative values of s_2 are rare and
-  probably uninformative; they suggest the model finds the token to be
-  unsurprising.
+  a sequence would be analogous to perplexity, and probably more informative,
+  since it captures the per-token difference from what the model anticipated.
+  Negative values of s_2 are rare and probably uninformative; they suggest the
+  model finds the token unsurprising.
 
-- **Dark-mode rim on `plot_latent_disc` (opened 2026-07-21).** The disc's
+- Dark-mode rim on `plot_latent_disc` (opened 2026-07-21). The disc's
   over-the-data rim is a hard-coded `#0005`, which over the `#111` dark fill is
   effectively invisible — it only reads where data covers it. The new
   `sca.vis.plot_rgb_cube` uses `light_dark("#0005", "#fff4")` instead, so the
@@ -340,14 +341,14 @@ readable cold without re-deriving code state.
   `plot_latent_disc` restyles the published ex-2.9.x figures, so it wants a
   deliberate pass over those rather than a drive-by edit.
 
-- **Blend modes in matplotlib figures (opened 2026-07-21).** matplotlib has no
+- Blend modes in matplotlib figures (opened 2026-07-21). matplotlib has no
   `mix-blend-mode` — no compositing operators on artists at all. Where several
   series coincide (e.g. the RGB channels in ex-2.1.4's answer-schedule), the last
   one drawn wins and the rest are hidden. `mini.vis.smooth_step` sidesteps it with
   tapered line widths, which works but encodes an arbitrary draw order in the
   widths. A real multiply/screen is possible: render each series to its own RGBA
   buffer and composite in numpy. Two things to get right if we build it — the
-  chrome (axes, grid, text) must be a separate layer that is *not* blended, or
+  chrome (axes, grid, text) must be a separate layer that is not blended, or
   labels over- and under-expose; and each layer's empty pixels must contribute the
   mode's identity (1 for multiply, 0 for screen) rather than the background color,
   or the background gets blended in once per layer. That second one only shows up
@@ -356,7 +357,7 @@ readable cold without re-deriving code state.
   ([`subline.py`](src/subline/subline.py) sets `--blend-mode` and applies it to
   the series paths only) — worth revisiting if a second figure wants it.
 
-- **Slope-capped sublines (opened 2026-07-21).** `Sparkline._create_path_data`
+- Slope-capped sublines (opened 2026-07-21). `Sparkline._create_path_data`
   takes its curve knots from glyph ink bounds, so a ramp is always one inter-glyph
   gap wide however big the jump is. A large step in surprisal therefore renders
   near-vertical, which reads as a discontinuity and gives up the rate-of-change
@@ -365,12 +366,12 @@ readable cold without re-deriving code state.
   survives) fixes it, but it restyles the published ex-2.1.1/2.1.2 figures, so it
   wants an opt-in parameter and a deliberate pass rather than a drive-by edit.
 
-- **Responsive multi-panel figures in reports (opened 2026-07-16).** The
-  ex-2.1.1 two-panel *named-pair lattice* was split into two independent
+- Responsive multi-panel figures in reports (opened 2026-07-16). The
+  ex-2.1.1 two-panel named-pair lattice was split into two independent
   `themed` figures wrapped in a `.report-figure-row` (inline-block, reflows to
   a stack on narrow screens; matched size via a shared projection + pinned
   limits + full-figure bbox rather than `sharey`). That pattern works when the
-  panels carry no shared axis *labels* and share only a scale. Still undecided
+  panels carry no shared axis labels and share only a scale. Still undecided
   for the remaining wide plots — `accuracy-sweep` (1×4) and `probe-r2` (1×3),
   which shrink illegibly on phones: (a) split like the lattice, but then we
   must manage the shared y-axis label and legend that currently live only on
@@ -382,10 +383,10 @@ readable cold without re-deriving code state.
   min-width/scroll wrapper lives — a `themed` option, or a CSS class the author
   opts into. Decide before the anchoring reports reuse these figures.
 
-- **CLI usability, remaining gaps** (from the 2026-07-14 cold-exploration
+- CLI usability, remaining gaps (from the 2026-07-14 cold-exploration
   session; the copy-pasteable-hints / sorting / help-text tier shipped — see
   #57 for the running thread):
-  - No way to *delete* an experiment's memo state. `mini gc <name>` sweeps only
+  - No way to delete an experiment's memo state. `mini gc <name>` sweeps only
     stale attempt files/superseded records, so a scratch or renamed experiment's
     DONE records live forever — on Modal too (a `cli-probe` probe experiment now
     sits there as a permanent example). Wants a `mini rm <name>` with the same
@@ -399,26 +400,26 @@ readable cold without re-deriving code state.
   - `mini results <name>` prints raw result reprs; a sweep with per-step metric
     lists dumps ~120 KB of floats. The new optional `key` arg narrows it, but
     consider truncating long reprs by default and/or `--json`.
-  - `mini logs` holds only failure tracebacks (now stated honestly), and the
-    Modal `fc-…` ids that `status` prints can't be fed back into any `mini`
+  - `mini logs` holds only failure tracebacks (the help text now says so), and
+    the Modal `fc-…` ids that `status` prints can't be fed back into any `mini`
     verb — worker stdout/logs need the Modal dashboard.
   - `tests/mini/test_apparatus.py::test_local_apparatus_concurrent` asserts
     3 × 0.1 s sleeps finish < 0.25 s; on a loaded 4-CPU remote container the
     pool takes ~1.9 s, so the test fails on a pristine tree. Loosen the bound
     or gate it on available CPU.
 
-- **Published reports depend on jsDelivr for the marimo runtime.** `marimo export
+- Published reports depend on jsDelivr for the marimo runtime. `marimo export
   html` points ~200 `<script>`/`<link>`/font URLs at
   `cdn.jsdelivr.net/npm/@marimo-team/frontend@<version>/dist`, so a published
   report only renders while that CDN + the pinned version stay up. Not worth doing
   now, but for archival we could self-host `dist/` into each bundle's `_assets/`
   and rewrite the CDN base to a relative path in `clean_docs`/`export_reports`
   (same post-export surgery seam as the show-code shim). Cost: ~a few MB of
-  JS/fonts per bundle and a maintenance tie to the marimo version. (The *local*
+  JS/fonts per bundle and a maintenance tie to the marimo version. (The local
   half — repointing CDN refs at marimo's bundled `_static/` to browser-check an
   export offline — is done: see the `report-render` skill.)
 
-- **Publish-tier exports go stale on rename.** `export_key` derives from the
+- Publish-tier exports go stale on rename. `export_key` derives from the
   docs-relative path, so moving a notebook orphans its synced bundle: the build
   looks for the new key, skips with a warning, and the site 404s while
   `index.md` still links the page. The `docs/m1/` casualties (ex-2.9.1..4,
@@ -442,7 +443,7 @@ readable cold without re-deriving code state.
   (duals in the `lax.scan` carry), with the dopesheet still driving the
   non-controlled props. If feedback-driven weights become standard, consider a
   Timeline mode where a prop is declared "controlled": keyframes set its
-  *bounds/defaults* and a callback supplies the live value.
+  bounds and defaults, and a callback supplies the live value.
 
 - ex-2.9.3's `publish_results` publishes `exemplar-hot`/`exemplar-cool` refs
   (the worst catastrophic run and its cooled-LR rescue) that no report reads.
@@ -463,7 +464,7 @@ readable cold without re-deriving code state.
   If a ref-delete/rename verb ever lands (eng/gc.md), sweep them. The m1 refs
   (`reports/ex-2.9.*`) predate milestone nesting and stay flat on purpose.
 
-- Remove the remaining mi-ni template *experiments* (`docs/pipeline`,
+- Remove the remaining mi-ni template experiments (`docs/pipeline`,
   `docs/probe`, `docs/acts` — their report notebooks are already gone) once the
   e2e tests that drive them (`tests/mini/test_experiments_e2e.py`) get their own
   fixtures, or once the first real M2 experiments can play that role. Ties into
@@ -479,10 +480,10 @@ readable cold without re-deriving code state.
 
 ## Backlog, grouped by what a single dev session should bundle
 
-(M2 *science* backlog, including issue #10, now lives in
+(The M2 science backlog, including issue #10, now lives in
 [`todo-science.md`](./todo-science.md).)
 
-**Storage/control-plane design.** These stem from the same list in
+Storage/control-plane design. These stem from the same list in
 [`eng/decisions.md`](./eng/decisions.md):
 
 - #38 — publish-tier hardening (private-CAS/public-publish bucket split;
@@ -491,7 +492,7 @@ readable cold without re-deriving code state.
   only thing left that would reshape what "CAS" means to
   [`mini gc`](./eng/gc.md) (#15, shipped in two cuts).
 
-**Orthogonal, no code overlap with the above:**
+Orthogonal, no code overlap with the above:
 
 - #45 — docs rework. Touches `docs/`, `README.md`, `eng/`, not `src/mini/`.
   Can run in parallel with anything.

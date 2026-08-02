@@ -13,18 +13,18 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Open questions
 
-- [ ] **Decide which retention statistic the reports quote.** #reports Ex-2.1.7
+- [ ] Decide which retention statistic the reports quote. #reports Ex-2.1.7
   computes "retention" two ways in two cells: the Findings section takes the
-  *minimum* final-over-peak margin across seeds, matching H4(b)'s per-run gate
+  minimum final-over-peak margin across seeds, matching H4(b)'s per-run gate
   ("for every anchored run … at least 0.8× that maximum"), while the Arms
-  section takes the *mean* across seeds. For `span-anti-late` those read 0.92
+  section takes the mean across seeds. For `span-anti-late` those read 0.92
   and 0.94; for `span-anti-hi`, 0.55 and 0.58. Both are defensible, but one
   report should not quote both under one name. The min is the gate-relevant
   one; the mean is the one already carried into the anneal-endpoint item below.
   Pick one and make the other follow.
 
-- [ ] **Sweep the anti-subspace anneal endpoint — the highest-value open knob
-  after ex-2.1.7.** The `span-anti-late` arm changed exactly one number, the
+- [ ] Sweep the anti-subspace anneal endpoint, the highest-value open knob
+  after ex-2.1.7. The `span-anti-late` arm changed exactly one number, the
   epoch at which the repulsive term finishes annealing to its hold ratio (50 →
   90), and improved margin (0.46 → 0.60), containment (ᾱ 0.33 → 0.13),
   retention (0.73 → 0.94) and grading (R² 0.62 → 0.78) together — a bigger
@@ -32,20 +32,20 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   keyframes were inherited from a 5-d autoencoder bottleneck and mapped onto
   our 100 epochs by fraction of training, so there was never a reason to expect
   them to be right for a 64-d residual stream. Two things the single arm cannot
-  separate: *when* the repulsion acts and *how much* of it there is, since
-  holding near peak for longer also delivers more of it. A sweep over
-  (`anneal_end`, `hold_ratio`) on a grid separates them; ex-2.4.1's ramp-*up*
-  schedule is worth including as a third shape. Cheap — training only, no new
-  measurements. #ex-2.1.7 #schedules #anchoring
+  separate: when the repulsion acts and how much of it there is, since holding
+  near peak for longer also delivers more of it. A sweep over (`anneal_end`,
+  `hold_ratio`) on a grid separates them; ex-2.4.1's ramp-up schedule is worth
+  including as a third shape. Cheap: training only, no new measurements.
+  #ex-2.1.7 #schedules #anchoring
 
-- [ ] **Locating the concept inside a labeled span, without being told where it
-  is.** Ex-2.1.7's largest single effect is narrowing the pull from four prompt
+- [ ] Locating the concept inside a labeled span, without being told where it
+  is. Ex-2.1.7's largest single effect is narrowing the pull from four prompt
   positions to op1 alone (+0.22 margin, and it is what stops the trajectory
   sliding). But that remedy is only available because this synthetic language
   has a known position carrying the concept, which is exactly what a labeled
   span of real text does not give you — so the finding is about what
   sequence-level labeling costs, not a design M3 can keep. Candidates: pool the
-  pull over the span (pull the *mean* state rather than each state, so a
+  pull over the span (pull the mean state rather than each state, so a
   color-independent shift no longer satisfies it); weight positions by an
   attention-derived estimate of where the concept sits; or pull only the
   position whose state is already most alignable, an EM-flavored scheme. The
@@ -53,12 +53,12 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   margin concentrates at op1 (0.63) with `+`/op2 near 0.08, so the model does
   distinguish these positions when the pull lets it. #ex-2.1.7 #labels #m3
 
-- [ ] **A heavier anchor buys alignment and loses selectivity.** Ex-2.1.7's
+- [ ] A heavier anchor buys alignment and loses selectivity. Ex-2.1.7's
   ceiling arm ran the full recipe at λ_a = 1, ten times the scoring rung. The
-  task never pushed back (holdout EM within 0.0013 of control), so the *task*
-  ceiling is still unfound — but the margin *fell* to 0.43 against 0.46 at a
+  task never pushed back (holdout EM within 0.0013 of control), so the task
+  ceiling is still unfound — but the margin fell to 0.43 against 0.46 at a
   tenth of the weight, with ᾱ back up to 0.46, retention down to 0.58, and the
-  colour cube compressed even in the token embedding (0.77 against 0.91). So
+  color cube compressed even in the token embedding (0.77 against 0.91). So
   there is a selectivity optimum in λ_a somewhere below 1, and the useful sweep
   is the one that finds it rather than the one that finds where the task
   breaks. Worth doing before D2.2 fixes an operating point. Note this also
@@ -67,8 +67,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   optimum, and the anti-subspace term restores the cube's extent at the scoring
   rung (91–103% of control against the bare pull's 67%). #ex-2.1.7 #anchoring
 
-- [x] **Refit the probe maps holding out one target *value* at a time, not one
-  equation.** Done in ex-2.1.5: `geometry.strict_r2` reports both estimators
+- [x] Refit the probe maps holding out one target value at a time, not one
+  equation. Done in ex-2.1.5: `geometry.strict_r2` reports both estimators
   side by side, the report shows the strict figure with a disagreement table,
   and the three operand-closing spaces are landmarks. The residual question is
   the fold-strength asymmetry, split out as its own item below.
@@ -80,7 +80,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   question — see the finding below for a one-cell prototype. The fix is a
   leave-one-group-out where the group is the target's value in the channel being
   scored (16 groups per hex digit, ~100–220 for named). Costs an eval-stage
-  re-run only (checkpoints are published under `CKPT_REF`), and it is *cheaper*
+  re-run only (checkpoints are published under `CKPT_REF`), and it is cheaper
   than the current fit. Two decisions to make: whether to report it beside the
   preregistered per-equation numbers or in place of them, and whether the
   cross-form ρ and principal angles (full-data fits, so unaffected mechanically)
@@ -99,10 +99,10 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   characters wide depending on the line (median 6), since that averaging is the
   real approximation and it applies to every named panel.
 
-- [ ] **The strict holdout is not equally strict across targets, so R² is not
-  comparable between the operand rows and the mix row.** `_value_folds` groups
-  by the target's value in one channel. For a named operand that group *is* the
-  colour — every line carrying the name shares its R value — so ~93 folds remove
+- [ ] The strict holdout is not equally strict across targets, so R² is not
+  comparable between the operand rows and the mix row. `_value_folds` groups
+  by the target's value in one channel. For a named operand that group is the
+  color — every line carrying the name shares its R value — so ~93 folds remove
   a median 15/768 lines and the name is genuinely gone. A mix value is a
   midpoint, mostly unique to a line or two: ~219 folds removing a median 4/768,
   with both operand names still in the fit. So "named mix @ pre = 0.94" and
@@ -110,24 +110,24 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   currently reads them side by side as if they weren't.
 
   Checked, and the headline survives: an identity-grouped fold (hold out every
-  line where a colour is an operand, score the lines where it is operand 1, so
+  line where a color is an operand, score the lines where it is operand 1, so
   every scored line has an unseen operand) gives mix @ pre = 0.94, op1 @ pre =
   0.64 — both unchanged to two places, over 139 folds × 3 seeds. Two things
-  still worth doing. (1) Report the mix row under identity folds so the
+  still to do. (1) Report the mix row under identity folds so the
   comparison is like for like; the per-channel grouping is the right one for
-  hex, where the digit *is* the value, so this is a per-form choice. (2) Explain
+  hex, where the digit is the value, so this is a per-form choice. (2) Explain
   why mix beats its own inputs. If the probe could only compose two independent
   operand readouts, op1 at 0.64 with op2 seen bounds mix at ~0.82, and we see
   0.94 — either the mix has its own direction by `pre`, or the probe is reading
-  the answer the model has already chosen and looking that colour up (the fold
-  removes a colour only where it is an *operand*). Same mechanism as the
+  the answer the model has already chosen and looking that color up (the fold
+  removes a color only where it is an operand). Same mechanism as the
   "answer positions partly read the answer" section, arriving one position
-  earlier. A fold that also removes lines where the colour is the answer would
+  earlier. A fold that also removes lines where the color is the answer would
   separate them. #metrics #ex-2.1.5 #representations
 
   Two more fold-shaped items to ride along in the same eval re-run, so the whole
-  set costs one pass. (a) The **word-family control** (identity-fold twin of the
-  colour-matched holdout) is quoted in H2 at −0.43 but computed offline, so the
+  set costs one pass. (a) The word-family control (identity-fold twin of the
+  color-matched holdout) is quoted in H2 at −0.43 but computed offline, so the
   report asserts a number it doesn't derive — the standard the retcon sweep set.
   Storing a word-family-folded map alongside the two existing ones makes it a
   report-side figure. (b) Nothing else in ex-2.1.5 needs the eval step touched,
@@ -137,7 +137,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   estimator (both give ρ = 0 at the centre cell, since every cross-form R² there
   is negative). #metrics #ex-2.1.5
 
-- [ ] **Depth-crossed cross-form transfer.** ρ as preregistered compares the same
+- [ ] Depth-crossed cross-form transfer. ρ as preregistered compares the same
   (depth, landmark) in both forms, but ex-2.1.5's two forms compute the mix in
   different places — named at the pre-answer position in the last layer, hex
   mid-answer a layer earlier, with hex's pre-answer column never clearing 0.20 at
@@ -145,19 +145,19 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   one that hasn't formed. The subspace half is already answered report-side from
   the stored weights (first principal angle 66–78° for every depth pair at
   `pre`; 57° at the closest pair anywhere both forms clear 0.3), so there is no
-  shared direction to find at *any* depth — but a zero-shot fit is a different
+  shared direction to find at any depth — but a zero-shot fit is a different
   test from a subspace angle, and only the fit needs activations the sweep
   doesn't publish. Cheap to add to `eval_one`: `transfer_maps` already has both
   forms' activations in hand, so a depth-crossed variant is a second pair of
   loops. Ride it along with the fold items above. #metrics #ex-2.1.5
   #representations
 
-- [ ] **Where does the bridge convert?** Ex-2.1.5's bridge cell answers unseen
+- [ ] Where does the bridge convert? Ex-2.1.5's bridge cell answers unseen
   `name + #hex` equations at 0.92 exact match, so a name's value reaches the hex
   answer path, and yet ρ between the two single-form probes is 0 and their mix
   decoders sit at the random-subspace angle. Both readings can hold if the model
   routes by form and converts somewhere our matched-site measurement doesn't
-  look. The measurement that would say: collect activations on *cross* lines and
+  look. The measurement that would say: collect activations on cross lines and
   fit probes there, then ask (a) at which landmark a named operand's value first
   becomes legible to the hex-form probe, and (b) whether the cross line's own
   geometry is the named one, the hex one, or a third. Needs a probe suite of
@@ -176,14 +176,14 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   at the cross line's pre-answer site in a third geometry would refute it and
   point to a genuinely shared intermediate. #ex-2.1.5 #representations #[D2.1]
 
-- [ ] **How much bridging does it take, and does answering in both forms
-  matter?** Ex-2.1.5 set the cross-line weight to 12% before we knew what the
+- [ ] How much bridging does it take, and does answering in both forms
+  matter? Ex-2.1.5 set the cross-line weight to 12% before we knew what the
   disjoint corpus would do, and that turns out to be enough to teach the
   conversion and not enough to move any alignment measure. A weight sweep would
   say whether those two thresholds are far apart. Worth pairing with a grammar
   change: this corpus's cross lines always answer in hex, so keeping two decoders
   is a perfectly good way to satisfy the task, and cross equations that answer in
-  *both* forms would remove that option. #ex-2.1.5 #task-grammar #[D2.1]
+  both forms would remove that option. #ex-2.1.5 #task-grammar #[D2.1]
 
 - [ ] Probe all positions in a sample of sequences. So far we have only probed
   specific locations, e.g. last token of first operand; last token before answer.
@@ -201,7 +201,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   `v4096` floor? Ex-2.1.3's cross-validated embedding probe places tokens
   0.73 / 0.63 / 0.49 grid cells from their true color at v27 / v64 / v216 —
   under one cell throughout, so nearest-name decoding survives even at v27 where
-  R² is only 0.66. In absolute terms that error *shrinks* with the grid
+  R² is only 0.66. In absolute terms that error shrinks with the grid
   (0.363 → 0.210 → 0.097 of the unit cube), so precision is relative, not a
   fixed resolution the finer grids keep exposing. v4096 breaks it both ways:
   0.166 absolute (worse than v216) and 2.5 cells. Two follow-ups. (a) Is the
@@ -221,7 +221,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   about the cost of one fit, and with no split to draw it takes no seed. It
   gives 0.66 against the stored 0.48 (v64 0.81→0.87, v216 0.95→0.97, v4096
   unchanged). (b) Worth storing alongside it: color's share of the top-3 PC
-  variance budget (0.25 / 0.26 / 0.56 / 0.80 across v27→v4096), which is *why*
+  variance budget (0.25 / 0.26 / 0.56 / 0.80 across v27→v4096), which is why
   PCA only finds the cube at the dense end. Deferred because editing the eval
   step is memoization evidence and re-runs every cell — bundle it with the next
   change that re-runs ex-2.1.3 anyway. The same treatment
@@ -230,7 +230,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 - [ ] Distance-shaped answer targets for ex-2.1.3, post-hoc. We scored answers
   against the one-hot truth (NLL of the true name); the sharper question is
-  whether the model's whole answer *distribution* is shaped like the geometry —
+  whether the model's whole answer distribution is shaped like the geometry —
   build a target distribution per prompt from RGB distance to the true mix
   (e.g. softmax of −distance/τ over the vocabulary) and measure cross-entropy /
   KL against it, sweeping τ. Needs no re-run: the eval step saved the full
@@ -238,13 +238,13 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   `{label}/logp/{set}`), so this is a report-side analysis. Ex-2.1.4's report
   now implements the τ-sweep (KL(q_τ ‖ p) with a uniform reference); reuse its
   recipe and τ grid so the rungs compare directly. Note from ex-2.1.4: the
-  metric jointly scores geometry *and* calibration — a confidently-wrong model
+  metric jointly scores geometry and calibration — a confidently-wrong model
   fits worse than uniform — so read it beside s₂. #[D2.1] #ex-2.1.3 #metrics
 
 - [ ] Cipher-name condition for the char-level language (deferred from
   ex-2.1.4): names whose letters encode the value through a per-position
   substitution, separating a compositional surface from a value-spelling one.
-  Run only if the anchored experiments need to know *why* multi-token naming
+  Run only if the anchored experiments need to know why multi-token naming
   costs precision, not just that it does. #[D2.1] #vocab #task-grammar
 
 - [ ] Probe the mid-emission dip (ex-2.1.4): at v216 the final-depth mix R²
@@ -285,11 +285,11 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   #superposition #model-arch #ex-2.1.3
 
 - [ ] Make the operation a variable before D2.2. `sca/data/colors.py` hardcodes one
-  op (`mix`, spelled `+`); anchoring *the operation* only makes sense once there is
+  op (`mix`, spelled `+`); anchoring the operation only makes sense once there is
   more than one. Add an operation table (name, surface form, grid fn with defined
   rounding — saturating add/subtract and screen all stay closed on 0..15), thread an
   `op` field through `Example`, and key the seen-pair bookkeeping on `(op, pair)`.
-  Spell operators as *words* (`red mix blue = purple`), not symbols, so the operation
+  Spell operators as words (`red mix blue = purple`), not symbols, so the operation
   concept is multi-token like the colors. No need to keep `+` compatible — each
   experiment retrains from scratch and carries its own control. Probe positions in
   `sca/compute/evaluation.py` assume the infix `a <op> b = ` frame; keep that frame.
@@ -308,7 +308,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   the fixed scalar α = 1/n_layer trains flat across the width × depth grid we can
   afford. #model-arch
 
-- [ ] Does the *shape* of the anchor anneal matter — linear vs minimum-jerk? M1
+- [ ] Does the shape of the anchor anneal matter — linear vs minimum-jerk? M1
   compared neither; it did test a stepped anneal, which held only when the LR
   warmup restarted from zero at each step, so the one discontinuity we measured
   needed an accommodation. Whether the milder discontinuity of a linear ramp
@@ -340,12 +340,12 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 - [ ] Pool the anchor term over positions instead of averaging over them. Ex-2.1.6
   pulls all four prompt positions equally and asks (H3) whether the concept
   condenses anyway. If it broadcasts instead, a logsumexp over positions is the
-  response: it asks that the span align *somewhere* rather than everywhere, which
+  response: it asks that the span align somewhere rather than everywhere, which
   is the shape a document-level label really has. Ex-2.1.6's H3 section names this
   as the queued answer to a broadcast result, so it wants to exist as an item
   either way. #[D2.1] #anchoring #ex-2.1.6
 
-- [ ] **Add the anti-subspace term and re-run ex-2.1.6.** The clear next step
+- [ ] Add the anti-subspace term and re-run ex-2.1.6. The next step
   from that result: one attractive term is satisfied largely by a
   color-independent shift of the whole cube onto the axis, so the margin stalls
   at 0.27 while the mean alignment climbs with λ. M1's loss carried
@@ -375,12 +375,12 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   "prioritize pooling" rather than "narrow the pull", which M3 cannot do.
   #[D2.1] #anchoring #ex-2.1.7
 
-- [ ] **An off-axis probe R² does not bound an intervention.** Ex-2.1.6 reported
+- [ ] An off-axis probe R² does not bound an intervention. Ex-2.1.6 reported
   redness still readable at R² ≈ 0.83 with the anchor direction removed, and
   the post-hoc check showed greenness and blueness score the same: it is the
   color cube the task needs, not a red-specific copy. So probe recoverability
   answers "can a linear readout still find it", while the intervention question
-  is what the *model's own* computation does under an edit — which is what M1
+  is what the model's own computation does under an edit — which is what M1
   measured as damage. Worth a methodology note wherever we quote leakage: the
   number sizes the concentration achieved, not the intervention's headroom.
   #methodology #anchoring #ex-2.1.6
@@ -393,7 +393,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   worth checking whether it holds at positions whose next token varies.
   #representations #ex-2.1.6
 
-- [ ] **Pull op1 alone**, as the counterpart to the position-pooling item below.
+- [ ] Pull op1 alone, as the counterpart to the position-pooling item below.
   Ex-2.1.6 pulls four prompt positions, and three of them (`+`, op2, `=`) carry
   no information about which color sits there — the label is an unobservable
   coin flip, so only the expected pull is visible, and at those positions it
@@ -408,10 +408,10 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   power analysis for how much anchor weight is available to spend. #[D2.1]
   #anchoring #ex-2.1.6
 
-- [ ] **Is the alignment decay worth chasing on its own?** Read as a gate, the
-  H4 slide in ex-2.1.6 is just a failure; read as a phenomenon it is the more
-  interesting half. The margin peaks near epoch 10 and loses about a quarter
-  over the next forty epochs *at constant λ*, so the optimizer walks away from
+- [ ] Is the alignment decay worth chasing on its own? Read as a gate, the
+  H4 slide in ex-2.1.6 is a failure; read as a phenomenon it may be the more
+  informative half. The margin peaks near epoch 10 and loses about a quarter
+  over the next forty epochs at constant λ, so the optimizer walks away from
   selectivity under steady pressure rather than losing it when protection is
   withdrawn. One reading is that the selective response arrives first and the
   rest of the cube follows it onto the axis, which the mean alignment climbing
@@ -429,7 +429,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   have already scored. Worth doing before the sweeps get wider in D2.2.
   #[D2.1] #ex-2.1.6
 
-- [ ] **Can an anchor be confined to part of the stream?** Ex-2.1.6 pulls all
+- [ ] Can an anchor be confined to part of the stream? Ex-2.1.6 pulls all
   five layers and all four prompt positions equally, and the margin came out
   with a shape nobody asked for: *red* enters at its own token and migrates with
   depth to the positions after it (op1 leads in the embedding and first block,
@@ -438,7 +438,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   matter — we would want the edit at every (layer, position) site anyway. It
   matters for [D2.3], which asks for suppression that degrades completion while
   leaving verification intact: that needs the concept localized somewhere we can
-  reach, and nothing so far says whether the anchor term can be *confined* to a
+  reach, and nothing so far says whether the anchor term can be confined to a
   chosen region rather than merely applied there. #[D2.3] #anchoring
   #representations #ex-2.1.6
 
@@ -447,7 +447,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   which is the crudest edit available and the one most exposed to the drift
   ex-2.1.6 found: if the whole cube has a common component on the axis, taking
   the axis away moves everything. A suppression shaped to act on the
-  red-selective *part* of the response — a function of the component rather than
+  red-selective part of the response — a function of the component rather than
   its deletion — might degrade red behavior while leaving the color cube intact,
   and it would still have side-effects boundable from the geometry beforehand,
   which is the property the method is for. Design question to settle before the
@@ -465,15 +465,15 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Findings & notes to carry forward
 
-- **A bare anchor term buys alignment without selectivity (ex-2.1.6,
-  2026-07-29).** First anchored transformer. One cosine term pulling the prompt
+- A bare anchor term buys alignment without selectivity (ex-2.1.6,
+  2026-07-29). First anchored transformer. One cosine term pulling the prompt
   span of red-labeled equations toward e₀, λ ∈ {0, 0.03, 0.1, 0.3} × 3 seeds on
   the ex-2.1.3 `v216` cell. H1 passed with room to spare: held-out exact match
   within 0.003 of control at every weight, NLL and open-pair distances flat, so
   the anchor is free at these weights. H2 and H3 failed and H4 failed in an
   unexpected way. The margin (label-affinity-weighted alignment minus the cube
   mean) settles at 0.27 against a 0.5 gate and is flat across a tenfold range of
-  λ, while the *mean* alignment over all colors climbs 0.42 → 0.62 with λ: the
+  λ, while the mean alignment over all colors climbs 0.42 → 0.62 with λ: the
   term is satisfied by moving everything onto the axis. Consistent with that,
   the margin is largest in the shared token embedding and decays through the
   position-aware blocks; the trajectory peaks near epoch 10 and slides back a
@@ -485,14 +485,14 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   in this design and both have queued follow-ups: the missing repulsive terms
   (M1 carried anti-subspace at 3% of the anchor weight) and the span pull, three
   of whose four positions cannot see which color sits there. Post-hoc: the cube
-  *swung* onto the axis rather than collapsing onto it (centroid·anchor 0.02 →
+  swung onto the axis rather than collapsing onto it (centroid·anchor 0.02 →
   0.89 at mid-stack, extent 0.63 → 0.43), and the off-axis leakage is
   undifferentiated across greenness and blueness, so it is the color cube
   rather than a red copy — the on-axis score is red-selective (0.35 vs 0.06),
   which is the part of the claim that stands. #[D2.1] #anchoring #ex-2.1.6
 
-- **A causal model's first position is context-free, so op1 alignment is a
-  property of the token (ex-2.1.6, 2026-07-29).** Position 0 attends to itself
+- A causal model's first position is context-free, so op1 alignment is a
+  property of the token (ex-2.1.6, 2026-07-29). Position 0 attends to itself
   alone, so every probe line sharing an op1 gives the same op1 measurement.
   Consequences for probe design: averaging over partners buys nothing at op1
   (it does at later positions), the measurement carries no sampling error from
@@ -501,11 +501,11 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   give. Pinned by a test in `tests/sca/test_anchoring.py`. #methodology
   #anchoring
 
-- **A principal angle between probe subspaces needs a dimension-matched null
-  (ex-2.1.5, 2026-07-27).** The angle between two 3-dimensional row-spaces
+- A principal angle between probe subspaces needs a dimension-matched null
+  (ex-2.1.5, 2026-07-27). The angle between two 3-dimensional row-spaces
   shrinks as the space they sit in does, so any sweep over residual width will
   see angles fall whatever the representations are doing. Ex-2.1.5's cross-form
-  mix decoders go 75° → 60° → 51° over d64 → d32 → d16, and two *random*
+  mix decoders go 75° → 60° → 51° over d64 → d32 → d16, and two random
   3-planes at those widths give 72° → 64° → 51°: the whole trend is the ambient
   dimension. Two nulls are worth carrying. Random 3-planes are the cheap one. The
   better one is a seed control — the same form's probe from a different seed,
@@ -514,8 +514,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   to within a few degrees at every width. Report raw angles only against one of
   these. #metrics #ex-2.1.5 #representations
 
-- **Compression separates the two forms rather than merging them (ex-2.1.5,
-  2026-07-27).** Narrowing the residual stream from 64 to 32 to 16 leaves ρ at 0
+- Compression separates the two forms rather than merging them (ex-2.1.5,
+  2026-07-27). Narrowing the residual stream from 64 to 32 to 16 leaves ρ at 0
   and the angles at their null, so capacity pressure buys no sharing at these
   scales. What it does instead is spend the remaining capacity unevenly: hex
   held-out accuracy runs 1.00 / 1.00 / 0.72 while named runs 0.67 / 0.43 / 0.05,
@@ -527,12 +527,12 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   capacity-pressure design that wants both forms to feel the squeeze equally has
   to match their margins. #ex-2.1.5 #superposition #task-grammar
 
-- **Depth moves the mix earlier in the sequence, not earlier in the stream
-  (ex-2.1.5, 2026-07-27).** Doubling L4 → L8 at d64 leaves held-out named
+- Depth moves the mix earlier in the sequence, not earlier in the stream
+  (ex-2.1.5, 2026-07-27). Doubling L4 → L8 at d64 leaves held-out named
   accuracy (0.667 → 0.671) and σ (0.032 → 0.032) untouched, so depth buys no
   resolution once the palette's spacing is the ceiling. It does buy about one
   extra layer of mature mix (1.7 of 4 layers over R² 0.9 at L4, 2.3 of 8 at L8),
-  but as a fraction of the network the mature mix sits *later*, 42% → 29%: the
+  but as a fraction of the network the mature mix sits later, 42% → 29%: the
   extra layers went in front of the computation, and the mix stayed against the
   answer. Where depth shows up is the token axis — the named mix at the `=` sign
   reads 0.58 at L4 against 0.77 at L8. At d16, where capacity rather than the
@@ -541,8 +541,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   at these depths and does not widen in proportion to the network. #ex-2.1.5
   #representations #anchoring
 
-- **Named exact match is set by the palette's snap margin, not by how well the
-  model represents colour (ex-2.1.5, 2026-07-26).** On an irregular palette the
+- Named exact match is set by the palette's snap margin, not by how well the
+  model represents color (ex-2.1.5, 2026-07-26). On an irregular palette the
   answer is the nearest name to the exact mix, so each prompt carries its own
   difficulty: the *snap margin* (runner-up distance minus winner distance) has a
   median of 0.033 of the unit cube at 140 names against a constant 0.2 on
@@ -552,21 +552,21 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   (`baselines.precision_limited_acc`, one free parameter) reproduces the whole
   curve at σ ≈ 0.033 (≈ 8/255 per channel) on held-out prompts. The same σ
   predicts ≈ 0.99 on `v216` — about what ex-2.1.3 (≈ 1.0) and ex-2.1.4 (0.91)
-  scored — so no change in colour precision is needed to explain the earlier
+  scored — so no change in color precision is needed to explain the earlier
   rungs' near-saturation. Consequences. (1) Compare accuracies across
   vocabularies only at matched margin, or through σ; raw exact match is a
   property of the palette as much as of the model. Standardizing this way splits
   `palette-250`'s drop (0.667 → 0.564) about evenly between a finer palette and a
-  real precision cost. (2) Trained pairs break the account's *shape* (the model
+  real precision cost. (2) Trained pairs break the account's shape (the model
   beats it at tight margins, falls short at wide ones), so errors on seen pairs
-  are not purely a resolution limit — recall is mixed in. (3) The behaviour is
+  are not purely a resolution limit — recall is mixed in. (3) The behavior is
   finer than the probe: at the pre-answer site the strict mix probe's residual is
   ≈ 0.058 against σ ≈ 0.033, so a probe R² is a floor on the value that is
   present, which matters wherever an anchor's supervision is itself a linear
   readout. #[D2.1] #ex-2.1.5 #metrics #representations
 
-- **Multi-token naming keeps the geometry where evidence is dense; `v27` cannot
-  say anything either way (ex-2.1.4, 2026-07-19; revised 2026-07-22).** Char-level twin of
+- Multi-token naming keeps the geometry where evidence is dense; `v27` cannot
+  say anything either way (ex-2.1.4, 2026-07-19; revised 2026-07-22). Char-level twin of
   ex-2.1.3: corpora identical line for line, every color an opaque four-letter
   random name (v27 + v216, d64-L4). At v216, held-out exact match is 0.91
   (word level: 0.99), misses are one grid level off in one channel (59 of 68,
@@ -582,7 +582,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   0.10, so word level's 0.27 and this experiment's 0.0 sit in the same band. Read
   the v27 cells as absent evidence rather than as a cost of multi-token naming,
   and prefer v216 or denser for rungs that have to carry a comparison.
-  Two null checks keep that honest on so coarse a grid
+  Two null checks on so coarse a grid
   (see the methodology note below): the model hands back an operand 53% of the
   time against a 40% neighbor-shell null (≈1.5 SE, 10 distinct pairs — no operand
   echo), and its open-pair distance beats a prompt-blind constant of 0.48, not just
@@ -601,8 +601,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   analysis in `docs/m2/ex-2.1.4/report.py`. #[D2.1] #ex-2.1.4 #vocab
   #representations #anchoring
 
-- **Color geometry is inferable from names alone; vocabulary density sets exact match
-  (ex-2.1.3, 2026-07-19).** Trained the un-anchored d64-L4 transformer on a named-only language
+- Color geometry is inferable from names alone; vocabulary density sets exact match
+  (ex-2.1.3, 2026-07-19). Trained the un-anchored d64-L4 transformer on a named-only language
   (one token per color, no hex) over vocabularies of 27/64/216/4096 grid colors. Every
   size learns the latent cube: embeddings hold RGB as a linear subspace (ridge R² up
   to ≈ 0.95), the mix is decodable at the pre-answer position (R² ≈ 0.9 from depth 1–2,
@@ -621,24 +621,24 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   superposition watch item in miniature. Full analysis in `docs/m2/ex-2.1.3/report.py`.
   #[D2.1] #ex-2.1.3 #vocab #geometry #representations
 
-- **`named_holdout` is unsolved in 4 layers; value → name translation is the blocker
-  (ex-2.1.2, 2026-07-15).** The 2×2 factorial (reverse aliases × off-palette
+- `named_holdout` is unsolved in 4 layers; value → name translation is the blocker
+  (ex-2.1.2, 2026-07-15). The 2×2 factorial (reverse aliases × off-palette
   named-as-hex, d64-L4) trained both missing ingredients — reverse aliases read
   out at 1.0 in their own frame, and name + name arithmetic generalizes to unseen
   off-palette pairs at ≈ 0.92 — yet `named_holdout` stays at exactly 0 in every cell.
   Decomposition: in the `open` cells ~1/3 of held-out answers are the correct mix value
-  *in hex form* (form rule learned per-pair, not per-value); the rest are lookup-neighbor
+  in hex form (form rule learned per-pair, not per-value); the rest are lookup-neighbor
   names. The name-identity margin (log P(true name) − best other name) sits ≈ −9 nats
   everywhere, so value → name never engages mid-equation though it is perfect in the
   `#hex = ` frame. Consequence: anchored runs train on the `both` corpus and use
   `open_holdout` + s₂ as graded canaries (`named_holdout` has no headroom to lose).
   Whether `named_holdout` is solvable at all in 4 layers is parked — candidates: a
-  denser named sub-grid (value-diverse rgb→name supervision *in-frame*, which changes
+  denser named sub-grid (value-diverse rgb→name supervision in-frame, which changes
   the concept inventory the anchors will label), more depth, or a frame-interleaving
   curriculum. Full analysis with figures in `docs/m2/ex-2.1.2/report.py`. #[D2.1]
   #ex-2.1.2
 
-- **Just-in-time computation *with eviction* (ex-2.1.2 answer-schedule probe).** At the
+- Just-in-time computation with eviction (ex-2.1.2 answer-schedule probe). At the
   final layer, channel k is decodable (R² ≈ 0.97) only at its own emission position, and
   previously-emitted channels are dropped from the deep residual stream — so a "result"
   concept never fully exists at any single position, and anchoring one there would fight
@@ -648,15 +648,15 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   token later, 0.95 blue at the last digit with red down to 0.38), so the schedule isn't
   an artifact of the bridged language. #[D2.1] #ex-2.1.2 #ex-2.1.5 #representations
 
-- **Calibrate the redirect's γ against the model's pre-norm activation scale** instead of
+- Calibrate the redirect's γ against the model's pre-norm activation scale instead of
   the fixed γ = 1. Ex-2.9.3 found the fixed value silently no-ops on ~1 run in 250 (the
   bias fails to dominate that seed's pre-norm residual, so "deleted" red passes through
   nearly untouched); ex-2.9.2 saw the same once. Cheap fix: set γ to a multiple of the
   ablated row's typical pre-norm contribution, measured on the train set after training.
   #anchoring #ex-2.9.3
 
-- **Choose measurement sites independently of the statistic being judged
-  (methodology, 2026-07-23).** From ex-2.1.5 drafting: when a comparison needs a
+- Choose measurement sites independently of the statistic being judged
+  (methodology, 2026-07-23). From ex-2.1.5 drafting: when a comparison needs a
   probe site (a layer × position cell), picking the site that maximizes the
   reported statistic is a selection effect — the maximum of a noisy map rises
   with the noise, which can manufacture a trend (e.g. across widths) on its own.
@@ -665,11 +665,11 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   best site beside it as an explicit upper bound. Also banked in the writing
   skill's preregistration section. #metrics #ex-2.1.5
 
-- **The hex embedding has one magnitude axis, and channel identity is positional
-  (ex-2.1.5, 2026-07-26).** The same 16 digit tokens serve all three channels, and the
+- The hex embedding has one magnitude axis, and channel identity is positional
+  (ex-2.1.5, 2026-07-26). The same 16 digit tokens serve all three channels, and the
   model uses RoPE, so the depth-0 residual is the token embedding with no positional
   component. The probe weights confirm what that implies: the readout direction for red
-  at digit 1, green at digit 2 and blue at digit 3 are *the same vector* — cosine
+  at digit 1, green at digit 2 and blue at digit 3 are the same vector — cosine
   +1.000 on all three seeds. So at the input there is no hex "red" direction to anchor
   or to align with named red; there is one value axis, read three times, with position
   supplying the channel. The channels do differentiate with depth (within one landmark
@@ -677,14 +677,14 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   directions exist — just not where the tokens enter. Bears directly on anchor
   placement for a mixed-vocabulary corpus. #anchoring #ex-2.1.5 #representations
 
-- **Per-equation leave-one-out lets probes memorize identity → value; per-value
-  holdout separates memory from geometry (ex-2.1.5, 2026-07-26).** Refit of all three
+- Per-equation leave-one-out lets probes memorize identity → value; per-value
+  holdout separates memory from geometry (ex-2.1.5, 2026-07-26). Refit of all three
   centre seeds, locally from published checkpoints — no Modal needed, and the grouped
   fit is cheaper than the shipped one because it shares a Gram matrix across groups.
   Three protocols: *equation* (shipped), *value* (hold out rows whose scored channel
-  carries the value), *strict* (hold out rows where the value appears in **any** slot —
+  carries the value), *strict* (hold out rows where the value appears in any slot —
   operand 1, operand 2 or the answer — which closes the path where the same hex digit,
-  or the same colour in the other operand slot, teaches its own direction from a slot
+  or the same color in the other operand slot, teaches its own direction from a slot
   the value holdout left alone). Refit *equation* reproduces the shipped arrays to
   4e-4, so the pipeline is faithful. Headline cells, seed-averaged:
 
@@ -695,17 +695,17 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   | hex op2, red retained at the green digit, L4 | 0.821 | −0.285 | −0.269 |
   | hex mix, pre-answer, L4 | 0.376 | 0.325 | 0.196 |
   | named op1 / op2, last operand char, L4 | 0.750 / 0.716 | −0.046 / 0.006 | −0.047 / 0.001 |
-  | named mix, pre-answer, L4 | 0.944 | 0.943 | **0.941** |
+  | named mix, pre-answer, L4 | 0.944 | 0.943 | 0.941 |
 
   Cross-slot leak (value → strict) is exactly zero at the embedding, where no attention
   has run — the control behaving as theory demands. It stays negligible for named
   (mean +0.003 on op2) and concentrates in the hex mix (mean +0.10, +0.13 at
   pre-answer), because the 16 digits are shared across all three channel slots.
-  Four outcomes, which is why the protocol matters:
+  Four outcomes:
   (1) hex digit cells at the embedding collapse 1.00 → 0.44, but land well above zero,
   so the digit tokens do carry a real (partial) magnitude axis rather than an arbitrary
   lookup;
-  (2) the same hex cell at the last layer holds 0.98 → 0.76, so depth *improves* the
+  (2) the same hex cell at the last layer holds 0.98 → 0.76, so depth improves the
   value geometry instead of merely relaying the token;
   (3) named operand readout falls 0.75 → 0.19 — the "holistic operand bundle" is mostly
   name-identity recovery, which fits ex-2.1.4's finding that value → name translation is
@@ -717,12 +717,12 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   binding, is what a cross-form anchor would have to bridge. #metrics #ex-2.1.5
   #anchoring #representations
 
-- **A named operand's value lives at the space that closes it, not on its characters —
-  and the landmark set doesn't measure those spaces (ex-2.1.5, 2026-07-26).** Under the
+- A named operand's value lives at the space that closes it, not on its characters —
+  and the landmark set doesn't measure those spaces (ex-2.1.5, 2026-07-26). Under the
   strict holdout, named operand 1 scores −0.05 at its own last character in the last
   layer, but +0.35 at the space that follows it and +0.47 at the space after the `+`;
   operand 2 scores +0.30 at the space before the `=`. So the earlier reading that named
-  operands carry no value geometry was an artefact of *where* we measured. A
+  operands carry no value geometry was an artefact of where we measured. A
   variable-length name has no fixed slot, so the model appears to resolve it into the
   delimiter — a summary position — and the value stays there across the operator.
   Hex does the opposite: at the same spaces it scores −0.19 to −0.34, nothing at all,
@@ -733,28 +733,28 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   a stable single-position home for a named operand's value, and hex has no counterpart.
   #representations #anchoring #ex-2.1.5 #task-grammar
 
-  **Qualified by a word-family control (2026-07-26).** 99 of the 140 names are
+  Qualified by a word-family control (2026-07-26). 99 of the 140 names are
   multi-word and modifiers recur (`green` in 26, `light` in 11), so part of what a
-  delimiter holds may be "this name contained *green*" rather than a resolved colour.
+  delimiter holds may be "this name contained *green*" rather than a resolved color.
   Holding out whole word families tests it, but names sharing a word also share a
-  region of the cube, so the holdout removes a colour *cluster* and the drop would be
-  ambiguous — hence a colour-matched control that removes the same number of names by
-  RGB proximity instead. The contrast (word − colour, last layer, 3 seeds):
+  region of the cube, so the holdout removes a color cluster and the drop would be
+  ambiguous — hence a color-matched control that removes the same number of names by
+  RGB proximity instead. The contrast (word − color, last layer, 3 seeds):
 
-  | target, site | value | colour-matched | word-family | word − colour |
+  | target, site | value | color-matched | word-family | word − color |
   |---|---|---|---|---|
-  | op1 @ its own last character | +0.245 | −0.297 | −0.831 | **−0.534** |
-  | op1 @ its closing space | +0.320 | −0.062 | −0.488 | **−0.426** |
-  | op2 @ its closing space | +0.372 | +0.017 | −0.353 | **−0.370** |
+  | op1 @ its own last character | +0.245 | −0.297 | −0.831 | −0.534 |
+  | op1 @ its closing space | +0.320 | −0.062 | −0.488 | −0.426 |
+  | op2 @ its closing space | +0.372 | +0.017 | −0.353 | −0.370 |
   | op1 @ the space after `+` | +0.559 | +0.284 | +0.209 | −0.075 |
-  | mix @ pre-answer | +0.879 | +0.644 | +0.772 | **+0.127** |
+  | mix @ pre-answer | +0.879 | +0.644 | +0.772 | +0.127 |
 
-  So a name's *own* closing space is substantially lexical, and "the model resolves the
+  So a name's own closing space is substantially lexical, and "the model resolves the
   name into the delimiter" was too clean a story. Two things survive it: one token
   further on, at the space after the `+`, the lexical dependence is small and the value
   still reads +0.209 under a holdout that removes 14 sibling names at the median (52 at
   the max); and the mix at pre-answer shows none at all — its sign flips, so H2's
-  headline is not a lexical artefact. A bias runs *against* this reading, which makes it
+  headline is not a lexical artefact. A bias runs against this reading, which makes it
   sturdier: modifier families like `light` are spread across the cube rather than
   clustered, so for those names the word holdout removes a scattered set that is easier
   to extrapolate from than the tight cluster the control removes.
@@ -763,22 +763,22 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   the snapped answer name rather than by the exact mix value, so they are not comparable
   cell-for-cell with the strict-holdout table above — only within this table.)
 
-- **Retention and value-geometry are different questions, and ex-2.1.2's eviction
-  finding may have measured the first (2026-07-26).** In ex-2.1.5, hex operand 2's red
-  channel read at the *green* digit in the last layer scores 0.821 per-equation and
+- Retention and value-geometry are different questions, and ex-2.1.2's eviction
+  finding may have measured the first (2026-07-26). In ex-2.1.5, hex operand 2's red
+  channel read at the green digit in the last layer scores 0.821 per-equation and
   −0.27 under a strict holdout. Both are true of different things: red's identity is
   still recoverable there (causal attention reaches back to its digit), but it is no
   longer placed by value. So "the earlier channel persists into later digits" is an
   identity claim, not a geometric one — and the report sentence that read it as depth
   accumulating a value representation is wrong and needs replacing. The same question
-  applies upstream: ex-2.1.2's just-in-time-*with-eviction* result (R² ≈ 0.97 at a
+  applies upstream: ex-2.1.2's just-in-time-with-eviction result (R² ≈ 0.97 at a
   channel's own emission position, dropped afterwards) was measured on a small
   vocabulary with the same per-equation holdout, so its "dropped" may mean "no longer
   recoverable" or "no longer value-organized". Worth a re-check before anchor design
   leans on it. #representations #ex-2.1.2 #ex-2.1.5 #metrics
 
-- **Use the embedding row as a surface-text control for any probe read at an answer
-  position (methodology, 2026-07-26).** Under teacher forcing the answer tokens are in
+- Use the embedding row as a surface-text control for any probe read at an answer
+  position (methodology, 2026-07-26). Under teacher forcing the answer tokens are in
   the input, so a probe there can succeed by reading the label. Depth 0 is the token
   lookup before any attention or MLP, so whatever it decodes is present by definition and
   is the right baseline. In ex-2.1.5's hex form it is nearly everything: at the embedding
@@ -790,8 +790,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   ground; prefer them for cross-form ρ, which answer positions would inflate in both
   directions. #metrics #ex-2.1.5 #representations
 
-- **On coarse grids, state the null before reading a pattern as behavior
-  (methodology, 2026-07-21).** Two overclaims found in ex-2.1.4's `v27` analysis and
+- On coarse grids, state the null before reading a pattern as behavior
+  (methodology, 2026-07-21). Two overclaims found in ex-2.1.4's `v27` analysis and
   corrected, both from a reference that was too weak for a 27-name vocabulary.
   (1) "The model often hands back an operand" read as an operand echo. But closure
   forces each channel of a training pair to agree or to hold both end levels, so an
@@ -812,7 +812,7 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   `self_nearest_rate`), so all four D2.1 reports compute them the same way.
   #metrics #task-grammar #ex-2.1.4
 
-- **Retcon sweep of ex-2.1.1 to ex-2.1.4 for unsupported claims (2026-07-22).** Applied
+- Retcon sweep of ex-2.1.1 to ex-2.1.4 for unsupported claims (2026-07-22). Applied
   the null discipline above to the three earlier reports; all are rebuilt and their
   numbers are now computed in-cell rather than asserted. What changed. ex-2.1.3: its
   `v27` held-out accuracy of 0.27 is only 1.2 SE over the 0.18 neighborhood null on ten
@@ -904,7 +904,7 @@ layers and token positions.
 [anchoring]: #anchoring
 
 The SCA method itself as applied here — the redirect/suppression mechanism, its
-knobs (e.g. γ), and design choices for *where* and *how* a concept is anchored.
+knobs (e.g. γ), and design choices for where and how a concept is anchored.
 
 ### Superposition
 
