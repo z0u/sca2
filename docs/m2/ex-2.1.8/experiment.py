@@ -76,9 +76,9 @@ SCORING_LAMBDA = 0.1
 """Anchor peak for every cell — ex-2.1.6's scoring rung, held fixed throughout."""
 
 SPAN = PROMPT_SPAN
-"""The four-position prompt pull. Fixed: ex-2.1.9's pooled pull is a span pull,
-so the operating point this experiment sets has to be measured on that span.
-Ex-2.1.7's op1 pull is the position oracle we are trying to retire."""
+"""The four-position prompt pull. Fixed: ex-2.1.7's op1 pull is a position
+oracle this testbed happens to supply, so an operating point is only useful
+without one if it was measured on a span."""
 
 # --- The factorial ----------------------------------------------------------
 
