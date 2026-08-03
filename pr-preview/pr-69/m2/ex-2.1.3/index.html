@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/313c302664f9511b85d03b2faed786597f8ad583/exports/m2/ex-2.1.3/" />
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/6fd68f1d7c82934dae222b03d12d7f83860d9295/exports/m2/ex-2.1.3/" />
     <meta name="color-scheme" content="light dark" /><script>/* mini:default-hidden-code */(function(){try{var u=new URL(window.location.href);if(!u.searchParams.has("show-code")){u.searchParams.set("show-code","false");window.history.replaceState(null,"",u.toString());}}catch(e){}})();</script>
     <meta charset="utf-8" />
     <link rel="icon" crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.15/dist/favicon.ico" />
@@ -346,6 +346,17 @@ figure.report-figure > figcaption {
 }
 .report-table :is(th, td):not(:first-child) {
   padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
 }
 
 /* Wide tables (e.g. the per-seed completions grid) scroll horizontally inside their own
