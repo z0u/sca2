@@ -190,12 +190,11 @@ def _(CONDS: list[str], CONTROL_ACC, acc, alpha_bar, grading, m_op1, traj):
 def _():
     mo.md(r"""
     /// admonition | How to read this report
-    This report started as a preregistered skeleton. We wrote and froze the
-    method, hypotheses, and decision thresholds before running the experiment,
-    then replaced the placeholders with results in place. So reading it is a
-    prediction → observation diff. No threshold was amended after the freeze.
-    Anything conceived after seeing the data is under *Exploratory analyses*,
-    marked post hoc.
+    This report was preregistered in Git. We wrote and froze the method,
+    hypotheses, and decision thresholds before running the experiment, then
+    replaced the placeholders with results in place. No threshold was amended
+    after the freeze. Anything conceived after seeing the data is under
+    *Exploratory analyses*, marked post hoc.
     ///
     """)
     return
@@ -213,7 +212,7 @@ def _():
     and eval sets, labels drawn per visit with probability
     `redness(op1)⁸ × 0.08`, and the exhaustive 27-partner alignment probe
     set. The measurements are also the same: the alignment map over layers ×
-    positions, the label-affinity-weighted margin, off-axis leakage probes,
+    positions, the label-affinity-weighted margin, the pair of redness probes,
     and the margin trajectory every 50 steps. The [ex-2.1.6
     report](../ex-2.1.6/report.py) documents each; only the changes are
     described below.
@@ -873,7 +872,7 @@ def _(alpha_bar, grading, m_op1):
     It reaches {m_op1("span-anti").mean():.3f}: comfortably into the partial
     band (0.35) and well clear of the ex-2.1.6 result of {_EX216_M:.2f}, but
     short of the gate. The repulsive term alone was the predicted fix, and it
-    gets most of the way there.
+    gets most (but not all) of the way there.
 
     /// details | The replication is bit-identical
     `span-bare` re-runs the $\lambda = 0.1$ condition of ex-2.1.6 through this
@@ -1275,7 +1274,7 @@ def _(ANCHORED, alpha_bar, traj):
     mo.md(rf"""
     **H4 fails on both parts.**
 
-    (a) Containment. No anti condition at the scoring rung falls to
+    (a) Containment. No *anti* condition at the scoring rung falls to
     $\bar\alpha \le {ex.MEAN_ALIGN_GATE:g}$:
     `span-anti` ends at {alpha_bar("span-anti").mean():.3f},
     `op1-anti` at {alpha_bar("op1-anti").mean():.3f},
@@ -1351,12 +1350,13 @@ def _(CONDS: list[str], LABELS, arrays, geometry, margin_map):
         """,
         caption=r"""
             Margin and cloud geometry by layer, seed means. Depth 0 is
-            the token embedding and depth 4 the last block's output. Left: the
-            margin at op1 by layer — the per-depth terms whose mean is
-            $m_{\text{op1}}$; the shaded band around the control is its seed
-            min–max, as the scale of a null. Middle: the cosine between the
-            centre of the 216 op1 states and the anchor direction — where the
-            cloud sits. Right: the extent of that cloud, the mean squared
+            the token embedding and depth 4 the last block's output.
+            **Left:** the margin at op1 by layer — the per-depth terms whose
+            mean is $m_{\text{op1}}$; the shaded band around the control is its
+            seed min–max, as the scale of a null.
+            **Middle:** the cosine between the centre of the 216 op1 states and
+            the anchor direction — where the cloud sits.
+            **Right:** the extent of that cloud, the mean squared
             distance of a color from the centre (states are unit-norm, so this
             runs from 0 for a collapsed cloud to 1 for a spread one). The
             repulsive term acts on the middle panel by construction; the right
@@ -1387,7 +1387,7 @@ def _(CONDS: list[str], LABELS, arrays, geometry, margin_map):
                 )  # fmt: skip
             ax.set_title(title, fontsize=10)
             ax.set_xticks(_depths)
-            ax.set_xlabel("layer (0 = embedding)")
+            ax.set_xlabel("layer")
             ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
         axes[2].set_ylim(0, 1.0)
         axes[0].legend(fontsize=7, frameon=False, ncols=2, loc="upper right")
@@ -1463,44 +1463,35 @@ def _(geometry, margin_map):
     #     geometry numbers are read at (2) was also unstated, and is now named.
 
     mo.md(rf"""
-    **Selectivity was being lost at depth, and depth is where these
-    interventions act.** Ex-2.1.6's margin peaked in the embedding and decayed
-    through the stack, and that decay reproduces here. Both factors act mostly
+    **Increased selectivity at deeper layers.** The margin in Ex-2.1.6 peaked in the embedding and decayed
+    through the stack (reproduced here). Both new factors act mostly
     on the decay rather than on the starting point: `op1-anti` starts
     {margin_map("op1-anti")[0, 0] / margin_map("span-bare")[0, 0]:.1f}× the bare
     span condition and ends the stack at
     {margin_map("op1-anti")[-1, 0] / margin_map("span-bare")[-1, 0]:.0f}× its
     margin.
 
-    The timing arm makes that plainest. It leaves the embedding level with
+    The timing arm makes that plainest. It leaves the embedding approx. equal to
     `span-bare`, rises through the middle of the stack, and finishes highest of
     any condition — about where it started, while every other condition ends
     well below its own embedding value.
 
-    **Either factor reduces the whole-cube shift on its own**, the mechanism
-    behind H4(a). The anchor axis carries essentially nothing about where the
-    control cloud sits, and the bare span pull swings it most of the way over:
-    the movement ex-2.1.6 diagnosed. The timing arm lands nearest the control of
-    any anchored condition.
+    **Both factors independently reduce the whole-cube shift.**
+    The anchor axis carries essentially nothing about where the
+    control cloud sits, and the bare span pull (ex-2.1.6) swings it most of the way over.
+    The timing arm resists the whole-cube shift best out of the tested conditions.
 
-    **The extent column answers a question ex-2.1.6 left open.** That experiment
-    found the bare anchor compressing the cube mid-stack, and suggested a
-    `separate`-style term might eventually be needed here, as it was in M1. On
-    this evidence it is not: every other factorial condition recovers most of
-    the extent.
+    **A *separate* term may not be needed.**
+    In ex-2.1.6, the bare anchor compressed the cube mid-stack, suggesting
+    that the *anti-subspace* and pairwise *separation* terms from M1 may be needed.
+    But in this experiment, most of the extent was recovered by *anti-subspace* alone.
 
-    Restoring the extent is not something the repulsion does specifically.
-    Reading the same 2×2 on spread gives the ordering H3 found on the margin:
-    narrowing the pull is worth {_eff("spread"):+.2f}, the repulsive term
-    {_eff("spread", "anti"):+.2f}. It seems the color-independent shift was what
-    compressed the cube, so anything that reduces the shift restores it.
+    Restoring the extent is not something the repulsion does specifically, yet the spread improves over the factorial conditions in the same order as the margin $m$. It seems the color-independent shift was what compressed the cube, so anything that reduces the shift restores it.
 
-    **Compression does show up in the ceiling arm.** At
+    **Compression recurs at high term weight (ceiling arm).** At
     $\lambda_\text{{a}} = 1$ the cube is narrower even in the token embedding
     ({_at("span-anti-hi", "spread", 0):.2f} against
-    {_at("lam0", "spread", 0):.2f} everywhere else), a layer the pull reaches
-    directly. So a `separate`-style term would start to matter past the
-    selectivity optimum, not at it.
+    {_at("lam0", "spread", 0):.2f} everywhere else). So a `separate`-style term may yet be needed in some configurations.
     """)
     return
 
@@ -1510,10 +1501,18 @@ def _():
     mo.md(r"""
     ## Secondary measurements
 
-    Where redness is readable is carried over from ex-2.1.6 without a gate. It
-    asks whether the anchor axis holds a *copy* of the concept or the concept
-    itself. The repulsive term pushes unlabeled colors off the axis, so it acts
-    on this quantity.
+    We reuse the "where is redness readable" measurement from ex-2.1.6, without
+    a gate. Two probes read the same target from complementary parts of the
+    residual stream: one from the anchor coordinate alone, and one from
+    everything else. The repulsive term pushes unlabeled colors off the axis,
+    so it acts on both.
+
+    The two have different reference points. The anchor coordinate starts empty
+    and can reach 1, so that probe measures how much redness anchoring put
+    there. The other 63 directions encode the color cube regardless of what the anchor
+    does. Redness is a function of color, so that probe has an RGB floor it
+    cannot go far below: it reports whether the cube survived rather than
+    whether the concept moved.
     """)
     return
 
@@ -1523,23 +1522,25 @@ def _(CONDS: list[str], LABELS, cells):
     _leak = {c: np.mean([cells[f"{c}-s{s}"]["leak_r2"] for s in ex.SEEDS], axis=0) for c in CONDS}
     _axis = {c: np.mean([cells[f"{c}-s{s}"]["axis_r2"] for s in ex.SEEDS], axis=0) for c in CONDS}
     _depths = np.arange(len(_leak["lam0"]))
+    _floor = ex.redness_rgb_floor()
 
     @themed(
         name="leakage",
-        alt_text="""
-            Two panels against layer depth. Left: how well redness can be read
-            from the residual stream once the anchor direction is projected out,
-            for each condition. Right: how much of the redness variance the
-            anchor component carries on its own.
+        alt_text=f"""
+            Two panels against layer depth, sharing a vertical R² scale. Left:
+            how well redness reads from the other 63 directions once the anchor
+            coordinate is removed, for each condition. Every line sits in a
+            narrow band near the top, at the caret marking the R² =
+            {_floor:.2f} floor. Right: the same target read from the anchor
+            coordinate alone, where the conditions separate widely and the
+            control sits near zero.
         """,
-        caption=r"""
-            Where redness is readable at op1. Left: held-out R² for a ridge probe
-            that predicts redness from the residual stream at op1, with the
-            $\hat v_{\text{red}}$ component removed first — how well *red* can
-            still be read from the other 63 directions. Right: the same target
-            predicted from the anchor component alone, as squared correlation.
-            Per-layer seed means. The sample is the 216 op1 colors, with a 5-fold
-            split so no color is scored by a probe that saw it during fitting.
+        caption=rf"""
+            How strongly redness is encoded at op1, read two ways on one R² scale.
+            **Left:** held-out R² for a ridge probe predicting redness from the residual stream at op1 with the $\hat v_{{\text{{red}}}}$ coordinate deleted.
+            The caret marks R² = {_floor:.2f}, the score the same probe gets from the raw RGB values, which no condition can fall far below while the cube is intact.
+            **Right:** the same target read from the anchor coordinate alone, as squared correlation, which starts at zero and has room to reach 1.
+            Per-layer seed means. The sample is the 216 op1 colors, with a 5-fold split so no color is scored by a probe that saw it during fitting.
             Neither panel has a pass/fail threshold.
         """,
     )
@@ -1554,7 +1555,10 @@ def _(CONDS: list[str], LABELS, cells):
             ["#999", "#f2b134", "#c1332a", "#e08a2e", "#7a2320", "#3d7ea6", "#5c3d8f"],
             ["#888", "#ffcc66", "#f0665a", "#ffab5e", "#b8564d", "#6ab0d4", "#a78bd6"],
         ), strict=True))  # fmt: skip
-        for ax, data, title in ((axes[0], _leak, "off the anchor axis"), (axes[1], _axis, "on the anchor axis")):
+        for ax, data, title in (
+            (axes[0], _leak, "from the other 63 directions"),
+            (axes[1], _axis, "from the anchor alone"),
+        ):
             for cond in CONDS:
                 ax.plot(
                     _depths, data[cond], color=_ink[cond], marker="o", ms=3.5,
@@ -1563,8 +1567,14 @@ def _(CONDS: list[str], LABELS, cells):
                 )  # fmt: skip
             ax.set_title(title, fontsize=10)
             ax.set_xticks(_depths)
-            ax.set_xlabel("layer (0 = embedding)")
+            ax.set_xlabel("layer")
             ax.set_ylim(-0.05, 1.0)
+        # The floor is a property of the target, not of any run: a caret on the
+        # axis says where it is without drawing a rule across the conditions.
+        axes[0].plot(
+            0, _floor, marker=5, ms=6, color=light_dark("#555", "#aaa"),
+            transform=axes[0].get_yaxis_transform(), clip_on=False, zorder=5,
+        )  # fmt: skip
         axes[0].set_ylabel("R² for redness")
         axes[0].legend(fontsize=7, frameon=False, ncols=2, loc="lower left")
         return fig
@@ -1575,26 +1585,46 @@ def _(CONDS: list[str], LABELS, cells):
 
 @app.cell(hide_code=True)
 def _(CONDS: list[str], cells):
-    _leak = {c: float(np.mean([cells[f"{c}-s{s}"]["leak_r2"] for s in ex.SEEDS])) for c in CONDS}
     _axis = {c: float(np.mean([cells[f"{c}-s{s}"]["axis_r2"] for s in ex.SEEDS])) for c in CONDS}
+    _floor = ex.redness_rgb_floor()
+    # Per-layer seed means, for the depth trend: averaging over layers hides it,
+    # since the conditions cross the floor in opposite directions.
+    _by_depth = {c: np.mean([cells[f"{c}-s{s}"]["leak_r2"] for s in ex.SEEDS], axis=0) for c in CONDS}
     mo.md(rf"""
-    **The axis became much more readable; everywhere else is unchanged.** On the
-    anchor component alone, redness goes from R² = {_axis["lam0"]:.2f} in the
+    **The axis became much more readable; everywhere else sits at the RGB floor.**
+    On the anchor coordinate alone, redness goes from R² = {_axis["lam0"]:.2f} in the
     control to {_axis["op1-bare"]:.2f} and {_axis["op1-anti"]:.2f} in the op1
-    conditions — double what the bare span pull achieved
-    ({_axis["span-bare"]:.2f}), and tracking the margin ordering closely. So the
+    conditions. That is double what the bare span pull achieved
+    ({_axis["span-bare"]:.2f}), and it tracks the margin ordering closely. So the
     conditions that score well on selectivity are also the ones that put the most
     redness on the axis.
 
-    Off the axis, nothing moved. Project the anchor direction out and redness is
-    still readable from the remaining 63 directions at
-    R² ≈ {min(_leak.values()):.2f}–{max(_leak.values()):.2f} in every condition
-    including the control ({_leak["lam0"]:.2f}). This is the same picture
-    ex-2.1.6 reported, and neither new factor changes it. The reading offered
-    there still stands: redness is a function of color, the task needs the color
-    cube, so a probe reading redness off the cube is not evidence of a second
-    copy of the concept. What the number does establish is that anchoring
-    *concentrated* redness onto the axis without removing it from anywhere else.
+    Read from the other 63 directions, every condition at every depth stays
+    within {max(abs(v - _floor).max() for v in _by_depth.values()):.2f} of
+    R² = {_floor:.2f}, which is what the same probe gets from the raw RGB values.
+    Call that the RGB floor: redness is a function of color and the task needs
+    the color cube, so a linear readout recovers about this much wherever the
+    anchor put it. Redness found outside the anchor is the cube being read, not
+    a second copy of the concept. The control is flat at
+    {_by_depth["lam0"].min():.2f}–{_by_depth["lam0"].max():.2f} at every depth,
+    just under the floor, because its color code is marginally lossier than the
+    raw channels.
+
+    The other conditions drift away from the floor with depth, in both
+    directions. The op1 conditions start
+    *below* it at the token embedding ({_by_depth["op1-anti"][0]:.2f}) and
+    finish *above* it at the last layer ({_by_depth["op1-anti"][-1]:.2f}).
+    Above the floor is reachable because the residual stream encodes color
+    nonlinearly and redness is quadratic in RGB, so a linear probe does better
+    there than on the raw channels. `span-bare` runs the other way, from
+    {_by_depth["span-bare"][0]:.2f} down to
+    {_by_depth["span-bare"][-1]:.2f}. Falling below the floor means color
+    itself was lost, the same cube compression its spread reports.
+
+    This measurement deletes 1 direction of 64, so it has almost no room to
+    move, and where it sits is set by what the task requires rather than by
+    where the anchor put anything. It is a check that the color cube survived,
+    beside task accuracy, rather than evidence about the anchor.
     """)
     return
 
@@ -1619,15 +1649,14 @@ def _(CONTROL_ACC, acc, alpha_bar, cells, grading, m_op1, traj):
     mo.md(rf"""
     ### The timing arm
 
-    `span-anti-late` differs from `span-anti` in one number: the epoch at
+    `span-anti-late` differs from `span-anti` in one way: the epoch at
     which the repulsive term finishes annealing down to its hold ratio, moved
-    from {ex.ANTI_ANNEAL_END:g} to {ex.ANTI_ANNEAL_END_LATE:g}. Nothing else
-    changes: same anchor, same span, same peak and hold ratios, same seeds.
+    from {ex.ANTI_ANNEAL_END:g} to {ex.ANTI_ANNEAL_END_LATE:g}.
     That one change improves on the M1 schedule on every statistic that H2 and
     H4 score, which we did not expect:
 
     - margin {m_op1("span-anti-late").mean():.3f} against
-      {m_op1("span-anti").mean():.3f}. The gap of {_dm:.2f} is about
+      {m_op1("span-anti").mean():.3f}. The difference of {_dm:.2f} is about
       {_dm / ex.NOISE_SEED_MEAN:.0f} noise units, and about the size of the whole
       anti-subspace main effect;
     - retention {_ret("span-anti-late"):.2f} against {_ret("span-anti"):.2f},
@@ -1637,26 +1666,20 @@ def _(CONTROL_ACC, acc, alpha_bar, cells, grading, m_op1, traj):
     - containment {alpha_bar("span-anti-late").mean():.3f} against
       {alpha_bar("span-anti").mean():.3f}, the lowest of any anchored condition.
       Least surprising of the four: more repulsion for longer lowers the very
-      quantity it penalizes. The margin and retention rows are what make it a
-      result.
+      quantity it penalizes.
 
-    Off-axis leakage is the one measurement that does not improve: the arm is
-    the highest of any condition ({_leak("span-anti-late"):.2f} against
-    {_leak("span-anti"):.2f}). The difference is small and the measurement
-    has no gate, but it is why the claim above is scoped to the scored
-    statistics rather than to everything we measured.
+    Redness read from the other 63 directions is the one measurement that does
+    not follow: this arm is the highest of any condition
+    ({_leak("span-anti-late"):.2f} against {_leak("span-anti"):.2f}). That is a
+    weak observation, and it is why the claim above is scoped to the scored
+    statistics. A value
+    above the floor says the residual stream is a more probe-friendly encoding of
+    color, which says nothing about the anchor either way.
 
-    The arm asked whether the M1 recipe is forgiving on this axis. It is not:
-    stretching one anneal by 2× was worth more than adding the term in the
-    first place. The M1 schedules varied by experiment, and ex-2.4.1 ran its
-    terms *up* over training rather than down, so the value was inherited
-    rather than chosen. It now looks worth choosing deliberately, and a
-    dedicated sweep over the anneal endpoint is the next step. Two limits on
-    that claim. First, this
-    is one alternative timing rather than a curve. Second, it is confounded
-    with total repulsive strength, since holding near peak for longer also
-    delivers more repulsion overall. Separating "when" from "how much" needs
-    the sweep, not this arm.
+    So stretching one anneal by 2× was worth more than adding the term in the first place. It looks worth a dedicated sweep over the anneal endpoint.
+    Note that we only measured one alternative timing,
+    and it is confounded with total repulsive strength, since holding near peak
+    for longer also delivers more repulsion overall.
 
     ### The ceiling arm
 
@@ -1673,18 +1696,11 @@ def _(CONTROL_ACC, acc, alpha_bar, cells, grading, m_op1, traj):
 
     But we have passed the selectivity ceiling. At ten times the weight the
     margin is {m_op1("span-anti-hi").mean():.3f}, level with the
-    {m_op1("span-anti").mean():.3f} of `span-anti` at a tenth of the weight. The
-    gap is {abs(m_op1("span-anti-hi").mean() - m_op1("span-anti").mean()):.3f},
-    inside the seed-mean noise floor, so read it as "no better" rather than
-    "worse". The other three measurements are outside the noise and all point
-    one way: $\bar\alpha$ back up to {alpha_bar("span-anti-hi").mean():.3f},
+    {m_op1("span-anti").mean():.3f} of `span-anti` at a tenth of the weight. The other three measurements are all worse: $\bar\alpha$ back up to {alpha_bar("span-anti-hi").mean():.3f},
     retention down to {_ret("span-anti-hi"):.2f}, and the cube compressed even
-    in the token embedding. So a heavier pull buys more alignment but no more
-    selectivity. At this weight, moving everything becomes the cheapest way to
-    satisfy the term; this is the same failure mode ex-2.1.6 found, reached from
-    a different direction. The practical consequence is that the anchor weight
-    is not the knob to turn for selectivity; the two factors this experiment
-    tested are.
+    in the token embedding. So a heavier pull gives more alignment but no more
+    selectivity: at this weight, moving everything becomes the cheapest way to
+    satisfy the term.
     """)
     return
 
@@ -1695,21 +1711,17 @@ def _():
     ## Exploratory analyses
 
     This section is post hoc: we planned it after seeing the results, and it
-    scores no hypothesis. It uses only the preregistered measurements; nothing
-    new was computed.
+    scores no hypothesis.
 
-    ### Why doesn't the repulsive term push *red* off the anchor too? (post hoc)
+    ### Why doesn't the repulsive term push *red* off the anchor too?
 
-    The anti-subspace term does not distinguish between concepts. By
-    construction, it penalizes $\cos^2(h, \hat v_{\text{red}})$ at every
+    The anti-subspace term does not distinguish between concepts: it penalizes $\cos^2(h, \hat v_{\text{red}})$ at every
     position of every line, labeled or not. That makes the timing arm look
     puzzling. Holding that penalty near its peak for another forty epochs ought
     to push the anchored concept off the anchor along with everything else.
-    Instead, that arm has the highest margin of any `span` condition. So either
-    the term somehow spares the labeled lines, or the push and the pull are not
-    the same size.
+    Instead, that arm has the highest margin of any `span` condition.
 
-    It is the second. Splitting the margin into its two halves shows the term
+    Splitting the margin into its two halves shows the term
     does act on *red*; the pull toward the anchor is simply stronger.
     """)
     return
@@ -1771,15 +1783,14 @@ def _(arrays):
         return float(_sched_e[past][np.argmax(r[past] < level)])
 
     mo.md(rf"""
-    Stretching the anneal costs the reddest colors {_dred:.3f} of alignment.
+    Delaying the $\lambda_{{\bar{{\text{{s}}}}}}$ anneal costs the reddest colors {_dred:.3f} of alignment.
     It costs the cube as a whole {_dall:.3f}, which is {_dall / _dred:.0f}
     times as much. So the term is doing what its definition says, *red*
     included. The margin improves because the same indiscriminate push matters
     far more for the unlabeled bulk than for the labeled reds.
 
     Why is the push so much gentler on the reds? It comes down to how the two
-    terms are normalized, which is a design detail rather than a fact about
-    concepts. Neither weight depends on the labels: $\lambda_\text{{a}}$ and
+    terms are normalized. Neither weight depends on the labels: $\lambda_\text{{a}}$ and
     $\lambda_{{\bar{{\text{{s}}}}}}$ are functions of the epoch alone, identical
     in every batch. What differs is the denominator *inside* each term. Both
     terms are means, but over different sets: the anchor averages over the
@@ -1800,78 +1811,6 @@ def _(arrays):
     also insensitive to *how many* labels a batch happens to carry: a batch with
     one labeled line pulls its positions as hard as a batch with three. The
     label rate only sets how often the term fires at all.
-
-    ### The two weights are in balance only in passing (post hoc)
-
-    The trajectories figure suggests the two term weights are unbalanced,
-    and the schedule panels show in which direction: both, at different
-    times. $\lambda_{{\bar{{\text{{s}}}}}}$ starts at
-    {ex.ANTI_PEAK_RATIO:g}$\lambda_\text{{a}}$, and is effectively even
-    higher through the warmup, before the anchor has ramped in. By the end it
-    is {1 / ex.ANTI_HOLD_RATIO:.0f}× *smaller* than $\lambda_\text{{a}}$, at
-    the hold ratio. So the two weights are equal only momentarily as the
-    anneal crosses over: near epoch {_ratio_below(1):.0f} on the default
-    anneal and {_ratio_below(1, ex.ANTI_ANNEAL_END_LATE):.0f} on the late
-    one.
-
-    Containment follows this schedule. In every anti condition, $\bar\alpha$
-    hugs the control for as long as
-    $\lambda_{{\bar{{\text{{s}}}}}} \gtrsim \lambda_\text{{a}}$. It starts
-    to climb once the anneal brings the ratio down to about a tenth: epoch
-    {_ratio_below(0.1):.0f} on the default anneal and
-    {_ratio_below(0.1, ex.ANTI_ANNEAL_END_LATE):.0f} on the late one, which
-    is where the trajectories inflect. The ceiling arm scales both weights
-    together, so its ratio follows the default schedule, and it inflects at
-    the same epoch despite its tenfold strength.
-
-    The margin behaves differently: it does its climbing during the
-    strong-repulsion phase. At the per-position ratios above, the pull
-    dominates wherever it applies, so the labeled reds reach the axis early
-    even under peak repulsion. So the second half of the schedule buys
-    little margin and gives up the containment. That puts the M1 hold ratio
-    of {ex.ANTI_HOLD_RATIO:g} on the wrong side of the balance point. The
-    timing arm shortens the time spent past that point and improves every
-    scored statistic. The natural extrapolation is to hold
-    $\lambda_{{\bar{{\text{{s}}}}}}$ near $\lambda_\text{{a}}$ to the end of
-    training, and the queued anneal-endpoint × hold-ratio grid should
-    include that point.
-
-    ### A confound in the second factor of H3, and why the ceiling arm resolves it (post hoc)
-
-    That same normalization means the op1-only pull is not purely a narrowing.
-    Dividing the same $\lambda_\text{{a}}$ among
-    {ex.PULLED_PER_BATCH[ex.SPAN_OP1]:.1f} positions instead of
-    {ex.PULLED_PER_BATCH[ex.SPAN_FULL]:.1f} makes the pull on each surviving
-    position about
-    {ex.PULLED_PER_BATCH[ex.SPAN_FULL] / ex.PULLED_PER_BATCH[ex.SPAN_OP1]:.1f}×
-    stronger ({_op1_ratio:,.0f}:1 against the repulsion, rather than
-    {_span_ratio:,.0f}:1). So the op1 factor of H3 changes two things at once:
-    which positions are pulled, and how hard each one is pulled. Read on its
-    own, its main effect could be either.
-
-    The ceiling arm separates them. It multiplies
-    $\lambda_\text{{a}}$ by ten, scaling the gradient at
-    every pulled position by 10, well past the ~4× that narrowing delivers. Yet
-    selectivity got *worse*, not better. If per-position pull strength were what
-    buys margin, the ceiling arm should be the best condition in the experiment;
-    instead it is among the worst. So the op1 effect comes from which positions
-    are pulled, not how hard, and the reading of H3 stands. A cleaner design
-    would still remove the confound: normalizing by a fixed count rather than by
-    the realized mask would make span a pure narrowing. That is worth doing
-    before the factor is used again.
-
-    Two things to carry forward. First, the strength of the repulsive term
-    *relative to the anchored concept* is set by the label rate as much as by
-    $\lambda_{{\bar{{\text{{s}}}}}}$. Sparser labels make the same weight
-    gentler on the concept while leaving it just as strong everywhere else, an
-    interaction neither this experiment nor M1 has mapped. Second, this explains
-    why the timing arm had room to improve at all: at these ratios the term is
-    nowhere near strong enough to disturb the concept, so "more repulsion for
-    longer" was nearly free. That predicts a limit. Push
-    $\lambda_{{\bar{{\text{{s}}}}}}$ far enough and the reddest colors should
-    come off the axis in earnest; and since the $2\cos$ gradient is largest for
-    states nearest the axis, it acts most strongly on exactly the anchored ones.
-    Finding that point is what the queued anneal sweep should look for.
     """)
     return
 
@@ -1886,83 +1825,48 @@ def _(alpha_bar):
     #     knows where it is": `m_by_position` is recorded by `eval_one` but no
     #     figure or table in this report shows it, so a reader cannot check the
     #     claim. Verify: if a per-position panel is added, this can come back.
-    mo.md(rf"""
+    mo.md(r"""
     ## Discussion
 
-    **A selective anchor in a transformer.** Ex-2.1.6 showed that an anchor was
-    free: the task tolerated the regularizer. It did not show that the anchor
-    was selective, meaning the concept actually landed where it was put, and
-    D2.1's claim that "SCA transfers to transformers" needs that second part
-    too.
-
-    This experiment supplies it, on three seeds of one synthetic testbed:
+    This experiment demonstrated a selective anchor in a transformer:
     `op1-anti` clears the margin gate with a graded response against the
     M1-derived shape and no measurable task cost. That fills the gap in D2.1 for
     this testbed, and it did so without either of the two obvious next steps —
     a heavier pull (the ceiling arm shows that makes matters worse) or the
-    remaining M1 repulsive terms (they were not needed).
+    remaining M1 repulsive terms.
 
-    **What the factorial attributed.** Both candidate mechanisms from the
+    Both candidate mechanisms from the
     ex-2.1.6 discussion turn out to be real, but their relative sizes are the
-    reverse of what that discussion expected. Narrowing the pull to the one
+    reverse of what that discussion expected, with the tested hyperparameters. Narrowing the pull to the one
     position that carries the labeled color helps more than adding the M1
-    repulsive term, and the conditions that pull the whole span are exactly the
-    ones whose margin keeps sliding during training. When three of the four
-    pulled positions cannot see which color they are being pulled toward, the
-    optimizer supplies a color-independent shift, and that shift is what
-    dilutes the margin.
+    repulsive term, and the conditions that pull the whole span are the
+    ones whose margin slides later in training.
 
-    **A caution about how far that generalizes.** The span pull is not an
+    However, the span pull is not an
     arbitrary choice we can simply drop. Sequence-level labeling forces it,
     because a document label marks no position as the relevant one. Our
     op1-only pull is possible only because this synthetic language has a known
     position that carries the concept, which is what a real corpus does not
     give you.
 
-    So the finding is really a statement about what sequence-level labeling
-    costs, not a design M3 can keep. The diagnosis transfers; the remedy needs
-    a mechanism for locating the concept within a labeled span.
+    The repulsive term is worth keeping, even though it failed H4(a).
+    It reduced the cube-wide drift but did not contain it, and $\bar\alpha$
+    climbed again once the anneal brought the weight down. But using a later
+    anneal improved margin, containment, retention, and grading, by more than
+    adding the term was worth in the first place. The M1 keyframes were
+    inherited from a 5-dimensional autoencoder bottleneck and mapped onto our
+    100 epochs by fraction of training, so there was never a reason to expect
+    them to be right for this architecture.
 
-    **The repulsive term is worth keeping, on a different schedule.** At the M1
-    weight ratio it fails H4(a). It reduces the cube-wide drift by about
-    {1 - alpha_bar("span-anti").mean() / alpha_bar("span-bare").mean():.0%}
-    but does not contain it, and $\bar\alpha$ climbs again once the anneal
-    hands the weight down to {ex.ANTI_HOLD_RATIO:g}$\lambda_\text{{a}}$.
+    Possible follow-ups:
+    - A sweep over weight ratios and anneal scheduling
+    - Try different pooling over the span to allow uneven pull without having to specify positions up-front
 
-    The timing arm changed just one number: it stretched the anneal endpoint
-    from epoch {ex.ANTI_ANNEAL_END:g} to {ex.ANTI_ANNEAL_END_LATE:g}. That
-    alone improves margin, containment, retention, and grading together, by
-    more than adding the term was worth in the first place. This is less
-    surprising than it sounds: the M1 keyframes were inherited from a
-    5-dimensional autoencoder bottleneck and mapped onto our 100 epochs by
-    fraction of training, so there was never a reason to expect them to be
-    right for a 64-dimensional residual stream.
-
-    **Where this leaves the open questions.** The best-supported next
-    measurement is a grid sweep of the anti-subspace anneal endpoint against
-    its hold ratio. The timing arm confounds "when the repulsion acts" with
-    "how much of it there is"; a grid separates them. The balance reading in
-    the exploratory section says where to look: hold ratios near 1 rather
-    than the M1 value of {ex.ANTI_HOLD_RATIO:g}.
-
-    The position question is harder and more interesting. It calls for a pull
-    that finds the concept inside a labeled span rather than being told where
-    it is, perhaps by pooling over the span or by weighting positions with an
-    attention-derived estimate.
-
-    The flattened label-affinity question from earlier experiments also reads
-    differently now that there is a graded response to compare against; note
-    the grading here is measured under a `redness⁸` distribution that puts
-    {ex.LABEL_W[np.argsort(ex.REDNESS)[-10:]].sum():.0%} of its mass on ten
-    colors.
-
-    One thing this experiment does *not* license. The off-axis leakage is
-    unchanged from ex-2.1.6 in every condition: redness stays as readable from
-    the other 63 directions as it is in the control. A selective anchor is not
-    the same as an exclusive one, so nothing here bounds what suppressing the
-    axis would do to the model's access to *red*. That is the question for
-    D2.2; this experiment supplies the anchored models to ask it of, not an
-    answer to it.
+    One thing this experiment does *not* license. Redness stays as readable from
+    the other 63 directions as it is in the control, unchanged from ex-2.1.6 in
+    every condition. A selective anchor is not the same as an exclusive one, so
+    nothing here bounds what suppressing the axis would do to the model's access
+    to *red*. That is the question for the intervention experiments.
     """)
     return
 

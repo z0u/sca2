@@ -702,6 +702,21 @@ def _cv_ridge_r2(x, y, n_folds: int = 5, penalties=(1e-4, 1e-3, 1e-2, 1e-1, 1.0,
     return 1.0 - ss_res / max(ss_tot, 1e-12)
 
 
+def redness_rgb_floor() -> float:
+    """Held-out R² for redness read linearly from the raw RGB values.
+
+    The reference for the probe that reads redness with the anchor removed.
+    Redness is a function of color and the task needs the color cube, so a
+    linear readout recovers about this much wherever the anchor put it — the
+    measurement cannot fall below it while the cube is intact. A condition at
+    this value holds no red-specific copy outside the anchor; one below it lost
+    color itself. Values above are reachable: the residual stream encodes color
+    nonlinearly, and redness is quadratic in RGB (add the second-order terms and
+    the fit is exact), so a linear probe can do better there than on raw RGB.
+    """
+    return _cv_ridge_r2(GRID_RGB, REDNESS)
+
+
 def measure_geometry(checkpoints: dict, probes, grid: str) -> dict:
     """The shape of the color cloud, and what is special about redness off the anchor axis.
 
