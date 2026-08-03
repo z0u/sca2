@@ -14,6 +14,8 @@ state.
 
 ## Scratch
 
+- Un/rewrap all multiline prose strings? I find I'm constantly re-wrapping these and it's getting old. Maybe it's better to keep them on one line and rely on the editor to soft-wrap. Apart from newlines that are actually useful within a paragraph, e.g. immediately preceding an inline list item (so it can be found in the unrendered text).
+
 - Method prose hardcodes constants that live in the experiment module
   (2026-08-01). #reports Ex-2.1.7's `### Schedule` cell is a literal
   `mo.md(r"...")`, so its numbers (anneal endpoints 50 and 90, the 2.5 opening

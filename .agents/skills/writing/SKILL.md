@@ -9,7 +9,7 @@ Write with a clear, correct, and understated style: considered but conversationa
 Characteristics:
 
 - Oxford comma; straight (not "smart") quotes, em-dashes sparingly (prefer other punctuation).
-- Calibrate confidence to the evidence: plain declaratives for what was measured or observed. Hedges and tense carry how strongly a claim is made, so they survive editing: "would start to matter" is weaker than "matters".
+- Calibrate confidence to the evidence: plain declaratives for what was measured or observed. Show how strongly a claim is made: "would start to matter" is weaker than "matters".
 - Verbs agree with which direction is good. Containment, decay and retention run downward, so "no condition reaches 0.1" reads backwards; "falls to" does not.
 - A term the reader may not know gets one short plain-English gloss on first use, in a footnote or a `details` block. Figure captions stay pure legend.
 - Plain connectives to continue a thought: "So", "But", etc.
@@ -53,11 +53,11 @@ Use normal-weight sentence case for headings and descriptive lists.
 Prefer paragraphs for nuanced or complex explanations; use lists sparingly, for
 summarizing steps or where clarity benefits from the structure.
 
-Emphasis is distracting to read, so it is reserved for two jobs, both in
-italics. Concepts like _red_ take italics whenever they appear. Named terms like
-_anchor_ take italics on first use in a section, and again later only if the
-role of the word would otherwise be ambiguous — to distinguish "anchor" the
-regularizer term from "the anchor point", say. Never use bold, and never use
-italics for other emphasis. The user will add them if necessary.
+Emphasis is distracting to read, so it is reserved for specific jobs.
+Concepts like _red_ take italics whenever they appear.
+Named terms like _anchor_ take italics on first use in a section, and again later only if the role of the word would otherwise be ambiguous — to distinguish "anchor" the regularizer term from "the anchor point", say.
+Inline list markers like **(a)** and **Left:** should be bold, but only if they are short.
+Paragraph headings may be bolded instead of using a 4th or 5th-level heading. Try to avoid it though.
+Never use bold or italics for other emphasis. The user will add them if necessary.
 
 For syntax conventions, refer to the relevant `style-*` skill.

@@ -13,7 +13,7 @@ report section, use the `report-restructure` skill instead — it runs a
 fresh-eyes agent with no conversation context and adds a template check, and
 its agent spec carries the rules this lint borrows from.
 
-By default, our docs and reports contain a lot of text that could be described as "fluff". Examples below, with bad text between `anti-example` tags, and better text (if any) between `corrected-example` tags.
+By default, our docs and reports contain a lot of text that could be described as "fluff". Examples below, with bad text between `anti-example` tags, and better text (if any) between `corrected-example` tags. Parentheses in an anti-example list are for clarification of the role of the term (not things to remove, and not their replacements).
 
 <anti-example>
 Every set the model fails, it fails confidently rather than hedging.
@@ -51,7 +51,7 @@ This is navel-gazing, and can be cut without replacement:
 - We ask two questions:
 </anti-example list>
 
-These are bombastic; sometimes they just need toning down, but often they can be removed:
+These are verbal/writing tics. Some are bombastic can just be removed; others need replacement:
 
 <anti-example list>
 - hedge
@@ -62,6 +62,24 @@ These are bombastic; sometimes they just need toning down, but often they can be
 - crucial
 - Furthermore
 - In conclusion
+- By construction
+- costs/buys
+- knob
+- sits/lands (measured position)
+- carry over (copy)
+- carry (convey)
+- read [as] (interpret/understand)
+- gap (measurable difference)
+</anti-example list>
+
+<aside>Some of the agent skills use words like "hedge", but they describe *language*, which is not what our experiments are about.</aside>
+
+No body metaphors; swap these for something else:
+
+<anti-example list>
+- wart/wrinkle (something undesirable)
+- hair (a small margin)
+- hands (gives/brings)
 </anti-example list>
 
 <anti-example>
