@@ -36,6 +36,15 @@ def _():
     mo.md(r"""
     # Experiment 2.9.3: why anchoring fails — timing, attribution, and a schedule fix
 
+    /// tip |
+    <!-- tl;dr -->
+    Our guess was that some initializations simply cannot be anchored by our
+    schedule, which would mean tuning the schedule per seed. That doesn't hold
+    up. Every failing run anchors first and then comes apart during the
+    high learning-rate plateau, and which runs fail follows the batch stream
+    rather than the init. Halving the peak learning rate removes the failures.
+    ///
+
     [Ex-2.9.2](../ex-2.9.2/report.py) identified two components to the variance
     in our ablation scores. The redistribution was fixed: fallback control
     gives the intervention a response we design ahead of time. The other part

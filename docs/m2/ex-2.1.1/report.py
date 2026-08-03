@@ -84,6 +84,17 @@ def _():
     mo.md(r"""
     # Ex 2.1.1: the color-mixing transformer, un-anchored
 
+    /// tip |
+    <!-- tl;dr -->
+    The un-anchored baseline for M2. A small transformer learns a
+    character-level language of color-mixing equations, solving the forms it
+    saw in training and unseen hex pairs, and color turns out to be linearly
+    decodable from its residual stream — with each seed putting *redness* in a
+    different place, which is the problem SCA is meant to solve. Held-out
+    *named* pairs sit at zero accuracy, so that eval set can't show us
+    degradation later.
+    ///
+
     In M2, we want to see whether Sparse Concept Anchoring carries over from
     autoencoders to transformers. Before we anchor anything we need a baseline,
     so this experiment trains a small transformer on a well-defined task.

@@ -64,6 +64,16 @@ def _():
     mo.md(r"""
     # Ex 2.1.5: disjoint vocabularies and more named colors
 
+    /// tip |
+    <!-- tl;dr -->
+    Two ways of writing the same colors, names and hex codes, that never share
+    a line. Both sublanguages train, and each builds its own linear color
+    geometry, but the two geometries stay separate under everything we tried:
+    narrowing the residual stream until the named form loses resolution, and
+    supervising a bridge between the forms. Keeping them apart apparently costs
+    the model less than merging them would.
+    ///
+
     Do two surface languages for the same domain converge on one internal
     geometry?
 

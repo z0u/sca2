@@ -31,81 +31,84 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
 
 ### Iteration 0: prep
 
-- [Experiment 2.9.1 redux](./m1/ex-2.9.1/report.py): the main M1 result
-  (deleting *red* from a 5D autoencoder), ported from
-  [ex-preppy](https://github.com/z0u/ex-preppy) to JAX. We ran it as an
-  end-to-end test of the M2 infrastructure.
+- [Experiment 2.9.1 redux](./m1/ex-2.9.1/report.py): a port of the main M1
+  result (anchor *red* to one latent axis of a small autoencoder, then zero the
+  axis and watch red disappear) from PyTorch to JAX, run as an end-to-end test
+  of this repo's infrastructure. The result reproduces, seed sensitivity and
+  all.
 - [nGPT scaling](./ngpt-scaling/report.py): a character-level width × depth
   sweep of our simplified nGPT (scalar gains, a residual step fixed at
-  1/n_layer). Converged loss stays flat across the sweep, so this architecture
-  seems safe to build the color-mixing experiments on.
+  1/n_layer). Converged loss improves with width and is flat across depth, and
+  no condition spikes or stalls, so the architecture seems safe to build the
+  color-mixing experiments on.
 - [Experiment 2.9.2](./m1/ex-2.9.2/report.py): fallback control for deleting
-  *red*. In ex-2.9.1, selectivity varied a lot with the seed. This experiment
-  tests the "optimal ablation" suggestion from the SCA paper against a
-  training-time alternative: pin the decoder response at the reserved
-  anti-anchor direction to mid-gray, then redirect the concept there. The
-  trained fallback collapses the variance to an analytic bound.
-- [Experiment 2.9.3](./m1/ex-2.9.3/report.py): exploration of why anchoring
-  fails. Per-step trajectories show that every failing seed anchors
-  successfully, then breaks during the high-LR plateau. A schedule sweep finds
-  the fix: halve the LR peak and keep the anneal.
+  *red*. Ablation scores in ex-2.9.1 varied a lot with the seed, so we compare
+  optimal ablation, which picks a replacement constant after training, against
+  a training-time alternative: one decoder-only loss term that teaches the
+  model what to output once the concept has been removed. Fallback control
+  gives the intervention a designed response, tight against its analytic bound
+  on every seed. Neither remedy touches the other half of the variance, where
+  anchoring itself fails.
+- [Experiment 2.9.3](./m1/ex-2.9.3/report.py): why anchoring fails. Our guess
+  was that some initializations simply cannot be anchored by our schedule, and
+  that doesn't hold up: every failing run anchors first and then comes apart
+  during the high learning-rate plateau, and which runs fail follows the batch
+  stream rather than the init. Halving the peak learning rate removes the
+  failures.
 - [Experiment 2.9.4](./m1/ex-2.9.4/report.py): closed-loop regularizer term
-  weights. Replaces the timed anneal with feedback. The mechanism works, but it
-  causes as many problems as it solves.
+  weights, replacing the timed anneal with feedback. The mechanism does what it
+  was designed to do, rescuing the seeds the static schedule loses, but it
+  breaks a similar number of others. We're keeping the static schedule.
 
 ### Iteration 1: D2.1, anchoring in a transformer
 
-- [Experiment 2.1.1](./m2/ex-2.1.1/report.py): a color-mixing transformer,
-  un-anchored. Defines a synthetic color-mixing language (named colors and hex
-  codes denoting the same concepts, with exact integer mixing), sweeps the nGPT
-  architecture over width × depth × seed, and builds measurement tools:
-  exact-match completion accuracy on seen, held-out, and unseen operand pairs,
-  plus per-layer residual-stream probes for operand and result colors.
-- [Experiment 2.1.2](./m2/ex-2.1.2/report.py): composition. The Ex-2.1.1 models
-  never solve the held-out named pairs. This experiment tests grammar
-  interventions (reverse alias lines and off-palette named equations). Both
-  train, but held-out named accuracy stays at zero. Position-resolved probes
-  suggest the mix never fully exists at any one position.
-- [Experiment 2.1.3](./m2/ex-2.1.3/report.py): word-level tokens. Removes the
-  hex values entirely; every color is a single opaque token. The model infers
-  the color-space geometry from co-occurrence: embeddings hold RGB as a
-  decodable linear subspace, mixes are computed in 3D value space at the
-  pre-answer position, and guesses land near the nearest color even for held-out
-  pairs. Exact match is non-monotonic in vocabulary size (essentially solved at
-  216 colors; near misses at 4096).
-- [Experiment 2.1.4](./m2/ex-2.1.4/report.py): multi-token names. The char-level
-  twin of Ex-2.1.3: corpora identical line for line, but colors are opaque
-  four-letter random strings, read and written one character at a time. At 216
-  colors the geometry survives multi-token naming, with held-out accuracy of
-  0.91, neighbor-level misses, the mix computed in value space at the pre-answer
-  position, and no per-channel eviction during emission (unlike hex answers). At
-  27 colors exact match falls to zero, with confidently wrong neighbor answers.
-  Reading names consumes most of the network's depth.
-- [Experiment 2.1.5](./m2/ex-2.1.5/report.py): disjoint vocabularies. A
-  preregistered baseline in which named and hex sublanguages never share a
-  line — 140 xkcd names at full 8-bit depth, no aliases, no cross form —
-  asking whether the two surface forms converge on one latent geometry.
-  Behavior and within-form geometry sections are filled in (named held-out 0.667
-  over strong nulls; hex 0.996); the cross-form alignment sections are still
-  in their preregistered form, with the analysis round in progress.
+- [Experiment 2.1.1](./m2/ex-2.1.1/report.py): the un-anchored baseline for M2.
+  A small transformer learns a character-level language of color-mixing
+  equations, solving the forms it saw in training and unseen hex pairs, and
+  color turns out to be linearly decodable from its residual stream — with each
+  seed putting *redness* in a different place, which is the problem SCA is
+  meant to solve. Held-out *named* pairs sit at zero accuracy, so that eval set
+  can't show us degradation later.
+- [Experiment 2.1.2](./m2/ex-2.1.2/report.py): making composition necessary.
+  The Ex-2.1.1 models never answered a held-out *named* pair, so this
+  experiment changes the grammar to make composition the only route: reverse
+  alias lines, and named equations whose mix falls off the palette. The model
+  picks up both new skills and still won't chain them within one forward pass,
+  leaving held-out named accuracy at zero. The off-palette set is a better
+  place to look for degradation in the anchored runs.
+- [Experiment 2.1.3](./m2/ex-2.1.3/report.py): named colors only. Removes the
+  hex codes, leaving one opaque token per color and nothing in the text to say
+  that colors are values at all. The model infers the geometry from
+  co-occurrence alone: its embeddings hold the RGB cube as a linear subspace,
+  it computes mixes in value space just before answering, and its held-out
+  guesses land on or beside the right color. Exact match rises and falls with
+  vocabulary size, while geometric closeness improves steadily.
+- [Experiment 2.1.4](./m2/ex-2.1.4/report.py): spelling the names. Does
+  geometry inference need one token per concept? At 216 colors, no. This is the
+  character-level twin of Ex-2.1.3, with the same equations but every color
+  spelled as an opaque four-letter name. The value subspace, the mix computed
+  just before the answer, and the neighbor-shaped misses all survive the
+  change, at a small cost in held-out accuracy. Reading names takes most of the
+  network's depth, leaving one layer for the mix to live in. The 27-color grid
+  turns out to be too coarse to tell us anything.
+- [Experiment 2.1.5](./m2/ex-2.1.5/report.py): disjoint vocabularies. Two ways
+  of writing the same colors, 140 xkcd names and full 8-bit hex codes, that
+  never share a line. Both sublanguages train, and each builds its own linear
+  color geometry, but the two geometries stay separate under everything tested:
+  narrowing the residual stream until the named form loses resolution, and
+  supervising a bridge between the forms. Keeping them apart apparently costs
+  the model less than merging them would.
 - [Experiment 2.1.6](./m2/ex-2.1.6/report.py): anchoring *red*, the first
-  anchored transformer run. One anchor term (no anti terms, no intervention),
-  with sequence-level noisy labels driven by the first operand's redness,
-  applied at every layer and prompt position of the word-level `v216` testbed.
-  The anchor is free — no weight in the sweep cost measurable accuracy — and it
-  moves the residual stream a long way onto the chosen direction. But it moves
-  the whole color cube rather than *red*: the alignment margin settles at 0.27
-  against a 0.5 gate, while the color-independent shift grows with λ. Redness
-  stays as readable off the anchor axis as in the control, so the axis holds a
-  copy. A bare attractive term seems to need the repulsive company M1 gave it.
+  anchored transformer run. One anchor term, with no anti terms and no
+  intervention. The anchor cost the task nothing measurable, and it moved the
+  residual stream a long way onto the chosen direction. But it moved the whole
+  color cube there, rather than *red* in particular: the margin settles at
+  about half its threshold, and a tenfold increase in the regularizer weight
+  did not improve it. The missing ingredient looks like a repulsive term, which
+  M1 had and this experiment deliberately left out.
 - [Experiment 2.1.7](./m2/ex-2.1.7/report.py): a repulsive term and a narrower
-  pull, giving the first *selective* anchor. A preregistered 2×2 factorial —
-  {bare anchor, anchor + M1's anti-subspace term} × {four-position prompt-span
-  pull, op1-only pull}, plus a schedule-timing arm and a weight-ceiling arm —
-  separates the two explanations Ex-2.1.6 left open for its flat margin. Both
-  mechanisms are real, and the blind span is the larger of the two: narrowing
-  the pull is worth +0.22 of margin against the repulsive term's +0.14, and
-  together they reach 0.64 over a 0.5 gate, graded at R² = 0.88, at no
-  measurable task cost. At M1's weight ratio the repulsion weakens the cube-wide
-  drift without containing it. Holding the repulsion near peak, rather than
-  annealing it at the halfway point, beats the M1 schedule on every measurement.
+  pull, giving the first *selective* anchor. Two mechanisms were tested for
+  improving anchor selectivity: applying the anchor term to operand 1 alone,
+  and adding a repulsive term to clear the target subspace. Both work, the
+  narrower pull more than the repulsion, and their effects stack somewhat.
+  Together they clear the margin gate at no measurable task cost.

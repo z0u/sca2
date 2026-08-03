@@ -83,6 +83,16 @@ def _():
     mo.md(r"""
     # Ex 2.1.2: making composition necessary
 
+    /// tip |
+    <!-- tl;dr -->
+    The ex-2.1.1 models never answered a held-out *named* pair, so we changed
+    the grammar to make composition the only route: reverse alias lines, and
+    named equations whose mix falls off the palette. The model picks up both
+    new skills and still won't chain them within one forward pass, leaving
+    held-out named accuracy at zero. The off-palette set is a better place to
+    look for degradation in the anchored runs.
+    ///
+
     [Ex-2.1.1](../ex-2.1.1/) gave us a decent baseline, but no model in the
     sweep ever solved `named_holdout`. That eval set contains pairs of named
     colors whose named-answer equation never appears in training, so the
