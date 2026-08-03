@@ -34,15 +34,12 @@ with app.setup(hide_code=True):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Experiment 2.9.3: why anchoring fails — timing, attribution, and a schedule fix
+    # Experiment 2.9.3: when anchoring fails
 
     /// tip |
     <!-- tl;dr -->
-    Our guess was that some initializations simply cannot be anchored by our
-    schedule, which would mean tuning the schedule per seed. That doesn't hold
-    up. Every failing run anchors first and then comes apart during the
-    high learning-rate plateau, and which runs fail follows the batch stream
-    rather than the init. Halving the peak learning rate removes the failures.
+    Every failing run anchors first and then comes apart during the high
+    learning-rate plateau. Halving the peak learning rate removes the failures.
     ///
 
     [Ex-2.9.2](../ex-2.9.2/report.py) identified two components to the variance

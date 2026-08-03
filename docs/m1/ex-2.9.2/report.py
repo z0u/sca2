@@ -57,15 +57,13 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    Ablation scores in ex-2.9.1 varied a lot with the seed. We compared two
-    remedies:
+    We compared two remedies for ablation seed-sensitivity:
     **1.** optimal ablation, which picks a replacement constant after training,
     and
-    **2.** fallback control, one decoder-only loss term that teaches the model
+    **2.** fallback control, a decoder-only loss term that teaches the model
     what to output once the concept has been removed.
-    Fallback control gives the intervention a designed response, tight against
-    its analytic bound on every seed. Neither remedy touches the other half of
-    the variance, where anchoring itself fails.
+    Fallback control worked well. Neither remedy touches the other half of the
+    variance, where anchoring itself fails.
     ///
 
     [Ex-2.9.1](../ex-2.9.1/report.py) reproduced the main M1 result: anchor

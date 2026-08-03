@@ -50,10 +50,10 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    We ported the main M1 result — anchor *red* to one latent axis of a small
-    autoencoder, then zero the axis and watch red disappear — from PyTorch to
-    JAX, as an end-to-end test of this repo's infrastructure. The result
-    reproduces, seed sensitivity and all, and the infrastructure holds up.
+    We ported the main M1 result from PyTorch to JAX: Anchor *red* to one latent
+    axis of a small autoencoder, then zero the axis and watch red disappear. The
+    result reproduces, seed sensitivity and all, and our new infrastructure
+    holds up.
     ///
 
     This is a port of [ex-preppy](https://github.com/z0u/ex-preppy) experiment

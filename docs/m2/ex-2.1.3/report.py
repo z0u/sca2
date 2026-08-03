@@ -114,13 +114,12 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    We removed the hex codes, leaving one opaque token per color and nothing in
-    the text to say that colors are values at all. The model infers the
-    geometry from co-occurrence alone: its embeddings hold the RGB cube as a
-    linear subspace, it computes mixes in value space just before answering,
-    and its held-out guesses land on or beside the right color. Exact match
-    rises and falls with vocabulary size, while geometric closeness improves
-    steadily.
+    No hex codes, just one opaque token per color and nothing in the text to say
+    that colors are values at all. The model infers the geometry from
+    co-occurrence alone: its embeddings hold the RGB cube as a linear subspace,
+    it computes mixes in value space just before answering, and its held-out
+    guesses land on or beside the right color. Exact match rises and falls with
+    vocabulary size, while geometric closeness improves steadily.
     ///
 
     Every experiment so far has taught the model colors two ways: as names

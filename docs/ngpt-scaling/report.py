@@ -65,10 +65,10 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    We swept our simplified nGPT across width × depth to check that it stays
+    Width × depth sweep of our simplified nGPT to check that it stays
     well-behaved as it grows. Converged loss improves with width and is flat
-    across depth, and no condition spikes or stalls. The architecture seems
-    safe to build the color-mixing experiments on.
+    across depth, and no condition spikes or stalls. The architecture seems safe
+    to build the color-mixing experiments on.
     ///
 
     Before we build the color-mixing experiments on top of this transformer, we

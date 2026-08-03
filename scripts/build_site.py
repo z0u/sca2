@@ -418,7 +418,7 @@ def convert_markdown(links: LinkResolver, externalizing: bool):
         from_dir = md_file.parent.relative_to(DOCS_DIR).as_posix()
         from_dir = "" if from_dir == "." else from_dir
         text = _rewrite_md_links(md_file.read_text("utf-8"), links, from_dir=from_dir, pretty=externalizing)
-        body = md_lib.markdown(text, extensions=["extra"])
+        body = md_lib.markdown(text, extensions=["extra", "md_in_html"])
         title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
         title = title_match.group(1).strip() if title_match else md_file.stem
         root = site_root(dest)

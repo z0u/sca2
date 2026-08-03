@@ -33,12 +33,9 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    We replaced the timed regularizer anneal with a feedback controller, so
-    that each weight climbs while its constraint is being violated and settles
-    back once it is met. The mechanism does what it was designed to do,
-    rescuing the seeds the static schedule loses, but it breaks a similar
-    number of others, so the failure rate doesn't improve. We're keeping the
-    static schedule.
+    We replaced the timed regularizer anneal with a feedback controller, so that
+    each weight climbs while its constraint is being violated and settles back
+    once it is met. It kind of worked but not very well, and it adds complexity.
     ///
 
     [Ex-2.9.3](../ex-2.9.3/report.py) traced anchoring failures to an
