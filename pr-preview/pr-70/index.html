@@ -21,7 +21,7 @@ intervention.</p>
 <a href="https://github.com/z0u/ex-preppy">code</a>. This site holds the experiment
 reports for the second milestone (M2), which asks: does SCA transfer to
 transformers? We anchor concepts in the residual stream of a small transformer
-trained on a synthetic color-mixing task (<em>red + blue = purple</em>), where ground
+trained on a synthetic color-mixing task (<code>red + blue = purple</code>), where ground
 truth is unambiguous, so a negative result stays interpretable. The plan and
 deliverables are in the <a href="https://github.com/z0u/sca2">project README</a>.</p>
 <p>&nbsp;</p>
@@ -32,89 +32,105 @@ automatically, with their figures served from a Hugging Face dataset; the
 infrastructure is <a href="https://github.com/z0u/mi-ni">mi-ni</a>.</p>
 <!-- These URLs are rewritten to point to the published notebooks -->
 
-<h3>Iteration 0: prep</h3>
+<details>
+<summary>
+<h3>Iteration 0 (prep)</h3>
+</summary>
+<p>These experiments were preparation for the main work: exercising the infrastructure, testing the normalized transformer architecture, and tying off some loose ends from M1.</p>
 <ul>
-<li><a href="m1/ex-2.9.1/">Experiment 2.9.1 redux</a>: a port of the main M1
-  result (anchor <em>red</em> to one latent axis of a small autoencoder, then zero the
-  axis and watch red disappear) from PyTorch to JAX, run as an end-to-end test
-  of this repo's infrastructure. The result reproduces, seed sensitivity and
-  all.</li>
-<li><a href="ngpt-scaling/">nGPT scaling</a>: a character-level width × depth
-  sweep of our simplified nGPT (scalar gains, a residual step fixed at
-  1/n_layer). Converged loss improves with width and is flat across depth, and
-  no condition spikes or stalls, so the architecture seems safe to build the
-  color-mixing experiments on.</li>
-<li><a href="m1/ex-2.9.2/">Experiment 2.9.2</a>: fallback control for deleting
-  <em>red</em>. Ablation scores in ex-2.9.1 varied a lot with the seed, so we compare
-  optimal ablation, which picks a replacement constant after training, against
-  a training-time alternative: one decoder-only loss term that teaches the
-  model what to output once the concept has been removed. Fallback control
-  gives the intervention a designed response, tight against its analytic bound
-  on every seed. Neither remedy touches the other half of the variance, where
-  anchoring itself fails.</li>
-<li><a href="m1/ex-2.9.3/">Experiment 2.9.3</a>: why anchoring fails. Our guess
-  was that some initializations simply cannot be anchored by our schedule, and
-  that doesn't hold up: every failing run anchors first and then comes apart
-  during the high learning-rate plateau, and which runs fail follows the batch
-  stream rather than the init. Halving the peak learning rate removes the
-  failures.</li>
-<li><a href="m1/ex-2.9.4/">Experiment 2.9.4</a>: closed-loop regularizer term
-  weights, replacing the timed anneal with feedback. The mechanism does what it
-  was designed to do, rescuing the seeds the static schedule loses, but it
-  breaks a similar number of others. We're keeping the static schedule.</li>
+<li>
+<p><a href="ngpt-scaling/">nGPT scaling</a></p>
+<p>Width × depth sweep of our simplified nGPT to check that it stays
+well-behaved as it grows. Converged loss improves with width and is flat
+across depth, and no condition spikes or stalls. The architecture seems safe
+to build the color-mixing experiments on.</p>
+</li>
+<li>
+<p><a href="m1/ex-2.9.1/">M1 2.9.1. Deleting <em>red</em>, now in JAX</a></p>
+<p>We ported the main M1 result from PyTorch to JAX: Anchor <em>red</em> to one latent
+axis of a small autoencoder, then zero the axis and watch red disappear. The
+result reproduces, seed sensitivity and all, and our new infrastructure
+holds up.</p>
+</li>
+<li>
+<p><a href="m1/ex-2.9.2/">M1 2.9.2. Fallback control</a></p>
+<p>We compared two remedies for ablation seed-sensitivity:
+<strong>1.</strong> optimal ablation, which picks a replacement constant after training,
+and
+<strong>2.</strong> fallback control, a decoder-only loss term that teaches the model
+what to output once the concept has been removed.
+Fallback control worked well. Neither remedy touches the other half of the
+variance, where anchoring itself fails.</p>
+</li>
+<li>
+<p><a href="m1/ex-2.9.3/">M1 2.9.3. When anchoring fails</a></p>
+<p>Every failing run anchors first and then comes apart during the high
+learning-rate plateau. Halving the peak learning rate removes the failures.</p>
+</li>
+<li>
+<p><a href="m1/ex-2.9.4/">M1 2.9.4. Closed-loop regularizer weights</a></p>
+<p>We replaced the timed regularizer anneal with a feedback controller, so that
+each weight climbs while its constraint is being violated and settles back
+once it is met. It kind of worked but not very well, and it adds complexity.</p>
+</li>
 </ul>
-<h3>Iteration 1: D2.1, anchoring in a transformer</h3>
+</details>
+<h3>D2.1: anchoring in a transformer</h3>
 <ul>
-<li><a href="m2/ex-2.1.1/">Experiment 2.1.1</a>: the un-anchored baseline for M2.
-  A small transformer learns a character-level language of color-mixing
-  equations, solving the forms it saw in training and unseen hex pairs, and
-  color turns out to be linearly decodable from its residual stream — with each
-  seed putting <em>redness</em> in a different place, which is the problem SCA is
-  meant to solve. Held-out <em>named</em> pairs sit at zero accuracy, so that eval set
-  can't show us degradation later.</li>
-<li><a href="m2/ex-2.1.2/">Experiment 2.1.2</a>: making composition necessary.
-  The Ex-2.1.1 models never answered a held-out <em>named</em> pair, so this
-  experiment changes the grammar to make composition the only route: reverse
-  alias lines, and named equations whose mix falls off the palette. The model
-  picks up both new skills and still won't chain them within one forward pass,
-  leaving held-out named accuracy at zero. The off-palette set is a better
-  place to look for degradation in the anchored runs.</li>
-<li><a href="m2/ex-2.1.3/">Experiment 2.1.3</a>: named colors only. Removes the
-  hex codes, leaving one opaque token per color and nothing in the text to say
-  that colors are values at all. The model infers the geometry from
-  co-occurrence alone: its embeddings hold the RGB cube as a linear subspace,
-  it computes mixes in value space just before answering, and its held-out
-  guesses land on or beside the right color. Exact match rises and falls with
-  vocabulary size, while geometric closeness improves steadily.</li>
-<li><a href="m2/ex-2.1.4/">Experiment 2.1.4</a>: spelling the names. Does
-  geometry inference need one token per concept? At 216 colors, no. This is the
-  character-level twin of Ex-2.1.3, with the same equations but every color
-  spelled as an opaque four-letter name. The value subspace, the mix computed
-  just before the answer, and the neighbor-shaped misses all survive the
-  change, at a small cost in held-out accuracy. Reading names takes most of the
-  network's depth, leaving one layer for the mix to live in. The 27-color grid
-  turns out to be too coarse to tell us anything.</li>
-<li><a href="m2/ex-2.1.5/">Experiment 2.1.5</a>: disjoint vocabularies. Two ways
-  of writing the same colors, 140 xkcd names and full 8-bit hex codes, that
-  never share a line. Both sublanguages train, and each builds its own linear
-  color geometry, but the two geometries stay separate under everything tested:
-  narrowing the residual stream until the named form loses resolution, and
-  supervising a bridge between the forms. Keeping them apart apparently costs
-  the model less than merging them would.</li>
-<li><a href="m2/ex-2.1.6/">Experiment 2.1.6</a>: anchoring <em>red</em>, the first
-  anchored transformer run. One anchor term, with no anti terms and no
-  intervention. The anchor cost the task nothing measurable, and it moved the
-  residual stream a long way onto the chosen direction. But it moved the whole
-  color cube there, rather than <em>red</em> in particular: the margin settles at
-  about half its threshold, and a tenfold increase in the regularizer weight
-  did not improve it. The missing ingredient looks like a repulsive term, which
-  M1 had and this experiment deliberately left out.</li>
-<li><a href="m2/ex-2.1.7/">Experiment 2.1.7</a>: a repulsive term and a narrower
-  pull, giving the first <em>selective</em> anchor. Two mechanisms were tested for
-  improving anchor selectivity: applying the anchor term to operand 1 alone,
-  and adding a repulsive term to clear the target subspace. Both work, the
-  narrower pull more than the repulsion, and their effects stack somewhat.
-  Together they clear the margin gate at no measurable task cost.</li>
+<li>
+<p><a href="m2/ex-2.1.1/">2.1.1. Un-anchored color-mixing transformer</a></p>
+<p>A small transformer learns a character-level language of color-mixing
+equations, solving the forms it saw in training and unseen hex pairs. Color
+turns out to be linearly decodable from its residual stream, with each seed
+putting <em>redness</em> in a different place. Held-out <em>named</em> pairs sit at zero
+accuracy.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.2/">2.1.2. Making composition necessary</a></p>
+<p>The previous model never answered a held-out <em>named</em> pair, so we changed the
+grammar to make composition the only route: reverse alias lines, and named
+equations whose mix falls off the palette. The model picks up both new skills
+and still won't chain them within one forward pass, leaving held-out named
+accuracy at zero.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.3/">2.1.3. Named colors only</a></p>
+<p>No hex codes, just one opaque token per color and nothing in the text to say
+that colors are values at all. The model infers the geometry from
+co-occurrence alone: its embeddings hold the RGB cube as a linear subspace, it
+computes mixes in value space just before answering, and its held-out guesses
+land on or beside the right color. Exact match rises and falls with vocabulary
+size, while geometric closeness improves steadily.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.4/">2.1.4. Spelling the names</a></p>
+<p>Does geometry inference need one token per concept? Not at 216 colors. We test
+the same equations but with every color spelled as an opaque four-letter name.
+There's a small drop in held-out accuracy, but the value subspace survives.
+Reading names takes most of the network's depth, leaving one layer for the mix
+to live in. The 27-color grid is too coarse.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.5/">2.1.5. Disjoint vocabularies and more named colors</a></p>
+<p>Names and hex codes. Both sublanguages train, and each builds its own linear
+color geometry. But the two geometries resist being combined, even under
+pressure from a narrow residual stream. Keeping them apart apparently costs
+less than merging them would.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.6/">2.1.6. Anchoring <em>red</em> in a transformer</a></p>
+<p>Our first anchored transformer, with a single attractive term. The anchor
+moved the activations to the chosen direction, and cost the task nothing
+measurable. But it moved the whole color cube, rather than <em>red</em> in
+particular.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.7/">2.1.7. A repulsive term and a narrower pull</a></p>
+<p>We tested two mechanisms to improve anchor selectivity:
+<strong>1.</strong> Apply the anchor term only to operand 1 (no other tokens), and
+<strong>2.</strong> Add a repulsive term to clear the target subspace.
+Both work, but 1. worked better, and their effects stack somewhat.</p>
+</li>
 </ul>
 </body>
 </html>
