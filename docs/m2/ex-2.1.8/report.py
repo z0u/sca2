@@ -36,38 +36,42 @@ def _():
     that contains the cube-wide drift without costing selectivity.
     ///
 
-    Ex-2.1.7 gave the first selective anchor in a transformer, and left one
-    gate unmet. The anti-subspace term is defined on the mean alignment
-    $\bar\alpha$ between the anchor direction and the whole color cube. It
-    brought that quantity from 0.53 without it down to {A50} with it, but never
-    to the {AGATE} that would count as containing the drift rather than
-    weakening it. The trajectories showed when containment gave way:
-    $\bar\alpha$ sits near control while the repulsion outweighs the pull, and
-    climbs once the anneal has brought $\lambda_{\bar{\text{s}}}$ down to
-    about a tenth of $\lambda_\text{a}$. Each condition broke at a time set by
-    its own schedule: around epoch 40 on the M1 anneal, and epoch 75 on the
-    arm that stretched it.
+    Ex-2.1.7 gave the first selective anchor in a transformer, but one gate
+    went unmet. The anti-subspace term is defined on $\bar\alpha$, the mean
+    alignment between the anchor direction and the whole color cube. With the
+    term on, $\bar\alpha$ came down from 0.53 to {A50}, never reaching
+    {AGATE}, the level that would count as containing the drift rather than
+    just weakening it.
+
+    The trajectories showed when containment gave way. While the repulsion
+    outweighs the pull, $\bar\alpha$ stays near the control; once the
+    anneal[^anneal] brings $\lambda_{\bar{\text{s}}}$ down to about a tenth of
+    $\lambda_\text{a}$, it starts to climb. Each condition broke at a time set
+    by its own schedule: around epoch 40 on the M1 anneal, epoch 75 on the arm
+    that stretched it.
+
+    [^anneal]: An anneal here is a schedule that ramps a loss weight down
+        gradually over training, rather than switching it off at once.
 
     That arm, `span-anti-late`, is the reason this experiment exists. It
-    changed exactly one number: the epoch at which the repulsion finishes
-    annealing to its hold ratio moved from 50 to 90. That one change improved
-    every statistic that the H2 and H4 hypotheses of that report scored:
-    margin {M50} → {M90}, $\bar\alpha$ {A50} → {A90}, retention across the
-    anneal, and grading. The M1 keyframes came from a 5-dimensional
-    autoencoder bottleneck, mapped onto our 100 epochs by fraction of
-    training, so there was never a reason to expect them to suit a
-    64-dimensional residual stream.
+    changed one number: the epoch at which the repulsion finishes annealing to
+    its hold ratio moved from 50 to 90. That improved every statistic the H2
+    and H4 hypotheses of that report scored: margin {M50} → {M90},
+    $\bar\alpha$ {A50} → {A90}, retention across the anneal, and grading.
 
-    One arm cannot say why it worked. Two readings fit it equally well.
+    The M1 keyframes came from a 5-dimensional autoencoder bottleneck, mapped
+    onto our 100 epochs by fraction of training, so there was never a reason to
+    expect them to suit a 64-dimensional residual stream. But one arm cannot
+    say why it worked, and two readings fit it equally well.
 
     **Timing.** The repulsion has to still be there when the pull is strong
     enough to move the cube, and a later anneal keeps it there.
 
-    **Level.** Containment is lost at a threshold — around
-    $\lambda_{\bar{\text{s}}}/\lambda_\text{a} \approx 0.1$ — and a later
+    **Level.** Containment is lost at a threshold, around
+    $\lambda_{\bar{\text{s}}}/\lambda_\text{a} \approx 0.1$, and a later
     anneal helps only because it postpones the crossing. On that reading the
-    endpoint is the wrong knob, and a floor above the threshold would hold
-    containment whenever the anneal finished.
+    endpoint is the wrong parameter to move, and a floor above the threshold
+    would hold containment whenever the anneal finished.
 
     They separate cleanly, because the second reading predicts an interaction
     the first does not: if a high enough floor never crosses the threshold,
@@ -150,14 +154,13 @@ def _():
     anchor schedule and its weight are unchanged. Only the anti-subspace
     schedule moves.
 
-    Two choices are worth stating because they constrain what this experiment
-    can hand to the next one.
+    Two choices constrain what this experiment can give the next one.
 
     **The pull stays on the four-position prompt span.** The op1-only pull in
-    ex-2.1.7 scored higher. But it is available only because this synthetic
+    ex-2.1.7 scored higher, but that option exists only because this synthetic
     language has a known position carrying the concept; a document-level label
-    gives no such position. Retiring that position oracle means pulling on a
-    span, so an operating point is only useful to us if it was measured on
+    gives no such position. Once we retire that position oracle we have to pull
+    on a span, so an operating point is only useful to us if it was measured on
     one.
 
     **The anchor weight stays at $\lambda_\text{a} = {SCORING}$.** The ceiling
@@ -172,16 +175,17 @@ def _():
 
     **Factor A, the anneal endpoint** — the epoch at which
     $\lambda_{\bar{\text{s}}}/\lambda_\text{a}$ reaches its hold ratio:
-    {ENDS}. 50 is M1's keyframe mapped by fraction of training and 90 is
-    ex-2.1.7's timing arm, so two cells reproduce measured conditions.
+    {ENDS}. 50 is the M1 keyframe mapped by fraction of training, and 90 is
+    the timing arm from ex-2.1.7, so two cells reproduce measured conditions.
 
     **Factor B, the hold ratio** — the level it settles at: {HOLDS}. 0.03 is
-    M1's. 0.30 is three times the level at which ex-2.1.7 saw containment give
-    way, so on the level reading it should never cross the threshold at all.
+    the M1 level. 0.30 is three times the level at which ex-2.1.7 saw
+    containment give way, so on the level reading it should never cross the
+    threshold at all.
 
     Endpoint 100 is excluded. With no hold window left after the anneal, the
-    hold ratio has almost no lever there, so that row would cross a factor
-    against nothing and dilute its main effect.
+    hold ratio barely matters there, so that row would cross a factor against
+    nothing and dilute its main effect.
 
     An un-anchored control ($\lambda_\text{a} = 0$) runs through the same code,
     giving {N_COND} conditions and {N_CELL} cells in total.
@@ -199,16 +203,16 @@ def _():
     mo.md(r"""
     ### The confound, and the arm that separates it
 
-    The two factors are not symmetric. The hold ratio is close to free in
-    total repulsion delivered, but the endpoint is not: a later anneal spends
-    longer at a high weight, so *when* the repulsion acts and *how much* of it
-    there is move together along factor A.
+    The two factors are not symmetric. Changing the hold ratio barely changes
+    the total repulsion delivered. Changing the endpoint does: a later anneal
+    spends longer at a high weight. So along factor A, *when* the repulsion
+    acts and *how much* of it there is move together.
 
     The dose below is $\int \lambda_{\bar{\text{s}}}(e)\cdot\text{lr}(e)\,de$
     over training. The learning rate belongs in the integrand because it
-    multiplies every term's gradient and is itself warming and annealing across
-    the same window; a weight-only integral would call two schedules equal that
-    deliver visibly different pushes.
+    multiplies the gradient of every term, and it is itself warming and
+    annealing across the same window. A weight-only integral would call two
+    schedules equal even when they deliver visibly different pushes.
     """)
     return
 
@@ -244,24 +248,20 @@ def _():
     </div>
 
     Across the hold ratio, dose moves by at most a sixth; across the endpoint
-    it rises by about three quarters. So dose-matching the two levels of
-    factor B is unnecessary. And dose-matching the three levels of factor A
-    cannot be done with the hold ratio: reaching the endpoint-90 dose from
-    endpoint 50 would need
+    it rises by about three quarters. So the two levels of factor B need no
+    dose-matching, and the three levels of factor A cannot be matched with the
+    hold ratio: reaching the endpoint-90 dose from endpoint 50 would need
     $\\lambda_{{\\bar{{\\text{{s}}}}}}/\\lambda_\\text{{a}} \\approx 1.18$,
-    which would hold the repulsion above the anchor weight for half of
-    training.
+    holding the repulsion above the anchor weight for half of training.
 
     The achievable match runs the other way. `{ex.DOSE_ARM}` is
     `end90-hold03` with the opening ratio scaled
     {ex.ANTI_PEAK_RATIO:g} → {ex.DOSE_MATCHED_PEAK_RATIO:g}, which delivers
     the dose of `{ex.DOSE_ARM_REFERENCE}` on the late schedule. It is an
-    interpolation rather than an extrapolation: the schedule sits at or below
-    `end90-hold03` at every epoch. Like the extra arms in ex-2.1.7 it scores
-    no hypothesis; it exists so the endpoint effect can be read as timing or
-    as dose.
+    interpolation rather than an extrapolation: the schedule stays at or below
+    `end90-hold03` at every epoch.
 
-    One asymmetry to carry into that reading. Matching the dose downward means
+    One asymmetry carries into that reading: matching the dose downward means
     the arm opens weaker than every other condition, so it holds less repulsion
     through the epochs where the anchor is first ramping in. If the arm tracks
     `{ex.DOSE_ARM_REFERENCE}` rather than `end90-hold03`, weak early repulsion
@@ -365,13 +365,12 @@ def _():
       `sim¹·⁵` over the 216 colors (H2).
     - Per-run margin trajectories, for retention (H2).
 
-    One convention is settled here rather than inherited. Ex-2.1.7 quoted
-    *retention* two ways under one name — the minimum final-over-peak margin
-    across seeds in its Findings, and the mean across seeds in its Arms
-    section. This report uses the **{RSTAT}**, and every later report should.
-    H4(b)'s gate is worded per run ("for every anchored run…"), so the minimum
-    is the statistic it asks for, and a three-seed mean can hide a single
-    sliding run, which is the failure the gate exists to catch.
+    Ex-2.1.7 quoted *retention* two ways under one name: the minimum
+    final-over-peak margin across seeds in its Findings, the mean across seeds
+    in its Arms section. This report uses the **{RSTAT}**, and every later
+    report should. The gate of H4(b) is worded per run ("for every anchored
+    run…"), so the minimum is the statistic it asks for; a three-seed mean can
+    hide a single sliding run, the failure the gate exists to catch.
     """.replace("{RSTAT}", ex.RETENTION_STAT)
     )
     return
@@ -405,14 +404,14 @@ def _():
     {FLOOR} ending at $\ge {RET}\times$ that maximum.
     Partial, in decreasing strength: (a) is met at the looser {ALPHAP} (the
     halving level from ex-2.1.7) with (b)–(d) held; or (a) is met at {ALPHA}
-    but the margin lands between the ex-2.1.7 value of {M50} and the gate.
+    but the margin falls between the ex-2.1.7 value of {M50} and the gate.
 
     **H3 — the level contributes at least as much containment as the timing.**
-    Scored on two main effects on $\bar\alpha$, both taken as differences of
-    means and reported with their sign. The hold-ratio effect is the nine runs
-    at 0.03 minus the nine at 0.30. The anneal-endpoint effect is the six runs
-    at endpoint 50 minus the six at endpoint 90. H3 holds when the hold-ratio
-    effect is at least {AGATE} and at least as large as the endpoint
+    Scored on two main effects[^main] on $\bar\alpha$, both taken as
+    differences of means and reported with their sign. The hold-ratio effect is
+    the nine runs at 0.03 minus the nine at 0.30. The anneal-endpoint effect is
+    the six runs at endpoint 50 minus the six at endpoint 90. H3 holds when the
+    hold-ratio effect is at least {AGATE} and at least as large as the endpoint
     effect.[^effect]
 
     Two outcomes that fail H3 are named in advance, so a miss stays readable.
@@ -420,27 +419,29 @@ def _():
     the timing account: the repulsion has to be present while the pull is
     strong, and no floor substitutes for that. Second, `{PRIMARY}` alone
     contains the drift while neither main effect clears {AGATE}. That is an
-    interaction, saying each knob is blocked by the other. The second outcome
-    is only reachable if the `hold30` row reverses the endpoint ordering:
-    ex-2.1.7 puts the endpoint span of the `hold03` row at {A50} → {A90} on
-    its own, and half of that already lands in the endpoint effect before the
-    other row is counted.
+    interaction, saying each factor is blocked by the other. The second outcome
+    is only reachable if the `hold30` row reverses the endpoint ordering.
+    Ex-2.1.7 measured the `hold03` row moving from {A50} to {A90} across the
+    endpoint on its own, and half of that span already falls inside the
+    endpoint effect before the other row is counted.
 
-    A supporting observation, with no gate of its own: the level account
-    predicts the endpoint effect **shrinks at the high hold ratio**, because a
-    floor that never crosses the threshold makes the crossing time irrelevant.
-    An endpoint effect of similar size at both hold ratios fits the timing
-    account instead. This is the interaction term of the same factorial, read
-    for its sign rather than scored. It is the observation the discussion
-    should lean on if the H3 main effects come out close.
+    A supporting observation, the interaction term of the same factorial read
+    for its sign rather than scored: the level account predicts the endpoint
+    effect **shrinks at the high hold ratio**, because a floor that never
+    crosses the threshold makes the crossing time irrelevant. An endpoint
+    effect of similar size at both hold ratios fits the timing account instead.
+    The discussion should lean on this if the H3 main effects come out close.
 
-    [^effect]: Taking ex-2.1.6's control spread of about 0.02 for
-        $\bar\alpha$, the hold-ratio effect's noise is near
-        $0.02\sqrt{2}/\sqrt{9} \approx 0.009$ and the endpoint effect's, on
-        six-run means, near $0.02\sqrt{2}/\sqrt{6} \approx 0.012$, so {AGATE}
-        is four to five times either. Whether the anchored conditions hold
-        that spread is checked from this experiment's own seeds before the
-        effects are read. If they do not, the observed spread replaces the
+    [^main]: A main effect is the average change from moving one factor,
+        averaged over the levels of the other.
+
+    [^effect]: Taking the ex-2.1.6 control spread of about 0.02 for
+        $\bar\alpha$, the noise on the hold-ratio effect is near
+        $0.02\sqrt{2}/\sqrt{9} \approx 0.009$, and on the endpoint effect,
+        with six-run means, near $0.02\sqrt{2}/\sqrt{6} \approx 0.012$; so
+        {AGATE} is four to five times either. Whether the anchored conditions
+        hold that spread is checked from this experiment's own seeds before
+        the effects are read. If they do not, the observed spread replaces the
         control spread and the gate moves with it; it is the only threshold in
         this report allowed to move.
     """.replace("{TASK}", f"{ex.TASK_GATE:g}")
@@ -471,9 +472,9 @@ def _():
     # (an ordering, not an exclusion) does not test; narrowed to the ordering.
     # The second named miss is kept but qualified: the 0.33 → 0.13 span that
     # ex-2.1.7 measured in the `hold03` row already puts ~0.10 into the endpoint
-    # effect, so that miss needs the `hold30` row to reverse. Verify: if the reproduction check finds
-    # `end50-hold03` and `end90-hold03` disagreeing with ex-2.1.7, this
-    # qualification goes with it.
+    # effect, so that miss needs the `hold30` row to reverse. Verify: if the
+    # reproduction check finds `end50-hold03` and `end90-hold03` disagreeing
+    # with ex-2.1.7, this qualification goes with it.
     return
 
 
@@ -484,19 +485,19 @@ def _():
     ## Reproduction check
 
     /// admonition | TODO
-    A two-row table: `end50-hold03` and `end90-hold03` against ex-2.1.7's
-    `span-anti` and `span-anti-late`, on $m_{\text{op1}}$ and $\bar\alpha$
+    A two-row table: `end50-hold03` and `end90-hold03` against `span-anti`
+    and `span-anti-late` from ex-2.1.7, on $m_{\text{op1}}$ and $\bar\alpha$
     (seed means; references in `ex.EX217_REFERENCE`). These conditions are
     identical in every parameter, so the two experiments should agree within
     the seed-mean noise floor of {NOISE} on the margin. Ex-2.1.6 carries no
     such floor for $\bar\alpha$, so the tolerance there is two seed-mean
     spreads computed from this experiment's own seeds, the same construction
-    H3's footnote uses.
+    the H3 footnote uses.
 
     Expected: agreement. A gap wider than about two noise units means
     something moved between the experiments that neither report accounts for,
-    and it invalidates reading this grid against ex-2.1.7's numbers — which
-    H2's partial and H3's framing both do.
+    and it invalidates reading this grid against the ex-2.1.7 numbers, which
+    the H2 partial and the H3 framing both do.
     ///
     """.replace("{NOISE}", f"{ex.NOISE_SEED_MEAN:g}")
     )
@@ -540,20 +541,20 @@ def _():
     The scoring table: one row per factorial cell, columns $\bar\alpha$,
     $m_{\text{op1}}$, grading ($\rho$ and $R^2$), and retention (minimum
     across seeds), each marked against its gate, with a final column saying
-    whether the cell meets all four. Ex-2.1.7's `span-anti` and
-    `span-anti-late` sit in the table as `end50-hold03` and `end90-hold03`.
+    whether the cell meets all four. The ex-2.1.7 conditions `span-anti` and
+    `span-anti-late` appear in the table as `end50-hold03` and `end90-hold03`.
 
     Expected under the level account: `{PRIMARY}` meets all four, and the
     `hold30` row generally beats the `hold03` row on containment. Under the
-    timing account the `end90` column carries it instead and `end50-hold30`
+    timing account the `end90` column meets them instead and `end50-hold30`
     fails containment.
 
     A contrary result worth naming: containment improves and the margin falls
-    with it, so no cell meets both. That would say the repulsion buys
-    containment by flattening the response rather than by clearing the axis —
-    the same trade ex-2.1.7's ceiling arm found on the anchor weight, arriving
-    on the repulsive side. The grading columns are what tell those apart, so
-    read them before the verdict.
+    with it, so no cell meets both. That would say the repulsion gets its
+    containment by flattening the response rather than by clearing the axis.
+    It is the same trade the ceiling arm in ex-2.1.7 found on the anchor
+    weight, arriving on the repulsive side. The grading columns tell those
+    apart, so read them before the verdict.
     ///
     """.replace("{PRIMARY}", ex.PRIMARY)
     )
@@ -567,13 +568,12 @@ def _():
     A trajectory figure: $\bar\alpha$ and $m_{\text{op1}}$ against epoch, one
     panel per factorial cell in a 3 × 2 mosaic (endpoint across, hold ratio
     down), with each cell's weight schedule drawn beneath it and the control
-    in grey in every panel. Ex-2.1.7's figure of this shape is the model.
+    in grey in every panel. The figure of this shape in ex-2.1.7 is the model.
 
-    This is where the mechanism is visible rather than inferred. Expected under
-    the level account: in the `hold03` row, $\bar\alpha$ leaves the control at
-    an epoch that tracks each cell's anneal endpoint; in the `hold30` row it
-    does not leave at all. Under the timing account the `hold30` row departs
-    too, just later.
+    Expected under the level account: in the `hold03` row, $\bar\alpha$ leaves
+    the control at an epoch that tracks each cell's anneal endpoint; in the
+    `hold30` row it does not leave at all. Under the timing account the
+    `hold30` row departs too, just later.
     ///
     """)
     return
@@ -589,7 +589,7 @@ def _():
     The factorial table on $\bar\alpha$: the six cell means, the two main
     effects with the {AGATE} gate marked, and the interaction. Repeat on
     $m_{\text{op1}}$ beside it, since a factor that contains the drift without
-    holding the margin has not bought an operating point.
+    holding the margin has not given us an operating point.
 
     Also state the seed spread this experiment actually measures for
     $\bar\alpha$, as the footnote to H3 requires, before reading either effect.
@@ -614,10 +614,10 @@ def _():
     $m_{\text{op1}}$, grading and retention — with the dose column from the
     Method table repeated, since it is the whole point of the comparison.
 
-    The arm delivers `{REF}`'s repulsion on `end90-hold03`'s timing. If it
-    tracks `end90-hold03`, the endpoint effect is timing and the extra dose is
-    incidental. If it tracks `{REF}`, the endpoint effect is dose, and
-    "anneal later" is a roundabout way of saying "use more".
+    The arm delivers the repulsion of `{REF}` on the timing of
+    `end90-hold03`. If it tracks `end90-hold03`, the endpoint effect is timing
+    and the extra dose is incidental. If it tracks `{REF}`, the endpoint effect
+    is dose, and "anneal later" is a roundabout way of saying "use more".
 
     Scores no hypothesis: one condition, three seeds, and the peak ratio moves
     alongside the endpoint, so it separates the two accounts without
@@ -636,10 +636,10 @@ def _():
     /// admonition | TODO
     Carried from ex-2.1.7 for continuity, scoring nothing: redness read from
     the other 63 directions against the computed RGB floor of 0.863, and the
-    color cube's extent through depth. Ex-2.1.7's timing arm was the highest of
-    any condition on the first of these while being the best on every scored
-    statistic, so the grid is worth checking for a trend the single arm could
-    not show.
+    extent of the color cube through depth. The timing arm in ex-2.1.7 was the
+    highest of any condition on the first of these while being the best on
+    every scored statistic, so the grid is worth checking for a trend the
+    single arm could not show.
     ///
     """)
     return
@@ -673,9 +673,9 @@ def _():
        predicts how much of the color cube an edit to the anchor axis would
        move.
     2. Does the schedule finding generalize past this architecture, or is it
-       another set of keyframes fitted to one testbed? M1's did not transfer;
-       stating what would make ours transfer is the useful move.
-    3. What remains unbought. Containment is not exclusivity: ex-2.1.7 found
+       another set of keyframes fitted to one testbed? The M1 keyframes did
+       not transfer; stating what would make ours transfer is the useful move.
+    3. What is still missing. Containment is not exclusivity: ex-2.1.7 found
        redness as readable off the anchor axis as in the control, and nothing
        in this grid changes that measurement's meaning.
     ///
