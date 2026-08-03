@@ -28,7 +28,7 @@ mo.Html(plot_factory())
 
 By default a `themed` figure inlines as a `data:` URI — fine to view, heavy for a
 report (two PNGs per figure, light + dark). To keep the report HTML light, set a
-**publisher** once in the setup cell and `themed` writes each figure out to a file
+_publisher_ once in the setup cell and `themed` writes each figure out to a file
 (keyed by its readable name) referenced by a relative URL instead. Figure cells don't
 change:
 

@@ -22,20 +22,20 @@ while its `REVIEW` notes travel on — see `references/review-passes.md` in the
 
 First pick the reviewer, since the two ask different questions:
 
-- **`prereg-reviewer`** — the report has no results yet. Is the design sound and
+- `prereg-reviewer`: the report has no results yet. Is the design sound and
   worth running as specified?
-- **`results-reviewer`** — the results have landed. Do they support the claims,
-  and can a fresh reader follow the report? This one also looks at the rendered
+- `results-reviewer`: the results have landed. Do they support the claims, and
+  can a fresh reader follow the report? This one also looks at the rendered
   figures unless you tell it not to.
 
 The experiment run leaves a signal:
 
-- **No `experiment.py` beside the report, or one marked `DESIGN_ONLY = True`** →
+- No `experiment.py` beside the report, or one marked `DESIGN_ONLY = True` →
   prereg. The skeleton is written before the DAG by design, and a design module
   that holds only constants declares itself with that marker.
-- **The report resolves no refs** (no `get_refs` / `load_results` in the setup
+- The report resolves no refs (no `get_refs` / `load_results` in the setup
   cell) → prereg. There is nothing for it to read yet.
-- **Otherwise, resolve the refs.** From the report's directory:
+- Otherwise, resolve the refs. From the report's directory:
 
   ```bash
   uv run python -c "
@@ -75,17 +75,28 @@ Then, for up to 3 rounds:
     - No blockers, and only minor or no changes: stop, this has converged.
     - Real fixes, but it recommends running, freezing, or publishing as-is:
       stop, this also counts as converged.
-    - Something structural it couldn't fix itself, a genuine design question, or
-      a disagreement about how a result should be read: stop and escalate to the
+    - Something structural it couldn't fix itself, a design question, or a
+      disagreement about how a result should be read: stop and escalate to the
       user.
     - It reversed something an earlier round decided, or it reports a claim
       pulling in two directions: stop and escalate. Another round will flip it
-      back. Put both readings to the user and say what would separate them —
+      back. Put both readings to the user and say what would separate them:
       splitting the hypothesis into two tracks, dropping one, or narrowing its
       scope. Only the human can make that call, since it changes what the
       experiment claims.
     - Otherwise (substantive fixes, not yet at "no blockers"): another round.
-4. After the loop ends (converged, escalated, or 3 rounds reached), summarize
+4. If the loop converged and the report is heading for a freeze or a publish,
+   export the document and give it to the `report-structure` agent. Reviewers
+   edit one section at a time, so duplication between sections, a tl;dr that has
+   grown into a second conclusion, and a findings section that a result never
+   reached only show up in the assembled render. It proposes rather than edits,
+   so bring its cut list to the user rather than acting on it — deleting a
+   paragraph is their call. Skip this step when you escalated: the text will
+   move again.
+
+   Read the render, not the source. A cell can fail to render and leave no trace
+   in `report.py`; ex-2.1.7 published without its H2 verdict that way.
+5. After the loop ends (converged, escalated, or 3 rounds reached), summarize
    for the user: what changed across all rounds, any open questions, and the
    final recommendation. Include `git diff --stat` for the report so they can
    see the size of the change, and list any `REVIEW` notes the rounds added —

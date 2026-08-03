@@ -1,8 +1,8 @@
 # Authoring an experiment
 
 An experiment is a plain function `main(ctx)` that expresses a dependency graph
-in ordinary Python. Each `ctx.run`/`ctx.map` call is **content-addressed
-(memoized)**: a cache hit returns the stored result; in-flight work suspends the
+in ordinary Python. Each `ctx.run`/`ctx.map` call is _content-addressed_
+(memoized): a cache hit returns the stored result; in-flight work suspends the
 wake (raises `Pending`); absent work launches a detached worker, then suspends.
 A driver re-runs `main` on every _wake_, so completed steps are memo hits and
 only the un-run pieces execute. Crash recovery is just "run it again".
@@ -18,8 +18,8 @@ def main(ctx: Ctx) -> dict:
 experiment = Experiment(name="my-exp", main=main)
 ```
 
-The module exposes a top-level `experiment = Experiment(...)`. It carries **no
-compute** — the apparatus is injected when it runs, so the same file runs
+The module exposes a top-level `experiment = Experiment(...)`. It carries no
+compute: the apparatus is injected when it runs, so the same file runs
 locally or on Modal without edits.
 
 ## Where experiments live
@@ -37,11 +37,11 @@ runnable example with both halves.
 
 Two conventions that keep the pairing healthy:
 
-- **Avoid naming a `src/` package after a docs filename.** Marimo runs a report
+- Avoid naming a `src/` package after a docs filename. Marimo runs a report
   with its own directory first on `sys.path`, so the sibling `experiment.py`
   shadows any package named `experiment`. Symptom: import dies with "'X' is not
   a package".
-- **Extract shared testbed code.** When a new experiment starts by copying a
+- Extract shared testbed code. When a new experiment starts by copying a
   sibling's model/eval helpers, consider lifting them into a shared `src/sca/`
   module (unless you expect heavy churn). Memoization evidence tracks project
   source transitively, so the split doesn't weaken cache correctness.
@@ -59,16 +59,16 @@ each attempt carries *evidence* (`fingerprint(source of fn + the project fns it
 calls)`) that decides whether its cached result is still current; stale evidence
 re-runs the task in place, under the same key (full semantics in
 [memoization.md](./memoization.md)). To keep the "fix a bug, re-run" loop fast
-and honest:
+and correct:
 
-- **Pass each task the narrow subset of config it actually uses.** `train(lr,
+- Pass each task the narrow subset of config it actually uses. `train(lr,
   vocab_size)` re-runs only when `lr` or `vocab_size` change; `train(whole_config)`
   re-runs whenever _any_ unrelated field changes.
-- **Keep `main` cheap and deterministic** — it re-runs every wake. Derive configs
+- Keep `main` cheap and deterministic; it re-runs every wake. Derive configs
   there; do heavy or random work _inside_ a task.
-- **Fold RNG seeds into the inputs**, so the memo is honest (same inputs ⇒ same
-  result). A task seeded from wall-clock can never be a cache hit.
-- **Force a re-run** by editing the function (its evidence goes stale) or passing
+- Fold RNG seeds into the inputs, so the same inputs really do produce the same
+  result. A task seeded from wall-clock can never be a cache hit.
+- Force a re-run by editing the function (its evidence goes stale) or passing
   `version="v2"` — either way a new attempt on the same record. Editing a project
   helper a task calls also invalidates it; library/framework churn does not.
 
@@ -87,9 +87,9 @@ def extract(cfg) -> dict:
     return {"cfg": cfg.id, "activations": art}
 ```
 
-The store is **project-scoped**, so one experiment can hand an artifact to
-another by name (`set_ref`/`get_ref`) with no recompute. Full semantics — trees,
-publishing artifacts to a URL, the Modal caveat — in [storage.md](./storage.md).
+The store is project-scoped, so one experiment can hand an artifact to
+another by name (`set_ref`/`get_ref`) with no recompute. Full semantics (trees,
+publishing artifacts to a URL, the Modal caveat) are in [storage.md](./storage.md).
 Externalizing a *report's* figures and data for publishing is in
 [reports.md](./reports.md); the `themed` hook for it is in
 [vis.md](./vis.md).
@@ -97,7 +97,7 @@ Externalizing a *report's* figures and data for publishing is in
 ## Routing steps to compute
 
 Compute is an execution choice, not part of the definition. A file experiment
-stays backend-agnostic by tagging steps with a **role** that the CLI/driver maps
+stays backend-agnostic by tagging steps with a _role_ that the CLI/driver maps
 to a concrete apparatus:
 
 ```python
@@ -115,7 +115,7 @@ The experiment's `roles=` table binds each label to hardware kwargs, e.g.
 Alongside the backend-native knobs, any role (local or Modal) can set
 `watchdog=` — seconds without *step* progress before the worker aborts itself
 (`FAILED` with a stack dump) instead of wedging silently until the role
-`timeout`. Size it past the longest legitimate gap **between** `emit_progress`
+`timeout`. Size it past the longest legitimate gap between `emit_progress`
 step advances; one-off setup before the first emission (tokenization,
 compilation) is covered by `watchdog_grace=` instead (default: same as
 `watchdog`), so a slow prep phase doesn't force the watchdog loose. The grace

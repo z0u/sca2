@@ -49,13 +49,13 @@ space is the message, so draw the domain rather than the chart furniture:
   them in panel units (`diameter=`) when the marks stand for grid cells:
   they then hold their size relative to the cube through any resize, and
   `sca.vis.grid_diameter(levels, view)` gives the value at which a full grid
-  tiles with no gaps — no trial and error. Marks sized this way carry no
-  edge, since at tiling density the edges become a mesh over the solid.
+  tiles with no gaps. Marks sized this way carry no edge, since at tiling
+  density the edges become a mesh over the solid.
 - Data marks and rim annotations draw with `clip_on=False`, as the disc
   panels' rim markers do. The limits describe the domain, not the ink: a
   mark centered on the silhouette overhangs it by half its width, and
   cropping that turns a circle into a flat-sided blob. Overhang into a
-  neighbouring panel is the lesser problem.
+  neighboring panel is the lesser problem.
 - Pass `truth=` (the same points' true RGB) to draw each target as an open
   ring with a stub to where the point actually landed, which is how
   positional error should read on a cube panel. `sca.vis.align_to_cube`
@@ -75,6 +75,12 @@ space is the message, so draw the domain rather than the chart furniture:
 A chart (loss curve, score sweep, schedule) keeps its axes. Use the
 stylesheet defaults from `mini.vis` and prefer meaningful ticks: a hue axis
 gets named ticks (Red, Green, Blue), not 0–1.
+
+A range band (e.g. `fill_between` showing a min/max or confidence spread)
+must sit behind every summary line, not just the line it belongs to —
+draw all bands first, then all lines, or give the bands a lower `zorder`
+explicitly. A band drawn after a neighboring condition's line covers that
+line and drowns it out.
 
 For an *ordinal* series (depth, size), encode order as ordered shades of one
 colormap rather than categorical hues — but pick the stops with `light_dark`:
@@ -99,6 +105,18 @@ def draw_latent_panel(ax, z, facecolors, edgecolors=None):
     ax.set_ylim(-1.1, 1.1)
     ax.set_axis_off()
 ```
+
+## Sharing an axis across panels
+
+Decide `sharex`/`sharey` from the *units*, not from the ranges the run happened
+to produce. Panels measuring the same quantity share; panels measuring different
+quantities get their own scale, however close the numbers land. A level and a
+contrast built from the same measurement (mean alignment and the alignment
+margin, say) count as the same units — sharing lets the reader compare their
+sizes by eye, which is usually the point of putting them side by side.
+
+Two panels with nearly-but-not-quite equal limits read as a bug; the fix is to
+share, or to make the scales visibly different, whichever the units call for.
 
 ## Color is data
 
@@ -194,11 +212,10 @@ color-matrix figure uses.
 
 ## What a figure costs to render
 
-`@themed` calls the plot function **twice** — once per theme — so everything
-inside it is paid twice, including work that has nothing to do with color.
-Only the drawing genuinely differs between the two passes. Compute the data
-in the cell, outside the decorated function, and let the plot function receive
-it and draw:
+`@themed` calls the plot function twice, once per theme, so everything inside
+it is paid twice, including work that has nothing to do with color. Only the
+drawing differs between the two passes. Compute the data in the cell, outside
+the decorated function, and let the plot function receive it and draw:
 
 ```python
 _null = {w: random_angle_null(w) for w in _widths}  # once, in the cell
@@ -225,7 +242,7 @@ pairs = rng.normal(size=(n, 2, width, 3))
 angles = gm.principal_angles(pairs[:, 0], pairs[:, 1])
 ```
 
-Likewise for nearest-neighbour work: `argmin` over distances doesn't need the
+Likewise for nearest-neighbor work: `argmin` over distances doesn't need the
 distances themselves. Expanding the squared distance to `|v|^2 - 2 v.x` turns
 a materialized (N, V, K) difference into one (N, V) matmul — see
 `sca.baselines.precision_limited_acc`.

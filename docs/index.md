@@ -50,7 +50,7 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   successfully, then breaks during the high-LR plateau. A schedule sweep finds
   the fix: halve the LR peak and keep the anneal.
 - [Experiment 2.9.4](./m1/ex-2.9.4/report.py): closed-loop regularizer term
-  weights. Replaces the timed anneal with feedback. The mechanism "works", but it
+  weights. Replaces the timed anneal with feedback. The mechanism works, but it
   causes as many problems as it solves.
 
 ### Iteration 1: D2.1, anchoring in a transformer
@@ -61,12 +61,11 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
   architecture over width × depth × seed, and builds measurement tools:
   exact-match completion accuracy on seen, held-out, and unseen operand pairs,
   plus per-layer residual-stream probes for operand and result colors.
-- [Experiment 2.1.2](./m2/ex-2.1.2/report.py): composition.
-  The Ex-2.1.1 models never solve the held-out named pairs. This experiment
-  tests grammar interventions (reverse alias lines and off-palette named
-  equations). Both train, but held-out named accuracy stays at zero.
-  Position-resolved probes suggest the mix never fully exists at any one
-  position.
+- [Experiment 2.1.2](./m2/ex-2.1.2/report.py): composition. The Ex-2.1.1 models
+  never solve the held-out named pairs. This experiment tests grammar
+  interventions (reverse alias lines and off-palette named equations). Both
+  train, but held-out named accuracy stays at zero. Position-resolved probes
+  suggest the mix never fully exists at any one position.
 - [Experiment 2.1.3](./m2/ex-2.1.3/report.py): word-level tokens. Removes the
   hex values entirely; every color is a single opaque token. The model infers
   the color-space geometry from co-occurrence: embeddings hold RGB as a
@@ -77,39 +76,36 @@ infrastructure is [mi-ni](https://github.com/z0u/mi-ni).
 - [Experiment 2.1.4](./m2/ex-2.1.4/report.py): multi-token names. The char-level
   twin of Ex-2.1.3: corpora identical line for line, but colors are opaque
   four-letter random strings, read and written one character at a time. At 216
-  colors the geometry survives multi-token naming: held-out accuracy 0.91 with
-  neighbor-level misses, the mix computed in value space at the pre-answer
+  colors the geometry survives multi-token naming, with held-out accuracy of
+  0.91, neighbor-level misses, the mix computed in value space at the pre-answer
   position, and no per-channel eviction during emission (unlike hex answers). At
-  27 colors exact match collapses to zero with confidently wrong neighbor
-  answers. Reading names consumes most of the network's depth.
-
+  27 colors exact match falls to zero, with confidently wrong neighbor answers.
+  Reading names consumes most of the network's depth.
 - [Experiment 2.1.5](./m2/ex-2.1.5/report.py): disjoint vocabularies. A
   preregistered baseline in which named and hex sublanguages never share a
   line — 140 xkcd names at full 8-bit depth, no aliases, no cross form —
   asking whether the two surface forms converge on one latent geometry.
-  Behavior and within-form geometry sections are filled (named held-out 0.667
+  Behavior and within-form geometry sections are filled in (named held-out 0.667
   over strong nulls; hex 0.996); the cross-form alignment sections are still
   in their preregistered form, with the analysis round in progress.
-
-- [Experiment 2.1.6](./m2/ex-2.1.6/report.py): anchoring *red* — the first
+- [Experiment 2.1.6](./m2/ex-2.1.6/report.py): anchoring *red*, the first
   anchored transformer run. One anchor term (no anti terms, no intervention),
-  sequence-level noisy labels driven by the first operand's redness, applied at
-  every layer and prompt position of the word-level `v216` testbed. The anchor
-  is free — no rung cost measurable accuracy at any weight — and it moves the
-  residual stream a long way onto the chosen direction, but it moves the whole
-  color cube rather than *red*: the alignment margin settles at 0.27 against a
-  0.5 gate while the color-independent shift grows with λ. Redness stays as
-  readable off the anchor axis as in the control, so the axis holds a copy.
-  The reading is that a bare attractive term needs the repulsive company M1
-  gave it.
-
+  with sequence-level noisy labels driven by the first operand's redness,
+  applied at every layer and prompt position of the word-level `v216` testbed.
+  The anchor is free — no weight in the sweep cost measurable accuracy — and it
+  moves the residual stream a long way onto the chosen direction. But it moves
+  the whole color cube rather than *red*: the alignment margin settles at 0.27
+  against a 0.5 gate, while the color-independent shift grows with λ. Redness
+  stays as readable off the anchor axis as in the control, so the axis holds a
+  copy. A bare attractive term seems to need the repulsive company M1 gave it.
 - [Experiment 2.1.7](./m2/ex-2.1.7/report.py): a repulsive term and a narrower
-  pull. Ex-2.1.6 left two candidate explanations for its flat margin, and this
-  experiment separates them with a 2×2 factorial at the same scoring rung:
+  pull, giving the first *selective* anchor. A preregistered 2×2 factorial —
   {bare anchor, anchor + M1's anti-subspace term} × {four-position prompt-span
-  pull, op1-only pull}, plus a schedule-timing arm and a weight-ceiling arm.
-  Preregistered: the method, hypotheses, and decision thresholds are frozen;
-  the run has not happened yet, so every results section is still a placeholder
-  saying what it will show.
-
-More reports will appear here as the M2 experiments land.
+  pull, op1-only pull}, plus a schedule-timing arm and a weight-ceiling arm —
+  separates the two explanations Ex-2.1.6 left open for its flat margin. Both
+  mechanisms are real, and the blind span is the larger of the two: narrowing
+  the pull is worth +0.22 of margin against the repulsive term's +0.14, and
+  together they reach 0.64 over a 0.5 gate, graded at R² = 0.88, at no
+  measurable task cost. At M1's weight ratio the repulsion weakens the cube-wide
+  drift without containing it. Holding the repulsion near peak, rather than
+  annealing it at the halfway point, beats the M1 schedule on every measurement.

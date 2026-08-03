@@ -35,12 +35,12 @@ except A, B:  # PEP 758
 ```
 
 If something looks unfamiliar, check the linters rather than rewriting it.
-`ruff` and `ty` are the arbiters: if they're happy, the code is fine — move on.
+`ruff` and `ty` are the arbiters: if they're happy, the code is fine.
 
 ## Typing
 
-Annotate. The point isn't ceremony; it's giving the type-checker something to
-catch, and giving the IDE something to complete. Future-you will appreciate it.
+Annotate, to give the type-checker something to catch and the IDE something to
+complete.
 
 Use `T | None`, never `Optional[T]`:
 

@@ -1,7 +1,7 @@
 # Recovery: fix, prune, retry
 
-The fix-a-bug-and-re-run loop, and how a task's identity keeps it fast and honest.
-This is the mechanics; the identity/evidence *model* it rests on is in
+The fix-a-bug-and-re-run loop, and how a task's identity keeps it fast and
+correct. This is the mechanics; the identity/evidence *model* it rests on is in
 [memoization.md](./memoization.md), and the operational safety of editing under live
 workers (cost, blast radius) is in [running.md](./running.md#hotfix-safety-avoid-double-spending).
 
@@ -23,9 +23,9 @@ Mid-sweep, a bug fails 20 of 100 cells while 80 finish fine. Because keys are
 identity, fixing the fn doesn't orphan anything — every cell keeps its key, and
 the tick judges each record against the new evidence:
 
-- **Default** (`mini run`): all 100 cells are stale, so all 100 re-run. Honest,
-  but it re-pays for the 80 good results.
-- **Bounded** (`mini run --keep-stale-done`): the 80 DONE cells are served as-is
+- Default (`mini run`): all 100 cells are stale, so all 100 re-run, re-paying
+  for the 80 good results.
+- Bounded (`mini run --keep-stale-done`): the 80 DONE cells are served as-is
   (their results predate the fix — `status` badges them `(stale code — kept)`,
   and the tick records them in the run's meta), and only the 20 failed cells
   re-run with the fixed code. No `retry` needed: a FAILED record whose code has
@@ -58,7 +58,7 @@ Local backend only for now (Modal Dict entries self-expire; see #15).
 ### Failure is terminal by design
 
 `FAILED` and `CANCELLED` are terminal *under the code that produced them*: a
-plain `mini run` will **not** relaunch them. This is deliberate — a
+plain `mini run` will not relaunch them. This is deliberate: a
 deterministic failure shouldn't busy-loop, and a fix should be intentional.
 Recovery takes one of:
 
@@ -75,15 +75,15 @@ record keeps its failed attempts in history (`mini explain`).
 
 By default `ctx.map` raises `Pending` until _every_ item has settled. Once the
 fan-out settles, any item that settled `FAILED`/`CANCELLED` makes the map raise an
-**`ExceptionGroup` of `TaskFailed`** — all of them at once, so you see every
-failure, not just the first. (`ctx.run`, being a single step, raises a bare
+`ExceptionGroup` of `TaskFailed`, carrying all of them at once so you see every
+failure. (`ctx.run`, being a single step, raises a bare
 `TaskFailed`.) The group carries each worker's stored traceback; handle it with
-`except* TaskFailed`. That's the right default when every cell matters — and since
+`except* TaskFailed`. That's the right default when every cell matters, and since
 a settled failure won't relaunch, raising is how the DAG gives up instead of
 spinning. Recover with `retry`.
 
 When some failures are expected — a bad hyperparameter region, an OOM at the
-extreme, a preempted container — pass **`allow_partial=True`**. The map still
+extreme, a preempted container — pass `allow_partial=True`. The map still
 waits for in-flight tasks to settle, but then returns instead of raising on the
 failures. The result list stays index-aligned with the inputs, with the `MISSING`
 sentinel in each failed/cancelled position:
@@ -114,4 +114,4 @@ records = store.records()                          # per-task state/metrics
 done = [store.result(r["key"]) for r in records if r.get("state") == RunState.DONE]
 ```
 
-This is exactly what `mini status`/`results` and a `report.py` notebook do.
+This is what `mini status`/`results` and a `report.py` notebook do.

@@ -21,7 +21,7 @@ class Apparatus:
         """Return a new Apparatus that runs *hook* before each job."""
 ```
 
-An appartus instance is usually named `app`. Usage:
+An apparatus instance is usually named `app`. Usage:
 
 ```py
 app = LocalApparatus("demo", max_workers=3)
@@ -56,7 +56,7 @@ uv run marimo export html docs/my-notebook.py -o /dev/null -- --app=modal --arch
 
 The `--` delimits notebook options from marimo's own args, which arrive via `mo.cli_args()` — so only a notebook that reads them (like the radio above) responds; a report that just consults the configured store ignores them. (This was `./go export`, now gone; the report-export verbs `./go preview`/`publish` render with defaults and don't forward notebook options.)
 
-**Syntax gotcha:** the options are flags — marimo's `cli_args()` only parses `--key=value` or `--key value`. A bare `key=value` parses to *nothing*, so the notebook silently falls back to its default (here `local`) with no error. Confirm which backend actually ran from the logs — a Modal run prints `Creating Modal image …` then `Running … on Modal`; a local one prints `Running … locally`.
+Syntax gotcha: the options are flags, and marimo's `cli_args()` only parses `--key=value` or `--key value`. A bare `key=value` parses to *nothing*, so the notebook silently falls back to its default (here `local`) with no error. Confirm which backend actually ran from the logs: a Modal run prints `Creating Modal image …` then `Running … on Modal`; a local one prints `Running … locally`.
 
 Always use the async methods `arun` and `amap` in Marimo notebooks and wherever there is an asynchronous context: Modal will complain otherwise. In other contexts, you can use the synchronous variants `run` and `map`, which are just wrappers provided for convenience.
 

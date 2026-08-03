@@ -9,7 +9,9 @@ Write with a clear, correct, and understated style: considered but conversationa
 Characteristics:
 
 - Oxford comma; straight (not "smart") quotes, em-dashes sparingly (prefer other punctuation).
-- Calibrate confidence to the evidence: plain declaratives for what was measured or observed.
+- Calibrate confidence to the evidence: plain declaratives for what was measured or observed. Show how strongly a claim is made: "would start to matter" is weaker than "matters".
+- Verbs agree with which direction is good. Containment, decay and retention run downward, so "no condition reaches 0.1" reads backwards; "falls to" does not.
+- A term the reader may not know gets one short plain-English gloss on first use, in a footnote or a `details` block. Figure captions stay pure legend.
 - Plain connectives to continue a thought: "So", "But", etc.
 - American spelling and double quotes to match the convention in scientific literature.
 - Alt text for all images: aids vision-impaired people and LLMs alike (see the alt-text skill).
@@ -33,9 +35,7 @@ Anti-patterns:
 
 ## Clarity
 
-Write as though explaining to an intelligent person with technical skill who is _not_ an expert in machine learning. Allow the reader to infer information from figures, context, and a few exemplar results; draw their attention to key details.
-
-So write in plain English, with respect for the reader's intelligence.
+Write plain English, as though explaining to an intelligent person with technical skill who is _not_ an expert in machine learning. Allow the reader to infer information from figures, context, and a few exemplar results; draw their attention to key details.
 
 ## Formatting and structure
 
@@ -50,18 +50,14 @@ Use normal-weight sentence case for headings and descriptive lists.
 + - Foo bar: baz
 ```
 
-Prefer paragraphs for nuanced or complex explanations; use lists for summarizing
-steps, or when clarity would genuinely benefit from structure, but use them
-sparingly.
+Prefer paragraphs for nuanced or complex explanations; use lists sparingly, for
+summarizing steps or where clarity benefits from the structure.
 
-Emphasis can be distracting to read, so follow these guidelines for where and
-how often to use it:
-
-- Use italics for concepts like _red_. When: usually.
-- Use italics for named terms like _anchor_. When: on the first use in a
-  section, and then if the role of the word would otherwise be ambiguous, e.g.
-  to distinguish "anchor" the regularizer term from "the anchor point".
-- Never use bold or italics for other emphasis, because they are distracting to
-  read. The user will add them if necessary.
+Emphasis is distracting to read, so it is reserved for specific jobs.
+Concepts like _red_ take italics whenever they appear.
+Named terms like _anchor_ take italics on first use in a section, and again later only if the role of the word would otherwise be ambiguous — to distinguish "anchor" the regularizer term from "the anchor point", say.
+Inline list markers like **(a)** and **Left:** should be bold, but only if they are short.
+Paragraph headings may be bolded instead of using a 4th or 5th-level heading. Try to avoid it though.
+Never use bold or italics for other emphasis. The user will add them if necessary.
 
 For syntax conventions, refer to the relevant `style-*` skill.
