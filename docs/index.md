@@ -125,3 +125,11 @@ These experiments were preparation for the main work: exercising the infrastruct
     **1.** Apply the anchor term only to operand 1 (no other tokens), and
     **2.** Add a repulsive term to clear the target subspace.
     Both work, but 1. worked better, and their effects stack somewhat.
+
+- [2.1.8. When the repulsion acts, and how much is left](./m2/ex-2.1.8/report.py)
+  — *preregistration; not yet run*
+
+    Ex-2.1.7 found that stretching one anneal was worth more than adding the
+    repulsive term in the first place. Here we cross **when** that anneal
+    finishes against **the level it finishes at**, to find an operating point
+    that contains the cube-wide drift without costing selectivity.

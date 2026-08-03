@@ -13,21 +13,26 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Open questions
 
-- [ ] Decide which retention statistic the reports quote. #reports Ex-2.1.7
-  computes "retention" two ways in two cells: the Findings section takes the
-  minimum final-over-peak margin across seeds, matching H4(b)'s per-run gate
-  ("for every anchored run … at least 0.8× that maximum"), while the Arms
-  section takes the mean across seeds. For `span-anti-late` those read 0.92
-  and 0.94; for `span-anti-hi`, 0.55 and 0.58. Both are defensible, but one
-  report should not quote both under one name. The min is the gate-relevant
-  one; the mean is the one already carried into the anneal-endpoint item below.
-  Pick one and make the other follow.
+- [x] Decide which retention statistic the reports quote. #reports Settled as
+  the **minimum** across seeds, in `ex-2.1.8.RETENTION_STAT` with the rationale:
+  H4(b)'s gate is worded per run ("for every anchored run … at least 0.8× that
+  maximum"), and a three-seed mean can hide a single sliding run, which is the
+  failure the gate exists to catch. Every later report follows it.
 
-- [ ] Sweep the anti-subspace anneal endpoint, the highest-value open knob
-  after ex-2.1.7. The `span-anti-late` arm changed exactly one number, the
+  Left to do: ex-2.1.7's *Arms* section still quotes the mean under the same
+  name (`span-anti-late` 0.94 against the Findings section's 0.92;
+  `span-anti-hi` 0.58 against 0.55). Fix it on the next touch of that report.
+
+- [~] Sweep the anti-subspace anneal endpoint, the highest-value open knob
+  after ex-2.1.7. **Preregistered as ex-2.1.8** — a 3 × 2 grid of
+  (`anneal_end` ∈ {50, 70, 90}) × (`hold_ratio` ∈ {0.03, 0.30}) plus a
+  dose-matched arm. Original note follows.
+
+  The `span-anti-late` arm changed exactly one number, the
   epoch at which the repulsive term finishes annealing to its hold ratio (50 →
   90), and improved margin (0.46 → 0.60), containment (ᾱ 0.33 → 0.13),
-  retention (0.73 → 0.94) and grading (R² 0.62 → 0.78) together — a bigger
+  retention (0.73 → 0.94 as means; see the item above) and grading (R² 0.62 →
+  0.78) together — a bigger
   margin gain than adding the term was worth in the first place. The M1
   keyframes were inherited from a 5-d autoencoder bottleneck and mapped onto
   our 100 epochs by fraction of training, so there was never a reason to expect
@@ -38,8 +43,70 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   including as a third shape. Cheap: training only, no new measurements.
   #ex-2.1.7 #schedules #anchoring
 
+  Found while designing ex-2.1.8, and worth keeping whatever that run says:
+  **`hold_ratio` is not a dose knob.** Integrating
+  ∫ λ_s̄(e)·lr(e) de over training, a 10× change in the hold ratio moves the
+  delivered repulsion by about a sixth, while stepping the endpoint 50 → 90
+  nearly doubles it. So in this schedule family the endpoint *is* the dose
+  axis, and the two cannot be crossed as factors: dose-matching endpoint 50 up
+  to endpoint 90 would need λ_s̄/λ_a ≈ 1.18, sustaining the repulsion above the
+  anchor weight for half of training. The achievable match runs the other way,
+  scaling the opening ratio down (2.5 → 1.443) on the late schedule, which is
+  what ex-2.1.8's dose arm does. The `anti_dose` helper in
+  `docs/m2/ex-2.1.8/experiment.py` computes it. #schedules
+
 - [ ] Locating the concept inside a labeled span, without being told where it
-  is. Ex-2.1.7's largest single effect is narrowing the pull from four prompt
+  is. **Queued as ex-2.1.9, behind ex-2.1.8's operating point.** Design notes
+  from the 2026-08-03 session are below; the original note follows them.
+
+  **The term.** Replace the per-position mean in `anchoring.anchor_term` with a
+  soft minimum over the span, so the loss asks that the span align *somewhere*
+  rather than everywhere. Use the **log-mean-exp** form,
+  −τ·log(mean_t exp(−x_t/τ)) with x_t = 1 − cos(h_t, v̂) — this is mellowmax
+  ([Asadi & Littman, 2017](https://arxiv.org/abs/1612.05628)), and it is the
+  right variant for two reasons. Its gradient is exactly the softmin weights
+  softmax(−x/τ), all non-negative and summing to 1, so the per-line pull budget
+  is conserved and λ_a means the same thing in every condition. And it reaches
+  the mean as τ → ∞ (the 1/n inside the log is what buys that; plain
+  log-sum-exp diverges instead) and the min as τ → 0, so the τ = ∞ limit
+  reproduces the span pull exactly and can be pinned by a unit test.
+
+  Not the softmax-weighted average Σ w_t x_t, which is the other thing called
+  "softmin": its gradient is w_t·[1 + (L − x_t)/τ], which **flips sign** once
+  x_t > L + τ, so poorly-aligned positions get actively pushed off the axis.
+  At τ = 0.4 on a two-position toy that is ~10% of the gradient budget spent as
+  repulsion — it would confound the experiment as "pull the best, push the
+  rest".
+
+  Pool over positions *within* a layer, leaving the layer mean alone: one
+  change at a time, and ex-2.1.6 found the concept migrates across positions
+  with depth, so a per-layer pool lets the pull follow that.
+
+  **Scoring cannot be m_op1 alone.** `op1-anti` is a ceiling on *the margin
+  measured at op1*, which is partly circular — it is the condition that pulls
+  exactly where we score, and the methodology note about choosing sites
+  independently of the statistic applies. And op1 may not be where the concept
+  belongs at depth: at layer 0 the residual is the token embedding, so op1 is
+  the only position that *can* carry red, while by the last layer ex-2.1.6
+  found `+` and `=` leading. Preregister the layer-mean of the max-over-span
+  margin, gated against **the same statistic computed on the control**, so
+  applying the maximum to both sides absorbs the maximum-of-noise inflation.
+  Report m_op1 beside it for continuity with ex-2.1.7.
+
+  **The figure that decides it:** the learned softmin weights per position per
+  layer, against the un-anchored control's own redness-by-position profile. If
+  they track, the pull found the circuit without being told where it was, which
+  is a better result than matching the oracle. If they concentrate somewhere
+  the control's profile does not, the pull is latching onto whatever is
+  cheapest to move — that is the failure mode. Weights near-uniform at any τ
+  short of collapse says the concentration has to come from the label side
+  instead.
+
+  Calibrate the τ grid from ex-2.1.7's stored per-position alignment profile
+  before running — pick τ so the leading position takes ~0.6–0.8 of the weight
+  at each layer. Report-side, free, and it keeps τ out of guess territory.
+
+  Original note follows. Ex-2.1.7's largest single effect is narrowing the pull from four prompt
   positions to op1 alone (+0.22 margin, and it is what stops the trajectory
   sliding). But that remedy is only available because this synthetic language
   has a known position carrying the concept, which is exactly what a labeled
@@ -337,13 +404,15 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   so (c) is what says whether the exclusion matters rather than a premise of
   the method. #[D2.1] #anchoring #ex-2.1.6
 
-- [ ] Pool the anchor term over positions instead of averaging over them. Ex-2.1.6
+- [~] Pool the anchor term over positions instead of averaging over them. Ex-2.1.6
   pulls all four prompt positions equally and asks (H3) whether the concept
   condenses anyway. If it broadcasts instead, a logsumexp over positions is the
   response: it asks that the span align somewhere rather than everywhere, which
   is the shape a document-level label really has. Ex-2.1.6's H3 section names this
   as the queued answer to a broadcast result, so it wants to exist as an item
-  either way. #[D2.1] #anchoring #ex-2.1.6
+  either way. Folded into the ex-2.1.9 design notes above, which settle the
+  pooling form (mellowmax, not a softmax-weighted average). #[D2.1] #anchoring
+  #ex-2.1.6
 
 - [ ] Add the anti-subspace term and re-run ex-2.1.6. The next step
   from that result: one attractive term is satisfied largely by a
@@ -373,7 +442,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   relevant one. The affinity-softmax / logsumexp pooling item above is the
   leading candidate; this item exists so a blind-span result gets read as
   "prioritize pooling" rather than "narrow the pull", which M3 cannot do.
-  #[D2.1] #anchoring #ex-2.1.7
+  Ex-2.1.7 delivered exactly that reading (H3's contrary outcome), so this is
+  now settled as the reason ex-2.1.9 exists. #[D2.1] #anchoring #ex-2.1.7
 
 - [ ] An off-axis probe R² does not bound an intervention. Ex-2.1.6 reported
   redness still readable at R² ≈ 0.83 with the anchor direction removed, and
