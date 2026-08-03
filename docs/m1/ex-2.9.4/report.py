@@ -31,6 +31,13 @@ def _():
     mo.md(r"""
     # Experiment 2.9.4: closed-loop regularizer weights
 
+    /// tip |
+    <!-- tl;dr -->
+    We replaced the timed regularizer anneal with a feedback controller, so that
+    each weight climbs while its constraint is being violated and settles back
+    once it is met. It kind of worked but not very well, and it adds complexity.
+    ///
+
     [Ex-2.9.3](../ex-2.9.3/report.py) traced anchoring failures to an
     instability late in training. The anchored solution is metastable
     during the high learning-rate plateau: the regularizers hold it in place,

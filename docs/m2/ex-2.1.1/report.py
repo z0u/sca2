@@ -82,7 +82,16 @@ with app.setup(hide_code=True):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Ex 2.1.1: the color-mixing transformer, un-anchored
+    # Ex 2.1.1: un-anchored color-mixing transformer
+
+    /// tip |
+    <!-- tl;dr -->
+    A small transformer learns a character-level language of color-mixing
+    equations, solving the forms it saw in training and unseen hex pairs. Color
+    turns out to be linearly decodable from its residual stream, with each seed
+    putting *redness* in a different place. Held-out *named* pairs sit at zero
+    accuracy.
+    ///
 
     In M2, we want to see whether Sparse Concept Anchoring carries over from
     autoencoders to transformers. Before we anchor anything we need a baseline,

@@ -14,7 +14,7 @@ List of stylistic improvements to make.
   - gap, a in "measurable difference", e.g. "the median gap between the nearest name and the second-nearest" -> "the median distance between the nearest and second-nearest names"
   - wrinkle, hair
 
-- [ ] Add a tl;dr **lede** to each of the reports, like the one in 2.1.7. Then use that text or something like it in docs/index.md for each of the reports instead of the current descriptions.
+- [x] Add a tl;dr **lede** to each of the reports, like the one in 2.1.7. Then use that text or something like it in docs/index.md for each of the reports instead of the current descriptions.
 
 ## Visual
 

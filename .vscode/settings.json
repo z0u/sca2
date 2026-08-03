@@ -20,4 +20,7 @@
         ".claude/skills": true,
         ".codex/skills": true
     },
+    "markdown.styles": [
+        "scripts/md.css"
+    ],
 }

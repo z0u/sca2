@@ -48,6 +48,14 @@ def _():
     mo.md(r"""
     # Experiment 2.9.1 redux: deleting *red*, now in JAX
 
+    /// tip |
+    <!-- tl;dr -->
+    We ported the main M1 result from PyTorch to JAX: Anchor *red* to one latent
+    axis of a small autoencoder, then zero the axis and watch red disappear. The
+    result reproduces, seed sensitivity and all, and our new infrastructure
+    holds up.
+    ///
+
     This is a port of [ex-preppy](https://github.com/z0u/ex-preppy) experiment
     2.9.1 (M1, autoencoders), run as an end-to-end test of the infrastructure
     in this repo before the M2 transformer experiments. It re-answers the M1

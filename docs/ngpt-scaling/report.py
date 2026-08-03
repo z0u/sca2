@@ -63,6 +63,14 @@ def _():
     mo.md(r"""
     # nGPT scaling: flat across the width × depth grid
 
+    /// tip |
+    <!-- tl;dr -->
+    Width × depth sweep of our simplified nGPT to check that it stays
+    well-behaved as it grows. Converged loss improves with width and is flat
+    across depth, and no condition spikes or stalls. The architecture seems safe
+    to build the color-mixing experiments on.
+    ///
+
     Before we build the color-mixing experiments on top of this transformer, we
     want to know that it holds its shape as it grows. This report trains the model
     at a range of sizes and checks that none of them misbehave.

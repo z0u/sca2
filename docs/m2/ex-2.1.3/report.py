@@ -112,6 +112,16 @@ def _():
     mo.md(r"""
     # Ex 2.1.3: named colors only
 
+    /// tip |
+    <!-- tl;dr -->
+    No hex codes, just one opaque token per color and nothing in the text to say
+    that colors are values at all. The model infers the geometry from
+    co-occurrence alone: its embeddings hold the RGB cube as a linear subspace,
+    it computes mixes in value space just before answering, and its held-out
+    guesses land on or beside the right color. Exact match rises and falls with
+    vocabulary size, while geometric closeness improves steadily.
+    ///
+
     Every experiment so far has taught the model colors two ways: as names
     (`red`) and as hex codes (`#f00`), with alias lines tying the two together.
     The hex form spells a color one channel at a time, so the geometry of color

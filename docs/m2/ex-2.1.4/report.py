@@ -166,6 +166,15 @@ def _():
     mo.md(r"""
     # Ex 2.1.4: spelling the names
 
+    /// tip |
+    <!-- tl;dr -->
+    Does geometry inference need one token per concept? Not at 216 colors. We
+    test the same equations but with every color spelled as an opaque
+    four-letter name. There's a small drop in held-out accuracy, but the value
+    subspace survives. Reading names takes most of the network's depth, leaving
+    one layer for the mix to live in. The 27-color grid is too coarse.
+    ///
+
     In [ex-2.1.3](../ex-2.1.3/), our small transformer inferred the geometry of
     a color space from mixing equations alone, but every color was a single
     opaque token: reading an operand was one table lookup, and writing the

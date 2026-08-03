@@ -55,21 +55,19 @@ def _():
     mo.md(r"""
     # Ex 2.1.6: anchoring *red* in a transformer
 
+    /// tip |
+    <!-- tl;dr -->
+    Our first anchored transformer, with a single attractive term. The anchor
+    moved the activations to the chosen direction, and cost the task nothing
+    measurable. But it moved the whole color cube, rather than *red* in
+    particular.
+    ///
+
     This is the first anchored transformer. During training we add one
     regularizer term that pulls the residual stream activations of *red-labeled*
     equations toward a fixed direction $\hat v_{\text{red}}$. Then we ask two
     questions: did the concept land where we put it, and what did that cost the
     task?
-
-    /// admonition | tl;dr
-    The anchor cost the task nothing measurable, and it moved the residual
-    stream a long way onto the chosen direction. But it moved the whole color
-    cube there, not *red* in particular. The margin we scored reached about
-    half its threshold, and a tenfold increase in the regularizer weight did
-    not improve it. The discussion argues that the missing ingredient is a
-    repulsive term: one that pushes non-red activations away from the anchor.
-    M1 had such a term, and this experiment deliberately left it out.
-    ///
 
     /// details | Notation
     Equations are `a + b = mix(a, b)` throughout M2, so $a$ and $b$ stay
