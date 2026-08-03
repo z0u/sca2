@@ -152,6 +152,10 @@ blockquote {
   color: var(--fg-muted);
 }
 
+a {
+  text-decoration: none;
+}
+
 /* Anchor links */
 a.anchor-link {
   opacity: 0;
@@ -167,4 +171,32 @@ a.anchor-link::after {
 }
 :hover > a.anchor-link {
   opacity: 1;
+}
+
+details summary,
+.github-markdown-body details summary {
+  list-style-position: outside;
+}
+
+/* Makes a ul look like a descriptive list. */
+ul:has(>li>p),
+.github-markdown-body ul:has(>li>p)
+{
+  padding-inline: 0;
+  --pseudo-dl-indent: 2ex;
+
+  >li {
+    list-style: none;
+    padding-inline-start: var(--pseudo-dl-indent);
+
+    /* pseudo-dt */
+    > :first-child {
+      font-weight: 500;
+      margin-inline-start: calc(0px - var(--pseudo-dl-indent));
+    }
+    > :first-child::after {
+      content: "";
+      display: block;
+    }
+  }
 }
