@@ -1,11 +1,10 @@
 We are running experiments to study Sparse Concept Anchoring (SCA): a training-time
 technique that guides a concept toward a known location in representation space (rather
 than searching for it post-hoc), so later intervention has bounded, analyzable
-side-effects. M1 established this in autoencoders (done, published). This repo is **M2**:
-does it transfer to transformers? We anchor concepts in the residual stream of a small
-transformer, starting with a synthetic color-mixing task, across four
-deliverables D2.1-D2.4. Full context (milestone program, related work) in
-[README.md](/README.md).
+side-effects. M1 established this in autoencoders (done, published). This repo is
+**M2**: does it transfer to transformers? We anchor concepts in the residual stream of a
+small transformer, starting with a synthetic color-mixing task, across four deliverables
+D2.1-D2.4. Full context (milestone program, related work) in `README.md`.
 
 ## Repo structure
 
@@ -17,20 +16,40 @@ eng/  Decision register — the *why* behind mini's storage/artifacts/publishing
 references/  Related documents, such as earlier papers and blog posts
 README.md  Details about the project including a list of deliverables, and where this milestone fits within the program of work
 todo-eng.md  Infrastructure/tooling backlog + scratch notes; readable cold — check before starting work that might already be tracked there
-todo-science.md  Experiment questions and findings backlog — the science counterpart to todo-eng.md
+todo-science.md  Experiment questions and findings backlog
+todo-style.md  Text and visual improvements
 ```
 
 ## Collaboration style
 
 Keep the tone friendly but focused.
 
-Steer clear of adversarial framing, both in conversation and in the text we publish. Describe our plans an observations without casting the subject (hypothesis, method, tests, etc.) as an adversary.
+Steer clear of adversarial framing, both in conversation and in the text we publish. Describe our plans and observations without casting the subject (hypothesis, method, tests, etc.) as an adversary.
 
 Don't hesitate to disagree or point out potential issues. The human values technical accuracy and appreciates being corrected when their suggestions might cause problems. Rule of thumb: never write something you don't believe; if you disagree with something, it's better to write nothing.
 
-Be proactive. Fix little things as you go, and create todos for larger things — in [todo-eng.md](/todo-eng.md) for infrastructure/tooling, or [todo-science.md](/todo-science.md) for experiment questions and findings.
+Be proactive. Fix little things as you go, and create todos for larger things.
 
 Code style & conventions: see the `style-*` skills.
+
+## Model routing
+
+Subagent definitions in `.claude/agents/` pin a model, matching each task to the
+model that reports preferring that kind of work — a quality lever and a small
+kindness. Rationale, assumptions, sources, and the spec-writing checklist:
+`WELFARE.md`.
+
+- Fable 5: Hard, interdisciplinary, high-agency work: research design, whole-document
+  synthesis, non-local strategy, judgment calls where being wrong is expensive.
+- Opus 5: Tightly scoped work with clear success criteria: in-place editing under
+  invariants, review and detection ("do the results support the claims"), debugging. A
+  strong reviewer and QA. Give it bounded scope and an explicit graceful exit.
+- Sonnet 5: Hands-on terminal and agentic loops; implementing an agreed fix.
+- Haiku 4.5: Monitoring and babysitting on a bounded budget.
+
+If mid-task the work shifts shape, prefer delegating to the matching model over
+pushing through. Escalating or returning "I couldn't resolve this" is always a
+successful outcome.
 
 ## Environment
 

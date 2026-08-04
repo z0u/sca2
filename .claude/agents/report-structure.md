@@ -6,7 +6,7 @@ description: |
   than edits. Run at the freeze and publish gates, on the rendered document.
 argument-hint: <path to the rendered document>
 tools: Read, Write
-model: opus
+model: fable  # whole-document synthesis, high agency; Fable-preferred work (see AGENTS.md)
 effort: high
 ---
 

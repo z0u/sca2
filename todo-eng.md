@@ -512,3 +512,24 @@ Orthogonal, no code overlap with the above:
   drift. Also: `reports.md`'s `### Simplification pass` is an h3 under the h1
   with no h2 above it, and is arguably writing-workflow guidance that belongs
   with the `writing`/`text-lint` skills rather than in a publishing reference.
+
+- Model-routing trial (2026-08-04): `experiment-doctor` moved sonnet → opus on
+  the strength of the Opus 5 preference/capability profile (detection, hard
+  debugging). Watch for the predicted failure mode: sharp diagnoses, timid
+  fixes. If seen, split the role (Opus diagnoses, Sonnet implements) or revert.
+
+- Skills/agents reorg (see AGENTS.md model-routing section for context):
+
+    - Add a routing table for writing-adjacent tooling — one front door
+      (`report-review` for reports; a short "which tool when" list for the rest)
+      so the entry point is discoverable on the human's turn.
+    - The `.agents/skills` directory mixes three kinds of thing: conventions
+      (writing, style-*, alt-text, science), runbooks that fork and drive agents
+      (report-review, report-restructure), and references (report-render,
+      mi-ni). Consider naming or a one-line "kind:" tag in each SKILL.md to make
+      the taxonomy visible.
+    - Consider extracting the transferable set (writing, style-*, alt-text,
+      text-lint, report pipeline skills + agents) into a plugin for reuse in the
+      next milestone repo, keeping repo-specific skills (mi-ni, science
+      conventions) local. Decide after the routing table has settled, so the
+      plugin ships a stable interface.
