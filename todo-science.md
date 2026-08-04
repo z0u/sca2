@@ -55,6 +55,26 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   what ex-2.1.8's dose arm does. The `anti_dose` helper in
   `docs/m2/ex-2.1.8/experiment.py` computes it. #schedules
 
+- [ ] **The Spearman half of the grading gate is unreachable alongside
+  containment**, so a report that scores both is asking for two things at once.
+  Found in ex-2.1.8's exploratory section, which computes the ceiling: for a
+  response that reproduces `sim^1.5` exactly above a knee and sits at the
+  control below it, ρ against `redness` reaches 0.82 with no containment at all
+  (because `sim^1.5` is not monotone in `redness` — they correlate at 0.90) and
+  0.59 once the 161 colors below redness 0.4 are collapsed together. The gate is
+  0.8. The R² track does not have this problem: its target is near zero exactly
+  where containment acts, so its ceiling is 0.94 at the same knee, and the 0.78
+  the best cell reaches is a real shortfall rather than an artifact.
+
+  M1 never asked for this. `sca.colorcube` scores `red` and `collateral` as two
+  groups (404 of 512 grid points are collateral, close to our 161 of 216), so
+  the large flat block is a property of the color grid rather than of the
+  residual stream, and M1 handled it with a group contrast instead of a rank
+  statistic over the whole cube. Options for the next design: drop the ρ track,
+  restrict it to colors above the knee, or replace both with a group contrast in
+  M1's shape. Needs a decision before the next report scores grading.
+  #ex-2.1.8 #measurement #reports
+
 - [ ] Locating the concept inside a labeled span, without being told where it
   is. **Queued as ex-2.1.9, behind ex-2.1.8's operating point.** Design notes
   from the 2026-08-03 session are below; the original note follows them.
