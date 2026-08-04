@@ -456,39 +456,60 @@ def _():
     halving level from ex-2.1.7) with (b)–(d) held; or (a) is met at {ALPHA}
     but the margin falls between the ex-2.1.7 value of {M50} and the gate.
 
-    **H3: The level contributes at least as much containment as the timing.**
-    We score this on two main effects[^main] on $\bar\alpha$, both taken as
-    differences of means and reported with their sign. The hold-ratio effect is
-    the nine runs at 0.03 minus the nine at 0.30. The anneal-endpoint effect is
-    the six runs at endpoint 50 minus the six at endpoint 90. H3 holds when the
-    hold-ratio effect is at least {AGATE} and at least as large as the endpoint
-    effect.[^effect]
+    **H3: A sustained floor makes the anneal endpoint redundant.** This is
+    the level account's distinguishing prediction: if containment is lost at a
+    threshold, the endpoint has leverage only in the row whose floor crosses
+    it. We score it on $\bar\alpha$ with two conditions, each a difference of
+    means reported with its sign.
+    (a) The hold-ratio main effect[^main] — the nine runs at 0.03 minus the
+    nine at 0.30 — is at least {AGATE}: the floor does something at all.
+    (b) The interaction — the end50 − end90 difference within the 0.03 row,
+    minus the same difference within the 0.30 row — is at least {IGATE}: the
+    endpoint's leverage lives in the row where the floor crosses the
+    threshold.[^effect]
+    Condition (a) guards (b) against a pass with no containment in it, since
+    a *negative* endpoint effect in the 0.30 row would inflate the interaction
+    on its own.
 
     Explicit outcomes that would fail H3:
-    **1.** If the endpoint effect clears {AGATE} and is the larger, that would suggest the repulsion has to be present while the pull is strong, and no floor substitutes for that.
-    **2.** If `{PRIMARY}` alone contains the drift while neither main effect clears {AGATE}, then each factor is blocked by the other.[^h3-fail-2]
+    **1.** If the endpoint effect — the six runs at endpoint 50 minus the six at endpoint 90 — clears {AGATE} in both rows separately while the interaction stays under {IGATE}, that is the timing account: the repulsion has to be present while the pull is strong, and no floor substitutes for that.
+    **2.** If `{PRIMARY}` alone contains the drift while (a) fails, then each factor is blocked by the other.[^h3-fail-2]
 
-    The sign of the interaction term of the factorial is considered but not scored. The level account predicts the endpoint effect shrinks at the high hold ratio, because a floor that never crosses the threshold makes the crossing time irrelevant. An endpoint effect of similar size at both hold ratios fits the timing account instead. The discussion should mention this if the H3 main effects come out close.
+    The ordering of the two main effects — whether the hold-ratio effect is at
+    least as large as the endpoint effect — is reported but not scored. It
+    agrees with the interaction in the clean outcomes and separates from it in
+    the partial ones (a floor that slows the climb without preventing it can
+    win the ordering while the interaction stays small), and in that case the
+    interaction is the reading to trust.
 
     [^h1-standing]: Ex-2.1.7 found no task cost anywhere, including at ten times this
         anchor weight, so this is a standing gate rather than an open question. We
         state it because a sustained repulsive floor is the one thing in this grid
         that has not been tried.
 
-    [^h3-fail-2]: The second outcome is only reachable if the `hold30` row reverses the endpoint ordering. Ex-2.1.7 measured the `hold03` row moving from {A50} to {A90} across the endpoint on its own, and half of that span already falls inside the endpoint effect before the other row is counted.
+    [^h3-fail-2]: With the `hold03` row reproducing its ex-2.1.7 span of {A50}
+        to {A90}, (a) can only fail if the 0.30 row's mean sits nearly as high
+        — which, with `{PRIMARY}` contained, requires a wide endpoint spread
+        inside the 0.30 row itself. That is the reversed-interaction corner
+        condition (a) exists to guard, so this miss and the guard are the same
+        geometry seen from two sides.
 
     [^main]: A main effect is the average change from moving one factor,
         averaged over the levels of the other.
 
     [^effect]: Taking the ex-2.1.6 control spread of about 0.02 for
-        $\bar\alpha$, the noise on the hold-ratio effect is near
-        $0.02\sqrt{2}/\sqrt{9} \approx 0.009$, and on the endpoint effect,
-        with six-run means, near $0.02\sqrt{2}/\sqrt{6} \approx 0.012$; so
-        {AGATE} is four to five times either. Before reading the effects, we
-        compute the spread from this experiment's own seeds and check that the
-        anchored conditions hold it. If they do not, the observed spread
-        replaces the control spread and the gate moves with it. It is the only
-        threshold in this report allowed to move.
+        $\bar\alpha$: the hold-ratio effect compares nine-run means, so its
+        noise is near $0.02\sqrt{2}/\sqrt{9} \approx 0.009$ and {AGATE} is
+        about five times that; the interaction is a difference of two
+        differences of three-run cell means, noise near
+        $0.02 \cdot 2/\sqrt{3} \approx 0.023$, so {IGATE} is about four times
+        that — and the level account's expectation, taking the full {A50} to
+        {A90} span in the 0.03 row and none of it in the 0.30 row, is about
+        0.20, twice the gate. Before reading either statistic, we compute the
+        spread from this experiment's own seeds and check that the anchored
+        conditions hold it. If they do not, the observed spread replaces the
+        control spread and the gates move with it. They are the only
+        thresholds in this report allowed to move.
     """.replace("{TASK}", f"{ex.TASK_GATE:g}")
         .replace("{ALPHAP}", f"{ex.MEAN_ALIGN_PARTIAL:g}")
         .replace("{ALPHA}", f"{ex.MEAN_ALIGN_GATE:g}")
@@ -498,12 +519,24 @@ def _():
         .replace("{FLOOR}", f"{ex.H4_FLOOR:g}")
         .replace("{RET}", f"{ex.H4_RETENTION:g}")
         .replace("{AGATE}", f"{ex.ALPHA_EFFECT_GATE:g}")
+        .replace("{IGATE}", f"{ex.ALPHA_INTERACTION_GATE:g}")
         .replace("{PRIMARY}", ex.PRIMARY)
         .replace("{A50}", f"{ex.EX217_REFERENCE['end50-hold03']['alpha']:.2f}")
         .replace("{A90}", f"{ex.EX217_REFERENCE['end90-hold03']['alpha']:.2f}")
         .replace("{M50}", f"{ex.EX217_REFERENCE['end50-hold03']['m_op1']:.2f}")
     )
-    # REVIEW: three changes to H1 and H3, none to a gate value.
+    # REVIEW: H3's gate moved from the main-effect ordering to the interaction,
+    # with the hold-ratio main effect kept as a guard. The ordering compares two
+    # marginal sizes and can pass in a world where the floor only slows the
+    # climb (hold effect large, interaction small), which is not the level
+    # account; the interaction is that account's distinguishing prediction, and
+    # a review round had already licensed the discussion to lean on it whenever
+    # the main effects came out close — a decisive statistic should carry a
+    # gate. Power: predicted signal ~0.20 against ~0.023 noise, gate 0.1. The
+    # ordering demotes to a reported observation. Verify: the level-account
+    # expectation derives from EX217_REFERENCE (0.33 → 0.13 in the hold03 row);
+    # if the reproduction check fails, the power argument goes with it.
+    # REVIEW: three earlier changes to H1 and H3, none to a gate value.
     # (1) H1's partial named the dose arm as the likely offender; the analysis
     # section names the `hold30` row, which is the arm holding a repulsive
     # weight no earlier experiment sustained, so the partial now matches it.
@@ -658,19 +691,28 @@ def _():
     mo.md(
         r"""
     /// admonition | TODO
-    The factorial table on $\bar\alpha$: the six cell means, the two main
-    effects with the {AGATE} gate marked, and the interaction. Repeat on
+    The factorial table on $\bar\alpha$: the six cell means; the hold-ratio
+    main effect against its {AGATE} gate; the interaction — the end50 − end90
+    difference within each row, then the 0.03 row's minus the 0.30 row's —
+    against its {IGATE} gate; and the endpoint effect within each row
+    separately, which is what named miss 1 reads. The main-effect ordering is
+    reported under the table, unscored. Repeat the cell means on
     $m_{\text{op1}}$ beside it, since a factor that contains the drift without
     holding the margin has not given us an operating point.
 
     Also state the seed spread this experiment actually measures for
-    $\bar\alpha$, as the footnote to H3 requires, before reading either effect.
+    $\bar\alpha$, as the footnote to H3 requires, before reading either
+    statistic.
 
-    Expected: the hold-ratio effect larger, and a negative interaction, with
-    the endpoint mattering less at the high floor. A same-sized endpoint effect
-    in both rows is the timing account, and is one of the two named misses.
+    Expected under the level account: an interaction near +0.20 — the whole
+    endpoint effect concentrated in the 0.03 row. A same-sized endpoint effect
+    in both rows puts the interaction near zero, which is the timing account
+    and named miss 1. In between — a positive interaction under the gate with
+    the 0.30 row still improving on the 0.03 row — reads as a floor that slows
+    the climb without preventing it, and the trajectory figure under H2 is
+    where that reading is checked.
     ///
-    """.replace("{AGATE}", f"{ex.ALPHA_EFFECT_GATE:g}")
+    """.replace("{AGATE}", f"{ex.ALPHA_EFFECT_GATE:g}").replace("{IGATE}", f"{ex.ALPHA_INTERACTION_GATE:g}")
     )
     return
 

@@ -265,8 +265,21 @@ is worded per run — and a three-seed mean can hide a single sliding run, which
 is the failure the gate exists to catch.
 """
 
+ALPHA_INTERACTION_GATE = 0.1
+"""H3(b): the smallest interaction on ᾱ scored as real.
+
+The interaction is the end50 − end90 difference within the 0.03 row minus the
+same difference within the 0.30 row: the level account's distinguishing
+prediction, since a floor that never crosses the containment threshold makes
+the crossing time irrelevant. Its noise is a difference of two differences of
+three-run cell means, about 0.02·2/√3 ≈ 0.023 at ex-2.1.6's control spread, so
+0.1 is about 4× that — and the level account's expectation from ex-2.1.7's own
+numbers (the full 0.33 → 0.13 span in the 0.03 row, near zero in the 0.30 row)
+is about 0.20, twice the gate.
+"""
+
 ALPHA_EFFECT_GATE = 0.05
-"""H3: the smallest main effect on ᾱ scored as real.
+"""H3(a): the smallest main effect on ᾱ scored as real.
 
 Ex-2.1.6's control put ᾱ's seed spread at about 0.02. A main effect here is a
 difference of two nine-run means, so its noise is roughly 0.02·√2/√9 ≈ 0.009,
