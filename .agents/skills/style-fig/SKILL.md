@@ -150,6 +150,9 @@ Authored HTML tables (built by hand and wrapped in `mo.Html`, not marimo's
   header text starts at the same indent as the swatched values below it.
 - Caption the table the same way you would a figure (see below), by wrapping it
   in `figure_html(..., caption=..., class_="report-figure")`.
+- In a scored results table, make it visible at a glance what counts as good:
+  mark each scored column's desired direction in its header (↑ or ↓, matching
+  the report's glossary), and bold the values that pass their gate.
 
 ## Theming and annotation
 

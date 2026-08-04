@@ -3,7 +3,7 @@ import marimo
 __generated_with = "0.23.15"
 app = marimo.App(
     width="medium",
-    app_title="Ex 2.1.8: when the repulsion acts, and how much is left",
+    app_title="Ex 2.1.8: Repulsion tuning",
     css_file="../../report.css",
     auto_download=["html"],
 )
@@ -40,41 +40,46 @@ def _():
     mo.md(
         r"""
     In ex-2.1.6 we aligned *red* with a direction in the residual stream, but it dragged the whole color space with it.
-    Then in ex-2.1.7 we added a repulsive *anti-subspace* term that pushed everything away from the _red_ axis $\hat v_{\text{red}}$. It worked, but not well enough: the mean *red*-alignment of all colors fell from $\bar\alpha$ = 0.53 to {A50}, but the target was &lt; {AGATE}.
+    Then in ex-2.1.7 we added a repulsive *anti-subspace* term that pushed everything away from the _red_ axis $\hat v_{\text{red}}$. It helped, but not enough: the mean *red*-alignment over all colors fell from $\bar\alpha$ = 0.53 to {A50}, and the target was &lt; {AGATE}.
 
-    The training trajectories showed that, while the repulsion outweighs the pull, $\bar\alpha$ stays near the control (good). Once the anneal[^anneal] brings $\lambda_{\bar{\text{s}}}$ down to about a tenth of $\lambda_\text{a}$, it starts to climb (not good). Each condition broke according to its own schedule: around epoch 40 on the M1 schedule, and epoch 75 on `span-anti-late` — the arm that stretched it.
+    The training trajectories show what happens over the course of a run. While the repulsion outweighs the pull, $\bar\alpha$ stays near the control, which is what we want. Then the anneal[^anneal] brings $\lambda_{\bar{\text{s}}}$ down to about a tenth of $\lambda_\text{a}$, and $\bar\alpha$ starts to climb again. Each condition turned at its own point in the schedule: around epoch 40 on the M1 schedule, and epoch 75 on `span-anti-late`, the arm that stretched it.
+
     The M1 keyframes came from a 5-dimensional autoencoder bottleneck, mapped onto our 100 epochs by fraction of training. So we never had much reason to expect them to suit a 64-dimensional residual stream.
 
     [^anneal]: An anneal here is a schedule that ramps a loss weight down gradually over training.
 
-    That arm only delayed the epoch at which the repulsion finished annealing, from 50 to 90, and that improved every statistic the H2 and H4 hypotheses scored: margin {M50} → {M90}, $\bar\alpha$ {A50} → {A90}, retention across the anneal, and grading. But for future experiments, should we stretch the anneal, or just have it end at a higher weight?
+    All that `span-anti-late` did was push the end of the anneal from epoch 50 to epoch 90. That improved every statistic the H2 and H4 hypotheses scored: margin {M50} → {M90}, $\bar\alpha$ {A50} → {A90}, retention across the anneal, and grading. For future experiments, then, should we stretch the anneal, or end it at a higher weight? Each option is a reading of the ex-2.1.7 result, and the rest of this report refers to them by name:
 
-    Let's test both. If $\bar\alpha$ stays low with a high enough $\lambda_{\bar{\text{s}}}$, then at that floor the endpoint shouldn't matter.
+    - The timing account: the repulsion has to still be there while the pull is strong enough to move the cube, and a later anneal keeps it there. Stretch the anneal.
+    - The level account: containment is lost when $\lambda_{\bar{\text{s}}}/\lambda_\text{a}$ falls past the threshold ex-2.1.7 observed, and a later anneal helps only by postponing that. End the anneal at a higher weight.
+
+    We test both. The two separate cleanly, because only the level account predicts an interaction: a floor that stays above the threshold never crosses it, so at that floor the timing of the endpoint should stop mattering.
 
     /// details | Notation and glossary
-    Unchanged from ex-2.1.7.
+    Carried from ex-2.1.7.
 
     | term | meaning | target |
     |:---:|:--- |:---:|
-    | $\hat v_{\text{red}}$ | the anchor direction |
-    | $\lambda_\text{a}$ | anchor weight, fixed at {SCORING} throughout |
-    | $\lambda_{\bar{\text{s}}}$ | anti-subspace weight, always given as the ratio $\lambda_{\bar{\text{s}}}/\lambda_\text{a}$ |
-    | cell | a sweep condition crossed with a seed |
-    | leak |  |
-    | contained |  |
-    | retention |  |
-    | $m$, $m_{\text{op1}}$ | alignment margin, and its layer mean at op1 <!-- isn't this defined in terms of $\bar\alpha$, $\hat v_{\text{red}}$ and ... something else? --> | ↑ |
-    | $\bar\alpha$ | mean alignment with $\hat v_{\text{red}}$ over all 216 colors, layer-averaged at op1 | ↓ |
+    | $\hat v_{\text{red}}$ | the anchor direction | |
+    | $\lambda_\text{a}$ | anchor weight, fixed at {SCORING} throughout | |
+    | $\lambda_{\bar{\text{s}}}$ | anti-subspace weight, always given as the ratio $\lambda_{\bar{\text{s}}}/\lambda_\text{a}$ | |
+    | cell | a sweep condition crossed with a seed | |
+    | $\alpha_c$, $\bar\alpha$ | the alignment (cosine) of color $c$ with $\hat v_{\text{red}}$ at op1, averaged over layers; and the mean of that over all 216 colors | ↓ |
+    | $m$, $m_{\text{op1}}$ | alignment margin $\sum_c w_c \alpha_c - \bar\alpha$, where $w_c$ are the *red*-label affinities normalized to sum to 1; $m_{\text{op1}}$ is the layer mean of $m$ at op1 | ↑ |
+    | contained | of a condition: $\bar\alpha \le {AGATE}$, so the drift is held near the control rather than just weakened | |
+    | retention | per run, the final $m_{\text{op1}}$ divided by its running peak (scored once the peak reaches {FLOOR}); reported as the minimum across seeds | ↑ |
+    | leak | $R^2$ of redness decoded from the 63 non-anchor directions at op1; unscored, and cannot fall below the RGB-geometry floor of 0.863 | — |
 
     | measurement | interpretation |
     |:---:|:--- |
     | $m \rightarrow 1$ | *red* colors are aligned with the anchor, and other colors are not |
-    | $m \rightarrow 0$ | *red* colors are unaligned, or it is but so are other colors |
+    | $m \rightarrow 0$ | *red* colors are unaligned, or they are but so is every other color |
     | $\bar\alpha \rightarrow 1$ | the whole cube is anchored, not just *red* |
     | $\bar\alpha \rightarrow 0$ | most colors are orthogonal to the anchor |
     ///
     """.replace("{SCORING}", f"{ex.SCORING_LAMBDA:g}")
         .replace("{AGATE}", f"{ex.MEAN_ALIGN_GATE:g}")
+        .replace("{FLOOR}", f"{ex.H4_FLOOR:g}")
         .replace("{M50}", f"{ex.EX217_REFERENCE['end50-hold03']['m_op1']:.2f}")
         .replace("{M90}", f"{ex.EX217_REFERENCE['end90-hold03']['m_op1']:.2f}")
         .replace("{A50}", f"{ex.EX217_REFERENCE['end50-hold03']['alpha']:.2f}")
@@ -139,11 +144,25 @@ def _():
     mo.md(
         r"""
     The anchor weight stays at $\lambda_\text{a} = {SCORING}$. The ceiling arm in ex-2.1.7 showed selectivity falling at ten times this weight, with no task cost even there. So the previous scoring rung is still the right place to tune the repulsion against.
+    """.replace("{SCORING}", f"{ex.SCORING_LAMBDA:g}")
+    )
+    return
 
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ### The sweep grid
 
     Factors:
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(
+        r"""
     - **A.** Anneal endpoint
 
         The epoch at which $\lambda_{\bar{\text{s}}}/\lambda_\text{a}$ reaches its hold ratio.
@@ -164,8 +183,7 @@ def _():
 
     An un-anchored control ($\lambda_\text{a} = 0$) runs through the same code,
     giving {N_COND} conditions and {N_CELL} cells in total.
-    """.replace("{SCORING}", f"{ex.SCORING_LAMBDA:g}")
-        .replace("{ENDS}", ", ".join(f"{e:g}" for e in ex.ANTI_ANNEAL_ENDS))
+    """.replace("{ENDS}", ", ".join(f"{e:g}" for e in ex.ANTI_ANNEAL_ENDS))
         .replace("{HOLDS}", ", ".join(f"{h:g}" for h in ex.ANTI_HOLD_RATIOS))
         .replace("{N_COND}", str(len(ex.CONDITIONS)))
         .replace("{N_CELL}", str(len(ex.CONDITIONS) * len(ex.SEEDS)))
@@ -261,6 +279,8 @@ def _():
             decay to zero by about epoch 80.
             The two crescents where they differ are hatched — grey where the dose arm falls short early, purple
             where it runs higher late. The two crescents are about the same size.
+            Faint reference curves show the anchor weight in both panels, and the
+            unscaled late schedule on the right.
         """,
         caption=r"""
             **The schedules under test.** **Left:** anti-subspace weight
@@ -269,6 +289,9 @@ def _():
             $\lambda_{\bar{\mathrm{s}}}\cdot$lr, so area on the page
             is repulsion delivered. Hatching shows where the dose arm
             falls short of the reference early and where it makes that back late.
+            Ghost ink in both panels: the anchor weight $\lambda_\mathrm{a}$; on
+            the right, also `end90-hold03`, the schedule the arm was scaled down
+            from.
         """,
     )
     def _plot():
@@ -363,8 +386,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(
-        r"""
+    mo.md(r"""
     ### Measurements
 
     Like ex-2.1.7:
@@ -377,7 +399,14 @@ def _():
     - Grading: Spearman $\rho$ against `redness` and Pearson $R^2$ against
       `sim¹·⁵` over the 216 colors (H2).
     - Per-run margin trajectories, for retention (H2).
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(
+        r"""
     Ex-2.1.7 quoted *retention* two ways under one name: the minimum
     final-over-peak margin across seeds in its Findings, and the mean across
     seeds in its Arms section. This report uses the **{RSTAT}**, and every
@@ -390,14 +419,20 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(
-        r"""
+    mo.md(r"""
     ## Hypotheses
 
     Gates and noise floors carry over from ex-2.1.7 with their thresholds and
     rationale, since we have the same architecture, the same measurement, and
     the same statistics.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(
+        r"""
     **H1: Task cost.** Every condition is task-clean, meaning `named_holdout`
     exact match within {TASK} (absolute) of the seed mean of the in-experiment
     control.[^h1-standing] Partial: the `hold03` cells and the dose arm are
@@ -427,8 +462,6 @@ def _():
     Explicit outcomes that would fail H3:
     **1.** If the endpoint effect clears {AGATE} and is the larger, that would suggest the repulsion has to be present while the pull is strong, and no floor substitutes for that.
     **2.** If `{PRIMARY}` alone contains the drift while neither main effect clears {AGATE}, then each factor is blocked by the other.[^h3-fail-2]
-
-    <!-- "the level account" and "the timing account" need clear definition somewhere -->
 
     The sign of the interaction term of the factorial is considered but not scored. The level account predicts the endpoint effect shrinks at the high hold ratio, because a floor that never crosses the threshold makes the crossing time irrelevant. An endpoint effect of similar size at both hold ratios fits the timing account instead. The discussion should mention this if the H3 main effects come out close.
 
@@ -487,10 +520,16 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
+    mo.md(r"""
+    ## Reproduction check
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
     mo.md(
         r"""
-    ## Reproduction check
-
     /// admonition | TODO
     A two-row table: `end50-hold03` and `end90-hold03` against `span-anti`
     and `span-anti-late` from ex-2.1.7, on $m_{\text{op1}}$ and $\bar\alpha$
@@ -519,10 +558,16 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
+    mo.md(r"""
+    ## Task cost (H1)
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
     mo.md(
         r"""
-    ## Task cost (H1)
-
     /// admonition | TODO
     A table over all {N} conditions: `named_holdout` exact match (seed mean ±
     spread), and the absolute gap from the control, with the {TASK} gate
@@ -540,18 +585,24 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
+    mo.md(r"""
+    ## An operating point (H2)
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
     mo.md(
         r"""
-    ## An operating point (H2)
-
     /// admonition | TODO
     The scoring table: one row per factorial cell, columns $\bar\alpha$,
     $m_{\text{op1}}$, grading ($\rho$ and $R^2$), and retention (minimum
     across seeds), each marked against its gate, with a final column saying
     whether the cell meets all four. The ex-2.1.7 conditions `span-anti` and
     `span-anti-late` appear in the table as `end50-hold03` and `end90-hold03`.
-
-    <!-- Columns in tables like these should make it clear what counts as good (e.g. uparrow and/or bolded values) -->
+    Column headers carry the desired direction (↑/↓, as in the glossary), and
+    values that pass their gate are bolded.
 
     Expected under the level account: `{PRIMARY}` meets all four, and the
     `hold30` row generally beats the `hold03` row on containment. Under the
@@ -591,10 +642,16 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
+    mo.md(r"""
+    ## Attribution (H3)
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
     mo.md(
         r"""
-    ## Attribution (H3)
-
     /// admonition | TODO
     The factorial table on $\bar\alpha$: the six cell means, the two main
     effects with the {AGATE} gate marked, and the interaction. Repeat on
@@ -615,10 +672,16 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
+    mo.md(r"""
+    ## The dose arm
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
     mo.md(
         r"""
-    ## The dose arm
-
     /// admonition | TODO
     Three rows: `{REF}`, `end90-hold03`, and `{ARM}`, on $\bar\alpha$,
     $m_{\text{op1}}$, grading and retention, with the dose column from the
