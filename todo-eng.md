@@ -14,6 +14,8 @@ state.
 
 ## Scratch
 
+- `gh-pages` branch pruning. This is where we publish reports to; see `.github/workflows/publish-docs.yml`. Currently the branch history is linear, and contains a commit for every preview build and every build on `main`. We should compact it, probably on every `main` build. How many commits to keep? Unsure, maybe ~1 week, maybe only those from `main` and currently-open branches. Maybe the Action that we use supports this out of the box.
+
 - Un/rewrap all multiline prose strings? I find I'm constantly re-wrapping these and it's getting old. Maybe it's better to keep them on one line and rely on the editor to soft-wrap. Apart from newlines that are actually useful within a paragraph, e.g. immediately preceding an inline list item (so it can be found in the unrendered text).
 
 - Method prose hardcodes constants that live in the experiment module
