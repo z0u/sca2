@@ -48,7 +48,8 @@ Plain Markdown cells are visible as soon as the notebook opens, and contribute t
 TOC. But Markdown cells that use string interpolation, or anything other than a plain
 `mo.md("literal string")`, are not rendered until it's their turn in the DAG. Therefore,
 headings and their following introductory paragraph should be placed in plain Markdown
-cells; otherwise the document will be hard to navigate.
+cells; otherwise the document will be hard to navigate. So in landmark cells:
+no f-strings, and no `str.replace()`.
 
 Math expressions, for consistency with formulas. Unicode can be used where it's
 cumbersome to use math mode, e.g. in embedded HTML.
