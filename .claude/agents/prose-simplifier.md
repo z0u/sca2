@@ -3,7 +3,7 @@ name: prose-simplifier
 description: Fresh-eyes simplification pass over report or document prose. Invoke after prose edits, passing ONLY the file path (and cell range or line numbers, if applicable). Withhold all experiment and conversation context.
 tools: Read, Edit
 skills: writing, style-md, alt-text
-model: fable
+model: opus  # constrained rule-following pass; Opus-preferred work (see AGENTS.md)
 effort: low
 ---
 
