@@ -161,19 +161,24 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
+    def _and_join(items) -> str:
+        """Prose list: a sealing "and" before the last item, so the list cannot leak into the next sentence."""
+        *head, last = list(items)
+        return f"{', '.join(head)} and {last}" if head else last
+
     mo.md(
         r"""
     - **A.** Anneal endpoint
 
         The epoch at which $\lambda_{\bar{\text{s}}}/\lambda_\text{a}$ reaches its hold ratio.
-        Levels: {{ENDS}}.
-        50 is the M1 keyframe mapped by fraction of training, and
+        Levels: {ENDS}.
+        Endpoint 50 is the M1 keyframe mapped by fraction of training, and
         90 is the timing arm from ex-2.1.7, so two cells reproduce conditions we have already measured.
 
     - **B.** Hold ratio
 
-        The level it settles at. Levels: {{HOLDS}}.
-        0.03 is the M1 level. 0.30 is three times the level at which ex-2.1.7 saw
+        The level it settles at. Levels: {HOLDS}.
+        Ratio 0.03 is the M1 level; 0.30 is three times the level at which ex-2.1.7 saw
         containment give way, so on the level reading it should never cross the
         threshold at all.
 
@@ -183,8 +188,8 @@ def _():
 
     An un-anchored control ($\lambda_\text{a} = 0$) runs through the same code,
     giving {N_COND} conditions and {N_CELL} cells in total.
-    """.replace("{ENDS}", ", ".join(f"{e:g}" for e in ex.ANTI_ANNEAL_ENDS))
-        .replace("{HOLDS}", ", ".join(f"{h:g}" for h in ex.ANTI_HOLD_RATIOS))
+    """.replace("{ENDS}", _and_join(f"{e:g}" for e in ex.ANTI_ANNEAL_ENDS))
+        .replace("{HOLDS}", _and_join(f"{h:.2f}" for h in ex.ANTI_HOLD_RATIOS))
         .replace("{N_COND}", str(len(ex.CONDITIONS)))
         .replace("{N_CELL}", str(len(ex.CONDITIONS) * len(ex.SEEDS)))
     )
