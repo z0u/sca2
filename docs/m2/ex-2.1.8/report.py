@@ -1508,13 +1508,292 @@ def _(ANCHORED, CONDS: list[str], cells, geometry):
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(r"""
+    mo.md(
+        r"""
     ## Exploratory analyses
 
-    /// admonition | TODO
-    Post hoc, planned after seeing the results; scores no hypothesis. We leave
-    this empty in the preregistration.
-    ///
+    Post hoc, and scoring nothing. H2 failed on grading in every cell, so the
+    question is what the response actually looks like.
+
+    ### What the two grading tracks disagree about
+
+    A pure step — *red* colors aligned, everything else orthogonal — is the
+    failure the grading gate exists to exclude. Both tracks carry a ceiling for
+    it, the best a step can score over all step locations: ρ can reach
+    {SRHO} and R² {SR2}, and both sit under the {GATE} gates, so no step passes.
+    """.replace("{SRHO}", f"{ex.STEP_RHO_CEILING:.2f}")
+        .replace("{SR2}", f"{ex.STEP_R2_CEILING:.2f}")
+        .replace("{GATE}", f"{ex.GRADE_R2_GATE:g}")
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(grading):
+    _above = [c for c in ex.FACTORIAL_NAMES if grading(c)[1] > ex.STEP_R2_CEILING]
+    _best_rho = max(grading(c)[0] for c in ex.FACTORIAL_NAMES)
+    _best_r2 = max(grading(c)[1] for c in ex.FACTORIAL_NAMES)
+    mo.md(rf"""
+    Read against those ceilings, the two tracks say opposite things.
+
+    On the rank track, every cell scores below what a step would: the best ρ in
+    the grid is {_best_rho:.2f} against a step ceiling of
+    {ex.STEP_RHO_CEILING:.2f}. On the proportionality track, {len(_above)} of
+    the six score above it, up to R² = {_best_r2:.2f} against
+    {ex.STEP_R2_CEILING:.2f}.
+
+    The two are measured against different targets — ρ ranks colors by
+    `redness`, R² fits values against `sim¹·⁵` — so they can disagree, and here
+    they do. Neither number on its own says whether the response is a grade or a
+    step, which is what the figure below is for.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, alpha_map, grading, m_op1):
+    _RESP = {c: alpha_map(c)[:, :, 0].mean(axis=0) for c in [*ex.FACTORIAL_NAMES, "lam0"]}
+    _order = np.argsort(ex.REDNESS)
+
+    def _windowed(y: np.ndarray, k: int = 25) -> np.ndarray:
+        """Mean of *y* over a sliding window of the redness ordering."""
+        pad = np.pad(y[_order], (k // 2, k // 2), mode="edge")
+        return np.convolve(pad, np.ones(k) / k, mode="valid")
+
+    def _fitted_target(y: np.ndarray) -> np.ndarray:
+        """`sim¹·⁵` rescaled by least squares onto the response — the shape R² scores against.
+
+        R² is scale-invariant, so the target has no natural height; fitting it
+        puts the curve where the statistic is actually comparing shapes.
+        """
+        t = ex.SIM_TARGET
+        b = np.polyfit(t, y, 1)
+        return np.polyval(b, t)
+
+    _CTRL = _windowed(_RESP["lam0"])
+    _GRID = [ROW[HOLD_LO], ROW[HOLD_HI]]
+
+    @themed(
+        name="grading",
+        alt_text="""
+            Six panels in a three-by-two grid sharing both axes: per-color alignment at
+            the first operand, from about -0.1 to 1, against the redness of that color,
+            from 0 to 1. Columns are anneal endpoints 50, 70 and 90; the upper row is
+            hold ratio 0.03 and the lower 0.30. Each panel scatters 216 marks drawn in
+            the color each stands for, with a heavy sliding-mean line through them, a
+            flat grey control band near zero, and a dashed straight reference line.
+            In every panel the marks form a dense flat cluster of greys, greens and
+            blues at low redness, then a sparse rising tail of oranges and reds. The
+            flat cluster sits higher in the upper row than the lower. The sliding mean
+            is close to flat across the left two-thirds of every panel and rises
+            steeply only in the right third, staying below the dashed line at low
+            redness and crossing it near the top.
+        """,
+        caption=r"""
+            **Alignment at op1, per color.** $\alpha_c$, the layer mean of
+            $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the
+            redness of the color. Columns are the anneal endpoint, rows the hold
+            ratio, as in the trajectory figure. One mark per color, drawn in that
+            color; the heavy line is a 25-color sliding mean over the redness
+            ordering, and the flat grey band is the same sliding mean for the
+            un-anchored control. The dashed line is `sim¹·⁵` rescaled onto the
+            response by least squares — the shape the $R^2$ track scores
+            against, so the marks' distance from it is what that statistic
+            measures. Per-panel statistics: both grading gates sit at 0.8, and
+            a pure step response can reach at most ρ = 0.75 or $R^2$ = 0.73.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        from typing import cast
+
+        from mini.vis import AxesGrid
+
+        fig, axes = plt.subplots(2, 3, figsize=(7.5, 5.0), sharey=True, sharex=True)
+        axes = cast(AxesGrid, axes)
+        for row, conds in zip(axes, _GRID, strict=True):
+            for ax, cond in zip(row, conds, strict=True):
+                a, (rho, r2) = _RESP[cond], grading(cond)
+                ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
+                ax.plot(
+                    ex.REDNESS[_order], _CTRL, color=light_dark("#999", "#777"), lw=3, alpha=0.5, zorder=1,
+                    solid_capstyle="round",
+                )  # fmt: skip
+                # The R² target, so a reader can see the fit the statistic reports
+                # rather than taking the number on trust. Smoothed the same way
+                # as the response: several colors share a redness, so connecting
+                # the target in redness order would zigzag between them.
+                ax.plot(ex.REDNESS[_order], _windowed(_fitted_target(a)), color=light_dark("#888", "#888"),
+                        lw=1.0, ls=(0, (4, 2)), zorder=2)  # fmt: skip
+                ax.scatter(ex.REDNESS, a, c=ex.GRID_RGB, s=18, lw=0.4, zorder=3,
+                           edgecolors=light_dark("#00000033", "#ffffff55"))  # fmt: skip
+                ax.plot(ex.REDNESS[_order], _windowed(a), color=light_dark("#222", "#eee"), lw=1.6, zorder=4)
+                ax.set_title(
+                    f"end {BY_NAME[cond]['anti_anneal_end']:.0f} · hold {BY_NAME[cond]['anti_hold_ratio']:.2f}",
+                    fontsize=9.5,
+                )
+                ax.annotate(
+                    f"ρ = {rho:.2f}\nR² = {r2:.2f}\n$m$ = {m_op1(cond).mean():.2f}",
+                    (0.03, 0.97), xycoords="axes fraction", va="top", fontsize=8,
+                    color=light_dark("#444", "#bbb"),
+                )  # fmt: skip
+        for ax in axes[1]:
+            ax.set_xlabel("redness of op1", fontsize="small")
+        for row in axes:
+            row[0].set_ylabel(r"$\alpha_c$ at op1", fontsize="small")
+        axes[0][0].set_ylim(-0.25, 1.25)  # headroom for the per-panel statistics
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    The response is not a step. It has a knee: flat from the control level up to
+    a redness of about 0.4, then a clean rise that tracks the dashed target
+    closely. Raising the hold ratio lowers the flat part toward the control
+    without changing the rise, which is containment doing what it is meant to.
+
+    But most of the color cube lives in that flat part. 161 of the 216 colors
+    fall below redness 0.4, and inside a flat band their alignments carry no
+    ordering — they are what containment collapses together. A rank statistic
+    over all 216 colors is therefore dominated by them.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(alpha_map):
+    _KNEES = (0.2, 0.3, 0.4, 0.5)
+    _R = ex.REDNESS
+    _resp = {c: alpha_map(c)[:, :, 0].mean(axis=0) for c in ex.FACTORIAL_NAMES}
+    _rows = "".join(
+        f"<tr><th><code>{c}</code></th>"
+        f"<td class='num'>{ex.spearman(_resp[c], _R):.3f}</td>"
+        + "".join(f"<td class='num'>{ex.spearman(_resp[c][_R >= k], _R[_R >= k]):.3f}</td>" for k in _KNEES)
+        + "</tr>"
+        for c in ex.FACTORIAL_NAMES
+    )
+    _head = "".join(f"<th class='num'>≥ {k:g} <span class='range'>({(_R >= k).sum()})</span></th>" for k in _KNEES)
+    _table = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr><th>cell</th><th class="num">all 216</th>{_head}</tr></thead>
+      <tbody>{_rows}</tbody>
+    </table></div>
+    """
+    _caption = f"""
+    Spearman ρ against <code>redness</code>, computed over all 216 colors and
+    then over the colors above each redness cut, with the number of colors
+    remaining in each header. The gate is {ex.GRADE_RHO_GATE:g}.
+    """
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
+    return
+
+
+@app.cell(hide_code=True)
+def _(alpha_map):
+    _R = ex.REDNESS
+    _hi = _R >= 0.4
+    _rho_hi = [float(ex.spearman(a[_hi], _R[_hi])) for a in (alpha_map(c)[:, :, 0].mean(axis=0) for c in ex.FACTORIAL_NAMES)]  # fmt: skip
+    mo.md(rf"""
+    Above the knee the ordering is good in every cell — ρ runs
+    {min(_rho_hi):.2f} to {max(_rho_hi):.2f} on the 55 colors with redness ≥
+    0.4, against a gate of {ex.GRADE_RHO_GATE:g} — and it climbs monotonically
+    as the flat colors are excluded. So the graded part of the response is
+    graded. What the full-set statistic reports is mostly the size of the flat
+    part.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### What a contained response can score
+
+    That raises a question about the gate rather than about the runs. If
+    containment collapses the low-redness colors together, and the grading
+    statistic reads their ordering, then the two are in tension by
+    construction. The question is how much.
+
+    So we build the best response either statistic could hope for — the target
+    shape exactly, above a knee, and contained to near zero below it — and score
+    it. This is a property of the two statistics and the 216-color grid, not a
+    measurement of any run.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    # Monte Carlo over the contained block's arbitrary ordering, which is what
+    # makes this an expectation rather than a value. Computed in the cell, and
+    # small enough that the draw count costs nothing.
+    _rng = np.random.default_rng(0)
+    _R, _T = ex.REDNESS, ex.SIM_TARGET
+
+    def _ceiling(knee: float, draws: int = 600) -> tuple[float, float]:
+        """Expected (ρ, R²) for a response that is `sim¹·⁵` above *knee* and contained below it."""
+        hi = _R >= knee
+        out = np.array(
+            [
+                (ex.spearman(a, _R), ex.r2_sim(a))
+                for a in (np.where(hi, _T, _rng.normal(0, 0.02, _R.size)) for _ in range(draws))
+            ]
+        )
+        return float(out[:, 0].mean()), float(out[:, 1].mean())
+
+    _rows = "".join(
+        f"<tr><th>{k:g}</th><td class='num'>{(_R < k).sum()}</td>"
+        f"<td class='num'>{r:.2f}</td><td class='num'>{r2:.2f}</td></tr>"
+        for k in (0.0, 0.3, 0.4, 0.5)
+        for r, r2 in [_ceiling(k)]
+    )
+    _table = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr>
+        <th>knee</th><th class="num">colors contained</th>
+        <th class="num">best ρ</th><th class="num">best R²</th>
+      </tr></thead>
+      <tbody>{_rows}</tbody>
+    </table></div>
+    """
+    _caption = f"""
+    The best either grading track can score, for a response that reproduces
+    <code>sim¹·⁵</code> exactly above the knee and sits at the control below it.
+    A knee of 0 is no containment at all. Both gates are
+    {ex.GRADE_R2_GATE:g}. Expectations over the contained block's arbitrary
+    ordering; a pure step reaches ρ = {ex.STEP_RHO_CEILING:.2f} and
+    R² = {ex.STEP_R2_CEILING:.2f} for comparison.
+    """
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
+    return
+
+
+@app.cell(hide_code=True)
+def _(grading):
+    _best_r2 = max(grading(c)[1] for c in ex.FACTORIAL_NAMES)
+    mo.md(rf"""
+    The two tracks come apart. Even with no containment at all, the best ρ a
+    perfect `sim¹·⁵` response reaches is 0.82, barely over the gate, because
+    `sim¹·⁵` is not a monotone function of `redness` — the two correlate at
+    0.90, not 1. Contain the 161 colors below redness 0.4 and the ceiling falls
+    to 0.59, under the observed values. So the ρ track penalizes containment,
+    and at the containment this grid achieves it cannot reach
+    {ex.GRADE_RHO_GATE:g} however well the response is graded.
+
+    R² behaves the other way. Its target is near zero for the colors
+    containment collapses, so containment moves the response toward the target
+    rather than away: the ceiling is 0.94 at a knee of 0.4 and 0.87 even at 0.5.
+    That track is reachable, and the best cell in this grid gets
+    {_best_r2:.2f} of it.
+
+    Two things follow, and both are for the next design rather than for this
+    report. The ρ gate as written is in tension with the containment H2 also
+    asks for, so a report that scores both is asking for two things at once
+    without saying so. And the R² shortfall is real: against an achievable 0.94,
+    {_best_r2:.2f} is a gap in the response, not an artifact of the statistic.
     """)
     return
 
