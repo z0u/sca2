@@ -221,7 +221,7 @@ def publish_results(results: list[dict]) -> dict:
         f"{i:03d}_{k}": np.asarray(v, dtype=np.float32) for i, r in enumerate(results) for k, v in r["traj"].items()
     }
     buf = io.BytesIO()
-    np.savez_compressed(buf, **trajs)  # ty:ignore[invalid-argument-type]
+    np.savez_compressed(buf, **trajs)
     set_ref(TRAJS_REF, put(buf.getvalue(), name="ex-2.9.4-trajectories.npz"))
     return {"n_published": len(metrics)}
 
