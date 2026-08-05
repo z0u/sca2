@@ -14,6 +14,14 @@ state.
 
 ## Scratch
 
+- I want to see how the model changes over the course of training. We have the trajectories, and they hint at the schedules playing a part in the final shape of the cube in latent space (rather than term weight being the sole determining factor). So, let's create animated visualizations of:
+
+    - Scatter plots of alignment, e.g. those titled "Alignment at op1, per color."
+    - The smooth-step per token metrics plots
+    - Linear probe readouts of the color cube, against the true cube
+
+    If this were interactive, I'd like to be able to scrub through epochs, conditions, and metrics. If the data required would be large, we'll need to consider some chunked format. This could be embedded in a Marimo notebook, but if it's easier to have it as a standalone SPA, that's fine too.
+
 - `gh-pages` branch pruning. This is where we publish reports to; see `.github/workflows/publish-docs.yml`. Currently the branch history is linear, and contains a commit for every preview build and every build on `main`. We should compact it, probably on every `main` build. How many commits to keep? Unsure, maybe ~1 week, maybe only those from `main` and currently-open branches. Maybe the Action that we use supports this out of the box.
 
 - Un/rewrap all multiline prose strings? I find I'm constantly re-wrapping these and it's getting old. Maybe it's better to keep them on one line and rely on the editor to soft-wrap. Apart from newlines that are actually useful within a paragraph, e.g. immediately preceding an inline list item (so it can be found in the unrendered text).
@@ -171,16 +179,23 @@ state.
   properly, since the failure costs a full re-train of a finished run. #storage
   #cli
 
-- Glossary of preferred terms for the science skill (2026-07-30). Reports
-  have accreted near-synonyms with drifting meanings: "condition" vs "cell"
-  (ex-2.1.7 settled on condition for the seven treatments, cell only for
-  condition × seed), plus "arm", "rung", "gate", "partial" vs "named contrary
-  reading" (ex-2.1.7's H3 distinguishes these: a partial is a weaker pass, a
-  contrary reading is a preregistered interpretation of a miss). A short
-  glossary in `.claude/skills/science/SKILL.md` would keep future reports and
-  reviews from re-negotiating them. Also note the loss-weight symbol scheme
+- Glossary of preferred terms (2026-07-30, updated 2026-08-05). Partly done:
+  the `style-terms` skill now defines condition / run / cell / arm / seed /
+  criterion, and ex-2.1.6/7/8 were edited to conform (cell is reserved for
+  literal grid entities; condition × seed is a "run"). Still to document
+  there: "rung", "gate", "partial" vs "named contrary reading" (ex-2.1.7's H3
+  distinguishes these: a partial is a weaker pass, a contrary reading is a
+  preregistered interpretation of a miss), and the loss-weight symbol scheme
   adopted in ex-2.1.7: λ subscripted by term (λ_a anchor, λ_s̄ anti-subspace;
   bar = repulsive), replacing the one-off μ.
+
+- Importable shared glossary for reports (2026-08-05). Each report restates
+  its glossary table by hand, which is how the cell/condition drift happened.
+  A small module (e.g. `mini.reports.glossary` or `src/sca`) holding term →
+  definition rows that a notebook imports and renders — each report selecting
+  the terms it uses — would keep definitions identical across reports while
+  staying self-contained when published. Needs care with memoization only if
+  it lands in `experiment.py` inputs; keep it report-side.
 
 - `ty` loses a PEP 695 `type` alias when solving widens it to a supertype
   (2026-07-30). Reproduced on 0.0.49 (our pin) and 0.0.65 (latest):

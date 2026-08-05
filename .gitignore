@@ -19,3 +19,4 @@ scratch*
 
 .claude/settings.local.json
 node_modules/
+.claude/worktrees/

@@ -14,6 +14,13 @@ List of stylistic improvements to make.
   - gap, a in "measurable difference", e.g. "the median gap between the nearest name and the second-nearest" -> "the median distance between the nearest and second-nearest names"
   - wrinkle, hair
 
+- [x] "cell" vs "condition" conflict with the glossary. Resolved the other way:
+  "cell" collides with table/heatmap cells and Marimo cells, which can't be renamed,
+  so prose now uses **condition** (seed-aggregated factor combination), **run**
+  (condition × seed), and **criterion** (a hypothesis-gate clause), reserving "cell"
+  for literal grid entities. Applied to ex-2.1.6/7/8 (where the old glossary lived);
+  earlier reports already conformed. Scheme documented in the `style-terms` skill.
+
 - [x] Add a tl;dr **lede** to each of the reports, like the one in 2.1.7. Then use that text or something like it in docs/index.md for each of the reports instead of the current descriptions.
 
 ## Visual
