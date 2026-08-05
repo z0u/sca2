@@ -91,6 +91,41 @@ see it. We chose not to make it evidence:
 If we ever do want a re-run on a flag change, `version=` on the task is the explicit
 lever, and it lands as a new attempt on the same record.
 
+## The JAX version moves the digest too
+
+The flags are not the only thing outside the fingerprint that changes the number.
+Measured while upgrading JAX for #73 — same code, same inputs, same seed, same L4,
+same `XLA_FLAGS`, 150 steps of the real `train_step` on nGPT d64-L4, three
+single-use containers per version:
+
+| jax / jaxlib | digest | final loss |
+| --- | --- | --- |
+| 0.10.1 | `e4b7c106…` | 5.531451225280762 |
+| 0.11.0 | `884ee00c…` | 5.531452655792236 |
+
+One distinct digest within each version, so 0.11 is every bit as reproducible as
+0.10 — it just lands somewhere else, about a part in 4×10⁶ away. That is the same
+magnitude as the nondeterminism the flags were introduced to remove, which is worth
+sitting with: the flags buy reproducibility *within* a pinned environment, not across
+one.
+
+The memo cannot see this. `_is_project_file` excludes site-packages, so no library
+source reaches the manifest, and `task_key_parts` composes identity from the fn's
+module-qualified name and an input fingerprint — neither of which mentions a package
+version. Checked directly: no `jax`, `jaxlib` or version string appears anywhere in a
+task's key or its evidence. So the failure mode is not a spuriously invalidated key
+(harmless — just a re-run) but the quiet one: **the same key mapping to a numerically
+different result after an upgrade.** A DONE record written under 0.10.1 keeps serving
+its old result, and a task re-run for any other reason silently produces the new one,
+under the key that already meant the old.
+
+The same reasoning as above still applies — this is provenance, not identity, and
+`compute_env` is where it belongs. But unlike `XLA_FLAGS`, a version bump arrives with
+an ordinary dependency upgrade rather than a deliberate flag change, so it wants a
+deliberate gate. When a numerics-relevant package moves, either accept that records
+straddle two regimes and say so where the numbers are published, or bump `version=` on
+the affected tasks to force a clean re-run.
+
 ## The alternative we didn't take: tolerating small differences
 
 The tempting move is to leave the GPU alone and teach the DAG that 4.147422 and

@@ -110,7 +110,12 @@ namespace = true
 
 [tool.ruff]
 line-length = 120
-extend-exclude = [".vulture-*"]
+# Markdown is excluded because ruff 0.16 began formatting fenced code blocks in
+# it. Our docs' blocks are illustrative fragments, not runnable code, and the
+# formatter reads them as the latter: it collapsed the very method-chaining
+# example that `style-py` exists to teach, because the one-liner fits in 120
+# columns. Excluding restores 0.15's behavior — prose stays ours to shape.
+extend-exclude = [".vulture-*", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "B", "C", "D", "T"]

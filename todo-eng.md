@@ -535,3 +535,29 @@ Orthogonal, no code overlap with the above:
       next milestone repo, keeping repo-specific skills (mi-ni, science
       conventions) local. Decide after the routing table has settled, so the
       plugin ships a stable interface.
+
+- Numerics-relevant package bumps need a gate (found in #73, 2026-08-05). A
+  jax 0.10.1 → 0.11.0 upgrade changed the final-weights digest of a fixed
+  nGPT d64-L4 run on a fixed L4 (`e4b7c106…` → `884ee00c…`, loss drift ~1 part
+  in 4×10⁶), while the memo key stayed identical — package versions feed
+  neither `task_key_parts`' identity nor its validity evidence, since
+  `_is_project_file` excludes site-packages. So a DONE record survives the
+  upgrade serving its old number, and a re-run for any other reason quietly
+  writes a new one under the same key. Written up in `eng/determinism.md`.
+  Options, none implemented: fold a pinned set of numerics packages into the
+  evidence (invalidates broadly, and every past record with it); surface a
+  warning when a record's `compute_env` numerics differ from the current
+  environment (cheap, detection-only, probably the right first move); or keep
+  it manual and bump `version=` per affected task on each numerics upgrade.
+
+- `tests/sca/test_training.py::test_progress_emitted_during_training` failed
+  once under `-n auto` on a loaded container (#73), at
+  `{m.total for m in messages} == {max(steps)}`, and passed on the next three
+  full-suite runs and on a serial re-run. Not reproduced since, so the cause is
+  unconfirmed. `total` is constant across `emit_progress` calls and
+  `BackgroundEmitter.close` flushes synchronously, so the likely shape is a
+  second message reaching the queue from the metrics path with a different
+  `total` — i.e. the assertion is stricter about queue contents than the
+  contract really is. Worth reproducing under artificial load before changing
+  anything. Noted while upgrading dependencies; nothing in that upgrade touches
+  the debouncer, but it has not been ruled out either.
