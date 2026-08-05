@@ -55,8 +55,14 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   what ex-2.1.8's dose arm does. The `anti_dose` helper in
   `docs/m2/ex-2.1.8/experiment.py` computes it. #schedules
 
-- [ ] **The Spearman half of the grading gate is unreachable alongside
+- [x] **The Spearman half of the grading gate is unreachable alongside
   containment**, so a report that scores both is asking for two things at once.
+  **Decided in ex-2.1.9's preregistration:** the ρ track is dropped as a gate
+  from that experiment on, and the R² track is scored *relative* to the
+  in-experiment span-mean arm (drop ≤ 0.1) rather than against an absolute
+  bar, since ex-2.1.8 left where a realistic absolute R² gate sits to a later
+  grid. The M1-shaped group contrast stays available as the candidate for a
+  future absolute gate. Original note follows.
   Found in ex-2.1.8's exploratory section, which computes the ceiling: for a
   response that reproduces `sim^1.5` exactly above a knee and sits at the
   control below it, ρ against `redness` reaches 0.82 with no containment at all
@@ -75,9 +81,16 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   M1's shape. Needs a decision before the next report scores grading.
   #ex-2.1.8 #measurement #reports
 
-- [ ] Locating the concept inside a labeled span, without being told where it
-  is. **Queued as ex-2.1.9, behind ex-2.1.8's operating point.** Design notes
-  from the 2026-08-03 session are below; the original note follows them.
+- [~] Locating the concept inside a labeled span, without being told where it
+  is. **Preregistered as ex-2.1.9** (2026-08-05): mellowmax pooling at
+  τ ∈ {0.01, 0.03, 0.1} plus τ = ∞ and an op1 reference arm, all at ex-2.1.8's
+  `end90-hold30` operating point. Two calibration findings moved the design
+  off the notes below: the 0.6–0.8 leading-weight band sits at τ ≈ 0.01–0.03
+  (nothing like the 0.4 in the toy example), and ex-2.1.8's span pull parks
+  its cube-wide drift on the constant syntax tokens (ᾱ maxed over span roles
+  0.37 against 0.09 at op1), so the prereg adds ᾱ_span as a scored statistic
+  and names the syntax-token latch as an explicit contrary outcome. Design
+  notes from the 2026-08-03 session are below; the original note follows them.
 
   **The term.** Replace the per-position mean in `anchoring.anchor_term` with a
   soft minimum over the span, so the loss asks that the span align *somewhere*
