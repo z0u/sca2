@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.15"
+__generated_with = "0.23.16"
 app = marimo.App(
     width="medium",
     app_title="Ex 2.1.9: A pull that finds its own position",
@@ -74,7 +74,9 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(r"""## Findings""")
+    mo.md(r"""
+    ## Findings
+    """)
     return
 
 
@@ -99,17 +101,18 @@ def _():
     Ex-2.1.6 pulled the whole prompt span of *red*-labeled lines toward the
     anchor axis. The term was mostly satisfied by moving the whole color cube,
     so we got alignment without selectivity. Ex-2.1.7 found that two fixes
-    stack: a repulsive anti-subspace term, and narrowing the pull to op1 alone.
-    Ex-2.1.8 tuned the schedule of the repulsion and landed on an operating
+    stack:
+    **(a)** a repulsive anti-subspace term, and
+    **(b)** narrowing the pull to op1 alone.
+    Ex-2.1.8 tuned the schedule of the repulsion (a) and landed on an operating
     point (`end90-hold30`) where the span pull holds the cube near the control
     (ᾱ = {ALPHA}) while keeping the margin ({MOP1}).
 
-    That leaves the narrowing fix, and it's the one we can't keep. Pulling op1
-    alone works because this language has exactly one position that names the
-    labeled concept, and we know which one it is. A document-level label on
+    That leaves the narrowing fix (b), which we can't keep. Pulling only op1
+    works because this language has exactly one position that names the
+    labeled concept, and we know which one it is, whereas a document-level label on
     natural text gives us a span and nothing else. Can the pull *find* the
-    right position on its own, given only the freedom to spread its budget
-    unevenly?
+    right position on its own, given the freedom to spread its budget unevenly?
 
     The pooled term (below) asks only that each labeled line align *somewhere*
     in its span, so the gradient concentrates on whichever position is already
@@ -118,19 +121,29 @@ def _():
     labeled line at once.
 
     The anti-subspace term should make that option unattractive. Every line,
-    labeled or not, pays repulsion for a syntax token that sits on the axis,
-    while an alignment *specific to red operands* costs repulsion only where
-    red actually occurs. If that trade works out, the pull should settle on op1
-    at the embedding, the only span position whose state varies with the
-    labeled color, and then follow the concept as it migrates across positions
-    with depth, which ex-2.1.6 saw the un-anchored model do.
+    labeled or not, feels repulsion on a syntax token that sits on the axis,
+    while repulsion on an alignment *specific to red operands* is countered by
+    the pull where red actually occurs. If that balances out, the pull should
+    settle on op1 at the embedding, the only span position whose state varies
+    with the labeled color, and then follow the concept as it migrates across
+    positions with depth, which ex-2.1.6 saw the un-anchored model do.
 
     It might not work out. The ex-2.1.8 span pull aligned the syntax tokens
-    hardest: at the embedding its best-aligned span roles are `+` and `=`, and
-    the cube-wide drift sits there too. ᾱ measured at op1 is {ALPHA}, but the
-    same statistic maxed over the span roles is {ASPAN}. The pooled term would
-    happily settle on that; whether the repulsion redirects it is the
-    experiment.
+    hardest: at the embedding its best-aligned span roles (positions named by
+    their job in the line: op1, `+`, op2, `=`) are `+` and `=`, and the
+    cube-wide drift is there too. ᾱ measured at op1 is {ALPHA}, but the same
+    statistic maxed over the span roles is {ASPAN}.[^aspan] The pooled term
+    would happily settle on that, so the question is whether the repulsion
+    redirects it.
+
+    [^aspan]: Ex-2.1.8 gated ᾱ at op1 only; the maxed-over-roles number is
+        computed here from its published arrays. Note the repulsion already
+        acts on every position — the syntax tokens climbed the axis despite
+        it, because the span-mean pull itself pushes them there (three of the
+        four pulled positions). Raising the repulsion floor would set up a
+        tug-of-war on those same states, and ex-2.1.8 left that lever untested
+        (its best floor was its highest). Pooling goes after the cause
+        instead: it lets the pull withdraw from positions it doesn't need.
     """.replace("{ALPHA}", f"{ex.EX218_REFERENCE['end90-hold30']['alpha_op1']:.2f}")
         .replace("{MOP1}", f"{ex.EX218_REFERENCE['end90-hold30']['m_op1']:.2f}")
         .replace("{ASPAN}", f"{ex.EX218_REFERENCE['end90-hold30']['alpha_span']:.2f}")
@@ -151,7 +164,7 @@ def _():
 
     ### The pooled term
 
-    Today the anchor term averages $x_t = 1 - \cos(h_t, \hat v)$ over every
+    Previously, the anchor term averaged $x_t = 1 - \cos(h_t, \hat v)$ over every
     pulled position. We replace that mean, per labeled line, with a soft
     minimum over the span of the line, the *mellowmax*[^mm]
 
@@ -162,13 +175,16 @@ def _():
     positions at different depths, following the concept as it migrates.
 
     Three properties made us pick this form over the other things called
-    "softmin". First, its gradient is the softmin weights
+    "softmin".
+    First, its gradient is the softmin weights
     $w_t = \mathrm{softmax}(-x/\tau)_t$, which are non-negative and sum to 1,
     so the pull budget of each line is conserved and $\lambda_a$ means the same
-    thing at every τ. Second, the $1/n$ inside the log makes $\tau = \infty$
+    thing at every τ.
+    Second, the $1/n$ inside the log makes $\tau = \infty$
     the span mean (we'll pin that with a unit test), so the τ = ∞ arm
     reproduces the ex-2.1.8 pull and the τ sweep interpolates from there down
-    toward a hard min at τ = 0. Third, it never pushes.
+    toward a hard min at τ = 0.
+    Third, it never pushes.
 
     That last property is why we avoid the other common "softmin", the
     softmax-*weighted average* $\sum_t w_t x_t$. Its gradient terms flip sign
@@ -197,8 +213,9 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    _rows = "\n".join(
-        f"    | `{c['name']}` | {c['lam']:g} | {'∞' if np.isinf(c['tau']) else f'{c["tau"]:g}'} | "
+    # Joined with the block's own indent so every row dedents evenly under mo.md.
+    _rows = "\n    ".join(
+        f"| `{c['name']}` | {c['lam']:g} | {'∞' if np.isinf(c['tau']) else f'{c["tau"]:g}'} | "
         f"{'op1 only' if c['span'] == 1 else 'prompt span'} |"
         for c in ex.CONDITIONS
     )
@@ -212,7 +229,7 @@ def _():
 
     | condition | $\lambda_a$ | τ | pulled positions |
     |---|---|---|---|
-{ROWS}
+    {ROWS}
 
     `span-mean` re-runs the `end90-hold30` condition of ex-2.1.8 through the
     pooled code path at τ = ∞: the baseline the pooled conditions have to beat,
@@ -222,6 +239,20 @@ def _():
     of it pooling recovers.
     """.replace("{ROWS}", _rows)
     )
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### Calibrating τ
+
+    The interesting τ range depends on how much $x_t$ varies across the span,
+    which we can read off the stored alignment maps of ex-2.1.8 before running
+    anything. The figure below computes what the softmin weights *would* be on
+    two reference profiles: a fresh run (the un-anchored control) and a trained
+    one (the span pull at the operating point).
+    """)
     return
 
 
@@ -267,7 +298,7 @@ def _(ALPHA218, leading_weight):
             crossing the band nearer 0.06 to 0.09.
         """,
         caption=r"""
-            **Calibrating the τ grid from ex-2.1.8's stored alignments.** The
+            **Calibrating the τ grid from the ex-2.1.8 stored alignments.** The
             leading span position's share of the softmin weight, by residual
             slice, if the weights were computed from the alignment profile of
             the un-anchored control (**left**) or the span pull at the
@@ -304,7 +335,7 @@ def _(ALPHA218, leading_weight):
         axs[1].legend(fontsize="x-small", loc="upper right", frameon=False)
         return fig
 
-    _plot()
+    mo.Html(_plot())
     return
 
 
@@ -317,19 +348,13 @@ def _(ALPHA218):
     _as218c = ex.alpha_span(ALPHA218["lam0"])
     mo.md(
         rf"""
-    ### Calibrating τ
-
-    The interesting τ range depends on how much $x_t$ varies across the span,
-    which we can read off the stored alignment maps of ex-2.1.8 before running
-    anything. The figure above computes what the softmin weights *would* be on
-    two reference profiles: a fresh run (the un-anchored control) and a trained
-    one (the span pull at the operating point). The design note targets a
-    leading position taking 0.6–0.8 of the weight, which lands at τ ≈ 0.01–0.03
-    on both profiles.
+    The design note targets a leading position taking 0.6–0.8 of the weight, which
+    lands at τ ≈ 0.01–0.03 on both profiles.
 
     So the grid is $\tau \in \{{{", ".join(f"{t:g}" for t in ex.TAUS)}\}}$: the
-    sharp edge of the band, its middle, and one rung toward the mean, with the
-    τ = ∞ arm closing the family. τ = 0.01 sits below the per-seed margin noise
+    sharp edge of the band, its middle, and one rung toward the mean end of
+    the τ axis (τ = 0.1, weights nearer uniform); the mean itself is the
+    τ = ∞ arm, which closes the family. τ = 0.01 sits below the per-seed margin noise
     ({ex.NOISE_PER_SEED:g}), so at that rung the pool will commit hard to early differences
     that may just be noise. That is the winner-take-most end of the sweep, by
     design.
@@ -337,10 +362,12 @@ def _(ALPHA218):
     The same arrays give the reproduction targets for the `span-mean` arm, as
     seed means: pooled margin M = {_m218:.2f} (control {_m218c:.2f}) and
     ᾱ_span = {_as218:.2f} (control {_as218c:.2f}). They also show the risk
-    plainly. At the embedding slice, the label-weighted $x_t$ of the span pull,
-    by role, is op1 {_x0[0]:.2f}, `+` {_x0[1]:.2f}, op2 {_x0[2]:.2f},
-    `=` {_x0[3]:.2f}. The constant syntax tokens are the best-aligned
-    positions, so a pool applied to *this* profile would put its weight there.
+    plainly. At the embedding slice, the alignment $\cos(h, \hat v)$ of the
+    span-pull run's states, averaged over colors with label-affinity weights,
+    is `+` {1 - _x0[1]:.2f} and `=` {1 - _x0[3]:.2f}, against op1
+    {1 - _x0[0]:.2f} and op2 {1 - _x0[2]:.2f}. The constant syntax tokens are
+    the best-aligned positions, so a pool applied to *this* profile would put
+    its weight there.
     """
     )
     return
@@ -496,7 +523,7 @@ def _():
     mo.stop(_res is None, mo.md("_Results are not published yet; the analysis cells below render once they are._"))
     assert _res is not None
     metrics, arrays = _res
-    return arrays, metrics
+    return
 
 
 @app.cell(hide_code=True)
@@ -541,7 +568,9 @@ def _():
     on M, and *below* `span-mean` on ᾱ_span. Contrary: pooled M at or under
     the span mean would say pooling bought nothing; pooled ᾱ_span unchanged
     while M rises would say the margin gain came from something other than
-    withdrawing the pull on syntax tokens.
+    withdrawing the pull on syntax tokens. If the syntax drift stays, the next
+    lever is the repulsion floor itself, which ex-2.1.8 left untested upward
+    (its best floor was its highest) — queued, not gated here.
     ///
     """)
     return
