@@ -27,7 +27,7 @@ with app.setup(hide_code=True):
     use_publisher(report_bundle(__file__))
 
     def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
-        """Resolve metrics and the stacked per-cell arrays from the store, or None if unpublished."""
+        """Resolve metrics and the stacked per-run arrays from the store, or None if unpublished."""
         store = project_store()
         arts = store.get_refs([ex.METRICS_REF, ex.ARRAYS_REF])
         m_art, a_art = arts[ex.METRICS_REF], arts[ex.ARRAYS_REF]
@@ -41,7 +41,7 @@ with app.setup(hide_code=True):
         return metrics, arrays
 
     def load_geometry() -> dict | None:
-        """The per-cell geometry pass, published under its own ref."""
+        """The per-run geometry pass, published under its own ref."""
         store = project_store()
         art = store.get_refs([ex.GEOMETRY_REF])[ex.GEOMETRY_REF]
         if art is None:
@@ -93,7 +93,8 @@ def _():
     | $\hat v_{\text{red}}$ | the anchor direction | |
     | $\lambda_\text{a}$ | anchor weight, fixed at {SCORING} throughout | |
     | $\lambda_{\bar{\text{s}}}$ | anti-subspace weight, always given as the ratio $\lambda_{\bar{\text{s}}}/\lambda_\text{a}$ | |
-    | cell | a sweep condition crossed with a seed | |
+    | condition | one combination of the sweep factors, aggregated over seeds unless stated | |
+    | run | a condition crossed with a seed: one training run | |
     | $\alpha_c$, $\bar\alpha$ | the alignment (cosine) of color $c$ with $\hat v_{\text{red}}$ at op1, averaged over layers; and the mean of that over all 216 colors | ↓ |
     | $m$, $m_{\text{op1}}$ | alignment margin $\sum_c w_c \alpha_c - \bar\alpha$, where $w_c$ are the *red*-label affinities normalized to sum to 1; $m_{\text{op1}}$ is the layer mean of $m$ at op1 | ↑ |
     | contained | of a condition: $\bar\alpha \le {AGATE}$, so the drift is held near the control rather than just weakened | |
@@ -160,10 +161,10 @@ def _(
     {ex.TASK_GATE:g}.
 
     **H2 (an operating point exists) — fails, on grading.** `{_p}`, the
-    preregistered primary cell, meets containment
+    preregistered primary condition, meets containment
     ($\bar\alpha = {alpha_bar(_p).mean():.3f}$, gate {ex.MEAN_ALIGN_GATE:g}),
     margin ({m_op1(_p).mean():.3f}, gate {ex.MARGIN_GATE:g}) and retention
-    ({retention(_p):.2f}, gate {ex.H4_RETENTION:g}). No cell in the grid reaches
+    ({retention(_p):.2f}, gate {ex.H4_RETENTION:g}). No condition in the grid reaches
     the grading gate of {ex.GRADE_R2_GATE:g} on either track; the best R² is
     {grading(_best_r2)[1]:.2f}. Neither named partial applies.
 
@@ -243,8 +244,8 @@ def _():
         The epoch at which $\lambda_{\bar{\text{s}}}/\lambda_\text{a}$ reaches its hold ratio.
         Levels: {ENDS}.
         Endpoint 50 is the M1 keyframe mapped by fraction of training, and
-        90 is the timing arm from ex-2.1.7. So two cells repeat conditions we
-        have already measured.
+        90 is the timing arm from ex-2.1.7. So two conditions repeat settings
+        we have already measured.
 
     - **B.** Hold ratio
 
@@ -258,7 +259,7 @@ def _():
     factor against nothing and dilute its main effect.
 
     An un-anchored control ($\lambda_\text{a} = 0$) runs through the same code,
-    giving {N_COND} conditions and {N_CELL} cells in total.
+    giving {N_COND} conditions and {N_CELL} runs in total.
     """.replace("{ENDS}", _and_join(f"{e:g}" for e in ex.ANTI_ANNEAL_ENDS))
         .replace("{HOLDS}", _and_join(f"{h:.2f}" for h in ex.ANTI_HOLD_RATIOS))
         .replace("{N_COND}", str(len(ex.CONDITIONS)))
@@ -439,7 +440,7 @@ def _():
         _hatch = dict(facecolor="none", lw=0, hatch_linewidth=0.5)
         ax.fill_between(E, _d_ref, _d_arm, where=_d_arm < _d_ref, hatch="///", edgecolor=_grey, **_hatch)
         ax.fill_between(E, _d_ref, _d_arm, where=_d_arm > _d_ref, hatch="\\\\\\", edgecolor=_arm_color, **_hatch)
-        # The un-matched late cell and the anchor, both in ghost ink: the arm's
+        # The un-matched late schedule and the anchor, both in ghost ink: the arm's
         # dose is meaningful against the schedule it was scaled down from, and
         # the repulsion against the pull it works against.
         ax.plot(E, _mu(_by_name["end90-hold03"]) * LR * 1e3, color=_grey, lw=0.5, alpha=0.45, ls=_dashes[90.0])
@@ -511,12 +512,12 @@ def _():
         r"""
     **H1: Task cost.** Every condition is task-clean, meaning `named_holdout`
     exact match within {TASK} (absolute) of the seed mean of the in-experiment
-    control.[^h1-standing] Partial: the `hold03` cells and the dose arm are
-    clean and a `hold30` cell is not.
+    control.[^h1-standing] Partial: the `hold03` conditions and the dose arm
+    are clean and a `hold30` condition is not.
 
-    **H2: An operating point exists.** Some task-clean factorial cell meets
-    all four of the selectivity and containment conditions from ex-2.1.7 at
-    once, which no condition in that experiment did:
+    **H2: An operating point exists.** Some task-clean factorial condition
+    meets all four of the selectivity and containment criteria from ex-2.1.7
+    at once, which no condition in that experiment did:
     (a) containment, $\bar\alpha \le {ALPHA}$;
     (b) margin, $m_{\text{op1}} \ge {MARGIN}$;
     (c) grading, Spearman $\rho \ge {RHO}$ against `redness` or Pearson
@@ -531,14 +532,14 @@ def _():
     **H3: A sustained floor makes the anneal endpoint redundant.** This is
     the prediction that sets the level account apart. If containment is lost at
     a threshold, then the endpoint only has leverage in the row whose floor
-    crosses that threshold. We score H3 on $\bar\alpha$ with two conditions,
+    crosses that threshold. We score H3 on $\bar\alpha$ with two criteria,
     each a difference of means reported with its sign.
     (a) The hold-ratio main effect,[^main] the nine runs at 0.03 minus the nine
     at 0.30, is at least {AGATE}. That says the floor does something at all.
     (b) The interaction is at least {IGATE}: the end50 − end90 difference
     within the 0.03 row, minus the same difference within the 0.30
     row.[^effect]
-    Condition (a) keeps (b) from passing without any containment behind it: a
+    Criterion (a) keeps (b) from passing without any containment behind it: a
     *negative* endpoint effect in the 0.30 row would inflate the interaction on
     its own.
 
@@ -576,7 +577,7 @@ def _():
         $\bar\alpha$. The hold-ratio effect compares nine-run means, so its
         noise is near $0.02\sqrt{2}/\sqrt{9} \approx 0.009$, and {AGATE} is
         about five times that. The interaction is a difference of two
-        differences of three-run cell means, with noise near
+        differences of three-run condition means, with noise near
         $0.02 \cdot 2/\sqrt{3} \approx 0.023$, so {IGATE} is about four times
         that. The endpoint effect within one row is a difference of three-run
         means, with noise near $0.02\sqrt{2}/\sqrt{3} \approx 0.016$, so
@@ -742,7 +743,7 @@ def _(
     TASK_CLEAN = {c: bool(abs(acc(c).mean() - CONTROL_ACC) <= ex.TASK_GATE) for c in CONDS}
 
     # The seed spread H3's footnote asks for, pooled over the six factorial
-    # conditions, and the factor the gates move by if the anchored cells do not
+    # conditions, and the factor the gates move by if the anchored conditions do not
     # hold the ex-2.1.6 control spread of 0.02. This is the one rescaling the
     # preregistration allows, so it is computed before either H3 statistic.
     CONTROL_SPREAD = 0.02
@@ -757,7 +758,7 @@ def _(
         return float(alpha_bar(lo).mean() - alpha_bar(hi).mean())
 
     def h2_conditions(cond: str) -> dict[str, bool]:
-        """The four H2 conditions for one cell, each under the name the hypothesis gives it."""
+        """The four H2 criteria for one condition, each under the name the hypothesis gives it."""
         rho, r2 = grading(cond)
         return {
             "containment": bool(alpha_bar(cond).mean() <= ex.MEAN_ALIGN_GATE),
@@ -851,7 +852,7 @@ def _(alpha_bar, grading, m_op1):
     against a floor of {ex.NOISE_SEED_MEAN:g}, and ᾱ within {_da:.3f}, inside
     the tolerance in either row. Grading agrees as well: `end90-hold03` scores
     R² = {grading("end90-hold03")[1]:.2f} here, the value ex-2.1.7 published for
-    the same cell.
+    the same condition.
 
     So the two experiments measure the same thing, and this grid can be read
     against the ex-2.1.7 numbers — which the H2 partials and the H3 power
@@ -916,7 +917,7 @@ def _(CONDS: list[str], CONTROL_ACC, HOLD_HI, ROW, acc):
 
     The preregistration named the `hold{HOLD_HI * 100:02.0f}` row as the place a
     task cost would show up, since it sustains a repulsive weight no earlier
-    experiment held. It does not: the worst cell in that row is `{_hi}` at
+    experiment held. It does not: the worst condition in that row is `{_hi}` at
     {abs(acc(_hi).mean() - CONTROL_ACC):.4f}, the same size as the gaps
     elsewhere. Holding the repulsion an order of magnitude above the M1 floor for
     the rest of training costs nothing the task loss can see.
@@ -935,7 +936,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Four conditions have to hold at once. The table below scores them together, with values that pass their gate in bold.
+    Four criteria have to hold at once. The table below scores them together, with values that pass their gate in bold.
     """)
     return
 
@@ -949,8 +950,8 @@ def _(BY_NAME, MEETS, alpha_bar, grading, h2_conditions, m_op1, retention):
     def _row(c: str) -> str:
         rho, r2 = grading(c)
         cell = BY_NAME[c]
-        # Name every condition the cell misses, not just the first: a row that
-        # fails containment and grading alike should say so.
+        # Name every criterion the condition misses: a row that fails
+        # containment and grading alike should say so.
         missed = ", ".join(k for k, ok in h2_conditions(c).items() if not ok)
         return (
             f"<tr><th><code>{c}</code></th>"
@@ -969,7 +970,7 @@ def _(BY_NAME, MEETS, alpha_bar, grading, h2_conditions, m_op1, retention):
     _table = f"""
     <div class="report-table-scroll"><table class="report-table">
       <thead><tr>
-        <th>cell</th><th class="num">end</th><th class="num">hold</th>
+        <th>condition</th><th class="num">end</th><th class="num">hold</th>
         <th class="num">ᾱ ↓</th><th class="num">m<sub>op1</sub> ↑</th>
         <th class="num">ρ ↑</th><th class="num">R² ↑</th><th class="num">retention ↑</th>
         <th>H2</th>
@@ -978,13 +979,13 @@ def _(BY_NAME, MEETS, alpha_bar, grading, h2_conditions, m_op1, retention):
     </table></div>
     """
     _caption = f"""
-    The H2 scoring table, one row per factorial cell. <strong>Bold</strong>
+    The H2 scoring table, one row per factorial condition. <strong>Bold</strong>
     marks a value that passes its gate: ᾱ ≤ {ex.MEAN_ALIGN_GATE:g},
     m<sub>op1</sub> ≥ {ex.MARGIN_GATE:g}, ρ ≥ {ex.GRADE_RHO_GATE:g} or R² ≥
     {ex.GRADE_R2_GATE:g}, retention ≥ {ex.H4_RETENTION:g}. ᾱ and m<sub>op1</sub>
     carry the seed standard deviation; grading is read off the seed-mean
     response, and retention is the minimum across seeds. The last column names
-    every condition a cell misses, or reports that it meets all four.
+    every criterion a condition misses, or reports that it meets all four.
     <code>end50-hold03</code> and <code>end90-hold03</code> are ex-2.1.7's
     <code>span-anti</code> and <code>span-anti-late</code>.
     """
@@ -999,17 +1000,17 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, grading, m_op1, retention):
     _contained = [c for c in ex.FACTORIAL_NAMES if alpha_bar(c).mean() <= ex.MEAN_ALIGN_GATE]
     _p = ex.PRIMARY
     mo.md(rf"""
-    **H2 fails, on grading.** The cell the preregistration named,
-    `{_p}`, meets three of the four conditions: it contains the drift at
+    **H2 fails, on grading.** The condition the preregistration named,
+    `{_p}`, meets three of the four criteria: it contains the drift at
     ᾱ = {alpha_bar(_p).mean():.3f} against a gate of {ex.MEAN_ALIGN_GATE:g},
     holds the margin at {m_op1(_p).mean():.3f} against {ex.MARGIN_GATE:g}, and
     retains {retention(_p):.2f}× its peak against {ex.H4_RETENTION:g}. But its
     response is graded at ρ = {grading(_p)[0]:.2f} and R² = {grading(_p)[1]:.2f},
     and the gate is {ex.GRADE_R2_GATE:g} on either track.
 
-    Every cell misses on grading. The best R² in the grid is
+    Every condition misses on grading. The best R² in the grid is
     {grading(_best_r2)[1]:.2f} (`{_best_r2}`) and the best ρ is
-    {grading(_best_rho)[0]:.2f} (`{_best_rho}`), so no cell comes within
+    {grading(_best_rho)[0]:.2f} (`{_best_rho}`), so no condition comes within
     {ex.GRADE_R2_GATE - grading(_best_r2)[1]:.2f} of passing. Neither named
     partial applies, since both assume grading holds and vary the containment
     or margin around it.
@@ -1025,12 +1026,12 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, grading, m_op1, retention):
     selectivity, and just stops short of the level H2 asked for.
 
     Containment on its own is now reachable, which it was not in ex-2.1.7.
-    One cell of the six falls to ᾱ ≤ {ex.MEAN_ALIGN_GATE:g}
+    One condition of the six falls to ᾱ ≤ {ex.MEAN_ALIGN_GATE:g}
     ({", ".join(f"`{c}`" for c in _contained)}), and a second comes within
     {min(alpha_bar(c).mean() for c in ROW[HOLD_HI] if c not in _contained) - ex.MEAN_ALIGN_GATE:.3f}
     of it. That experiment's best was
     {ex.EX217_REFERENCE["end90-hold03"]["alpha"]:.2f}, and its gate went unmet
-    everywhere. Both of the near cells are in the
+    everywhere. Both of the near conditions are in the
     `hold{HOLD_HI * 100:02.0f}` row.
     """)
     return
@@ -1087,7 +1088,7 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, traj):
             ratio 0.03 and the lower is 0.30. In each pair the upper panel plots mean
             alignment as a solid line and margin as a dashed line, over a flat grey
             control pair near zero; the shorter log-scale panel beneath plots that
-            cell's two weight schedules, anchor in red and repulsion in blue.
+            condition's two weight schedules, anchor in red and repulsion in blue.
             In the upper row of pairs, the solid line stays low while the blue
             repulsion curve is above the red anchor curve, then climbs steeply once the
             blue curve drops below it — later in each successive column, and reaching a
@@ -1104,7 +1105,7 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, traj):
             is the margin $m_{\text{op1}}$; the grey pair is the un-anchored
             control. The caret on the left spine is the containment gate, the
             one on the right the margin floor that retention is scored from.
-            Below each: the weight schedule that cell trained under, anchor
+            Below each: the weight schedule that condition trained under, anchor
             $\lambda_\mathrm{a}$ in red and repulsion
             $\lambda_{\bar{\mathrm{s}}}$ in blue, on a log scale shared by all
             six so schedules compare across the grid as well as down a pair.
@@ -1186,7 +1187,7 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, traj):
 
 @app.cell(hide_code=True)
 def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, alpha_bar, traj):
-    # Two epochs per cell, both read the same way for every condition. The
+    # Two epochs per condition, both read the same way across the grid. The
     # crossing comes from the schedule functions and the departure from the
     # recorded trajectory, so neither is fitted.
     _E = np.linspace(0.0, float(ex.SCHEDULER.epochs), 4001)
@@ -1221,14 +1222,14 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, alpha_bar, traj):
     _table = f"""
     <div class="report-table-scroll"><table class="report-table">
       <thead><tr>
-        <th>cell</th><th class="num">crossing</th><th class="num">departure</th>
+        <th>condition</th><th class="num">crossing</th><th class="num">departure</th>
         <th class="num">lag</th><th class="num">runway</th><th class="num">final ᾱ</th>
       </tr></thead>
       <tbody>{_rows}</tbody>
     </table></div>
     """
     _caption = """
-    Two epochs read off each cell. Crossing is the first epoch at which the
+    Two epochs read off each condition. Crossing is the first epoch at which the
     repulsion falls below the pull, computed from the schedules. Departure is
     the last epoch at which ᾱ is still within 0.05 of the control, read off the
     recorded trajectory. Runway is the training left after departure.
@@ -1240,13 +1241,13 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, alpha_bar, traj):
 @app.cell(hide_code=True)
 def _(HOLD_HI, HOLD_LO, ROW, alpha_bar):
     mo.md(rf"""
-    Every cell departs, including the three at the sustained floor. So the
+    Every condition departs, including the three at the sustained floor. So the
     strong form of the level account — a floor high enough that the crossing
     never happens — is not what the trajectories show. All six cross, and all
     six climb afterwards.
 
     What the floor does is move the crossing later and flatten what follows.
-    Departure tracks the crossing in every cell, and raising the hold ratio
+    Departure tracks the crossing in every condition, and raising the hold ratio
     pushes both later, the departure by more than the crossing. That is the
     delay. The flattening shows up when the departure epoch is held roughly
     fixed and the row changes: `{ROW[HOLD_HI][1]}` and `{ROW[HOLD_LO][2]}` leave
@@ -1275,14 +1276,14 @@ def _(ALPHA_SPREAD, CONTROL_SPREAD, EFFECT_GATE, GATE_SCALE, INTERACTION_GATE):
     _moved = GATE_SCALE > 1.0
     mo.md(rf"""
     H3 has a footnote that asks for the seed spread before either statistic is used, and
-    allows the gates to move with it. Pooled over the six factorial cells, the seed spread of ᾱ
+    allows the gates to move with it. Pooled over the six factorial conditions, the seed spread of ᾱ
     is {ALPHA_SPREAD:.4f}, against the ex-2.1.6 control value of
-    {CONTROL_SPREAD:g} the gates were sized on. The anchored cells do not hold
+    {CONTROL_SPREAD:g} the gates were sized on. The anchored conditions do not hold
     it, so the gates move by {GATE_SCALE:.2f}×: the main effect is scored at
     {EFFECT_GATE:.3f} and the interaction at {INTERACTION_GATE:.3f}. Those are
     the numbers used below{"" if _moved else " (unmoved)"}.
 
-    One cell accounts for most of that spread. The rest sit between 0.006 and 0.027,
+    One condition accounts for most of that spread. The rest sit between 0.006 and 0.027,
     so the rescaling is driven by a single condition rather than by the grid
     being noisy throughout.
     """)
@@ -1309,7 +1310,7 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, m_op1):
     </table></div>
     """
     _caption = """
-    The factorial, as cell means on both statistics. Above: ᾱ, which H3 is
+    The factorial, as condition means on both statistics. Above: ᾱ, which H3 is
     scored on. Below: the margin, repeated because a factor that contains the
     drift while losing the margin does not give an operating point.
     """
@@ -1403,9 +1404,9 @@ def _(BY_NAME, alpha_bar, grading, m_op1, retention):
     </table></div>
     """
     _caption = f"""
-    The dose arm against the two cells it is built from. Dose is relative to
+    The dose arm against the two conditions it is built from. Dose is relative to
     <code>{ex.DOSE_ARM_REFERENCE}</code>, as in the Method table. The arm has
-    that cell's dose and the <code>end90-hold03</code> timing, so its position
+    that condition's dose and the <code>end90-hold03</code> timing, so its position
     between them is the comparison.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
@@ -1525,7 +1526,7 @@ def _():
         r"""
     ## Exploratory analyses
 
-    Post hoc, and scoring nothing. H2 failed on grading in every cell, so the
+    Post hoc, and scoring nothing. H2 failed on grading in every condition, so the
     question is what the response actually looks like.
 
     ### The grading metrics disagree
@@ -1547,7 +1548,7 @@ def _(grading):
     mo.md(rf"""
     Considering those ceilings, the two tracks say opposite things.
 
-    - **ρ** ranks colors by `redness`. Every cell scores below what a step would: the best ρ in the grid is {_best_rho:.2f} against a step ceiling of {ex.STEP_RHO_CEILING:.2f}.
+    - **ρ** ranks colors by `redness`. Every condition scores below what a step would: the best ρ in the grid is {_best_rho:.2f} against a step ceiling of {ex.STEP_RHO_CEILING:.2f}.
     - **R²** fits values against `sim¹·⁵` (proportionality). {len(_above)} of the six score above the ceiling, up to R² = {_best_r2:.2f} against {ex.STEP_R2_CEILING:.2f}.
 
     Neither actually says whether the response is a grade or a step, so we visualize it below.
@@ -1685,7 +1686,7 @@ def _(alpha_map):
     _table = f"""
     <div class="report-table-scroll"><table class="report-table">
       <thead>
-        <tr><th>cell</th><th class="num">all 216</th>{_head}</tr></thead>
+        <tr><th>condition</th><th class="num">all 216</th>{_head}</tr></thead>
       <tbody>{_rows}</tbody>
     </table></div>
     """
@@ -1704,7 +1705,7 @@ def _(alpha_map):
     _hi = _R >= 0.4
     _rho_hi = [float(ex.spearman(a[_hi], _R[_hi])) for a in (alpha_map(c)[:, :, 0].mean(axis=0) for c in ex.FACTORIAL_NAMES)]  # fmt: skip
     mo.md(rf"""
-    Above the knee the ordering is good in every cell — ρ runs
+    Above the knee the ordering is good in every condition — ρ runs
     {min(_rho_hi):.2f} to {max(_rho_hi):.2f} on the {_hi.sum()} colors with redness ≥
     0.4, against a gate of {ex.GRADE_RHO_GATE:g} — and it climbs monotonically
     as the flat colors are excluded. So the graded part of the response is
@@ -1718,7 +1719,7 @@ def _():
     mo.md(r"""
     ### What a contained response can score
 
-    That raises a question about the gate. If containment collapses the low-redness colors together, and the grading statistic reads their ordering, then they must be in tension. How high could the statistic be, under those conditions?
+    That raises a question about the gate. If containment collapses the low-redness colors together, and the grading statistic reads their ordering, then they must be in tension. How high could the statistic be, under those constraints?
 
     We build the best response either statistic could hope for: the target shape exactly, above a knee, and contained to near zero below it. This is a property of the two statistics and the 216-color grid, not a measurement of any run.
     """)
@@ -1791,8 +1792,8 @@ def _(ceiling, grading):
     R² behaves the other way. Its target is near zero for the colors
     containment collapses, so containment moves the response toward the target
     rather than away: the ceiling is {_knee[1]:.2f} at a knee of 0.4 and
-    {_deep[1]:.2f} even at 0.5. That track is reachable, and the best cell in
-    this grid gets {_best_r2:.2f} of it.[^m1r2]
+    {_deep[1]:.2f} even at 0.5. That track is reachable, and the best condition
+    in this grid gets {_best_r2:.2f} of it.[^m1r2]
 
     Within that family — `sim¹·⁵` at full amplitude — the ρ gate and the
     containment H2 also asks for cannot both be met. ᾱ crosses under

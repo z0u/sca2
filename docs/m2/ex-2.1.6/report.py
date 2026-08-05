@@ -27,7 +27,7 @@ with app.setup(hide_code=True):
     use_publisher(report_bundle(__file__))
 
     def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
-        """Resolve metrics and the stacked per-cell arrays from the store, or None if unpublished."""
+        """Resolve metrics and the stacked per-run arrays from the store, or None if unpublished."""
         store = project_store()
         arts = store.get_refs([ex.METRICS_REF, ex.ARRAYS_REF])
         m_art, a_art = arts[ex.METRICS_REF], arts[ex.ARRAYS_REF]
@@ -83,9 +83,10 @@ def _():
     should be spelled some other way.
 
     For the sweep, the three-tiered vocabulary of ex-2.1.5 carries over. A
-    **condition** is one setting of the swept hyperparameter; a **cell** is one
-    run, a condition crossed with a seed, which is what `metrics["cells"]`
-    holds; an **arm** is a named group of conditions with a purpose of its own.
+    **condition** is one setting of the swept hyperparameter, aggregated over
+    seeds; a **run** is a condition crossed with a seed, one training run,
+    which is what the legacy stored key `metrics["cells"]` holds; an **arm** is
+    a named extra condition off the ladder, answering one question of its own.
     Since $\lambda$ here is a ladder, its conditions are also called **rungs**.
     ///
 
@@ -95,11 +96,11 @@ def _():
     concept geometry is legible, so that the effects of an anchor can be
     attributed to it.
 
-    The testbed is the word-level `v216` cell from Ex-2.1.3: 216 grid colors,
-    **one token** each, `name + name = name` equations, d64-L4. Held-out
-    baseline accuracy is ≈ 1.0 and the color cube is linearly decodable from the
-    embeddings, so there is headroom to lose and a known un-anchored geometry to
-    compare against.
+    The testbed is the word-level `v216` condition from Ex-2.1.3: 216 grid
+    colors, **one token** each, `name + name = name` equations, d64-L4.
+    Held-out baseline accuracy is ≈ 1.0 and the color cube is linearly
+    decodable from the embeddings, so there is headroom to lose and a known
+    un-anchored geometry to compare against.
 
     The labels are sparse, noisy, and binary, following M1/Ex-1.7 via
     M1/Ex-2.9.1. Each line is labeled *red* with probability
@@ -169,9 +170,9 @@ def _():
 
     ### Task and corpus
 
-    Identical to the `v216` cell of ex-2.1.3: the six-level sub-grid `(0, 3, 6, 9,
-    12, 15)` of the 16-level cube (216 colors, one opaque token each),
-    equations `name + name = name` with exact integer mixing, 100 k lines,
+    Identical to the `v216` condition of ex-2.1.3: the six-level sub-grid
+    `(0, 3, 6, 9, 12, 15)` of the 16-level cube (216 colors, one opaque token
+    each), equations `name + name = name` with exact integer mixing, 100 k lines,
     20% of distinct closed pairs held out. The eval sets are the same three:
     `named_seen`, `named_holdout`, and `open` (pairs whose mix has no name).
 
@@ -180,7 +181,7 @@ def _():
     pairs whose mix has a name, with the color as the first operand. Closed
     pairs guarantee every probe line has a named answer, so the measured
     answer position corresponds to a real token. Using all 27 makes the probe
-    set exhaustive: no sampling, no seed, and every cell measured on
+    set exhaustive: no sampling, no seed, and every run measured on
     identical lines, drawn from seen and held-out pairs alike. Per-color
     alignment statistics average over op2 rather than conditioning on it.
 
@@ -454,7 +455,7 @@ def _():
 
     The sweep conditions are peak anchor weight
     $\lambda \in \{0,\ 0.03,\ 0.1,\ 0.3\}$ crossed with seeds $\{0, 1, 2\}$, so
-    12 cells. ($\lambda$ is M1's symbol for a regularizer weight, $\Omega$
+    12 runs. ($\lambda$ is M1's symbol for a regularizer weight, $\Omega$
     being the regularizer itself.) The $\lambda{=}0$ condition is the
     in-experiment control: same corpus, labels ignored. The other rungs chart
     the dose–response.
@@ -463,7 +464,7 @@ def _():
     anneal starts at epoch 50 rather than 90, still reaching the floor at 100.
     Star arm is our shorthand, borrowed from the *star points* of a central
     composite design: it moves one factor off the scoring rung instead of
-    crossing the whole grid, so it costs 3 cells rather than 12 and answers a
+    crossing the whole grid, so it costs 3 runs rather than 12 and answers a
     single question. The question here is whether the long hold at peak buys
     alignment or just leaks: the anchor keeps pulling every labeled line for
     90 epochs, and leakage is the secondary measurement we most expect to be
@@ -926,7 +927,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _(CONDS, CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
-    # ex-2.1.3's published v216 cell, the external reference for the control row.
+    # ex-2.1.3's published v216 condition, the external reference for the control row.
     _REF = {"named_seen": 1.000, "named_holdout": 0.9948, "nll": 0.0245, "open": 0.1414}
 
     def _cell(cond: str, set_name: str, key: str, fmt: str = "{:.3f}") -> str:
@@ -966,8 +967,8 @@ def _(CONDS, CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
     guessed color to the true mix, on pairs with no named answer. Δ holdout EM
     is the signed gap to the λ = 0 control, and the last column reports the H1
     gate, which passes when that gap is within 0.02. The first row is the
-    published ex-2.1.3 <code>v216</code> cell; it is an external reference, not
-    a condition of this sweep.
+    published ex-2.1.3 <code>v216</code> condition; it is an external
+    reference, not part of this sweep.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -998,7 +999,7 @@ def _(CONDS, CONTROL_ACC, acc, stats):
     ignores the prompt. The shortfall is in the last step of resolving between
     two adjacent names, and it is a property of this testbed rather than of the
     anchor: the control sits with the rest, and this is the same picture
-    ex-2.1.3 reported for this cell.
+    ex-2.1.3 reported for this condition.
 
     So at these weights, the dose–response curve has no cost side. The next
     section looks at what the anchor buys.

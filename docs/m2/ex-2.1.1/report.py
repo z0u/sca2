@@ -668,7 +668,7 @@ def _(metrics):
             _models[_s] = (_model, CharTokenizer(_config.tokenizer))
 
     def complete(seed: int, prompts: list[str]) -> list[str]:
-        """Greedy completions from the chosen cell trained with *seed*."""
+        """Greedy completions from the chosen configuration trained with *seed*."""
         model, tok = _models[seed]
         return greedy_completions(model, tok, prompts, 12)
 

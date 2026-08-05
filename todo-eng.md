@@ -177,16 +177,23 @@ state.
   properly, since the failure costs a full re-train of a finished run. #storage
   #cli
 
-- Glossary of preferred terms for the science skill (2026-07-30). Reports
-  have accreted near-synonyms with drifting meanings: "condition" vs "cell"
-  (ex-2.1.7 settled on condition for the seven treatments, cell only for
-  condition × seed), plus "arm", "rung", "gate", "partial" vs "named contrary
-  reading" (ex-2.1.7's H3 distinguishes these: a partial is a weaker pass, a
-  contrary reading is a preregistered interpretation of a miss). A short
-  glossary in `.claude/skills/science/SKILL.md` would keep future reports and
-  reviews from re-negotiating them. Also note the loss-weight symbol scheme
+- Glossary of preferred terms (2026-07-30, updated 2026-08-05). Partly done:
+  the `style-terms` skill now defines condition / run / cell / arm / seed /
+  criterion, and ex-2.1.6/7/8 were edited to conform (cell is reserved for
+  literal grid entities; condition × seed is a "run"). Still to document
+  there: "rung", "gate", "partial" vs "named contrary reading" (ex-2.1.7's H3
+  distinguishes these: a partial is a weaker pass, a contrary reading is a
+  preregistered interpretation of a miss), and the loss-weight symbol scheme
   adopted in ex-2.1.7: λ subscripted by term (λ_a anchor, λ_s̄ anti-subspace;
   bar = repulsive), replacing the one-off μ.
+
+- Importable shared glossary for reports (2026-08-05). Each report restates
+  its glossary table by hand, which is how the cell/condition drift happened.
+  A small module (e.g. `mini.reports.glossary` or `src/sca`) holding term →
+  definition rows that a notebook imports and renders — each report selecting
+  the terms it uses — would keep definitions identical across reports while
+  staying self-contained when published. Needs care with memoization only if
+  it lands in `experiment.py` inputs; keep it report-side.
 
 - `ty` loses a PEP 695 `type` alias when solving widens it to a supertype
   (2026-07-30). Reproduced on 0.0.49 (our pin) and 0.0.65 (latest):

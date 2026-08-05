@@ -27,7 +27,7 @@ with app.setup(hide_code=True):
     use_publisher(report_bundle(__file__))
 
     def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
-        """Resolve metrics and the stacked per-cell arrays from the store, or None if unpublished."""
+        """Resolve metrics and the stacked per-run arrays from the store, or None if unpublished."""
         store = project_store()
         arts = store.get_refs([ex.METRICS_REF, ex.ARRAYS_REF])
         m_art, a_art = arts[ex.METRICS_REF], arts[ex.ARRAYS_REF]
@@ -41,7 +41,7 @@ with app.setup(hide_code=True):
         return metrics, arrays
 
     def load_geometry() -> dict | None:
-        """The per-cell geometry pass, published under its own ref."""
+        """The per-run geometry pass, published under its own ref."""
         store = project_store()
         art = store.get_refs([ex.GEOMETRY_REF])[ex.GEOMETRY_REF]
         if art is None:
@@ -113,7 +113,7 @@ def _():
     | $\ell$ | layer index |
     | $m$, $m_{\text{op1}}$ | alignment margin; its layer mean at op1 |
     | $\bar\alpha$ | mean alignment with $\hat v_{\text{red}}$ over all 216 colors, layer-averaged at op1 |
-    | **cell** | a **condition** crossed with a seed |
+    | **run** | a **condition** crossed with a seed: one training run |
     ///
     """)
     return
@@ -338,7 +338,7 @@ def _():
     """
     _caption = f"""
     The seven conditions, each run at seeds {ex.SEEDS} — {len(ex.CONDITIONS) * len(ex.SEEDS)}
-    cells. The four factorial conditions share λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} and carry the H2
+    runs. The four factorial conditions share λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} and carry the H2
     and H3 gates; the two arms add none of their own, though H1 and H4 reach them by their
     stated scopes — the timing arm is a λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} anti condition,
     and H4(b) covers every anchored run. λ<sub>s̄</sub>/λ<sub>a</sub> is
@@ -426,7 +426,7 @@ def _():
     # with the old 0.25 halving level kept as a named partial.
     #
     # REVIEW: H3's "about 4× the three-seed noise floor" is 3×: 0.1 / 0.032. A main
-    # effect is a difference of two two-cell means, so its noise is about the same
+    # effect is a difference of two two-condition means, so its noise is about the same
     # 0.032 as a single seed-mean (0.032/sqrt(2) per side, combined in quadrature).
     # Corrected in the text and in `MAIN_EFFECT_GATE`; the gate value is unchanged.
     #
@@ -604,9 +604,9 @@ def _():
 
 @app.cell(hide_code=True)
 def _(CONDS: list[str], CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
-    # Two external references, both published: ex-2.1.3's v216 cell (the un-anchored
-    # testbed this is all built on) and ex-2.1.6's λ=0.1 condition, which `span-bare`
-    # re-runs. Neither is a condition of this sweep.
+    # Two external references, both published: ex-2.1.3's v216 condition (the
+    # un-anchored testbed this is all built on) and ex-2.1.6's λ=0.1 condition, which
+    # `span-bare` re-runs. Neither belongs to this sweep.
     _REFS = [
         ("ex-2.1.3 <code>v216</code>", {"seen": 1.000, "hold": 0.9948, "nll": 0.0245, "open": 0.1414}),
         ("ex-2.1.6 λ<sub>a</sub> = 0.1", {"seen": 1.000, "hold": 0.9974, "nll": 0.0167, "open": 0.1295}),
@@ -650,7 +650,7 @@ def _(CONDS: list[str], CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
     guessed color to the true mix, on pairs with no named answer. Δ holdout EM
     is the signed gap to the in-experiment control, and the last column reports
     the H1 gate, which passes when that gap is within {ex.TASK_GATE:g}. The two
-    top rows are published cells from earlier experiments, shown for comparison.
+    top rows are published conditions from earlier experiments, shown for comparison.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -1086,9 +1086,9 @@ def _(ANCHORED, CONDS: list[str], LABELS, SCHEDULES, SCHED_E, traj):
             on the left spine are the H4(a) grading levels for $\bar\alpha$,
             and the one on the right is the H4(b) floor for
             $m_{{\text{{op1}}}}$. The dotted rule is the published ex-2.1.6
-            endpoint of {_EX216_ALPHA:.2f}. Since span-bare re-runs that cell,
-            its solid line landing on the rule is the reproduction check. Seed
-            spread is given in the H4 table below.
+            endpoint of {_EX216_ALPHA:.2f}. Since span-bare re-runs that
+            condition, its solid line landing on the rule is the reproduction
+            check. Seed spread is given in the H4 table below.
             Below each: the weight schedule that condition trained under, in
             the colors of the schedules figure above: anchor $\lambda_\mathrm{{a}}$
             in red, repulsion $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue (absent
@@ -1156,7 +1156,7 @@ def _(ANCHORED, CONDS: list[str], LABELS, SCHEDULES, SCHED_E, traj):
             path_effects=_halo,
         )  # fmt: skip
         # Label the dotted rule in the panel that re-runs it. span-bare repeats
-        # the λ=0.1 cell of ex-2.1.6, so its solid line landing on the rule is
+        # the λ=0.1 condition of ex-2.1.6, so its solid line landing on the rule is
         # the reproduction check; labeling it there makes that point without a
         # legend entry.
         axd["span-bare"].annotate(
