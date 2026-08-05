@@ -1716,6 +1716,28 @@ def _(alpha_map):
 
 @app.cell(hide_code=True)
 def _():
+    mo.md(
+        r"""
+    Whether the figure shows *good* grading depends on the shape we ask for,
+    and the two statistics ask for different shapes. ρ names no shape at all:
+    it asks that all 216 colors be ordered by `redness`, with every pair
+    weighted equally, so no part of the cube should sit flat. It reads the flat
+    block as {LO} failures of ordering, however clean the rise above the knee
+    is.
+
+    R² names one shape. `sim¹·⁵` is itself below 0.05 for three quarters of the
+    colors, so most of the cube should sit flat; where the response does rise,
+    it should follow the similarity curve, which sits between linear and
+    quadratic in the cosine similarity to *red*. Grading has no answer without a
+    target. R² makes that choice explicit, and the knee in the figure is roughly
+    the shape it asks for.
+    """.replace("{LO}", f"{(ex.REDNESS < 0.4).sum()}")
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _():
     mo.md(r"""
     ### What a contained response can score
 
@@ -1825,26 +1847,43 @@ def _(ceiling, grading):
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
+def _(alpha_bar, grading, m_op1, retention):
+    _p = ex.PRIMARY
+    _alt = "end90-hold03"
+    mo.md(rf"""
     ## Discussion
 
-    /// admonition | TODO
-    Written when the results land. It should answer these questions, and go no
-    further than the data supports:
+    The operating point to carry forward is `{_p}`: ᾱ =
+    {alpha_bar(_p).mean():.3f}, margin {m_op1(_p).mean():.2f}, retention
+    {retention(_p):.2f}, task-clean. `{_alt}` grades slightly better, but ᾱ
+    decides it: ᾱ predicts how much of the color cube an edit along the anchor
+    axis would drag with it, and the two conditions differ by
+    {alpha_bar(_alt).mean() / alpha_bar(_p).mean():.1f}× on it, against a
+    {grading(_alt)[1] - grading(_p)[1]:.2f} difference on the reachable grading
+    track. Anything that pulls without a position oracle, and any intervention
+    experiment, wants the smaller spread of side-effects.
 
-    1. Which operating point should the next experiments use, and on what
-       evidence? Anything that pulls without a position oracle needs one, and
-       so would an intervention experiment. $\bar\alpha$ is the number that
-       predicts how much of the color cube an edit to the anchor axis would
-       move.
-    2. Does the schedule finding generalize past this architecture, or is it
-       another set of keyframes fitted to one testbed? The M1 keyframes did
-       not transfer, so it is worth stating what would make ours transfer.
-    3. What is still missing. Containment is not exclusivity: ex-2.1.7 found
-       redness as readable off the anchor axis as in the control, and nothing
-       in this grid changes what that measurement means.
-    ///
+    The M1 keyframes were fractions of training, and those did not transfer.
+    The trajectories suggest carrying something dimensionless instead: ᾱ
+    departs the control shortly after the repulsion falls below the pull, and
+    the floor sets how fast it climbs after that crossing. If that mechanism
+    holds elsewhere, the design variables are the crossing epoch and the ratio
+    of the floor to the containment threshold. This grid measures one
+    architecture on one task, so that is a reading to test; the reproduction
+    check here shows the kind of evidence that would count.
+
+    Three things this experiment does not settle. Containment is not
+    exclusivity: redness stays as readable off the anchor axis as it is in the
+    control, down at the floor the RGB task itself sets. So an edit to the axis
+    moves less of the cube, but the axis is not the only place *red* lives.
+
+    The grading gate needs a decision before the next report scores it: the ρ
+    track cannot reach its gate alongside full-amplitude containment, and one
+    grid is not enough to say where a realistic R² gate sits.
+
+    And the best floor here is also the highest floor tested, so whether a
+    higher or flat-held repulsion does better, or starts to cost the margin, is
+    outside the range this grid measured.
     """)
     return
 
