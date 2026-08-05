@@ -9,6 +9,7 @@ constraint (nGPT's hypersphere projection).
 import equinox as eqx
 import jax.numpy as jnp
 import optax
+from jax.typing import ArrayLike
 from jaxtyping import Array, Float, Int, PyTree
 
 from sca.model import LanguageModel
@@ -46,6 +47,11 @@ def make_train_step(optimizer: optax.GradientTransformation):
 
 
 @eqx.filter_jit
-def eval_step(model: LanguageModel, x: Int[Array, "B T"], y: Int[Array, "B T"]) -> Float[Array, ""]:
-    """Validation loss."""
-    return loss_fn(model, x, y)
+def eval_step(model: LanguageModel, x: Int[ArrayLike, "B T"], y: Int[ArrayLike, "B T"]) -> Float[Array, ""]:
+    """Validation loss.
+
+    Batches arrive from ``sample_batches`` as numpy, which jit converts on the
+    way in — so this boundary is annotated for what callers actually hold, and
+    the ``asarray`` below (free under trace) narrows for the jax-typed interior.
+    """
+    return loss_fn(model, jnp.asarray(x), jnp.asarray(y))

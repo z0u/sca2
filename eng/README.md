@@ -22,8 +22,9 @@ Start with whichever question you're holding:
   live memo hit.
 - [Reproducible GPU runs](./determinism.md) — why the same seed gave three different
   models, what the `XLA_FLAGS` we set buy and cost, why the flags live in the
-  environment rather than in Python, and why "just tolerate small differences" doesn't
-  survive contact with a content-addressed DAG.
+  environment rather than in Python, why a JAX bump moves the digest without moving
+  the memo key, and why "just tolerate small differences" doesn't survive contact
+  with a content-addressed DAG.
 - [Non-goals and recorded decisions](./decisions.md) — chunked datatrees, checkpoints,
   `obstore`, the HF cache tier, why no hosted experiment tracker, why the code fingerprint
   is ours rather than a library's, and the open/deferred list with issue links.
