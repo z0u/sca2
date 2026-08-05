@@ -1,6 +1,6 @@
 {
   "devDependencies": {
-    "lint-staged": "^15"
+    "lint-staged": "^17"
   },
   "lint-staged": {
     "*.py": [
