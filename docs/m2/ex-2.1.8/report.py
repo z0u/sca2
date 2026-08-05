@@ -97,6 +97,8 @@ def _():
     | $\alpha_c$, $\bar\alpha$ | the alignment (cosine) of color $c$ with $\hat v_{\text{red}}$ at op1, averaged over layers; and the mean of that over all 216 colors | ↓ |
     | $m$, $m_{\text{op1}}$ | alignment margin $\sum_c w_c \alpha_c - \bar\alpha$, where $w_c$ are the *red*-label affinities normalized to sum to 1; $m_{\text{op1}}$ is the layer mean of $m$ at op1 | ↑ |
     | contained | of a condition: $\bar\alpha \le {AGATE}$, so the drift is held near the control rather than just weakened | |
+    | $\rho$ | *rank* grading: the Spearman correlation between the per-color $\alpha_c$ and `redness`. Asks whether the response puts the colors in the same order redness does, ignoring how large it is | ≥ {RHO} |
+    | $R^2$ | *proportionality* grading: the squared Pearson correlation between $\alpha_c$ and `sim¹·⁵`, each color's cosine similarity to *red* raised to 1.5. Asks whether the response has that shape, ignoring its scale | ≥ {R2} |
     | retention | per run, the final $m_{\text{op1}}$ divided by its running peak (scored once the peak reaches {FLOOR}); reported as the minimum across seeds | ↑ |
     | leak | $R^2$ of redness decoded from the 63 non-anchor directions at op1; unscored, and cannot fall below the RGB-geometry floor of 0.863 | — |
 
@@ -109,6 +111,8 @@ def _():
     ///
     """.replace("{SCORING}", f"{ex.SCORING_LAMBDA:g}")
         .replace("{AGATE}", f"{ex.MEAN_ALIGN_GATE:g}")
+        .replace("{RHO}", f"{ex.GRADE_RHO_GATE:g}")
+        .replace("{R2}", f"{ex.GRADE_R2_GATE:g}")
         .replace("{FLOOR}", f"{ex.H4_FLOOR:g}")
         .replace("{M50}", f"{ex.EX217_REFERENCE['end50-hold03']['m_op1']:.2f}")
         .replace("{M90}", f"{ex.EX217_REFERENCE['end90-hold03']['m_op1']:.2f}")
@@ -169,11 +173,11 @@ def _(
     {INTERACTION_GATE:.3f} — a pass by
     {(INTERACTION - INTERACTION_GATE) / INTERACTION_GATE * 100:.0f}%. Both gates
     are the preregistered values rescaled by this experiment's own seed spread,
-    as H3's footnote directs.
+    as the H3 footnote directs.
 
-    **Containment is now reachable, and it is new.** `{_p}` is the first
+    **Containment is now newly reachable.** `{_p}` is the first
     condition in M2 to hold $\bar\alpha$ near the control while keeping the
-    margin. Ex-2.1.7's best was
+    margin. The best in ex-2.1.7 was
     {ex.EX217_REFERENCE["end90-hold03"]["alpha"]:.2f} and its gate went unmet
     everywhere.
     """)
@@ -721,7 +725,19 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(CONDS: list[str], END_HI, END_LO, HOLD_HI, HOLD_LO, ROW, acc, alpha_bar, grading, m_op1, retention):
+def _(
+    CONDS: list[str],
+    END_HI,
+    END_LO,
+    HOLD_HI,
+    HOLD_LO,
+    ROW,
+    acc,
+    alpha_bar,
+    grading,
+    m_op1,
+    retention,
+):
     CONTROL_ACC = float(acc("lam0").mean())
     TASK_CLEAN = {c: bool(abs(acc(c).mean() - CONTROL_ACC) <= ex.TASK_GATE) for c in CONDS}
 
@@ -770,6 +786,7 @@ def _(CONDS: list[str], END_HI, END_LO, HOLD_HI, HOLD_LO, ROW, acc, alpha_bar, g
         MEETS,
         TASK_CLEAN,
         end_effect,
+        h2_conditions,
     )
 
 
@@ -814,7 +831,7 @@ def _(alpha_bar, m_op1):
     </table></div>
     """
     _caption = f"""
-    The two cells this grid shares with ex-2.1.7, against that report's published
+    The two conditions this grid shares with ex-2.1.7, against that report's published
     seed means. <code>end50-hold03</code> repeats its <code>span-anti</code> and
     <code>end90-hold03</code> its <code>span-anti-late</code>. The margin
     tolerance is the carried seed-mean noise floor, {ex.NOISE_SEED_MEAN:g}; the
@@ -830,15 +847,15 @@ def _(alpha_bar, grading, m_op1):
     _dm = max(abs(m_op1(c).mean() - r["m_op1"]) for c, r in ex.EX217_REFERENCE.items())
     _da = max(abs(alpha_bar(c).mean() - r["alpha"]) for c, r in ex.EX217_REFERENCE.items())
     mo.md(rf"""
-    Both cells reproduce. The margins land {_dm:.3f} from the published values
+    Both conditions reproduce. The margins land {_dm:.3f} from the published values
     against a floor of {ex.NOISE_SEED_MEAN:g}, and ᾱ within {_da:.3f}, inside
     the tolerance in either row. Grading agrees as well: `end90-hold03` scores
     R² = {grading("end90-hold03")[1]:.2f} here, the value ex-2.1.7 published for
     the same cell.
 
     So the two experiments measure the same thing, and this grid can be read
-    against the ex-2.1.7 numbers. The H2 partials and the H3 power argument
-    both rest on that.
+    against the ex-2.1.7 numbers — which the H2 partials and the H3 power
+    argument both rely on.
     """)
     return
 
@@ -889,7 +906,7 @@ def _(CONDS: list[str], CONTROL_ACC, TASK_CLEAN, acc):
 
 
 @app.cell(hide_code=True)
-def _(CONDS: list[str], CONTROL_ACC, ROW, HOLD_HI, acc):
+def _(CONDS: list[str], CONTROL_ACC, HOLD_HI, ROW, acc):
     _worst = max(CONDS, key=lambda c: abs(acc(c).mean() - CONTROL_ACC))
     _hi = max(ROW[HOLD_HI], key=lambda c: abs(acc(c).mean() - CONTROL_ACC))
     mo.md(rf"""
@@ -901,7 +918,7 @@ def _(CONDS: list[str], CONTROL_ACC, ROW, HOLD_HI, acc):
     task cost would show up, since it sustains a repulsive weight no earlier
     experiment held. It does not: the worst cell in that row is `{_hi}` at
     {abs(acc(_hi).mean() - CONTROL_ACC):.4f}, the same size as the gaps
-    elsewhere. Holding the repulsion an order of magnitude above M1's floor for
+    elsewhere. Holding the repulsion an order of magnitude above the M1 floor for
     the rest of training costs nothing the task loss can see.
     """)
     return
@@ -917,12 +934,9 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(
-        r"""
-    Four conditions have to hold at once, and the table below scores them
-    together. Values that pass their gate are bold.
-    """
-    )
+    mo.md(r"""
+    Four conditions have to hold at once. The table below scores them together, with values that pass their gate in bold.
+    """)
     return
 
 
@@ -993,7 +1007,7 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, grading, m_op1, retention):
     response is graded at ρ = {grading(_p)[0]:.2f} and R² = {grading(_p)[1]:.2f},
     and the gate is {ex.GRADE_R2_GATE:g} on either track.
 
-    Grading is what every cell misses on. The best R² in the grid is
+    Every cell misses on grading. The best R² in the grid is
     {grading(_best_r2)[1]:.2f} (`{_best_r2}`) and the best ρ is
     {grading(_best_rho)[0]:.2f} (`{_best_rho}`), so no cell comes within
     {ex.GRADE_R2_GATE - grading(_best_r2)[1]:.2f} of passing. Neither named
@@ -1001,14 +1015,14 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, grading, m_op1, retention):
     or margin around it.
 
     The contrary result the preregistration named — containment bought by
-    flattening the response — is not what happened. Along the endpoint, ᾱ falls
+    flattening the response — is not what happened. As the anneal is stretched, ᾱ falls
     and the margin rises together: `{ROW[HOLD_LO][0]}` sits at
     ᾱ {alpha_bar(ROW[HOLD_LO][0]).mean():.3f} with margin
     {m_op1(ROW[HOLD_LO][0]).mean():.3f}, and `{ROW[HOLD_LO][-1]}` at
     {alpha_bar(ROW[HOLD_LO][-1]).mean():.3f} with {m_op1(ROW[HOLD_LO][-1]).mean():.3f}.
     Grading rises with them, from {grading(ROW[HOLD_LO][0])[1]:.2f} to
-    {grading(ROW[HOLD_LO][-1])[1]:.2f}. So the schedule is buying selectivity
-    rather than trading it away; it stops short of the level H2 asked for.
+    {grading(ROW[HOLD_LO][-1])[1]:.2f}. So stretching the anneal buys
+    selectivity, and just stops short of the level H2 asked for.
 
     Containment on its own is now reachable, which it was not in ex-2.1.7.
     One cell of the six falls to ᾱ ≤ {ex.MEAN_ALIGN_GATE:g}
@@ -1016,7 +1030,7 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, grading, m_op1, retention):
     {min(alpha_bar(c).mean() for c in ROW[HOLD_HI] if c not in _contained) - ex.MEAN_ALIGN_GATE:.3f}
     of it. That experiment's best was
     {ex.EX217_REFERENCE["end90-hold03"]["alpha"]:.2f}, and its gate went unmet
-    everywhere. Both of the near cells sit in the
+    everywhere. Both of the near cells are in the
     `hold{HOLD_HI * 100:02.0f}` row.
     """)
     return
@@ -1025,8 +1039,8 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, grading, m_op1, retention):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    The endpoint table says where each run finished. The trajectories say when
-    it got there, which is what separates the two accounts.
+    The endpoint table says where each run finished. The trajectories say how it
+    got there, which separates the two accounts H3 is built on.
     """)
     return
 
@@ -1260,15 +1274,15 @@ def _():
 def _(ALPHA_SPREAD, CONTROL_SPREAD, EFFECT_GATE, GATE_SCALE, INTERACTION_GATE):
     _moved = GATE_SCALE > 1.0
     mo.md(rf"""
-    H3's footnote asks for the seed spread before either statistic is read, and
-    allows the gates to move with it. Pooled over the six factorial cells, ᾱ's
-    seed spread is {ALPHA_SPREAD:.4f}, against the ex-2.1.6 control value of
+    H3 has a footnote that asks for the seed spread before either statistic is used, and
+    allows the gates to move with it. Pooled over the six factorial cells, the seed spread of ᾱ
+    is {ALPHA_SPREAD:.4f}, against the ex-2.1.6 control value of
     {CONTROL_SPREAD:g} the gates were sized on. The anchored cells do not hold
     it, so the gates move by {GATE_SCALE:.2f}×: the main effect is scored at
     {EFFECT_GATE:.3f} and the interaction at {INTERACTION_GATE:.3f}. Those are
     the numbers used below{"" if _moved else " (unmoved)"}.
 
-    One cell carries most of that spread. The rest sit between 0.006 and 0.027,
+    One cell accounts for most of that spread. The rest sit between 0.006 and 0.027,
     so the rescaling is driven by a single condition rather than by the grid
     being noisy throughout.
     """)
@@ -1297,7 +1311,7 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, m_op1):
     _caption = """
     The factorial, as cell means on both statistics. Above: ᾱ, which H3 is
     scored on. Below: the margin, repeated because a factor that contains the
-    drift while losing the margin has not bought an operating point.
+    drift while losing the margin does not give an operating point.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -1330,18 +1344,18 @@ def _(
     interaction is over it. Miss 2 needed the main effect to fail, and it
     passes by a factor of {HOLD_EFFECT / EFFECT_GATE:.1f}.
 
-    Two things temper this. The interaction clears its gate by
+    However, the interaction only clears its gate by
     {INTERACTION - INTERACTION_GATE:.3f}, about
-    {(INTERACTION - INTERACTION_GATE) / INTERACTION_GATE * 100:.0f}% — a pass,
-    and a narrow one, on a gate that moved because of this experiment's own
+    {(INTERACTION - INTERACTION_GATE) / INTERACTION_GATE * 100:.0f}% — on a gate that moved because of this experiment's own
     seed spread. And the level account predicted about +0.20, with the whole
-    endpoint effect inside the low row; the observed {INTERACTION:+.3f} sits
+    endpoint effect inside the low row; the observed {INTERACTION:+.3f} is
     below that, because the endpoint still moves ᾱ by
-    {end_effect(HOLD_HI):+.3f} in the high row rather than by nothing.
+    {end_effect(HOLD_HI):+.3f} in the high row, where that account expects
+    nothing.
 
     So the endpoint keeps some leverage even at the sustained floor. The
-    trajectories say why: the floor postpones the crossing and slows the climb
-    after it, and neither is the same as never crossing. The statistic H3 was
+    trajectories show that the floor postpones the crossing and slows the climb
+    after it, but it still crosses. The statistic H3 was
     built on separates the accounts in the direction it was meant to, and the
     mechanism behind it is milder than the account it favors.
 
@@ -1391,7 +1405,7 @@ def _(BY_NAME, alpha_bar, grading, m_op1, retention):
     _caption = f"""
     The dose arm against the two cells it is built from. Dose is relative to
     <code>{ex.DOSE_ARM_REFERENCE}</code>, as in the Method table. The arm has
-    that cell's dose and <code>end90-hold03</code>'s timing, so its position
+    that cell's dose and the <code>end90-hold03</code> timing, so its position
     between them is the comparison.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
@@ -1407,12 +1421,11 @@ def _(alpha_bar):
     {(_ref - _arm) / (_ref - _late) * 100:.0f}% of the way across. So most of
     what the endpoint buys is timing, and some of it is dose.
 
-    That split is worth taking loosely. This is one condition on three seeds, it
-    scores nothing, and scaling the opening ratio to
+    That should be taken loosely: this is one condition on three seeds, it scores nothing, and scaling the opening ratio to
     {ex.DOSE_MATCHED_PEAK_RATIO:g} weakens the repulsion through the epochs
     where the anchor first ramps in, which the Method section named as a
-    confound of its own. The reading it does support is the negative one: the
-    endpoint effect is not merely a dose effect wearing a schedule's clothes,
+    confound of its own. The reading it does support is that the
+    endpoint effect is not *merely* a dose effect,
     because holding the dose fixed leaves most of the gap intact.
     """)
     return
@@ -1515,12 +1528,10 @@ def _():
     Post hoc, and scoring nothing. H2 failed on grading in every cell, so the
     question is what the response actually looks like.
 
-    ### What the two grading tracks disagree about
+    ### The grading metrics disagree
 
-    A pure step — *red* colors aligned, everything else orthogonal — is the
-    failure the grading gate exists to exclude. Both tracks carry a ceiling for
-    it, the best a step can score over all step locations: ρ can reach
-    {SRHO} and R² {SR2}, and both sit under the {GATE} gates, so no step passes.
+    The grading metrics are meant to rule out a *step*, in which very *red* colors would be aligned but everything else orthogonal. Both metrics cap out on a step, at the best it can score over all step locations: ρ can reach
+    {SRHO} and R² {SR2}, both under the {GATE} gates, so no step passes.
     """.replace("{SRHO}", f"{ex.STEP_RHO_CEILING:.2f}")
         .replace("{SR2}", f"{ex.STEP_R2_CEILING:.2f}")
         .replace("{GATE}", f"{ex.GRADE_R2_GATE:g}")
@@ -1534,18 +1545,12 @@ def _(grading):
     _best_rho = max(grading(c)[0] for c in ex.FACTORIAL_NAMES)
     _best_r2 = max(grading(c)[1] for c in ex.FACTORIAL_NAMES)
     mo.md(rf"""
-    Read against those ceilings, the two tracks say opposite things.
+    Considering those ceilings, the two tracks say opposite things.
 
-    On the rank track, every cell scores below what a step would: the best ρ in
-    the grid is {_best_rho:.2f} against a step ceiling of
-    {ex.STEP_RHO_CEILING:.2f}. On the proportionality track, {len(_above)} of
-    the six score above it, up to R² = {_best_r2:.2f} against
-    {ex.STEP_R2_CEILING:.2f}.
+    - **ρ** ranks colors by `redness`. Every cell scores below what a step would: the best ρ in the grid is {_best_rho:.2f} against a step ceiling of {ex.STEP_RHO_CEILING:.2f}.
+    - **R²** fits values against `sim¹·⁵` (proportionality). {len(_above)} of the six score above the ceiling, up to R² = {_best_r2:.2f} against {ex.STEP_R2_CEILING:.2f}.
 
-    The two are measured against different targets — ρ ranks colors by
-    `redness`, R² fits values against `sim¹·⁵` — so they can disagree, and here
-    they do. Neither number on its own says whether the response is a grade or a
-    step, which is what the figure below is for.
+    Neither actually says whether the response is a grade or a step, so we visualize it below.
     """)
     return
 
@@ -1649,17 +1654,18 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, alpha_map, grading, m_op1):
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(r"""
+    mo.md(
+        r"""
     The response is not a step. It has a knee: flat from the control level up to
     a redness of about 0.4, then a clean rise that tracks the dashed target
     closely. Raising the hold ratio lowers the flat part toward the control
     without changing the rise, which is containment doing what it is meant to.
 
-    But most of the color cube lives in that flat part. 161 of the 216 colors
+    But most of the color cube lives in that flat part. {LO} of the {N} colors
     fall below redness 0.4, and inside a flat band their alignments carry no
-    ordering — they are what containment collapses together. A rank statistic
-    over all 216 colors is therefore dominated by them.
-    """)
+    ordering. A rank statistic over all {N} colors is therefore dominated by them.
+    """.replace("{LO}", f"{(ex.REDNESS < 0.4).sum()}").replace("{N}", f"{ex.REDNESS.size}")
+    )
     return
 
 
@@ -1678,7 +1684,8 @@ def _(alpha_map):
     _head = "".join(f"<th class='num'>≥ {k:g} <span class='range'>({(_R >= k).sum()})</span></th>" for k in _KNEES)
     _table = f"""
     <div class="report-table-scroll"><table class="report-table">
-      <thead><tr><th>cell</th><th class="num">all 216</th>{_head}</tr></thead>
+      <thead>
+        <tr><th>cell</th><th class="num">all 216</th>{_head}</tr></thead>
       <tbody>{_rows}</tbody>
     </table></div>
     """
@@ -1698,11 +1705,10 @@ def _(alpha_map):
     _rho_hi = [float(ex.spearman(a[_hi], _R[_hi])) for a in (alpha_map(c)[:, :, 0].mean(axis=0) for c in ex.FACTORIAL_NAMES)]  # fmt: skip
     mo.md(rf"""
     Above the knee the ordering is good in every cell — ρ runs
-    {min(_rho_hi):.2f} to {max(_rho_hi):.2f} on the 55 colors with redness ≥
+    {min(_rho_hi):.2f} to {max(_rho_hi):.2f} on the {_hi.sum()} colors with redness ≥
     0.4, against a gate of {ex.GRADE_RHO_GATE:g} — and it climbs monotonically
     as the flat colors are excluded. So the graded part of the response is
-    graded. What the full-set statistic reports is mostly the size of the flat
-    part.
+    graded, but the full-set statistic is dominated by the flat part.
     """)
     return
 
@@ -1712,15 +1718,9 @@ def _():
     mo.md(r"""
     ### What a contained response can score
 
-    That raises a question about the gate rather than about the runs. If
-    containment collapses the low-redness colors together, and the grading
-    statistic reads their ordering, then the two are in tension by
-    construction. The question is how much.
+    That raises a question about the gate. If containment collapses the low-redness colors together, and the grading statistic reads their ordering, then they must be in tension. How high could the statistic be, under those conditions?
 
-    So we build the best response either statistic could hope for — the target
-    shape exactly, above a knee, and contained to near zero below it — and score
-    it. This is a property of the two statistics and the 216-color grid, not a
-    measurement of any run.
+    We build the best response either statistic could hope for: the target shape exactly, above a knee, and contained to near zero below it. This is a property of the two statistics and the 216-color grid, not a measurement of any run.
     """)
     return
 
@@ -1728,72 +1728,97 @@ def _():
 @app.cell(hide_code=True)
 def _():
     # Monte Carlo over the contained block's arbitrary ordering, which is what
-    # makes this an expectation rather than a value. Computed in the cell, and
-    # small enough that the draw count costs nothing.
-    _rng = np.random.default_rng(0)
-    _R, _T = ex.REDNESS, ex.SIM_TARGET
-
-    def _ceiling(knee: float, draws: int = 600) -> tuple[float, float]:
-        """Expected (ρ, R²) for a response that is `sim¹·⁵` above *knee* and contained below it."""
-        hi = _R >= knee
+    # makes this an expectation rather than a value. Seeded per call so the
+    # numbers don't depend on which cell asks first, and small enough that the
+    # draw count costs nothing.
+    def ceiling(knee: float, scale: float = 1.0, draws: int = 600) -> tuple[float, float, float]:
+        """Expected (ρ, R², ᾱ) for a response that is *scale* × `sim¹·⁵` above *knee*, contained below it."""
+        R, T = ex.REDNESS, ex.SIM_TARGET
+        rng = np.random.default_rng(0)
+        hi = R >= knee
         out = np.array(
             [
-                (ex.spearman(a, _R), ex.r2_sim(a))
-                for a in (np.where(hi, _T, _rng.normal(0, 0.02, _R.size)) for _ in range(draws))
+                (ex.spearman(a, R), ex.r2_sim(a), a.mean())
+                for a in (np.where(hi, scale * T, rng.normal(0, 0.02, R.size)) for _ in range(draws))
             ]
         )
-        return float(out[:, 0].mean()), float(out[:, 1].mean())
+        rho, r2, alpha = out.mean(axis=0)
+        return float(rho), float(r2), float(alpha)
 
     _rows = "".join(
-        f"<tr><th>{k:g}</th><td class='num'>{(_R < k).sum()}</td>"
-        f"<td class='num'>{r:.2f}</td><td class='num'>{r2:.2f}</td></tr>"
-        for k in (0.0, 0.3, 0.4, 0.5)
-        for r, r2 in [_ceiling(k)]
+        f"<tr><th>{k:g}</th><td class='num'>{(ex.REDNESS < k).sum()}</td>"
+        f"<td class='num'>{r:.2f}</td><td class='num'>{r2:.2f}</td><td class='num'>{a:.3f}</td></tr>"
+        for k in (0.0, 0.2, 0.3, 0.4, 0.5)
+        for r, r2, a in [ceiling(k)]
     )
     _table = f"""
     <div class="report-table-scroll"><table class="report-table">
       <thead><tr>
         <th>knee</th><th class="num">colors contained</th>
-        <th class="num">best ρ</th><th class="num">best R²</th>
+        <th class="num">best ρ</th><th class="num">best R²</th><th class="num">ᾱ</th>
       </tr></thead>
       <tbody>{_rows}</tbody>
     </table></div>
     """
     _caption = f"""
     The best either grading track can score, for a response that reproduces
-    <code>sim¹·⁵</code> exactly above the knee and sits at the control below it.
-    A knee of 0 is no containment at all. Both gates are
-    {ex.GRADE_R2_GATE:g}. Expectations over the contained block's arbitrary
-    ordering; a pure step reaches ρ = {ex.STEP_RHO_CEILING:.2f} and
+    <code>sim¹·⁵</code> exactly above the knee and sits at the control below it,
+    with the ᾱ that response implies. A knee of 0 is no containment at all.
+    Both grading gates are {ex.GRADE_R2_GATE:g} and the containment gate is
+    ᾱ ≤ {ex.MEAN_ALIGN_GATE:g}. Expectations over the contained block's
+    arbitrary ordering; a pure step reaches ρ = {ex.STEP_RHO_CEILING:.2f} and
     R² = {ex.STEP_R2_CEILING:.2f} for comparison.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
-    return
+    return (ceiling,)
 
 
 @app.cell(hide_code=True)
-def _(grading):
+def _(ceiling, grading):
     _best_r2 = max(grading(c)[1] for c in ex.FACTORIAL_NAMES)
+    _corr = float(np.corrcoef(ex.SIM_TARGET, ex.REDNESS)[0, 1])
+    _open, _mid, _knee, _deep = (ceiling(k) for k in (0.0, 0.3, 0.4, 0.5))
+    _half = ceiling(0.2, scale=0.5)
     mo.md(rf"""
     The two tracks come apart. Even with no containment at all, the best ρ a
-    perfect `sim¹·⁵` response reaches is 0.82, barely over the gate, because
-    `sim¹·⁵` is not a monotone function of `redness` — the two correlate at
-    0.90, not 1. Contain the 161 colors below redness 0.4 and the ceiling falls
-    to 0.59, under the observed values. So the ρ track penalizes containment,
-    and at the containment this grid achieves it cannot reach
+    perfect `sim¹·⁵` response reaches is {_open[0]:.2f}, barely over the gate, because
+    `sim¹·⁵` is not a monotone function of `redness` (they correlate at {_corr:.2f}, not 1).
+    With the {(ex.REDNESS < 0.4).sum()} colors below `redness` 0.4 contained, the ceiling falls
+    to {_knee[0]:.2f}, under the observed values. So past a light knee the ρ track
+    penalizes containment, and at the containment this grid achieves it cannot reach
     {ex.GRADE_RHO_GATE:g} however well the response is graded.
 
     R² behaves the other way. Its target is near zero for the colors
     containment collapses, so containment moves the response toward the target
-    rather than away: the ceiling is 0.94 at a knee of 0.4 and 0.87 even at 0.5.
-    That track is reachable, and the best cell in this grid gets
-    {_best_r2:.2f} of it.
+    rather than away: the ceiling is {_knee[1]:.2f} at a knee of 0.4 and
+    {_deep[1]:.2f} even at 0.5. That track is reachable, and the best cell in
+    this grid gets {_best_r2:.2f} of it.[^m1r2]
 
-    Two things follow, and both are for the next design rather than for this
-    report. The ρ gate as written is in tension with the containment H2 also
-    asks for, so a report that scores both is asking for two things at once
-    without saying so. And the R² shortfall is real: against an achievable 0.94,
-    {_best_r2:.2f} is a gap in the response, not an artifact of the statistic.
+    Within that family — `sim¹·⁵` at full amplitude — the ρ gate and the
+    containment H2 also asks for cannot both be met. ᾱ crosses under
+    {ex.MEAN_ALIGN_GATE:g} somewhere between a knee of 0.3 and 0.4, and by
+    there ρ has fallen from {_mid[0]:.2f} to {_knee[0]:.2f}.
+
+    That family is narrow, though. ρ ranks colors, so it is blind to the
+    amplitude the ᾱ gate measures: scale the above-knee response to half of
+    `sim¹·⁵` at a knee of 0.2, and both gates clear at once, at ρ =
+    {_half[0]:.2f} and ᾱ = {_half[2]:.3f}. What the two gates jointly exclude
+    is a response that is both steeply graded and full-amplitude on the reds,
+    which is narrower than the gates being incompatible. Either way the ρ gate
+    is doing something the preregistration did not say it was doing, and a
+    future design should settle the amplitude question before reusing it.
+
+    The R² shortfall is in the response itself: against an achievable
+    {_knee[1]:.2f}, {_best_r2:.2f} is a real gap. Setting a realistic R² gate
+    for future work would take more than this one grid.
+
+    [^m1r2]: M1 scored proportionality with a Pearson R² as well, but of a
+    different quantity: reconstruction error under intervention against
+    $\cos^2$ similarity to *red* (D1.3), where the square is what the
+    projection predicts. Here it is training-time alignment against
+    `sim¹·⁵`, an exponent chosen as a shape between linear and quadratic rather
+    than derived. Same statistic, different response variable and target, so
+    M1's values are not a benchmark for this gate.
     """)
     return
 
