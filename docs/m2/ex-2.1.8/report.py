@@ -59,7 +59,7 @@ def _():
     /// tip |
     <!-- tl;dr -->
     We tested anti-subspace schedules (trailing timing and strength) to find an operating point that contains the cube-wide drift without reducing selectivity.
-    Holding the repulsion high for longer contains the drift and keeps the margin, which nothing before this did. The response still isn't graded enough to call it an operating point.
+    Holding the repulsion high for longer contains the drift and keeps the margin, which nothing before this did. It's unclear if the response is well-graded.
     ///
     """)
     return
