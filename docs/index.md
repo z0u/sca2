@@ -136,8 +136,12 @@ These experiments were preparation for the main work: exercising the infrastruct
 
 - [2.1.9. A pull that finds its own position](./m2/ex-2.1.9/report.py)
 
-    Preregistration; not yet run. The op1-only pull is a position oracle
-    natural language won't supply, so we let the anchor term choose for
-    itself: a soft minimum (mellowmax) over the span instead of a mean. We ask
-    whether it recovers the oracle's selectivity, and whether the weight lands
-    where the concept lives.
+    The op1-only pull is a position oracle natural language won't supply, so
+    we let the anchor term choose for itself: a soft minimum (mellowmax) over
+    the span instead of a mean. It chooses correctly — at the embedding the
+    weight lands on op1, the only position that can carry the concept there —
+    and the operating point survives, with grading improving. The margin gain
+    over the span mean is small, though: under the max-over-roles statistic
+    the span mean already sits near the oracle, so there was little headroom
+    to recover. At the sharpest τ the deep slices latch onto `+` within the
+    first few epochs, and the choice is never revisited.

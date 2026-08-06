@@ -22,7 +22,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from sca.anchoring import PROMPT_SPAN, softmin_weights
+from sca.anchoring import (
+    PROMPT_SPAN,
+    anchor_weight as _anchor_weight,
+    anti_subspace_weight as _anti_subspace_weight,
+    softmin_weights,
+)
 from sca.colorcube import redness, sim_to_red
 from sca.config import SchedulerConfig
 from sca.data.colors import N_LEVELS
@@ -112,6 +117,44 @@ def mellowmax_min(x: np.ndarray, tau: float, axis: int = -1) -> np.ndarray:
     z = -x / tau
     m = z.max(axis=axis, keepdims=True)
     return -tau * (np.log(np.mean(np.exp(z - m), axis=axis)) + np.squeeze(m, axis=axis))
+
+
+def anchor_weight(epoch, *, peak: float = SCORING_LAMBDA) -> np.ndarray:
+    """The anchor weight λ at (fractional) *epoch*. Unchanged from ex-2.1.6.
+
+    The same library function the training loop uses, with this experiment's
+    schedule constants bound, so the report's schedule panel cannot drift from
+    what the run trained under.
+    """
+    return _anchor_weight(
+        epoch,
+        peak=peak,
+        warmup_epochs=SCHEDULER.warmup_epochs,
+        anneal_start=ANNEAL_START,
+        anneal_end=ANNEAL_END,
+        floor=ANNEAL_FLOOR,
+    )
+
+
+def anti_subspace_weight(
+    epoch,
+    *,
+    lam: float = SCORING_LAMBDA,
+    anneal_end: float = ANTI_ANNEAL_END,
+    hold_ratio: float = ANTI_HOLD_RATIO,
+    peak_ratio: float = ANTI_PEAK_RATIO,
+) -> np.ndarray:
+    """The anti-subspace weight μ at (fractional) *epoch*, defaulting to the operating point."""
+    return _anti_subspace_weight(
+        epoch,
+        lam=lam,
+        peak_ratio=peak_ratio,
+        hold_ratio=hold_ratio,
+        anneal_end=anneal_end,
+        anchor_anneal_start=ANNEAL_START,
+        anchor_anneal_end=ANNEAL_END,
+        floor=ANNEAL_FLOOR,
+    )
 
 
 # --- Conditions -------------------------------------------------------------
