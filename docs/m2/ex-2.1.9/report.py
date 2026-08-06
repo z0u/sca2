@@ -1342,83 +1342,102 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(READ, pi_bar, read_gain):
+def _(READ, cells, pi_bar, read_gain):
     _PI = {c: pi_bar(c) for c in ex.POOLED_NAMES}
+    _PI_SEEDS = {
+        c: np.array([np.asarray(cells[f"{c}-s{s}"]["pi"], dtype=float) for s in ex.SEEDS]) for c in ex.POOLED_NAMES
+    }
     _GAIN = {c: read_gain(c) for c in ex.POOLED_NAMES}
-    _x = np.arange(5)
+    _x = np.arange(ex.SPAN)
 
     @themed(
         name="weight-profiles",
         alt_text="""
-            Four panels in a row sharing a vertical axis from 0 to 1 over
-            slices emb to 4. First panel: the control's readability profile as
-            four smooth-stepped lines — op1 high at about 0.85 at every slice;
-            plus and equals near zero at the embedding then jumping to about
-            0.8 after it, equals sagging toward 0.63 at depth; op2 low
-            throughout, at or below 0.2. The other three panels are stacked
-            area charts of the softmin weight for the pooled arms at tau
-            0.01, 0.03 and 0.1: in all three the op1 band takes about
-            three-quarters of the height at the embedding. At tau 0.01 the
-            op1 band narrows to a third after slice 1 while the plus band
-            takes two-thirds. At tau 0.03 the op1 band holds about
-            two-thirds at every slice with plus taking the rest. At tau 0.1
-            the op1 band widens with depth to nearly the whole panel.
+            A five-by-three grid of small flush panels. Columns are the pooled
+            arms at tau 0.01, 0.03 and 0.1; rows are residual slices with the
+            last slice on top and the embedding at the bottom; each panel
+            spans the four span roles op1, plus, op2 and equals on its
+            horizontal axis, from 0 to 1 vertically. A shaded smooth-step
+            area shows the softmin weight and a dashed line the control's
+            readability, which is identical across the columns of a row: op1
+            near 0.85 everywhere, plus and equals near 0.8 on all rows but
+            the embedding, where both drop to zero, and op2 never above 0.2.
+            In the bottom (embedding) row of every column, the weight area is
+            a tall block at op1, about 0.77, with a small step at plus. Going
+            up the tau 0.01 column the op1 block shrinks to about a third
+            while a block at plus grows to two thirds. In the tau 0.03 column
+            op1 stays near two thirds with plus taking the rest. In the tau
+            0.1 column op1 grows toward 0.95 with the other roles near zero.
         """,
         caption=rf"""
             **What the pull chose, against where the concept is readable.**
-            Left: the readability profile of the un-anchored control,
+            The trained softmin weight profile $\bar\pi(\ell, t)$ of each
+            pooled arm (shaded area, seed mean; hairlines are the seed
+            minimum and maximum), over the four span roles, one panel per
+            residual slice with the embedding at the bottom. The dashed line
+            is the readability profile of the *un-anchored control*,
             $R^2(\ell, t)$ — a ridge probe predicting op1's redness from the
-            state at each (slice, role), one color held out at a time, mean
-            of three seeds. Right three: the trained softmin weight profile
-            $\bar\pi(\ell, t)$ of each pooled arm as stacked bands (op1 at
-            the base, then `+`, op2, `=`; bands sum to 1), seed means. The
-            caret marks the H4(a) gate, {ex.LEAD_GATE:g} at the embedding;
-            the number under each arm is its H4(b) weighted readability gain
-            (gate ≥ {ex.READ_GAIN_GATE:g}, scored on P). Positions are
-            ordinal; risers carry no data.
+            state at each (slice, role), one color held out at a time — the
+            same reference in every column of a row. The caret on the
+            embedding row marks the H4(a) gate: op1's weight ≥
+            {ex.LEAD_GATE:g} (uniform is 0.25). The number atop each column
+            is its H4(b) weighted readability gain (gate ≥
+            {ex.READ_GAIN_GATE:g}, scored on P). Roles are ordinal, so the
+            risers carry no data.
         """,
     )
     def _plot() -> plt.Figure:
-        from typing import cast
+        from matplotlib.layout_engine import ConstrainedLayoutEngine
 
-        from mini.vis import AxesRow, smooth_step, smooth_step_band
+        from mini.vis import smooth_step, smooth_step_area
 
-        _role_ink = {
-            "op1": light_dark("#c1332a", "#f0665a"),
-            "+": light_dark("#1f6fb4", "#5fa8dd"),
-            "op2": light_dark("#2a9d8f", "#5fc9bd"),
-            "=": light_dark("#7b3fa0", "#b98ce0"),
+        _cond_ink = {
+            "pool-t010": light_dark("#7fb3d8", "#4f7ea6"),
+            "pool-t030": light_dark("#1f6fb4", "#5fa8dd"),
+            "pool-t100": light_dark("#12497c", "#8ec4ea"),
         }
         _grey = light_dark("#666", "#999")
+        _read_ink = light_dark("#555", "#aaa")
+        _hair = light_dark("#00000055", "#ffffff55")
         _gate = light_dark("#555", "#bbb")
-        fig, axes = plt.subplots(1, 4, figsize=(7.5, 2.6), sharex=True, sharey=True, layout="constrained")
-        axes = cast(AxesRow, axes)
-
-        ax = axes[0]
-        for ti, ink in enumerate(_role_ink.values()):
-            smooth_step(ax, _x, READ[:, ti], ramp=0.5, color=ink, lw=1.6)
-        ax.set_title("readability (control)", fontsize=9, color=_grey)
-        ax.set_ylabel("$R^2$  /  weight", fontsize="x-small")
-
-        for ax, cond in zip(axes[1:], ex.POOLED_NAMES, strict=True):
-            cum = np.concatenate([np.zeros((5, 1)), np.cumsum(_PI[cond], axis=1)], axis=1)
-            for ti, ink in enumerate(_role_ink.values()):
-                smooth_step_band(ax, _x, cum[:, ti], cum[:, ti + 1], ramp=0.5, color=ink,
-                                 alpha=light_dark(0.55, 0.5))  # fmt: skip
-                smooth_step(ax, _x, cum[:, ti + 1], ramp=0.5, color=ink, lw=0.9)
-            ax.plot(0, ex.LEAD_GATE, marker=9, ms=3, color=_gate, clip_on=False, zorder=6,
-                    transform=ax.get_yaxis_transform())  # fmt: skip
-            ax.set_title("P (pool-t030)" if cond == ex.PRIMARY else cond, fontsize=9,
-                         fontweight="bold" if cond == ex.PRIMARY else "normal")  # fmt: skip
-            ax.annotate(f"gain {_GAIN[cond]:+.2f}", (0.5, 0.02), xycoords="axes fraction", ha="center",
-                        fontsize=8, color=light_dark("#333", "#ccc"))  # fmt: skip
-        for ax in axes:
-            ax.set_xticks(_x, ["emb", "1", "2", "3", "4"])
-            ax.tick_params(labelsize=8)
-            ax.set_ylim(0, 1.0)
-        _leg = [plt.Line2D([], [], color=ink, lw=1.6) for ink in _role_ink.values()]
-        fig.legend(_leg, list(_role_ink), fontsize=8, frameon=False, ncols=4, loc="lower center",
-                   bbox_to_anchor=(0.5, 1.0), labelcolor=_grey)  # fmt: skip
+        fig, axes = plt.subplots(5, 3, figsize=(7.0, 5.2), sharex=True, sharey=True)
+        _engine = fig.get_layout_engine()
+        assert isinstance(_engine, ConstrainedLayoutEngine)
+        _engine.set(hspace=0, h_pad=0.01, wspace=0.05)
+        for col, cond in enumerate(ex.POOLED_NAMES):
+            ink = _cond_ink[cond]
+            for row in range(5):
+                sl = 4 - row  # last slice on top, the embedding at the bottom
+                ax = axes[row][col]
+                smooth_step_area(ax, _x, _PI[cond][sl], ramp=0.5, color=ink, alpha=light_dark(0.22, 0.28))
+                smooth_step(ax, _x, _PI[cond][sl], ramp=0.5, color=ink, lw=1.5)
+                for edge in (_PI_SEEDS[cond][:, sl].min(axis=0), _PI_SEEDS[cond][:, sl].max(axis=0)):
+                    smooth_step(ax, _x, edge, ramp=0.5, color=_hair, lw=0.5)
+                smooth_step(ax, _x, READ[sl], ramp=0.5, color=_read_ink, lw=1.0, ls=(0, (4, 2)))
+                ax.set(ylim=(-0.08, 1.08), xlim=(-0.4, ex.SPAN - 0.6), yticks=[0.0, 0.5, 1.0])
+                ax.spines[:].set_visible(False)
+                ax.grid(axis="y", which="major", c="#888", alpha=0.2)
+                ax.tick_params(axis="x", length=0, labelbottom=False)
+                ax.tick_params(axis="y", left=True, right=True, direction="in", labelleft=False, labelright=False)
+                if col == 0:
+                    ax.set_ylabel("emb" if sl == 0 else f"{sl}", fontsize=8)
+            axes[0][col].set_title("P (pool-t030)" if cond == ex.PRIMARY else cond, fontsize=9.5, color=ink,
+                                   fontweight="bold" if cond == ex.PRIMARY else "normal")  # fmt: skip
+            axes[0][col].annotate(f"gain {_GAIN[cond]:+.2f}", (0.97, 0.88), xycoords="axes fraction", ha="right",
+                                  va="top", fontsize=8, color=light_dark("#444", "#bbb"))  # fmt: skip
+            # The H4(a) gate reads exactly here: op1's weight at the embedding.
+            axes[4][col].plot(0, ex.LEAD_GATE, marker=9, ms=3, color=_gate, clip_on=False, zorder=6,
+                              transform=axes[4][col].get_yaxis_transform())  # fmt: skip
+            axes[4][col].set_xticks(_x, ex.ROLES)
+            axes[4][col].tick_params(axis="x", labelbottom=True, labelsize=8.5)
+        # One panel says what the scale is; numbering all fifteen spends ink on a fact stated once.
+        axes[4][2].tick_params(axis="y", labelright=True, labelsize=7, pad=2)
+        fig.supylabel("slice", fontsize=9)
+        _pi_key = plt.Rectangle((0, 0), 1, 1, fc=_grey, alpha=0.35, ec="none")
+        _read_key = plt.Line2D([], [], color=_read_ink, lw=1.0, ls=(0, (4, 2)))
+        fig.legend([_pi_key, _read_key], [r"softmin weight $\bar\pi$", "control readability $R^2$"],
+                   fontsize=8.5, frameon=False, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.0),
+                   labelcolor=_grey)  # fmt: skip
         return fig
 
     mo.Html(_plot())
