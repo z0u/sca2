@@ -507,6 +507,13 @@ state.
   (`_assets/provenance.json` already records them) against what's current. Worth
   doing once we notice it biting.
 
+- `mini/__init__.py` re-exports the whole package (2026-08-06). #tooling
+  `from mini.reports import export_key` runs `apparatus`, `modal_apparatus`,
+  `experiment`, `store`… so a leaf module with only stdlib imports still needs the
+  full environment. Cost a round in CI: `scripts/changed_reports.py` was written to
+  run before the install and couldn't. Not urgent — nothing else wants a lightweight
+  import today — but worth remembering before writing the next standalone tool.
+
 ## Backlog, grouped by what a single dev session should bundle
 
 (The M2 science backlog, including issue #10, now lives in

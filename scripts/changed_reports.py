@@ -11,9 +11,10 @@ Publishing only the changed notebooks is also what keeps ``docs/publish.lock`` l
 each run repins the reports that have new content and leaves every other pin as it was,
 so the lock diff reads as the list of reports the branch actually changed.
 
-Stdlib-only on purpose (``mini.reports`` imports nothing heavier), so it runs straight
-from a checkout with no install: most pushes change no report, and that answer should be
-cheap enough to ask on every one.
+Needs the project installed, despite reading like a script that wouldn't: importing
+``mini.reports`` runs ``mini/__init__.py``, which pulls in the whole package. CI answers
+the common "nothing to do" case with a plain ``git diff`` first and only reaches this
+once a notebook under ``docs/`` has actually moved.
 """
 
 import argparse
@@ -34,9 +35,14 @@ def changed_reports(base: str, root: Path = ROOT) -> list[Path]:
     landed on the base branch meanwhile aren't mistaken for ours. Deletions are filtered
     out — there's no bundle to export for a report that's gone, and the next publish
     prunes its pin anyway (``export_reports.update_pins``).
+
+    Scoped to ``docs/`` by the same reasoning as :func:`~mini.reports.report_notebooks`:
+    a report is a notebook *there*. Without the pathspec, anything in the repo carrying
+    the text ``marimo.App(`` reads as a report — this module's own tests, for instance —
+    and would be handed to the publisher with a nonsense export key.
     """
     diff = subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=d", f"{base}...HEAD"],
+        ["git", "diff", "--name-only", "--diff-filter=d", f"{base}...HEAD", "--", "docs"],
         cwd=root,
         capture_output=True,
         text=True,

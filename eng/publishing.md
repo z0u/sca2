@@ -145,9 +145,12 @@ Further decisions:
   the one step of the loop that had to be *remembered*, and forgetting it fails quietly:
   the notebook merges, the site keeps serving the previous export's figures, and nothing
   says so. `publish-reports.yml` runs `./go publish` for the report notebooks the branch
-  changed against its base (`scripts/changed_reports.py`, stdlib-only so the "nothing
-  changed" answer costs a git diff rather than an install), then commits the pins that
-  moved.
+  changed against its base (`scripts/changed_reports.py`), then commits the pins that
+  moved. The selection is two-stage, because the common answer should be cheap: a plain
+  `git diff` decides whether any notebook under `docs/` moved at all, and only then does
+  the job install the project and ask which of them are auto-publishable reports. (The
+  script reads like it would run without an install, but importing `mini.reports` runs
+  `mini/__init__.py`, which pulls in the whole package.)
 
   Three shapes of this were available, and **ordering picked the winner**. The preview
   serves the branch's pins, so the pins must move *before* the site is assembled — and

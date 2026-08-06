@@ -68,35 +68,55 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
           fetch-depth: 0 # the merge base with the base branch needs history
 
+      - name: Did the branch touch a notebook?
+        id: touched
+        # The cheap gate, and pure git on purpose: most pushes change nothing under
+        # docs/, and that answer shouldn't cost an install. *Which* of them are reports
+        # is a question for changed_reports.py below, which needs the project (importing
+        # `mini.reports` runs `mini/__init__.py`, and that pulls in the whole package).
+        run: |
+          set -euo pipefail
+          if [[ "${ALL:-}" == "true" ]]; then
+            echo "maybe=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags --quiet origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          # Collected rather than piped into `grep -q`: an early-exiting grep would
+          # SIGPIPE the diff, and pipefail would read that as "no match".
+          touched="$(git diff --name-only "origin/$BASE...HEAD" -- docs | grep '\.py$' || true)"
+          if [[ -n "$touched" ]]; then
+            echo "maybe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No notebook changed since $BASE — nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Install uv
+        if: steps.touched.outputs.maybe == 'true'
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        if: steps.touched.outputs.maybe == 'true'
+        # The full project, not the `pages` group: publishing renders the notebooks,
+        # which import src/ and read the store.
+        run: uv sync
+
       - name: Select reports
         id: select
+        if: steps.touched.outputs.maybe == 'true'
         run: |
           set -euo pipefail
           args="$RUNNER_TEMP/publish-args.txt"
           if [[ "${ALL:-}" == "true" ]]; then
             echo --all > "$args"
           else
-            git fetch --no-tags --quiet origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
-            # Stdlib-only, so this runs before the project is installed: most pushes
-            # change no report, and that's the answer we want cheaply.
-            PYTHONPATH=src python3 scripts/changed_reports.py "origin/$BASE" > "$args"
+            uv run scripts/changed_reports.py "origin/$BASE" > "$args"
           fi
           if [[ -s "$args" ]]; then
             echo "any=true" >> "$GITHUB_OUTPUT"
             { echo "Publishing:"; sed 's/^/- /' "$args"; } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No report changed since $BASE — nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+            echo "Notebooks moved, but no auto-publishable report among them." >> "$GITHUB_STEP_SUMMARY"
           fi
-
-      - name: Install uv
-        if: steps.select.outputs.any == 'true'
-        uses: astral-sh/setup-uv@v6
-
-      - name: Install dependencies
-        if: steps.select.outputs.any == 'true'
-        # The full project, not the `pages` group: publishing renders the notebooks,
-        # which import src/ and read the store.
-        run: uv sync
 
       - name: Publish
         if: steps.select.outputs.any == 'true'

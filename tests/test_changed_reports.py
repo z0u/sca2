@@ -76,6 +76,16 @@ def test_the_opt_out_marker_is_left_to_a_hand_publish(repo):
     assert selected(repo) == set()
 
 
+def test_a_notebook_outside_docs_is_not_a_report(repo):
+    """`marimo.App(` appears in plenty of files that aren't reports — this repo's own
+    tests among them. Only `docs/` is the report tree."""
+    (tests := repo / "tests").mkdir()
+    (tests / "test_something.py").write_text(f'SAMPLE = """{_APP}"""\n')
+    (repo / "notebook.py").write_text(_APP)
+    commit(repo, "a test that quotes a notebook")
+    assert selected(repo) == set()
+
+
 def test_a_deleted_report_has_no_bundle_to_export(repo):
     (repo / "docs" / "overview.py").unlink()
     commit(repo, "drop a report")
