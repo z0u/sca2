@@ -143,5 +143,7 @@ These experiments were preparation for the main work: exercising the infrastruct
     and the operating point survives, with grading improving. The margin gain
     over the span mean is small, though: under the max-over-roles statistic
     the span mean already sits near the oracle, so there was little headroom
-    to recover. At the sharpest τ the deep slices latch onto `+` within the
-    first few epochs, and the choice is never revisited.
+    to recover. At depth the concentration is winner-take-all run by run:
+    at the two sharper τ some runs latch onto `+` within the first few
+    epochs and never revisit, and only τ = 0.1 keeps a graded profile on
+    op1 in every run.

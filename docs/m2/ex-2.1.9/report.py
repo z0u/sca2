@@ -70,7 +70,10 @@ def _():
     only position that can carry the concept there — and the operating point
     stays healthy, with grading improving. What it doesn't do is buy margin:
     the span mean's max-over-roles margin already sits near the oracle's, so
-    there was almost no headroom for the pooled pull to claim.
+    there was almost no headroom for the pooled pull to claim. At depth the
+    concentration is winner-take-all run by run — at the two sharper τ some
+    runs latch onto `+` in the first few epochs — and only the softest rung
+    keeps a graded profile in every run.
     ///
     """)
     return
@@ -99,7 +102,8 @@ def _(a_op1, a_span, acc, grading_r2, m_span, pi_bar, read_gain, retention):
     {max(abs(acc(c).mean() - _ctrl) for c in ["span-mean", *ex.POOLED_NAMES, ex.ORACLE_ARM]):.4f},
     against a gate of {ex.TASK_GATE:g}.
 
-    **H2 (pooling increases selectivity) — refuted.** On P (`{_P}`):
+    **H2 (pooling increases selectivity) — unmet.** On the primary condition
+    (`{_P}`):
     (a) the margin gain over the span mean is {_gain:+.3f} against a gate of
     {ex.POOL_GAIN_GATE:g} (partial {ex.POOL_GAIN_PARTIAL:g}), and
     (b) the syntax-role drift falls by {_drop:.3f} against a required
@@ -107,10 +111,10 @@ def _(a_op1, a_span, acc, grading_r2, m_span, pi_bar, read_gain, retention):
     gates, and neither partial applies. One piece of context, unpacked in the
     selectivity section: the op1 oracle itself beats the span mean by only
     {_headroom:.3f} on $m_\text{{span}}$ here, so H2(a)'s gate was out of
-    reach for any pull; P recovered {_gain / _headroom:.0%} of the headroom
-    that existed.
+    reach for any pull; `{_P}` recovered {_gain / _headroom:.0%} of the
+    headroom that existed.
 
-    **H3 (the operating point survives pooling) — holds.** On P: containment
+    **H3 (the operating point survives pooling) — holds.** On `{_P}`: containment
     $\bar\alpha$ = {a_op1(_P).mean():.3f} (gate ≤ {ex.MEAN_ALIGN_GATE:g});
     retention {_ret:.2f} (gate ≥ {ex.RETENTION_GATE:g}, minimum across seeds);
     and grading $r^2$ = {grading_r2(_P):.2f} against the span mean's
@@ -118,12 +122,14 @@ def _(a_op1, a_span, acc, grading_r2, m_span, pi_bar, read_gain, retention):
     {ex.GRADE_R2_DROP:g} and instead the response got better graded.
 
     **H4 (the weight lands where the concept lives) — holds.** At the
-    embedding slice P puts {pi_bar(_P)[0, 0]:.2f} of the softmin weight on
-    op1 (gate ≥ {ex.LEAD_GATE:g}; uniform is 0.25) — the only span position
-    whose state can carry the concept there — and the weighted readability
-    gain is {read_gain(_P):+.2f} (gate ≥ {ex.READ_GAIN_GATE:g}). The one
-    latch in the sweep arrives at the sharpest τ only, at depth only (*Where
-    the weight went*).
+    embedding slice `{_P}` puts {pi_bar(_P)[0, 0]:.2f} of the softmin weight
+    on op1 (gate ≥ {ex.LEAD_GATE:g}; uniform is 0.25) — the only span
+    position whose state can carry the concept there — and the weighted
+    readability gain is {read_gain(_P):+.2f} (gate ≥ {ex.READ_GAIN_GATE:g}).
+    At depth the concentration is winner-take-all seed by seed: at the two
+    sharper τ some seeds latch onto `+` in the first few epochs, and only
+    τ = 0.1 keeps a graded profile on op1 in every seed (*Where the weight
+    went*).
 
     So the pull finds the concept-bearing position without the oracle, and
     holding the operating point costs nothing — but finding it buys almost no
@@ -237,7 +243,7 @@ def _():
     so the pull budget of each line is conserved and $\lambda_a$ means the same
     thing at every τ.
     Second, the $1/n$ inside the log makes $\tau = \infty$
-    the span mean (we'll pin that with a unit test), so the τ = ∞ arm
+    the span mean (we'll pin that with a unit test), so the τ = ∞ condition
     reproduces the ex-2.1.8 pull and the τ sweep interpolates from there down
     toward a hard min at τ = 0.
     Third, it never pushes.
@@ -423,11 +429,11 @@ def _(ALPHA218, arrays218):
     So the grid is $\tau \in \{{{", ".join(f"{t:g}" for t in ex.TAUS)}\}}$: the
     sharp edge of the band, the soft edge, and one rung toward the mean end of
     the τ axis (τ = 0.1, weights nearer uniform); the mean itself is the
-    τ = ∞ arm, which closes the family. τ = 0.01 sits below the per-seed margin noise
+    τ = ∞ condition, which closes the family. τ = 0.01 sits below the per-seed margin noise
     ({ex.NOISE_PER_SEED:g}), so at that rung the pool will commit hard to early differences
     that may just be noise. That is the winner-take-most end of the sweep.
 
-    The ex-2.1.8 arrays give the reproduction targets for the `span-mean` arm,
+    The ex-2.1.8 arrays give the reproduction targets for the `span-mean` condition,
     as means of per-run statistics — the convention the results are scored
     under: pooled margin m_span = {_m218:.2f} (control {_m218c:.2f})
     and ᾱ_span = {_as218:.2f} (control {_as218c:.2f}). They also put numbers
@@ -538,12 +544,13 @@ def _():
     statistic is unchanged. Derivations for the new gates are in
     [experiment.py](./experiment.py), next to their constants.
 
-    Throughout, *P* names the primary pooled condition, fixed in advance as
-    `{PRIMARY}`: on both reference profiles its τ sits at the calibration
-    band's soft edge on the shallow slices, and below the band on the deeper
-    ones — the conservative end of the target range — a criterion
-    independent of every gated statistic. H2–H4 all score P. The
-    other two pooled arms are the τ sweep, reported beside P but not gated.
+    In the hypothesis statements, *P* names the primary pooled condition,
+    fixed in advance as `{PRIMARY}`: on both reference profiles its τ sits at
+    the calibration band's soft edge on the shallow slices, and below the
+    band on the deeper ones — the conservative end of the target range — a
+    criterion independent of every gated statistic. H2–H4 all score P; the
+    results prose calls it `{PRIMARY}` or "the primary condition". The other
+    two pooled conditions are the τ sweep, reported beside P but not gated.
     If P turns out task-dirty, H2–H4 go unscored and the refuted H1 is the
     finding.
 
@@ -572,7 +579,7 @@ def _():
     across seeds);
     (c) grading, the squared Pearson correlation $r^2$ against `sim¹·⁵` of
     P's seed-mean op1 response no more than {DROP} below the `span-mean`
-    arm's (higher is fine).[^grading-note]
+    condition's (higher is fine).[^grading-note]
     Partial: (a) and (b) hold, (c) misses.
 
     **H4: The weight lands where the concept lives.** On the weight profile of P:
@@ -664,6 +671,7 @@ def _():
         a_span,
         acc,
         alpha_map,
+        arrays,
         cells,
         m_op1,
         m_span,
@@ -776,7 +784,7 @@ def _():
 
     First the reproduction check the method promises, so any drift introduced
     by the new code path is visible before a pooled condition is read: the
-    `span-mean` arm re-runs ex-2.1.8's operating point through the pooled
+    `span-mean` condition re-runs ex-2.1.8's operating point through the pooled
     code at τ = ∞, so it should land on that experiment's numbers.
     """)
     return
@@ -857,9 +865,9 @@ def _(ANCHORED, a_span, m_span):
         name="h2-dots",
         alt_text="""
             Two dot-plot panels sharing a horizontal cosine axis from 0 to about
-            0.75, with five condition rows: span-mean, three pooled arms at
+            0.75, with five condition rows: span-mean, three pooled conditions at
             increasing tau, and op1-oracle. Each row shows three small seed dots
-            and a larger mean marker. Left panel, margin: all five rows cluster
+            and a vertical tick at their mean. Left panel, margin: all five rows cluster
             between 0.62 and 0.69, with a dotted partial line at 0.71 and a
             dashed gate line at 0.78, both to the right of every row; the
             pooled rows sit slightly right of span-mean, below the oracle row.
@@ -869,8 +877,8 @@ def _(ANCHORED, a_span, m_span):
         """,
         caption=rf"""
             **The H2 statistics, control-subtracted.** Left:
-            $m_\text{{span}}$; right: ᾱ_span. Small dots are seeds, the large
-            mark their mean; the τ = ∞ and oracle reference rows are greyed.
+            $m_\text{{span}}$; right: ᾱ_span. Small dots are seeds, the tick
+            their mean; the τ = ∞ and oracle reference rows are greyed.
             Dashed carets mark the H2 gates for P: a margin gain of
             {ex.POOL_GAIN_GATE:g} over `span-mean` (dotted: the
             {ex.POOL_GAIN_PARTIAL:g} partial) and a drift drop of
@@ -901,7 +909,7 @@ def _(ANCHORED, a_span, m_span):
             for yi, cond in enumerate(_rows):
                 v = data[cond]
                 ax.plot(v, [yi] * len(v), "o", ms=3.5, color=_ink[cond], alpha=0.55, mew=0)
-                ax.plot(v.mean(), yi, "o", ms=7, color=_ink[cond])
+                ax.plot(v.mean(), yi, "|", ms=18, color=_ink[cond])
             ax.set_title(title, fontsize="small", color=_grey)
             ax.set_yticks(range(len(_rows)), _rows, fontsize=8)
             ax.set_xlim(0, 0.82)
@@ -948,7 +956,8 @@ def _(ANCHORED, a_span, grading_r2, m_op1, m_span):
     """
     _caption = f"""
     The τ sweep beside its references, seed means (± seed standard deviation
-    where quoted). Only P (<strong>bold</strong>) is gated; "oracle frac" is
+    where quoted). Only the primary condition (<strong>bold</strong>) is
+    gated; "oracle frac" is
     the fraction of the span-mean-to-oracle gap recovered, whose denominator
     is {_headroom:.3f}. m<sub>op1</sub> is carried for continuity with
     ex-2.1.7/8, and r² previews the grading track scored under H3.
@@ -958,19 +967,29 @@ def _(ANCHORED, a_span, grading_r2, m_op1, m_span):
 
 
 @app.cell(hide_code=True)
-def _(a_span, m_span):
+def _(a_span, cells, m_span, pi_bar):
     _P = ex.PRIMARY
     _gain = m_span(_P).mean() - m_span(ex.MEAN_ARM).mean()
     _drop = a_span(ex.MEAN_ARM).mean() - a_span(_P).mean()
     _headroom = m_span(ex.ORACLE_ARM).mean() - m_span(ex.MEAN_ARM).mean()
-    mo.md(rf"""
-    **H2 is refuted.** On P, (a) the margin gain is {_gain:+.3f} against a
-    gate of {ex.POOL_GAIN_GATE:g} (partial {ex.POOL_GAIN_PARTIAL:g}), and
-    (b) the syntax-role drift falls by {_drop:.3f} against a required
-    {ex.SYNTAX_DRIFT_GATE:g}. Both moved the way the mechanism predicts and
-    neither reaches its gate, so neither partial applies.
+    # op1's share of the pull budget, mean over slices; the references by construction.
+    _share = {c: pi_bar(c)[:, 0].mean() for c in ex.POOLED_NAMES}
 
-    Two things the gate arithmetic hides:
+    def _latched(cond: str) -> list[int]:
+        """Seeds whose slice-4 softmin weight left op1 (weight < 0.5)."""
+        pis = {s: np.asarray(cells[f"{cond}-s{s}"]["pi"], dtype=float) for s in ex.SEEDS}
+        return [s for s, pi in pis.items() if pi[4, 0] < 0.5]
+
+    _l30 = _latched(_P)[0]
+    mo.md(rf"""
+    **H2 is unmet.** On the primary condition `{_P}`, (a) the margin gain is
+    {_gain:+.3f} against a gate of {ex.POOL_GAIN_GATE:g} (partial
+    {ex.POOL_GAIN_PARTIAL:g}), and (b) the syntax-role drift falls by
+    {_drop:.3f} against a required {ex.SYNTAX_DRIFT_GATE:g}. Both moved the
+    way the mechanism predicts and neither reaches its gate, so neither
+    partial applies.
+
+    Three things the gate arithmetic hides:
 
     1. **The margin headroom collapsed before the sweep began.** The gate was
        sized from the op1 oracle's +{ex.EX217_OP1_GAIN:g} margin gain in
@@ -978,25 +997,39 @@ def _(a_span, m_span):
        $m_\text{{span}}$ at the ex-2.1.8 operating point, the oracle's whole
        advantage over the span mean is {_headroom:.3f}: less than half the
        gate. No condition, oracle included, could have passed H2(a) as
-       preregistered. P recovered {_gain / _headroom:.0%} of the headroom
-       that existed. Among the three finite-τ arms both statistics improve
-       monotonically toward τ = 0.1 — `pool-t100` even clears the H2(b)
-       drift drop outright, at
-       {a_span(ex.MEAN_ARM).mean() - a_span("pool-t100").mean():.3f} against
-       the {ex.SYNTAX_DRIFT_GATE:g} gate, though it too misses (a), at
-       {m_span("pool-t100").mean() - m_span(ex.MEAN_ARM).mean():+.3f}. P was
-       fixed in advance, so these are reported, ungated observations, and the
-       finite-τ ordering rests on differences of one-to-two seed spreads —
-       suggestive rather than scored.
+       preregistered. The primary recovered {_gain / _headroom:.0%} of the
+       headroom that existed.
 
-    2. **The max hides where the margin lives.** The role profiles below show
-       why the span mean scores so close to the oracle: at depth, every span
-       role of the `span-mean` arm carries margin (its syntax-role states
-       attend back to op1, so they become selective too), and a max over
-       roles only needs one good role. Pooling *did* change the shape —
-       margin and drift both withdraw from op2 and `=` almost entirely — but
-       op1's own margin is nearly the same in every anchored condition, so
-       the max barely moves.
+    2. **The sweep is ordered by where the pull's budget went, and that is
+       non-monotone in τ.** In the dot chart, both statistics walk steadily
+       from `span-mean` to the oracle even though τ runs (∞, 0.01, 0.03,
+       0.1, and the oracle is no τ at all). The hidden axis is op1's share
+       of the pull: 0.25 for the span mean by construction, then
+       {_share["pool-t010"]:.2f} → {_share[_P]:.2f} →
+       {_share["pool-t100"]:.2f} across the sweep (mean over slices of the
+       weight profiles under H4), and 1.0 for the oracle. A sharper τ
+       concentrates the budget harder but risks putting it on the wrong
+       role: at depth, each seed of the two sharper rungs commits everything
+       to a single role, and at τ = 0.01 two seeds of three commit to `+`
+       (at τ = 0.03, one; at τ = 0.1, none). The same decomposition holds
+       within a condition — `{_P}`'s committed-to-`+` seed (s{_l30}) scores
+       $m_\text{{span}}$ {m_span(_P)[_l30]:.2f} and ᾱ_span
+       {a_span(_P)[_l30]:.2f} where its op1-keeping seeds score
+       ≈{np.mean(np.delete(m_span(_P), _l30)):.2f} and
+       ≈{np.mean(np.delete(a_span(_P), _l30)):.2f}. So the finite-τ means
+       differ mostly through how many seeds latched, and the sweep's message
+       is a latch-rate trend rather than a smooth dose response; with three
+       seeds per rung the rates themselves are coarse, so carrying a τ
+       forward should rest on the latch mechanism (*Where the weight went*),
+       with more seeds at the chosen rung in the next design.
+
+    3. **Why the span mean scores near the oracle.** The role profiles below
+       show it: at depth, every span role of the `span-mean` condition
+       carries margin (its syntax-role states attend back to op1, so they
+       become selective too), and a max over roles only needs one good role.
+       Pooling *did* change the shape — margin and drift both withdraw from
+       op2 and `=` almost entirely — but op1's own margin is nearly the same
+       in every anchored condition, so the max barely moves.
     """)
     return
 
@@ -1016,7 +1049,7 @@ def _(alpha_map):
             Six panels in a two-by-three grid: columns are span-mean, pool-t030
             and op1-oracle; the top row plots margin by role against slice, the
             bottom row drift by role, both from about -0.1 to 0.9. Four
-            smooth-stepped lines per panel, one per span role. Top left: all
+            marked lines per panel, one per span role. Top left: all
             four roles rise together to between 0.5 and 0.8 after the
             embedding. Top middle and top right: the op1 line alone stays high,
             about 0.8 at slice 1 falling to 0.4 (middle) or 0.5 (right) at slice 4, while
@@ -1030,16 +1063,16 @@ def _(alpha_map):
             **Where the margin and the drift live.** Margin (top) and drift
             (bottom) by span role, per slice, seed means: $m(\ell, t)$ and the
             unweighted mean alignment $\bar\alpha(\ell, t)$. Columns:
-            the span mean, P, and the op1 oracle. The scored statistics take
-            the per-slice max over these lines ($m_\text{span}$ from the top
-            row, ᾱ_span from the bottom), so a single high line is all either
-            statistic sees. Positions are ordinal; the risers carry no data.
+            the span mean, the primary, and the op1 oracle. The scored
+            statistics take the per-slice max over these lines
+            ($m_\text{span}$ from the top row, ᾱ_span from the bottom), so a
+            single high line is all either statistic sees.
         """,
     )
     def _plot() -> plt.Figure:
         from typing import cast
 
-        from mini.vis import AxesGrid, smooth_step
+        from mini.vis import AxesGrid
 
         _role_ink = {
             "op1": light_dark("#c1332a", "#f0665a"),
@@ -1055,9 +1088,9 @@ def _(alpha_map):
             for ax, cond in zip(row, _CONDS3, strict=True):
                 ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
                 for ti, ink in enumerate(_role_ink.values()):
-                    smooth_step(ax, _x, _prof[cond][quantity][:, ti], ramp=0.5, color=ink, lw=1.5)
+                    ax.plot(_x, _prof[cond][quantity][:, ti], color=ink, lw=1.5, marker="o", ms=3, mew=0)
                 if quantity == "margin":
-                    ax.set_title("P (pool-t030)" if cond == ex.PRIMARY else cond, fontsize=9.5)
+                    ax.set_title("pool-t030 (primary)" if cond == ex.PRIMARY else cond, fontsize=9.5)
                 ax.set_ylim(-0.12, 0.92)
                 ax.tick_params(labelsize=8)
         for ax in axes[1]:
@@ -1075,21 +1108,105 @@ def _(alpha_map):
 
 @app.cell(hide_code=True)
 def _(alpha_map):
+    _CONDS3 = [ex.MEAN_ARM, ex.PRIMARY, ex.ORACLE_ARM]
+    _prof = {}
+    for _c in _CONDS3:
+        _a = alpha_map(_c)
+        _m = np.einsum("c,lct->lt", ex.LABEL_W, _a) - _a.mean(axis=1)
+        _prof[_c] = {"margin": _m[:, : ex.SPAN], "drift": _a[:, :, : ex.SPAN].mean(axis=1)}
+    _x = np.arange(ex.SPAN)
+
+    @themed(
+        name="position-profiles",
+        alt_text="""
+            A five-by-three grid of small flush panels: the same margin and
+            drift data as the previous figure, transposed. Columns are
+            span-mean, pool-t030 and op1-oracle; rows are residual slices
+            with the last slice on top and the embedding at the bottom; each
+            panel spans the four span roles op1, plus, op2 and equals, from 0
+            to about 0.95 vertically. A shaded smooth-step area shows the
+            margin and a solid line the drift. In the span-mean column every
+            row above the embedding is a wide raised block: margin between
+            0.5 and 0.8 at all four roles. In the pool-t030 and oracle
+            columns the block narrows to a single tall step at op1, with the
+            other roles below 0.3. The drift line roughly shadows the margin
+            at about half its height in every panel; on the embedding row it
+            is a step at plus and equals for span-mean, at plus alone for
+            pool-t030, and lower, about 0.3 at plus, for the oracle.
+        """,
+        caption=r"""
+            **The same profiles, position-major.** Margin $m(\ell, t)$
+            (shaded area) and drift $\bar\alpha(\ell, t)$ (line) over the
+            four span roles, one panel per residual slice with the embedding
+            at the bottom — the transpose of the figure above, in the layout
+            the weight profiles under H4 use. Columns: the span mean, the
+            primary, and the op1 oracle. Roles are ordinal, so the risers
+            carry no data.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        from matplotlib.layout_engine import ConstrainedLayoutEngine
+
+        from mini.vis import smooth_step, smooth_step_area
+
+        _margin_ink = light_dark("#b4531f", "#dd8f5f")
+        _drift_ink = light_dark("#1f6fb4", "#5fa8dd")
+        _grey = light_dark("#666", "#999")
+        fig, axes = plt.subplots(5, 3, figsize=(7.0, 3.7), sharex=True, sharey=True)
+        _engine = fig.get_layout_engine()
+        assert isinstance(_engine, ConstrainedLayoutEngine)
+        _engine.set(hspace=0, h_pad=0.01, wspace=0.05)
+        for col, cond in enumerate(_CONDS3):
+            for row in range(5):
+                sl = 4 - row  # last slice on top, the embedding at the bottom
+                ax = axes[row][col]
+                smooth_step_area(ax, _x, _prof[cond]["margin"][sl], ramp=0.5, color=_margin_ink,
+                                 alpha=light_dark(0.25, 0.3))  # fmt: skip
+                smooth_step(ax, _x, _prof[cond]["margin"][sl], ramp=0.5, color=_margin_ink, lw=1.2)
+                smooth_step(ax, _x, _prof[cond]["drift"][sl], ramp=0.5, color=_drift_ink, lw=1.5)
+                ax.set(ylim=(-0.08, 0.98), xlim=(-0.4, ex.SPAN - 0.6), yticks=[0.0, 0.4, 0.8])
+                ax.spines[:].set_visible(False)
+                ax.grid(axis="y", which="major", c="#888", alpha=0.2)
+                ax.tick_params(axis="x", length=0, labelbottom=False)
+                ax.tick_params(axis="y", left=True, right=True, direction="in", labelleft=False, labelright=False)
+                if col == 0:
+                    ax.set_ylabel("emb" if sl == 0 else f"{sl}", fontsize=8)
+            axes[0][col].set_title("pool-t030 (primary)" if cond == ex.PRIMARY else cond, fontsize=9.5)
+            axes[4][col].set_xticks(_x, ex.ROLES)
+            axes[4][col].tick_params(axis="x", labelbottom=True, labelsize=8.5)
+        axes[4][2].tick_params(axis="y", labelright=True, labelsize=7, pad=2)
+        fig.supylabel("slice", fontsize=9)
+        _m_key = plt.Rectangle((0, 0), 1, 1, fc=_margin_ink, alpha=0.35, ec="none")
+        _d_key = plt.Line2D([], [], color=_drift_ink, lw=1.5)
+        fig.legend([_m_key, _d_key], [r"margin $m(\ell, t)$", r"drift $\bar\alpha(\ell, t)$"],
+                   fontsize=8.5, frameon=False, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.0),
+                   labelcolor=_grey)  # fmt: skip
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(alpha_map):
     _emb = {c: alpha_map(c)[0, :, : ex.SPAN].mean(axis=0) for c in [ex.MEAN_ARM, ex.PRIMARY, ex.ORACLE_ARM]}
     mo.md(rf"""
-    The drift row also says where P's remaining ᾱ_span sits: on `+`, at the
-    embedding. Pooling released `=` almost entirely (embedding drift
-    {_emb[ex.MEAN_ARM][3]:.2f} → {_emb[ex.PRIMARY][3]:.2f}) but left
-    {_emb[ex.PRIMARY][1]:.2f} on `+`, barely below the span mean's
-    {_emb[ex.MEAN_ARM][1]:.2f} — consistent with the ~0.2 of softmin weight
-    the pull still spends there (H4 below). Curiously, even the op1 oracle —
-    which never pulls `+` at any slice, and whose op1 states cannot read the
-    `+` embedding at all (position 0 attends only to itself) — leaves
-    {_emb[ex.ORACLE_ARM][1]:.2f} of drift on that embedding, so about half of
-    the `+` drift arrives through some path other than the pull, presumably
-    the task loss rearranging the shared syntax embedding once the red
-    operands occupy the axis. Marked for the exploratory queue rather than
-    interpreted here.
+    The drift that pooling leaves behind has an address: the `+` embedding.
+    On the embedding row, the primary's pooling released `=` almost entirely
+    (drift {_emb[ex.MEAN_ARM][3]:.2f} under the span mean →
+    {_emb[ex.PRIMARY][3]:.2f}) but left {_emb[ex.PRIMARY][1]:.2f} on `+`,
+    barely below the span mean's {_emb[ex.MEAN_ARM][1]:.2f} — consistent
+    with the ~0.2 of softmin weight the pull still spends there (H4 below).
+    The op1 oracle complicates that account: it never pulls `+` at any
+    slice, and its op1 states cannot even read the `+` embedding (position 0
+    attends only to itself), yet its `+` embedding still ends at
+    {_emb[ex.ORACLE_ARM][1]:.2f}. So about half of the `+` drift is paid for
+    by something other than the pull — and whatever pays for it does so
+    against the repulsion, which runs from the first epoch and still holds
+    at the end. The trajectory records no per-role drift, so this run can't
+    say whether that alignment climbs early (against the repulsion's peak)
+    or late (as the anneal decays); the candidate mechanism and the timing
+    are both queued as exploratory questions rather than interpreted here.
     """)
     return
 
@@ -1174,7 +1291,7 @@ def _(ANCHORED, retention, traj):
             assert _r is not None
             ax.annotate(f"{_r:.2f}", (0.97, 0.6), xycoords="axes fraction", ha="right", fontsize=8,
                         color=light_dark("#444", "#bbb"))  # fmt: skip
-            ax.set_title("P (pool-t030)" if cond == ex.PRIMARY else cond, fontsize=9.5, color=_ink)
+            ax.set_title("pool-t030 (primary)" if cond == ex.PRIMARY else cond, fontsize=9.5, color=_ink)
             ax.set_xlim(0, ex.SCHEDULER.epochs)
             ax.set_ylim(-0.08, _top * 1.08)
             ax.tick_params(labelbottom=cond in _GRID[1], labelleft=cond in _LEFT, labelsize=8)
@@ -1212,7 +1329,7 @@ def _(ANCHORED, a_op1, retention):
     assert _ret is not None
     _worst = min((r for c in ANCHORED if (r := retention(c)) is not None))
     mo.md(rf"""
-    **H3(a) and (b) hold.** On P, $\bar\alpha$ at op1 ends at
+    **H3(a) and (b) hold.** On the primary condition, $\bar\alpha$ at op1 ends at
     {a_op1(_P).mean():.3f} <span class='range'>±{a_op1(_P).std(ddof=1):.3f}</span>
     against the {ex.MEAN_ALIGN_GATE:g} gate, and retention is {_ret:.2f}
     against {ex.RETENTION_GATE:g}. The contrary outcome — a concentrated pull
@@ -1229,19 +1346,19 @@ def _(ANCHORED, a_op1, retention):
 def _(ANCHORED, alpha_map, grading_r2, m_span):
     _ALL = ["lam0", *ANCHORED]
     _RESP = {c: alpha_map(c)[:, :, 0].mean(axis=0) for c in _ALL}
-    _order = np.argsort(ex.REDNESS)
-
-    def _windowed(y: np.ndarray, k: int = 25) -> np.ndarray:
-        """Mean of *y* over a sliding window of the redness ordering."""
-        pad = np.pad(y[_order], (k // 2, k // 2), mode="edge")
-        return np.convolve(pad, np.ones(k) / k, mode="valid")
 
     def _fitted_target(y: np.ndarray) -> np.ndarray:
         """`sim¹·⁵` rescaled by least squares onto the response — the shape r² scores against."""
         b = np.polyfit(ex.SIM_TARGET, y, 1)
         return np.polyval(b, ex.SIM_TARGET)
 
-    _CTRL = _windowed(_RESP["lam0"])
+    def _level_mean(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """The conditional mean of *y* at each distinct redness level (29 of them)."""
+        levels = np.unique(np.round(ex.REDNESS, 6))
+        means = np.array([y[np.round(ex.REDNESS, 6) == lv].mean() for lv in levels])
+        return levels, means
+
+    _CTRL = _level_mean(_RESP["lam0"])
     _GRID = [_ALL[:3], _ALL[3:]]
 
     @themed(
@@ -1250,23 +1367,26 @@ def _(ANCHORED, alpha_map, grading_r2, m_span):
             Six panels in a two-by-three grid sharing both axes: per-color
             alignment at the first operand, from about -0.2 to 1.2, against
             the redness of that color from 0 to 1. Panels are the control,
-            span-mean, and the three pooled arms and the oracle. The control
+            span-mean, and the three pooled conditions and the oracle. The control
             panel is flat near zero. Every other panel scatters 216 marks
             drawn in the color each stands for, forming a flat cluster at low
-            redness and a rising tail of oranges and reds, with a heavy
-            sliding-mean line hugging a dashed reference curve. The flat
-            cluster sits slightly lower and the rise slightly straighter in
-            the pooled and oracle panels than in span-mean.
+            redness and a rising tail of oranges and reds, with a thin
+            conditional-mean line and a dashed reference curve through it.
+            The flat cluster sits slightly lower and the rise slightly
+            straighter in the pooled and oracle panels than in span-mean; in
+            the pool-t010 panel the rise has a visible shelf between redness
+            0.7 and 0.8.
         """,
         caption=r"""
             **Grading: alignment at op1, per color.** $\alpha_c$, the mean
             over slices of $\cos(h, \hat v_{\text{red}})$ at op1, seed mean,
             against the redness of the color. One mark per color, drawn in
-            that color; the heavy line is a 25-color sliding mean over the
-            redness ordering, the flat grey band the same line for the
-            control, and the dashed line `sim¹·⁵` rescaled onto the response
-            by least squares — the shape the $r^2$ statistic scores against.
-            H3(c) gates P's $r^2$ relative to `span-mean`'s.
+            that color; the thin dark line is the mean response at each of
+            the 29 distinct redness levels, the flat grey band the same line
+            for the control, and the dashed line `sim¹·⁵` rescaled onto the
+            response by least squares — the shape the $r^2$ statistic scores
+            against. H3(c) gates the primary's $r^2$ relative to
+            `span-mean`'s.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1280,15 +1400,15 @@ def _(ANCHORED, alpha_map, grading_r2, m_span):
             for ax, cond in zip(row, conds, strict=True):
                 a = _RESP[cond]
                 ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
-                ax.plot(ex.REDNESS[_order], _CTRL, color=light_dark("#999", "#777"), lw=3, alpha=0.5, zorder=1,
+                ax.plot(*_CTRL, color=light_dark("#999", "#777"), lw=3, alpha=0.5, zorder=1,
                         solid_capstyle="round")  # fmt: skip
-                if cond != "lam0":
-                    ax.plot(ex.REDNESS[_order], _windowed(_fitted_target(a)), color=light_dark("#888", "#888"),
-                            lw=1.0, ls=(0, (4, 2)), zorder=2)  # fmt: skip
                 ax.scatter(ex.REDNESS, a, c=ex.GRID_RGB, s=18, lw=0.4, zorder=3,
                            edgecolors=light_dark("#00000033", "#ffffff55"))  # fmt: skip
-                ax.plot(ex.REDNESS[_order], _windowed(a), color=light_dark("#222", "#eee"), lw=1.6, zorder=4)
-                ax.set_title("P (pool-t030)" if cond == ex.PRIMARY else ("control" if cond == "lam0" else cond),
+                if cond != "lam0":
+                    ax.plot(*_level_mean(_fitted_target(a)), color=light_dark("#888", "#888"),
+                            lw=1.0, ls=(0, (4, 2)), zorder=2)  # fmt: skip
+                    ax.plot(*_level_mean(a), color=light_dark("#222", "#eee"), lw=1.2, zorder=4)
+                ax.set_title("pool-t030 (primary)" if cond == ex.PRIMARY else ("control" if cond == "lam0" else cond),
                              fontsize=9.5)  # fmt: skip
                 if cond != "lam0":
                     ax.annotate(
@@ -1311,18 +1431,20 @@ def _(ANCHORED, alpha_map, grading_r2, m_span):
 def _(grading_r2):
     _P = ex.PRIMARY
     mo.md(rf"""
-    **H3(c) holds, with the sign reversed.** The gate tolerated P's $r^2$
-    landing up to {ex.GRADE_R2_DROP:g} below the span mean's; instead it
-    lands {grading_r2(_P) - grading_r2(ex.MEAN_ARM):+.2f} *above* it
-    ({grading_r2(_P):.2f} against {grading_r2(ex.MEAN_ARM):.2f}). The
+    **H3(c) holds, with the sign reversed.** The gate would have tolerated $r^2$
+    on the primary falling {ex.GRADE_R2_DROP:g} below the span mean's;
+    instead it lands {grading_r2(_P) - grading_r2(ex.MEAN_ARM):+.2f} *above*
+    it ({grading_r2(_P):.2f} against {grading_r2(ex.MEAN_ARM):.2f}). The
     contrary expectation — that concentrating the pull would sharpen the
-    response into a step — has it backwards: every pooled arm grades at or
-    above the span mean, and the oracle best of all
+    response into a step — mostly has it backwards: every pooled condition
+    grades at or above the span mean, and the oracle best of all
     ({grading_r2(ex.ORACLE_ARM):.2f}). Withdrawing the pull from positions
     that don't carry the concept apparently cleans the response shape at the
-    one that does. As a footnote to ex-2.1.8's open question about where a
-    realistic absolute grading bar sits: P and the oracle both clear the 0.8
-    that experiment couldn't reach.
+    one that does. The exception is visible in the `pool-t010` panel: a
+    shelf in the rise near redness 0.8, which turns out to belong to the
+    latched seeds (*Exploratory analyses*). As a footnote to ex-2.1.8's open
+    question about where a realistic absolute grading bar sits: the primary
+    and the oracle both clear the 0.8 that experiment couldn't reach.
     """)
     return
 
@@ -1342,7 +1464,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(READ, cells, pi_bar, read_gain):
+def _(READ: np.ndarray, cells, pi_bar, read_gain):
     _PI = {c: pi_bar(c) for c in ex.POOLED_NAMES}
     _PI_SEEDS = {
         c: np.array([np.asarray(cells[f"{c}-s{s}"]["pi"], dtype=float) for s in ex.SEEDS]) for c in ex.POOLED_NAMES
@@ -1354,36 +1476,45 @@ def _(READ, cells, pi_bar, read_gain):
         name="weight-profiles",
         alt_text="""
             A five-by-three grid of small flush panels. Columns are the pooled
-            arms at tau 0.01, 0.03 and 0.1; rows are residual slices with the
+            conditions at tau 0.01, 0.03 and 0.1; rows are residual slices with the
             last slice on top and the embedding at the bottom; each panel
             spans the four span roles op1, plus, op2 and equals on its
             horizontal axis, from 0 to 1 vertically. A shaded smooth-step
-            area shows the softmin weight and a dashed line the control's
+            area shows the seed-mean softmin weight, three hairlines the
+            individual seeds, and a dashed line the control's
             readability, which is identical across the columns of a row: op1
             near 0.85 everywhere, plus and equals near 0.8 on all rows but
             the embedding, where both drop to zero, and op2 never above 0.2.
             In the bottom (embedding) row of every column, the weight area is
-            a tall block at op1, about 0.77, with a small step at plus. Going
-            up the tau 0.01 column the op1 block shrinks to about a third
-            while a block at plus grows to two thirds. In the tau 0.03 column
-            op1 stays near two thirds with plus taking the rest. In the tau
-            0.1 column op1 grows toward 0.95 with the other roles near zero.
+            a tall block at op1, about 0.77, with a small step at plus, and
+            the hairlines hug the mean. On the deeper rows of the tau 0.01
+            and 0.03 columns the hairlines separate completely: each seed's
+            profile is a full-height block at a single role — plus in two
+            seeds of three at tau 0.01, one of three at 0.03 — so the mean
+            area, op1 at about a third or two thirds with plus taking the
+            rest, is a mixture of one-hot seeds. In the tau 0.1 column op1
+            grows toward 0.95 with the other roles near zero and the
+            hairlines stay together.
         """,
         caption=rf"""
             **What the pull chose, against where the concept is readable.**
-            The trained softmin weight profile $\bar\pi(\ell, t)$ of each
-            pooled arm (shaded area, seed mean; hairlines are the seed
-            minimum and maximum), over the four span roles, one panel per
-            residual slice with the embedding at the bottom. The dashed line
+            The trained softmin weight profile of each pooled condition
+            (shaded area, seed mean $\bar\pi(\ell, t)$; hairlines, the three
+            seeds individually), over the four span roles, one panel per
+            residual slice with the embedding at the bottom. Where the
+            hairlines separate — the deep slices at τ ≤ 0.03 — each seed's
+            profile is one-hot on a single role, and the mean is a mixture
+            of seeds rather than a shape any run has. The dashed line
             is the readability profile of the *un-anchored control*,
             $R^2(\ell, t)$ — a ridge probe predicting op1's redness from the
             state at each (slice, role), one color held out at a time — the
-            same reference in every column of a row. The caret on the
+            same reference in every column of a row (its own seed spread is
+            ≤ 0.09 everywhere except op2 at depth, ≈ 0.2). The caret on the
             embedding row marks the H4(a) gate: op1's weight ≥
             {ex.LEAD_GATE:g} (uniform is 0.25). The number atop each column
             is its H4(b) weighted readability gain (gate ≥
-            {ex.READ_GAIN_GATE:g}, scored on P). Roles are ordinal, so the
-            risers carry no data.
+            {ex.READ_GAIN_GATE:g}, scored on the primary). Roles are
+            ordinal, so the risers carry no data.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1400,7 +1531,7 @@ def _(READ, cells, pi_bar, read_gain):
         _read_ink = light_dark("#555", "#aaa")
         _hair = light_dark("#00000055", "#ffffff55")
         _gate = light_dark("#555", "#bbb")
-        fig, axes = plt.subplots(5, 3, figsize=(7.0, 5.2), sharex=True, sharey=True)
+        fig, axes = plt.subplots(5, 3, figsize=(7.0, 3.7), sharex=True, sharey=True)
         _engine = fig.get_layout_engine()
         assert isinstance(_engine, ConstrainedLayoutEngine)
         _engine.set(hspace=0, h_pad=0.01, wspace=0.05)
@@ -1411,8 +1542,8 @@ def _(READ, cells, pi_bar, read_gain):
                 ax = axes[row][col]
                 smooth_step_area(ax, _x, _PI[cond][sl], ramp=0.5, color=ink, alpha=light_dark(0.22, 0.28))
                 smooth_step(ax, _x, _PI[cond][sl], ramp=0.5, color=ink, lw=1.5)
-                for edge in (_PI_SEEDS[cond][:, sl].min(axis=0), _PI_SEEDS[cond][:, sl].max(axis=0)):
-                    smooth_step(ax, _x, edge, ramp=0.5, color=_hair, lw=0.5)
+                for seed_prof in _PI_SEEDS[cond][:, sl]:
+                    smooth_step(ax, _x, seed_prof, ramp=0.5, color=_hair, lw=0.5)
                 smooth_step(ax, _x, READ[sl], ramp=0.5, color=_read_ink, lw=1.0, ls=(0, (4, 2)))
                 ax.set(ylim=(-0.08, 1.08), xlim=(-0.4, ex.SPAN - 0.6), yticks=[0.0, 0.5, 1.0])
                 ax.spines[:].set_visible(False)
@@ -1421,7 +1552,7 @@ def _(READ, cells, pi_bar, read_gain):
                 ax.tick_params(axis="y", left=True, right=True, direction="in", labelleft=False, labelright=False)
                 if col == 0:
                     ax.set_ylabel("emb" if sl == 0 else f"{sl}", fontsize=8)
-            axes[0][col].set_title("P (pool-t030)" if cond == ex.PRIMARY else cond, fontsize=9.5, color=ink,
+            axes[0][col].set_title("pool-t030 (primary)" if cond == ex.PRIMARY else cond, fontsize=9.5, color=ink,
                                    fontweight="bold" if cond == ex.PRIMARY else "normal")  # fmt: skip
             axes[0][col].annotate(f"gain {_GAIN[cond]:+.2f}", (0.97, 0.88), xycoords="axes fraction", ha="right",
                                   va="top", fontsize=8, color=light_dark("#444", "#bbb"))  # fmt: skip
@@ -1445,21 +1576,28 @@ def _(READ, cells, pi_bar, read_gain):
 
 
 @app.cell(hide_code=True)
-def _(READ, pi_bar, read_gain):
+def _(READ: np.ndarray, cells, pi_bar, read_gain):
     _P = ex.PRIMARY
     _emb = {c: pi_bar(c)[0] for c in ex.POOLED_NAMES}
+    # Deep-slice choices per seed: which role holds the slice-4 weight in each run.
+    _s4 = {
+        c: [int(np.argmax(np.asarray(cells[f"{c}-s{s}"]["pi"], dtype=float)[4])) for s in ex.SEEDS]
+        for c in ex.POOLED_NAMES
+    }
+    _n_plus = {c: sum(1 for r in roles if r == 1) for c, roles in _s4.items()}
     mo.md(rf"""
-    **H4(a) holds.** At the embedding, P's leading role is op1 with weight
-    {_emb[_P][0]:.2f} against the {ex.LEAD_GATE:g} gate — and the same is
-    true at every τ ({_emb["pool-t010"][0]:.2f} at 0.01,
+    **H4(a) holds.** At the embedding, the primary's leading role is op1
+    with weight {_emb[_P][0]:.2f} against the {ex.LEAD_GATE:g} gate — and
+    the same is true at every τ ({_emb["pool-t010"][0]:.2f} at 0.01,
     {_emb["pool-t100"][0]:.2f} at 0.1). Neither contrary outcome occurred
-    where the gate reads: no arm latched the embedding onto `+` or `=`
+    where the gate reads: no condition latched the embedding onto `+` or `=`
     (readability ≈ 0 there), and none stayed uniform. The trained weights
     concentrate harder than the 0.6–0.8 calibration band predicted from the
     reference profiles, which is the softmin's self-reinforcement doing what
     the introduction said it would — just in the right place.
 
-    **H4(b) holds.** P's weighted readability gain is {read_gain(_P):+.2f}
+    **H4(b) holds.** The primary's weighted readability gain is
+    {read_gain(_P):+.2f}
     against the {ex.READ_GAIN_GATE:g} gate (pool-t010
     {read_gain("pool-t010"):+.2f}, pool-t100 {read_gain("pool-t100"):+.2f}).
     Most of the gain comes from avoiding op2 — the one span role that stays
@@ -1467,18 +1605,22 @@ def _(READ, pi_bar, read_gain):
     four deep slices, against {READ[1:, [0, 1, 3]].mean():.2f} for the other
     three roles).
 
-    Across depth the arms diverge, and the divergence is the syntax latch in
-    miniature. At τ = 0.01 the deep slices latch onto `+`
-    ({pi_bar("pool-t010")[4, 1]:.2f} of the weight at slice 4): a cheap
-    choice the winner-take-most rung commits to early, though not a
-    ruinous one, since `+` at depth reads op1's redness at $R^2$ ≈
-    {READ[1:, 1].mean():.2f}. At τ = 0.03 the weight follows op1 at every
-    slice with `+` as a steady minority; at τ = 0.1 it consolidates onto op1
-    almost completely. The prereg expected migration *toward* the syntax
-    roles with depth in step with readability; what actually distinguishes
-    the healthy arms is that they keep op1 — which stays the *most* readable
-    role at every slice — and the pull only leaves it where τ is sharp
-    enough to lock in an early accident.
+    Across depth the conditions diverge, and seed by seed the divergence is
+    all-or-nothing: the hairlines show each run of the two sharper rungs
+    committing its entire deep-slice weight to a single role. At τ = 0.01
+    that role is `+` in {_n_plus["pool-t010"]} seeds of three and op1 in the
+    other; at τ = 0.03, `+` in {_n_plus["pool-t030"]}; at τ = 0.1 none
+    commit to `+`, and the profile is the sweep's only genuinely graded one
+    at depth (op1 at 0.87–0.97 per seed, with real weight left elsewhere).
+    So the seed-mean's apparent `+` minority at τ = 0.03 is a mixture of
+    one-hot seeds, and the τ trend is a latch-rate trend: 2/3 → 1/3 → 0/3.
+    A `+` latch is a cheap early choice rather than a ruinous one, since `+`
+    at depth reads op1's redness at $R^2$ ≈ {READ[1:, 1].mean():.2f}. The
+    prereg expected migration *toward* the syntax roles with depth in step
+    with readability; what actually distinguishes the healthy runs is that
+    they keep op1 — which stays the *most* readable role at every slice —
+    and the pull only leaves it where τ is sharp enough to lock in an early
+    accident.
     """)
     return
 
@@ -1495,27 +1637,31 @@ def _():
 
 @app.cell(hide_code=True)
 def _(traj):
-    # Post hoc. Seed means once, in the cell — @themed draws twice.
-    _PI_T = {c: np.mean([traj(c, s, "pi") for s in ex.SEEDS], axis=0) for c in ex.POOLED_NAMES}
+    # Post hoc. Per-seed trajectories: the seed mean at depth would average
+    # one-hot runs into a shape no run has, so every run is drawn.
+    _PI_T = {c: [traj(c, s, "pi") for s in ex.SEEDS] for c in ex.POOLED_NAMES}
     _EPOCHS = np.mean([traj(ex.PRIMARY, s, "epoch") for s in ex.SEEDS], axis=0)
 
     @themed(
         name="concentration-timing",
         alt_text="""
             Two line panels sharing an epoch axis from 0 to 100, each with
-            three curves for the pooled arms at tau 0.01, 0.03 and 0.1, and a
-            horizontal reference line at 0.25 for uniform weights. Left
-            panel, op1's weight at the embedding: all three curves start near
-            0.4, rise steeply between epochs 5 and 20 to about 0.8, and stay
-            flat to the end. Right panel, op1's weight at the last slice: the
-            tau 0.1 curve shoots to about 0.95 by epoch 10 and holds; the tau
-            0.03 curve rises to about 0.67 and holds; the tau 0.01 curve
-            falls to about 0.33 by epoch 6 and never recovers.
+            nine thin curves — one per run, three per pooled condition at tau
+            0.01, 0.03 and 0.1 — and a horizontal reference line at 0.25 for
+            uniform weights. Left panel, op1's weight at the embedding: the
+            nine curves scatter over 0 to 0.8 for the first few epochs, then
+            converge to about 0.8 by epoch 20 and stay flat to the end.
+            Right panel, op1's
+            weight at the last slice: every curve saturates by epoch 8 and
+            never moves again. Two of the three tau 0.01 curves fall to 0 by
+            epoch 3 and the third rises to 1; one tau 0.03 curve falls to 0
+            while the other two rise to 1; all three tau 0.1 curves rise to
+            about 0.9 and hold there, short of saturation.
         """,
         caption=r"""
-            **When the pull decides (post hoc).** op1's share of the softmin
-            weight over training, at the embedding (**left**) and at the last
-            slice (**right**), seed means; the thin rule is uniform (0.25).
+            **When the pull decides.** op1's share of the softmin weight
+            over training, at the embedding (**left**) and at the last slice
+            (**right**), one line per run; the thin rule is uniform (0.25).
             The vertical band is the anchor's warmup window (epochs 0–10);
             the repulsion anneal runs to epoch 90.
         """,
@@ -1537,13 +1683,15 @@ def _(traj):
             ax.axvspan(0, ex.SCHEDULER.warmup_epochs, color=_grey, alpha=0.12, lw=0)
             ax.axhline(1 / ex.SPAN, color=_grey, lw=0.6, alpha=0.5, zorder=0)
             for cond, ink in _ink.items():
-                ax.plot(_EPOCHS, _PI_T[cond][:, sl, 0], color=ink, lw=1.5, label=cond)
+                for si, pi_t in enumerate(_PI_T[cond]):
+                    ax.plot(_EPOCHS, pi_t[:, sl, 0], color=ink, lw=1.1, alpha=0.9,
+                            label=cond if si == 0 else "_")  # fmt: skip
             ax.set_title(title, fontsize="small", color=_grey)
             ax.set_xlim(0, ex.SCHEDULER.epochs)
-            ax.set_ylim(0, 1.0)
+            ax.set_ylim(-0.02, 1.02)
             ax.set_xlabel("epoch", fontsize="x-small")
             ax.tick_params(labelsize=8)
-        axes[0].set_ylabel(r"$\bar\pi_\mathrm{op1}$", fontsize="x-small")
+        axes[0].set_ylabel(r"$\pi_\mathrm{op1}$", fontsize="x-small")
         axes[1].legend(fontsize=8, frameon=False, loc="center right", labelcolor=_grey)
         return fig
 
@@ -1554,23 +1702,122 @@ def _(traj):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    The choice is made during the anchor ramp and never revisited. At every
-    τ, op1's embedding weight settles by about epoch 20 and then holds to
-    the end of training; at the sharpest τ the deep slices commit to `+` by
-    epoch 6 — before the anchor has even finished warming up — and eighty
-    subsequent epochs of full-strength repulsion never dislodge it. So the
-    repulsion's job here is done in the first few epochs (making the shared
-    syntax embeddings unattractive *before* the softmin closes), and the
-    long anneal that ex-2.1.8 tuned matters for containment rather than for
-    position choice. That reframes the latch as a race at initialization:
-    whichever role happens to align cheapest in the first few hundred steps
-    keeps the weight, which is why the winner-take-most rung is the fragile
-    one.
+    The choice is made during the anchor ramp, run by run. Every run's
+    embedding weight settles by about epoch 20, and every run's deep-slice
+    choice is committed by epoch 8 — the τ = 0.01 latches by epoch 2–3,
+    before the anchor has even finished warming up — and no choice changes
+    for the rest of training. Nor is there much reason it should: once the
+    softmin has concentrated, the losing roles receive no pull, and late
+    training supplies no perturbation of the needed size — the learning
+    rate is decaying, the regularizer weights are annealing, and 100 epochs
+    is generous for this corpus, so the task loss has long converged. Two
+    consequences: the long repulsion anneal that ex-2.1.8 tuned matters for
+    containment rather than for position choice (whatever the repulsion
+    contributes to the choice, it contributes in the first few epochs,
+    before the softmin closes), and any intervention on the choice — a τ
+    schedule that starts soft and sharpens, say — has to land in that same
+    window. The latch, then, is a race at initialization: whichever role
+    happens to align cheapest in the first few hundred steps keeps the
+    weight, which is why the winner-take-most rung latches most often.
+    """)
+    return
 
-    Still queued, from the prereg's candidate list: per-color weight maps
-    (do strongly-red lines concentrate differently from weakly-red ones?),
-    and the source of the `+` embedding drift that persists even under the
-    op1 oracle (noted under H2).
+
+@app.cell(hide_code=True)
+def _(arrays, cells):
+    # Post hoc: the H3(c) scatter's pool-t010 shelf, split by each run's
+    # deep-slice choice.
+    _levels = np.unique(np.round(ex.REDNESS, 6))
+
+    def _level_mean(y: np.ndarray) -> np.ndarray:
+        return np.array([y[np.round(ex.REDNESS, 6) == lv].mean() for lv in _levels])
+
+    def _resp(cond: str, s: int) -> np.ndarray:
+        """One run's per-color op1 response: the mean over slices of alignment at op1."""
+        return arrays[f"{cond}-s{s}/alpha"][:, :, 0].mean(axis=0)
+
+    def _kept_op1(cond: str, s: int) -> bool:
+        return bool(np.asarray(cells[f"{cond}-s{s}"]["pi"], dtype=float)[4, 0] >= 0.5)
+
+    @themed(
+        name="grading-by-seed",
+        alt_text="""
+            Three line panels, one per pooled condition at tau 0.01, 0.03 and
+            0.1, sharing axes: mean response against redness of op1 from 0 to
+            1, three lines per panel, one per run, colored red if the run's
+            deep slices kept op1 and blue if they latched onto plus. Red
+            lines rise smoothly from near 0 at low redness to about 0.9 at
+            redness 1 in every panel. Blue lines — two in the tau 0.01 panel,
+            one in the tau 0.03 panel, none at tau 0.1 — track near zero all
+            the way to redness 0.72, then jump to about 0.5 at redness 0.8
+            and 0.7 by redness 1: a step where the red lines have a slope.
+        """,
+        caption=r"""
+            **The shelf, split by each run's deep-slice choice.** The
+            grading response of every pooled run — the mean response at each
+            of the 29 redness levels, as in the H3(c) figure but one line
+            per run — colored by where that run's slice-4 softmin weight
+            ended: op1 kept (red) or latched onto `+` (blue).
+        """,
+    )
+    def _plot() -> plt.Figure:
+        from typing import cast
+
+        from mini.vis import AxesRow
+
+        _ink = {True: light_dark("#c1332a", "#f0665a"), False: light_dark("#1f6fb4", "#5fa8dd")}
+        _grey = light_dark("#666", "#999")
+        fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.4), sharex=True, sharey=True, layout="constrained")
+        axes = cast(AxesRow, axes)
+        for ax, cond in zip(axes, ex.POOLED_NAMES, strict=True):
+            ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
+            for s in ex.SEEDS:
+                ax.plot(_levels, _level_mean(_resp(cond, s)), color=_ink[_kept_op1(cond, s)], lw=1.3)
+            ax.set_title("pool-t030 (primary)" if cond == ex.PRIMARY else cond, fontsize=9.5)
+            ax.set_xlabel("redness of op1", fontsize="x-small")
+            ax.tick_params(labelsize=8)
+        axes[0].set_ylabel(r"$\alpha_c$ at op1", fontsize="x-small")
+        _keys = [plt.Line2D([], [], color=_ink[k], lw=1.3) for k in (True, False)]
+        axes[2].legend(_keys, ["deep pull kept op1", "latched onto +"], fontsize=8, frameon=False,
+                       loc="upper left", labelcolor=_grey)  # fmt: skip
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(arrays, cells):
+    def _resp_at(cond: str, s: int, level: float) -> float:
+        sel = np.round(ex.REDNESS, 2) == level
+        return float(arrays[f"{cond}-s{s}/alpha"][:, sel, 0].mean())
+
+    _latched = [s for s in ex.SEEDS if np.asarray(cells[f"pool-t010-s{s}"]["pi"], dtype=float)[4, 0] < 0.5]
+    _kept = [s for s in ex.SEEDS if s not in _latched][0]
+    _hi = np.mean([_resp_at("pool-t010", s, 0.8) for s in _latched])
+    _lo = np.mean([_resp_at("pool-t010", s, 0.72) for s in _latched])
+    mo.md(rf"""
+    The shelf belongs to the latched runs. In the runs whose deep slices
+    kept op1, the response grades smoothly with redness at every τ. In the
+    runs that latched onto `+`, it holds up only at the red end and drops
+    sharply below redness 0.8 — `pool-t010`'s two latched runs average
+    {_hi:.2f} at redness 0.8 and {_lo:.2f} at 0.72, where its op1-keeping
+    run reads {_resp_at("pool-t010", _kept, 0.72):.2f} — which is also where
+    the label affinity falls away steeply. That reading makes sense of the
+    mechanism: in a latched run only the embedding slice still pulls op1, so
+    a color keeps its alignment only to the extent that its lines keep
+    getting labeled, and the graded contribution the deep slices add in
+    healthy runs is missing. The seed-mean scatter under H3(c) blends the
+    two shapes, which is what the `pool-t010` panel's shelf is.
+
+    Still queued, from the prereg's candidate list and this round: per-color
+    weight maps (do strongly-red lines concentrate differently from
+    weakly-red ones?); the source and timing of the `+` embedding drift that
+    persists even under the op1 oracle (noted under H2 — the trajectory
+    should record per-role drift next time so the timing is answerable); a τ
+    schedule that starts soft and sharpens as a latch remedy; and more seeds
+    at the chosen rung, since three per condition makes a latch rate a
+    coarse estimate.
     """)
     return
 
