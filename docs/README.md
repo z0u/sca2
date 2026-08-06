@@ -24,6 +24,20 @@ Publishing also records the commit sha that the bundle landed as into
 its pinned revision, so a publish from a branch deploys nothing until the pin
 reaches main; the PR preview serves the branch's pins meanwhile.
 
+CI publishes too, so a forgotten `./go publish` no longer leaves a merged report
+showing the previous export's figures. Every push to a PR runs
+[`publish-reports.yml`](../.github/workflows/publish-reports.yml) before the preview
+build: it publishes the report notebooks the branch changed
+([`scripts/changed_reports.py`](../scripts/changed_reports.py)) and commits the pins
+that moved — every other pin is left as it was, so the lock diff stays the list of
+reports the branch actually touched. Publishing by hand still works and is still
+worth doing while you're iterating; CI is the backstop.
+
+A report that's expensive to render can opt out with `# mini:no-auto-publish` in the
+notebook (see `mini.reports`), or per-PR with the `no-auto-publish` label; either
+way `./go publish <nb>` remains yours to run. The durable fix is usually to move the
+slow part into the experiment so the report only reads results.
+
 `./go site` (CI) then assembles `_site/` from the pinned bundles, serving each
 report at `_site/<key>/index.html`, with the URL `<key>/`. `./go preview` assembles
 the same site locally: it exports stale reports to `.mini/exports/` and copies their

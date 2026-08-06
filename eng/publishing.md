@@ -93,9 +93,8 @@ Further decisions:
   only `MINI_PUBLISH_REPO` — not the (now private) bucket. `store_for` builds a CAS-less
   store from a `publish-repo` alone for exactly this; the single-bucket default still
   serves the build off `MINI_STORE_BUCKET`. Set whichever your store layout uses.
-- **PR previews ride the same read-only build.** Because `./go publish` runs on the
-  agent's branch *before* the PR opens, the bundles are already on the publish tier when
-  review starts — a preview needs no compute, just HTML assembled around them.
+- **PR previews ride the same read-only build.** The bundles are already on the publish
+  tier when review starts — a preview needs no compute, just HTML assembled around them.
   `pr-preview.yml` runs `./go site` on the PR and deploys to `pr-preview/pr-<n>/` on the
   `gh-pages` branch (torn down on close, linked from a sticky PR comment). That forces
   the production deploy to be branch-based too (`clean-exclude: pr-preview/`): an
@@ -142,3 +141,39 @@ Further decisions:
   build stays dumb. Everything in the footer derives from the store's refs — no build
   timestamps — so re-publishing unchanged data produces the same bundle content and
   publishing stays idempotent.
+- **CI publishes the reports a PR changed, as a job of the preview run.** Publishing was
+  the one step of the loop that had to be *remembered*, and forgetting it fails quietly:
+  the notebook merges, the site keeps serving the previous export's figures, and nothing
+  says so. `publish-reports.yml` runs `./go publish` for the report notebooks the branch
+  changed against its base (`scripts/changed_reports.py`, stdlib-only so the "nothing
+  changed" answer costs a git diff rather than an install), then commits the pins that
+  moved.
+
+  Three shapes of this were available, and **ordering picked the winner**. The preview
+  serves the branch's pins, so the pins must move *before* the site is assembled — and
+  two workflows on the same `pull_request` trigger can't be sequenced, while a pin
+  commit pushed with `GITHUB_TOKEN` deliberately doesn't re-trigger the preview. So
+  publishing is a prerequisite job of `pr-preview.yml` (via `workflow_call`, which also
+  gives it a `workflow_dispatch` entry point of its own), and the preview job pulls the
+  freshly pushed `publish.lock` over its merge-ref checkout.
+
+  Publishing only the *changed* notebooks bounds two things at once: the lock diff reads
+  as the list of reports the branch touched, and CI time doesn't scale with the report
+  count. Over-publishing is safe but slow — an identical re-publish mints no commit, so
+  no pin moves — which is what makes a long-lived branch merely expensive rather than
+  noisy. What this doesn't catch is a report whose *inputs* changed while its notebook
+  didn't (a re-run experiment, restyled figures in `src/`); those still want a hand
+  publish, and the manual dispatch takes `--all`.
+
+  **This does put a write token in CI**, which the staging design above had avoided.
+  The avoidance was of write access in the *build* — and that still holds: the deploy
+  and the preview assembly stay read-only, and the promotion is still a pin reaching
+  main, not an HF-side branch. Only the new publish job is authenticated, and it's
+  fenced to same-repo PRs, since a forked PR would otherwise run its own notebook code
+  against our store.
+
+  The escape hatch is `# mini:no-auto-publish` in the notebook (per report) or the
+  `no-auto-publish` label (per PR), for a report too slow to render on every push. It's
+  a marker rather than a config list because it belongs *with* the report — a list in
+  CI config is one more thing to update when a report moves. Reaching for it is a hint
+  that the report is doing work the experiment should be doing.

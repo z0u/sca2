@@ -3,10 +3,12 @@ import json
 import pytest
 
 from mini.reports import (
+    NO_AUTO_PUBLISH_MARKER,
     PROVENANCE_ASSET,
     PUBLISH_LOCK,
     SOURCE_ONLY_MARKER,
     Publisher,
+    auto_publishes,
     export_key,
     externalize_html,
     insert_base,
@@ -310,6 +312,25 @@ def test_report_notebooks_skips_source_only(tmp_path):
     (tmp_path / "plain.py").write_text("x = 1\n")
     found = {p.relative_to(tmp_path).as_posix() for p in report_notebooks(tmp_path)}
     assert found == {"report.py", "sub/nested.py"}
+
+
+def test_auto_publishes_by_default(tmp_path):
+    nb = tmp_path / "report.py"
+    nb.write_text(_APP)
+    assert auto_publishes(nb)
+
+
+def test_no_auto_publish_marker_opts_out_of_ci_only(tmp_path):
+    nb = tmp_path / "report.py"
+    nb.write_text(f"import marimo\n# {NO_AUTO_PUBLISH_MARKER} — slow to render\napp = marimo.App()\n")
+    assert is_report_notebook(nb)  # still a report: rendered, pinned, on the site
+    assert not auto_publishes(nb)  # just not by CI
+
+
+def test_auto_publishes_excludes_non_reports(tmp_path):
+    (plain := tmp_path / "mod.py").write_text("x = 1\n")
+    assert not auto_publishes(plain)
+    assert not auto_publishes(tmp_path / "missing.py")
 
 
 def test_externalize_html_writes_sidecar_and_passes_through(tmp_path):

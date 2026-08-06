@@ -497,6 +497,16 @@ state.
   so the mismatch costs the reader a translation step. Point the heatmap at
   `label_landmarks` too — its panels are wide enough for the full set.
 
+- Auto-publish only sees changed *notebooks* (2026-08-06). #publishing
+  `scripts/changed_reports.py` selects on the git diff, so a report whose inputs
+  moved while its `report.py` didn't — a re-run experiment writing new refs, a
+  restyle in `src/sca/vis*.py`, an edit to `docs/report.css` — isn't republished
+  until someone runs `./go publish` or the manual dispatch with `--all`. A sibling
+  `experiment.py` change is the cheap 80% heuristic (same directory, likely new
+  results); the honest version compares the store refs the last export resolved
+  (`_assets/provenance.json` already records them) against what's current. Worth
+  doing once we notice it biting.
+
 ## Backlog, grouped by what a single dev session should bundle
 
 (The M2 science backlog, including issue #10, now lives in

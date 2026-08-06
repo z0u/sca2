@@ -3,13 +3,17 @@ name: PR Preview
 # Deploys a preview of the site for each PR at <site>/pr-preview/pr-<n>/, so a
 # new report's figures are reviewable without downloading the build artifact.
 # The build is the same read-only assembly as production: it pulls whatever
-# bundles `./go publish` already synced to the publish tier (an agent publishes
-# from its branch before opening the PR) and writes HTML around them. Each
+# bundles are synced to the publish tier and writes HTML around them. Each
 # report is fetched and based at the revision pinned in docs/publish.lock *on
 # the PR branch*, so a branch publish shows up here without touching what
 # production serves (main's pins) — merging the PR is what promotes it. The
 # preview is torn down when the PR closes; a sticky comment on the PR carries
 # the link.
+#
+# Publishing runs first, as a job here rather than a workflow of its own: the
+# preview serves the branch's pins, so `./go publish` has to have updated them
+# before the site is assembled. That also means the agent no longer has to
+# remember to publish before opening the PR — see publish-reports.yml.
 
 on:
   pull_request:
@@ -22,14 +26,36 @@ permissions:
   pull-requests: write
 
 jobs:
+  publish:
+    # Bring the changed reports' bundles and pins up to date before the preview is
+    # built. Skipped on close (nothing to publish for a teardown) and on forks.
+    if: >-
+      github.event.action != 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/publish-reports.yml
+    secrets: inherit
+
   preview:
     runs-on: ubuntu-latest
-    # Forked PRs get no secrets (the build needs HF_TOKEN to read the publish
+    needs: publish
+    # `always()` so the teardown still runs on close (where publish is skipped), and so
+    # a report that fails to render doesn't also cost us the preview of the ones that
+    # rendered. Forked PRs get no secrets (the build needs HF_TOKEN to read the publish
     # tier), and shouldn't deploy to the site anyway.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: always() && github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Pick up the pins just published
+        # The checkout above is the merge ref recorded when this run started, so it
+        # predates the publish job's commit. Take just the lock from the branch tip.
+        if: needs.publish.outputs.published == 'true'
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git fetch --no-tags --quiet origin "$BRANCH"
+          git checkout FETCH_HEAD -- docs/publish.lock
 
       - name: Install uv
         if: github.event.action != 'closed'

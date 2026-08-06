@@ -1,0 +1,149 @@
+name: Publish Reports
+
+# Runs `./go publish` for the reports a branch changed — the authenticated half of
+# publishing (render the notebook, sync its bundle to the publish tier, pin the revision
+# in docs/publish.lock), which we keep forgetting to do by hand. Only the *changed*
+# notebooks are published, so each run repins the reports that have new content and
+# leaves every other pin alone; the lock diff stays the list of reports the branch
+# actually touched. See scripts/changed_reports.py for the selection.
+#
+# It runs as a prerequisite job of pr-preview.yml rather than off its own
+# `pull_request` trigger, because the order matters: the preview serves each report at
+# the revision pinned *on the branch*, so the pins have to land before the site is
+# assembled. Two workflows on the same trigger can't be sequenced, and the pin commit is
+# pushed with GITHUB_TOKEN, which by design doesn't re-trigger the preview.
+#
+# Opting a slow report out:
+#   - one report:   put `# mini:no-auto-publish` in the notebook (mini.reports)
+#   - one PR:       add the `no-auto-publish` label
+# Both leave `./go publish <nb>` working by hand. The better fix is usually to move the
+# slow part into the experiment, so the report only reads results.
+#
+# The token contract is stricter than the site build's: this workflow *writes* (it syncs
+# bundles to the publish tier and reads the store the reports draw on), so `HF_TOKEN`
+# needs read on the store bucket and write on the publish repo — the read-only token the
+# deploy and preview builds can get by with isn't enough here.
+
+on:
+  workflow_call:
+    outputs:
+      published:
+        description: New pins were pushed to the branch ('true' when the lock moved)
+        value: ${{ jobs.publish.outputs.published }}
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Publish the reports changed since this ref
+        default: main
+      all:
+        description: Publish every report instead (ignores `base`)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Forked PRs get no secrets, and shouldn't write to our publish tier anyway. The
+    # label is the per-PR escape hatch; on a manual run there's no PR and it's absent.
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && !contains(github.event.pull_request.labels.*.name, 'no-auto-publish')
+    outputs:
+      published: ${{ steps.push.outputs.published }}
+    env:
+      # The branch this run publishes from and pushes its pins back to.
+      BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      BASE: ${{ github.event.pull_request.base.ref || inputs.base || 'main' }}
+      ALL: ${{ inputs.all }} # manual runs only; empty when called from pr-preview.yml
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The head *branch*, not the PR's merge ref: this job commits to it.
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          fetch-depth: 0 # the merge base with the base branch needs history
+
+      - name: Select reports
+        id: select
+        run: |
+          set -euo pipefail
+          args="$RUNNER_TEMP/publish-args.txt"
+          if [[ "${ALL:-}" == "true" ]]; then
+            echo --all > "$args"
+          else
+            git fetch --no-tags --quiet origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+            # Stdlib-only, so this runs before the project is installed: most pushes
+            # change no report, and that's the answer we want cheaply.
+            PYTHONPATH=src python3 scripts/changed_reports.py "origin/$BASE" > "$args"
+          fi
+          if [[ -s "$args" ]]; then
+            echo "any=true" >> "$GITHUB_OUTPUT"
+            { echo "Publishing:"; sed 's/^/- /' "$args"; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No report changed since $BASE — nothing to publish." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Install uv
+        if: steps.select.outputs.any == 'true'
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        if: steps.select.outputs.any == 'true'
+        # The full project, not the `pages` group: publishing renders the notebooks,
+        # which import src/ and read the store.
+        run: uv sync
+
+      - name: Publish
+        if: steps.select.outputs.any == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          MINI_PUBLISH_REPO: ${{ vars.MINI_PUBLISH_REPO }}
+          MINI_STORE_BUCKET: ${{ vars.MINI_STORE_BUCKET }}
+        run: |
+          set -euo pipefail
+          mapfile -t reports < "$RUNNER_TEMP/publish-args.txt"
+          ./go publish "${reports[@]}"
+
+      - name: Push pins
+        id: push
+        if: steps.select.outputs.any == 'true'
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- docs/publish.lock; then
+            # Every bundle was already current: an identical re-publish mints no commit
+            # on the publish tier, so there's no new revision to pin.
+            echo "Bundles were already up to date; no pin moved." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # The added lines of the lock diff *are* the reports with new content.
+          pinned="$RUNNER_TEMP/pinned.txt"
+          git diff -U0 -- docs/publish.lock | sed -n 's/^+ *"\([^"]*\)".*/\1/p' > "$pinned"
+          keys="$(paste -sd, "$pinned" | sed 's/,/, /g')"
+          n="$(wc -l < "$pinned")"
+          if [[ "$n" -eq 0 ]]; then
+            msg=(-m "Update publish pins") # removals only: a deleted report's pin, pruned
+          elif [[ "$n" -gt 4 ]]; then
+            msg=(-m "Publish $n reports" -m "$(sed 's/^/- /' "$pinned")")
+          else
+            msg=(-m "Publish $keys")
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit "${msg[@]}" -- docs/publish.lock
+          # A concurrent push to the branch is the one expected failure; rebase onto it
+          # and retry, since the pin commit touches nothing else.
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:refs/heads/$BRANCH"; then
+              echo "published=true" >> "$GITHUB_OUTPUT"
+              echo "Pinned: ${keys}" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep $((attempt * 2))
+            git pull --rebase --quiet origin "$BRANCH"
+          done
+          echo "Could not push the updated pins to $BRANCH." >&2
+          exit 1
