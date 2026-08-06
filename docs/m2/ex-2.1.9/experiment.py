@@ -156,16 +156,17 @@ ORACLE_ARM = "op1-oracle"
 
 PRIMARY = "pool-t030"
 """P, the condition H2–H4 score, fixed before the run. Chosen because its τ
-sits at the middle of the 0.6–0.8 calibration band on both reference profiles
-— a criterion independent of every statistic the gates read, so no gate is
-scored on a condition selected by that same gate's statistic. The other two
-pooled arms are the τ sweep: reported beside P, not gated."""
+sits at the soft edge of the 0.6–0.8 calibration band on both reference
+profiles — the conservative end of the target range, and a criterion
+independent of every gated statistic, so no gate is scored on a condition
+selected by that same gate's statistic. The other two pooled arms are the τ
+sweep: reported beside P, not gated."""
 
 # --- Statistics shared with the report --------------------------------------
 
 
 def pooled_margin(alpha: np.ndarray, weights: np.ndarray) -> float:
-    """M: the layer-mean of the max-over-span margin, for one run's alignment map.
+    """m_span: the mean over slices of the max-over-span margin, for one run's alignment map.
 
     *alpha* is (slices, colors, positions) on the probe set; *weights* is
     LABEL_W. The max over span roles is applied to every condition and to the
@@ -200,7 +201,12 @@ def spearman(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def r2_sim(alpha: np.ndarray) -> float:
-    """Pearson R² between a per-color response and SIM_TARGET — M1's proportionality score."""
+    """Squared Pearson correlation (r²) between a per-color response and SIM_TARGET.
+
+    M1's proportionality score. Written r² in this report to keep it apart
+    from the readability probe's held-out coefficient of determination, which
+    earlier reports also wrote as R².
+    """
     return float(np.corrcoef(alpha, SIM_TARGET)[0, 1] ** 2)
 
 
@@ -211,7 +217,7 @@ TASK_GATE = 0.02
 
 POOL_GAIN_GATE = 0.15
 POOL_GAIN_PARTIAL = 0.09
-"""H2(a): the pooled margin gain over the span mean, M(P) − M(span-mean).
+"""H2(a): the pooled margin gain over the span mean, m_span(P) − m_span(span-mean).
 
 A difference of two three-seed condition means; at ex-2.1.6's seed-mean margin
 noise of 0.032 that difference carries about 0.032·√2 ≈ 0.045, so the gate is
@@ -236,8 +242,8 @@ from ex-2.1.8, whose operating point meets it at 0.087."""
 RETENTION_FLOOR = 0.2
 RETENTION_GATE = 0.8
 RETENTION_STAT = "min"
-"""H3(b): retention on the M trajectory — for every run whose running maximum
-of M reaches `RETENTION_FLOOR`, the final value is at least `RETENTION_GATE`×
+"""H3(b): retention on the m_span trajectory — for every run whose running
+maximum reaches `RETENTION_FLOOR`, the final value is at least `RETENTION_GATE`×
 that maximum. The quoted statistic is the minimum across seeds
 (`RETENTION_STAT`, settled in ex-2.1.8). The values are ex-2.1.8's H4 gates
 under clearer names, since retention scores H3 here."""

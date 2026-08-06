@@ -128,13 +128,16 @@ def _():
     with the labeled color, and then follow the concept as it migrates across
     positions with depth, which ex-2.1.6 saw the un-anchored model do.
 
-    It might not work out. The ex-2.1.8 span pull aligned the syntax tokens
-    hardest: at the embedding its best-aligned span roles (positions named by
-    their job in the line: op1, `+`, op2, `=`) are `+` and `=`, and the
-    cube-wide drift is there too. ᾱ measured at op1 is {ALPHA}, but the same
-    statistic maxed over the span roles is {ASPAN}.[^aspan] The pooled term
-    would happily settle on that, so the question is whether the repulsion
-    redirects it.
+    It might not work out. The ex-2.1.8 span pull actually aligned the syntax
+    tokens the most: at the embedding its best-aligned span roles (positions
+    named by their job in the line: op1, `+`, op2, `=`) are `+` and `=`, and
+    the cube-wide drift is there too. ᾱ measured at op1 is {ALPHA}, but the
+    same statistic maxed over the span roles is {ASPAN}.[^aspan] The pooled
+    term would happily settle on that. Call that outcome the *syntax latch* —
+    a latch because the softmin's concentration is self-reinforcing (the
+    leading position gets the pull, which extends its lead), so whatever it
+    closes on first, it holds. The question is whether the repulsion redirects
+    it before it closes.
 
     [^aspan]: Ex-2.1.8 gated ᾱ at op1 only; the maxed-over-roles number is
         computed here from its published arrays. Note the repulsion already
@@ -177,7 +180,7 @@ def _():
     Three properties made us pick this form over the other things called
     "softmin".
     First, its gradient is the softmin weights
-    $w_t = \mathrm{softmax}(-x/\tau)_t$, which are non-negative and sum to 1,
+    $\pi_t = \mathrm{softmax}(-x/\tau)_t$, which are non-negative and sum to 1,
     so the pull budget of each line is conserved and $\lambda_a$ means the same
     thing at every τ.
     Second, the $1/n$ inside the log makes $\tau = \infty$
@@ -187,7 +190,7 @@ def _():
     Third, it never pushes.
 
     That last property is why we avoid the other common "softmin", the
-    softmax-*weighted average* $\sum_t w_t x_t$. Its gradient terms flip sign
+    softmax-*weighted average* $\sum_t \pi_t x_t$. Its gradient terms flip sign
     once the cost of a position is τ past the pooled value, so poorly-aligned
     positions would be actively pushed off the axis (on a two-position toy at
     τ = 0.4, about 10% of the gradient budget). That would confound this
@@ -234,9 +237,11 @@ def _():
     `span-mean` re-runs the `end90-hold30` condition of ex-2.1.8 through the
     pooled code path at τ = ∞: the baseline the pooled conditions have to beat,
     differing from them only in τ. `op1-oracle` is the op1-only pull of
-    ex-2.1.7 at the new operating point: the ceiling that knowing the right
-    position buys, measured through identical code, so we can say what fraction
-    of it pooling recovers.
+    ex-2.1.7 at the new operating point: what knowing the right position buys,
+    measured through identical code, so we can say what fraction of it pooling
+    recovers. It is a reference rather than a strict ceiling — the oracle
+    pulls op1 at every slice, and ex-2.1.6 saw the concept migrate to later
+    roles with depth, so a per-slice pool could in principle beat it.
     """.replace("{ROWS}", _rows)
     )
     return
@@ -352,22 +357,20 @@ def _(ALPHA218):
     lands at τ ≈ 0.01–0.03 on both profiles.
 
     So the grid is $\tau \in \{{{", ".join(f"{t:g}" for t in ex.TAUS)}\}}$: the
-    sharp edge of the band, its middle, and one rung toward the mean end of
+    sharp edge of the band, the soft edge, and one rung toward the mean end of
     the τ axis (τ = 0.1, weights nearer uniform); the mean itself is the
     τ = ∞ arm, which closes the family. τ = 0.01 sits below the per-seed margin noise
     ({ex.NOISE_PER_SEED:g}), so at that rung the pool will commit hard to early differences
-    that may just be noise. That is the winner-take-most end of the sweep, by
-    design.
+    that may just be noise. That is the winner-take-most end of the sweep.
 
-    The same arrays give the reproduction targets for the `span-mean` arm, as
-    seed means: pooled margin M = {_m218:.2f} (control {_m218c:.2f}) and
-    ᾱ_span = {_as218:.2f} (control {_as218c:.2f}). They also show the risk
-    plainly. At the embedding slice, the alignment $\cos(h, \hat v)$ of the
-    span-pull run's states, averaged over colors with label-affinity weights,
-    is `+` {1 - _x0[1]:.2f} and `=` {1 - _x0[3]:.2f}, against op1
-    {1 - _x0[0]:.2f} and op2 {1 - _x0[2]:.2f}. The constant syntax tokens are
-    the best-aligned positions, so a pool applied to *this* profile would put
-    its weight there.
+    The ex-2.1.8 arrays give the reproduction targets for the `span-mean` arm,
+    as seed means: pooled margin m_span = {_m218:.2f} (control {_m218c:.2f})
+    and ᾱ_span = {_as218:.2f} (control {_as218c:.2f}). They also put numbers
+    on the syntax latch: at the embedding slice, the alignment
+    $\cos(h, \hat v)$ of the span-pull run's states, averaged over colors with
+    label-affinity weights, is `+` {1 - _x0[1]:.2f} and `=` {1 - _x0[3]:.2f},
+    against op1 {1 - _x0[0]:.2f} and op2 {1 - _x0[2]:.2f} — a pool applied to
+    *this* profile would close on the syntax tokens.
     """
     )
     return
@@ -378,14 +381,23 @@ def _():
     mo.md(r"""
     ### Measurements
 
-    Alignment maps, task evals, trajectories and probes carry over from
-    ex-2.1.8 unchanged. Three statistics are new or newly scored, all computed
-    from the same maps:
+    Alignment maps ($\cos(h, \hat v)$ at every slice, color, and role, each
+    color averaged over its 27 probe lines), task evals, trajectories and
+    probes are from ex-2.1.8 unchanged. Labels also still key on the color of
+    op1 alone, as in every experiment since ex-2.1.6: pooling moves where the
+    *pull* acts, never which lines are labeled. Three statistics are new or
+    newly scored, all computed from the same maps:
 
-    **The pooled margin M** is the layer-mean of the max-over-span margin: for
-    each residual slice, take the affinity-weighted margin at each span role
-    and keep the largest, then average over slices. We can't score the margin
-    at op1 alone, because one condition pulls exactly where we would be
+    **The pooled margin m_span** is the mean over slices of the max-over-span
+    margin: for each slice, take the margin at each span role and keep the
+    largest, then average over slices. The margin at a role is selectivity
+    rather than raw alignment: over the 216 colors, the affinity-weighted mean
+    alignment of their states at that (slice, role), minus the unweighted
+    mean — how much closer a line sits to the axis for having a red op1. At
+    depth the syntax roles' states vary with the color of op1 too (they attend
+    back to it), so the margin means the same thing at every role; there is no
+    separate notion of how aligned a role *should* be. We can't score the
+    margin at op1 alone, because one condition pulls exactly where we would be
     scoring, and op1 may not be where the concept belongs at depth anyway.
 
     The max is applied identically to every condition and to the control, so
@@ -394,23 +406,29 @@ def _():
     $m_\text{op1}$ beside it for continuity with ex-2.1.7 and ex-2.1.8.
 
     **ᾱ_span** is the counterpart for containment, with the same max
-    treatment: the layer-mean of the max-over-span mean alignment over all 216
-    colors. The usual ᾱ reads at op1 only, which the ex-2.1.8 operating point
-    shows isn't enough here: its cube-wide drift sits on the syntax roles,
-    where the op1 statistic can't see it.
+    treatment: for each slice, the unweighted mean alignment over the 216
+    colors' states at each span role, keeping the largest role; then the mean
+    over slices. Color enters only through that mean — this is drift of the
+    whole cloud, not selectivity. The usual ᾱ reads at op1 only, which the
+    ex-2.1.8 operating point shows isn't enough here: its cube-wide drift sits
+    on the syntax roles, where the op1 statistic can't see it.
 
-    **The softmin weight profile** $\bar w(l, t)$ records what the pull
-    actually chose. At the end of training we compute the weights
-    $\mathrm{softmax}(-x/\tau)$ on the alignment probe set (every color as op1
-    against all 27 closed partners), per slice and span role, weighted by
-    label affinity over colors.
+    **The softmin weight profile** $\bar\pi(l, t)$ records what the pull
+    actually chose. (π, since $w$ collides with model weights.) At the end of
+    training we compute the weights $\mathrm{softmax}(-x/\tau)$ on the
+    alignment probe set (every color as op1 against all 27 closed partners),
+    per slice and span role, weighted by label affinity over colors.
 
     Its reference is **the readability profile of the control** $R^2(l, t)$: a
     ridge probe predicting the redness of op1 from the state of the
-    *un-anchored control* at each (slice, role), with one op1 color held out at
-    a time. At the embedding we know this profile in advance, since op1 is the
-    only span position whose state varies with the color of op1. That is what
-    makes H4(a) a prediction rather than a measured convention.
+    *un-anchored control* at each (slice, role), with one op1 color held out
+    at a time. This $R^2$ is the probe's held-out coefficient of
+    determination (negative on a role that carries nothing), a different
+    quantity from the squared Pearson correlation that grading uses; earlier
+    reports wrote both as $R^2$, so here they are $R^2$ (probes) and $r^2$
+    (grading). At the embedding we know this profile in advance, since op1 is
+    the only span position whose state varies with the color of op1. H4(a)
+    relies on this for its prediction.
     """)
     return
 
@@ -428,37 +446,43 @@ def _():
     # same fact H4(a) relies on. Verify: the R² profile's embedding row should be
     # ~0 off op1.
     # REVIEW: P was "the task-clean finite-τ condition with the largest seed-mean
-    # M", which selects by the statistic H2(a) then gates — a maximum over three
-    # arms scored against a single-comparison gate. P is now fixed in advance to
-    # `pool-t030` by the calibration-band criterion (its τ sits at the middle of
-    # the 0.6–0.8 band on both reference profiles), which is independent of every
-    # gated statistic; the other pooled arms demote to a reported sweep. Verify:
-    # the calibration figure — if the band middle moves off τ = 0.03 when
-    # recomputed, the choice of P should move with it before the freeze.
+    # m_span", which selects by the statistic H2(a) then gates — a maximum over
+    # three arms scored against a single-comparison gate. P is now fixed in
+    # advance to `pool-t030` by the calibration-band criterion (its τ sits inside
+    # the 0.6–0.8 band, at its soft edge, on both reference profiles), which is
+    # independent of every gated statistic; the other pooled arms demote to a
+    # reported sweep. Verify: the calibration figure — if the band moves off
+    # τ = 0.03 when recomputed, the choice of P should move with it before the
+    # freeze.
+    # REVIEW: H3(c) said "within 0.1" of the span-mean arm's grading, which reads
+    # two-sided; the intent is a floor, so it now says "no more than 0.1 below
+    # (higher is fine)". Verify: `GRADE_R2_DROP` names a drop, not a distance.
     mo.md(
         r"""
     ## Hypotheses
 
-    Gates and noise floors carry from ex-2.1.6 through ex-2.1.8 wherever the
+    Gates and noise floors are from ex-2.1.6 through ex-2.1.8 wherever the
     statistic is unchanged. Derivations for the new gates are in
     [experiment.py](./experiment.py), next to their constants.
 
     Throughout, *P* names the primary pooled condition, fixed in advance as
-    `{PRIMARY}`: its τ sits at the middle of the calibration band on both
-    reference profiles, a criterion independent of every statistic the gates
-    read. H2–H4 all score P. The other two pooled arms are the τ sweep,
-    reported beside P but not gated. If P turns out task-dirty, H2–H4 go
-    unscored and H1 carries the finding.
+    `{PRIMARY}`: its τ sits at the calibration band's soft edge on both
+    reference profiles — the conservative end of the target range — a
+    criterion independent of every gated statistic. H2–H4 all score P. The
+    other two pooled arms are the τ sweep, reported beside P but not gated.
+    If P turns out task-dirty, H2–H4 go unscored and the refuted H1 is the
+    finding.
 
     **H1: Task cost.** Every condition is task-clean: `named_holdout` exact
     match within {TASK} (absolute) of the seed mean of the in-experiment
     control. No partial credit: ex-2.1.7 found no task cost even at ten times
-    this anchor weight, and nothing in this design adds task pressure.
+    this anchor weight, and nothing in this design should add task pressure.
 
-    **H2: Pooling buys selectivity over the span mean.**
-    (a) $M(P) - M(\text{span-mean}) \ge {GAIN}$, about two thirds of what the
-    op1 oracle bought at op1 in ex-2.1.7 ({OP1GAIN}), and roughly 3× the noise
-    of a difference of three-seed means.
+    **H2: Pooling increases selectivity over the span mean.**
+    (a) $m_\text{span}(P) - m_\text{span}(\text{span-mean}) \ge {GAIN}$,
+    about two thirds of what the op1 oracle gave at op1 in ex-2.1.7
+    ({OP1GAIN}), and roughly 3× the noise of a difference of three-seed
+    means.
     (b) The syntax-role drift falls: $\bar\alpha_\text{span}(P) \le
     \bar\alpha_\text{span}(\text{span-mean}) - {SDRIFT}$.
     Partial: (b) holds and (a) lands in $[{GAINP}, {GAIN})$; or exactly one
@@ -469,11 +493,12 @@ def _():
 
     **H3: The operating point survives pooling.** On P:
     (a) containment, $\bar\alpha \le {ALPHA}$ at op1;
-    (b) retention, every run whose running maximum of M reaches {FLOOR}
-    ending at $\ge {RET}\times$ that maximum (quoted as the minimum across
-    seeds);
-    (c) grading, $R^2$ against `sim¹·⁵` of P's seed-mean op1 response within
-    {DROP} of the value for the `span-mean` arm.[^grading-note]
+    (b) retention, every run whose running maximum of $m_\text{span}$ reaches
+    {FLOOR} ending at $\ge {RET}\times$ that maximum (quoted as the minimum
+    across seeds);
+    (c) grading, the squared Pearson correlation $r^2$ against `sim¹·⁵` of
+    P's seed-mean op1 response no more than {DROP} below the `span-mean`
+    arm's (higher is fine).[^grading-note]
     Partial: (a) and (b) hold, (c) misses.
 
     **H4: The weight lands where the concept lives.** On the weight profile of P:
@@ -482,23 +507,24 @@ def _():
     the 0.6–0.8 calibration band described weights recomputed on reference
     profiles);
     (b) across the four slices after the embedding, the weighted readability gain —
-    $\sum_t \bar w(l,t) R^2(l,t) - \mathrm{mean}_t R^2(l,t)$, averaged over
+    $\sum_t \bar\pi(l,t) R^2(l,t) - \mathrm{mean}_t R^2(l,t)$, averaged over
     slices — is at least {RGAIN}.
     Partial: (a) holds and (b) lands in $[0, {RGAIN})$.
     Two contrary outcomes, both leading to the same conclusion: span labels
     need help from the label side (per-line reweighting), not just the loss
-    side. *Latch*: the embedding weight concentrates on `+` or `=`, meaning the
-    pull took the cheap shared tokens and the repulsion failed to make them
-    unattractive; a latch would take H2(b) down with it — one mechanism,
-    seen from the loss side there and the weight side here. *Uniform*: no
-    slice reaches {LEAD} in any pooled condition, meaning the pool can't tell
-    the positions apart at any τ short of collapse.
+    side. *Latch*: the syntax latch from the intro arrives — the embedding
+    weight concentrates on `+` or `=`, meaning the pull took the cheap shared
+    tokens and the repulsion failed to make them unattractive; a latch would
+    take H2(b) down with it — one mechanism, seen from the loss side there
+    and the weight side here. *Uniform*: no slice reaches {LEAD} in any
+    pooled condition, meaning the pool can't tell the positions apart at any
+    τ short of collapse.
 
     [^grading-note]: The Spearman ρ grading track is retired as of this
         experiment. The ceiling analysis in ex-2.1.8 showed that ρ against
         `redness` can't reach its 0.8 gate alongside full-amplitude containment
         (best reachable 0.59–0.82), because the response target isn't monotone
-        in redness. The R² track survives, but as a relative gate; ex-2.1.8
+        in redness. The $r^2$ track survives, but as a relative gate; ex-2.1.8
         left the question of where a realistic absolute bar sits to a later
         grid.
     """.replace("{TASK}", f"{ex.TASK_GATE:g}")
@@ -554,23 +580,28 @@ def _():
     ## Selectivity against the span mean (H2)
 
     /// admonition | TODO
-    Dot chart of control-subtracted M by condition (three seeds and their
-    mean), with `span-mean` and `op1-oracle` as reference bands, and the
-    fraction of the oracle gap recovered, $(M(P) - M(\text{mean})) /
-    (M(\text{oracle}) - M(\text{mean}))$, quoted beside it. Second panel:
-    ᾱ_span the same way. $m_\text{op1}$ reported beside M for continuity.
-    The same table carries the reproduction check the method promises:
-    `span-mean`'s M and ᾱ_span against the ex-2.1.8 targets quoted under
-    *Calibrating τ*, so a drift introduced by the new code path is visible
-    before any pooled condition is read.
+    Dot chart of control-subtracted $m_\text{span}$ by condition (three seeds
+    and their mean), with `span-mean` and `op1-oracle` as reference bands, and
+    the fraction of the oracle gap recovered,
+    $(m_\text{span}(P) - m_\text{span}(\text{mean})) /
+    (m_\text{span}(\text{oracle}) - m_\text{span}(\text{mean}))$, quoted
+    beside it. Second panel: ᾱ_span the same way. $m_\text{op1}$ reported
+    beside $m_\text{span}$ for continuity. An accompanying table carries the
+    reproduction check the method promises: `span-mean`'s $m_\text{span}$ and
+    ᾱ_span against the ex-2.1.8 targets quoted under *Calibrating τ*, so a
+    drift introduced by the new code path is visible before any pooled
+    condition is read.
 
     Expected under the mechanism: pooled conditions between the two references
-    on M, and *below* `span-mean` on ᾱ_span. Contrary: pooled M at or under
-    the span mean would say pooling bought nothing; pooled ᾱ_span unchanged
-    while M rises would say the margin gain came from something other than
-    withdrawing the pull on syntax tokens. If the syntax drift stays, the next
-    lever is the repulsion floor itself, which ex-2.1.8 left untested upward
-    (its best floor was its highest) — queued, not gated here.
+    on $m_\text{span}$ — though above `op1-oracle` is possible, since the
+    oracle pulls op1 at every slice while the concept migrates to later roles
+    with depth — and *below* `span-mean` on ᾱ_span. Contrary: pooled
+    $m_\text{span}$ at or under the span mean would say pooling bought
+    nothing; pooled ᾱ_span unchanged while $m_\text{span}$ rises would say
+    the margin gain came from something other than withdrawing the pull on
+    syntax tokens. If the syntax drift stays, the next lever is the repulsion
+    floor itself, which ex-2.1.8 left untested upward (its best floor was its
+    highest) — queued, not gated here.
     ///
     """)
     return
@@ -583,10 +614,15 @@ def _():
     ## The operating point under pooling (H3)
 
     /// admonition | TODO
-    Trajectories of M and ᾱ (op1) over training for P, `span-mean` and the
-    control, with the anneal schedule ghosted; the retention statistic per
-    run; and the grading scatter (per-color op1 response against `sim¹·⁵`)
-    for P beside `span-mean`, each with its R².
+    Two figures, both covering *all* conditions with P called out (scored
+    numbers quoted for P only; showing the rest is reporting the sweep, not
+    an exploratory analysis). Fig 1: trajectories of $m_\text{span}$ and ᾱ
+    (op1) over training, in the format of the earlier trajectory figures — a
+    grid with one panel per condition, the other conditions ghosted for
+    reference, and the anchor/anti schedules drawn beneath; the retention
+    statistic annotated on each panel and quoted in the caption. Fig 2: the
+    grading scatter (per-color op1 response against `sim¹·⁵`), one panel per
+    condition, each with its $r^2$.
 
     Expected: P tracks `span-mean` on containment and retention, since pooling
     redirects the budget of the pull rather than adding to it, and grading
@@ -606,17 +642,22 @@ def _():
     ## Where the weight went (H4)
 
     /// admonition | TODO
-    The figure this experiment exists for: $\bar w(l, t)$ as a slice × role
-    heatmap (one per τ, P highlighted), beside the readability profile of the
-    control $R^2(l, t)$ on the same axes. Annotate the embedding row, where
-    H4(a) is decided, and quote the weighted readability gain per slice.
+    Illustration of the primary effect: $\bar\pi(l, t)$ as a smooth-step
+    stacked line chart over slices, one series per role (the ex-2.1.4 and
+    ex-2.1.6 form), one figure per pooled condition with P called out — a
+    grid is optional. The readability profile of the control $R^2(l, t)$
+    beside it on the same axes; the stacked form leaves room for both where
+    a heatmap wouldn't. Annotate the embedding slice, where H4(a) is
+    decided, and quote the four-slice mean readability gain (the H4(b)
+    number; per-slice values only if the chart leaves room).
     Expected under the mechanism: weight on op1 at the embedding, migrating
     toward `+`/`=`/op2 with depth in step with readability. Latch outcome:
     embedding weight on `+`/`=`, where readability is ~0. Uniform outcome:
-    no row of the heatmap far from 0.25. The weights may track readability
+    every slice's weights near 0.25. The weights may track readability
     better than the margin gains suggest, meaning the pull found the right
     place without any payoff; the discussion should then treat finding the
-    mechanism and benefiting from it separately.
+    mechanism and benefiting from it separately — the mechanism may work
+    while buying nothing at this scale or on this testbed.
     ///
     """)
     return
@@ -628,11 +669,13 @@ def _():
     ## Exploratory analyses
 
     Nothing here is preregistered; everything in this section is marked post
-    hoc. Candidates we already know we'll want: the trajectory of the weight
-    profile over training (does concentration happen during the anchor ramp, or
-    only once the repulsion anneals?), per-color weight maps (do strongly-red
-    lines concentrate differently from weakly-red ones?), and how sensitive the
-    H4 profile is to τ across the grid.
+    hoc. Candidates we suspect we'll want: the trajectory of the weight
+    profile over training (does concentration happen during the anchor ramp,
+    or only once the repulsion anneals? — the trajectory instrument will
+    record the small per-slice-and-role weight profile at each measurement,
+    so this is a stored summary rather than something to recompute), per-color
+    weight maps (do strongly-red lines concentrate differently from weakly-red
+    ones?), and how sensitive the H4 profile is to τ across the grid.
     """)
     return
 
@@ -644,7 +687,7 @@ def _():
 
     /// admonition | TODO
     After the results land, and after a discussion round: what the outcome
-    means for M3's document-level labels, and whether the label-side
+    implies for the document-level labels in M3, and whether label-side
     mechanisms (per-line reweighting, EM-flavored schemes) are needed at all.
     Not to be written in advance.
     ///

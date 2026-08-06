@@ -92,6 +92,17 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   and names the syntax-token latch as an explicit contrary outcome. Design
   notes from the 2026-08-03 session are below; the original note follows them.
 
+  Conditional follow-up arm, suggested in the 2026-08-05 review: exclude the
+  embedding slice from the pull, so no shared token embedding can satisfy the
+  term directly and every pulled state can, in principle, depend on whether an
+  earlier token was red. Queued rather than added: it changes two things at
+  once against ex-2.1.8 (pooling and pull depth), the H4 weight profile will
+  already show *where* a latch forms, and the embedding shift can partially
+  propagate to deeper slices through the residual stream anyway, so the arm is
+  sharpest as a follow-up targeted at whatever ex-2.1.9 finds. Related: the
+  "can an anchor be confined to part of the stream" item under #[D2.3].
+  #ex-2.1.9 #anchoring
+
   **The term.** Replace the per-position mean in `anchoring.anchor_term` with a
   soft minimum over the span, so the loss asks that the span align *somewhere*
   rather than everywhere. Use the **log-mean-exp** form,

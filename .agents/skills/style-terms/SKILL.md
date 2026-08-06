@@ -41,11 +41,15 @@ Use these terms consistently across all reports.
 
 - layer-mean
 
-  The mean over all residual-stream slices of a per-slice statistic ("the layer-mean margin"). A historical name, kept for continuity with ex-2.1.6 onward, even though it averages L+1 slices.
+  The mean over all residual-stream slices of a per-slice statistic ("the layer-mean margin"). A historical name from ex-2.1.6 onward, even though it averages L+1 slices; keep it only where continuity with an old statistic matters (m_op1), and describe new statistics as "the mean over slices" instead (ex-2.1.9's m_span does this).
 
 - role
 
   The job a position plays in a line: op1, `+`, op2, `=`, answer, newline. Positions are crop-relative and shift with every batch; roles are line-relative, so pulls, masks, and measurements are keyed by role. "Span roles" are the four prompt roles the anchor term can act on.
+
+- R² vs r²
+
+  Two statistics that earlier reports both wrote as R². Write $R^2$ for a probe's held-out coefficient of determination (can be negative; measures a fitted readout), and $r^2$ for a squared Pearson correlation (bounded to [0, 1]; measures proportionality, e.g. the grading track). Say which one in prose on first use.
 
 
 [^not-cell]: In classical DoE a condition is called a cell, but we can't call it that because other senses of "cell" appear in reports and cannot be renamed away: cells of a table or heatmap ("each cell is the seed mean"), and Marimo notebook cells ("the analysis cells below"). Reports also legitimately use it for spatial grids (color-grid cells, Voronoi cells). So in prose, "cell" never means a condition or a run. In _code_, the stored key `metrics["cells"]` can keep its legacy name to avoid invalidating memo keys.
