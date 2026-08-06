@@ -7,6 +7,8 @@ import jax.random as jr
 import numpy as np
 import pytest
 
+import jax
+
 from sca.anchoring import (
     LINE_TOKENS,
     PROMPT_SPAN,
@@ -16,8 +18,10 @@ from sca.anchoring import (
     anchor_term,
     anti_subspace_term,
     margin,
+    pooled_anchor_term,
     sample_anchored_batches,
     smoothstep,
+    softmin_weights,
 )
 from sca.compute.data_pipelines import save_data
 from sca.compute.training import train_anchored
@@ -125,6 +129,86 @@ def test_anchor_term_is_zero_when_aligned_and_two_when_opposed():
     np.testing.assert_allclose(anchor_term(jnp.asarray(-states), jnp.asarray(mask)), 2.0, rtol=1e-6, atol=0)
     # An empty mask contributes nothing rather than 0/0.
     assert float(anchor_term(jnp.asarray(states), jnp.zeros_like(jnp.asarray(mask)))) == 0.0
+
+
+def pooled_setup() -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """One batch row, two lines of two pulled positions: x = 1 − cos of [0.8, 0.4 | 0.0, 1.0]."""
+    states = np.zeros((1, 1, 4, 8), dtype=np.float32)
+    states[..., 0] = [0.2, 0.6, 1.0, 0.0]
+    mask = np.ones((1, 4), dtype=np.float32)
+    line_id = np.array([[0, 0, 1, 1]], dtype=np.int32)
+    return jnp.asarray(states), jnp.asarray(mask), jnp.asarray(line_id)
+
+
+def test_pooled_term_at_tau_inf_is_the_mean_of_per_line_means():
+    states, mask, line_id = pooled_setup()
+    # Full lines: per-line means [0.6, 0.5] → 0.55, which is also the flat mean here.
+    pooled = pooled_anchor_term(states, mask, line_id, 2, np.inf)
+    np.testing.assert_allclose(pooled, 0.55, rtol=1e-6, atol=0)
+    np.testing.assert_allclose(pooled, anchor_term(states, mask), rtol=1e-6, atol=0)
+    # A truncated line: [0.8, 0.4 | 0.0] → per-line means [0.6, 0.0] → 0.3,
+    # where the flat mean over positions would say 0.4.
+    cut = jnp.asarray(np.array([[1, 1, 1, 0]], dtype=np.float32))
+    np.testing.assert_allclose(pooled_anchor_term(states, cut, line_id, 2, np.inf), 0.3, rtol=1e-6, atol=0)
+    np.testing.assert_allclose(anchor_term(states, cut), 0.4, rtol=1e-6, atol=0)
+
+
+def test_pooled_term_reaches_the_min_as_tau_falls():
+    states, mask, line_id = pooled_setup()
+    # For two positions, mm = min + τ·log(2 / (1 + e^{−Δ/τ})); at τ = 0.01 the
+    # far position's e^{−40} vanishes, leaving min + τ·ln 2 per line.
+    expected = (0.4 + 0.0) / 2 + 0.01 * np.log(2)
+    np.testing.assert_allclose(pooled_anchor_term(states, mask, line_id, 2, 0.01), expected, rtol=1e-4, atol=0)
+
+
+def test_pooled_gradient_is_the_softmin_weights_and_conserves_the_budget():
+    states, mask, line_id = pooled_setup()
+    x = np.array([[0.8, 0.4], [0.0, 1.0]])  # (line, position)
+    for tau in (0.01, 0.1, 1.0, np.inf):
+        grad = jax.grad(lambda s, t=tau: pooled_anchor_term(s, mask, line_id, 2, t))(states)
+        got = np.asarray(grad)[0, 0, :, 0].reshape(2, 2)  # d/d cos at the anchor axis
+        # d/d cos = −π_t / n_lines: each line's budget is the softmin weights, whatever τ.
+        np.testing.assert_allclose(got, -softmin_weights(x, tau) / 2, rtol=1e-4, atol=1e-7)
+        np.testing.assert_allclose(got.sum(axis=1), -0.5, rtol=1e-5, atol=0)
+    # Off-axis components carry no gradient, and an empty mask contributes none at all.
+    assert float(jnp.abs(jnp.asarray(grad)[..., 1:]).max()) == 0.0
+    empty = jax.grad(lambda s: pooled_anchor_term(s, jnp.zeros_like(mask), line_id, 2, 0.1))(states)
+    np.testing.assert_allclose(np.asarray(empty), 0.0, rtol=0, atol=0)
+    assert float(pooled_anchor_term(states, jnp.zeros_like(mask), line_id, 2, 0.1)) == 0.0
+
+
+def test_pooling_is_within_each_slice():
+    # Two slices with opposite profiles: the pool must find each slice's own min.
+    states = np.zeros((2, 1, 2, 8), dtype=np.float32)
+    states[0, ..., 0] = [1.0, 0.0]  # x = [0.0, 1.0]
+    states[1, ..., 0] = [0.0, 1.0]  # x = [1.0, 0.0]
+    mask = jnp.ones((1, 2), dtype=jnp.float32)
+    line_id = jnp.zeros((1, 2), dtype=jnp.int32)
+    tiny = pooled_anchor_term(jnp.asarray(states), mask, line_id, 1, 0.001)
+    np.testing.assert_allclose(tiny, 0.001 * np.log(2), rtol=1e-3, atol=0)  # each slice: min 0 + τ·ln2
+
+
+def test_softmin_weights_limits():
+    x = np.array([0.8, 0.4, 0.0, 1.0])
+    np.testing.assert_allclose(softmin_weights(x, np.inf), 0.25, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(softmin_weights(x, 0.001), [0.0, 0.0, 1.0, 0.0], rtol=0, atol=1e-12)
+    np.testing.assert_allclose(softmin_weights(x, 0.5).sum(), 1.0, rtol=1e-12, atol=0)
+
+
+def test_sampled_line_ids_group_the_mask_without_changing_the_draws(corpus):
+    mc, dc = model_config(), data_config(0.0)
+    plain = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(3), np.ones(64)))
+    x, y, mask, local = next(
+        sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(3), np.ones(64), lines=True)
+    )
+    np.testing.assert_array_equal(x, plain[0])
+    np.testing.assert_array_equal(mask, plain[2])
+    assert local.min() == 0 and local.max() <= mc.block_size // LINE_TOKENS + 1
+    # Local ids step by at most one, and every step lands on a line boundary of the packed corpus.
+    steps = np.diff(local, axis=1)
+    assert set(np.unique(steps)) <= {0, 1}
+    # Within one line id, positions are contiguous and at most LINE_TOKENS long.
+    assert all(np.bincount(row).max() <= LINE_TOKENS for row in local)
 
 
 def test_anti_subspace_term_reads_the_mean_square_alignment_of_live_positions():
@@ -280,8 +364,8 @@ def test_anchoring_moves_the_labeled_color_toward_the_axis(data_dir, tmp_path):
         )
         assert len(metrics) == 15
         assert set(traj) == {
-            *("step", "epoch", "lr", "weight", "anti_weight", "m_op1"),
-            *("alpha_op1", "val_loss", "anchor", "anti"),
+            *("step", "epoch", "lr", "weight", "anti_weight", "m_op1", "m_span"),
+            *("alpha_op1", "val_loss", "anchor", "anti", "pi"),
         }
         assert not any(traj["anti_weight"])  # no repulsive term in this pair
         trajectories[peak] = traj
@@ -291,6 +375,31 @@ def test_anchoring_moves_the_labeled_color_toward_the_axis(data_dir, tmp_path):
     assert anchored["alpha_op1"][-1] > 0.5  # and the stream moved onto the axis
     assert anchored["alpha_op1"][-1] > control["alpha_op1"][-1] + 0.4
     assert anchored["m_op1"][-1] > control["m_op1"][-1]  # the labeled color leads the rest
+
+
+def test_pooled_training_runs_and_records_the_weight_profile(data_dir, tmp_path):
+    """The pooled path trains end to end; at τ = ∞ the recorded profile is uniform."""
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    tokens, weights = probe_set()
+    trajs = {}
+    for tau in (np.inf, 0.05):
+        _, _, traj = train_anchored(
+            training_config(),
+            data_dir,
+            anchor=AnchorSpec(peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=tau),
+            label_p=label_p,
+            probe_tokens=tokens,
+            probe_weights=weights,
+            checkpoint_dir=tmp_path / f"ckpt-t{tau}",
+            traj_stride=20,
+        )
+        assert traj["pi"].shape == (len(traj["step"]), 3, PROMPT_SPAN)  # (measurements, slices, roles)
+        np.testing.assert_allclose(traj["pi"].sum(axis=-1), 1.0, rtol=1e-5, atol=0)
+        assert traj["anchor"][-1] < traj["anchor"][0]  # the pull pulled
+        trajs[tau] = traj
+    np.testing.assert_allclose(trajs[np.inf]["pi"], 1 / PROMPT_SPAN, rtol=0, atol=1e-6)
+    assert float(np.abs(trajs[0.05]["pi"][-1] - 0.25).max()) > 0.05  # a finite τ concentrates
 
 
 def test_the_anchor_is_the_only_difference_between_conditions(data_dir, tmp_path):

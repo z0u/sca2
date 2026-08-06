@@ -7,8 +7,10 @@ and the measurement side reads how far that got.
 
 Three pieces, kept separate so an experiment can use them independently:
 
-- **The pull.** `anchor_term` is the cosine term itself; `make_anchored_train_step`
-  folds it into a training step at a scheduled weight, and `anchor_weight` is
+- **The pull.** `anchor_term` is the cosine term itself, and `pooled_anchor_term`
+  its mellowmax variant that asks each labeled line to align *somewhere* in its
+  span rather than everywhere; `make_anchored_train_step`
+  folds either into a training step at a scheduled weight, and `anchor_weight` is
   that schedule (ramp, hold, anneal to a floor above zero — the M1/ex-2.9.3
   lesson that protection withdrawn entirely lets the task loss reclaim the axis).
   `anti_subspace_term` is its repulsive companion from M1: an indiscriminate
@@ -32,6 +34,7 @@ from dataclasses import dataclass
 from typing import Iterator
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
@@ -85,6 +88,11 @@ class AnchorSpec:
     anneal_end: float
     floor: float = 0.1
     span: int = PROMPT_SPAN
+    tau: float | None = None
+    """Mellowmax temperature for per-line pooling over the span, or None for the
+    flat mean over pulled positions (the ex-2.1.6..8 term). τ = ∞ is the pooled
+    code path at the span mean: a per-line mean of means, which differs from the
+    flat mean only on lines a crop truncates."""
 
     def __call__(self, epoch) -> np.ndarray:
         return anchor_weight(
@@ -176,6 +184,60 @@ def anchor_term(states: Float[Array, "L1 B T C"], mask: Float[Array, "B T"]) -> 
     return jnp.sum((1.0 - cos) * mask) / (states.shape[0] * (jnp.sum(mask) + 1e-8))
 
 
+def softmin_weights(x: np.ndarray, tau: float, axis: int = -1) -> np.ndarray:
+    """softmax(−x/τ) along *axis*: the per-position weights of the mellowmax gradient.
+
+    Non-negative and summing to 1, so the pull budget of a line is conserved at
+    every τ; τ = ∞ gives the uniform weights of the span mean. The measurement
+    side of `pooled_anchor_term` — what the pull chose, read off an alignment map.
+    """
+    if np.isinf(tau):
+        return np.full_like(x, 1.0 / x.shape[axis])
+    z = -x / tau
+    z = z - z.max(axis=axis, keepdims=True)
+    w = np.exp(z)
+    return w / w.sum(axis=axis, keepdims=True)
+
+
+def pooled_anchor_term(
+    states: Float[Array, "L1 B T C"],
+    mask: Float[Array, "B T"],
+    line_id: Int[Array, "B T"],
+    n_lines: int,
+    tau: float,
+) -> Float[Array, ""]:
+    """Mean over labeled lines and slices of the mellowmax of (1 − cos) over each line's span.
+
+    The mellowmax −τ·log(mean exp(−x/τ)) (Asadi & Littman, 2017) interpolates
+    from the hard minimum (τ → 0) to the mean (τ = ∞), so the term asks each
+    labeled line to align *somewhere* in its visible span, concentrating the
+    pull wherever alignment is cheapest. Its gradient per line is the softmin
+    weights, non-negative and summing to 1, so the pull budget of each line is
+    conserved and the anchor weight means the same thing at every τ.
+
+    *mask* marks the pulled positions as in `anchor_term`; *line_id* groups them
+    into lines (any per-batch-row local index below *n_lines*). The pool runs
+    within each residual-stream slice, so the pull can choose different
+    positions at different depths. Lines with no visible pulled position
+    contribute nothing, as does an unlabeled batch.
+    """
+    sel = (line_id[..., None] == jnp.arange(n_lines)) & (mask[..., None] > 0)  # (B, T, N)
+    count = sel.sum(axis=1)  # (B, N) pulled positions per line
+    labeled = count > 0
+    x = 1.0 - states[..., ANCHOR_AXIS]  # (L1, B, T)
+    if np.isinf(tau):
+        pooled = jnp.einsum("lbt,btn->lbn", x, sel.astype(x.dtype)) / jnp.maximum(count, 1)
+    else:
+        # The per-line min keeps exp in range (x − min ≥ 0 within the line); its
+        # dependence cancels analytically, so it carries no gradient of its own.
+        xw = jnp.where(sel[None], x[..., None], jnp.inf)  # (L1, B, T, N)
+        lmin = jax.lax.stop_gradient(jnp.where(labeled, xw.min(axis=2), 0.0))
+        z = jnp.exp(jnp.where(sel[None], -(x[..., None] - lmin[:, :, None, :]) / tau, -jnp.inf))
+        mean_z = z.sum(axis=2) / jnp.maximum(count, 1)
+        pooled = lmin - tau * jnp.log(jnp.where(labeled, mean_z, 1.0))
+    return jnp.sum(pooled * labeled) / (states.shape[0] * (jnp.sum(labeled) + 1e-8))
+
+
 def anti_subspace_term(states: Float[Array, "L1 B T C"], live: Float[Array, "B T"]) -> Float[Array, ""]:
     """Mean of cos²(h, e₀) over every residual-stream slice and every live position.
 
@@ -189,14 +251,23 @@ def anti_subspace_term(states: Float[Array, "L1 B T C"], live: Float[Array, "B T
     return jnp.sum(cos**2 * live) / (states.shape[0] * (jnp.sum(live) + 1e-8))
 
 
-def make_anchored_train_step(optimizer: optax.GradientTransformation):
+def make_anchored_train_step(
+    optimizer: optax.GradientTransformation,
+    tau: float | None = None,
+    n_lines: int = 0,
+):
     """Build a jitted training step for cross-entropy plus the two weighted anchor terms.
 
     The weights are arguments rather than closures, so the schedules move
-    without recompiling. Returns the three loss terms separately: the anchor
-    term is the training-side view of what the alignment measurements read
-    later, and the anti-subspace term is the same view of the mean alignment
-    H4 scores. Pass `anti_weight=0` for a bare anchor.
+    without recompiling; *tau* is fixed per build, since a condition's pooling
+    does not move over training. With `tau=None` the anchor term is the flat
+    per-position mean (`anchor_term`); with a float (∞ allowed) it is the
+    per-line mellowmax (`pooled_anchor_term`), and *n_lines* bounds the local
+    line index the step's `line_id` argument carries. Returns the three loss
+    terms separately: the anchor term is the training-side view of what the
+    alignment measurements read later, and the anti-subspace term is the same
+    view of the mean alignment the containment gates score. Pass
+    `anti_weight=0` for a bare anchor.
     """
 
     @eqx.filter_jit
@@ -206,13 +277,17 @@ def make_anchored_train_step(optimizer: optax.GradientTransformation):
         x: Int[Array, "B T"],
         y: Int[Array, "B T"],
         mask: Float[Array, "B T"],
+        line_id: Int[Array, "B T"],
         weight: Float[Array, ""],
         anti_weight: Float[Array, ""],
     ) -> tuple[LanguageModel, PyTree, Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
         def loss_fn(model: LanguageModel):
             states, logits = model.stream_and_logits(x)
             live = (x != 0).astype(states.dtype)
-            task, anchor = cross_entropy(logits, y), anchor_term(states, mask)
+            task = cross_entropy(logits, y)
+            anchor = (
+                anchor_term(states, mask) if tau is None else pooled_anchor_term(states, mask, line_id, n_lines, tau)
+            )
             anti = anti_subspace_term(states, live)
             return task + weight * anchor + anti_weight * anti, (task, anchor, anti)
 
@@ -232,7 +307,8 @@ def sample_anchored_batches(
     rng: np.random.Generator,
     label_p: Float[np.ndarray, " V"],
     span: int = PROMPT_SPAN,
-) -> Iterator[tuple[Int[np.ndarray, "B T"], Int[np.ndarray, "B T"], Float[np.ndarray, "B T"]]]:
+    lines: bool = False,
+) -> Iterator[tuple]:
     """Yield *n_batches* of (inputs, targets, anchor mask).
 
     The crops are `sca.data.batches.sample_batches`, repeated here rather than
@@ -242,6 +318,10 @@ def sample_anchored_batches(
     line is labeled on one epoch and not the next, and the draws are consumed
     whatever the anchor weight is, which keeps every condition of a sweep on
     identical batches for a given seed.
+
+    With `lines=True` each batch carries a fourth element: the (B, T) local
+    line index (0 .. `block_size // LINE_TOKENS + 1`) that groups positions
+    into lines for `pooled_anchor_term`. The draws are identical either way.
     """
     block_size = model_config.block_size
     n_starts = len(data) - block_size - 1
@@ -265,12 +345,16 @@ def sample_anchored_batches(
 
         absolute = starts[:, None] + offsets
         line = absolute // LINE_TOKENS
+        local = line - line[:, :1]
         op1 = data[line * LINE_TOKENS]  # every line's first operand, wherever the crop landed
         draw = rng.random((len(starts), n_lines))
-        labeled = np.take_along_axis(draw, line - line[:, :1], axis=1) < label_p[op1]
+        labeled = np.take_along_axis(draw, local, axis=1) < label_p[op1]
         # Padded positions are not shown to the model, so they are not pulled either.
         mask = labeled & (absolute % LINE_TOKENS < span) & (x != 0)
-        yield x, y, mask.astype(np.float32)
+        if lines:
+            yield x, y, mask.astype(np.float32), local.astype(np.int32)
+        else:
+            yield x, y, mask.astype(np.float32)
 
 
 @eqx.filter_jit
