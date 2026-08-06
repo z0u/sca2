@@ -47,11 +47,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Forked PRs get no secrets, and shouldn't write to our publish tier anyway. The
-    # label is the per-PR escape hatch; on a manual run there's no PR and it's absent.
+    # A manual run always goes ahead. On a PR, both gates apply: forks get no secrets and
+    # shouldn't write to our publish tier anyway, and the label is the per-PR opt-out.
     if: >-
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-      && !contains(github.event.pull_request.labels.*.name, 'no-auto-publish')
+      github.event_name != 'pull_request'
+      || (github.event.pull_request.head.repo.full_name == github.repository
+      && !contains(github.event.pull_request.labels.*.name, 'no-auto-publish'))
     outputs:
       published: ${{ steps.push.outputs.published }}
     env:
