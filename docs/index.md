@@ -133,3 +133,11 @@ These experiments were preparation for the main work: exercising the infrastruct
     selectivity. Holding the repulsion high for longer contains the drift and
     keeps the margin, which nothing before this did. It's unclear if the
     response is well-graded.
+
+- [2.1.9. A pull that finds its own position](./m2/ex-2.1.9/report.py)
+
+    Preregistration; not yet run. The op1-only pull is a position oracle
+    natural language won't supply, so we let the anchor term choose for
+    itself: a soft minimum (mellowmax) over the span instead of a mean. We ask
+    whether it recovers the oracle's selectivity, and whether the weight lands
+    where the concept lives.
