@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from sca.anchoring import PROMPT_SPAN
+from sca.anchoring import PROMPT_SPAN, softmin_weights
 from sca.colorcube import redness, sim_to_red
 from sca.config import SchedulerConfig
 from sca.data.colors import N_LEVELS
@@ -100,21 +100,6 @@ LEAD_BAND = (0.6, 0.8)
 """The target range for the leading position's softmin weight, per the design note."""
 
 
-def softmin_weights(x: np.ndarray, tau: float, axis: int = -1) -> np.ndarray:
-    """softmax(−x/τ) along *axis* — the mellowmax gradient's per-position weights.
-
-    Non-negative and summing to 1, so the pull budget per line is conserved and
-    λ_a means the same thing at every τ. τ = ∞ gives the uniform weights of the
-    span mean.
-    """
-    if np.isinf(tau):
-        return np.full_like(x, 1.0 / x.shape[axis])
-    z = -x / tau
-    z = z - z.max(axis=axis, keepdims=True)
-    w = np.exp(z)
-    return w / w.sum(axis=axis, keepdims=True)
-
-
 def mellowmax_min(x: np.ndarray, tau: float, axis: int = -1) -> np.ndarray:
     """The soft minimum −τ·log(mean exp(−x/τ)) along *axis*.
 
@@ -155,11 +140,11 @@ ORACLE_ARM = "op1-oracle"
 
 PRIMARY = "pool-t030"
 """P, the condition H2–H4 score, fixed before the run. Chosen because its τ
-sits at the soft edge of the 0.6–0.8 calibration band on both reference
-profiles — the conservative end of the target range, and a criterion
-independent of every gated statistic, so no gate is scored on a condition
-selected by that same gate's statistic. The other two pooled arms are the τ
-sweep: reported beside P, not gated."""
+sits at (or, on the deeper slices, just below) the soft edge of the 0.6–0.8
+calibration band on both reference profiles — the conservative end of the
+target range, and a criterion independent of every gated statistic, so no
+gate is scored on a condition selected by that same gate's statistic. The
+other two pooled arms are the τ sweep: reported beside P, not gated."""
 
 # --- Statistics shared with the report --------------------------------------
 
@@ -264,7 +249,7 @@ four roles is 0.25, and seed spread on a label-weighted mean weight is small,
 so 0.4 is well clear of both."""
 
 READ_GAIN_GATE = 0.05
-"""H4(b): mean over the position-aware slices of Σ_t w̄(l,t)·R²(l,t) − mean_t R²(l,t) —
+"""H4(b): mean over the position-aware slices of Σ_t π̄(l,t)·R²(l,t) − mean_t R²(l,t) —
 how much better the weighted positions read op1's redness than the span
 average. Zero for uniform weights or a flat readability profile, by
 construction."""
@@ -276,22 +261,25 @@ NOISE_SEED_MEAN = 0.032
 # --- Published references ---------------------------------------------------
 
 EX218_REFERENCE = {
-    "lam0": {"m_op1": -0.03, "alpha_op1": 0.008, "m_pooled": 0.015, "alpha_span": 0.034},
+    "lam0": {"m_op1": -0.03, "alpha_op1": 0.008, "m_span": 0.015, "alpha_span": 0.034},
     "end90-hold30": {
         "m_op1": 0.61,
         "alpha_op1": 0.087,
         "retention": 0.97,
         "r2": 0.77,
-        "m_pooled": 0.64,
+        "m_span": 0.64,
         "alpha_span": 0.37,
     },
 }
-"""Ex-2.1.8's control and operating point: seed means recomputed from that
-experiment's published metrics and arrays (2026-08-05), including the two
-pooled statistics defined above, which ex-2.1.8 itself did not report. The
-`span-mean` arm here re-runs `end90-hold30`, so these are its reproduction
-targets; the calibration cell in `report.py` re-derives them from the store
-rather than trusting this dict."""
+"""Ex-2.1.8's control and operating point: means of per-run statistics,
+recomputed from that experiment's published metrics and arrays (2026-08-05),
+including the two pooled statistics defined above, which ex-2.1.8 itself did
+not report. Per-run first, then the mean — the same convention results are
+scored under, since both pooled statistics take a max over roles and computing
+them on a seed-mean map would suppress the max-of-noise inflation the control
+subtraction is there to absorb. The `span-mean` arm here re-runs
+`end90-hold30`, so these are its reproduction targets; the calibration cell in
+`report.py` re-derives them from the store rather than trusting this dict."""
 
 EX217_OP1_GAIN = 0.22
 """Ex-2.1.7's op1-only margin gain over the span pull at the old schedule — the
@@ -631,7 +619,9 @@ def eval_one(trained: dict, evals, probes, grid: str, tau: float, condition: str
     #     averaged over partners and label-affinity-weighted over colors.
     x = 1.0 - cos[:, :, :SPAN]
     w_line = softmin_weights(x, tau)  # (L1, C*P, SPAN)
-    pi = np.einsum("lcpt,c->lt", w_line.reshape(cos.shape[0], len(weights), n_partners, SPAN), weights)
+    w_color = w_line.reshape(cos.shape[0], len(weights), n_partners, SPAN).mean(axis=2)
+    pi = np.einsum("lct,c->lt", w_color, weights)
+    np.testing.assert_allclose(pi.sum(axis=-1), 1.0, rtol=0, atol=1e-5)  # a mean of simplex weights stays on it
     arrays["pi"] = pi.astype(np.float32)
 
     # --- Leakage: redness from the residual stream at op1, with the anchor axis removed.
@@ -740,8 +730,9 @@ def _loo_color_r2(x, y_color, n_partners: int, penalties=(1e-4, 1e-3, 1e-2, 1e-1
     color shares its target (the redness of op1), so the held-out unit has to
     be the color: at op1 the partner lines of a color are identical states, and
     a per-row split would test a probe on rows it trained on. The penalty is
-    chosen once per profile entry by an interleaved 5-group CV over colors —
-    the reported number is the LOO R², which no penalty was picked on.
+    chosen one level up — once per profile entry, by an interleaved 5-group CV
+    over the same colors — so the held-out fits share a penalty that every
+    color had a say in, while no fit is tested on a color it trained on.
     """
     import numpy as np
 
@@ -812,7 +803,7 @@ def publish_results(results: list[dict], stats: dict, readability: dict, checkpo
 
     from mini.store import get, put, set_ref
 
-    cells = [{k: v for k, v in r.items() if k != "arrays"} for r in results]
+    cells = [{k: (None if k == "tau" and np.isinf(v) else v) for k, v in r.items() if k != "arrays"} for r in results]
     metrics = {
         "cells": cells,
         "corpus_stats": stats,
@@ -838,6 +829,7 @@ def publish_results(results: list[dict], stats: dict, readability: dict, checkpo
             },
             "anneal": {"start": ANNEAL_START, "end": ANNEAL_END, "floor": ANNEAL_FLOOR},
             "traj_stride": TRAJ_STRIDE,
+            "noise": {"per_seed": NOISE_PER_SEED, "seed_mean": NOISE_SEED_MEAN},
             "ex218_reference": EX218_REFERENCE,
             "ex217_op1_gain": EX217_OP1_GAIN,
             "gates": {

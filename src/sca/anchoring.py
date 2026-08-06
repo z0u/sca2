@@ -269,6 +269,8 @@ def make_anchored_train_step(
     view of the mean alignment the containment gates score. Pass
     `anti_weight=0` for a bare anchor.
     """
+    if tau is not None and n_lines < 1:
+        raise ValueError(f"pooled anchor (tau={tau}) needs n_lines >= 1, got {n_lines}")
 
     @eqx.filter_jit
     def train_step(

@@ -281,7 +281,7 @@ def _():
         return np.einsum("lc,c->l", w.max(axis=-1), ex.LABEL_W)
 
     ALPHA218 = {c: ex218_alpha(c) for c in ["lam0", "end90-hold30"]}
-    return ALPHA218, leading_weight
+    return ALPHA218, arrays218, leading_weight
 
 
 @app.cell(hide_code=True)
@@ -345,12 +345,23 @@ def _(ALPHA218, leading_weight):
 
 
 @app.cell(hide_code=True)
-def _(ALPHA218):
+def _(ALPHA218, arrays218):
     _x0 = np.einsum("ct,c->t", 1.0 - ALPHA218["end90-hold30"][0, :, : ex.SPAN], ex.LABEL_W)
-    _m218 = ex.pooled_margin(ALPHA218["end90-hold30"], ex.LABEL_W)
-    _m218c = ex.pooled_margin(ALPHA218["lam0"], ex.LABEL_W)
-    _as218 = ex.alpha_span(ALPHA218["end90-hold30"])
-    _as218c = ex.alpha_span(ALPHA218["lam0"])
+
+    def _seed_mean(stat, cond: str) -> float:
+        """Mean of the per-run statistic — the convention every result is scored under.
+
+        Both pooled statistics take a max over roles, so computing them on the
+        seed-mean map instead would suppress the max-of-noise inflation that
+        the control subtraction is there to absorb, and understate the
+        control's ᾱ_span in particular.
+        """
+        return float(np.mean([stat(arrays218[f"{cond}-s{s}/alpha"]) for s in (0, 1, 2)]))
+
+    _m218 = _seed_mean(lambda a: ex.pooled_margin(a, ex.LABEL_W), "end90-hold30")
+    _m218c = _seed_mean(lambda a: ex.pooled_margin(a, ex.LABEL_W), "lam0")
+    _as218 = _seed_mean(ex.alpha_span, "end90-hold30")
+    _as218c = _seed_mean(ex.alpha_span, "lam0")
     mo.md(
         rf"""
     The design note targets a leading position taking 0.6–0.8 of the weight, which
@@ -364,7 +375,8 @@ def _(ALPHA218):
     that may just be noise. That is the winner-take-most end of the sweep.
 
     The ex-2.1.8 arrays give the reproduction targets for the `span-mean` arm,
-    as seed means: pooled margin m_span = {_m218:.2f} (control {_m218c:.2f})
+    as means of per-run statistics — the convention the results are scored
+    under: pooled margin m_span = {_m218:.2f} (control {_m218c:.2f})
     and ᾱ_span = {_as218:.2f} (control {_as218c:.2f}). They also put numbers
     on the syntax latch: at the embedding slice, the alignment
     $\cos(h, \hat v)$ of the span-pull run's states, averaged over colors with
@@ -457,6 +469,14 @@ def _():
     # REVIEW: H3(c) said "within 0.1" of the span-mean arm's grading, which reads
     # two-sided; the intent is a floor, so it now says "no more than 0.1 below
     # (higher is fine)". Verify: `GRADE_R2_DROP` names a drop, not a distance.
+    # REVIEW (pre-launch): recomputing the calibration puts τ = 0.03's leading
+    # weight at the band's soft edge on the two shallowest slices and 0.4–0.5
+    # on the deeper three, so "sits at the soft edge" over-claimed; P and its
+    # criterion are unchanged, the wording now says "at or just below". The
+    # reproduction targets are likewise now means of per-run statistics
+    # (per-run max over roles, then mean), matching how results are scored —
+    # on the seed-mean map the max-of-noise inflation cancels and the
+    # control's ᾱ_span reads ~2.6× lower than the scoring convention's.
     mo.md(
         r"""
     ## Hypotheses
@@ -466,9 +486,10 @@ def _():
     [experiment.py](./experiment.py), next to their constants.
 
     Throughout, *P* names the primary pooled condition, fixed in advance as
-    `{PRIMARY}`: its τ sits at the calibration band's soft edge on both
-    reference profiles — the conservative end of the target range — a
-    criterion independent of every gated statistic. H2–H4 all score P. The
+    `{PRIMARY}`: its τ sits at (or, on the deeper slices, just below) the
+    calibration band's soft edge on both reference profiles — the
+    conservative end of the target range — a criterion independent of every
+    gated statistic. H2–H4 all score P. The
     other two pooled arms are the τ sweep, reported beside P but not gated.
     If P turns out task-dirty, H2–H4 go unscored and the refuted H1 is the
     finding.
