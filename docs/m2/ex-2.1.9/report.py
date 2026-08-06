@@ -95,47 +95,40 @@ def _(a_op1, a_span, acc, grading_r2, m_span, pi_bar, read_gain, retention):
     assert _ret is not None
     mo.md(rf"""
     **H1 (task cost) — holds.** The largest `named_holdout` exact-match gap
-    from the control across all six conditions is
+    from the control across all five anchored conditions is
     {max(abs(acc(c).mean() - _ctrl) for c in ["span-mean", *ex.POOLED_NAMES, ex.ORACLE_ARM]):.4f},
     against a gate of {ex.TASK_GATE:g}.
 
-    **H2 (pooling increases selectivity) — refuted.** On P (`{_P}`), the
-    margin gain over the span mean is
-    (a) $m_\text{{span}}$ {_gain:+.3f} against a gate of {ex.POOL_GAIN_GATE:g}
-    (partial {ex.POOL_GAIN_PARTIAL:g}), and
+    **H2 (pooling increases selectivity) — refuted.** On P (`{_P}`):
+    (a) the margin gain over the span mean is {_gain:+.3f} against a gate of
+    {ex.POOL_GAIN_GATE:g} (partial {ex.POOL_GAIN_PARTIAL:g}), and
     (b) the syntax-role drift falls by {_drop:.3f} against a required
     {ex.SYNTAX_DRIFT_GATE:g} — the predicted direction on both, short of both
-    gates, and neither partial applies. The context that matters: the op1
-    oracle itself beats the span mean by only {_headroom:.3f} on
-    $m_\text{{span}}$ here, so the gate — scaled from the {ex.EX217_OP1_GAIN:g}
-    op1 gain of ex-2.1.7's oracle under the old schedule — was out of reach
-    for *any* pull, oracle included. P recovered {_gain / _headroom:.0%} of
-    the headroom that actually existed. The selectivity section unpacks why
-    the span mean starts so close to the oracle.
+    gates, and neither partial applies. One piece of context, unpacked in the
+    selectivity section: the op1 oracle itself beats the span mean by only
+    {_headroom:.3f} on $m_\text{{span}}$ here, so H2(a)'s gate was out of
+    reach for any pull; P recovered {_gain / _headroom:.0%} of the headroom
+    that existed.
 
     **H3 (the operating point survives pooling) — holds.** On P: containment
     $\bar\alpha$ = {a_op1(_P).mean():.3f} (gate ≤ {ex.MEAN_ALIGN_GATE:g});
     retention {_ret:.2f} (gate ≥ {ex.RETENTION_GATE:g}, minimum across seeds);
     and grading $r^2$ = {grading_r2(_P):.2f} against the span mean's
     {grading_r2(ex.MEAN_ARM):.2f} — the gate tolerated a drop of
-    {ex.GRADE_R2_DROP:g} and instead the response got *better* graded.
+    {ex.GRADE_R2_DROP:g} and instead the response got better graded.
 
     **H4 (the weight lands where the concept lives) — holds.** At the
     embedding slice P puts {pi_bar(_P)[0, 0]:.2f} of the softmin weight on
     op1 (gate ≥ {ex.LEAD_GATE:g}; uniform is 0.25) — the only span position
     whose state can carry the concept there — and the weighted readability
-    gain is {read_gain(_P):+.2f} (gate ≥ {ex.READ_GAIN_GATE:g}). The τ sweep
-    adds a mechanism note: at τ = 0.01, the winner-take-most rung, the deep
-    slices latch onto `+` — the syntax latch the introduction named, arriving
-    only at depth and only at the sharpest τ — while at τ = 0.03 and 0.1 the
-    weight follows op1 at every slice.
+    gain is {read_gain(_P):+.2f} (gate ≥ {ex.READ_GAIN_GATE:g}). The one
+    latch in the sweep arrives at the sharpest τ only, at depth only (*Where
+    the weight went*).
 
-    Together: the pooled pull *finds* the concept-bearing position without the
-    oracle, and holding the operating point costs nothing — but at this
-    operating point, finding it buys almost no additional margin. Finding the
-    mechanism and benefiting from it come apart, as the H4 design note
-    anticipated; what that means for M3's document-level labels is for the
-    discussion round.
+    So the pull finds the concept-bearing position without the oracle, and
+    holding the operating point costs nothing — but finding it buys almost no
+    additional margin here. What that means for M3's document-level labels is
+    for the discussion round.
     """)
     return
 
@@ -546,10 +539,10 @@ def _():
     [experiment.py](./experiment.py), next to their constants.
 
     Throughout, *P* names the primary pooled condition, fixed in advance as
-    `{PRIMARY}`: its τ sits at (or, on the deeper slices, just below) the
-    calibration band's soft edge on both reference profiles — the
-    conservative end of the target range — a criterion independent of every
-    gated statistic. H2–H4 all score P. The
+    `{PRIMARY}`: on both reference profiles its τ sits at the calibration
+    band's soft edge on the shallow slices, and below the band on the deeper
+    ones — the conservative end of the target range — a criterion
+    independent of every gated statistic. H2–H4 all score P. The
     other two pooled arms are the τ sweep, reported beside P but not gated.
     If P turns out task-dirty, H2–H4 go unscored and the refuted H1 is the
     finding.
@@ -867,9 +860,10 @@ def _(ANCHORED, a_span, m_span):
             0.75, with five condition rows: span-mean, three pooled arms at
             increasing tau, and op1-oracle. Each row shows three small seed dots
             and a larger mean marker. Left panel, margin: all five rows cluster
-            between 0.63 and 0.69, with a dashed gate line at 0.78 far to the
-            right of every row; the pooled rows sit slightly right of span-mean,
-            below the oracle row. Right panel, drift: the rows walk steadily
+            between 0.62 and 0.69, with a dotted partial line at 0.71 and a
+            dashed gate line at 0.78, both to the right of every row; the
+            pooled rows sit slightly right of span-mean, below the oracle row.
+            Right panel, drift: the rows walk steadily
             left from span-mean at 0.34 down to op1-oracle at 0.13, with the
             dashed gate at 0.24 sitting left of the pool-t030 row.
         """,
@@ -985,9 +979,15 @@ def _(a_span, m_span):
        advantage over the span mean is {_headroom:.3f}: less than half the
        gate. No condition, oracle included, could have passed H2(a) as
        preregistered. P recovered {_gain / _headroom:.0%} of the headroom
-       that existed, and the sweep is monotone in τ — but the differences sit
-       at one-to-two seed spreads, so the ordering is suggestive rather than
-       scored.
+       that existed. Among the three finite-τ arms both statistics improve
+       monotonically toward τ = 0.1 — `pool-t100` even clears the H2(b)
+       drift drop outright, at
+       {a_span(ex.MEAN_ARM).mean() - a_span("pool-t100").mean():.3f} against
+       the {ex.SYNTAX_DRIFT_GATE:g} gate, though it too misses (a), at
+       {m_span("pool-t100").mean() - m_span(ex.MEAN_ARM).mean():+.3f}. P was
+       fixed in advance, so these are reported, ungated observations, and the
+       finite-τ ordering rests on differences of one-to-two seed spreads —
+       suggestive rather than scored.
 
     2. **The max hides where the margin lives.** The role profiles below show
        why the span mean scores so close to the oracle: at depth, every span
@@ -1019,7 +1019,7 @@ def _(alpha_map):
             smooth-stepped lines per panel, one per span role. Top left: all
             four roles rise together to between 0.5 and 0.8 after the
             embedding. Top middle and top right: the op1 line alone stays high,
-            from about 0.7 at slice 1 falling to about 0.4 at slice 4, while
+            about 0.8 at slice 1 falling to 0.4 (middle) or 0.5 (right) at slice 4, while
             the plus, op2 and equals lines sit below 0.3. Bottom left: plus and
             equals start near 0.55 at the embedding and fall with depth while
             op2 rises to about 0.28. Bottom middle: the plus line starts at

@@ -182,12 +182,13 @@ MEAN_ARM = "span-mean"
 ORACLE_ARM = "op1-oracle"
 
 PRIMARY = "pool-t030"
-"""P, the condition H2–H4 score, fixed before the run. Chosen because its τ
-sits at (or, on the deeper slices, just below) the soft edge of the 0.6–0.8
-calibration band on both reference profiles — the conservative end of the
-target range, and a criterion independent of every gated statistic, so no
-gate is scored on a condition selected by that same gate's statistic. The
-other two pooled arms are the τ sweep: reported beside P, not gated."""
+"""P, the condition H2–H4 score, fixed before the run. Chosen because on
+both reference profiles its τ sits at the soft edge of the 0.6–0.8
+calibration band on the shallow slices, and below the band on the deeper
+ones — the conservative end of the target range, and a criterion
+independent of every gated statistic, so no gate is scored on a condition
+selected by that same gate's statistic. The other two pooled arms are the τ
+sweep: reported beside P, not gated."""
 
 # --- Statistics shared with the report --------------------------------------
 
