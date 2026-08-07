@@ -804,13 +804,16 @@ def _loo_color_r2(x, y_color, n_partners: int, penalties=(1e-4, 1e-3, 1e-2, 1e-1
 
 
 def readability_profile(checkpoints: dict, probes, grid: str) -> dict:
-    """R²(l, t): how well each (slice, role) of the *control* reads op1's redness.
+    """R²(l, t): how well each (slice, role) of a checkpoint reads op1's redness.
 
-    The reference profile H4(b) scores the weight profile against, computed for
-    each un-anchored seed over the full probe set (per-line states, one color
-    held out at a time — `_loo_color_r2`). At the embedding every role but op1
-    should carry nothing: a token's state there cannot depend on another
-    position, which is the fact H4(a)'s prediction rests on.
+    Computed for every cell over the full probe set (per-line states, one color
+    held out at a time — `_loo_color_r2`). The control rows are the reference
+    profile H4(b) scores the weight profile against: at the embedding every
+    role but op1 should carry nothing, since a token's state there cannot
+    depend on another position, which is the fact H4(a)'s prediction rests on.
+    The anchored rows are exploratory, added in the results round to ask where
+    redness is readable once a pull has acted — the report keeps them out of
+    the preregistered scoring.
     """
     import numpy as np
 
@@ -1005,8 +1008,7 @@ def main(ctx: Ctx) -> dict:
         role="eval",
     )
     ckpts = dict(zip(labels, [t["checkpoint"] for t in trained], strict=True))
-    controls = {label: ckpts[label] for label in ckpts if label.startswith("lam0")}
-    readability = ctx.run(readability_profile, controls, prep["probes"], GRID, role="probe")
+    readability = ctx.run(readability_profile, ckpts, prep["probes"], GRID, role="probe")
     summary = ctx.run(
         publish_results, evaled, prep["stats"], readability, ckpts, prep["evals"], prep["probes"], role="prep"
     )
@@ -1047,9 +1049,9 @@ experiment = Experiment(
         # Three teacher-forced eval sets, one probe pass, and 5 × 5-fold ridge probes on 216 rows.
         # The geometry step runs the same probes over all 18 checkpoints, so it needs longer.
         "eval": dict(gpu="L4", timeout=2700),
-        # The readability profile: 20 (slice, role) ridge probes per control
-        # seed, each with 216 leave-one-color-out fits on 5 832 lines. CPU-bound
-        # linear algebra; the forward pass is small enough not to need a GPU.
+        # The readability profile: 20 (slice, role) ridge probes per checkpoint
+        # (all 18 cells), each with 216 leave-one-color-out fits on 5 832 lines.
+        # CPU-bound linear algebra; the forward pass doesn't need a GPU.
         "probe": dict(cpu=4, timeout=2700),
     },
 )

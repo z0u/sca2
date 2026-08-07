@@ -115,6 +115,17 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
     Echoes the M1 lesson that schedules shaping the space at the right moments
     beat curricula — and M1's schedules were never re-ablated in this
     architecture, so whether they're needed here is still open.
+  - **Can τ adapt itself?** (Raised in the 2026-08-07 review round.) A trainable
+    τ won't work bare: for any fixed alignment profile the mellowmax value falls
+    monotonically as τ → 0, so gradient descent on τ always sharpens — the
+    self-reinforcement is in the loss itself. It would need a counterweight,
+    e.g. hold the softmin weights to a target entropy (an effective candidate
+    count) and let τ float to meet it, annealing the target on a schedule. That
+    is a feedback controller on a regularizer, which ex-2.9.4 found workable but
+    fiddly and not obviously better than a timed schedule — so try the plain
+    soft → sharp schedule first, and "soften near critical points" only if a
+    usable critical-point signal exists (loss curvature, sudden readability
+    gains).
   - **Latch rates need more seeds.** Three per rung makes 2/3 vs 0/3 a coarse
     estimate; the next design that picks a τ should carry enough seeds at the
     chosen rung to bound its latch rate, rather than re-running ex-2.1.9 wider.
