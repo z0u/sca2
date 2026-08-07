@@ -92,7 +92,12 @@ def test_progress_emitted_during_training(data_dir):
     assert all(m.run_id == "run-1" and m.job_id == "job-1" for m in messages)
     steps = [m.step for m in messages]
     assert steps == sorted(steps)
-    assert {m.total for m in messages} == {max(steps)}, "final step should equal the reported total"
+    # The loop reports metrics before its first `emit_progress`, so a leading message can
+    # carry the `(0, 0)` placeholder — "total not known yet", which every consumer already
+    # reads as unknown. Whether it is delivered or superseded depends on when the emitter
+    # thread starts, so only messages that name a total are held to it.
+    assert {m.total for m in messages if m.total} == {max(steps)}, "the total should not move mid-run"
+    assert messages[-1].step == messages[-1].total, "the final step should equal the reported total"
     # Through the metrics dict, not the message string: that's the field the memo
     # record keeps and the status flags read.
     assert messages[-1].metrics["loss"] > 0
