@@ -236,6 +236,8 @@ def _():
     pooling happens *within* each slice, so the pull can choose different
     positions at different depths, following the concept as it migrates.
 
+    ![A training batch drawn as a cube: mellowmax pools within each line's span at every slice, then plain means collapse lines, slices, and batch rows.](public/pooling.svg)
+
     Three properties made us pick this form over the other things called
     "softmin".
     First, its gradient is the softmin weights
