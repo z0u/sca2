@@ -223,7 +223,14 @@ def _():
     sequence-level labels, measurements, anchor schedule, and the
     anti-subspace schedule fixed at the operating point of that experiment
     (`end90-hold30`) in every anchored cell.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(
+        r"""
     ### The pooled term
 
     Previously, the anchor term averaged $x_t = 1 - \cos(h_t, \hat v)$ over every
@@ -234,10 +241,7 @@ def _():
 
     averaged over labeled lines and residual-stream slices as before.[^rs]
 
-    <figure>
-        <img alt-text=A training batch drawn as a cube: mellowmax pools within each line's span at every slice, then plain means collapse lines, slices, and batch rows." src="public/pooling.svg">
-        <figcaption>Pooling happens within each slice, so the pull can choose different positions at different depths, following the concept as it migrates.</figcaption>
-    </figure>
+    {FIGURE}
 
     Three properties made us pick this form over the other things called
     "softmin".
@@ -272,7 +276,15 @@ def _():
         temperature-controlled interpolation between min (τ → 0) and mean
         (τ → ∞); "softmin" is ambiguous between this and the softmax-weighted
         average, hence the care.
-    """)
+    """.replace(
+            "{FIGURE}",
+            mo.image(
+                Path(__file__).parent / "public" / "pooling.svg",
+                alt="A training batch drawn as a cube: mellowmax pools within each line's span at every slice, then plain means collapse lines, slices, and batch rows.",
+                caption="Pooling happens within each slice, so the pull can choose different positions at different depths, following the concept as it migrates.",
+            ).text,
+        )
+    )
     return
 
 

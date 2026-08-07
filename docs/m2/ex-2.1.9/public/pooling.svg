@@ -4,29 +4,29 @@
   viewBox="0 0 479 388"
   fill="none"
   xmlns="http://www.w3.org/2000/svg"
-  style="color-scheme: light dark"
+  style="color-scheme: light dark; --cube-fill: light-dark(#fff, #222);"
 >
-  <g id="Frame 12">
+  <!-- cube-fill is different from the color cube fill to keep them visually distinct. -->
     <rect
       width="479"
       height="388"
       style="fill: light-dark(white, transparent)"
     />
-    <g id="Cube">
+    <g id="cube">
       <path
-        id="Cube-base"
+        id="cube-silhouette"
         d="M69.0496 123.175V264.744L204.593 343L340.136 264.744V123.175L204.593 44.919L69.0496 123.175Z"
-        stroke-width="3"
-        style="stroke: light-dark(black, white); fill: light-dark(#eee, black)"
+        stroke-width="2"
+        style="stroke: light-dark(black, white); fill: var(--cube-fill);"
       />
       <path
-        id="Cube-edges-in"
+        id="cube-edges-in"
         d="M69.0496 123.175L204.481 201.495M204.593 343V201.56L204.481 201.495M340.136 123.175L204.481 201.495"
-        style="stroke: light-dark(black, white)"
-        stroke-width="2"
+        style="stroke: light-dark(black, white); opacity: 0.7;"
+        stroke-width="1"
       />
       <g
-        id="subdivisions"
+        id="cube-subdivisions"
         opacity="0.33"
         stroke-width="0.5"
         style="stroke: light-dark(black, white)"
@@ -56,6 +56,7 @@
         <path d="M163.71 248.34V284.191" />
         <path d="M103.329 248.34V284.191" />
       </g>
+
       <g
         id="mellowmax-connectors"
         stroke-width="1"
@@ -94,7 +95,7 @@
         id="mean-outline"
         stroke-width="8"
         stroke-linecap="round"
-        style="stroke: light-dark(white, black)"
+        style="stroke: var(--cube-fill)"
       >
         <path d="M273.465 161.907V285.815" />
         <path d="M221 191.494L322.893 133" />
@@ -162,5 +163,4 @@
         <tspan x="365.5" y="76.3182">mean</tspan>
       </text>
     </g>
-  </g>
 </svg>
