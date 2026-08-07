@@ -49,6 +49,7 @@ dev = [
     "segno>=1.6.1",  # QR code generation
     "ty>=0.0.19",  # type checker
     "vulture>=2.14",  # dead code detection
+    "watchdog>=6.0.0",  # Marimo hot-reload
 ]
 local = [
 ]
@@ -95,6 +96,9 @@ publish-repo = "z0u/sca2-pub"
 # A role can override per-experiment with env= (merged key by key). Not a secret
 # channel: these values are recorded on every task record. Tokens go in secrets=.
 env = { XLA_FLAGS = "--xla_cpu_enable_concurrency_optimized_scheduler=false --xla_gpu_deterministic_ops=true --xla_gpu_exclude_nondeterministic_ops=true" }
+
+[tool.marimo.runtime]
+watcher_on_save = "autorun"
 
 [tool.uv]
 # Dependency cooldown to mitigate risk of supply chain attacks.
