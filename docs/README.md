@@ -24,6 +24,20 @@ Publishing also records the commit sha that the bundle landed as into
 its pinned revision, so a publish from a branch deploys nothing until the pin
 reaches main; the PR preview serves the branch's pins meanwhile.
 
+Forgetting to publish is caught rather than done for you, in two places. The push
+hook ([`pre-push-check.sh`](../.claude/hooks/pre-push-check.sh)) blocks a push that
+changed a report without moving its pin, and CI's `Reports published` step repeats
+the check on the PR. Both run
+[`scripts/unpublished_reports.py`](../scripts/unpublished_reports.py) — a git diff
+against the base branch, compared with `publish.lock` — so neither needs the store, a
+render, or a write token. The publish itself stays with you, in the session that
+already has a warm store.
+
+Three ways past it, in rising order of permanence: `git push --no-verify` gets a push
+out now (CI still flags it); the `skip-publish-check` label settles it for one PR; and
+`# mini:manual-publish` in a notebook (see `mini.reports`) opts that report out for
+good, for one you'd rather publish on your own schedule.
+
 `./go site` (CI) then assembles `_site/` from the pinned bundles, serving each
 report at `_site/<key>/index.html`, with the URL `<key>/`. `./go preview` assembles
 the same site locally: it exports stale reports to `.mini/exports/` and copies their

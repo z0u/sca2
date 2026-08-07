@@ -497,6 +497,38 @@ state.
   so the mismatch costs the reader a translation step. Point the heatmap at
   `label_landmarks` too — its panels are wide enough for the full set.
 
+- The publish check only sees changed *notebooks* (2026-08-06). #publishing
+  `scripts/unpublished_reports.py` compares a git diff against `publish.lock`, so a
+  report whose inputs moved while its `report.py` didn't — a re-run experiment
+  writing new refs, a restyle in `src/sca/vis*.py`, an edit to `docs/report.css` —
+  passes the check while serving stale figures. A sibling `experiment.py` change is
+  the cheap 80% heuristic (same directory, likely new results); the sharper version
+  compares the store refs the last export resolved (`_assets/provenance.json` already
+  records them) against what's current. Worth doing once we notice it biting.
+
+- `mini/__init__.py` re-exports the whole package (2026-08-06). #tooling
+  `from mini.reports import export_key` runs `apparatus`, `modal_apparatus`,
+  `experiment`, `store`… so a leaf module with only stdlib imports still needs the
+  full environment. Cost a round in CI: `scripts/unpublished_reports.py` was written
+  to run before the install and couldn't. Not urgent — nothing else wants a
+  lightweight import today — but worth remembering before the next standalone tool.
+
+- `test_progress_emitted_during_training` is racy (2026-08-06). #testing
+  Failed once in CI (`{0, 4} == {4}`), passes locally and on a re-run. Real cause,
+  not a fluke of the assertion: the training loop calls `emit_metrics` *before* the
+  first `emit_progress`, and `emit_metrics` emits `ctx._last`, which is still the
+  `(0, 0, "")` placeholder. `BackgroundEmitter` holds one latest-wins slot drained by
+  a daemon thread started on first use, so whether that `total=0` message is
+  delivered or overwritten by `emit_progress(1, 4)` is a race between thread startup
+  and one `train_step`. A contended runner loses it.
+
+  Two ways out, and the choice is about intent. The test's own message says "*final*
+  step should equal the reported total", which `assert messages[-1].total == max(steps)`
+  expresses and the current set-equality doesn't — a test-only change. Or make
+  `emit_metrics` not emit before any progress exists, which is arguably tidier but
+  would silence a metrics-only job that never calls `emit_progress`. Prefer the
+  former unless a placeholder total is causing trouble elsewhere.
+
 ## Backlog, grouped by what a single dev session should bundle
 
 (The M2 science backlog, including issue #10, now lives in

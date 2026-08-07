@@ -3,10 +3,12 @@ import json
 import pytest
 
 from mini.reports import (
+    MANUAL_PUBLISH_MARKER,
     PROVENANCE_ASSET,
     PUBLISH_LOCK,
     SOURCE_ONLY_MARKER,
     Publisher,
+    is_manually_published,
     export_key,
     externalize_html,
     insert_base,
@@ -310,6 +312,19 @@ def test_report_notebooks_skips_source_only(tmp_path):
     (tmp_path / "plain.py").write_text("x = 1\n")
     found = {p.relative_to(tmp_path).as_posix() for p in report_notebooks(tmp_path)}
     assert found == {"report.py", "sub/nested.py"}
+
+
+def test_reports_are_publish_checked_by_default(tmp_path):
+    nb = tmp_path / "report.py"
+    nb.write_text(_APP)
+    assert not is_manually_published(nb)
+
+
+def test_manual_publish_marker_opts_out_of_the_reminder_only(tmp_path):
+    nb = tmp_path / "report.py"
+    nb.write_text(f"import marimo\n# {MANUAL_PUBLISH_MARKER} — published on its own schedule\napp = marimo.App()\n")
+    assert is_report_notebook(nb)  # still a report: rendered, pinned, on the site
+    assert is_manually_published(nb)  # just not nagged about
 
 
 def test_externalize_html_writes_sidecar_and_passes_through(tmp_path):

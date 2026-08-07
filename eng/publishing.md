@@ -93,9 +93,8 @@ Further decisions:
   only `MINI_PUBLISH_REPO` — not the (now private) bucket. `store_for` builds a CAS-less
   store from a `publish-repo` alone for exactly this; the single-bucket default still
   serves the build off `MINI_STORE_BUCKET`. Set whichever your store layout uses.
-- **PR previews ride the same read-only build.** Because `./go publish` runs on the
-  agent's branch *before* the PR opens, the bundles are already on the publish tier when
-  review starts — a preview needs no compute, just HTML assembled around them.
+- **PR previews ride the same read-only build.** The bundles are already on the publish
+  tier when review starts — a preview needs no compute, just HTML assembled around them.
   `pr-preview.yml` runs `./go site` on the PR and deploys to `pr-preview/pr-<n>/` on the
   `gh-pages` branch (torn down on close, linked from a sticky PR comment). That forces
   the production deploy to be branch-based too (`clean-exclude: pr-preview/`): an
@@ -142,3 +141,45 @@ Further decisions:
   build stays dumb. Everything in the footer derives from the store's refs — no build
   timestamps — so re-publishing unchanged data produces the same bundle content and
   publishing stays idempotent.
+- **Forgetting to publish is checked, not automated away.** Publishing is the one step
+  of the loop that has to be *remembered*, and forgetting it fails quietly: the notebook
+  merges, the site keeps serving the previous export's figures, and nothing says so. Two
+  tripwires now compare what a branch *changed* against what it *repinned*
+  (`scripts/unpublished_reports.py`): the pre-push hook blocks the push, and CI's
+  `Reports published` step fails the PR. Both are a git diff plus `publish.lock` — no
+  store access, no render, **no write token**, which is what keeps the read-only-CI
+  property above intact.
+
+  The alternative was to have CI run `./go publish` itself, and it was built before it
+  was rejected. Worth recording *why*, because the reasoning generalizes: **the cost was
+  never the publishing, it was the committing.** For CI to publish, it must write the new
+  pin back to the branch, and that one requirement cascades — a write-scoped token in a
+  job that runs notebook code off the branch; a bot commit racing the agent's own pushes;
+  and, because a `GITHUB_TOKEN` push doesn't re-trigger workflows, the preview would
+  build against stale pins unless publishing were nested *inside* `pr-preview.yml` as a
+  prerequisite job, with a merge-ref-versus-branch-tip dance to hand the fresh lock over.
+  Every awkward part of that design traced to the commit. Dropping it collapsed ~100
+  lines of workflow into one read-only step.
+
+  The check also puts the work in the right place. A publish wants a warm store and the
+  results already resolved — which the session that ran the experiment has and a fresh CI
+  runner doesn't, so CI would re-download the lot to re-render what was just rendered.
+
+  **A weaker guarantee, deliberately.** A check tells you; it can't fix it. Ignore the
+  red mark and the report stays stale, where auto-publishing would have closed the hole
+  outright. That's the accepted trade: a loud, cheap, credential-free signal over a
+  silent one that needed write access to CI. It's also why the check *fails* rather than
+  printing advice — the session-start hook has said "always publish before pushing" for
+  months, and the reports still went stale.
+
+  Escape hatches, in rising order of permanence: `git push --no-verify` (the hook's
+  existing convention, for getting something onto GitHub now — CI still flags it), the
+  `skip-publish-check` label (one PR), and `# mini:manual-publish` in a notebook
+  (:data:`MANUAL_PUBLISH_MARKER`, for a report published on its author's own schedule).
+  A marker rather than a list in CI config, so it travels with the report.
+
+  Two limits worth knowing. The check sees changed *notebooks*, so a report whose inputs
+  moved while its `report.py` didn't — a re-run experiment, a restyle in `src/` — passes
+  clean (see `todo-eng.md`). And a stale `origin/main`, which a fresh container often
+  has, is self-correcting: it makes more reports look changed, but their pins moved in
+  that same range, so they don't register as unpublished.
