@@ -232,11 +232,12 @@ def _():
 
     $$\mathrm{mm}_\tau(x) = -\tau \log \frac{1}{n} \sum_{t \in \text{span}} e^{-x_t / \tau},$$
 
-    averaged over labeled lines and residual-stream slices as before.[^rs] The
-    pooling happens *within* each slice, so the pull can choose different
-    positions at different depths, following the concept as it migrates.
+    averaged over labeled lines and residual-stream slices as before.[^rs]
 
-    ![A training batch drawn as a cube: mellowmax pools within each line's span at every slice, then plain means collapse lines, slices, and batch rows.](public/pooling.svg)
+    <figure>
+        <img alt-text=A training batch drawn as a cube: mellowmax pools within each line's span at every slice, then plain means collapse lines, slices, and batch rows." src="public/pooling.svg">
+        <figcaption>Pooling happens within each slice, so the pull can choose different positions at different depths, following the concept as it migrates.</figcaption>
+    </figure>
 
     Three properties made us pick this form over the other things called
     "softmin".
