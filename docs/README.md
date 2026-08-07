@@ -24,19 +24,19 @@ Publishing also records the commit sha that the bundle landed as into
 its pinned revision, so a publish from a branch deploys nothing until the pin
 reaches main; the PR preview serves the branch's pins meanwhile.
 
-CI publishes too, so a forgotten `./go publish` no longer leaves a merged report
-showing the previous export's figures. Every push to a PR runs
-[`publish-reports.yml`](../.github/workflows/publish-reports.yml) before the preview
-build: it publishes the report notebooks the branch changed
-([`scripts/changed_reports.py`](../scripts/changed_reports.py)) and commits the pins
-that moved — every other pin is left as it was, so the lock diff stays the list of
-reports the branch actually touched. Publishing by hand still works and is still
-worth doing while you're iterating; CI is the backstop.
+Forgetting to publish is caught rather than done for you, in two places. The push
+hook ([`pre-push-check.sh`](../.claude/hooks/pre-push-check.sh)) blocks a push that
+changed a report without moving its pin, and CI's `Reports published` step repeats
+the check on the PR. Both run
+[`scripts/unpublished_reports.py`](../scripts/unpublished_reports.py) — a git diff
+against the base branch, compared with `publish.lock` — so neither needs the store, a
+render, or a write token. The publish itself stays with you, in the session that
+already has a warm store.
 
-A report that's expensive to render can opt out with `# mini:no-auto-publish` in the
-notebook (see `mini.reports`), or per-PR with the `no-auto-publish` label; either
-way `./go publish <nb>` remains yours to run. The durable fix is usually to move the
-slow part into the experiment so the report only reads results.
+Three ways past it, in rising order of permanence: `git push --no-verify` gets a push
+out now (CI still flags it); the `skip-publish-check` label settles it for one PR; and
+`# mini:manual-publish` in a notebook (see `mini.reports`) opts that report out for
+good, for one you'd rather publish on your own schedule.
 
 `./go site` (CI) then assembles `_site/` from the pinned bundles, serving each
 report at `_site/<key>/index.html`, with the URL `<key>/`. `./go preview` assembles

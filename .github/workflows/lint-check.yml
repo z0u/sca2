@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # the publish check diffs against the base branch's merge base
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -32,6 +34,40 @@ jobs:
 
       - name: Run tests
         run: ./go test -v
+
+      - name: Reports published
+        # A report changed without its pin moving means the merged site would serve the
+        # previous export's figures — a quiet failure, so it gets a loud check. Pure git
+        # plus docs/publish.lock: no store access, no render, and no write token, which
+        # is what keeps CI read-only (see eng/publishing.md). The publish itself belongs
+        # in the session that has a warm store; this only notices when it was skipped.
+        #
+        # Last of the real checks: a stale pin is the least urgent failure here and
+        # shouldn't mask a broken test.
+        if: >-
+          github.event_name == 'pull_request'
+          && !contains(github.event.pull_request.labels.*.name, 'skip-publish-check')
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --quiet origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          stale="$(uv run scripts/unpublished_reports.py "origin/$BASE")"
+          if [[ -z "$stale" ]]; then
+            echo "Every report this branch changed has been republished." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Reports changed without a publish"
+            echo
+            echo "Merging would leave the site serving the previous export's figures."
+            sed 's/^/- \`/; s/$/\`/' <<< "$stale"
+            echo
+            echo "Run \`./go publish $(tr '\n' ' ' <<< "$stale" | sed 's/ $//')\` and push the updated \`docs/publish.lock\`."
+            echo "To merge without republishing, add the \`skip-publish-check\` label."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::Reports changed without a publish — see the job summary."
+          exit 1
 
       - name: Dead code detection
         continue-on-error: true

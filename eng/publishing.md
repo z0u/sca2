@@ -141,42 +141,45 @@ Further decisions:
   build stays dumb. Everything in the footer derives from the store's refs — no build
   timestamps — so re-publishing unchanged data produces the same bundle content and
   publishing stays idempotent.
-- **CI publishes the reports a PR changed, as a job of the preview run.** Publishing was
-  the one step of the loop that had to be *remembered*, and forgetting it fails quietly:
-  the notebook merges, the site keeps serving the previous export's figures, and nothing
-  says so. `publish-reports.yml` runs `./go publish` for the report notebooks the branch
-  changed against its base (`scripts/changed_reports.py`), then commits the pins that
-  moved. The selection is two-stage, because the common answer should be cheap: a plain
-  `git diff` decides whether any notebook under `docs/` moved at all, and only then does
-  the job install the project and ask which of them are auto-publishable reports. (The
-  script reads like it would run without an install, but importing `mini.reports` runs
-  `mini/__init__.py`, which pulls in the whole package.)
+- **Forgetting to publish is checked, not automated away.** Publishing is the one step
+  of the loop that has to be *remembered*, and forgetting it fails quietly: the notebook
+  merges, the site keeps serving the previous export's figures, and nothing says so. Two
+  tripwires now compare what a branch *changed* against what it *repinned*
+  (`scripts/unpublished_reports.py`): the pre-push hook blocks the push, and CI's
+  `Reports published` step fails the PR. Both are a git diff plus `publish.lock` — no
+  store access, no render, **no write token**, which is what keeps the read-only-CI
+  property above intact.
 
-  Three shapes of this were available, and **ordering picked the winner**. The preview
-  serves the branch's pins, so the pins must move *before* the site is assembled — and
-  two workflows on the same `pull_request` trigger can't be sequenced, while a pin
-  commit pushed with `GITHUB_TOKEN` deliberately doesn't re-trigger the preview. So
-  publishing is a prerequisite job of `pr-preview.yml` (via `workflow_call`, which also
-  gives it a `workflow_dispatch` entry point of its own), and the preview job pulls the
-  freshly pushed `publish.lock` over its merge-ref checkout.
+  The alternative was to have CI run `./go publish` itself, and it was built before it
+  was rejected. Worth recording *why*, because the reasoning generalizes: **the cost was
+  never the publishing, it was the committing.** For CI to publish, it must write the new
+  pin back to the branch, and that one requirement cascades — a write-scoped token in a
+  job that runs notebook code off the branch; a bot commit racing the agent's own pushes;
+  and, because a `GITHUB_TOKEN` push doesn't re-trigger workflows, the preview would
+  build against stale pins unless publishing were nested *inside* `pr-preview.yml` as a
+  prerequisite job, with a merge-ref-versus-branch-tip dance to hand the fresh lock over.
+  Every awkward part of that design traced to the commit. Dropping it collapsed ~100
+  lines of workflow into one read-only step.
 
-  Publishing only the *changed* notebooks bounds two things at once: the lock diff reads
-  as the list of reports the branch touched, and CI time doesn't scale with the report
-  count. Over-publishing is safe but slow — an identical re-publish mints no commit, so
-  no pin moves — which is what makes a long-lived branch merely expensive rather than
-  noisy. What this doesn't catch is a report whose *inputs* changed while its notebook
-  didn't (a re-run experiment, restyled figures in `src/`); those still want a hand
-  publish, and the manual dispatch takes `--all`.
+  The check also puts the work in the right place. A publish wants a warm store and the
+  results already resolved — which the session that ran the experiment has and a fresh CI
+  runner doesn't, so CI would re-download the lot to re-render what was just rendered.
 
-  **This does put a write token in CI**, which the staging design above had avoided.
-  The avoidance was of write access in the *build* — and that still holds: the deploy
-  and the preview assembly stay read-only, and the promotion is still a pin reaching
-  main, not an HF-side branch. Only the new publish job is authenticated, and it's
-  fenced to same-repo PRs, since a forked PR would otherwise run its own notebook code
-  against our store.
+  **A weaker guarantee, deliberately.** A check tells you; it can't fix it. Ignore the
+  red mark and the report stays stale, where auto-publishing would have closed the hole
+  outright. That's the accepted trade: a loud, cheap, credential-free signal over a
+  silent one that needed write access to CI. It's also why the check *fails* rather than
+  printing advice — the session-start hook has said "always publish before pushing" for
+  months, and the reports still went stale.
 
-  The escape hatch is `# mini:no-auto-publish` in the notebook (per report) or the
-  `no-auto-publish` label (per PR), for a report too slow to render on every push. It's
-  a marker rather than a config list because it belongs *with* the report — a list in
-  CI config is one more thing to update when a report moves. Reaching for it is a hint
-  that the report is doing work the experiment should be doing.
+  Escape hatches, in rising order of permanence: `git push --no-verify` (the hook's
+  existing convention, for getting something onto GitHub now — CI still flags it), the
+  `skip-publish-check` label (one PR), and `# mini:manual-publish` in a notebook
+  (:data:`MANUAL_PUBLISH_MARKER`, for a report published on its author's own schedule).
+  A marker rather than a list in CI config, so it travels with the report.
+
+  Two limits worth knowing. The check sees changed *notebooks*, so a report whose inputs
+  moved while its `report.py` didn't — a re-run experiment, a restyle in `src/` — passes
+  clean (see `todo-eng.md`). And a stale `origin/main`, which a fresh container often
+  has, is self-correcting: it makes more reports look changed, but their pins moved in
+  that same range, so they don't register as unpublished.

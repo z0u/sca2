@@ -52,9 +52,9 @@ __all__ = [
     "save_pins",
     "is_report_notebook",
     "report_notebooks",
-    "auto_publishes",
+    "is_manually_published",
     "SOURCE_ONLY_MARKER",
-    "NO_AUTO_PUBLISH_MARKER",
+    "MANUAL_PUBLISH_MARKER",
     "PROVENANCE_ASSET",
     "use_publisher",
     "current_publisher",
@@ -268,24 +268,22 @@ def report_notebooks(docs: str | Path) -> list[Path]:
     return sorted(p for p in Path(docs).rglob("*.py") if is_report_notebook(p))
 
 
-# A report carrying this marker is published by hand (``./go publish <nb>``) — CI's
-# auto-publish leaves it alone. It stays a full report otherwise: still rendered, still on
-# the site, still pinned. The escape hatch is for a report that's genuinely expensive to
-# render, though the durable fix is to move that compute into the experiment so the report
-# only reads results. Like :data:`SOURCE_ONLY_MARKER` the text is matched literally, so
-# put it in a cell the notebook tool preserves (e.g. the setup block).
-NO_AUTO_PUBLISH_MARKER = "mini:no-auto-publish"
+# A report carrying this marker is republished on a schedule its author controls, so
+# nothing reminds you when an edit leaves its bundle behind (the pre-push hook and CI's
+# publish check both skip it). It stays a full report otherwise: rendered, pinned, on the
+# site. Like :data:`SOURCE_ONLY_MARKER` the text is matched literally, so put it in a cell
+# the notebook tool preserves (e.g. the setup block).
+MANUAL_PUBLISH_MARKER = "mini:manual-publish"
 
 
-def auto_publishes(path: str | Path) -> bool:
-    """Whether CI may publish *path* on its own — a report without the opt-out marker.
+def is_manually_published(path: str | Path) -> bool:
+    """Whether *path* opts out of the "you changed this without republishing" reminder.
 
     The two markers answer different questions: :data:`SOURCE_ONLY_MARKER` says "not a
-    report at all", :data:`NO_AUTO_PUBLISH_MARKER` says "a report, but I'll publish it
-    myself". See :func:`is_report_notebook` for the first.
+    report at all", :data:`MANUAL_PUBLISH_MARKER` says "a report, but I'll decide when it
+    publishes". See :func:`is_report_notebook` for the first.
     """
-    p = Path(path)
-    return is_report_notebook(p) and NO_AUTO_PUBLISH_MARKER not in p.read_text("utf-8", errors="ignore")
+    return MANUAL_PUBLISH_MARKER in Path(path).read_text("utf-8", errors="ignore")
 
 
 # Set by ``scripts/export_reports.py`` in the ``marimo export`` subprocess env — the one

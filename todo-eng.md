@@ -497,22 +497,21 @@ state.
   so the mismatch costs the reader a translation step. Point the heatmap at
   `label_landmarks` too — its panels are wide enough for the full set.
 
-- Auto-publish only sees changed *notebooks* (2026-08-06). #publishing
-  `scripts/changed_reports.py` selects on the git diff, so a report whose inputs
-  moved while its `report.py` didn't — a re-run experiment writing new refs, a
-  restyle in `src/sca/vis*.py`, an edit to `docs/report.css` — isn't republished
-  until someone runs `./go publish` or the manual dispatch with `--all`. A sibling
-  `experiment.py` change is the cheap 80% heuristic (same directory, likely new
-  results); the honest version compares the store refs the last export resolved
-  (`_assets/provenance.json` already records them) against what's current. Worth
-  doing once we notice it biting.
+- The publish check only sees changed *notebooks* (2026-08-06). #publishing
+  `scripts/unpublished_reports.py` compares a git diff against `publish.lock`, so a
+  report whose inputs moved while its `report.py` didn't — a re-run experiment
+  writing new refs, a restyle in `src/sca/vis*.py`, an edit to `docs/report.css` —
+  passes the check while serving stale figures. A sibling `experiment.py` change is
+  the cheap 80% heuristic (same directory, likely new results); the sharper version
+  compares the store refs the last export resolved (`_assets/provenance.json` already
+  records them) against what's current. Worth doing once we notice it biting.
 
 - `mini/__init__.py` re-exports the whole package (2026-08-06). #tooling
   `from mini.reports import export_key` runs `apparatus`, `modal_apparatus`,
   `experiment`, `store`… so a leaf module with only stdlib imports still needs the
-  full environment. Cost a round in CI: `scripts/changed_reports.py` was written to
-  run before the install and couldn't. Not urgent — nothing else wants a lightweight
-  import today — but worth remembering before writing the next standalone tool.
+  full environment. Cost a round in CI: `scripts/unpublished_reports.py` was written
+  to run before the install and couldn't. Not urgent — nothing else wants a
+  lightweight import today — but worth remembering before the next standalone tool.
 
 ## Backlog, grouped by what a single dev session should bundle
 
