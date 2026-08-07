@@ -126,6 +126,18 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
     soft → sharp schedule first, and "soften near critical points" only if a
     usable critical-point signal exists (loss curvature, sudden readability
     gains).
+  - **Position dropout in the pool.** (Raised in the 2026-08-07 review round,
+    round 3.) Mask a random subset of span positions out of the softmin each
+    step before pooling. The latch is self-reinforcing because the cheapest
+    position absorbs the whole pull every step; dropout keeps the runners-up
+    receiving gradient, so the race stays open longer. Same role as noisy
+    gating / expert dropout in mixture-of-experts routing, where it counters
+    the analogous router collapse. Unlike a τ schedule it needs no timing
+    decision — the cost is a drop-rate hyperparameter and a noisier anchor
+    loss. Caveat at very low τ: on steps where the favorite is masked, the
+    pull concentrates fully on the next-cheapest position rather than
+    spreading, so it randomizes the winner per step rather than softening
+    the pooling; likely most useful combined with a moderate τ.
   - **Latch rates need more seeds.** Three per rung makes 2/3 vs 0/3 a coarse
     estimate; the next design that picks a τ should carry enough seeds at the
     chosen rung to bound its latch rate, rather than re-running ex-2.1.9 wider.

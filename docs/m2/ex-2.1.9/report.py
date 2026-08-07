@@ -1221,7 +1221,7 @@ def _(alpha_map):
 def _(alpha_map):
     _emb = {c: alpha_map(c)[0, :, : ex.SPAN].mean(axis=0) for c in [ex.MEAN_ARM, ex.PRIMARY, ex.ORACLE_ARM]}
     mo.md(rf"""
-    The drift that survives pooling sits at one address: the `+` embedding.
+    The drift survives pooling only at the `+` role.
     On the embedding row, the primary's pooling released `=` almost entirely
     (drift {_emb[ex.MEAN_ARM][3]:.2f} under the span mean →
     {_emb[ex.PRIMARY][3]:.2f}) but left {_emb[ex.PRIMARY][1]:.2f} on `+`,
@@ -1943,27 +1943,27 @@ def _(ANCHORED, READ: np.ndarray, cells, metrics):
         [np.asarray(metrics["readability"][f"pool-t010-s{s}"], dtype=float)[4, 0] for s in _latched10]
     )
     mo.md(rf"""
-    Redness is readable almost everywhere in the anchored runs (a review
-    question). In every anchored condition, op1 reads at $R^2$ ≥
-    {_op1_min:.2f} at every slice, so the anchor axis itself now carries
-    redness. Past the embedding, `+` and `=` read at {_syn.mean():.2f} on
-    average and never below {_syn.min():.2f}, much as in the control:
-    attention hands each syntax role a copy of the operand's color,
-    whether or not anything pulls there.
+    Redness is readable almost everywhere in the anchored runs. In every
+    anchored condition, op1 reads at $R^2$ ≥ {_op1_min:.2f} at every
+    slice, so the anchor axis itself now encodes redness. Past the
+    embedding, `+` and `=` read at {_syn.mean():.2f} on average and never
+    below {_syn.min():.2f}, much as in the control: attention copies the
+    operand's color into each syntax role, whether or not anything pulls
+    there.
 
     So the weight profile is not proportional to readability, and it
     couldn't be: at depth π̄ is one-hot, while $R^2$ is high at three roles
     of four. The softmin allocates by *alignment cost* among positions
-    nearly all of which could carry the concept, which is part of why the
+    nearly all of which could host the concept, which is part of why the
     latch is a race rather than a search. The latched runs of `pool-t010`
-    still read op1 at {_latched_op1:.2f} at the last slice. The pull wasn't
-    blind there; it had simply found `+` cheaper first.
+    still read op1 at {_latched_op1:.2f} at the last slice: the pull
+    wasn't blind there; it had found `+` cheaper first.
 
     The influence also runs the other way: where the pull keeps spending,
     it *creates* readability. op2 is the one role the control barely reads,
     at {READ[3:, 2].mean():.2f} across the two deepest slices. The span
     mean never stops pulling op2, and there it reads
-    {_R["span-mean"][3:, 2].mean():.2f}. The pool of the primary condition
+    {_R["span-mean"][3:, 2].mean():.2f}; the primary condition's pool
     withdrew from op2, and there it reads
     {_R["pool-t030"][3:, 2].mean():.2f}, back at the control's level.
     """)
@@ -1973,15 +1973,19 @@ def _(ANCHORED, READ: np.ndarray, cells, metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    None of the remaining candidates are run in this report; they are
-    queued for later designs, tracked in the project backlog: per-color
-    weight maps (do strongly-red lines concentrate differently from
-    weakly-red ones?); the source and timing of the `+` embedding drift
-    that persists even under the op1 oracle (noted under H2 — the
-    trajectory should record per-role drift next time so the timing is
-    answerable); a τ schedule that starts soft and sharpens as a latch
-    remedy; and more seeds at the chosen rung, since three per condition
-    makes a latch rate a coarse estimate.
+    Candidates we didn't run, queued in the project backlog:
+
+    - Per-color weight maps: do strongly-red lines concentrate
+      differently from weakly-red ones?
+    - Where the `+` embedding drift comes from, and when: it persists
+      even under the op1 oracle, as noted under H2. Recording drift per
+      role in the trajectory would settle the timing.
+    - Two ways to avoid the latch: a τ schedule that starts soft and
+      sharpens, or position dropout in the pool — mask a random subset
+      of span positions out of the softmin each step, so no single
+      position can absorb the whole pull early.
+    - More seeds at the chosen rung. Three per condition gives only a
+      coarse estimate of the latch rate.
     """)
     return
 
@@ -1991,54 +1995,57 @@ def _():
     mo.md(r"""
     ## Discussion
 
-    The claim this experiment adds to the program is about *placement*. A
-    pull that is allowed to choose its own position chooses correctly at
-    the embedding, the one slice where the architecture, and not the
-    preference of the pull, fixes the right answer. Later milestones need
-    that property, because natural-language labels name concepts, not
-    token positions.
+    What this experiment adds to the program is placement *along the
+    sequence*. Where the concept lives in representation space is still
+    chosen up front, as everywhere in SCA: the pull aims at the same
+    fixed anchor direction throughout. The mellowmax adds one further
+    choice: which token positions receive that pull. Left to choose, the
+    pull chooses correctly at the embedding — the one slice where the
+    architecture fixes the right answer, rather than the pull picking a
+    favorite. Later milestones need that, because natural-language labels
+    name concepts, not token positions.
 
-    The margin question mostly dissolved on the way. Under the
-    max-over-roles statistic the span mean already sits near the oracle,
-    so position-finding was never going to pay in margin here. What it
-    pays in is shape: the pooled pull withdraws drift from op2 and `=`
-    nearly entirely, and the response it leaves at op1 grades better than
-    the response under the span mean.
+    The margin question mostly dissolved. Under the max-over-roles
+    statistic, the span mean is already near the oracle, so
+    position-finding was never going to improve the margin much. What it
+    improves is the shape: the pooled pull withdraws drift from op2 and
+    `=` nearly entirely, and the response it leaves at op1 grades better
+    than the response under the span mean.
 
     The qualification is the latch. Below τ = 0.1, the deep-slice choice
-    is a per-run race (see the readability probe above), settled in the
-    first few epochs and never revisited, and a run that latches onto `+`
-    loses the graded response that makes the anchor usable. So τ is not a
-    free sharpness dial: it trades concentration against the risk of
-    committing to the wrong role before the representation has formed.
+    is a per-run race (see the readability probe above): it settles in
+    the first few epochs, is never revisited, and a run that latches onto
+    `+` loses some of the graded response that makes the anchor usable.
+    So sharpening τ is not free — more concentration comes with more risk
+    of committing to the wrong role before the representation has formed.
 
-    The natural remedy is a τ schedule that starts soft and sharpens once
-    the geometry is stable. M1 makes that plausible, since schedules that
-    shaped the latent space at the right time worked there where curricula
-    didn't. Whether this architecture needs the schedule at all is
-    untested.
-
-    In larger models the same reasoning points the other way: a concept
-    that only forms late in training would meet a pull that has already
-    sharpened and committed to whatever was cheap early. A sharpening
-    schedule has to answer for that timing, and three seeds per rung is
+    One possible remedy is a τ schedule that starts soft and sharpens as
+    the geometry stabilizes. M1 makes that plausible: there, schedules
+    that shaped the latent space at the right time worked where curricula
+    didn't.[^untested] It may be hard to design in a larger model,
+    though. A concept that only forms late in training would meet a pull
+    that has already sharpened around whatever was cheap early. The
+    schedule has to anticipate that timing, and three seeds per rung is
     too few to estimate the latch rates that would score it.
 
-    For the document-level labels of M3, the mellowmax itself is the
-    interesting finding. Its softmin weights are the per-position
-    responsibilities that an EM-flavored label-assignment scheme would
-    compute,[^em] so the pooled term already is a label-side mechanism,
-    applied at token granularity. This experiment says that scheme can
-    locate a concept when the label is per-line and the candidates number
-    four.
+    Mellowmax is an interesting finding for M3, where labels get coarser.
+    Its softmin weights are the same per-position responsibilities that
+    an EM-flavored label-assignment scheme would compute,[^em] so the
+    pooled term is already such a scheme, with single tokens as the unit.
+    This experiment says it can locate a concept when the label covers a
+    whole line, although our lines only had four tokens to pool over.
 
-    A document-level label widens the pool to every line of a document,
-    with more candidates and cheaper wrong ones, and nothing here rules
-    that in or out. But we now know a specific failure mode to design for:
-    early winner-take-all latching rather than diffuse smearing. The
-    softest rung suggests the useful regime is soft pooling with a
-    considered choice of *when* to sharpen, rather than hard selection
-    from the start.
+    Coarser labels, whether per sentence, per document, or a sliding
+    window with graded scores, would widen the pool: more candidates, and
+    cheaper wrong ones. Nothing here rules that in or out, but this
+    experiment does name the failure mode to design for: early winner-take-all latching,
+    not diffuse smearing. The softest rung suggests the useful regime is
+    soft pooling with a considered choice of *when* to sharpen, rather
+    than hard selection from the start.
+
+    [^untested]: Regularizer weight schedules are an inheritance from M1.
+        We haven't tested whether this architecture *needs* them: perhaps
+        constant term weights would work.
 
     [^em]: Expectation-maximization: alternate between assigning each item
         a soft share of responsibility to each component, and refitting
