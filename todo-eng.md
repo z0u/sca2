@@ -513,22 +513,6 @@ state.
   to run before the install and couldn't. Not urgent — nothing else wants a
   lightweight import today — but worth remembering before the next standalone tool.
 
-- `test_progress_emitted_during_training` is racy (2026-08-06). #testing
-  Failed once in CI (`{0, 4} == {4}`), passes locally and on a re-run. Real cause,
-  not a fluke of the assertion: the training loop calls `emit_metrics` *before* the
-  first `emit_progress`, and `emit_metrics` emits `ctx._last`, which is still the
-  `(0, 0, "")` placeholder. `BackgroundEmitter` holds one latest-wins slot drained by
-  a daemon thread started on first use, so whether that `total=0` message is
-  delivered or overwritten by `emit_progress(1, 4)` is a race between thread startup
-  and one `train_step`. A contended runner loses it.
-
-  Two ways out, and the choice is about intent. The test's own message says "*final*
-  step should equal the reported total", which `assert messages[-1].total == max(steps)`
-  expresses and the current set-equality doesn't — a test-only change. Or make
-  `emit_metrics` not emit before any progress exists, which is arguably tidier but
-  would silence a metrics-only job that never calls `emit_progress`. Prefer the
-  former unless a placeholder total is causing trouble elsewhere.
-
 ## Backlog, grouped by what a single dev session should bundle
 
 (The M2 science backlog, including issue #10, now lives in
