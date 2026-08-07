@@ -103,6 +103,61 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   "can an anchor be confined to part of the stream" item under #[D2.3].
   #ex-2.1.9 #anchoring
 
+- [ ] Follow-ups from the ex-2.1.9 results review (2026-08-06). The headline
+  behind all of them: at depth the pooled pull is winner-take-all *per run* at
+  τ ≤ 0.03 (each seed's deep-slice softmin weight is one-hot; the seed means
+  were mixtures), the choice is committed by epoch 8 in every run, and the τ
+  sweep's apparent dose response is a latch-rate trend (2/3 → 1/3 → 0/3 runs
+  latching `+` across τ = 0.01 / 0.03 / 0.1).
+  - **A τ schedule, soft → sharp.** The commit window is the first few epochs,
+    so a remedy must act there: start τ high (mean-like, no self-reinforcement)
+    while the repulsion makes the syntax tokens unattractive, then sharpen.
+    Echoes the M1 lesson that schedules shaping the space at the right moments
+    beat curricula — and M1's schedules were never re-ablated in this
+    architecture, so whether they're needed here is still open.
+  - **Can τ adapt itself?** (Raised in the 2026-08-07 review round.) A trainable
+    τ won't work bare: for any fixed alignment profile the mellowmax value falls
+    monotonically as τ → 0, so gradient descent on τ always sharpens — the
+    self-reinforcement is in the loss itself. It would need a counterweight,
+    e.g. hold the softmin weights to a target entropy (an effective candidate
+    count) and let τ float to meet it, annealing the target on a schedule. That
+    is a feedback controller on a regularizer, which ex-2.9.4 found workable but
+    fiddly and not obviously better than a timed schedule — so try the plain
+    soft → sharp schedule first, and "soften near critical points" only if a
+    usable critical-point signal exists (loss curvature, sudden readability
+    gains).
+  - **Position dropout in the pool.** (Raised in the 2026-08-07 review round,
+    round 3.) Mask a random subset of span positions out of the softmin each
+    step before pooling. The latch is self-reinforcing because the cheapest
+    position absorbs the whole pull every step; dropout keeps the runners-up
+    receiving gradient, so the race stays open longer. Same role as noisy
+    gating / expert dropout in mixture-of-experts routing, where it counters
+    the analogous router collapse. Unlike a τ schedule it needs no timing
+    decision — the cost is a drop-rate hyperparameter and a noisier anchor
+    loss. Caveat at very low τ: on steps where the favorite is masked, the
+    pull concentrates fully on the next-cheapest position rather than
+    spreading, so it randomizes the winner per step rather than softening
+    the pooling; likely most useful combined with a moderate τ.
+  - **Latch rates need more seeds.** Three per rung makes 2/3 vs 0/3 a coarse
+    estimate; the next design that picks a τ should carry enough seeds at the
+    chosen rung to bound its latch rate, rather than re-running ex-2.1.9 wider.
+  - **Record per-role drift in the trajectory.** The `+` embedding ends at 0.30
+    alignment even under the op1 oracle, which never pulls `+` and whose op1
+    states can't read it. Whatever pays for that pays against the repulsion,
+    which runs from epoch 0 — so *when* it climbs is diagnostic: early would
+    mean the repulsion never priced it out; late (as the anneal decays) would
+    fit a task-loss equilibrium. The current traj records only op1 drift and
+    the softmin weights; mid-run checkpoints are overwritten, so this needs a
+    re-run with per-role ᾱ(ℓ, t) recorded. Candidate mechanism worth testing
+    then: `+` appears in every line, so a constant e₀ component there can carry
+    the cube-mean redness to every answer, leaving op1 to carry deviations.
+  - **Early lock-in vs late-forming concepts.** The choice never being
+    revisited is harmless here (the task converges in epochs), but in larger
+    models concepts can form late (phase-transition-style), after the pull has
+    committed to a position. Whether a committed softmin can follow a concept
+    that moves is a question the τ schedule above also bears on. #ex-2.1.9
+    #anchoring #schedules
+
   **The term.** Replace the per-position mean in `anchoring.anchor_term` with a
   soft minimum over the span, so the loss asks that the span align *somewhere*
   rather than everywhere. Use the **log-mean-exp** form,

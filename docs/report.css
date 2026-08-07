@@ -11,9 +11,11 @@
 /* Centre figures that don't fill the content column. `themed` (mini.vis.nb) emits a
  * <figure class="mini-themed-figure-<hash>"> wrapping the light/dark <img> pair; the
  * visible one is display:block, so margin-inline:auto centres it. */
-figure[class*="mini-themed-figure"] {
+.markdown figure,
+ figure[class*="mini-themed-figure"] {
   text-align: center;
 }
+.markdown figure img,
 figure[class*="mini-themed-figure"] img {
   margin-inline: auto;
 }
