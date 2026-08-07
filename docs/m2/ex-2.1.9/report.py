@@ -3,7 +3,7 @@ import marimo
 __generated_with = "0.23.16"
 app = marimo.App(
     width="medium",
-    app_title="Ex 2.1.9: A pull that finds its own position",
+    app_title="Ex 2.1.9: Softmin sequence pooling",
     css_file="../../report.css",
     auto_download=["html"],
 )
@@ -59,22 +59,16 @@ with app.setup(hide_code=True):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    # Ex 2.1.9: A pull that finds its own position
+    # Ex 2.1.9: Softmin pooling over sequences
 
     /// tip |
     <!-- tl;dr -->
-    Pulling on op1 alone worked best so far, but it relies on us knowing which
-    token carries the concept, and natural language won't tell us that. So we
-    replace the mean over the span in the anchor term with a soft minimum
-    (mellowmax), and check where the pull chooses to concentrate. It finds the
-    right position on its own — at the embedding the weight lands on op1, the
-    only position that can carry the concept there — and the operating point
-    stays healthy, with grading improving. What it doesn't do is buy margin:
-    the span mean's max-over-roles margin already sits near the oracle's, so
-    there was almost no headroom for the pooled pull to claim. At depth the
-    concentration is winner-take-all run by run — at the two sharper τ some
-    runs latch onto `+` in the first few epochs — and only the softest rung
-    keeps a graded profile in every run.
+    Anchoring on op1 alone worked best so far, but in natural language we won't
+    know which tokens hold the concept. So we pool over sequences with a soft
+    minimum (mellowmax) and let the pull choose its own position. At the
+    embedding it picks op1 unaided, the operating point stays healthy, and
+    grading improves. It wins no margin though, and only the softest pooling
+    stays graded in every run.
     ///
     """)
     return

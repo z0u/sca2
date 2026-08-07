@@ -134,16 +134,11 @@ These experiments were preparation for the main work: exercising the infrastruct
     keeps the margin, which nothing before this did. It's unclear if the
     response is well-graded.
 
-- [2.1.9. A pull that finds its own position](./m2/ex-2.1.9/report.py)
+- [2.1.9. Softmin sequence pooling](./m2/ex-2.1.9/report.py)
 
-    The op1-only pull is a position oracle natural language won't supply, so
-    we let the anchor term choose for itself: a soft minimum (mellowmax) over
-    the span instead of a mean. It chooses correctly — at the embedding the
-    weight lands on op1, the only position that can carry the concept there —
-    and the operating point survives, with grading improving. The margin gain
-    over the span mean is small, though: under the max-over-roles statistic
-    the span mean already sits near the oracle, so there was little headroom
-    to recover. At depth the concentration is winner-take-all run by run:
-    at the two sharper τ some runs latch onto `+` within the first few
-    epochs and never revisit, and only τ = 0.1 keeps a graded profile on
-    op1 in every run.
+    Anchoring on op1 alone worked best so far, but in natural language we won't
+    know which tokens hold the concept. So we pool over sequences with a soft
+    minimum (mellowmax) and let the pull choose its own position. At the
+    embedding it picks op1 unaided, the operating point stays healthy, and
+    grading improves. It wins no margin though, and only the softest pooling
+    stays graded in every run.
