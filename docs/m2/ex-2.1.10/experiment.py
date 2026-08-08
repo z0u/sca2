@@ -17,6 +17,10 @@ will be:
 
     bin/mini run docs/m2/ex-2.1.10/experiment.py --app modal --max-containers 8
     bin/mini status ex-2.1.10
+
+Implementation notes for the DAG: the primary runs nine seeds (see CONDITIONS);
+and the post-training data collection was slow in ex-2.1.9, so fan it out
+across containers rather than serializing it per run.
 """
 
 from __future__ import annotations
@@ -42,6 +46,9 @@ __all__ = ["softmin_weights"]  # re-exported for the report's calibration cells
 
 GRID = "v216"  # the ex-2.1.3 cell: 216 colors, one word each, d64-L4
 SEEDS = [0, 1, 2]
+"""The base seeds, shared with ex-2.1.9. Each condition carries its own seed
+count (see CONDITIONS); a condition's seeds are range(count), so every
+condition includes these three."""
 PEAK_LR = 1e-2
 
 CORPUS_SEED = 0
@@ -181,25 +188,37 @@ def anti_subspace_weight(
 # --- Conditions ----------------------------------------------------------------
 
 
-def _either(tau: float) -> dict:
+N_SEEDS_PRIMARY = 9
+"""Seeds for the primary condition. Ex-2.1.9's deep-slice choice was one-hot
+per run, so the failure of interest is a rate across runs — three seeds can't
+distinguish "latched once in three" from bad luck, and τ = 0.1's clean 0/3
+there may itself have been luck. Nine on the one gated condition gives the
+latch rate a usable denominator; the references and unscored arms keep three."""
+
+
+def _either(tau: float, seeds: int = 3) -> dict:
     return {
         "name": f"either-t{tau * 1000:03.0f}",
         "lam": SCORING_LAMBDA,
         "tau": tau,
         "pull": "span",
         "labels": "either",
+        "seeds": seeds,
     }
 
 
 CONDITIONS: list[dict] = [
-    {"name": "lam0", "lam": 0.0, "tau": np.inf, "pull": "span", "labels": "either"},
-    {"name": "op1-labels", "lam": SCORING_LAMBDA, "tau": 0.100, "pull": "span", "labels": "op1"},
-    *[_either(t) for t in TAUS],
-    {"name": "slot-oracle", "lam": SCORING_LAMBDA, "tau": np.inf, "pull": "slot", "labels": "either"},
+    {"name": "lam0", "lam": 0.0, "tau": np.inf, "pull": "span", "labels": "either", "seeds": 3},
+    {"name": "op1-labels", "lam": SCORING_LAMBDA, "tau": 0.100, "pull": "span", "labels": "op1", "seeds": 3},
+    _either(0.100, seeds=N_SEEDS_PRIMARY),
+    _either(0.500),
+    _either(2.500),
+    {"name": "slot-oracle", "lam": SCORING_LAMBDA, "tau": np.inf, "pull": "slot", "labels": "either", "seeds": 3},
 ]
-"""Six conditions × 3 seeds. Every anchored cell runs the anti-subspace term at
-the operating point and (where the pull is pooled) the mellowmax over the
-prompt span; only the labelling rule and τ vary.
+"""Six conditions; three seeds each except the primary's nine (24 runs). A
+condition's seeds are range(seeds). Every anchored cell runs the anti-subspace
+term at the operating point and (where the pull is pooled) the mellowmax over
+the prompt span; only the labelling rule and τ vary.
 
 `op1-labels` re-runs ex-2.1.9's `pool-t100` verbatim — op1-keyed labels at
 RED_RATE, same seeds, same draws — so it is both the reproduction check for
@@ -220,11 +239,11 @@ REFERENCE_ARM = "op1-labels"
 ORACLE_ARM = "slot-oracle"
 
 PRIMARY = "either-t100"
-"""P, the condition H2–H4 score, fixed before the run: the either-slot arm at
+"""The primary — the condition H2–H4 score, fixed before the run: the either-slot arm at
 τ = 0.1, the only rung ex-2.1.9 found graded in every seed — a criterion from
 the previous experiment's published result, independent of every statistic
 gated here. The other two either-slot arms are the soft-τ sweep: reported
-beside P, not gated."""
+beside the primary, not gated."""
 
 # --- Statistics shared with the report -------------------------------------------
 
@@ -296,7 +315,7 @@ ex-2.1.9's H4(a), which `pool-t100` passed at 0.77."""
 CONTRAST_GATE = 0.2
 CONTRAST_PARTIAL = 0.1
 """H2(b): required between-group contrast in op2 weight over the four
-position-aware slices, mean over slices of π̄_G2(l, op2) − π̄_G1(l, op2).
+post-attention slices, mean over slices of π̄_G2(l, op2) − π̄_G1(l, op2).
 A contrast in [CONTRAST_PARTIAL, CONTRAST_GATE) scores H2 as partial when (a)
 also holds.
 
@@ -310,7 +329,7 @@ bounded in [−1, 1] whose ex-2.1.9 seed spreads were a few hundredths."""
 
 ORACLE_FRAC_GATE = 0.75
 ORACLE_FRAC_PARTIAL = 0.50
-"""H4: control-subtracted m_line(P) as a fraction of control-subtracted
+"""H4: control-subtracted m_line(primary) as a fraction of control-subtracted
 m_line(slot-oracle).
 
 Scale-free because the labeller itself is new, so no earlier experiment
@@ -333,10 +352,11 @@ RETENTION_STAT = "min"
 """H3(b): retention on the m_line trajectory — for every run whose running
 maximum reaches `RETENTION_FLOOR`, the final value is at least
 `RETENTION_GATE`× that maximum, quoted as the minimum across seeds (settled in
-ex-2.1.8)."""
+ex-2.1.8). With nine seeds on the primary the minimum runs over nine, a
+stricter read than ex-2.1.9's three; intentional."""
 
 GRADE_R2_DROP = 0.10
-"""H3(c): the largest grading loss tolerated, r²(op1-labels) − r²(P), on the
+"""H3(c): the largest grading loss tolerated, r²(op1-labels) − r²(primary), on the
 seed-mean op1 response against SIM_TARGET. Relative, as in ex-2.1.9; the
 reference arm reproduces `pool-t100`, whose r² was 0.83."""
 

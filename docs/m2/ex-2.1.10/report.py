@@ -64,11 +64,10 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    Ex-2.1.9's pooled pull found the concept's position unaided — but every
-    label still keyed on op1, so only one position ever carried the evidence.
-    Now a line is labeled when *either* operand draws, with the per-slot rate
-    halved to keep the label budget where it was, and the pull has to find
-    the red operand line by line. Two soft-τ arms ride along.
+    Mellowmax-pooled pull found the concept position unaided, but every label
+    was keyed on op1, so only one position ever carried the evidence. Now a line
+    is labeled when *either* operand draws the label, so the pull has to find
+    the red operand line by line.
     ///
     """)
     return
@@ -103,34 +102,42 @@ def _():
     Ex-2.1.9 took away the position oracle: the pooled (mellowmax) anchor term
     asks each labeled line to align *somewhere* in its span, and the pull put
     {LEAD} of its weight on op1 at the embedding without being told. But the
-    labels still pointed. A line drew a label as a function of its *first*
-    operand's redness, so op1 was the only position whose evidence ever
-    justified a label, and a pull that settled on op1 globally could never be
-    wrong.
+    labels still pointed. A label is a per-visit Bernoulli draw — each time a
+    line is visited in training, it *draws* a label with a small probability —
+    and in ex-2.1.9 that probability depended on the *first* operand's redness
+    alone, so op1 was the only position whose evidence ever justified a label,
+    and a pull that settled on op1 globally could never be wrong. Settling
+    globally is possible, too: RoPE never writes position into the stream, but
+    causal attention gives each role a different view of the line — op1
+    attends only to itself — so from the first block on, the roles are
+    distinguishable states a pull could latch.
 
-    A document-level label on natural text — "this review is negative", "this
-    tweet is obscene" — says the concept occurs *somewhere* and nothing else.
+    Why push toward labels that don't point? Because M3's targets are natural
+    text, and there labels arrive at the document level — "this review is
+    negative", "this tweet is obscene" — since nobody marks which tokens carry
+    the concept. A document-level label says the concept occurs *somewhere* —
+    one phrase, or smeared across the whole text — and nothing else.
     This experiment widens our labels by one step in that direction: either
     operand can draw the label, so a line can be labeled because of a red op2
-    while its op1 is blue. The pull then has to do per-line work: on
+    while its op1 is blue. The localization then has to vary per-line: on
     op1-triggered lines the red state is at position 0, on op2-triggered
     lines at position 2, and a pool that commits to one position for the whole
-    run will pull blue states onto the axis on the lines it got wrong.
+    run would pull blue states onto the axis on the lines it got wrong.
 
     Whether that failure would even show up in the scores is not obvious,
     because of a mechanism ex-2.1.9 already ran into: the span positions share token
     embeddings. At the embedding slice a color's state is its token embedding
-    wherever the token appears (RoPE adds no positional component at depth 0),
-    so once red embeddings sit on the axis, a red op2 line has an aligned
+    wherever the token appears (position enters only through attention, so it
+    can't show up before the first block), so once red embeddings sit on the
+    axis, a red op2 line has an aligned
     position *for free* — the labeller's slot-symmetry is satisfied by the
-    lexicon before any per-line choice happens. The position-aware slices are
+    lexicon before any per-line choice happens. The post-attention slices are
     where the question is real: there, ex-2.1.9 found the pool's deep-slice
     choice is winner-take-all *per run*, committed by epoch 8. If that
     winner is global, the two label groups will show the same weight profile;
     if the pool localizes per line, a red op2 should carry the weight on the
-    lines where it is the evidence. That contrast is the discriminator this
-    design gates on (H2), and the selectivity delivered to labeled lines
-    (H4) is scored separately, since the embedding give-away means the second
+    lines where it is the evidence (H2). The selectivity delivered to labeled lines
+    is scored separately (H4), since the embedding give-away means the second
     can pass while the first fails.
 
     One scope limit: our mixing operation can't make the
@@ -146,8 +153,34 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(
-        r"""
+    mo.md(r"""
+    /// details | Glossary
+    - **line** — one probe equation, `c1 + c2 = answer`; the probe set has
+      5832 of them.
+    - **span** — a line's four prompt positions, the ones the pooled pull
+      chooses among.
+    - **role** — what a span position holds: op1, `+`, op2, `=`. The grammar
+      is fixed, so role and position name the same thing here.
+    - **slice** ($\ell$) — a depth at which the residual stream is read: the
+      embedding, plus the stream after each of the four blocks.
+    - **alignment** ($\alpha$) — $\cos(h, \hat v)$, a state's cosine to the
+      anchor axis; $\bar\alpha$ is its mean over colors or lines, called
+      *drift* when the mean runs over the unlabeled bulk.
+    - **margin** ($m$) — label-weighted minus unweighted mean alignment: how
+      much closer the labeled-ish material is to the axis than everything
+      else.
+    - **softmin weight** ($\pi$) — the share of the pooled pull a span
+      position receives; sums to 1 over the span.
+    - **G1 / G2** — the label groups: probe lines weighted by P(only op1
+      drew) and P(only op2 drew) respectively.
+    ///
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ## Method
 
     Everything follows ex-2.1.9 except the labelling rule: the word-level
@@ -155,10 +188,17 @@ def _():
     seeds, the mellowmax-pooled anchor term, the anchor schedule, and the
     anti-subspace schedule fixed at ex-2.1.8's operating point
     (`end90-hold30`) in every anchored cell.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(
+        r"""
     ### The labelling rule
 
-    Labels stay what they have been since ex-2.1.6 — binary, drawn per visit,
+    Labels are as they have been since ex-2.1.6 — binary, drawn per visit,
     with probability graded in redness — except that now both operands draw.
     Each operand of a line draws independently at redness⁸ × {SLOTRATE}, and
     the line is labeled when either draws. The per-slot rate is half of the
@@ -166,6 +206,15 @@ def _():
     it was, up to the tiny both-draw overlap; the label-budget check below
     computes both. A labeled line's pulled positions are its prompt
     span, as before — the label never says which operand drew.
+
+    The answer position stays outside the span, as it has since the pull
+    became pooled in ex-2.1.9: the model has to *produce* the mix there, so
+    pulling that state toward red would oppose the task on every labeled line
+    whose answer isn't red — it would entangle the anchor with the output
+    rather than with the concept. (A full-line arm, answer included, would be
+    a fair robustness probe — a position where the concept is diluted — and
+    is queued in todo-science rather than run here.) Lines whose operands are
+    *both* reddish exist too; their weight maps are on the exploratory list.
 
     The `slot-oracle` condition is the exception that measures what the label
     withholds: it pulls only the operand(s) that actually drew, no pooling
@@ -188,23 +237,32 @@ def _():
 def _():
     # Joined with the block's own indent so every row dedents evenly under mo.md.
     _rows = "\n    ".join(
-        f"| `{c['name']}` | {c['lam']:g} | {'∞' if np.isinf(c['tau']) else f'{c["tau"]:g}'} | "
-        f"{c['labels']} | {'the operand that drew' if c['pull'] == 'slot' else 'prompt span, pooled'} |"
+        f"| `{c['name']}`{' **(primary)**' if c['name'] == ex.PRIMARY else ''} | {c['lam']:g} | "
+        f"{'∞' if np.isinf(c['tau']) else f'{c["tau"]:g}'} | "
+        f"{c['labels']} | {'the operand that drew' if c['pull'] == 'slot' else 'prompt span, pooled'} | "
+        f"{c['seeds']} |"
         for c in ex.CONDITIONS
     )
     mo.md(
         r"""
     ### Conditions
 
-    Six conditions, three seeds each. Every anchored cell runs the
-    anti-subspace term at the operating point; only the labelling rule and τ
-    vary.
+    Six conditions. Three seeds each, except the primary, which runs nine:
+    ex-2.1.9's deep-slice choice was one-hot per *run*, so the failure of
+    interest is a rate across runs, and three seeds can't tell "latched once
+    in three" from bad luck — τ = 0.1's clean 0/3 there may itself have been
+    luck. Nine seeds on the one gated condition gives the latch rate a usable
+    denominator and the per-seed hairlines in the H2 figure something to
+    show; {NRUNS} runs in all. Every anchored cell runs the anti-subspace
+    term at the operating point; only the labelling rule and τ vary.
 
-    | condition | $\lambda_a$ | τ | labels | pulled positions |
-    |---|---|---|---|---|
+    <!-- tau renders as T in this font in table headers, so using mathmode -->
+
+    | condition | $\lambda_a$ | $τ$ | labels | pulled positions | seeds |
+    |---|---|---|---|---|---|
     {ROWS}
 
-    `either-t100` is the primary, *P*: the either-slot labeller at τ = 0.1,
+    `either-t100` is the primary: the either-slot labeller at τ = 0.1,
     the only rung ex-2.1.9 found graded in every seed (latch rate 0/3) — a
     criterion from the previous experiment's published result, independent of
     everything gated here. The τ = 0.5 and 2.5 arms are the soft ladder,
@@ -220,7 +278,7 @@ def _():
     labels are judged against. `slot-oracle` shows what knowing the triggering slot is worth,
     measured through identical code — a reference rather than a strict
     ceiling, for the same reason ex-2.1.9's `op1-oracle` was.
-    """.replace("{ROWS}", _rows)
+    """.replace("{ROWS}", _rows).replace("{NRUNS}", str(sum(c["seeds"] for c in ex.CONDITIONS)))
     )
     return
 
@@ -230,9 +288,9 @@ def _():
     mo.md(r"""
     ### Calibration
 
-    Three checks before anything runs, computed from the design constants and
-    ex-2.1.9's published arrays: the label budget, the baseline profile shape,
-    and the placement of the soft-τ rungs.
+    A few checks before anything runs, computed from the design constants and
+    ex-2.1.9's published arrays: the label budget, the placement of the
+    soft-τ rungs, and the reproduction targets for the reference arm.
     """)
     return
 
@@ -262,7 +320,7 @@ def _():
     _shares = [float(np.mean(x)) / _tot for x in (_g1, _g2, _both)]
 
     mo.md(rf"""
-    **The label budget.** Over the closed-pair universe the corpus draws from,
+    **The label budget.** Over the closed-pair set the corpus draws from,
     the op1 labeller labels {_p_old:.4f} of lines per visit and the either-slot
     labeller at the halved rate labels {_p_new:.4f} — a
     {abs(_p_new / _p_old - 1) * 100:.1f}% difference, so the halving does keep
@@ -280,167 +338,11 @@ def _():
     _e219 = load_ex219()
     mo.stop(
         _e219 is None,
-        mo.md("_Ex-2.1.9's published results aren't reachable from here; the carried figures need them._"),
+        mo.md("_Ex-2.1.9's published results aren't reachable from here; the calibration cells need them._"),
     )
     assert _e219 is not None
     _metrics219, arrays219 = _e219
-
-    def ex219_mean(key: str, conds: list[str]) -> dict[str, np.ndarray]:
-        """Seed-mean of a per-run array from ex-2.1.9, per condition."""
-        return {c: np.mean([arrays219[f"{c}-s{s}/{key}"] for s in (0, 1, 2)], axis=0) for c in conds}
-
-    READ219 = np.mean([arrays219[f"lam0-s{s}/readability"] for s in (0, 1, 2)], axis=0)
-    return READ219, arrays219, ex219_mean
-
-
-@app.cell(hide_code=True)
-def _(ex219_mean):
-    _CONDS3 = ["span-mean", "pool-t100", "op1-oracle"]
-    _alpha3 = ex219_mean("alpha", _CONDS3)
-    _prof = {}
-    for _c, _a in _alpha3.items():
-        _m = np.einsum("c,lct->lt", ex.LABEL_W, _a) - _a.mean(axis=1)
-        _prof[_c] = {"margin": _m[:, : ex.SPAN], "drift": _a[:, :, : ex.SPAN].mean(axis=1)}
-    _x = np.arange(ex.SPAN)
-
-    @themed(
-        name="ex219-position-profiles",
-        alt_text="""
-            A five-by-three grid of small flush panels. Columns are the
-            ex-2.1.9 conditions span-mean, pool-t100 and op1-oracle; rows are
-            residual slices with the last slice on top and the embedding at
-            the bottom; each panel spans the four span roles op1, plus, op2
-            and equals, from 0 to about 0.95 vertically. A shaded smooth-step
-            area shows the margin and a solid line the drift. In the
-            span-mean column every row above the embedding is a wide raised
-            block with margin between 0.5 and 0.8 at all four roles. In the
-            pool-t100 and oracle columns the block narrows to a single tall
-            step at op1, with the other roles below 0.3. The drift line
-            roughly shadows the margin at about half its height; on the
-            embedding row it steps up at plus and equals for span-mean and at
-            plus alone for pool-t100.
-        """,
-        caption=r"""
-            **The baseline shape, from ex-2.1.9.** Margin $m(\ell,t)$
-            (shaded area) and drift $\bar\alpha(\ell,t)$ (line) over the four
-            span roles, one panel per residual slice with the embedding at the
-            bottom, from ex-2.1.9's published arrays (seed means). Under
-            op1-keyed labels the pooled pull (`pool-t100`, middle) narrows the
-            span-mean's four-role block to a step at op1, nearly matching the
-            oracle. This experiment's H2 figure will draw the same panels
-            *twice per condition* — once per label group — and the question is
-            whether the step moves to op2 on the lines where op2 drew.
-        """,
-    )
-    def _plot() -> plt.Figure:
-        from matplotlib.layout_engine import ConstrainedLayoutEngine
-
-        from mini.vis import smooth_step, smooth_step_area
-
-        _margin_ink = light_dark("#b4531f", "#dd8f5f")
-        _drift_ink = light_dark("#1f6fb4", "#5fa8dd")
-        _grey = light_dark("#666", "#999")
-        fig, axes = plt.subplots(5, 3, figsize=(7.0, 3.7), sharex=True, sharey=True)
-        _engine = fig.get_layout_engine()
-        assert isinstance(_engine, ConstrainedLayoutEngine)
-        _engine.set(hspace=0, h_pad=0.01, wspace=0.05)
-        for col, cond in enumerate(_CONDS3):
-            for row in range(5):
-                sl = 4 - row  # last slice on top, the embedding at the bottom
-                ax = axes[row][col]
-                smooth_step_area(ax, _x, _prof[cond]["margin"][sl], ramp=0.5, color=_margin_ink,
-                                 alpha=light_dark(0.25, 0.3))  # fmt: skip
-                smooth_step(ax, _x, _prof[cond]["margin"][sl], ramp=0.5, color=_margin_ink, lw=1.2)
-                smooth_step(ax, _x, _prof[cond]["drift"][sl], ramp=0.5, color=_drift_ink, lw=1.5)
-                ax.set(ylim=(-0.08, 0.98), xlim=(-0.4, ex.SPAN - 0.6), yticks=[0.0, 0.4, 0.8])
-                ax.spines[:].set_visible(False)
-                ax.grid(axis="y", which="major", c="#888", alpha=0.2)
-                ax.tick_params(axis="x", length=0, labelbottom=False)
-                ax.tick_params(axis="y", left=True, right=True, direction="in", labelleft=False, labelright=False)
-                if col == 0:
-                    ax.set_ylabel("emb" if sl == 0 else f"{sl}", fontsize=8)
-            axes[0][col].set_title(cond, fontsize=9.5)
-            axes[4][col].set_xticks(_x, ex.ROLES)
-            axes[4][col].tick_params(axis="x", labelbottom=True, labelsize=8.5)
-        fig.supylabel("slice", fontsize=9)
-        _m_key = plt.Rectangle((0, 0), 1, 1, fc=_margin_ink, alpha=0.35, ec="none")
-        _d_key = plt.Line2D([], [], color=_drift_ink, lw=1.5)
-        fig.legend([_m_key, _d_key], [r"margin $m(\ell, t)$", r"drift $\bar\alpha(\ell, t)$"],
-                   fontsize=8.5, frameon=False, ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.0),
-                   labelcolor=_grey)  # fmt: skip
-        return fig
-
-    mo.Html(_plot())
-    return
-
-
-@app.cell(hide_code=True)
-def _(READ219, ex219_mean):
-    _pi9 = ex219_mean("pi", ["pool-t100"])["pool-t100"]
-    _x = np.arange(ex.SPAN)
-
-    @themed(
-        name="ex219-weight-profile",
-        alt_text="""
-            A single column of five small flush panels, residual slices with
-            the last slice on top and the embedding at the bottom, each
-            spanning the four span roles op1, plus, op2 and equals from 0 to
-            1. A shaded smooth-step area shows the softmin weight of
-            ex-2.1.9's pool-t100 condition and a dashed line shows the
-            un-anchored control's readability profile. At the embedding the
-            weight is a tall step at op1 near 0.8 with about 0.2 at plus. In
-            the deeper slices the weight stays almost entirely on op1, with a
-            sliver at equals in the last slice, while the readability line
-            stays high at op1 and plus, dips at op2 and rises again at
-            equals.
-        """,
-        caption=r"""
-            **Where the pull went under op1-keyed labels** (ex-2.1.9,
-            `pool-t100`, seed mean): the softmin weight profile
-            $\bar\pi(\ell,t)$ (shaded) against the un-anchored control's
-            readability profile $R^2(\ell,t)$ (dashed) — a ridge probe's
-            held-out score for op1's redness at each site. The H2 figure
-            reads its per-group weight profiles against these same axes: on
-            op2-triggered lines, weight following the *evidence* would step
-            at op2, where this profile has almost none.
-        """,
-    )
-    def _plot() -> plt.Figure:
-        from matplotlib.layout_engine import ConstrainedLayoutEngine
-
-        from mini.vis import smooth_step, smooth_step_area
-
-        _pi_ink = light_dark("#7b3fa0", "#b98ce0")
-        _read_ink = light_dark("#2a9d8f", "#5fc9bd")
-        _grey = light_dark("#666", "#999")
-        fig, axes = plt.subplots(5, 1, figsize=(3.4, 3.7), sharex=True, sharey=True)
-        _engine = fig.get_layout_engine()
-        assert isinstance(_engine, ConstrainedLayoutEngine)
-        _engine.set(hspace=0, h_pad=0.01)
-        for row in range(5):
-            sl = 4 - row
-            ax = axes[row]
-            smooth_step_area(ax, _x, _pi9[sl], ramp=0.5, color=_pi_ink, alpha=light_dark(0.22, 0.28))
-            smooth_step(ax, _x, _pi9[sl], ramp=0.5, color=_pi_ink, lw=1.5)
-            smooth_step(ax, _x, READ219[sl], ramp=0.5, color=_read_ink, lw=1.0, ls=(0, (4, 2)))
-            ax.set(ylim=(-0.08, 1.05), xlim=(-0.4, ex.SPAN - 0.6), yticks=[0.0, 0.5, 1.0])
-            ax.spines[:].set_visible(False)
-            ax.grid(axis="y", which="major", c="#888", alpha=0.2)
-            ax.tick_params(axis="x", length=0, labelbottom=False)
-            ax.tick_params(axis="y", left=True, right=True, direction="in", labelleft=False, labelright=False)
-            ax.set_ylabel("emb" if sl == 0 else f"{sl}", fontsize=8)
-        axes[4].set_xticks(_x, ex.ROLES)
-        axes[4].tick_params(axis="x", labelbottom=True, labelsize=8.5)
-        fig.supylabel("slice", fontsize=9)
-        _p_key = plt.Rectangle((0, 0), 1, 1, fc=_pi_ink, alpha=0.35, ec="none")
-        _r_key = plt.Line2D([], [], color=_read_ink, lw=1.0, ls=(0, (4, 2)))
-        fig.legend([_p_key, _r_key], [r"softmin weight $\bar\pi(\ell,t)$", r"control readability $R^2(\ell,t)$"],
-                   fontsize=8.5, frameon=False, ncols=1, loc="lower center", bbox_to_anchor=(0.5, 1.0),
-                   labelcolor=_grey)  # fmt: skip
-        return fig
-
-    mo.Html(_plot())
-    return
+    return (arrays219,)
 
 
 @app.cell(hide_code=True)
@@ -472,15 +374,18 @@ def _(arrays219):
             horizontal line.
         """,
         caption=r"""
-            **Placing the soft-τ ladder,** recomputed from ex-2.1.9's stored
-            alignments as in that experiment's calibration: the leading span
-            position's share of the softmin weight if the weights were
-            computed on the un-anchored control's profile (**left**) or the
-            `pool-t100` profile (**right**). Dashed verticals are this
-            experiment's rungs. τ = 0.1 keeps a clear leader on the trained
-            profile; τ = 2.5 is within a few hundredths of uniform (0.25) on
-            both, confirming it as the tiny-bias arm and the reason no
-            τ = ∞ arm runs here.
+            **Where the soft-τ rungs land** — the check the ladder was chosen
+            by, not derivable from first principles: the leading span
+            position's share of the softmin weight, as a function of τ, if
+            the weights were computed on ex-2.1.9's stored alignments — the
+            un-anchored control's profile (**left**) or the `pool-t100`
+            profile (**right**). Dashed verticals are this experiment's
+            rungs, and the curves say what each will do: τ = 0.1 keeps a
+            clear leader on the trained profile, τ = 2.5 is within a few
+            hundredths of uniform (0.25) on both — so it *is* the tiny-bias
+            arm, and a τ = ∞ arm would add nothing — and τ = 0.5 splits the
+            gap. Had a rung landed on the flat shoulder next to another, we'd
+            have moved it.
         """,
     )
     def _plot():
@@ -533,28 +438,38 @@ def _(arrays219):
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(r"""
+    mo.md(
+        r"""
     ### Measurements
 
     Task evals, the readability profile, grading, and the trajectory
-    instrument are ex-2.1.9's. Two things change shape and two are new, all on
-    the same probe set (every color as op1 against its 27 closed partners —
-    which, read symmetrically, is every closed pair):
+    instrument are from ex-2.1.9. Two measurements change and two are new,
+    all on the same probe set: all 5832 ordered closed pairs, so every color
+    appears both as op1 and as op2. (Terms like *line*, *role*, *slice* and
+    *alignment* are pinned down in the Glossary above; alignment throughout
+    is $\cos(h, \hat v)$, a state's cosine to the anchor axis.)
 
-    **Per-line alignment maps.** The eval step now stores $\cos(h, \hat v)$
+    **Per-line alignment maps.** The eval step now stores alignment
     per probe *line* — (slices, 5832 lines, positions) — rather than averaged
     into per-color rows. The per-color maps every earlier statistic uses are
     recovered by averaging over partners, so every earlier statistic is unchanged, and the
     line-keyed statistics below become computable. Per-line softmin weights
-    are stored the same way.
+    are stored the same way. The volume stays small: 5 slices × 5832 lines ×
+    ~6 positions in float32 is ≈ 0.7 MB per array, two arrays per run, so
+    ≈ 35 MB across all {NRUNS} runs — an order of magnitude over ex-2.1.9's
+    per-color arrays but nowhere near needing different processing, and the
+    per-role trajectory adds well under a megabyte per run.
 
-    **m_line**, the selectivity this experiment scores: the per-line
-    generalization of ex-2.1.9's m_span. Per slice, the line-weighted mean
-    alignment at each span role minus the unweighted mean over lines, keeping
-    the largest role; then the mean over slices. The weights are the
-    labeller's own P(labeled) per line, normalized — "how much closer does a
-    line sit to the axis for being the kind of line the labeller flags" —
-    which keys on op1 alone in the old scheme and on both operands now. The
+    **m_line**, the selectivity this experiment scores — m_span, generalized
+    from colors to lines. To recap m_span (ex-2.1.9's scored statistic): on
+    the per-color maps, take the affinity-weighted mean alignment minus the
+    plain mean — a margin per (slice, role) saying how much closer red-ish
+    material is to the axis than average — keep the best span role per
+    slice, and average over slices. m_line is the same recipe on the
+    per-line maps: weight *lines* instead of colors, using the labeller's
+    own P(labeled) per line, normalized — "how much closer does a line sit
+    to the axis for being the kind of line the labeller flags" — which keys
+    on op1 alone in the old scheme and on both operands now. The
     max over roles is applied to every condition and the control alike, so
     its maximum-of-noise inflation cancels in the control-subtracted
     comparisons, as before. The trajectory records m_line, so retention reads
@@ -567,15 +482,18 @@ def _():
     answer is defensible) get almost no say. Within each group,
     $\bar\pi_G(\ell, t)$ is the group-weighted mean softmin weight per slice
     and role. Under per-line localization the two profiles should differ —
-    G1 stepping at op1, G2 at op2; under a global winner they are identical
-    by construction.
+    G1 stepping at op1, G2 at op2. Under a global winner they are identical
+    no matter what: if every line carries the same weight profile, the two
+    group means — which differ only in how lines are weighted — both return
+    that one profile.
 
     **Per-role drift in the trajectory.** Ex-2.1.9 couldn't say *when* the
     `+` embedding climbed to 0.30 alignment because the trajectory recorded
     op1 drift only; it now records $\bar\alpha(\ell, t)$ over all span roles
     at each measurement, which is the data that question needs. Report-side
     only; nothing is gated on it.
-    """)
+    """.replace("{NRUNS}", str(sum(c["seeds"] for c in ex.CONDITIONS)))
+    )
     return
 
 
@@ -585,59 +503,63 @@ def _():
         r"""
     ## Hypotheses
 
-    Gates and noise floors are ex-2.1.6 through ex-2.1.9's wherever the
+    Gates and noise floors are from ex-2.1.6 through ex-2.1.9 wherever the
     statistic is unchanged; derivations for the new ones are in
     [experiment.py](./experiment.py), next to their constants.
 
-    Throughout, *P* is `{PRIMARY}` (fixed in advance, see *Conditions*). The
-    τ = 0.5 and 2.5 arms are reported beside P but not gated. If P turns out
-    task-dirty, H2–H4 go unscored and the refuted H1 is the finding.
+    Throughout, "the primary" is `{PRIMARY}` (fixed in advance, marked in the
+    *Conditions* table). The τ = 0.5 and 2.5 arms are reported beside it but
+    not gated. If the primary turns out task-dirty, H2–H4 go unscored and the
+    refuted H1 is the finding.
 
     **H1: Task cost.** Every condition is task-clean: `named_holdout` exact
     match within {TASK} (absolute) of the seed mean of the in-experiment
     control. No partial credit; nothing in this design adds task pressure,
     and no anchored condition on this testbed has ever shown any.
 
-    **H2: The pull follows the label, line by line.** On P's per-group weight
-    profiles:
-    (a) at the embedding slice, each group's leading role is its own operand —
+    **H2: The pull selects the labelled operand.** On the primary's per-group
+    weight profiles:
+    **(a)** at the embedding slice, each group's leading role is its own operand —
     op1 for G1, op2 for G2 — with weight $\ge {LEAD}$ in both (uniform is
     0.25);
-    (b) across the four position-aware slices, the between-group contrast in
+    **(b)** across the four post-attention slices, the between-group contrast in
     op2 weight, $\mathrm{mean}_\ell\,[\bar\pi_{G2}(\ell, \text{op2}) -
     \bar\pi_{G1}(\ell, \text{op2})]$, is $\ge {CONTRAST}$.
     Partial: (a) holds and (b) lands in $[{CONTRASTP}, {CONTRAST})$.
     (a) is close to forced by the shared embeddings *if* the pull aligns red
     tokens at all, so on its own it mostly rules out the syntax latch; (b) is
     the real question — ex-2.1.9's deep-slice winner-take-all was per *run*,
-    and (b) asks whether the winner can vary per line when the label demands
-    it. Contrary outcomes: *global latch* — both groups lead at the same
-    role (op1, or worse, `+`), the contrast sits near 0, and on op2-triggered
-    lines the pull is dragging non-red states onto the axis, which H3(a)
-    should catch as ᾱ contamination; *uniform* — no slice reaches {LEAD} in
-    either group at any τ, meaning the pool can't tell the positions apart
-    once the label stops pointing.
+    and (b) asks whether the winner can vary per line when the label demands it.
+    Contrary outcomes:
+    *global latch* — both groups lead at the same role (op1, or worse, `+`), the
+    contrast sits near 0, and on op2-triggered lines the pull is dragging
+    non-red states onto the axis, which H3(a) should catch as ᾱ contamination;
+    *uniform* — the primary reaches {LEAD} in neither group at any slice
+    (τ = 0.1 is the sharpest rung, so if it can't concentrate, the softer
+    arms won't either), meaning the pool can't tell the positions apart once
+    the label stops pointing.
 
-    **H3: The operating point survives the wider labeller.** On P:
-    (a) containment, $\bar\alpha \le {ALPHA}$ at op1 (also the contamination
+    **H3: The operating point survives the wider labeller.** On the primary:
+    **(a)** containment, $\bar\alpha \le {ALPHA}$ at op1 (also the contamination
     detector for H2's global-latch outcome);
-    (b) retention, every run whose running maximum of m_line reaches
+    **(b)** retention, every run whose running maximum of m_line reaches
     {FLOOR} ending at $\ge {RET}\times$ that maximum (quoted as the minimum
-    across seeds);
-    (c) grading, P's seed-mean op1 response $r^2$ against `sim¹·⁵` no more
-    than {DROP} below the `op1-labels` arm's (higher is fine).
+    across seeds — nine of them here, a stricter read than ex-2.1.9's three);
+    **(c)** grading, the primary's seed-mean op1 response $r^2$ against
+    `sim¹·⁵` no more than {DROP} below the `op1-labels` arm's (higher is
+    fine).
     Partial: (a) and (b) hold, (c) misses.
 
     **H4: Selectivity holds without the pointer.** Control-subtracted
-    m_line of P reaches $\ge {FRAC}$ of the control-subtracted m_line of
-    `slot-oracle`. Partial: $[{FRACP}, {FRAC})$.
+    m_line of the primary reaches $\ge {FRAC}$ of the control-subtracted
+    m_line of `slot-oracle`. Partial: $[{FRACP}, {FRAC})$.
     The latch account predicts roughly the op1-triggered share of the label
     mass (~half) plus whatever the shared embeddings give away, so a pass has
     to clear that; for scale, ex-2.1.9's pooled arms recovered 91–98% of
-    their oracle. H4 is outcome where H2 is mechanism: the embedding
-    give-away means H4 can pass while H2(b) fails, and that pair of verdicts
-    would itself be a finding — selectivity delivered by the lexicon, not by
-    localization.
+    their oracle. Note that H4 can pass while H2(b) fails — the shared
+    embeddings can deliver selectivity to labeled lines with no per-line
+    localization at depth — and that pair of verdicts would itself be a
+    finding: selectivity from the lexicon rather than from localization.
     """.replace("{TASK}", f"{ex.TASK_GATE:g}")
         .replace("{PRIMARY}", ex.PRIMARY)
         .replace("{LEAD}", f"{ex.LEAD_GATE:g}")
@@ -671,8 +593,8 @@ def _():
     /// admonition | TODO
     The usual table: `named_holdout` exact match by condition (seed mean ±
     spread) against the control, and the gap to the {TASK} gate. Expected:
-    everything clean. A dirty condition would be news; a dirty P leaves H2–H4
-    unscored, per the Hypotheses.
+    everything clean. A dirty condition would be news; a dirty primary leaves
+    H2–H4 unscored, per the Hypotheses.
     ///
     """.replace("{TASK}", f"{ex.TASK_GATE:g}")
     )
@@ -686,14 +608,18 @@ def _():
 
     /// admonition | TODO
     The headline figure: per-group weight profiles $\bar\pi_{G1}(\ell,t)$ and
-    $\bar\pi_{G2}(\ell,t)$ for P, in the smooth-step position-profile form of
-    the carried ex-2.1.9 figures — two columns (G1: op1 drew; G2: op2 drew),
-    five slice rows, the control's readability profile dashed behind, the
+    $\bar\pi_{G2}(\ell,t)$ for the primary, in ex-2.1.9's smooth-step
+    position-profile form (five slice rows with the embedding at the bottom,
+    roles on the x-axis, the control's readability profile dashed behind —
+    the preferred format for these results) — two columns (G1: op1 drew; G2:
+    op2 drew), the
     embedding row annotated with the H2(a) verdicts and the deep-slice op2
     contrast (the H2(b) number) quoted in the caption. The same figure for
-    the soft-τ arms beside it (smaller, reported not gated), and per-seed
+    the soft-τ arms beside it (same size, reported not gated), and per-seed
     hairlines since ex-2.1.9's deep-slice choices were per-run one-hot —
     seed-mean profiles alone could read as graded when the runs are not.
+    With nine seeds on the primary, the hairlines double as the latch-rate
+    count.
 
     Expected under per-line localization: G1 steps at op1, G2 at op2, at the
     embedding and (more diffusely) at depth. Global latch: the two columns
@@ -714,16 +640,20 @@ def _():
     ## The operating point under the wider labeller (H3)
 
     /// admonition | TODO
-    Two figures, all conditions with P called out. Fig 1: trajectories of
+    Two figures, all conditions with the primary called out. Fig 1:
+    trajectories of
     m_line and ᾱ (op1) over training in the usual panel-grid form, schedules
     drawn beneath, the retention statistic annotated per panel. Fig 2: the
     grading scatter (per-color op1 response against `sim¹·⁵`), one panel per
     condition, each with its $r^2$; `op1-labels` is the reference the {DROP}
     drop is read against, and its own reproduction against ex-2.1.9's
     `pool-t100` (targets under *Calibration*) is quoted in
-    the caption.
+    the caption. Layout note: six conditions make a clean 2 × 3 in both
+    figures, with the schedules drawn inside each trajectory panel rather
+    than given a seventh — ex-2.1.9's five-plus-schedules grid was lopsided,
+    and this count shouldn't be.
 
-    Expected: P tracks `op1-labels` on all three statistics — the pull
+    Expected: the primary tracks `op1-labels` on all three statistics — the pull
     budget is unchanged, only its assignment to lines moved. Contrary worth
     watching for: ᾱ at op1 rising above the gate with the margin intact,
     which is the global-latch contamination signature (non-red op1 states
@@ -741,13 +671,15 @@ def _():
     ## Selectivity against the slot oracle (H4)
 
     /// admonition | TODO
-    Dot chart of control-subtracted m_line by condition (three seeds and
-    their mean), with `op1-labels` and `slot-oracle` as reference bands and
-    the oracle fraction quoted beside P. m_span and $m_\text{op1}$ reported
-    alongside for continuity with ex-2.1.9. Expected: P between the
+    Dot chart of control-subtracted m_line by condition (per-seed dots and
+    their mean; nine dots on the primary), with `op1-labels` and
+    `slot-oracle` as reference bands and
+    the oracle fraction quoted beside the primary. m_span and $m_\text{op1}$
+    reported
+    alongside for continuity with ex-2.1.9. Expected: the primary between the
     references, nearer the oracle, as ex-2.1.9's pooled arms were to theirs.
-    Contrary: P at ~half the oracle is the latch account's signature;
-    P *above* the oracle is possible in principle (the oracle pulls one slot
+    Contrary: ~half the oracle is the latch account's signature;
+    landing *above* the oracle is possible in principle (the oracle pulls one slot
     per line even where the concept has migrated to `=` at depth) and would
     say the pool's freedom is worth more than the label's pointer.
     ///
