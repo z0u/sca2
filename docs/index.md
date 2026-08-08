@@ -142,3 +142,10 @@ These experiments were preparation for the main work: exercising the infrastruct
     embedding it picks op1 unaided, the operating point stays healthy, and
     grading improves. It wins no margin though, and only the softest pooling
     stays graded in every run.
+
+- [2.1.10. A label that doesn't point](./m2/ex-2.1.10/report.py)
+
+    Preregistered; not yet run. Ex-2.1.9's labels still keyed on op1, so the
+    label itself said where the concept was. Now either operand can trigger the
+    label (per-slot rate halved to keep the label budget), and the pooled pull
+    has to find the red operand line by line. Two soft-τ arms ride along.
