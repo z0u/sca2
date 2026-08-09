@@ -505,7 +505,19 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   pulls the prompt span only as a measurement instrument (the answer position
   has a known redness confound, and unpulled it doubles as a spillover read),
   so (c) is what says whether the exclusion matters rather than a premise of
-  the method. #[D2.1] #anchoring #ex-2.1.6
+  the method. Update 2026-08-08: (a) is now ex-2.1.10 (preregistered); (b) and
+  (c) remain open, and the ex-2.1.10 prereg points here for (c). #[D2.1]
+  #anchoring #ex-2.1.6
+
+- [ ] An operation that can make the answer redder than both operands (e.g.
+  additive or screen blending), so the language contains lines where the
+  concept's strongest evidence is at a position the labeller never keys on.
+  Ex-2.1.10's scope limit names this: with averaging mixes, two candidate
+  operand positions is as blind as the testbed gets, so "concept at a position
+  the label gave no hint of" is untestable until the grammar grows such an
+  operation. Pairs naturally with the operation-as-variable item queued before
+  D2.2. (2026-08-08, from the ex-2.1.10 prereg review.) #[D2.1] #task-grammar
+  #anchoring
 
 - [~] Pool the anchor term over positions instead of averaging over them. Ex-2.1.6
   pulls all four prompt positions equally and asks (H3) whether the concept
