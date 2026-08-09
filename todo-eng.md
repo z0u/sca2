@@ -224,12 +224,23 @@ state.
   supertype-widening bug above, and ongoing inference-performance work every
   release.
 
-- Pre-push `ty` check scans nested worktrees (2026-07-29). Pushing from a
-  `.claude/worktrees/<name>` worktree runs `ty check` from the parent checkout,
-  which picks up the worktree's copy of `src/mini` as a separate tree with the
-  wrong first-party roots — 23 spurious unresolved-import/type errors on a
-  Markdown-only change. The hook (or ty config) should exclude
-  `.claude/worktrees/`, or run from the repo root of the tree being pushed.
+- Done: pre-push `ty` check scanning nested worktrees (2026-07-29, verified
+  2026-08-09). Filed against ty 0.0.49: pushing from a `.claude/worktrees/<name>`
+  worktree ran `ty check` from the parent checkout, which picked up the
+  worktree's copy of `src/mini` as a separate tree with the wrong first-party
+  roots — 23 spurious unresolved-import/type errors on a Markdown-only change.
+  Re-tested on current pin (ty 0.0.65, bumped 2026-07-30 in the entry just
+  above): built a scratch worktree under `.claude/worktrees/` and ran
+  the hook's actual command, `uv run ty check`, from the repo root exactly as
+  `pre-push-check.sh` does. Clean — "All checks passed!". Forcing
+  `--no-respect-ignore-files` reproduces the original failure verbatim (23
+  diagnostics, all `unresolved-import` under
+  `.claude/worktrees/tytest/src/mini/...`), confirming the fix is ty now
+  respecting `.gitignore` by default (`.claude/worktrees/` is listed there) —
+  gained somewhere in the 0.0.49 → 0.0.63 bump, not anything in this repo. No
+  code change needed; left as a config default rather than an explicit
+  `[tool.ty]` exclude, since pinning to the current default would just be
+  encoding today's behavior as if it were a requirement.
 
 - Ex-2.1.5 export time: what's left (2026-07-28). Two fixes landed —
   `baselines.precision_limited_acc` now finds the nearest candidate with a
