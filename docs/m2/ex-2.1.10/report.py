@@ -65,11 +65,12 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    Mellowmax-pooled pull found the concept position unaided, but every label
-    was keyed on op1, so only one position ever carried the evidence. Now a line
-    is labeled when *either* operand draws the label, so the pull has to find
-    the red operand line by line. It does: each label group's pull lands on
-    its own operand, and the selectivity delivered matches the slot oracle's.
+    The mellowmax-pooled pull found the concept position on its own, but every
+    label was keyed on op1, so only one position ever carried the evidence. Now
+    a line is labeled when *either* operand draws the label, and the pull has to
+    find the red operand line by line. It does: the pull in each label group
+    lands on its own operand, and the selectivity delivered matches that of the
+    slot oracle.
     ///
     """)
     return
@@ -98,30 +99,32 @@ def _(a_op1, acc, contrast, grading_r2, m_line, pi_group_mean, retention):
     against a gate of {ex.TASK_GATE:g}.
 
     **H2 (the pull selects the labelled operand) — holds.** On the primary
-    (`{_P}`): (a) at the embedding each group's leading role is its own
+    (`{_P}`): (a) at the embedding the leading role in each group is its own
     operand, at weight {_lead:.2f} (gate ≥ {ex.LEAD_GATE:g}; uniform is
     0.25), in all nine runs individually; (b) the deep-slice between-group
-    op2 contrast is {contrast(_P).mean():+.2f} (gate ≥ {ex.CONTRAST_GATE:g})
-    — most of the one-hot amplitude, so the winner varies per line, and
-    neither contrary outcome (global latch, uniform) occurred.
+    op2 contrast is {contrast(_P).mean():+.2f} (gate ≥
+    {ex.CONTRAST_GATE:g}), which is most of the one-hot amplitude. So the
+    winner varies per line, and neither a global latch nor uniform weights
+    occurred.
 
     **H3 (the operating point survives) — holds.** On `{_P}`: containment
     $\bar\alpha$ at op1 = {a_op1(_P).mean():.3f} (gate ≤
     {ex.MEAN_ALIGN_GATE:g}); retention {_ret:.2f} (gate ≥
     {ex.RETENTION_GATE:g}, minimum across nine seeds); grading $r^2$ =
-    {grading_r2(_P):.2f} against the reference arm's
-    {grading_r2(ex.REFERENCE_ARM):.2f}, a drop of
+    {grading_r2(_P):.2f} against {grading_r2(ex.REFERENCE_ARM):.2f} for the
+    reference arm, a drop of
     {grading_r2(ex.REFERENCE_ARM) - grading_r2(_P):.3f} (gate ≤
     {ex.GRADE_R2_DROP:g}).
 
     **H4 (selectivity without the pointer) — holds.** Control-subtracted
-    m_line of the primary is {_frac:.0%} of the slot oracle's (gate ≥
-    {ex.ORACLE_FRAC_GATE:.0%}) — at the oracle, within seed noise, and well
-    clear of the latch account's ~half.
+    m_line of the primary is {_frac:.0%} of the value for the slot oracle
+    (gate ≥ {ex.ORACLE_FRAC_GATE:.0%}). That is level with the oracle,
+    within seed noise, and well clear of the ~half the latch account
+    predicts.
 
-    The reference arm reproduced ex-2.1.9's `pool-t100` through the new
-    labelling code path to three decimals on every carried statistic
-    (*Reproduction*, under H2's section).
+    The reference arm reproduced `pool-t100` from ex-2.1.9 through the new
+    labelling code path, matching every carried statistic to three decimals
+    (*Reproduction*, in the H2 section).
     """)
     return
 
@@ -791,8 +794,8 @@ def _(CONDS: list[str], acc):
     **H1 holds.** The largest gap from the control is
     {abs(acc(_worst).mean() - _ctrl):.4f}, at `{_worst}`, against a gate of
     {ex.TASK_GATE:g}, so H2–H4 are all scored. Labels that no longer say
-    which operand drew change nothing the task loss can see, consistent with
-    every anchored condition on this testbed so far.
+    which operand drew change nothing the task loss can see, as with every
+    anchored condition on this testbed so far.
     """)
     return
 
@@ -802,10 +805,10 @@ def _():
     mo.md(r"""
     ## Where the weight went, by label group (H2)
 
-    First the reproduction check the method promises, so any drift introduced
-    by the new labelling code path is visible before an either-slot condition
-    is read: `op1-labels` re-runs ex-2.1.9's `pool-t100` verbatim — same
-    labels, same seeds, same draws — through the widened sampler.
+    The `op1-labels` arm re-runs `pool-t100` from ex-2.1.9 verbatim (same
+    labels, same seeds, same draws) through the widened sampler, so any
+    drift from the new labelling code path is visible before we read an
+    either-slot condition.
     """)
     return
 
@@ -852,23 +855,25 @@ def _(a_op1, a_span, m_op1, m_span):
 def _(pi_group_mean):
     _lead_emb = pi_group_mean("op1-labels")[0, 0, 0]
     mo.md(rf"""
-    The reproduction is as close as the store's rounding: every carried
-    statistic lands within ±0.001 of its target, and the embedding lead
-    weight ({_lead_emb:.2f}) matches ex-2.1.9's
-    {ex.EX219_REFERENCE["pool-t100"]["lead_emb"]:g}. The op1-keyed draw
-    consumes the rng exactly as the old sampler did, so this is the same
-    training trajectory replayed, and the either-slot conditions can be read
-    against `op1-labels` as a like-for-like baseline. The control's gaps are
-    a seed-spread-sized reminder that it consumes *different* draws (the
-    either-slot labeller's two per line), so its comparison carries
-    corpus-draw noise as the method warned.
+    The reproduction is as close as the rounding in the store allows: every
+    carried statistic lands within ±0.001 of its target, and the embedding
+    lead weight ({_lead_emb:.2f}) matches the
+    {ex.EX219_REFERENCE["pool-t100"]["lead_emb"]:g} of ex-2.1.9. The
+    op1-keyed draw consumes the rng as the old sampler did, so this is the
+    same training trajectory replayed, and the either-slot conditions can be
+    read against `op1-labels` as a like-for-like baseline.
 
-    Now the headline: where each label group's pull went. The two groups
-    weight the same 5832 probe lines by the labeller's own one-slot-only
-    probabilities — G1 by P(only op1 drew), G2 by P(only op2 drew) — and the
-    profiles below are the group-weighted mean softmin weights, per slice
-    and role. Under a global winner the two columns of each pair would be
-    identical; under per-line localization they mirror.
+    The gaps in the control are the size of the seed spread, a reminder that
+    it consumes *different* draws (two per line from the either-slot
+    labeller), so that comparison carries corpus-draw noise, as the method
+    warned.
+
+    Both groups weight the same 5832 probe lines by the one-slot-only
+    probabilities of the labeller itself, G1 by P(only op1 drew) and G2 by
+    P(only op2 drew). The profiles below are the group-weighted mean softmin
+    weights, per slice and role. Under a global winner the two columns of
+    each pair would be identical; under per-line localization they mirror
+    each other.
     """)
     return
 
@@ -993,26 +998,29 @@ def _(contrast, pi_group_mean):
     _pg = pi_group_mean(_P)
     _con = {c: contrast(c) for c in [*ex.EITHER_NAMES, "op1-labels"]}
     mo.md(rf"""
-    **H2 holds, and the profiles mirror.** (a) At the embedding each group's
-    leading role is its own operand at weight {_pg[0, 0, 0]:.2f} (gate ≥
-    {ex.LEAD_GATE:g}) — in all nine runs individually, with the two groups'
-    values equal by construction at the embedding, where a token's state
-    cannot depend on its line.[^emb-sym] (b) The between-group op2 contrast
-    over the post-attention slices is {_con[_P].mean():+.2f}
-    <span class='range'>±{_con[_P].std(ddof=1):.2f}</span> against the
-    {ex.CONTRAST_GATE:g} gate. G2's op2 weight at the last slice is
-    {_pg[1, 4, 2]:.2f}, so on the lines where op2 was the evidence, the pull
-    puts nearly everything there; ex-2.1.9's winner-take-all is still in
-    force, and the winner now varies line by line. Neither contrary outcome
-    occurred: no global latch (the columns are far from identical) and no
-    uniform collapse at the primary's τ.
+    **H2 holds, and the profiles mirror each other.** (a) At the embedding
+    the leading role in each group is its own operand, at weight
+    {_pg[0, 0, 0]:.2f} (gate ≥ {ex.LEAD_GATE:g}), in all nine runs
+    individually. The two groups take equal values there by construction,
+    since at the embedding the state of a token cannot depend on its
+    line.[^emb-sym]
 
-    [^emb-sym]: The probe set contains both orders of every pair and the
+    (b) The between-group op2 contrast over the post-attention slices
+    is {_con[_P].mean():+.2f}
+    <span class='range'>±{_con[_P].std(ddof=1):.2f}</span> against the
+    {ex.CONTRAST_GATE:g} gate. The op2 weight of G2 at the last slice is
+    {_pg[1, 4, 2]:.2f}, so on the lines where op2 was the evidence the pull
+    puts nearly everything there. The winner-take-all behavior of ex-2.1.9
+    is still in force, and the winner now varies line by line: the columns
+    are far from identical, and they do not collapse to uniform at the τ of
+    the primary.
+
+    [^emb-sym]: The probe set contains both orders of every pair, and the
         span positions share token embeddings, so the G1 and G2 profiles are
-        exact mirrors at the embedding slice. The gate there really tests
-        concentration — that the pool has left uniform — and that the
-        concentration sits on operands rather than syntax. Depth is where
-        the groups can genuinely differ, which is why H2(b) reads only the
+        exact mirrors at the embedding slice. What the gate tests there is
+        concentration: that the pool has moved away from uniform, and that
+        the concentration sits on operands rather than syntax. Depth is
+        where the groups can differ, which is why H2(b) reads only the
         post-attention slices.
 
     The unscored arms behave as the τ ladder predicted. At τ = 0.5 the
@@ -1020,16 +1028,17 @@ def _(contrast, pi_group_mean):
     and the deep contrast reaches only
     {_con["either-t500"].mean():+.2f}; at τ = 2.5 the profile is the span
     mean in all but name (contrast {_con["either-t2500"].mean():+.2f}). A
-    pull that cannot concentrate cannot localize, however good its labels.
+    pull that cannot concentrate cannot localize, however good the labels
+    are.
 
-    One number worth holding onto for M3: the *measured* contrast of the
-    op1-keyed reference arm is {_con["op1-labels"].mean():+.2f} — the shared
+    The op1-keyed reference arm has a *measured* contrast of
+    {_con["op1-labels"].mean():+.2f}, worth holding onto for M3. The shared
     lexicon aligns red op2 tokens for free, so a softmin read at τ = 0.1
     finds them even though the pull never targeted op2. But that free
-    contrast decays with depth (G2's op2 weight falls from
+    contrast decays with depth: the op2 weight of G2 falls from
     {pi_group_mean("op1-labels")[1, 1, 2]:.2f} at slice 1 to
-    {pi_group_mean("op1-labels")[1, 4, 2]:.2f} at slice 4) where the
-    primary's holds ({_pg[1, 1, 2]:.2f} → {_pg[1, 4, 2]:.2f}): training on
+    {pi_group_mean("op1-labels")[1, 4, 2]:.2f} at slice 4, where the
+    primary holds ({_pg[1, 1, 2]:.2f} → {_pg[1, 4, 2]:.2f}). Training on
     the wider labels is what keeps the localization alive where the states
     are contextual.
     """)
@@ -1163,16 +1172,18 @@ def _(ANCHORED, a_op1, retention):
     mo.md(rf"""
     **H3(a) and (b) hold.** On the primary, $\bar\alpha$ at op1 ends at
     {a_op1(_P).mean():.3f} <span class='range'>±{a_op1(_P).std(ddof=1):.3f}</span>
-    against the {ex.MEAN_ALIGN_GATE:g} gate — *below* the op1-keyed
-    reference's {a_op1(ex.REFERENCE_ARM).mean():.3f}, so the contamination
-    signature of a global latch (non-red op1 states dragged onto the axis on
-    op2-triggered lines) is absent, consistent with the H2 profiles. With
-    half the pull budget now landing on op2, op1 simply hosts less of the
-    drift. Retention is {_ret:.2f} against {ex.RETENTION_GATE:g} — the
-    minimum over nine seeds, a stricter read than the three-seed conditions'
-    — and the worst retention anywhere in the sweep is {_worst:.2f}. The
-    five anchored panels are near copies: localizing per line neither delays
-    the margin nor loosens its hold.
+    against the {ex.MEAN_ALIGN_GATE:g} gate. That is *below* the
+    {a_op1(ex.REFERENCE_ARM).mean():.3f} of the op1-keyed reference, so the
+    contamination a global latch would leave (non-red op1 states dragged
+    onto the axis on op2-triggered lines) is absent, which agrees with the
+    H2 profiles. With half the pull budget now landing on op2, op1 simply
+    hosts less of the drift.
+
+    Retention is {_ret:.2f} against {ex.RETENTION_GATE:g}, taken as the
+    minimum over nine seeds, a stricter
+    read than for the three-seed conditions; the worst retention anywhere in
+    the sweep is {_worst:.2f}. The five anchored panels are near copies, so
+    localizing per line neither delays the margin nor loosens its hold.
     """)
     return
 
@@ -1265,16 +1276,18 @@ def _(grading_r2):
     _P = ex.PRIMARY
     mo.md(rf"""
     **H3(c) holds.** The primary grades at $r^2$ = {grading_r2(_P):.2f}
-    against the reference arm's {grading_r2(ex.REFERENCE_ARM):.2f} — a drop
+    against {grading_r2(ex.REFERENCE_ARM):.2f} for the reference arm, a drop
     of {grading_r2(ex.REFERENCE_ARM) - grading_r2(_P):.3f} against the
-    {ex.GRADE_R2_DROP:g} tolerated. Widening the labels cost the response
-    shape essentially nothing at the primary's τ. The softer arms are
-    another story: {grading_r2("either-t500"):.2f} at τ = 0.5 and
-    {grading_r2("either-t2500"):.2f} at τ = 2.5, with the grading panels
-    showing where it goes — the low-redness response turns noisy and drifts
-    off zero, since a diffuse pull drags every span position of every
-    labeled line, red op1 or no. The slot oracle grades best of all
-    ({grading_r2(ex.ORACLE_ARM):.2f}), as its ex-2.1.9 analogue did.
+    {ex.GRADE_R2_DROP:g} tolerated. So widening the labels cost the response
+    shape essentially nothing at the τ of the primary.
+
+    The softer arms fare worse:
+    {grading_r2("either-t500"):.2f} at τ = 0.5 and
+    {grading_r2("either-t2500"):.2f} at τ = 2.5. The grading panels show
+    where it goes; the low-redness response turns noisy and drifts off zero,
+    since a diffuse pull drags every span position of every labeled line,
+    red op1 or not. The slot oracle grades best of all
+    ({grading_r2(ex.ORACLE_ARM):.2f}), as the analogue in ex-2.1.9 did.
     """)
     return
 
@@ -1284,10 +1297,9 @@ def _():
     mo.md(r"""
     ## Selectivity against the slot oracle (H4)
 
-    H2 asked where the weight went; H4 asks what that bought. m_line is the
-    selectivity delivered to the lines the labeller flags, and the slot
-    oracle — trained on the same label draws, told which operand drew — is
-    the reference for what the withheld information is worth.
+    m_line is the selectivity delivered to the lines the labeller flags, and
+    the slot oracle — trained on the same label draws, told which operand
+    drew — is the reference for what the withheld information is worth.
     """)
     return
 
@@ -1404,30 +1416,33 @@ def _(a_span, grading_r2, m_line):
     _frac = (m_line(_P).mean() - _CTRL) / (m_line(ex.ORACLE_ARM).mean() - _CTRL)
     _ref_frac = (m_line(ex.REFERENCE_ARM).mean() - _CTRL) / (m_line(ex.ORACLE_ARM).mean() - _CTRL)
     mo.md(rf"""
-    **H4 holds.** The primary delivers {_frac:.0%} of the oracle's
-    control-subtracted m_line against the {ex.ORACLE_FRAC_GATE:.0%} gate —
-    at the oracle, within seed noise (spreads of
-    {m_line(_P).std(ddof=1):.3f} and {m_line(ex.ORACLE_ARM).std(ddof=1):.3f}
-    on conditions sharing the same label draws). The latch account, which
-    predicted roughly the op1-triggered half plus the lexicon give-away, is
-    ruled out twice over: by this fraction and by H2's profiles directly.
-    The prereg named landing at or above the oracle as possible in
-    principle, the oracle being bound to the operand that drew even where
-    the concept has migrated at depth; at this margin the honest reading is
-    parity — knowing which slot triggered is worth nothing here that the
-    pool cannot recover on its own.
+    **H4 holds.** The primary delivers {_frac:.0%} of the
+    control-subtracted m_line of the oracle, against the
+    {ex.ORACLE_FRAC_GATE:.0%} gate. That is level with the oracle, within
+    seed noise (spreads of {m_line(_P).std(ddof=1):.3f} and
+    {m_line(ex.ORACLE_ARM).std(ddof=1):.3f} on conditions sharing the same
+    label draws). The latch account predicted roughly the op1-triggered half
+    plus the lexicon give-away, and it is ruled out twice over: by this
+    fraction, and by the H2 profiles.
 
-    Two reference points situate that. The op1-keyed arm reaches only
-    {_ref_frac:.0%} of the oracle on the same statistic: its pull never
-    serves the op2-triggered half of the label mass, so widening the labels
-    is what closed the gap. And the soft-τ arms *exceed* everything on
-    m_line ({m_line("either-t500").mean():.2f} at τ = 0.5) while failing
-    every other instrument — contrast near zero (H2), grading down by ~0.2
+    The prereg allowed for landing at or above the oracle in principle,
+    since the oracle is bound to the operand that drew even where the
+    concept has migrated at depth. At this margin the defensible reading is
+    parity: knowing which slot triggered is worth nothing here that the pool
+    cannot recover on its own.
+
+    The op1-keyed arm reaches only {_ref_frac:.0%} of the oracle on the
+    same statistic, because its pull never serves the op2-triggered half of
+    the label mass. Widening the labels is what closed the gap.
+
+    The soft-τ arms *exceed* everything on m_line
+    ({m_line("either-t500").mean():.2f} at τ = 0.5) while failing every
+    other instrument: contrast near zero (H2), grading down by ~0.2
     (H3(c)), and span drift ᾱ_span at {a_span("either-t500").mean():.2f}
-    against the primary's {a_span(_P).mean():.2f}. A diffuse pull aligns the
-    whole span of labeled-ish lines, and a margin that takes the best role
-    per slice rewards that spread; the number is real, though what it
-    measures there is a smeared, poorly-graded alignment rather than a
+    against {a_span(_P).mean():.2f} for the primary. A diffuse pull aligns
+    the whole span of labeled-ish lines, and a margin that takes the best
+    role per slice rewards that spread. The number is real, but what it
+    measures there is a smeared, poorly graded alignment rather than a
     localized one. The exploratory section returns to this trade.
     """)
     return
@@ -1533,48 +1548,49 @@ def _(N_SEEDS: dict, R1: np.ndarray, R2: np.ndarray, arrays, traj):
     could see that its `+` embedding ended near 0.30 alignment; it could not
     see when. The per-role trajectory answers: late. At epoch 30 the two
     syntax embeddings sit at {_at(30)[0, 1]:.2f} (`+`) and
-    {_at(30)[0, 3]:.2f} (`=`); the drift accrues through epochs 30–90 as
+    {_at(30)[0, 3]:.2f} (`=`). The drift accrues through epochs 30–90 as
     the repulsion anneals toward its hold ratio, reaching
-    {_at(90)[0, 1]:.2f} and {_at(90)[0, 3]:.2f}, and the anchor's own
-    end-of-training anneal claws none of it back. So the syntax drift is
-    bought against the *weakening* repulsion, and in this experiment `=` —
-    outside the labelled operands but inside the pulled span — is the larger
-    of the two. At depth the picture inverts: the operand roles carry the
-    residual drift ({_at(100)[4, 0]:.2f} at op1, {_at(100)[4, 2]:.2f} at
-    op2) and the syntax roles nothing, which is where H3(a)'s containment
-    gate reads and passes.
+    {_at(90)[0, 1]:.2f} and {_at(90)[0, 3]:.2f}, and the end-of-training
+    anneal of the anchor recovers none of it. So the syntax drift is bought
+    against the *weakening* repulsion, and in this experiment `=` is the
+    larger of the two; `=` sits outside the labelled operands but inside the
+    pulled span.
 
-    **Is the deep choice still one-hot? (per-line weight entropy.)** Yes —
+    At depth the picture inverts. The operand roles carry the residual drift
+    ({_at(100)[4, 0]:.2f} at op1, {_at(100)[4, 2]:.2f} at op2) and the
+    syntax roles carry none, and that is where the containment gate of H3(a)
+    reads and passes.
+
+    **Is the deep choice still one-hot? (per-line weight entropy.)** Yes,
     per line. On the label-weighted probe mass, the leading role at the
-    last slice holds over 0.9 of a line's weight on
+    last slice holds over 0.9 of the weight of a line on
     {np.mean(_lead_mass):.0%} of the mass (seed range
-    {min(_lead_mass):.0%}–{max(_lead_mass):.0%}); the un-labelled bulk
+    {min(_lead_mass):.0%}–{max(_lead_mass):.0%}). The un-labelled bulk
     stays near uniform, since a flat alignment profile gives the softmin
-    nothing to concentrate on. Ex-2.1.9's winner-take-all survives the
-    wider labels in exactly the form H2 requires: committed within a line,
-    varying across lines.
+    nothing to concentrate on. The winner-take-all behavior of ex-2.1.9
+    survives the wider labels in the form H2 requires: committed within a
+    line, varying across lines.
 
     **The both-red lines.** Where both operands are red, either answer is
     defensible, and the pool declines to choose: at the embedding the
     both-draw-weighted profile splits {_both_emb[0]:.2f}/{_both_emb[2]:.2f}
     between the operands (forced by the shared lexicon), and at the last
-    slice it still spreads — op1 {_both_deep[0]:.2f}, op2
+    slice it still spreads: op1 {_both_deep[0]:.2f}, op2
     {_both_deep[2]:.2f}, `=` {_both_deep[3]:.2f}, with
     {np.mean(_split_mass):.0%} of the both-draw mass within 0.2 of an even
-    operand split. These lines are {(ex.p_slot(R1) * ex.p_slot(R2)).sum() / _line_p.sum():.1%}
-    of the label mass, so nothing above turns on them; they preview the M3
+    operand split. These lines are {_pb.sum() / _line_p.sum():.1%}
+    of the label mass, so nothing above turns on them. They preview the M3
     case where a document holds the concept in several places at once.
 
     **The soft-τ trade.** Across the ladder, localization and grading fall
     together while m_line rises: contrast 0.85 → 0.17 → 0.03 and $r^2$
     0.82 → 0.67 → 0.61 as τ goes 0.1 → 0.5 → 2.5, with m_line highest at
     the diffuse end (the H4 table). A nearly-mean pull does still buy
-    line-keyed *margin* — labeled lines' spans align more than the bulk —
-    but it localizes barely at all once the label stops pointing, and what
-    it aligns is poorly graded. For M3 the operational lesson is about
-    instruments: a margin statistic alone cannot distinguish localized
-    selectivity from smeared selectivity; it needs the group contrast and
-    the grading track beside it.
+    line-keyed *margin*, in that the spans of labeled lines align more than
+    the bulk. But it localizes barely at all once the label stops pointing,
+    and what it aligns is poorly graded. For M3, a margin statistic alone
+    cannot distinguish localized selectivity from smeared selectivity, so it
+    needs the group contrast and the grading track beside it.
     """)
     return
 
