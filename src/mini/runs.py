@@ -210,9 +210,17 @@ def stale_progress(rec: dict, now: float | None = None) -> bool:
     ``STALE_HEARTBEAT_S``. Before the first emission the watchdog applies its
     startup grace instead of the tight timeout, so the badge matches: a worker
     legitimately tokenizing for ten minutes is not "possibly wedged" yet.
+
+    A task inside a declared blocking phase (:func:`~mini.progress.blocking_phase`
+    — a checkpoint upload, a large pull) stamps ``phase_until``, and is not
+    stale until that budget runs out. Same reasoning as the grace: the span has
+    no steps to report and is healthy anyway.
     """
     age = progress_age(rec, now)
     if age is None:
+        return False
+    now = now if now is not None else time.time()
+    if (until := rec.get("phase_until")) and now < until:
         return False
     if rec.get("progress_at"):
         threshold = rec.get("watchdog_s") or STALE_HEARTBEAT_S

@@ -18,7 +18,8 @@ from typing import Any, Callable
 
 import cloudpickle
 
-from contextlib import nullcontext
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from math import isfinite
 
 from mini._queues import EndOfQueue
@@ -323,6 +324,35 @@ def _arm_watchdog(
     return wd, fields
 
 
+def _phase_hook(
+    watchdog: Watchdog | None, record: Callable[..., bool]
+) -> Callable[[str, float], AbstractContextManager[None]]:
+    """Back :func:`~mini.progress.blocking_phase` with the two things that read a stall.
+
+    A step-free span the task declares — a checkpoint upload, a dataset pull —
+    has to reach both judges of "is this worker wedged?", or one of them still
+    says yes. The *watchdog* is the one with teeth: without its phase, a
+    post-loop upload trips the tight step threshold and a finished task is
+    aborted and re-run from scratch. The *record* stamp is what
+    :func:`~mini.runs.stale_progress` reads, so the monitor doesn't badge a
+    healthy upload as a wedge for as long as it runs.
+
+    The stamp is written whether or not a watchdog is armed: the badge is
+    computed from the record either way.
+    """
+
+    @contextmanager
+    def phase(label: str, timeout_s: float) -> Iterator[None]:
+        record(phase=label, phase_until=time.time() + timeout_s)
+        try:
+            with watchdog.phase(label, timeout_s) if watchdog is not None else nullcontext():
+                yield
+        finally:
+            record(phase=None, phase_until=None)
+
+    return phase
+
+
 def _stall_handler(
     store: MemoStore, key: str, gen: str | None, commit: Callable[[], None] | None, record: Callable[..., bool]
 ) -> Callable[[str], None]:
@@ -405,6 +435,9 @@ def execute_task(
     only — result upload rides on the role timeout as before. *watchdog_grace_s*
     is the looser threshold that applies until the first progress emission, so
     one-off setup (tokenization, compilation) doesn't force the watchdog loose.
+    Spans *inside* the call that legitimately make no step progress get the same
+    treatment on demand, via :func:`~mini.progress.blocking_phase` — which
+    ``mini.store``'s transfers already declare for themselves.
     """
 
     def record(**fields: Any) -> bool:
@@ -440,7 +473,12 @@ def execute_task(
             producer_context(producer) if producer is not None else nullcontext(),
             resolved_refs_context(resolved),
             progress_context(
-                key, key, queue=sink, emission_interval=0.2, on_progress=watchdog.poke if watchdog else None
+                key,
+                key,
+                queue=sink,
+                emission_interval=0.2,
+                on_progress=watchdog.poke if watchdog else None,
+                on_phase=_phase_hook(watchdog, record),
             ),
             watchdog if watchdog is not None else nullcontext(),
         ):

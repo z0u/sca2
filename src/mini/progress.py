@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import contextvars
-from collections.abc import Callable
-from contextlib import contextmanager
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass, field
 
 from mini._debounce import BackgroundEmitter
@@ -71,6 +71,10 @@ class JobContext:
     # it measures the *task's* progress: delivery happens on a background thread, so
     # a slow control plane would otherwise read as a wedged worker.
     on_progress: Callable[[int, int], None] | None = None
+    # Opens a declared step-free span (see :func:`blocking_phase`). The worker
+    # binds it to the watchdog's own ``phase`` plus a record stamp, so both the
+    # abort threshold and the client-side staleness badge learn about the span.
+    on_phase: Callable[[str, float], AbstractContextManager[None]] | None = None
     metrics: dict[str, float] = field(default_factory=dict)
     goals: dict[str, str] = field(default_factory=dict)
     _last: tuple[int, int, str] = field(default=(0, 0, ""), init=False, repr=False)
@@ -99,6 +103,7 @@ def progress_context(
     queue: QueueLike[ProgressMessage] | None,
     emission_interval: float,
     on_progress: Callable[[int, int], None] | None = None,
+    on_phase: Callable[[str, float], AbstractContextManager[None]] | None = None,
 ):
     """Context manager for setting the current job context"""
     ctx = JobContext(
@@ -107,6 +112,7 @@ def progress_context(
         queue=queue,
         emission_interval=emission_interval if emission_interval is not None else 0.1,
         on_progress=on_progress,
+        on_phase=on_phase,
     )
     token = _job_context.set(ctx)
     try:
@@ -146,6 +152,37 @@ def emit_progress(step: int, total: int, message: str = ""):
     if ctx.on_progress is not None:
         ctx.on_progress(step, total)  # synchronous and local — the watchdog's advance signal
     ctx._emitter(_message(ctx, step, total, message))
+
+
+@contextmanager
+def blocking_phase(label: str, timeout_s: float) -> Iterator[None]:
+    """Declare a span that legitimately makes no step progress.
+
+    The worker's progress watchdog aborts a task whose ``(step, total)`` stops
+    advancing, which is what turns a wedged worker into a fast retryable failure
+    instead of a burnt role timeout. But some spans have no steps to report and
+    are perfectly healthy: uploading a checkpoint after the last step, pulling a
+    dataset before the first, a long eval between epochs. Name one, and the
+    watchdog measures it against *timeout_s* instead of the tight step
+    threshold::
+
+        with blocking_phase("upload checkpoint", timeout_s=600):
+            art = put(workdir / "model", name="model")
+
+    The budget is a bound rather than a pass: a span that hangs is still caught,
+    just at *timeout_s*. Size it for the slowest healthy case — aborting a
+    healthy task throws away everything it has done, while catching a wedge late
+    only costs idle time.
+
+    ``mini.store``'s ``put``, ``get`` and ``get_many`` already declare their own,
+    sized from the payload, so a step that only moves artifacts needs nothing
+    here. Phases nest, and only ever widen the threshold.
+
+    A no-op outside a job context, and on a worker with no watchdog armed.
+    """
+    ctx = _job_context.get()
+    with nullcontext() if ctx is None or ctx.on_phase is None else ctx.on_phase(label, timeout_s):
+        yield
 
 
 def emit_metrics(**scalars: float) -> None:
