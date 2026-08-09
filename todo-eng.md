@@ -189,9 +189,11 @@ state.
   callback, so incremental byte liveness would mean hooking the underlying
   transfer. A phase is honest about what it knows. Worth revisiting if a
   callback appears — real bytes/s would let the budget tighten a lot.
-  Follow-on worth having: the monitor shows a frozen step during a phase, when
-  it could show the label ("upload checkpoint") — the record carries it already,
-  so this is display-side only (`progress_display.py` / `monitor.py`).
+  `status --json` carries `phase`/`phase_until` (a frozen step next to
+  `stale_progress: false` reads as a contradiction without them). Follow-on
+  worth having: the *human-readable* status line still shows only the frozen
+  step, where it could show the label ("put model") — display-side only, in
+  `progress_display.py` / `monitor.py`.
 
 - Glossary of preferred terms (2026-07-30, updated 2026-08-05). Partly done:
   the `style-terms` skill now defines condition / run / cell / arm / seed /

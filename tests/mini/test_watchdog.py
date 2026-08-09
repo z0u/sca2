@@ -221,6 +221,30 @@ def test_stale_progress_pauses_for_a_declared_blocking_phase():
     assert stale_progress(rec | {"phase_until": 900.0}, now=1000.0) is True  # budget itself blown
 
 
+def test_status_json_surfaces_the_declared_phase():
+    """A frozen step reported alongside ``stale_progress: false`` reads as a
+    contradiction unless the span that explains it travels with it."""
+    from mini.__main__ import _task_json
+
+    out = _task_json(
+        {
+            "key": "k",
+            "fn": "train",
+            "state": RunState.RUNNING,
+            "env": {"host": "x"},
+            "started_at": 400.0,
+            "heartbeat_at": 999.0,
+            "progress_at": 700.0,  # long stale in wall-clock terms
+            "watchdog_s": 120.0,
+            "step": 3300,
+            "total": 3300,
+            "phase": "put model",
+            "phase_until": time.time() + 600.0,
+        }
+    )
+    assert (out["phase"], out["step"], out["stale_progress"]) == ("put model", 3300, False)
+
+
 def test_stale_progress_honors_startup_grace():
     # In setup (no progress_at yet): the grace governs, mirroring the watchdog.
     setup = {"state": RunState.RUNNING, "env": {"host": "x"}, "started_at": 400.0, "heartbeat_at": 999.0}
