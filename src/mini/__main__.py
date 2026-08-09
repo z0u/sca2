@@ -868,6 +868,11 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "timeout_s",
         "watchdog_s",
         "watchdog_grace_s",
+        # The declared step-free span a task is inside, if any (mini.blocking_phase).
+        # Without it a frozen step and a fresh `stale_progress: false` look like a
+        # contradiction; with it, "put model" says the pause is the work.
+        "phase",
+        "phase_until",
     ):
         if (v := rec.get(f)) is not None:
             out[f] = v

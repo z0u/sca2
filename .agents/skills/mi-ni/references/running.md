@@ -232,8 +232,10 @@ worker settles itself FAILED with an all-thread stack dump
 burn until `timeout`. Until the first progress emission, `watchdog_grace=`
 applies instead (default: same as `watchdog`), so a long one-off setup phase
 doesn't force the watchdog loose — keep `watchdog` sized to the step cadence
-and let the grace cover the prep. Treat a `WatchdogStall` like a flaky infra
-failure unless it recurs on the same cell: `retry --key <key>`.
+and let the grace cover the prep. Step-free spans mid-run declare themselves
+with `mini.blocking_phase` (artifact transfers already do), so a checkpoint
+upload after the last step isn't read as a wedge. Treat a `WatchdogStall` like
+a flaky infra failure unless it recurs on the same cell: `retry --key <key>`.
 
 ## Recovery
 

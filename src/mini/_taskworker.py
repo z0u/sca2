@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -18,7 +19,9 @@ from typing import Any, Callable
 
 import cloudpickle
 
-from contextlib import nullcontext
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager, nullcontext
+from itertools import count
 from math import isfinite
 
 from mini._queues import EndOfQueue
@@ -323,6 +326,60 @@ def _arm_watchdog(
     return wd, fields
 
 
+def _phase_hook(
+    watchdog: Watchdog | None, record: Callable[..., bool]
+) -> Callable[[str, float], AbstractContextManager[None]]:
+    """Back :func:`~mini.progress.blocking_phase` with the two things that read a stall.
+
+    A step-free span the task declares — a checkpoint upload, a dataset pull —
+    has to reach both judges of "is this worker wedged?", or one of them still
+    says yes. The *watchdog* is the one with teeth: without its phase, a
+    post-loop upload trips the tight step threshold and a finished task is
+    aborted and re-run from scratch. The *record* stamp is what
+    :func:`~mini.runs.stale_progress` reads, so the monitor doesn't badge a
+    healthy upload as a wedge for as long as it runs.
+
+    The stamp is written whether or not a watchdog is armed: the badge is
+    computed from the record either way.
+    """
+    open_spans: dict[int, tuple[float, str]] = {}  # token -> (deadline, label)
+    tokens = count()
+    lock = threading.Lock()
+
+    def restamp() -> None:
+        """Stamp the span with the latest deadline still open, or clear at the last exit.
+
+        Phases nest — task code can wrap a ``put`` that declares one of its own —
+        while the record holds a single label, so an inner exit has to hand the
+        record back to its parent rather than clear it. Keyed by the deadline
+        rather than the budget: what the badge needs is when the outstanding
+        allowance actually runs out.
+        """
+        with lock:
+            spans = list(open_spans.values())
+        if spans:
+            deadline, label = max(spans, key=lambda s: s[0])
+            record(phase=label, phase_until=deadline)
+        else:
+            record(phase=None, phase_until=None)
+
+    @contextmanager
+    def phase(label: str, timeout_s: float) -> Iterator[None]:
+        token = next(tokens)
+        with lock:
+            open_spans[token] = (time.time() + timeout_s, label)
+        restamp()
+        try:
+            with watchdog.phase(label, timeout_s) if watchdog is not None else nullcontext():
+                yield
+        finally:
+            with lock:
+                open_spans.pop(token, None)
+            restamp()
+
+    return phase
+
+
 def _stall_handler(
     store: MemoStore, key: str, gen: str | None, commit: Callable[[], None] | None, record: Callable[..., bool]
 ) -> Callable[[str], None]:
@@ -405,6 +462,9 @@ def execute_task(
     only — result upload rides on the role timeout as before. *watchdog_grace_s*
     is the looser threshold that applies until the first progress emission, so
     one-off setup (tokenization, compilation) doesn't force the watchdog loose.
+    Spans *inside* the call that legitimately make no step progress get the same
+    treatment on demand, via :func:`~mini.progress.blocking_phase` — which
+    ``mini.store``'s transfers already declare for themselves.
     """
 
     def record(**fields: Any) -> bool:
@@ -440,7 +500,12 @@ def execute_task(
             producer_context(producer) if producer is not None else nullcontext(),
             resolved_refs_context(resolved),
             progress_context(
-                key, key, queue=sink, emission_interval=0.2, on_progress=watchdog.poke if watchdog else None
+                key,
+                key,
+                queue=sink,
+                emission_interval=0.2,
+                on_progress=watchdog.poke if watchdog else None,
+                on_phase=_phase_hook(watchdog, record),
             ),
             watchdog if watchdog is not None else nullcontext(),
         ):

@@ -111,7 +111,9 @@ bounded:
    - Confirm over 2–3 `status --brief` snapshots ≥ 3 minutes apart (a long
      non-emitting stretch — a heavy import, one big step — can look frozen
      briefly, and `stale_progress` uses a generic threshold when no watchdog
-     is set).
+     is set). A task inside a declared blocking phase — the record carries
+     `phase` and `phase_until`, e.g. a checkpoint upload — is not stale until
+     that budget runs out, so read those fields before calling it wedged.
    - `bin/mini cancel <exp> --key <key>` reaps just the stuck worker —
      healthy siblings keep running — then `bin/mini retry <exp> --key <key>`.
      (Plain `cancel` without `--key` stops the whole experiment; use it only

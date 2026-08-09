@@ -122,6 +122,14 @@ compilation) is covered by `watchdog_grace=` instead (default: same as
 ends at the first emission — emit once real step cadence begins, not before.
 Leave `watchdog` unset for steps that never emit step progress.
 
+Spans *inside* the loop that legitimately report no steps get the same
+allowance on demand, via `mini.blocking_phase(label, timeout_s=…)`. `put`,
+`get` and `get_many` already declare their own, sized from the payload, so a
+step that checkpoints after its last training step needs nothing — reach for it
+only when your own code blocks for longer than the step cadence (a long eval,
+a download you drive yourself). The budget bounds the span rather than
+exempting it: a span that hangs is still caught, at `timeout_s`.
+
 A role can also set `env=` — environment for the worker, in place *before* the
 process starts (a Modal container Secret; locally, the task subprocess's env).
 Reach for it when a library reads its env once at init and a task setting it on

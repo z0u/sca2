@@ -17,6 +17,11 @@ interpreter, so raising an exception at it could go unheard forever.
 
 Heartbeats and metrics-only emissions deliberately do **not** feed the
 watchdog — liveness without progress is precisely the wedge signature.
+
+Some spans have no steps to report and are healthy anyway: a checkpoint upload
+after the last step, a dataset pull before the first. :meth:`Watchdog.phase`
+lets the task declare those and name a budget for them, so they are measured
+against their own threshold rather than the tight step one.
 """
 
 from __future__ import annotations
@@ -26,6 +31,9 @@ import sys
 import threading
 import time
 import traceback
+from collections.abc import Iterator
+from contextlib import contextmanager
+from itertools import count
 from typing import Any, Callable
 
 __all__ = ["Watchdog", "WatchdogStall"]
@@ -51,6 +59,9 @@ class Watchdog:
     emission — a task that emits step 0 up front and then preps for minutes
     should hold its first emission until real step cadence begins.
 
+    Spans in the *middle* of a task that legitimately make no step progress get
+    :meth:`phase`, which is the same idea as the grace with a caller-named budget.
+
     On stall, *on_stall* is called with a diagnosis (summary + all-thread stack
     dump) — it should persist the failure wherever the task records state — and
     then the process exits, no matter what *on_stall* did. Exiting on the
@@ -73,12 +84,51 @@ class Watchdog:
         self._advanced_at = time.monotonic()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="mini-watchdog", daemon=True)
+        # Blocking phases currently open, by entry token. Keyed rather than a plain
+        # list so nested phases pop the one they pushed, not an equal-valued sibling.
+        self._phases: dict[int, tuple[float, str]] = {}
+        self._phase_tokens = count()
+        self._lock = threading.Lock()  # _phases is read from the watchdog thread
 
     def poke(self, step: int, total: int) -> None:
         """Report the task's current position; only a *change* resets the clock."""
         if (step, total) != self._last:
             self._last = (step, total)
             self._advanced_at = time.monotonic()
+
+    @contextmanager
+    def phase(self, label: str, timeout_s: float) -> Iterator[None]:
+        """Allow *timeout_s* without step progress for a declared blocking span.
+
+        Setup gets ``grace_s``; this is the same allowance for any span the task
+        names as legitimately step-free — uploading a checkpoint, pulling a
+        dataset, a long eval between epochs. The clock resets on both entry and
+        exit, so the span gets its whole budget and the loop that follows gets
+        its whole timeout.
+
+        A budget only ever *widens* the threshold: it is a bound, not a pass. A
+        span that truly hangs is still caught, at *timeout_s* rather than at the
+        tight step timeout. Size it for the slowest healthy case — aborting a
+        healthy task throws away everything it has done, while catching a wedge
+        late only costs idle time.
+
+        Nests, and is safe to call from any thread.
+        """
+        token = next(self._phase_tokens)
+        with self._lock:
+            self._phases[token] = (timeout_s, label)
+            self._advanced_at = time.monotonic()
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._phases.pop(token, None)
+                self._advanced_at = time.monotonic()
+
+    def _widest_phase(self) -> tuple[float, str] | None:
+        with self._lock:
+            phases = list(self._phases.values())
+        return max(phases, key=lambda p: p[0]) if phases else None
 
     def __enter__(self) -> Watchdog:
         self._advanced_at = time.monotonic()
@@ -88,8 +138,14 @@ class Watchdog:
     def __exit__(self, *exc: Any) -> None:
         self._stop.set()
 
-    def _threshold(self) -> float:
+    def _standing_threshold(self) -> float:
+        """What governs absent any declared phase: the grace until the first poke."""
         return self.timeout_s if self._last is not None else self.grace_s
+
+    def _threshold(self) -> float:
+        phase = self._widest_phase()
+        standing = self._standing_threshold()
+        return max(standing, phase[0]) if phase is not None else standing
 
     def _run(self) -> None:
         poll = min(self.timeout_s / 4, self.grace_s / 4, 15.0)
@@ -117,6 +173,10 @@ class Watchdog:
             at, limit = f" at step {self._last[0]}/{self._last[1]}", f"watchdog {self.timeout_s:g}s"
         else:
             at, limit = " before any progress emission", f"startup grace {self.grace_s:g}s"
+        # Name the threshold that actually expired, so the diagnosis says which
+        # budget to look at — the tight step one, or a phase that outlasted it.
+        if (phase := self._widest_phase()) is not None and phase[0] > self._standing_threshold():
+            limit = f"blocking phase {phase[1]!r} {phase[0]:g}s"
         parts.append(
             f"WatchdogStall: no step progress in {stalled_s:.0f}s ({limit}){at}"
             " — worker aborted, releasing its resources; retry when ready"

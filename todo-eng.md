@@ -164,20 +164,36 @@ state.
     statistic) in the docstring. Then it is one block to verify instead of a
     hunt, and it is the natural thing for a ledger to key on.
 
-- The watchdog fires during a task's post-loop artifact upload (2026-07-31).
-  Four of ex-2.1.7's 21 training cells aborted with `WatchdogStall` at step
-  3300/3300 — training had finished, and the stall was `put(workdir / "model")`
-  pushing a checkpoint to the HF store, which took over 300s with eight
-  containers uploading at once. The role's `watchdog` covers the gap between
-  step emissions, so a long tail after the last step reads as a stall no
-  matter how healthy the loop was. `watchdog_grace` already solves the
-  mirror-image case at the start of a task, so the shape of a fix exists: either
-  a matching teardown grace, or have `put` emit liveness while it uploads (it
-  knows the byte count, so it could emit real progress). Worked around in
-  ex-2.1.7 by sizing the watchdog for the upload rather than the loop, which
-  makes the number mean something different per experiment — worth fixing
-  properly, since the failure costs a full re-train of a finished run. #storage
-  #cli
+- Done: the watchdog fires during a task's post-loop artifact upload
+  (2026-07-31, fixed 2026-08-09). #storage #cli Four of ex-2.1.7's 21 training
+  cells aborted with `WatchdogStall` at step 3300/3300 — training had finished,
+  and the stall was `put(workdir / "model")` pushing a checkpoint to the HF
+  store, which took over 300s with eight containers uploading at once. The
+  role's `watchdog` covers the gap between step emissions, so a long tail after
+  the last step reads as a stall no matter how healthy the loop was.
+  Fixed by generalizing `watchdog_grace` from "the head of the task" to any
+  declared span: `Watchdog.phase(label, timeout_s)` widens the threshold for a
+  span and resets the clock at both ends, fronted by
+  `mini.blocking_phase(label, timeout_s=…)` for task code. `Store.put` / `get` /
+  `get_many` declare their own, sized `120s + size / 512 KiB/s`, so the
+  ex-2.1.7 shape needs no experiment-side change. A budget only ever *widens*
+  the threshold, so a phase bounds a span rather than exempting it — a hung
+  upload is still caught, just at its own budget. Erring loose is the cheap
+  direction here: a wedge caught late costs idle time, aborting a healthy task
+  costs the whole re-train.
+  The worker also stamps `phase`/`phase_until` on the record, so
+  `runs.stale_progress` (and the monitor badge) doesn't read a healthy upload as
+  a wedge for as long as it runs.
+  Not done, and the reason the byte-progress option was passed over: neither
+  `huggingface_hub.upload_file` nor the local backend exposes a per-chunk
+  callback, so incremental byte liveness would mean hooking the underlying
+  transfer. A phase is honest about what it knows. Worth revisiting if a
+  callback appears — real bytes/s would let the budget tighten a lot.
+  `status --json` carries `phase`/`phase_until` (a frozen step next to
+  `stale_progress: false` reads as a contradiction without them). Follow-on
+  worth having: the *human-readable* status line still shows only the frozen
+  step, where it could show the label ("put model") — display-side only, in
+  `progress_display.py` / `monitor.py`.
 
 - Glossary of preferred terms (2026-07-30, updated 2026-08-05). Partly done:
   the `style-terms` skill now defines condition / run / cell / arm / seed /

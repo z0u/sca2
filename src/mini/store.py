@@ -59,6 +59,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Literal
 
+from mini.progress import blocking_phase
+
 __all__ = [
     "Artifact",
     "BlobStat",
@@ -196,6 +198,35 @@ def _tree_sha(children: tuple[Artifact, ...]) -> str:
     """A stable content id for a manifest: hash the sorted ``(name, sha)`` pairs."""
     manifest = "\n".join(f"{c.name}\t{c.sha256}" for c in sorted(children, key=lambda c: c.name))
     return _hash_bytes(manifest.encode())
+
+
+# A transfer makes no *step* progress, so a step that moves bytes has to tell the
+# worker's watchdog that the pause is the work rather than a wedge — otherwise a
+# checkpoint upload after the last step reads exactly like a hang, and a finished
+# task gets thrown away (see :func:`mini.progress.blocking_phase`).
+#
+# The budget: fixed overhead for hashing and round trips, plus the bytes at a
+# floor rate far under any healthy link. The floor is deliberately pessimistic —
+# a sweep's containers share an uplink, so per-container throughput during a
+# simultaneous checkpoint flush is nothing like a solo benchmark. Erring loose is
+# the cheap direction, and bounded either way: a budget can only relax the
+# watchdog, never the role ``timeout`` behind it, so the worst a too-generous one
+# can do is hand a wedged transfer back the behaviour it had before the watchdog
+# existed — while a too-tight one throws away a finished task.
+_TRANSFER_OVERHEAD_S = 120.0
+_TRANSFER_FLOOR_BPS = 512 * 1024
+
+
+def _transfer_budget_s(size: int) -> float:
+    """Seconds a transfer of *size* bytes may take before it counts as stalled."""
+    return _TRANSFER_OVERHEAD_S + size / _TRANSFER_FLOOR_BPS
+
+
+def _size_on_disk(src: Path) -> int:
+    """Bytes at *src*: one file, or every file under a directory."""
+    if src.is_dir():
+        return sum(p.stat().st_size for p in src.rglob("*") if p.is_file())
+    return src.stat().st_size
 
 
 # Object kinds a result's data graph never hides an Artifact behind: crossing
@@ -352,13 +383,20 @@ class Store(ABC):
         A directory becomes a ``tree`` artifact: each file is stored as its own
         blob and the returned handle carries the manifest. ``name`` is the logical
         name (carry the extension — it sets the served media type).
+
+        Declares a watchdog phase for the upload, sized from the payload, so a
+        step that checkpoints after its last training step isn't mistaken for a
+        wedge (see :func:`_transfer_budget_s`).
         """
         if isinstance(data, (bytes, bytearray)):
-            return self._put_bytes(bytes(data), name=name)
+            data = bytes(data)
+            with blocking_phase(f"put {name}", _transfer_budget_s(len(data))):
+                return self._put_bytes(data, name=name)
         src = Path(data)
-        if src.is_dir():
-            return self._put_tree(src, name=name)
-        return self._put_file(src, name=name)
+        with blocking_phase(f"put {name}", _transfer_budget_s(_size_on_disk(src))):
+            if src.is_dir():
+                return self._put_tree(src, name=name)
+            return self._put_file(src, name=name)
 
     def _put_bytes(self, data: bytes, *, name: str) -> Artifact:
         sha = _hash_bytes(data)
@@ -387,17 +425,24 @@ class Store(ABC):
         For a ``file`` artifact *dest* is the destination file; for a ``tree`` it's
         the destination directory, and the children are prefetched in one batch
         (the per-op latency of a remote backend is paid once, not per child).
+
+        Declares a watchdog phase for the download, sized from the handle, so a
+        step that pulls a large artifact mid-run isn't mistaken for a wedge. The
+        recursive child calls land on pool threads, which don't carry the job
+        context — so the one phase opened here covers the whole tree, which is
+        what its ``art.size`` budget is sized for.
         """
         dest = Path(dest)
-        if art.kind == "tree":
-            self._prefetch([art])
-            dest.mkdir(parents=True, exist_ok=True)
-            with ThreadPoolExecutor(max_workers=min(8, len(art.children) or 1)) as ex:
-                list(ex.map(lambda c: self.get(c, dest / c.name), art.children))
+        with blocking_phase(f"get {art.name}", _transfer_budget_s(art.size)):
+            if art.kind == "tree":
+                self._prefetch([art])
+                dest.mkdir(parents=True, exist_ok=True)
+                with ThreadPoolExecutor(max_workers=min(8, len(art.children) or 1)) as ex:
+                    list(ex.map(lambda c: self.get(c, dest / c.name), art.children))
+                return dest
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            self._read_blob(art.sha256, dest)
             return dest
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        self._read_blob(art.sha256, dest)
-        return dest
 
     def get_many(self, items: Iterable[tuple[Artifact, Path]]) -> list[Path]:
         """Materialize several artifacts, batching the remote pull into one round trip.
@@ -408,9 +453,10 @@ class Store(ABC):
         *items*; local materialization then overlaps in a small thread pool.
         """
         pairs = [(a, Path(d)) for a, d in items]
-        self._prefetch(a for a, _ in pairs)
-        with ThreadPoolExecutor(max_workers=min(8, len(pairs) or 1)) as ex:
-            return list(ex.map(lambda p: self.get(*p), pairs))
+        with blocking_phase(f"get {len(pairs)} artifacts", _transfer_budget_s(sum(a.size for a, _ in pairs))):
+            self._prefetch(a for a, _ in pairs)
+            with ThreadPoolExecutor(max_workers=min(8, len(pairs) or 1)) as ex:
+                return list(ex.map(lambda p: self.get(*p), pairs))
 
     def _prefetch(self, arts: Iterable[Artifact]) -> None:  # noqa: B027 — a hook: empty here, non-abstract
         """Warm whatever cache backs :meth:`_read_blob` for *arts*, in one batch.
