@@ -103,9 +103,7 @@ def _(a_op1, acc, contrast, grading_r2, m_line, pi_group_mean, retention):
     operand, at weight {_lead:.2f} (gate ≥ {ex.LEAD_GATE:g}; uniform is
     0.25), in all nine runs individually; (b) the deep-slice between-group
     op2 contrast is {contrast(_P).mean():+.2f} (gate ≥
-    {ex.CONTRAST_GATE:g}), which is most of the one-hot amplitude. So the
-    winner varies per line, and neither a global latch nor uniform weights
-    occurred.
+    {ex.CONTRAST_GATE:g}).
 
     **H3 (the operating point survives) — holds.** On `{_P}`: containment
     $\bar\alpha$ at op1 = {a_op1(_P).mean():.3f} (gate ≤
@@ -118,9 +116,7 @@ def _(a_op1, acc, contrast, grading_r2, m_line, pi_group_mean, retention):
 
     **H4 (selectivity without the pointer) — holds.** Control-subtracted
     m_line of the primary is {_frac:.0%} of the value for the slot oracle
-    (gate ≥ {ex.ORACLE_FRAC_GATE:.0%}). That is level with the oracle,
-    within seed noise, and well clear of the ~half the latch account
-    predicts.
+    (gate ≥ {ex.ORACLE_FRAC_GATE:.0%}).
 
     The reference arm reproduced `pool-t100` from ex-2.1.9 through the new
     labelling code path, matching every carried statistic to three decimals
@@ -897,7 +893,8 @@ def _(N_SEEDS: dict, READ: np.ndarray, contrast, pi_group, pi_group_mean):
             sits at op2 at every slice, 0.77 at the embedding rising to 0.95
             at depth. Nine per-seed hairlines hug the mean everywhere. A
             dashed readability line in the G1 column is high at op1 on every
-            slice and near zero elsewhere at the embedding.
+            slice; at the embedding it falls to near zero at the other three
+            roles, while at depth it dips at plus and rises again at equals.
         """,
         "either-t500": """
             The same ten-panel layout for tau 0.5. Both columns are nearly
@@ -961,8 +958,12 @@ def _(N_SEEDS: dict, READ: np.ndarray, contrast, pi_group, pi_group_mean):
                 axes[0][col].set_title(gname, fontsize=8.5, color=ink)
                 # H2(a) reads exactly here: the group's own-operand weight at the embedding.
                 own = 0 if col == 0 else 2
-                axes[4][col].plot(own, ex.LEAD_GATE, marker=9, ms=3, color=_gate, clip_on=False, zorder=6,
-                                  transform=axes[4][col].get_yaxis_transform())  # fmt: skip
+                # REVIEW: the H2(a) carets were drawn under get_yaxis_transform(),
+                # which reads x in axes fraction — so G1's landed on the left spine
+                # and G2's outside the panel, contradicting the caption ("at each
+                # group's own operand"). Now plain data coords. Verify: G2's caret
+                # should sit under the op2 tick, beside the 0.77 annotation.
+                axes[4][col].plot(own, ex.LEAD_GATE, marker=9, ms=3, color=_gate, clip_on=False, zorder=6)
                 axes[4][col].annotate(f"{_pg[col, 0, own]:.2f}", (own, min(_pg[col, 0, own] + 0.14, 0.92)),
                                       ha="center", fontsize=7, color=light_dark("#444", "#bbb"))  # fmt: skip
                 axes[4][col].set_xticks(_x, ex.ROLES)
@@ -1219,7 +1220,7 @@ def _(CONDS: list[str], alpha_map, grading_r2, m_line):
             redness and a rising tail of oranges and reds that tracks the
             dashed reference curve closely. In the either-t500 and
             either-t2500 panels the low-redness cluster scatters much more
-            widely, from about -0.2 to 0.35, and the conditional-mean line
+            widely, from about -0.2 to 0.5, and the conditional-mean line
             wanders around a slightly raised level before rising, hugging
             the reference less tightly.
         """,
@@ -1474,9 +1475,10 @@ def _(N_SEEDS: dict, traj):
             Two panels sharing an epoch axis from 0 to 100 and an alignment
             axis from about -0.1 to 0.45, with the repulsion schedule shaded
             faintly behind each. Left panel, the embedding slice: the equals
-            curve climbs steadily from zero after epoch 20 to 0.40 by epoch
-            90 and holds; the plus curve does the same to 0.28; op1 and op2
-            stay flat within a few hundredths of zero. Right panel, the last
+            and plus curves rise to about 0.13 by epoch 15, hold flat to
+            epoch 35, then climb to 0.40 and 0.28 respectively by epoch 90;
+            op1 and op2 dip to about -0.12 near epoch 8 and return to within
+            a few hundredths of zero. Right panel, the last
             slice: op1 and op2 rise gently to 0.15 and 0.12 while plus and
             equals stay near zero.
         """,
@@ -1519,7 +1521,7 @@ def _(N_SEEDS: dict, traj):
 
 
 @app.cell(hide_code=True)
-def _(N_SEEDS: dict, R1: np.ndarray, R2: np.ndarray, arrays, traj):
+def _(N_SEEDS: dict, R1: np.ndarray, R2: np.ndarray, arrays, contrast, grading_r2, traj):
     _P = ex.PRIMARY
     _AR = np.mean([traj(_P, s, "alpha_roles") for s in range(N_SEEDS[_P])], axis=0)
     _EP = np.mean([traj(_P, s, "epoch") for s in range(N_SEEDS[_P])], axis=0)
@@ -1583,8 +1585,10 @@ def _(N_SEEDS: dict, R1: np.ndarray, R2: np.ndarray, arrays, traj):
     case where a document holds the concept in several places at once.
 
     **The soft-τ trade.** Across the ladder, localization and grading fall
-    together while m_line rises: contrast 0.85 → 0.17 → 0.03 and $r^2$
-    0.82 → 0.67 → 0.61 as τ goes 0.1 → 0.5 → 2.5, with m_line highest at
+    together while m_line rises: contrast
+    {" → ".join(f"{contrast(c).mean():.2f}" for c in ex.EITHER_NAMES)} and
+    $r^2$ {" → ".join(f"{grading_r2(c):.2f}" for c in ex.EITHER_NAMES)} as
+    τ goes {" → ".join(f"{t:g}" for t in ex.TAUS)}, with m_line highest at
     the diffuse end (the H4 table). A nearly-mean pull does still buy
     line-keyed *margin*, in that the spans of labeled lines align more than
     the bulk. But it localizes barely at all once the label stops pointing,
