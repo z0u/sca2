@@ -13,11 +13,11 @@ from __future__ import annotations
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 import pytest
 
-from mini._taskworker import _MemoSink
+from mini._taskworker import _MemoSink, _phase_hook
 from mini._watchdog import Watchdog
 from mini.experiment import Experiment
 from mini.local_apparatus import LocalApparatus
@@ -219,6 +219,26 @@ def test_stale_progress_pauses_for_a_declared_blocking_phase():
     assert stale_progress(rec, now=1000.0) is True
     assert stale_progress(rec | {"phase_until": 1200.0}, now=1000.0) is False
     assert stale_progress(rec | {"phase_until": 900.0}, now=1000.0) is True  # budget itself blown
+
+
+def test_nested_phases_hand_the_record_back_rather_than_clearing_it(monkeypatch: pytest.MonkeyPatch):
+    """Task code wrapping a `put` — which declares one of its own — leaves two
+    spans open. The record holds one label, so the inner exit has to restore the
+    outer's, not clear it: otherwise the badge calls the rest of the outer span
+    a wedge."""
+    monkeypatch.setattr(time, "time", lambda: 1000.0)
+    stamps: list[tuple[str | None, float | None]] = []
+
+    def record(**fields: Any) -> bool:  # matches execute_task's own record()
+        stamps.append((fields.get("phase"), fields.get("phase_until")))
+        return True
+
+    phase = _phase_hook(None, record)
+    with phase("archive epoch", 600.0):
+        with phase("put model", 120.0):
+            pass
+        assert stamps[-1] == ("archive epoch", 1600.0)  # back to the outer span, still open
+    assert stamps[-1] == (None, None)  # only the last exit clears it
 
 
 def test_status_json_surfaces_the_declared_phase():

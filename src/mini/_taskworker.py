@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -20,6 +21,7 @@ import cloudpickle
 
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager, nullcontext
+from itertools import count
 from math import isfinite
 
 from mini._queues import EndOfQueue
@@ -340,15 +342,40 @@ def _phase_hook(
     The stamp is written whether or not a watchdog is armed: the badge is
     computed from the record either way.
     """
+    open_spans: dict[int, tuple[float, str]] = {}  # token -> (deadline, label)
+    tokens = count()
+    lock = threading.Lock()
+
+    def restamp() -> None:
+        """Stamp the span with the latest deadline still open, or clear at the last exit.
+
+        Phases nest — task code can wrap a ``put`` that declares one of its own —
+        while the record holds a single label, so an inner exit has to hand the
+        record back to its parent rather than clear it. Keyed by the deadline
+        rather than the budget: what the badge needs is when the outstanding
+        allowance actually runs out.
+        """
+        with lock:
+            spans = list(open_spans.values())
+        if spans:
+            deadline, label = max(spans, key=lambda s: s[0])
+            record(phase=label, phase_until=deadline)
+        else:
+            record(phase=None, phase_until=None)
 
     @contextmanager
     def phase(label: str, timeout_s: float) -> Iterator[None]:
-        record(phase=label, phase_until=time.time() + timeout_s)
+        token = next(tokens)
+        with lock:
+            open_spans[token] = (time.time() + timeout_s, label)
+        restamp()
         try:
             with watchdog.phase(label, timeout_s) if watchdog is not None else nullcontext():
                 yield
         finally:
-            record(phase=None, phase_until=None)
+            with lock:
+                open_spans.pop(token, None)
+            restamp()
 
     return phase
 
