@@ -18,8 +18,9 @@ Three pieces, kept separate so an experiment can use them independently:
   pull has to buy alignment against a headwind.
 - **The labels.** `sample_anchored_batches` crops packed token blocks exactly as
   `sca.data.batches.sample_batches` does, and adds the (B, T) mask of positions
-  the term pulls: the prompt span of lines whose first operand drew a label this
-  visit.
+  the term pulls: the prompt span of lines that drew a label this visit.
+  `LabelSpec` says which operands draw (op1 alone, or either independently) and
+  whether the pull covers the span or just the operand(s) that drew.
 - **The readout.** `alignment` reads cos(h, e₀) off the residual stream, and
   `margin` contracts it to the label-affinity-weighted margin the hypotheses score.
 
@@ -31,7 +32,7 @@ direction constraint needs no companion term to keep activation scale in hand.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Iterator, Literal
 
 import equinox as eqx
 import jax
@@ -172,6 +173,25 @@ def anti_subspace_weight(
     return lam * ratio * end
 
 
+@dataclass(frozen=True)
+class LabelSpec:
+    """Which lines draw a label each visit, and which of their positions the pull covers.
+
+    *p* is a per-token probability. Under `op1` keying it is P(line labeled),
+    read off the first operand alone — the ex-2.1.6..9 labeller, and what a
+    bare array passed in its place means. Under `either` keying it is the
+    per-operand rate: op1 and op2 draw independently and the line is labeled
+    when either does, so the label no longer says which position carried it.
+    *pull* picks the masked positions of a labeled line: its prompt span, or
+    just the operand(s) that drew (`slot`) — the pull of a labeller that names
+    the slot, which the span pull has to match without being told.
+    """
+
+    p: Float[np.ndarray, " V"]
+    keying: Literal["op1", "either"] = "op1"
+    pull: Literal["span", "slot"] = "span"
+
+
 def anchor_term(states: Float[Array, "L1 B T C"], mask: Float[Array, "B T"]) -> Float[Array, ""]:
     """Mean of (1 − cos(h, e₀)) over pulled positions and residual-stream slices.
 
@@ -307,7 +327,7 @@ def sample_anchored_batches(
     model_config: ModelConfig,
     n_batches: int,
     rng: np.random.Generator,
-    label_p: Float[np.ndarray, " V"],
+    label_p: Float[np.ndarray, " V"] | LabelSpec,
     span: int = PROMPT_SPAN,
     lines: bool = False,
 ) -> Iterator[tuple]:
@@ -315,16 +335,19 @@ def sample_anchored_batches(
 
     The crops are `sca.data.batches.sample_batches`, repeated here rather than
     wrapped because the mask needs the crop offsets and that generator does not
-    yield them. `label_p[token]` is the probability that a line whose first
-    operand is *token* draws a label, redrawn per visit as in M1 — so the same
-    line is labeled on one epoch and not the next, and the draws are consumed
-    whatever the anchor weight is, which keeps every condition of a sweep on
-    identical batches for a given seed.
+    yield them. *label_p* is a `LabelSpec`, or a bare per-token array meaning
+    op1 keying: the probability that a line draws a label, redrawn per visit as
+    in M1 — so the same line is labeled on one epoch and not the next, and the
+    draws are consumed whatever the anchor weight is, which keeps every
+    condition sharing a labeller on identical batches and label draws for a
+    given seed. (Labellers with different keying consume the stream
+    differently, so *those* comparisons carry corpus-draw noise.)
 
     With `lines=True` each batch carries a fourth element: the (B, T) local
     line index (0 .. `block_size // LINE_TOKENS + 1`) that groups positions
     into lines for `pooled_anchor_term`. The draws are identical either way.
     """
+    spec = label_p if isinstance(label_p, LabelSpec) else LabelSpec(np.asarray(label_p))
     block_size = model_config.block_size
     n_starts = len(data) - block_size - 1
     if n_starts < 1:
@@ -349,10 +372,21 @@ def sample_anchored_batches(
         line = absolute // LINE_TOKENS
         local = line - line[:, :1]
         op1 = data[line * LINE_TOKENS]  # every line's first operand, wherever the crop landed
-        draw = rng.random((len(starts), n_lines))
-        labeled = np.take_along_axis(draw, local, axis=1) < label_p[op1]
+        if spec.keying == "op1":
+            draw = rng.random((len(starts), n_lines))
+            drew1 = np.take_along_axis(draw, local, axis=1) < spec.p[op1]
+            drew2 = np.zeros_like(drew1)
+        else:
+            op2 = data[line * LINE_TOKENS + 2]
+            draw = rng.random((len(starts), n_lines, 2))
+            drew1 = np.take_along_axis(draw[..., 0], local, axis=1) < spec.p[op1]
+            drew2 = np.take_along_axis(draw[..., 1], local, axis=1) < spec.p[op2]
+        role = absolute % LINE_TOKENS
         # Padded positions are not shown to the model, so they are not pulled either.
-        mask = labeled & (absolute % LINE_TOKENS < span) & (x != 0)
+        if spec.pull == "span":
+            mask = (drew1 | drew2) & (role < span) & (x != 0)
+        else:
+            mask = ((drew1 & (role == 0)) | (drew2 & (role == 2))) & (x != 0)
         if lines:
             yield x, y, mask.astype(np.float32), local.astype(np.int32)
         else:

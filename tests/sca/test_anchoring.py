@@ -14,6 +14,7 @@ from sca.anchoring import (
     PROMPT_SPAN,
     AnchorSpec,
     AntiSpec,
+    LabelSpec,
     alignment,
     anchor_term,
     anti_subspace_term,
@@ -119,6 +120,49 @@ def test_padded_positions_are_never_pulled(corpus):
     _, _, mask = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(2), np.ones(64)))
     x, _, _ = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(2), np.ones(64)))
     assert mask[x == 0].sum() == 0
+
+
+def test_a_bare_array_and_an_op1_spec_draw_identically(corpus):
+    """The reproduction arm leans on this: op1 keying consumes the rng exactly as before."""
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    mc, dc = model_config(), data_config()
+    legacy = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(5), label_p))
+    spec = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(5), LabelSpec(label_p)))
+    for a, b in zip(legacy, spec, strict=True):
+        np.testing.assert_array_equal(a, b)
+
+
+def test_either_keying_pulls_lines_whose_op2_drew(corpus):
+    """With p deterministic, either keying labels a strict superset of op1 keying's lines."""
+    p = np.zeros(64)
+    p[COLORS[0]] = 1.0  # every draw succeeds for COLORS[0], no other color ever draws
+    mc, dc = model_config(), data_config(0.0)
+    _, _, op1_mask = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(6), p))
+    x, _, either_mask = next(
+        sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(6), LabelSpec(p, keying="either"))
+    )
+    a, b = op1_mask.astype(bool), either_mask.astype(bool)
+    assert (a & ~b).sum() == 0  # every op1-labeled line is still labeled...
+    assert (b & ~a).sum() > 0  # ...and lines labeled through op2 alone join them
+    # Lines labeled only through op2 carry a different color at op1, and it is pulled.
+    assert len(set(np.unique(x[b & ~a])) & set(COLORS[1:])) > 0
+
+
+def test_slot_pull_marks_only_the_operands_that_drew(corpus):
+    mc, dc = model_config(), data_config(0.0)
+    p = np.zeros(64)
+    p[COLORS[0]] = 1.0
+    x, _, span_mask = next(
+        sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(7), LabelSpec(p, keying="either"))
+    )
+    _, _, slot_mask = next(
+        sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(7), LabelSpec(p, keying="either", pull="slot"))
+    )
+    pulled = slot_mask.astype(bool)
+    assert pulled.sum() > 0
+    assert set(np.unique(x[pulled])) == {COLORS[0]}  # only the operand(s) that drew, never syntax
+    assert not (pulled & ~span_mask.astype(bool)).any()  # a subset of the span pull, same label draws
 
 
 def test_anchor_term_is_zero_when_aligned_and_two_when_opposed():
@@ -365,7 +409,7 @@ def test_anchoring_moves_the_labeled_color_toward_the_axis(data_dir, tmp_path):
         assert len(metrics) == 15
         assert set(traj) == {
             *("step", "epoch", "lr", "weight", "anti_weight", "m_op1", "m_span"),
-            *("alpha_op1", "val_loss", "anchor", "anti", "pi"),
+            *("alpha_op1", "alpha_roles", "val_loss", "anchor", "anti", "pi"),
         }
         assert not any(traj["anti_weight"])  # no repulsive term in this pair
         trajectories[peak] = traj
@@ -391,12 +435,17 @@ def test_pooled_training_runs_and_records_the_weight_profile(data_dir, tmp_path)
             label_p=label_p,
             probe_tokens=tokens,
             probe_weights=weights,
+            probe_line_w=weights,
             checkpoint_dir=tmp_path / f"ckpt-t{tau}",
             traj_stride=20,
         )
         assert traj["pi"].shape == (len(traj["step"]), 3, PROMPT_SPAN)  # (measurements, slices, roles)
         np.testing.assert_allclose(traj["pi"].sum(axis=-1), 1.0, rtol=1e-5, atol=0)
         assert traj["anchor"][-1] < traj["anchor"][0]  # the pull pulled
+        # The trajectory carries the per-role drift, and — since the line weights
+        # here equal the color weights — an m_line that reduces to m_span exactly.
+        assert traj["alpha_roles"].shape == (len(traj["step"]), 3, PROMPT_SPAN)
+        np.testing.assert_allclose(traj["m_line"], traj["m_span"], rtol=1e-6, atol=1e-7)
         trajs[tau] = traj
     np.testing.assert_allclose(trajs[np.inf]["pi"], 1 / PROMPT_SPAN, rtol=0, atol=1e-6)
     assert float(np.abs(trajs[0.05]["pi"][-1] - 0.25).max()) > 0.05  # a finite τ concentrates
