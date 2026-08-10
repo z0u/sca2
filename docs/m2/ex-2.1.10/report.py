@@ -1735,51 +1735,35 @@ def _(N_SEEDS, alpha_map, arrays):
 
 
 @app.cell(hide_code=True)
-def _(m_line):
-    _CTRL = float(m_line("lam0").mean())
-    _frac = (m_line(ex.PRIMARY).mean() - _CTRL) / (m_line(ex.ORACLE_ARM).mean() - _CTRL)
-    mo.md(rf"""
+def _():
+    mo.md(r"""
     ## Discussion
 
-    Ex-2.1.9 left a doubt unsettled: every label there was keyed on op1, so
-    the pooled pull's clean localization might have been inherited from
-    labels that always pointed at the answer. This experiment removes the
-    pointer, and the localization survives — the pull lands on the operand
-    that drew the label, line by line, delivering {_frac:.0%} of the
-    control-subtracted selectivity of the slot oracle. The information the
-    labeller withholds — which operand triggered — turns out to be worth
-    nothing here, because pooling recovers it from the geometry. So for M3,
-    where document-level labels
-    do not point, the burden of localization can sit on the loss side:
-    label-side help — EM-style responsibilities, attention-derived position
-    weights — drops from "probably needed" to a contingency for harder
-    settings.
+    The doubt ex-2.1.9 could not settle — that the pooled pull's clean
+    localization was inherited from labels that always pointed at op1 — is
+    settled: removing the pointer changed nothing an oracle could improve
+    on (H4). So for M3, where document-level labels do not point, the
+    burden of localization can sit on the loss side: label-side help —
+    EM-style responsibilities, attention-derived position weights — drops
+    from "probably needed" to a contingency for harder settings.
 
-    Two candidate positions, a lexicon shared by both, and a task that keeps
-    each operand's color legible at its own position: the per-line
-    localization problem does not get much easier than that. The grammar
-    cannot yet produce a line whose strongest evidence sits at a position
-    the labeller never keys on — that needs an operation that can make the
-    answer redder than both operands, which is queued. The both-red lines
-    that preview multi-site concepts are a few percent of the label mass,
-    where the pull splits rather than chooses. So parity with the oracle
-    reads as: pooling suffices when the concept is findable line by line.
-    That is the default M3 should start from; the queued grammar extensions
-    are what would stress it as documents get longer and sites more
-    numerous.
+    The qualification is how easy this testbed makes the per-line problem:
+    two candidate positions, a lexicon shared by both, each operand's color
+    legible at its own position (the scope limit in the introduction), and
+    multi-site lines rare enough that nothing gated turns on them. Parity
+    with the oracle therefore reads as: pooling suffices when the concept
+    is findable line by line. That is the default M3 should start from; the
+    queued grammar extensions are what would stress it as documents get
+    longer and sites more numerous.
 
-    The remaining risk lives in the operating point, τ. The ladder makes it
-    concrete: soften the pool and m_line *rises* while the group contrast
-    and the grading collapse, so a margin-guided search over τ would walk to
-    the smeared end and report success. Selectivity in M3 therefore needs
-    reading as a triple of margin, group contrast, and per-color grading.
-    The look inside the grading statistic above sharpened the third leg: the
-    per-color $r^2$ scores the soft arms down for seed-stable per-color
-    scatter — the failure an intervention would feel — while a
-    conditional-mean reading over redness levels scores those same arms
-    best. Both readings belong in the M3 instrument set. A finer τ ladder
-    near the primary is queued, since everything between the first two
-    rungs is unmeasured and that step is where the localization was lost.
+    The remaining risk lives in the operating point, τ. A margin-guided
+    search over τ would walk to the smeared end and report success (the
+    soft-τ trade, in Exploratory), so selectivity in M3 needs reading as a
+    triple of margin, group contrast, and per-color grading — with both
+    grading readings in the instrument set, since only the per-color one
+    feels the failure an intervention would. A finer τ ladder near the
+    primary is queued; everything between the first two rungs is
+    unmeasured.
 
     For D2.1 the chain is now complete: a span pull broadcasts (ex-2.1.6),
     the repulsion schedule sets a workable operating point (ex-2.1.8),
