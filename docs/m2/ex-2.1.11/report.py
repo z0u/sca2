@@ -372,8 +372,8 @@ def _():
     raises m_line while the per-color grading and the group contrast
     collapse, so selectivity smears out into "everything red-ish moves".
 
-    That shape decides the shape of the search. A trade in both directions
-    would need a Pareto front,[^pareto] but objectives that move together can
+    That structure decides the shape of the search. A two-way trade would
+    need a Pareto front,[^pareto] but objectives that move together can
     be constraints around a single scalar. So the objective is one number:
     maximize m_line, subject to the task gate, containment, retention,
     grading, contrast, and the latch veto, with the values under *Objective,
@@ -385,8 +385,8 @@ def _():
     turn out to sit on the constraint boundary, the map will show it.
 
     [^pareto]: The set of points at which no objective can be improved without
-        giving up some of another — a curve to choose along, rather than a
-        single winner.
+        giving up some of another. It is a curve to choose along, rather than
+        a single winner.
     """)
     return
 
@@ -863,8 +863,7 @@ def _():
     mo.md(rf"""
     **Objective** (from `experiment.OBJECTIVE`): rank feasible trials by
     seed-mean m_line, largest first. m_line is the one statistic tight enough
-    to rank on, and the calibration stage shows why it can't stand alone. So
-    everything else is a constraint:
+    to rank on, so everything else is a constraint:
 
     | constraint | bar | source |
     |---|---|---|
@@ -875,22 +874,20 @@ def _():
     | contrast | group contrast ≥ {ex.CONTRAST_MIN:g} | ex-2.1.10's partial bar |
     | latch | no run with deep-slice syntax weight > {ex.LATCH_PI:g} | calibrated above |
 
-    **Rounds.** Round 1 runs all {ex.N_TRIALS} trials at seed 0. The noise
-    floors allow this: the per-run σ of the margin statistics is far below the
-    effects we care about. The {ex.N_PROMOTE} feasible trials with the highest
+    **Rounds.** Round 1 runs all {ex.N_TRIALS} trials at seed 0, which the
+    noise floors allow. The {ex.N_PROMOTE} feasible trials with the highest
     m_line are promoted to {ex.SEEDS_PROMOTE} seeds. If fewer are feasible, we
     promote all of them; if none are, we publish the infeasibility map and
-    propose nothing. The proposed operating point is the promoted trial with
-    the highest seed-mean m_line that is still feasible on seed means; the
-    latch veto stays per-run. Promotion only partly corrects the winner's
-    curse, which is why the proposal has to be confirmed at fresh seeds before
-    anyone quotes it.
+    propose nothing.
+
+    The proposed operating point is the promoted trial with the highest
+    seed-mean m_line that is still feasible on seed means; the latch veto stays
+    per-run. Promotion only partly corrects the winner's curse.
 
     **Stopping rule.** Fixed budget, two rounds, no adaptive continuation.
     Trials that diverge or fail are published as failures rather than
-    resampled. We publish every trial, including the ones that go nowhere.
-    Memoization keeps them anyway, and a complete table is what makes the map
-    from a search trustworthy.
+    resampled. Memoization keeps them anyway, and a complete table is what
+    makes the map from a search trustworthy.
     """)
     return
 
@@ -963,17 +960,17 @@ def _():
     /// admonition | TODO
     Table: `anti-hold` and `anti-peak` against `ref`, same statistics, same
     bands, with the delivered dose and centroid of each arm restated from the
-    conditions table. We gate the effect of the schedule on the peak-matched
-    arm, and read the hold-level arm as the dose secondary.
+    conditions table.
 
     The mechanism proposed in ex-2.1.8 is that early repulsion pushes the
     syntax roles out of reach before the pull commits. Under that account we
     expect `anti-hold` to lose containment or contrast, and `anti-peak` to
-    hold the statistics but pay somewhere visible. If `anti-peak` pays
-    nothing, the schedule was a constant in disguise and branch B runs. The
-    other outcome worth naming is `anti-hold` within band, which would say the
-    timing of the repulsion never mattered at this operating point, and branch
-    B runs at the lower level.
+    hold the statistics but pay somewhere visible.
+
+    If `anti-peak` pays nothing, the schedule was a constant in disguise and
+    branch B runs. The other outcome worth naming is `anti-hold` within band,
+    which would say the timing of the repulsion never mattered at this
+    operating point, and branch B runs at the lower level.
     ///
     """)
     return
@@ -987,12 +984,13 @@ def _():
     /// admonition | TODO
     Table: `short` − `ref` on the decision statistics, with the task gate
     measured against `short-lam0`. Then the m_line and validation-loss
-    trajectories on a shared fraction-of-training axis. Ex-2.1.6 saw margins
-    flat from about epoch 50 and validation loss settling earlier, so we
-    expect `short` to land within band and the survey to cost half as much.
-    The contrary result is a resolved gap in m_line or retention, which would
-    mean the last 50 epochs do some consolidation the trajectory statistics
-    haven't shown. Either way it is worth knowing before D2.2 scales
+    trajectories on a shared fraction-of-training axis.
+
+    Ex-2.1.6 saw margins flat from about epoch 50 and validation loss settling
+    earlier, so we expect `short` to land within band and the survey to cost
+    half as much. The contrary result is a resolved gap in m_line or retention,
+    which would mean the last 50 epochs do some consolidation the trajectory
+    statistics haven't shown. Either way it is worth knowing before D2.2 scales
     anything.
     ///
     """)
@@ -1038,8 +1036,8 @@ def _():
     2. Marginals: m_line and each constraint statistic against each
        dimension, with the branch A anti axes shown in dose and centroid
        coordinates, and feasible trials distinguished from infeasible ones.
-       What we read off is where the feasible region sits and how flat m_line
-       is across it. A wide plateau is itself the result D2.2 wants.
+       We read off where the feasible region sits and how flat m_line is
+       across it; a wide plateau is itself the result D2.2 wants.
     3. The m_line against r² plane with the constraint boundary drawn,
        showing what the grading constraint excluded. Alongside the per-color
        r², we report the conditional-mean r² over redness levels. The
