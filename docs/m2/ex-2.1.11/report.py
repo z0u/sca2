@@ -57,10 +57,11 @@ with app.setup(hide_code=True):
             ex.EX218_METRICS_REF,
         ]
         arts = store.get_refs(refs)
-        if any(arts[r] is None for r in refs):
+        found = [a for r in refs if (a := arts[r]) is not None]
+        if len(found) < len(refs):
             return None
         with tempfile.TemporaryDirectory() as d:
-            paths = store.get_many([(arts[r], Path(d) / f"{i}.bin") for i, r in enumerate(refs)])
+            paths = store.get_many([(a, Path(d) / f"{i}.bin") for i, a in enumerate(found)])
             m10 = json.loads(paths[0].read_text())
             with np.load(paths[1]) as z:
                 a10 = {k: z[k] for k in z.files if "/alpha" in k or "/w_line" in k}
