@@ -10,6 +10,7 @@ from sca.anchoring import (
     PROMPT_SPAN,
     AnchorSpec,
     AntiSpec,
+    LabelSpec,
     alignment,
     make_anchored_train_step,
     margin,
@@ -110,9 +111,10 @@ def train_anchored(
     *,
     anchor: AnchorSpec,
     anti: AntiSpec | None = None,
-    label_p: np.ndarray,
+    label_p: np.ndarray | LabelSpec,
     probe_tokens: np.ndarray,
     probe_weights: np.ndarray,
+    probe_line_w: np.ndarray | None = None,
     checkpoint_dir: Path,
     checkpoint_every: int | None = None,
     traj_stride: int = 50,
@@ -137,10 +139,14 @@ def train_anchored(
         anti: Weight and schedule for the anti-subspace term, or None for a bare
             anchor. The term runs at weight zero when absent, so the loss is the
             same function either way.
-        label_p: (vocab,) probability that a line draws a label, by its first
-            operand's token; redrawn per visit.
+        label_p: a `LabelSpec`, or a (vocab,) array meaning op1 keying — the
+            probability that a line draws a label, by its first operand's
+            token; redrawn per visit either way.
         probe_tokens: (C, T) one line per color, that color as first operand.
         probe_weights: (C,) label-affinity weights, summing to 1.
+        probe_line_w: (C,) per-*line* weights, summing to 1, for a labeller
+            keyed on more than op1. When given, the trajectory also records
+            `m_line`, the per-line margin the wider labeller's retention reads.
         checkpoint_dir: Where to write checkpoints; sweep cells sharing a volume
             must each pass their own.
         checkpoint_every: Save a checkpoint every N epochs. None = about 50 in all.
@@ -175,7 +181,7 @@ def train_anchored(
     tokens_per_epoch = epoch_length * config.data.batch_size * config.model.block_size
     all_metrics: list[TrainingMetrics] = []
     keys = ("step", "epoch", "lr", "weight", "anti_weight", "m_op1", "m_span", "alpha_op1")
-    traj: dict[str, list] = {k: [] for k in (*keys, "val_loss", "anchor", "anti", "pi")}
+    traj: dict[str, list] = {k: [] for k in (*keys, "val_loss", "anchor", "anti", "pi", "alpha_roles")}
     tau_eff = np.inf if anchor.tau is None else anchor.tau
     step = 0
 
@@ -187,6 +193,12 @@ def train_anchored(
         # The margin is a contrast, so it is blind to the whole cube drifting onto
         # the axis together. Carrying the plain mean beside it keeps the two apart.
         traj["alpha_op1"].append(float(alpha[:, :, 0].mean()))
+        # Unweighted drift per (slice, role): which role pays for its alignment, and when.
+        traj["alpha_roles"].append(alpha.mean(axis=1))
+        if probe_line_w is not None:
+            m_line = float(margin(alpha, probe_line_w).max(axis=1).mean())
+            traj.setdefault("m_line", []).append(m_line)
+            emit_metrics(m_line=m_line)
         # What the pull chose: the softmin weight each span role would take at the
         # anchor's τ, label-affinity-weighted over colors. Uniform at τ = ∞.
         traj["pi"].append(np.einsum("lct,c->lt", softmin_weights(1.0 - alpha, tau_eff), probe_weights))
@@ -202,7 +214,10 @@ def train_anchored(
         traj["anti"].append(anti_loss)
         emit_metrics(m_op1=m_op1, m_span=m_span)
 
-    expect_metrics(loss="down", anchor="down", m_op1="up", m_span="up")
+    expected = dict(loss="down", anchor="down", m_op1="up", m_span="up")
+    if probe_line_w is not None:
+        expected["m_line"] = "up"
+    expect_metrics(**expected)
     for epoch in range(config.scheduler.epochs):
         train_losses, anchor_losses, anti_losses = [], [], []
         for x, y, mask, line_id in sample_anchored_batches(

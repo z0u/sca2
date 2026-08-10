@@ -605,6 +605,38 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   D2.2. (2026-08-08, from the ex-2.1.10 prereg review.) #[D2.1] #task-grammar
   #anchoring
 
+- [ ] Survey τ finely near the ex-2.1.10 primary. The ladder τ = 0.1 → 0.5 →
+  2.5 loses the deep-slice group contrast (0.85 → 0.17 → 0.03) and the grading
+  (r² 0.82 → 0.67 → 0.61) in its first step, so where the trade turns — and
+  how sharply — is unmeasured between 0.1 and 0.5. A finer ladder around 0.1
+  (± 0.05 and outward, say τ ∈ 0.05–0.3) would say whether the primary sits on
+  a plateau or a narrow optimum, which M3 needs to know before it inherits a
+  τ. Report-side calibration from the stored weight profiles first, as
+  ex-2.1.9's prereg did, then a short sweep. (2026-08-10, from the ex-2.1.10
+  review round.) #ex-2.1.10 #anchoring #schedules
+
+- [ ] Selectivity is a triple in M3: margin + group contrast + per-color
+  grading. Ex-2.1.10's soft arms top m_line while the contrast and the grading
+  collapse, so a margin-guided hyperparameter search would walk to the smeared
+  end. Grading itself needs both of its readings: the per-color r² charges for
+  seed-stable per-color scatter (70% of the soft arms' residual variance about
+  the sim¹·⁵ fit — the operative failure for intervention, since a mis-scored
+  color would respond as if it were redder than it is), while a
+  conditional-mean r² over redness levels scores the soft arms best in the
+  sweep (0.94). Only the pair separates graded-on-average from graded
+  color-by-color. (2026-08-10, from the ex-2.1.10 review round.) #ex-2.1.10
+  #metrics #measurement
+
+- [ ] Distinct operand lexicons, so per-group embedding reads can bind. With
+  one lexicon serving both operand slots, the embedding-slice weight profile
+  is symmetric between ex-2.1.10's label groups by construction — a token's
+  embedding cannot depend on its line — so the H2(a) embedding read is
+  near-vacuous and all the localization content sits in the post-attention
+  slices. Disjoint op1/op2 color vocabularies (same palette, two names per
+  color) would make the embedding read informative and remove the head start
+  the shared lexicon gives the pull. (2026-08-10, from the ex-2.1.10
+  discussion round.) #ex-2.1.10 #task-grammar #anchoring
+
 - [~] Pool the anchor term over positions instead of averaging over them. Ex-2.1.6
   pulls all four prompt positions equally and asks (H3) whether the concept
   condenses anyway. If it broadcasts instead, a logsumexp over positions is the
