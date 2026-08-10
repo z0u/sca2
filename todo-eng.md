@@ -24,6 +24,25 @@ state.
 
 - `gh-pages` branch pruning. This is where we publish reports to; see `.github/workflows/publish-docs.yml`. Currently the branch history is linear, and contains a commit for every preview build and every build on `main`. We should compact it, probably on every `main` build. How many commits to keep? Unsure, maybe ~1 week, maybe only those from `main` and currently-open branches. Maybe the Action that we use supports this out of the box.
 
+    Measured 2026-08-10, so the growth rate is on record rather than guessed at:
+    239 commits since the branch opened on 2026-07-14 (~8/day), 7.5 MiB of
+    history against `main`'s 2.2 MiB, and a 17.9 MiB working tree across 177
+    files. Nothing to act on yet at that size — the note is when, not whether.
+
+    The action does have it out of the box: `single-commit: true` on
+    `JamesIves/github-pages-deploy-action`, which the docs are blunt about —
+    "using this option will also cause any existing history to be wiped from the
+    deployment branch". Two interactions to settle before reaching for it, and
+    the docs cover neither. It has to force-push, where the production deploy
+    runs `force: false` precisely so it rebases onto a concurrent preview deploy
+    rather than dropping it; and the PR previews live in the same tree under
+    `clean-exclude: pr-preview/`, so their *files* should survive into the
+    single commit while a preview deploy racing the force push would not. That
+    race is rare and self-healing (the next preview deploy restores it), but it
+    is the thing to check rather than assume. A `main`-only prune that keeps a
+    window of commits avoids both by never rewriting what a preview is standing
+    on.
+
 - Un/rewrap all multiline prose strings? I find I'm constantly re-wrapping these and it's getting old. Maybe it's better to keep them on one line and rely on the editor to soft-wrap. Apart from newlines that are actually useful within a paragraph, e.g. immediately preceding an inline list item (so it can be found in the unrendered text).
 
 - Method prose hardcodes constants that live in the experiment module
@@ -443,9 +462,15 @@ state.
     `--app` — there's no way to enumerate experiments that exist on Modal; you
     must already know the name. The empty-state hint now says so, but listing
     would be better.
-  - `mini results <name>` prints raw result reprs; a sweep with per-step metric
-    lists dumps ~120 KB of floats. The new optional `key` arg narrows it, but
-    consider truncating long reprs by default and/or `--json`.
+  - Done: `mini results <name>` dumped ~120 KB of floats (2026-08-10). It now
+    walks the result and elides length only — a long sequence keeps its first
+    few elements plus a count, an artifact shows name/size/file-count instead of
+    64-character shas and every child blob, arrays show their shape. Keys and
+    scalars are verbatim and never rounded, so the summary can be read as the
+    result; `--full` gives the repr. An ex-2.1.10-shaped result: 56 KB → 539
+    characters. `--json` was passed over rather than deferred: results carry
+    `Artifact`s and numpy arrays, so a JSON mode needs an encoding convention
+    for them, and that belongs with a gather API rather than a print verb.
   - `mini logs` holds only failure tracebacks (the help text now says so), and
     the Modal `fc-…` ids that `status` prints can't be fed back into any `mini`
     verb — worker stdout/logs need the Modal dashboard.
