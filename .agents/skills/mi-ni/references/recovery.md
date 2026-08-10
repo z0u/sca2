@@ -115,3 +115,9 @@ done = [store.result(r["key"]) for r in records if r.get("state") == RunState.DO
 ```
 
 This is what `mini status`/`results` and a `report.py` notebook do.
+
+`mini results` prints each task's result with the bulk elided — long sequences
+become `[0.5, 0.4, 0.3, … +3297]`, an artifact becomes its name and size — since a
+sweep of per-step metric lists is otherwise thousands of floats in the terminal.
+Keys and scalars print verbatim, so the summary can be read as the result; `--full`
+prints the whole repr when you want the numbers themselves.

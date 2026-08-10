@@ -892,3 +892,110 @@ def test_worker_env_defaults_from_the_project_config(tmp_path: Path, monkeypatch
     remote = _build_apparatus("envexp", margs)
     assert isinstance(remote, ModalApparatus)
     assert remote.modal_fn_kwargs["env"] == {"XLA_FLAGS": "-x", "KEEP": "1"}
+
+
+# ---------------------------------------------------------------------------
+# `results`: eliding the bulk
+# ---------------------------------------------------------------------------
+
+
+def test_a_long_sequence_is_elided_with_its_count():
+    """The reason the default view exists: a per-step metric list is one float per
+    step, and a sweep of them buries every scalar worth reading."""
+    from mini.__main__ import _abbreviated
+
+    assert _abbreviated({"val_loss": [0.5, 0.4, 0.3, 0.2, 0.1]}) == "{'val_loss': [0.5, 0.4, 0.3, … +2]}"
+    assert _abbreviated([1, 2, 3]) == "[1, 2, 3]"  # nothing dropped, nothing said
+    assert _abbreviated([]) == "[]"
+
+
+def test_scalars_and_keys_survive_verbatim():
+    """What a reader takes from the abbreviated view has to be what the result says,
+    so only lengths are lost: no rounding, no reformatting, and every key kept."""
+    from mini.__main__ import _abbreviated
+
+    stats = {"em": 0.8333333333333334, "nll": 1.204, "converged": True, "tau": None, "name": "lam0"}
+    assert _abbreviated(stats) == (
+        "{'em': 0.8333333333333334, 'nll': 1.204, 'converged': True, 'tau': None, 'name': 'lam0'}"
+    )
+
+
+def test_containers_keep_their_shape():
+    from mini.__main__ import _abbreviated
+
+    assert _abbreviated((1, 2)) == "(1, 2)"
+    assert _abbreviated({"a": {"b": [1, 2, 3, 4]}}) == "{'a': {'b': [1, 2, 3, … +1]}}"
+    assert _abbreviated(frozenset({1})) == "{1}"
+
+
+def test_a_long_string_says_how_much_it_dropped():
+    from mini.__main__ import _abbreviated
+    from mini.__main__ import _STR_CAP as cap
+
+    assert _abbreviated("x" * cap) == repr("x" * cap)
+    assert _abbreviated("x" * (cap + 5)) == f"{'x' * cap!r}… +5 chars"
+
+
+def test_an_array_shows_its_shape_rather_than_its_payload():
+    import numpy as np
+
+    from mini.__main__ import _abbreviated
+
+    assert _abbreviated(np.zeros((3300, 4), dtype=np.float32)) == "float32[3300, 4]"
+
+
+def test_an_artifact_shows_the_handle_a_listing_wants():
+    """Returning bulk as an artifact is the house pattern, so this handle is the one
+    a results listing meets most; its full repr is 64-character shas and, for a tree,
+    every child blob."""
+    from mini.__main__ import _abbreviated
+    from mini.store import Artifact
+
+    blob = Artifact(sha256="ab" * 32, size=9021, name="evals.json")
+    assert _abbreviated(blob) == "Artifact('evals.json', 9021 bytes, sha256=abababababab…)"
+
+    tree = Artifact(sha256="cd" * 32, size=48213, name="ckpt", kind="tree", children=(blob, blob, blob))
+    assert _abbreviated(tree) == "Artifact('ckpt', 48213 bytes, 3 files, sha256=cdcdcdcdcdcd…)"
+
+
+def test_nesting_is_walked_only_so_far():
+    from mini.__main__ import _abbreviated
+
+    deep = value = {}
+    for _ in range(10):
+        value["a"] = value = {}
+    assert _abbreviated(deep).endswith("…" + "}" * 7)
+
+
+def test_an_unrenderable_value_falls_back_to_a_capped_repr():
+    from mini.__main__ import _abbreviated
+    from mini.__main__ import _STR_CAP as cap
+
+    class Sprawling:
+        def __repr__(self):
+            return "S(" + "y" * 300 + ")"  # 303 characters, and no quotes added on the way out
+
+    assert _abbreviated(Sprawling()) == f"{'S(' + 'y' * (cap - 2)}… +{303 - cap} chars"
+
+
+def test_results_elides_by_default_and_full_restores_the_repr(tmp_path: Path, monkeypatch, capsys):
+    """End to end over a real store: the default line is short enough to read, and
+    every number in it is one `--full` away from being checked."""
+    monkeypatch.chdir(tmp_path)
+
+    def train(x):
+        return {"label": f"cell-{x}", "val_loss": [0.1 * i for i in range(500)]}
+
+    exp = Experiment(name="res", main=lambda ctx: ctx.map(train, [1]))
+    _drive(exp, LocalApparatus("res"))
+
+    from mini.__main__ import cmd_results
+
+    cmd_results(argparse.Namespace(name="res", key=None, app="local", full=False))
+    brief = capsys.readouterr().out
+    assert "'label': 'cell-1'" in brief and "… +497]" in brief
+    assert len(brief) < 200
+
+    cmd_results(argparse.Namespace(name="res", key=None, app="local", full=True))
+    full = capsys.readouterr().out
+    assert "… +497]" not in full and len(full) > 3000

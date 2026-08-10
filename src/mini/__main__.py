@@ -37,6 +37,7 @@ import json
 import os
 import sys
 import time
+from dataclasses import fields, is_dataclass
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -57,7 +58,7 @@ from mini.runs import (
     stale_heartbeat,
     stale_progress,
 )
-from mini.store import _project_config
+from mini.store import Artifact, _project_config
 from utils.time import duration
 
 _GLYPH = {
@@ -942,7 +943,74 @@ def cmd_watch(args: argparse.Namespace) -> None:
         raise SystemExit(code)
 
 
+# A result routinely carries a per-step metric list — a training task's `val_loss` is
+# one float per step — so a sweep's raw reprs run to ~120 KB of floats, and the scalars
+# worth reading are buried in them (and, for an agent, the dump lands in its context).
+# The default view elides the bulk and nothing else: every mapping key and every scalar
+# prints verbatim, so what a reader takes from it is what the result says. Only lengths
+# are lost, and each elision states how much it stands for. `--full` prints the repr.
+_SEQ_HEAD = 3  # elements of a sequence shown before the elision
+_STR_CAP = 80  # characters of a string shown before the elision (a sha256 still fits)
+_MAX_DEPTH = 6  # nesting deeper than this is elided rather than walked
+
+
+def _elided(parts: list[str], total: int, brackets: str) -> str:
+    """*parts* (already rendered) inside *brackets*, capped at :data:`_SEQ_HEAD` with a count."""
+    open_c, close_c = brackets
+    shown = parts[:_SEQ_HEAD]
+    if total > len(shown):
+        shown.append(f"… +{total - len(shown)}")
+    return f"{open_c}{', '.join(shown)}{close_c}"
+
+
+def _capped(text: str, *, quoted: bool) -> str:
+    """*text* cut to :data:`_STR_CAP` characters, saying how many it dropped.
+
+    *quoted* distinguishes a string value, which prints as its repr, from an already
+    rendered one — a number's repr must not pick up a second set of quotes.
+    """
+    shown = text[:_STR_CAP]
+    return (repr(shown) if quoted else shown) + (f"… +{len(text) - _STR_CAP} chars" if len(text) > _STR_CAP else "")
+
+
+def _abbreviated(value: Any, depth: int = 0) -> str:
+    """A one-line rendering of *value* with its bulk elided — for reading, not parsing.
+
+    Containers are walked so their shape survives: a mapping keeps every key, and a
+    sequence keeps its first few elements plus a count of the rest. Dataclasses walk as
+    their fields, which is what keeps an :class:`~mini.store.Artifact` tree from
+    printing every child. Scalars are never rounded or reformatted — an abbreviated
+    number that read as exact would be worse than no number at all.
+    """
+    if depth > _MAX_DEPTH:
+        return "…"
+    match value:
+        case str():
+            return _capped(value, quoted=True)
+        case dict():
+            rendered = [f"{k!r}: {_abbreviated(v, depth + 1)}" for k, v in value.items()]
+            return f"{{{', '.join(rendered)}}}"  # every key, however many: the keys are the map
+        case list() | tuple() | set() | frozenset():
+            brackets = {list: "[]", tuple: "()", set: "{}", frozenset: "{}"}[type(value)]
+            head = [_abbreviated(v, depth + 1) for v in list(value)[:_SEQ_HEAD]]
+            return _elided(head, len(value), brackets)
+    if hasattr(value, "shape") and hasattr(value, "dtype"):  # numpy/jax array: shape, not payload
+        return f"{value.dtype}{list(value.shape)}"
+    if isinstance(value, Artifact):
+        # Returning bulk as an artifact is the house pattern, so this is the handle a
+        # listing meets most. What identifies it here is the name and the size; the
+        # sha is 64 characters no `mini` verb takes as input, and a tree's children are
+        # per-file blobs that would crowd out the rest of the result. `--full` has them.
+        children = f", {len(value.children)} files" if value.kind == "tree" else ""
+        return f"Artifact({value.name!r}, {value.size} bytes{children}, sha256={value.sha256[:12]}…)"
+    if is_dataclass(value) and not isinstance(value, type):
+        rendered = [f"{f.name}={_abbreviated(getattr(value, f.name), depth + 1)}" for f in fields(value)]
+        return f"{type(value).__name__}({', '.join(rendered)})"
+    return _capped(repr(value), quoted=False)  # anything else — scalars included — through the cap
+
+
 def cmd_results(args: argparse.Namespace) -> None:
+    """Print each task's result, with long sequences elided unless ``--full``."""
     store = _store_for(args.name, args)
     recs = store.records()
     if not recs:
@@ -953,10 +1021,11 @@ def cmd_results(args: argparse.Namespace) -> None:
         if not matches:
             raise SystemExit(f"no record for key {args.key!r} in experiment {args.name!r} — keys are listed by: status")
         current, stale = matches, []
+    render = repr if args.full else _abbreviated
     for rec in sorted(current, key=_launch_order):
         key = rec["key"]
         if _rec_state(rec) == RunState.DONE:
-            print(f"{key}  {store.result(key)}")
+            print(f"{key}  {render(store.result(key))}")
         else:
             print(f"{key}  ({_rec_state(rec)} — no result)")
     if stale:  # results under keys the DAG no longer requests would mislead a gather
@@ -1440,6 +1509,12 @@ def main() -> None:
     p = sub.add_parser("results", help="print per-task results, by experiment NAME")
     _add_name_arg(p)
     p.add_argument("key", nargs="?", default=None, help="print just this task's result (default: every task)")
+    p.add_argument(
+        "--full",
+        action="store_true",
+        help=f"print each result's whole repr; by default sequences past {_SEQ_HEAD} elements are "
+        "elided with a count (a per-step metric list is otherwise thousands of floats)",
+    )
     _add_app_flag(p)
     p.set_defaults(func=cmd_results)
 
