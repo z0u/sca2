@@ -23,7 +23,11 @@ Use these terms consistently across all reports.
 
 - arm
 
-  An extra desing parameter outside the factorial (or ladder), branching off one grid condition with one thing changed to answer one question (the star, timing, ceiling, and dose arms). Arms ride along, typically unscored.
+  An extra design parameter outside the factorial (or ladder), branching off one grid condition with one thing changed to answer one question (the star, timing, ceiling, and dose arms). Arms ride along, typically unscored.
+
+- trial
+
+  One sampled point in a survey's search space; seed-aggregated, like a condition. "Condition" implies named levels chosen in advance, which a sampled point doesn't have, so use "trial" wherever the point came out of a sampling rule. Surveys have trials and no arms. See the `science` skill for the experiment type.
 
 - seed
 

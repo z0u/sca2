@@ -13,6 +13,63 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Open questions
 
+- [ ] **The D2.1 tuning space, sorted.** The tuning loose ends below read as
+  independent items, which makes them look like a long backlog rather than what
+  they are: a handful of cheap ablations plus one survey. The survey type is
+  defined in the `science` skill — it preregisters a search plan, scores nothing,
+  and hands an operating point to the next preregistered experiment. Recommended
+  order, ablations first, because deleting a dimension is far cheaper than
+  searching it.
+
+  **Free first, before spending any runs.** Two calibrations cost nothing.
+  (a) The noise floor is already in the store: ex-2.1.10 ran nine seeds on its
+  primary (`N_SEEDS_PRIMARY`), and the per-run spread there is **m_line sd 0.0088,
+  m_op1 0.019, ᾱ_op1 0.021, ᾱ_span 0.026, named-holdout EM 0.0087**. So the
+  margin objectives are tight relative to the effects worth chasing — the τ
+  rungs span 0.42 → 0.49 on m_line, several sd apart — and a single-seed wide
+  round is viable for them. Containment is the opposite: ᾱ_op1's sd is 42% of its
+  own mean, so it belongs in a search as a *constraint*, not as something to rank
+  on. Also worth keeping: τ = 0.5 and τ = 2.5 differ by 0.001 on m_line against a
+  per-run sd of ~0.013, so those two rungs were never distinguishable, which is
+  the resolution rule doing its job on data we already have. Caveat: this is
+  τ = 0.1, outside the latching regime. At τ ≤ 0.03 the statistic is bimodal per
+  run (see below), the floor doesn't transfer, and the objective has to be a rate.
+  (b) The correlation structure among m_line, ᾱ, retention and grading R² across
+  stored runs says whether those objectives genuinely trade off, and so whether a
+  survey needs a Pareto front or can use a scalar.
+
+  **Necessity ablations, as ordinary preregistered conditions or arms.** Each is a
+  small contrast, and each "no difference" removes search dimensions:
+  - Are schedules needed at all in this architecture? A flat-λ condition against
+    the M1 keyframes. The big one: it can collapse `warmup_epochs`,
+    `anneal_start`, `anneal_end` and `floor` in one contrast.
+  - Is 100 epochs more than the testbed needs? Already noted below as purely a
+    budget question, to be settled by a length arm. Answering it makes every
+    later survey trial cheaper.
+  - Anneal shape, linear vs minimum-jerk — already noted below as cheap to settle
+    as a two-condition arm on whatever anchored experiment is running anyway.
+
+  **Survey targets**, the continuous knobs that survive: λ_a, τ, the anti-subspace
+  dose, and the position-dropout rate if that mechanism is adopted.
+
+  **Two design notes**, both specific to this testbed and both easy to get wrong:
+  - *Reparameterize the schedule axes before searching.* `anneal_end` and
+    `hold_ratio` are not independent factors — the endpoint *is* the dose axis
+    (see the ex-2.1.8 dose finding below), so a search over the raw knobs finds a
+    correlated ridge and reports both knobs as mattering. Search (delivered dose,
+    timing centroid) instead; `anti_dose` in `docs/m2/ex-2.1.8/experiment.py`
+    already computes the integral.
+  - *Skip Bayesian optimization.* It returns an argmax where we want a map, and
+    with the containment objective's noise it would chase seed luck. Sobol over a
+    reduced space gives both the candidate and the marginals.
+
+  Nothing needs building to run one: `ctx.map` with `allow_partial=True` handles
+  diverged trials, memoization makes a promoted second round re-run only what's
+  new, and a data-dependent proposal step is expressible today as its own
+  memoized `ctx.run`. Don't add a generic grid builder — its absence keeps the
+  design constants importable into the report's prose. #[D2.1] #anchoring
+  #schedules #methodology
+
 - [x] Decide which retention statistic the reports quote. #reports Settled as
   the **minimum** across seeds, in `ex-2.1.8.RETENTION_STAT` with the rationale:
   H4(b)'s gate is worded per run ("for every anchored run … at least 0.8× that
