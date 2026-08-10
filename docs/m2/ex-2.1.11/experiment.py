@@ -218,10 +218,18 @@ def equiv_band(stat: str, n_a: int = 3, n_b: int = 3) -> float:
     return 2.0 * NOISE_RUN[stat] * float(np.sqrt(1.0 / n_a + 1.0 / n_b))
 
 
-DECISION_STATS = ["m_line", "alpha_op1", "retention", "r2_sim"]
+DECISION_STATS = ["m_line", "alpha_op1", "retention", "r2_sim", "contrast"]
 """The statistics an ablation decision reads, each against its `equiv_band`.
 Task cost is gated separately (`TASK_GATE`, an absolute bar), and the latch
 detector (`LATCH_PI`) is a per-run veto rather than a band."""
+# REVIEW: added `contrast` (round-1 tension). The anti-subspace analysis names
+# it as the expected discriminator ("anti-hold loses containment or contrast"),
+# but the rules could not read it, so an arm losing contrast alone would have
+# scored "within band" and been adopted. Its band is tiny (2σ·√(2/3) ≈ 0.009
+# against a statistic the primary holds at 0.85), so the addition costs little
+# resolution and any error it introduces keeps the incumbent recipe. Verify:
+# with five statistics over five comparison arms, the note on family-wise
+# resolution in DECISION_RULES sizes the spurious-call risk this raises.
 
 # --- Stage 2: the ablation conditions ----------------------------------------
 
@@ -265,6 +273,13 @@ task gate holds (holdout EM within TASK_GATE of the same-length control); and
 no run latches a syntax role (LATCH_PI). Any resolved regression keeps the
 incumbent recipe — ties break toward the simpler recipe only when nothing
 resolves.
+
+Resolution caveat, known going in: five statistics read at ±2 sd across five
+comparison arms makes a spurious "resolved" call somewhere likely even under
+no true effect. Every such error lands on the conservative side — it keeps
+the incumbent recipe or the longer run — so the stage is biased toward
+keeping complexity, never toward adopting a simplification the data doesn't
+support. Read a lone marginal excursion with that in mind.
 
 1. `flat-anchor` within band, or better on m_line → the survey runs the flat
    anchor (four schedule knobs deleted). Otherwise it keeps the schedule,

@@ -365,13 +365,20 @@ def _():
     mo.md(r"""
     ### Calibration: the shape of the objective
 
-    Across the ten anchored operating points already in the store (the
-    ex-2.1.8 grid, the ex-2.1.9 ladder, and the ex-2.1.10 arms), margin and
-    containment don't trade. Their correlation is weakly negative, meaning
-    the better operating points improved both at once. The trade that does
-    bind is margin against grading, and it runs along the τ axis: softening τ
-    raises m_line while the per-color grading and the group contrast
-    collapse, so selectivity smears out into "everything red-ish moves".
+    Across the anchored operating points already in the store, margin and
+    containment don't trade: their correlation is negative on both available
+    readings (computed live below the figure), meaning the better operating
+    points improved both at once. The trade that does bind is margin against
+    grading, and it runs along the τ axis: softening τ raises m_line while
+    the per-color grading and the group contrast collapse, so selectivity
+    smears out into "everything red-ish moves".
+    <!-- REVIEW: the correlation was a hard-coded −0.19 credited to all three
+    prior experiments; it is now computed in the figure cell from the loaded
+    metrics, on two bases: m_span over the ten ex-2.1.9/ex-2.1.10 points (the
+    original number — ex-2.1.8 publishes no m_span, so it never contributed),
+    and m_op1 over all seventeen points including the ex-2.1.8 grid. Verify:
+    both print beneath the trade figure. -->
+
 
     That structure decides the shape of the search. A two-way trade would
     need a Pareto front,[^pareto] but objectives that move together can
@@ -449,10 +456,32 @@ def _(per_run, prior):
         ax.set_title("margin buys smear at soft τ", fontsize="small", color=grey)
         return fig
 
+    # Margin–containment correlation across stored operating points, on two
+    # bases: m_span over the ex-2.1.9/ex-2.1.10 points (ex-2.1.8 publishes no
+    # m_span), and m_op1 over all three experiments' anchored points.
+    def _seed_means(metrics: dict, stat: str) -> dict[str, float]:
+        conds = sorted({c["condition"] for c in metrics["cells"]} - {"lam0"})
+        return {
+            k: float(np.mean([c[stat] for c in metrics["cells"] if c["condition"] == k]))
+            for k in conds
+            if stat in next(c for c in metrics["cells"] if c["condition"] == k)
+        }
+
+    def _corr(stat: str, sources: list[dict]) -> tuple[float, int]:
+        m = [v for s in sources for v in _seed_means(s, stat).values()]
+        a = [v for s in sources for v in _seed_means(s, "alpha_mean_op1").values()]
+        return float(np.corrcoef(m, a)[0, 1]), len(m)
+
+    _r_span, _n_span = _corr("m_span", [prior["m9"], prior["m10"]])
+    _r_op1, _n_op1 = _corr("m_op1", [prior["m8"], prior["m9"], prior["m10"]])
+
     _corr_note = mo.md(rf"""
-    Margin–containment correlation across the ten stored operating points:
-    $r$ = −0.19 (no trade; both improve together along the design line).
-    For scale, the primary's nine runs put per-run grading at
+    Margin–containment correlation across the stored anchored operating
+    points: $r$ = {_r_span:+.2f} over the {_n_span} ex-2.1.9/ex-2.1.10 points
+    (m_span basis), and $r$ = {_r_op1:+.2f} over all {_n_op1} points including
+    the ex-2.1.8 grid (m_op1 basis, the statistic all three share). No trade
+    on either reading; both improve together along the design line. For
+    scale, the primary's nine runs put per-run grading at
     {per_run["r2_sim"].mean():.2f} ± {per_run["r2_sim"].std(ddof=1):.3f}
     against {_pts["either-t2500"][1].mean():.2f} for the softest arm.
     """)
