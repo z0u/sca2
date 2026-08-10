@@ -13,7 +13,10 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
 ## Open questions
 
-- [ ] **The D2.1 tuning space, sorted.** The tuning loose ends below read as
+- [~] **The D2.1 tuning space, sorted.** **Preregistration drafted as
+  ex-2.1.11** (2026-08-10, in review): calibration from stored results, then
+  the ablation conditions below as one stage, then a Sobol survey over
+  (λ_a, τ, anti dose). Original note follows. The tuning loose ends below read as
   independent items, which makes them look like a long backlog rather than what
   they are: a handful of cheap ablations plus one survey. The survey type is
   defined in the `science` skill — it preregisters a search plan, scores nothing,
@@ -305,7 +308,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   margin concentrates at op1 (0.63) with `+`/op2 near 0.08, so the model does
   distinguish these positions when the pull lets it. #ex-2.1.7 #labels #m3
 
-- [ ] A heavier anchor buys alignment and loses selectivity. Ex-2.1.7's
+- [~] A heavier anchor buys alignment and loses selectivity. Folded into
+  ex-2.1.11's λ_a dimension ([0.02, 1.0], log). Original note follows. Ex-2.1.7's
   ceiling arm ran the full recipe at λ_a = 1, ten times the scoring rung. The
   task never pushed back (holdout EM within 0.0013 of control), so the task
   ceiling is still unfound — but the margin fell to 0.43 against 0.46 at a
@@ -560,7 +564,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   the fixed scalar α = 1/n_layer trains flat across the width × depth grid we can
   afford. #model-arch
 
-- [ ] Does the shape of the anchor anneal matter — linear vs minimum-jerk? M1
+- [~] Does the shape of the anchor anneal matter — linear vs minimum-jerk?
+  Folded into ex-2.1.11's `linear` condition. Original note follows. M1
   compared neither; it did test a stepped anneal, which held only when the LR
   warmup restarted from zero at each step, so the one discontinuity we measured
   needed an accommodation. Whether the milder discontinuity of a linear ramp
@@ -605,7 +610,9 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   D2.2. (2026-08-08, from the ex-2.1.10 prereg review.) #[D2.1] #task-grammar
   #anchoring
 
-- [ ] Survey τ finely near the ex-2.1.10 primary. The ladder τ = 0.1 → 0.5 →
+- [~] Survey τ finely near the ex-2.1.10 primary. Folded into ex-2.1.11's τ
+  dimension ([0.05, 0.30], calibrated on the weight scale from the stored
+  profiles). Original note follows. The ladder τ = 0.1 → 0.5 →
   2.5 loses the deep-slice group contrast (0.85 → 0.17 → 0.03) and the grading
   (r² 0.82 → 0.67 → 0.61) in its first step, so where the trade turns — and
   how sharply — is unmeasured between 0.1 and 0.5. A finer ladder around 0.1
@@ -661,7 +668,9 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   `separate` would start to matter at weights past the ones we swept. #[D2.1]
   #anchoring #ex-2.1.6
 
-- [ ] Sweep the anti-subspace weight λ_s̄, conditioned on the ex-2.1.7 read.
+- [~] Sweep the anti-subspace weight λ_s̄, conditioned on the ex-2.1.7 read.
+  Folded into ex-2.1.11: the `anti-hold`/`anti-peak` brackets probe the hold
+  level, and the surviving anti dimension is surveyed. Original note follows.
   Ex-2.1.7 runs the M1 schedule (2.5 → 0.03 of the anchor weight) at one
   setting; its timing arm probes how long the weight stays high but nothing
   probes the hold level itself. The sweep earns its runs in one outcome: the
@@ -757,7 +766,8 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
   was demonstrated, and picking a stopping point from these trajectories would
   be selecting on noise. #[D2.1] #anchoring #ex-2.1.6
 
-- [ ] Is 100 epochs more than this testbed needs? Ex-2.1.6's margin is flat from
+- [~] Is 100 epochs more than this testbed needs? Folded into ex-2.1.11's
+  `short` condition. Original note follows. Ex-2.1.6's margin is flat from
   roughly epoch 50 in every anchored condition, and validation loss settles
   earlier still, so half the schedule may be buying nothing. Purely a budget
   question — it does not interact with the alignment decay above, and it should

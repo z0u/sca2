@@ -24,6 +24,7 @@ dependencies = [
     "requests>=2.32.3",
     "rich>=14.3.2",  # pretty terminal output
     "scikit-learn>=1.6.1",
+    "scipy>=1.15",  # quasi-Monte Carlo sampling (stats.qmc) for surveys; already present via scikit-learn
 ]
 
 [project.scripts]
