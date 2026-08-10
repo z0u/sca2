@@ -928,6 +928,17 @@ def test_containers_keep_their_shape():
     assert _abbreviated(frozenset({1})) == "{1}"
 
 
+def test_a_container_subclass_renders_rather_than_raising():
+    """A namedtuple is a tuple, and a result carrying one shouldn't cost the verb —
+    which is what dispatching on the exact type did."""
+    from collections import OrderedDict, namedtuple
+
+    from mini.__main__ import _abbreviated
+
+    assert _abbreviated(namedtuple("P", "a b")(1, 2)) == "(1, 2)"
+    assert _abbreviated(OrderedDict(a=1)) == "{'a': 1}"
+
+
 def test_a_long_string_says_how_much_it_dropped():
     from mini.__main__ import _abbreviated
     from mini.__main__ import _STR_CAP as cap

@@ -991,7 +991,9 @@ def _abbreviated(value: Any, depth: int = 0) -> str:
             rendered = [f"{k!r}: {_abbreviated(v, depth + 1)}" for k, v in value.items()]
             return f"{{{', '.join(rendered)}}}"  # every key, however many: the keys are the map
         case list() | tuple() | set() | frozenset():
-            brackets = {list: "[]", tuple: "()", set: "{}", frozenset: "{}"}[type(value)]
+            # By instance, not by exact type: a namedtuple is a tuple, and a KeyError
+            # here would take down the verb over a cosmetic choice of bracket.
+            brackets = "[]" if isinstance(value, list) else "()" if isinstance(value, tuple) else "{}"
             head = [_abbreviated(v, depth + 1) for v in list(value)[:_SEQ_HEAD]]
             return _elided(head, len(value), brackets)
     if hasattr(value, "shape") and hasattr(value, "dtype"):  # numpy/jax array: shape, not payload
