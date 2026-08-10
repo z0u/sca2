@@ -470,11 +470,18 @@ def _():
     position, computed from the stored alignment profiles of the primary.
 
     The bounds [0.05, 0.30] keep that leading weight between about 0.74 and
-    about 0.42 on the trained profile, which contains the 0.6–0.8 target band
-    from ex-2.1.9. They also stay clear of the latching regime, where τ ≲ 0.03,
-    the leading weight is ≳ 0.82, and the profile goes one-hot per run at
-    depth. The upper bound stops short of τ = 0.5, which the trade figure
-    above shows is already smeared.
+    about 0.42 on the trained profile, which covers the lower part of the
+    0.6–0.8 target band from ex-2.1.9. Reaching 0.8 would need τ of about
+    0.04. The lower bound sits above that, keeping a margin over the latching
+    regime, where τ ≲ 0.03, the leading weight is ≳ 0.82, and the profile goes
+    one-hot per run at depth. The upper bound stops short of τ = 0.5, which
+    the trade figure above shows is already smeared.
+    <!-- REVIEW: was "contains the 0.6-0.8 target band". The stated range of
+    the leading weight is [0.42, 0.74], so it meets the band only over
+    0.6-0.74; the figure's alt text already described the two as overlapping.
+    The exclusion of the top of the band is a margin choice rather than a
+    consequence of the latching regime, so it is now stated as one. Verify: if
+    the survey shows τ ≈ 0.04 stays graded, the lower bound can widen. -->
     """)
     return
 
@@ -772,11 +779,13 @@ def _():
     ### The survey space
 
     Two dimensions are always sampled, both on a log scale. λ_a spans
-    [0.02, 1.0]: from half the rung we scored at, below which the ladder in
-    ex-2.1.6 suggests the pull is weak, up to the weight of the ex-2.1.7
+    [0.02, 1.0]: from a fifth of the rung we scored at, below which the ladder
+    in ex-2.1.6 suggests the pull is weak, up to the weight of the ex-2.1.7
     ceiling arm, where selectivity was already gone. So we believe the optimum
     is somewhere inside. τ spans [0.05, 0.30], on the weight-scale argument
     above.
+    <!-- REVIEW: "half the rung" → "a fifth"; the scored rung is λ = 0.1 and
+    the bound is 0.02. Same correction in the SPACE_COMMON docstring. -->
 
     The anti-subspace dimension depends on decision rule 2. If a flat ratio is
     enough (branch B), it is one knob: μ/λ ∈ [0.10, 3.0], log, running from a
@@ -908,9 +917,11 @@ def _():
     seeds = {ex.N_RUNS_ABLATION} runs, then at most {ex.N_TRIALS} +
     {ex.N_PROMOTE} × {ex.SEEDS_PROMOTE - 1} = {ex.N_RUNS_SURVEY} survey runs.
     That is about {ex.N_RUNS_ABLATION + ex.N_RUNS_SURVEY} training runs in the
-    worst case, each roughly 25 minutes of L4 time with the slim eval, and
-    half that for the survey stage if we adopt `short`. It comes to about
-    twice the cost of ex-2.1.10.
+    worst case, each roughly 25 minutes of L4 time with the slim eval.
+    Ex-2.1.10 was 24 runs, so this is about three times as many, or about
+    twice the training time if we adopt `short` and the survey stage runs at
+    half length. Each run is also cheaper, because the slim eval drops the
+    readability, geometry, and leakage passes.
 
     Each stage launches with `--max-containers {ex.MAX_CONTAINERS}` and a
     `--budget` sized from its run count. Memoization means the promoted round

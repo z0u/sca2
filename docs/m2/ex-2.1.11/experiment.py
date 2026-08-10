@@ -169,11 +169,18 @@ def dose_centroid(weight_fn, *, epochs: int = EPOCHS, n: int = 40_001) -> float:
     return float(np.trapezoid(e * f, e) / np.trapezoid(f, e))
 
 
-ANTI_REL_DOSE_OP = anchor_dose(lambda e: anti_weight(e, lam=1.0))
-"""The operating point's anti-subspace dose at unit λ — the denominator of the
-survey's `anti_dose` dimension. Dividing λ out makes the multiplier a pure
-schedule quantity, so it composes with the `lam` dimension instead of
-double-counting it."""
+def anti_dose_ref(epochs: int = EPOCHS) -> float:
+    """The reference schedule's anti-subspace dose at unit λ, at the given length.
+
+    The denominator of the survey's `anti_dose` dimension. Dividing λ out makes
+    the multiplier a pure schedule quantity, so it composes with the `lam`
+    dimension instead of double-counting it. It is length-matched because a
+    50-epoch condition delivers half the dose of the same shape at 100, and a
+    relative coordinate that read 0.5 for the reference shape would misname the
+    axis the survey's marginals are reported on.
+    """
+    return anchor_dose(lambda e: anti_weight(e, lam=1.0, epochs=epochs), epochs=epochs)
+
 
 ANTI_CENTROID_OP = dose_centroid(lambda e: anti_weight(e))
 """Epoch 26.5: where the operating point's repulsion is delivered, on average."""
@@ -289,12 +296,18 @@ SPACE_COMMON: dict[str, tuple[float, float, str]] = {
     "lam": (0.02, 1.0, "log"),
     "tau": (0.05, 0.30, "log"),
 }
-"""Dimension → (low, high, scale). λ_a spans half the scoring rung to the
-ex-2.1.7 ceiling arm's weight, where selectivity was lost — the optimum is
+"""Dimension → (low, high, scale). λ_a spans a fifth of the scoring rung to
+the ex-2.1.7 ceiling arm's weight, where selectivity was lost — the optimum is
 believed inside. τ spans the graded regime: the calibration cell shows the
-leading softmin weight runs 0.74 → 0.42 across it, the 0.6–0.8 target band
-sits inside, and the latching regime (τ ≲ 0.03) stays outside. Both are
-temperatures/weights, so log scale."""
+leading softmin weight runs 0.74 → 0.42 across it, covering the lower part of
+the 0.6–0.8 target band from ex-2.1.9, and the latching regime (τ ≲ 0.03)
+stays outside. Both are temperatures/weights, so log scale."""
+# REVIEW: "half the scoring rung" → "a fifth" (SCORING_LAMBDA is 0.1 and the
+# bound is 0.02). And the τ range covers 0.6–0.74 of the target band, not all
+# of it: reaching 0.8 needs τ ≈ 0.04, which the lower bound holds off from to
+# keep a margin above the latching regime. Verify: the tau-range figure's own
+# alt text describes the two bands as overlapping, which is the reading kept
+# here; widen the bound only with evidence that τ ≈ 0.04 stays graded.
 
 SPACE_ANTI_SCHED: dict[str, tuple[float, float, str]] = {
     "anti_peak_ratio": (0.75, 4.0, "log"),
@@ -351,7 +364,15 @@ def anti_rel_dose(trial: dict, epochs: int = EPOCHS) -> float:
             anneal_end_frac=trial["anti_anneal_end_frac"],
             epochs=epochs,
         )
-    return anchor_dose(w, epochs=epochs) / ANTI_REL_DOSE_OP
+    # REVIEW: normalized against the reference dose at the *same* length, and
+    # the superseded ANTI_REL_DOSE_OP constant removed. The numerator already
+    # varied with `epochs` while the denominator was pinned to 100, so if
+    # decision rule 3 adopted `short` every trial's relative dose would have
+    # halved and the reference shape would have read 0.500 instead of 1.00.
+    # This changes a reported coordinate, not what is sampled or ranked.
+    # Verify: at epochs=EPOCHS the value is unchanged, so the frozen branch A
+    # trial table in the report is identical.
+    return anchor_dose(w, epochs=epochs) / anti_dose_ref(epochs)
 
 
 # --- Stage 3: objective, constraints, promotion ------------------------------
@@ -418,11 +439,19 @@ promoted round has run. Diverged or failed trials are published as such
 
 MAX_CONTAINERS = 8
 N_RUNS_ABLATION = len(ABLATION_CONDITIONS) * N_SEEDS_ABLATION  # 24
-N_RUNS_SURVEY = N_TRIALS + N_PROMOTE * (SEEDS_PROMOTE - 1)  # 62 at most
-"""≈ 86 training runs in the worst case, ~25 min of L4 each with the slim
-eval — comparable to two ex-2.1.10s, and half that for the survey stage if
-`short` is adopted. Each stage is launched with --max-containers 8 and the
-stage's run count times a generous per-run bound as --budget."""
+N_RUNS_SURVEY = N_TRIALS + N_PROMOTE * (SEEDS_PROMOTE - 1)  # 56 at most
+"""≈ 80 training runs in the worst case, ~25 min of L4 each with the slim
+eval. That is about three times the 24 runs of ex-2.1.10, or about twice the
+training time if `short` is adopted and the survey stage runs at half length.
+Each run is also cheaper, because the slim eval drops the readability,
+geometry, and leakage passes. Each stage is launched with --max-containers 8
+and the stage's run count times a generous per-run bound as --budget."""
+# REVIEW: corrected 62 → 56 and 86 → 80 (arithmetic: 32 + 6×4 = 56, + 24
+# ablation runs). The report renders these from the constants, so only these
+# comments were stale. Recast "comparable to two ex-2.1.10s" as ~3× its run
+# count, because 80/24 = 3.3; the "twice" figure holds only in run-equivalents
+# once `short` halves the survey stage. Verify: if N_PROMOTE or SEEDS_PROMOTE
+# move, both numbers here move with them.
 
 # --- Result refs -------------------------------------------------------------
 
