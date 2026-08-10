@@ -443,9 +443,15 @@ state.
     `--app` — there's no way to enumerate experiments that exist on Modal; you
     must already know the name. The empty-state hint now says so, but listing
     would be better.
-  - `mini results <name>` prints raw result reprs; a sweep with per-step metric
-    lists dumps ~120 KB of floats. The new optional `key` arg narrows it, but
-    consider truncating long reprs by default and/or `--json`.
+  - Done: `mini results <name>` dumped ~120 KB of floats (2026-08-10). It now
+    walks the result and elides length only — a long sequence keeps its first
+    few elements plus a count, an artifact shows name/size/file-count instead of
+    64-character shas and every child blob, arrays show their shape. Keys and
+    scalars are verbatim and never rounded, so the summary can be read as the
+    result; `--full` gives the repr. An ex-2.1.10-shaped result: 56 KB → 539
+    characters. `--json` was passed over rather than deferred: results carry
+    `Artifact`s and numpy arrays, so a JSON mode needs an encoding convention
+    for them, and that belongs with a gather API rather than a print verb.
   - `mini logs` holds only failure tracebacks (the help text now says so), and
     the Modal `fc-…` ids that `status` prints can't be fed back into any `mini`
     verb — worker stdout/logs need the Modal dashboard.
