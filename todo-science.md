@@ -40,9 +40,38 @@ Items may be tagged, and a tag _may_ link to more info. Potential tags:
 
   **Necessity ablations, as ordinary preregistered conditions or arms.** Each is a
   small contrast, and each "no difference" removes search dimensions:
-  - Are schedules needed at all in this architecture? A flat-λ condition against
-    the M1 keyframes. The big one: it can collapse `warmup_epochs`,
-    `anneal_start`, `anneal_end` and `floor` in one contrast.
+  - Are schedules needed at all in this architecture? Not one contrast — the two
+    terms behave differently, and a flat arm needs a λ value, which is the thing
+    we don't know yet. **Bracket rather than survey:** pick flat levels that
+    straddle the schedule's own range, so the conclusion holds wherever the
+    optimum sits. If the schedule beats every constant in its range, no constant
+    substitutes for the shape; if one wins, the schedule dimensions go away and
+    we have a better operating point at once.
+
+    *Anchor term:* dose-matching is nearly free. The ex-2.1.10 spec sits at peak
+    for 82% of epochs, and ∫λ·lr against the real optax schedule gives a
+    dose-matched flat λ of **0.970 × peak** — so flat-at-peak and dose-matched
+    coincide to within 3%, well inside the noise floor above, and no invariant
+    has to be chosen. One flat-at-peak arm ablates `warmup_epochs`,
+    `anneal_start`, `anneal_end` and `floor` together. Note where that leaves the
+    interesting question: the ramp carries 7.3% of the dose and the end anneal
+    0.28% (lr has cosine-decayed to 0.4% of its area by epoch 90), so if either
+    matters it is not through dose. The ramp overlaps the commitment window —
+    ex-2.1.9's τ latch is decided by epoch 8, inside the 10-epoch warmup, and the
+    `AnchorSpec` docstring says the ramp exists so the anchor arrives with the
+    optimizer rather than ahead of it. A flat arm applies full λ from step 0 to a
+    still-random model, so predict the effect in latch rate and which role wins,
+    not in the dose-driven statistics.
+
+    *Anti term:* cannot be dose-matched to a flat weight at all. The range is
+    833× (0.00030 → 0.25 at `hold_ratio` 0.03), and a dose-matched constant would
+    sit at 0.169–0.177, i.e. **1.7 × the anchor peak sustained for all of
+    training** — a different regime rather than a comparable condition. Same trap
+    as ex-2.1.8's dose-match below (λ_s̄/λ_a ≈ 1.18 for half of training), worse.
+    So bracket it instead: flat at the hold level and flat at the peak, dose
+    reported rather than matched, and let the outcomes say which invariant
+    predicts them. Gate the schedule main effect at matched peak; read the dose
+    alignment as a stated secondary.
   - Is 100 epochs more than the testbed needs? Already noted below as purely a
     budget question, to be settled by a length arm. Answering it makes every
     later survey trial cheaper.
