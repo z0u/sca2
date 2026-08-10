@@ -65,12 +65,11 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    The mellowmax-pooled pull found the concept position on its own, but every
-    label was keyed on op1, so only one position ever carried the evidence. Now
-    a line is labeled when *either* operand draws the label, and the pull has to
-    find the red operand line by line. It does: the pull in each label group
-    lands on its own operand, and the selectivity delivered matches that of the
-    slot oracle.
+    Mellowmax pooling found the concept position on its own in ex-2.1.9, but
+    every label was keyed on op1, so only one position ever carried the
+    evidence. Now we label lines when either operand is *red*, and the pull has
+    to find the right operand line by line. It does, with selectivity matching
+    that of the oracle.
     ///
     """)
     return
@@ -669,7 +668,6 @@ def _():
         acc,
         alpha_map,
         arrays,
-        cells,
         m_line,
         m_op1,
         m_span,
@@ -679,7 +677,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(N_SEEDS: dict, alpha_map, arrays, metrics, traj):
+def _(N_SEEDS, alpha_map, arrays, metrics, traj):
     # The probe lines' operand rednesses, recomputed from the palette by the same
     # loop the prep step runs — what the group weighting and m_line key on.
     from sca.colorcube import redness as _redness
@@ -731,7 +729,16 @@ def _(N_SEEDS: dict, alpha_map, arrays, metrics, traj):
         ]
         return min(r) if r else None
 
-    return READ, R1, R2, contrast, grading_r2, pi_group, pi_group_mean, retention
+    return (
+        R1,
+        R2,
+        READ,
+        contrast,
+        grading_r2,
+        pi_group,
+        pi_group_mean,
+        retention,
+    )
 
 
 @app.cell(hide_code=True)
@@ -875,7 +882,7 @@ def _(pi_group_mean):
 
 
 @app.cell(hide_code=True)
-def _(N_SEEDS: dict, READ: np.ndarray, contrast, pi_group, pi_group_mean):
+def _(N_SEEDS, READ: np.ndarray, contrast, pi_group, pi_group_mean):
     _x = np.arange(ex.SPAN)
     _INK = {
         "either-t100": light_dark("#1f6fb4", "#5fa8dd"),
@@ -963,6 +970,9 @@ def _(N_SEEDS: dict, READ: np.ndarray, contrast, pi_group, pi_group_mean):
                 # and G2's outside the panel, contradicting the caption ("at each
                 # group's own operand"). Now plain data coords. Verify: G2's caret
                 # should sit under the op2 tick, beside the 0.77 annotation.
+                # TODO: The carets and annotations read strangely.
+                # - The carets look like they're pointing at something slightly to the right of the role. Either use a center-symmetric marker, or push them over to one of the y axes.
+                # - On op1, the annotation is next to a y-axis tick, which makes it look like a negative number
                 axes[4][col].plot(own, ex.LEAD_GATE, marker=9, ms=3, color=_gate, clip_on=False, zorder=6)
                 axes[4][col].annotate(f"{_pg[col, 0, own]:.2f}", (own, min(_pg[col, 0, own] + 0.14, 0.92)),
                                       ha="center", fontsize=7, color=light_dark("#444", "#bbb"))  # fmt: skip
@@ -975,7 +985,7 @@ def _(N_SEEDS: dict, READ: np.ndarray, contrast, pi_group, pi_group_mean):
 
     _titles = {"either-t100": "The primary", "either-t500": "Softer", "either-t2500": "Near the span mean"}
     _body = "".join(_profile_fig(c, _titles[c]) for c in ex.EITHER_NAMES)
-    _caption = rf"""
+    _caption = mo.md(rf"""
     **Per-group weight profiles under the either-slot labeller.** Within each
     sub-figure: columns are the label groups (G1 weights probe lines by
     P(only op1 drew), G2 by P(only op2 drew)); rows are residual slices with
@@ -988,7 +998,7 @@ def _(N_SEEDS: dict, READ: np.ndarray, contrast, pi_group, pi_group_mean):
     the seed-mean weight beside it. Each sub-caption quotes the H2(b)
     deep-slice op2 contrast (gate ≥ {ex.CONTRAST_GATE:g}, scored on the
     primary only).
-    """
+    """).text
     mo.Html(figure_html(_body, caption=_caption, aria_label="Per-group softmin weight profiles, one sub-figure per either-slot condition"))  # fmt: skip
     return
 
@@ -1051,16 +1061,17 @@ def _():
     mo.md(r"""
     ## The operating point under the wider labeller (H3)
 
-    The endpoint numbers say where each run finished; the trajectories say
-    how it got there — in particular whether a pull that has to localize per
-    line buys its margin later, or holds it less firmly once the repulsion
-    anneals away, than the op1-keyed reference.
+    The endpoint numbers say where each run finished; the trajectories show how
+    it got there. In particular, whether a pull that has to localize per line
+    attains its margin later, or holds it less firmly once the repulsion anneals
+    away, than the op1-keyed reference.
+    <!-- Yes, that's an interesting thing to look for — but the figure doesn't show it well, because the trajectories are hard to compare. I think we need more ghosts: at least for op1-labels, maybe also for slot-oracle, and maybe for all of them. -->
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(ANCHORED, N_SEEDS: dict, retention, traj):
+def _(ANCHORED, N_SEEDS, retention, traj):
     _KEYS = ("alpha_op1", "m_line")
     # Seed means once, in the cell: @themed calls the plot function twice.
     _MEAN = {
@@ -1120,6 +1131,7 @@ def _(ANCHORED, N_SEEDS: dict, retention, traj):
         _top = max(np.max(_MEAN[c]["m_line"]) for c in ANCHORED)
         for cond in ANCHORED:
             ax = axd[cond]
+            # Where we have two carets, it would be nice to style them differently, e.g. to have one filled and the other outlined. Even nicer would be to include the symbols in the caption, e.g. ▶ ▷ ◀ ◁
             ax.plot(0, ex.MEAN_ALIGN_GATE, marker=9, ms=3, color=_gate, clip_on=False, zorder=6,
                     transform=ax.get_yaxis_transform())  # fmt: skip
             ax.plot(1, ex.RETENTION_FLOOR, marker=8, ms=3, color=_gate, clip_on=False, zorder=6,
@@ -1177,14 +1189,14 @@ def _(ANCHORED, a_op1, retention):
     {a_op1(ex.REFERENCE_ARM).mean():.3f} of the op1-keyed reference, so the
     contamination a global latch would leave (non-red op1 states dragged
     onto the axis on op2-triggered lines) is absent, which agrees with the
-    H2 profiles. With half the pull budget now landing on op2, op1 simply
-    hosts less of the drift.
+    H2 profiles. Op1 now hosts less of the drift, perhaps because half the pull
+    budget now goes to op2.
 
-    Retention is {_ret:.2f} against {ex.RETENTION_GATE:g}, taken as the
-    minimum over nine seeds, a stricter
-    read than for the three-seed conditions; the worst retention anywhere in
-    the sweep is {_worst:.2f}. The five anchored panels are near copies, so
-    localizing per line neither delays the margin nor loosens its hold.
+    Retention is {_ret:.2f} against {ex.RETENTION_GATE:g}, taken as the minimum
+    over nine seeds, a stricter read than for the three-seed conditions; the
+    worst retention anywhere in the sweep is {_worst:.2f}. The five anchored
+    panels above are near copies, so localizing per line neither delays the
+    margin nor loosens its hold.
     """)
     return
 
@@ -1237,6 +1249,8 @@ def _(CONDS: list[str], alpha_map, grading_r2, m_line):
             ({grading_r2(ex.REFERENCE_ARM):.2f}) reproduces ex-2.1.9's
             `pool-t100` ({ex.EX219_REFERENCE["pool-t100"]["r2"]:g}).
         """,
+        # In this figure, the high-tau conditions actually seem to fit the dashed grading curve better than any of the others. The black line that is being used for grading zig-zags, but I think that's an artifact of the clusters given by "levels of redness". If it was measured as the mean of the envelope, or with a sliding mean of two redness levels, then I think the high-tau runs would score best here. That is, the poor grading of t500 and t2500 seems to be accidentally correct, but only because the redness levels happened to result in the zig-zag.
+        # I'm still unsure about the top of the curves, where they all flatten out. That is very unlike sim^{>1}. Is this just a result of the reddest 12 colors attracting labels, and so it's those that flatten out at the top? Or is it the shape we should expect of a truly good grading? How should we expect reddish colors to be distributed near the _red_ pole on the hypersphere?
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(2, 3, figsize=(7.5, 5.0), sharey=True, sharex=True, layout="constrained")
@@ -1373,6 +1387,7 @@ def _(ANCHORED, a_op1, a_span, grading_r2, m_line, m_op1, m_span):
     def _row(c: str) -> str:
         frac = f"{(m_line(c).mean() - _CTRL) / _ORACLE:.0%}" if c != ex.ORACLE_ARM else "—"
         bold = "<strong>{}</strong>".format if c == ex.PRIMARY else "{}".format
+        # Bolding doesn't show up visually, because it's inside a th, which is also bold.
         return (
             f"<tr><th>{bold(f'<code>{c}</code>')}</th>"
             f"<td class='num'>{m_line(c).mean():.3f} <span class='range'>±{m_line(c).std(ddof=1):.3f}</span></td>"
@@ -1411,7 +1426,7 @@ def _(ANCHORED, a_op1, a_span, grading_r2, m_line, m_op1, m_span):
 
 
 @app.cell(hide_code=True)
-def _(a_span, grading_r2, m_line):
+def _(a_span, m_line):
     _P = ex.PRIMARY
     _CTRL = float(m_line("lam0").mean())
     _frac = (m_line(_P).mean() - _CTRL) / (m_line(ex.ORACLE_ARM).mean() - _CTRL)
@@ -1462,7 +1477,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(N_SEEDS: dict, traj):
+def _(N_SEEDS, traj):
     _P = ex.PRIMARY
     _AR = np.mean([traj(_P, s, "alpha_roles") for s in range(N_SEEDS[_P])], axis=0)  # (K, slices, roles)
     _EP = np.mean([traj(_P, s, "epoch") for s in range(N_SEEDS[_P])], axis=0)
@@ -1521,7 +1536,7 @@ def _(N_SEEDS: dict, traj):
 
 
 @app.cell(hide_code=True)
-def _(N_SEEDS: dict, R1: np.ndarray, R2: np.ndarray, arrays, contrast, grading_r2, traj):
+def _(N_SEEDS, R1, R2, arrays, contrast, grading_r2, traj):
     _P = ex.PRIMARY
     _AR = np.mean([traj(_P, s, "alpha_roles") for s in range(N_SEEDS[_P])], axis=0)
     _EP = np.mean([traj(_P, s, "epoch") for s in range(N_SEEDS[_P])], axis=0)
@@ -1545,10 +1560,11 @@ def _(N_SEEDS: dict, R1: np.ndarray, R2: np.ndarray, arrays, contrast, grading_r
     )
     _both_deep = np.mean(_both4, axis=0)
 
+    # Revise to remove possessives (e.g. Ex-2.1.9 [...] its)
     mo.md(rf"""
     **When the syntax embeddings drift (queued by ex-2.1.9).** Ex-2.1.9
     could see that its `+` embedding ended near 0.30 alignment; it could not
-    see when. The per-role trajectory answers: late. At epoch 30 the two
+    see when. The per-role trajectory shows that it it occurs late. At epoch 30 the two
     syntax embeddings sit at {_at(30)[0, 1]:.2f} (`+`) and
     {_at(30)[0, 3]:.2f} (`=`). The drift accrues through epochs 30–90 as
     the repulsion anneals toward its hold ratio, reaching
@@ -1584,6 +1600,7 @@ def _(N_SEEDS: dict, R1: np.ndarray, R2: np.ndarray, arrays, contrast, grading_r
     of the label mass, so nothing above turns on them. They preview the M3
     case where a document holds the concept in several places at once.
 
+    <!-- Yep, cool. One thing we should probably do is survey many values of \tau near 0.1. Apparently the 0.1 -> 0.5 step was not good! But what about ± 0.05? etc. -->
     **The soft-τ trade.** Across the ladder, localization and grading fall
     together while m_line rises: contrast
     {" → ".join(f"{contrast(c).mean():.2f}" for c in ex.EITHER_NAMES)} and
