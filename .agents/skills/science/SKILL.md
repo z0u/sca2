@@ -38,93 +38,44 @@ Describe what is needed (figure, table, expectations).
 
 ## Surveys
 
-Some questions are about choosing an operating point in a space too large to give every
-point a hypothesis: the anchor weight's selectivity optimum, the mellowmax temperature,
-how much repulsion to deliver and when. A *survey* is the experiment type for those. It
-preregisters the search plan instead of an outcome, and it scores nothing.
+Some questions are about choosing an operating point in a space too large to give every point a hypothesis: the anchor weight's selectivity optimum, the mellowmax temperature, how much repulsion to deliver and when. A *survey* is the experiment type for those. It preregisters the search plan instead of an outcome, and it scores nothing.
 
-What makes a search credible is the same thing that makes preregistration work — the
-analysis was fixed before the data existed. So freeze the procedure, in place of
-`## Hypotheses`:
+What makes a search credible is the same thing that makes preregistration work — the analysis was fixed before the data existed. So freeze the procedure, in place of `## Hypotheses`:
 
-- **The space.** Each dimension with its bounds and its scale (log for weights and
-  temperatures).
-- **The sampling rule**, with its seed, so the trial list can be reviewed before the run.
-  Prefer Sobol (`scipy.stats.qmc`) over uniform draws: it fills the box more evenly, so
-  the one-dimensional marginals are less lumpy for the same budget. SciPy only reaches us
-  through scikit-learn, so declare it when the first survey lands.
+- **The space.** Each dimension with its bounds and its scale (log for weights and temperatures).
+- **The sampling rule**, with its seed, so the trial list can be reviewed before the run. Prefer Sobol (`scipy.stats.qmc`) over uniform draws: it fills the box more evenly, so the one-dimensional marginals are less lumpy for the same budget. SciPy only reaches us through scikit-learn, so declare it when the first survey lands.
 - **The trial budget**, and the `--budget` and `--max-containers` caps that hold it.
-- **The objective.** Where objectives trade against each other — the usual case here,
-  since anchor weight buys alignment and spends selectivity — state it as a constraint
-  ("maximize m_line subject to holdout EM within `TASK_GATE` of control") and report the
-  Pareto front rather than a scalar winner.
-- **The seed budget:** how many seeds per trial in the first round, which band gets
-  promoted, and to how many. Cut cost on the seed axis rather than by stopping runs
-  early, because the margin peaks around epoch 10 and drifts down over the following
-  forty, so a short-run proxy would favour configurations that look good early.
-- **The noise floor of each objective**, measured first, and the resolution it licenses.
-  A survey may not claim a difference it cannot resolve. Sometimes this is free: a past
-  condition with many seeds gives the per-run spread of every statistic at that operating
-  point, already in the store.
+- **The objective.** Where objectives trade against each other — the usual case here, since anchor weight buys alignment and spends selectivity — state it as a constraint ("maximize m_line subject to holdout EM within `TASK_GATE` of control") and report the Pareto front rather than a scalar winner.
+- **The seed budget:** how many seeds per trial in the first round, which band gets promoted, and to how many. Cut cost on the seed axis rather than by stopping runs early, because the margin peaks around epoch 10 and drifts down over the following forty, so a short-run proxy would favour configurations that look good early.
+- **The noise floor of each objective**, measured first, and the resolution it licenses. A survey may not claim a difference it cannot resolve. Sometimes this is free: a past condition with many seeds gives the per-run spread of every statistic at that operating point, already in the store.
 - **The stopping rule.**
 
-With those fixed, everything the survey reports is a deterministic function of the data,
-so there is no forking-path problem. The only freedom left is which point wins, and that
-is the output rather than a claim.
+With those fixed, everything the survey reports is a deterministic function of the data, so there is no forking-path problem. The only freedom left is which point wins, and that is the output rather than a claim.
 
 Two rules make the type safe to publish.
 
-**Nothing a survey reports may be quoted as a result.** It proposes an operating point;
-the next preregistered experiment adopts that point, scores it at fresh seeds, and
-reports the survey's value beside the confirmed one. The gap is the winner's-curse
-correction — a search's best trial wins partly on merit and partly on lucky seeds, so
-re-measuring is what turns a proposal into a number. That handoff already happens
-informally (ex-2.1.9 ran at ex-2.1.8's `end90-hold30` point); naming it makes the
-proposing half publishable.
+**Nothing a survey reports may be quoted as a result.** It proposes an operating point; the next preregistered experiment adopts that point, scores it at fresh seeds, and reports the survey's value beside the confirmed one. The gap is the winner's-curse correction — a search's best trial wins partly on merit and partly on lucky seeds, so re-measuring is what turns a proposal into a number. That handoff already happens informally (ex-2.1.9 ran at ex-2.1.8's `end90-hold30` point); naming it makes the proposing half publishable.
 
-**Publish every trial**, including the ones that went nowhere. Selective reporting is
-what would make a large search worthless, and a complete table settles it. Memoization
-means the data is there anyway.
+**Publish every trial**, including the ones that went nowhere. Selective reporting is what would make a large search worthless, and a complete table settles it. Memoization means the data is there anyway.
 
-Then report the landscape rather than the winner. "The margin holds above 0.5 for λ_a
-anywhere in [0.05, 0.4]" is worth more than "0.12 was best": it is what the next
-milestone inherits, and a wide plateau is itself a result, since it says the method does
-not need careful tuning.
+Then report the landscape rather than the winner. "The margin holds above 0.5 for λ_a anywhere in [0.05, 0.4]" is worth more than "0.12 was best": it is what the next milestone inherits, and a wide plateau is itself a result, since it says the method does not need careful tuning.
 
 ### A survey's report
 
 Same skeleton, with three differences.
 
-- `## Findings` becomes `## Observations` — same place, same brevity, but each line
-  carries its noise floor where a verdict would carry its gate, and one line names the
-  proposed operating point.
+- `## Findings` becomes `## Observations` — same place, same brevity, but each line carries its noise floor where a verdict would carry its gate, and one line names the proposed operating point.
 - `## Hypotheses` becomes `## Search plan`.
-- `### Conditions` becomes the space specification plus the full trial table. This is the
-  convention that has to bend: elsewhere the report imports hand-justified condition
-  dicts and renders them as prose, which is why there's no generic grid builder, and a
-  hundred trials can't each carry a docstring. So the justification attaches to the
-  dimension rather than the level, and the trial table is generated from stored results.
+- `### Conditions` becomes the space specification plus the full trial table. This is the convention that has to bend: elsewhere the report imports hand-justified condition dicts and renders them as prose, which is why there's no generic grid builder, and a hundred trials can't each carry a docstring. So the justification attaches to the dimension rather than the level, and the trial table is generated from stored results.
 
-Say "survey" in the first clause of the tl;dr and label it the same way in
-`docs/index.md`. Numbering stays in the `ex-2.1.N` sequence.
+Say "survey" in the first clause of the tl;dr and label it the same way in `docs/index.md`. Numbering stays in the `ex-2.1.N` sequence.
 
-`docs/ngpt-scaling/report.py` is the closest existing example — a width × depth grid, no
-hypotheses, and a conclusion about whether the region is safe to build on. A survey is
-that plus the frozen search plan, which a 3 × 3 didn't need.
+`docs/ngpt-scaling/report.py` is the closest existing example — a width × depth grid, no hypotheses, and a conclusion about whether the region is safe to build on. A survey is that plus the frozen search plan, which a 3 × 3 didn't need.
 
 ## Best practices
 
 - Choose a measurement site by a criterion independent of the statistic you're judging.
-- Ablate before you search, and **bracket rather than survey** when the ablation needs a
-  value you haven't found yet. Removing a schedule means running a constant instead, and
-  which constant you pick can decide the answer. Rather than matching on one invariant
-  (area, maximum, or endpoint — each defensible, each a different condition), choose flat
-  levels that straddle the schedule's own range. If the schedule beats every constant in
-  its range, no constant substitutes for the shape, whatever the optimum turns out to be;
-  if one wins, the schedule dimensions go away and you have a better operating point too.
-  Report the matching invariants for every arm instead of matching on one, so the results
-  can say which was the active ingredient. Each dimension deleted this way is much cheaper
-  than searching it.
+- Ablate before you search, and **bracket rather than survey** when the ablation needs a value you haven't found yet. Removing a schedule means running a constant instead, and which constant you pick can decide the answer. Rather than matching on one invariant (area, maximum, or endpoint — each defensible, each a different condition), choose flat levels that straddle the schedule's own range. If the schedule beats every constant in its range, no constant substitutes for the shape, whatever the optimum turns out to be; if one wins, the schedule dimensions go away and you have a better operating point too. Report the matching invariants for every arm instead of matching on one, so the results can say which was the active ingredient. Each dimension deleted this way is much cheaper than searching it.
 - (more in `/todo-science.md`)
 
 ## Collaborating on a report
@@ -157,22 +108,13 @@ Both work, but 1. worked better, and their effects stack.
 ///
 ```
 
-Four lines or so (two when reflowed): what we tried, and which way it came out.
-It orients someone deciding whether to read on, so keep numbers, hypothesis IDs,
-thresholds, and caveats out of it. The analysis sections and the discussion
-carry the full accounting. Left to itself this box grows into a second
-conclusion; if a sentence in it would also belong in the discussion, cut it.
+Four lines or so (two when reflowed): what we tried, and which way it came out. It orients someone deciding whether to read on, so keep numbers, hypothesis IDs, thresholds, and caveats out of it. The analysis sections and the discussion carry the full accounting. Left to itself this box grows into a second conclusion; if a sentence in it would also belong in the discussion, cut it.
 
-The title is empty (`/// tip |`) so the box reads as a lede rather than a
-labelled aside, and the `<!-- tl;dr -->` comment keeps the marker greppable. In
-a preregistration draft, write the "what we tried" half and leave the outcome
-line for later.
+The title is empty (`/// tip |`) so the box reads as a lede rather than a labelled aside, and the `<!-- tl;dr -->` comment keeps the marker greppable. In a preregistration draft, write the "what we tried" half and leave the outcome line for later.
 
 ### Findings
 
-Directly under the tl;dr, and above the intro prose. Every preregistered
-hypothesis, its verdict, and the one number that decides it, with its gate
-inline so the section stands alone. Under 200 words:
+Directly under the tl;dr, and above the intro prose. Every preregistered hypothesis, its verdict, and the one number that decides it, with its gate inline so the section stands alone. Under 200 words:
 
 ```md
 ## Findings
@@ -185,30 +127,17 @@ anti-subspace effect (+0.141) is smaller than the op1-only effect (+0.221),
 not larger; the ordering holds within every seed.
 ```
 
-The tl;dr says which way it came out; this says what happened. A reader who
-stops here should be able to tell that three of four hypotheses missed, without
-reading a discussion to find out. Without it, a reader gets nothing until they
-have read the whole report.
+The tl;dr says which way it came out; this says what happened. A reader who stops here should be able to tell that three of four hypotheses missed, without reading a discussion to find out. Without it, a reader gets nothing until they have read the whole report.
 
-Verdicts only. Interpretation, mechanism, and whether an outcome was named in
-advance belong to the analysis sections. In a preregistration draft the heading
-goes in empty, since writing it is the first thing to do when results land.
+Verdicts only. Interpretation, mechanism, and whether an outcome was named in advance belong to the analysis sections. In a preregistration draft the heading goes in empty, since writing it is the first thing to do when results land.
 
-Two consequences for the rest of the report. The discussion no longer opens by
-re-deriving the results, because they are above it — it interprets, and nothing
-else. And a section that cannot supply its own line here has a gap worth fixing:
-if a verdict or its deciding number is missing, or first appears in some other
-section, that is the section's problem rather than the summary's.
+Two consequences for the rest of the report. The discussion no longer opens by re-deriving the results, because they are above it — it interprets, and nothing else. And a section that cannot supply its own line here has a gap worth fixing: if a verdict or its deciding number is missing, or first appears in some other section, that is the section's problem rather than the summary's.
 
 ### Recording a review decision
 
-Reports go through several fresh-eyes review rounds, each reader starting from
-the report alone. `REVIEW` notes are how one round's decisions reach the next.
+Reports go through several fresh-eyes review rounds, each reader starting from the report alone. `REVIEW` notes are how one round's decisions reach the next.
 
-**Leave a `REVIEW` note wherever a review changes a claim:** a threshold, a verdict,
-a scope, or a wording that changes what is being asserted. Typos and prose
-polish don't need one. Say what the change was, why, and what a later reader
-should check to disagree with it. Usually a Python comment in the cell:
+**Leave a `REVIEW` note wherever a review changes a claim:** a threshold, a verdict, a scope, or a wording that changes what is being asserted. Typos and prose polish don't need one. Say what the change was, why, and what a later reader should check to disagree with it. Usually a Python comment in the cell:
 
 ```python
 # REVIEW: narrowed "anchoring transfers" to "transfers at layer 4" — H2 only
@@ -216,29 +145,10 @@ should check to disagree with it. Usually a Python comment in the cell:
 # in the exploratory section covers other layers, this can widen again.
 ```
 
-An HTML comment inside a Markdown string works when the note has to sit beside
-one specific paragraph; it stays invisible in the render. Make it visible only
-when a reader of the published report benefits from it. The marker is greppable
-either way, so a review pass can find every prior decision before touching the
-same text.
+An HTML comment inside a Markdown string works when the note has to sit beside one specific paragraph; it stays invisible in the render. Make it visible only when a reader of the published report benefits from it. The marker is greppable either way, so a review pass can find every prior decision before touching the same text.
 
-**A note should only record the change and its warrant:** what the report now
-claims, and why that follows from the data. It is the same category of thing as
-a code comment explaining a non-obvious invariant, which is why the next round
-may read it. It never carries a judgment of the report's quality, a round's
-confidence, or anything phrased as "I suspect" or "this felt weak", since that
-primes the next reader instead of informing them. Observations of that kind go
-in the round's own report, under `Tensions`, where they reach the supervisor and
-stop.
+**A note should only record the change and its warrant:** what the report now claims, and why that follows from the data. It is the same category of thing as a code comment explaining a non-obvious invariant, which is why the next round may read it. It never carries a judgment of the report's quality, a round's confidence, or anything phrased as "I suspect" or "this felt weak", since that primes the next reader instead of informing them. Observations of that kind go in the round's own report, under `Tensions`, where they reach the supervisor and stop.
 
-**A note you would reverse is a finding.** Wanting to undo a recorded decision
-usually means the claim is doing two jobs at once, and each reviewer is right
-about a different one. Say so, name both readings, and stop. The resolution is
-structural (split the hypothesis into two tracks, drop one, or state the scope
-that separates them) and it needs the human, because it changes what the
-experiment claims.
+**A note you would reverse is a finding.** Wanting to undo a recorded decision usually means the claim is doing two jobs at once, and each reviewer is right about a different one. Say so, name both readings, and stop. The resolution is structural (split the hypothesis into two tracks, drop one, or state the scope that separates them) and it needs the human, because it changes what the experiment claims.
 
-Commissioning the rounds — which pass to run when, how to brief a reviewer, when
-to stop and escalate, and the lighter pass for prose alone — is in
-[references/review-passes.md](references/review-passes.md). Always read this if
-you are the lead.
+Commissioning the rounds — which pass to run when, how to brief a reviewer, when to stop and escalate, and the lighter pass for prose alone — is in [references/review-passes.md](references/review-passes.md). Always read this if you are the lead.
