@@ -558,6 +558,8 @@ def _():
     ### The ablation conditions
 
     There are nine conditions, three seeds each, all at the reference λ_a and τ under the either-slot labeller. `ref` re-runs the primary recipe from ex-2.1.10 through the code path of this experiment, so every comparison is between runs of identical code. `lam0` and `short-lam0` are the task-cost controls, one at each length. `flat-both` combines the two flat simplifications. We need it because an arm that changes one schedule at a time cannot show an interaction between the two; we read it only if decision rules 1 and 2 both simplify. The table reports dose and centroid for each arm, so the outcomes can tell us which of the two was doing the work.
+
+    Four more conditions were added once these had settled, under rules frozen in turn before they ran; they are set out under *An amendment to the search plan* below, with the reasoning that motivated them.
     """)
     return
 
@@ -705,7 +707,7 @@ def _():
             f"<details><summary>Branch A trial list (schedule retained)</summary>{_a}</details>"
             f"<details><summary>Branch B trial list (flat anti)</summary>{_b}</details>",
             caption=mo.md(rf"""
-            **The frozen trial lists**, {ex.N_TRIALS} scrambled-Sobol points per branch (seed {ex.SOBOL_SEED}), shown for review before any run. Branch A adds the derived (relative dose, centroid) coordinates its marginals will be reported in; relative dose is the trial's $\int (\lambda_{{\bar{{s}}}}/\lambda_a) \cdot \mathrm{{lr}} \, \mathrm{{d}}e$ over the operating point's.
+            **The frozen trial lists**, scrambled-Sobol points at seed {ex.SOBOL_SEED}, shown for review before any run: {ex.n_trials({**ex.SPACE_COMMON, **ex.SPACE_ANTI_SCHED})} for branch A's four dimensions, {ex.n_trials({**ex.SPACE_COMMON, **ex.SPACE_ANTI_FLAT})} for branch B's three. Branch A adds the derived (relative dose, centroid) coordinates its marginals will be reported in; relative dose is the trial's $\int (\lambda_{{\bar{{s}}}}/\lambda_a) \cdot \mathrm{{lr}} \, \mathrm{{d}}e$ over the operating point's.
             """).text,
             class_="report-figure",
         )
@@ -735,7 +737,7 @@ def _():
     | contrast | group contrast ≥ {ex.CONTRAST_MIN:g} | ex-2.1.10's partial bar |
     | latch | no run with deep-slice syntax weight > {ex.LATCH_PI:g} | calibrated above |
 
-    **Rounds.** Round 1 runs all {ex.N_TRIALS} trials at seed 0, which the noise floors allow. The {ex.N_PROMOTE} feasible trials with the highest m_line are promoted to {ex.SEEDS_PROMOTE} seeds. If fewer are feasible, we promote all of them; if none are, we publish the infeasibility map and propose nothing.
+    **Rounds.** Round 1 runs every trial at seed 0, which the noise floors allow. The {ex.N_PROMOTE} feasible trials with the highest m_line are promoted to {ex.SEEDS_PROMOTE} seeds. If fewer are feasible, we promote all of them; if none are, we publish the infeasibility map and propose nothing.
 
     The proposed operating point is the promoted trial with the highest seed-mean m_line that is still feasible on seed means; the latch veto stays per-run. Promotion only partly corrects the winner's curse.
 
@@ -755,7 +757,9 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    {len(ex.ABLATION_CONDITIONS)} ablation conditions × {ex.N_SEEDS_ABLATION} seeds = {ex.N_RUNS_ABLATION} runs, then at most {ex.N_TRIALS} + {ex.N_PROMOTE} × {ex.SEEDS_PROMOTE - 1} = {ex.N_RUNS_SURVEY} survey runs. That is about {ex.N_RUNS_ABLATION + ex.N_RUNS_SURVEY} training runs in the worst case, each roughly 25 minutes of L4 time with the slim eval. Ex-2.1.10 was 24 runs, so this is about 3.5 times as many, or about twice the training time if we adopt `short` and the survey stage runs at half length. Each run is also cheaper, because the slim eval drops the readability, geometry, and leakage passes.
+    {len(ex.ABLATION_CONDITIONS)} ablation conditions × {ex.N_SEEDS_ABLATION} seeds = {ex.N_RUNS_ABLATION} runs, plus the amendment's {len(ex.AMENDMENT_CONDITIONS)} × {ex.N_SEEDS_ABLATION} = {ex.N_RUNS_AMENDMENT}, then at most {max(ex.N_TRIALS_BY_DIM.values())} + {ex.N_PROMOTE} × {ex.SEEDS_PROMOTE - 1} = {ex.N_RUNS_SURVEY} survey runs: about {ex.N_RUNS_ABLATION + ex.N_RUNS_AMENDMENT + ex.N_RUNS_SURVEY} training runs in the worst case.
+
+    The design budgeted roughly 25 minutes of L4 per run, inherited from ex-2.1.10. The ablation stage then billed 0.7–3.6 minutes each, because the slim eval drops the readability, geometry and leakage passes and the corpus is prepared once for the whole DAG. At the observed rate the experiment fits in under two hours of wall clock, which is what made the amendment affordable to decide on its merits rather than on cost.
 
     Each stage launches with `--max-containers {ex.MAX_CONTAINERS}` and a `--budget` sized from its run count. Memoization means the promoted round re-runs only the new seeds, and `ctx.map` with `allow_partial=True` lets diverged trials land as data rather than failures.
 
@@ -786,7 +790,7 @@ def _():
     # stored summary, so the decision in this report is the frozen rule applied
     # to data the reader can see.
     ab_summary = ex.ablation_summary(ab_cells)
-    ab_decision = ex.decide(ab_summary)
+    ab_decision = ex.decide_amended(ab_summary)
     return ab_arrays, ab_cells, ab_decision, ab_summary
 
 
@@ -797,8 +801,8 @@ def _(ab_summary: dict):
         + "".join(f"<td class='num'>{s[k]:+.4f}</td>" for k in ex.DECISION_STATS)
         + f"<td class='num'>{s['holdout_em']:.4f}</td>"
         + f"<td class='num'>{len(s['latched'])}</td></tr>"
-        for c in ex.ABLATION_CONDITIONS
-        if (name := c["name"]) and (s := ab_summary[name])
+        for c in ex.ALL_CONDITIONS
+        if (name := c["name"]) in ab_summary and (s := ab_summary[name])
     )
     _head = "".join(
         f"<th class='num'>{k} {'↑' if ex.STAT_DIRECTION[k] == 'up' else '↓'}</th>" for k in ex.DECISION_STATS
@@ -946,7 +950,15 @@ def _():
     mo.md(r"""
     ### Do the flat arms compose?
 
-    Rule 3 does not read this arm: it is read only when rules 1 and 2 both simplify, and rule 2 did not, so nothing here changes the survey. The arm was insurance against an outcome that did not happen, and it cost three runs.
+    The arm ran, and it fails on all five statistics. Rule 3 never reads it: the rule fires only when rules 1 and 2 both simplify, and rule 2 did not, so nothing here changes the survey either way. The arm was insurance against an outcome that did not happen, and it cost three runs.
+
+    <!-- REVIEW: reordered so the result comes before the rule. The section
+    previously opened with "rule 3 does not read this arm", which a reader can
+    take to mean the arm was never run. It ran; it is unread and it also fails.
+    No claim changes. -->
+
+    It does answer a question the amendment below asks, which is why the three runs were not wasted.
+
 
     The numbers are worth a look anyway. `flat-both` fails on all five statistics, and its runs disagree about how: two put their deep-slice weight on `=` and op2, and the third on `+`. So the failure is not even stable across seeds. This is what `anti-hold` does on its own, and that is the reading to prefer, since the flat anchor contributes nothing to it. Pairing `flat-anchor` with the *scheduled* anti term is exactly the arm that passed.
 
@@ -1058,6 +1070,126 @@ def _(ab_summary: dict, delta_table):
 
 @app.cell(hide_code=True)
 def _():
+    mo.md(rf"""
+    ### An amendment to the search plan
+
+    Everything above ran under rules frozen before any of it. This section adds four conditions and three rules, also frozen before any of *them* ran. Rules 1–5 stand exactly as they fired; the amendment extends the plan where round 1 turned out not to answer the question we had asked it.
+
+    **What round 1 could not settle.** Rule 2 read two constants, at {ex.ANTI_HOLD_RATIO:g} and {ex.ANTI_PEAK_RATIO:g}, and both resolved worse than `ref`, which we read as the schedule earning its shape at both ends. But those two arms differ from `ref` in two ways at once: in shape, and in dose ({ex.anchor_dose(lambda e: ex.anti_weight(e, hold_ratio=ex.ANTI_HOLD_RATIO, shape="flat")) / ex.anchor_dose(lambda e: ex.anti_weight(e)):.2f}× and {ex.anchor_dose(lambda e: ex.anti_weight(e, hold_ratio=ex.ANTI_PEAK_RATIO, shape="flat")) / ex.anchor_dose(lambda e: ex.anti_weight(e)):.2f}× the reference).
+
+    So a second reading survives them: total dose has an interior optimum, and the shape is incidental. The seed means fit it too. Containment moves monotonically with dose across the three arms, and `ref` sits between the two brackets while beating both on the other three statistics.
+
+    The design anticipated this middle level and set it aside. The frozen note under `ABLATION_CONDITIONS` says the anti term "cannot be dose-matched flat (the match would sit at 1.7× the anchor peak for all of training, a different regime)".
+
+    That was the right call with no data in hand, and it follows the bracketing advice: straddling the range of the schedule asks whether *any* constant substitutes for the shape, and it needs no invariant to be chosen. What round 1 changed is that this level is now the one measurement that separates two live readings, rather than one more point in a range.
+
+    **The four conditions.** `anti-mid` holds λ_s̄/λ_a constant at {ex.ANTI_MID_RATIO:g}, the level that matches the reference dose, so it differs from `ref` in shape alone. `anti-mid-flat` pairs that constant with the flat anchor. Since `ref` and `flat-anchor` have already run, the four cells complete a 2 × 2 in (anchor shape) × (anti shape), which is what it takes to read an interaction.
+
+    `short25` halves the adopted length again, and `short25-lam0` is its task-cost control, since un-anchored holdout EM is itself a function of length.
+
+    **Why this does not spend the preregistration.** A survey scores nothing. Its output is a proposal, which the next preregistered experiment confirms at fresh seeds, so there is no verdict here for a late change to manufacture. The risks specific to this experiment type are selective reporting and quoting the numbers from a survey as results, and adding arms touches neither, as long as every arm is published.
+
+    What protects the rest is ordinary freezing, done a second time: the rules below were fixed before the runs, they name their predictions, and rules 1–5 keep their own record. `decide` reads round 1 alone whatever else has landed, so the amendment shows up as a diff rather than an overwrite.
+
+    One cost, uncorrected. Rule 6 is a third constant tested against a rule that simplifies on a tie, so it is a third chance to simplify by luck. We are leaning on the survey contract rather than on the risk being small: a spurious pass buys a slightly wrong search space, and D2.2 re-measures the operating point at fresh seeds. Branch A is the more expensive branch, so a spurious pass would displace the incumbent that costs *more* to search.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    def _anti(c: dict):
+        _e: int = c["epochs"]
+        _shape = ex.condition_shapes(c)[1]
+        _w = lambda e: ex.anti_weight(  # noqa: E731
+            e, lam=c["lam"], epochs=_e, shape=_shape, hold_ratio=c.get("anti_ratio", ex.ANTI_HOLD_RATIO)
+        )
+        return ex.anchor_dose(_w, epochs=_e), ex.dose_centroid(_w, epochs=_e)
+
+    _ref_dose, _ = _anti(next(c for c in ex.ABLATION_CONDITIONS if c["name"] == "ref"))
+    _what = {
+        "anti-mid": f"λ_s̄/λ_a constant at the dose-matched level ({ex.ANTI_MID_RATIO:g})",
+        "anti-mid-flat": "the same constant, paired with the flat anchor",
+        "short25": "the whole recipe in a quarter of the epochs",
+        "short25-lam0": "un-anchored control at 25 epochs",
+    }
+    _rows = "".join(
+        f"<tr><td><code>{c['name']}</code></td><td>{_what[c['name']]}</td>"
+        f"<td class='num'>{c['epochs']}</td>"
+        f"<td class='num'>{'—' if c['lam'] == 0 else format(_anti(c)[0] / _ref_dose, '.2f')}</td>"
+        f"<td class='num'>{'—' if c['lam'] == 0 else format(_anti(c)[1] / c['epochs'], '.2f')}</td></tr>"
+        for c in ex.AMENDMENT_CONDITIONS
+    )
+    mo.Html(
+        figure_html(
+            f"""
+            <table class="report-table">
+            <thead><tr><th>condition</th><th>what it changes</th><th class="num">epochs</th>
+            <th class="num">anti dose vs <code>ref</code></th><th class="num">centroid</th></tr></thead>
+            <tbody>{_rows}</tbody>
+            </table>
+            """,
+            caption=mo.md("""
+            **The amendment's conditions**, three seeds each. Dose is ∫ λ_s̄·lr d*e* divided by the same integral for the reference schedule, at the same length; centroid is where that dose is delivered, as a fraction of training. `anti-mid` and `anti-mid-flat` match the reference dose by construction, and differ from it in *when* the repulsion arrives: the reference delivers it at a centroid of 0.27, a constant at 0.34. That is the contrast rule 6 turns on. The two short arms carry the reference shape unchanged, so their doses scale with length rather than moving independently.
+            """).text,
+            class_="report-figure",
+        )
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(f"""
+    **The rules** (from `experiment.AMENDMENT_RULES`, frozen before the runs).
+
+    **6.** `anti-mid` against `ref`. Within band, or better → the dose is the active ingredient, the anti schedule collapses to a flat ratio, and the survey searches branch B with {ex.ANTI_MID_RATIO:g} as its reference level. Resolved worse → the shape is load-bearing, and branch A is confirmed rather than merely un-overturned.
+
+    **7.** `anti-mid-flat` against `flat-anchor`. Rules 1 and 6 are one-factor readings, so both simplifications are adopted together only if the pair holds. This is the interaction gate of rule 3, now at a level that can pass it. If rule 6 simplifies and this arm does not, we keep the anchor schedule and adopt the flat anti.
+
+    **8.** `short25` within band against `ref`, task-gated against `short25-lam0` → the survey runs at {ex.EPOCHS_SHORTER} epochs. Otherwise the {ex.EPOCHS_SHORT} of rule 4 stands.
+
+    **What each reading predicts.** A constant at {ex.ANTI_MID_RATIO:g} delivers about 0.7× the repulsion of the schedule over the window where the latch is decided, and four to six times its late repulsion over the window where grading is learned. So the shape reading predicts m_line and grading below band with containment intact, a weakened blend of both round-1 failures. The dose reading predicts every statistic within band.
+
+    Grading is the statistic to watch: it is what the M1 schedules bought, and it is the one both round-1 brackets lost.
+
+    `flat-both` already speaks to half of this. It holds the anchor at full strength from step 0 and still fails the way `anti-hold` does, so the flat anti fails at the low end for some reason other than the anchor being weak early. The high end is where the 2 × 2 is still open, and rule 7 closes it.
+
+    For rule 8, the trap runs the opposite way to the usual one. The margin peaks near epoch 10 and drifts down over the following forty, so a shorter run can score *better* on m_line while being the less converged model. The task gate and grading decide this arm; an m_line improvement on its own does not carry it.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    #### Shape or dose? (rules 6 and 7)
+
+    /// admonition | TODO
+    The `anti-mid` and `anti-mid-flat` delta tables against `ref` and `flat-anchor`, read as the round-1 tables. Plus the 2 × 2 of seed-mean m_line and r2_sim over (anchor shape) × (anti shape), which is the panel that shows an interaction if there is one.
+
+    Expected under the shape reading: `anti-mid` below band on m_line and r2_sim, containment intact or improved. Under the dose reading: every statistic within band, and the survey drops to three dimensions. A result contrary to both, with containment resolving worse while grading holds, would say that dose is not the axis that matters.
+    ///
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    #### Can we halve the budget again? (rule 8)
+
+    /// admonition | TODO
+    The `short25` delta table against `ref`, its task cost against `short25-lam0`, and the m_line and validation-loss trajectories on a fraction-of-training axis, as in the `short` figure above.
+
+    Expected: the task gate is the binding constraint, since 25 epochs is where the un-anchored control may stop saturating holdout EM. If the control drops, the gate is measuring convergence rather than the cost of anchoring, and the arm fails on that ground rather than on selectivity.
+    ///
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
     mo.md(r"""
     ### What the survey runs
     """)
@@ -1072,14 +1204,14 @@ def _(ab_decision: dict):
         for d, (lo, hi, scale) in _space.items()
     )
     mo.md(f"""
-    The four rules that touch the survey resolve to one recipe and one box. The anchor weight is flat at the sampled λ_a; the anti-subspace term keeps its schedule, with the hold ratio fixed at {ex.ANTI_HOLD_RATIO:g} and its peak and anneal endpoint sampled; every trial runs {ab_decision["epochs"]} epochs.
+    The rules that touch the survey resolve to one recipe and one box. The anchor weight is {"flat at the sampled λ_a" if ab_decision["anchor_shape"] == "flat" else "scheduled, peaking at the sampled λ_a"}; the anti-subspace term {f"keeps its schedule, with the hold ratio fixed at {ex.ANTI_HOLD_RATIO:g} and its peak and anneal endpoint sampled" if ab_decision["anti_branch"] == "A" else "is flat at the sampled ratio"}; every trial runs {ab_decision["epochs"]} epochs.
 
     <table class="report-table">
     <thead><tr><th>dimension</th><th class="num">low</th><th class="num">high</th><th>scale</th></tr></thead>
     <tbody>{_rows}</tbody>
     </table>
 
-    That is branch {ab_decision["anti_branch"]} of the frozen plan, so the trial list is the one shown under *The survey space* above: {ex.N_TRIALS} scrambled-Sobol points at seed {ex.SOBOL_SEED}, run at one seed each, with the top {ex.N_PROMOTE} feasible trials promoted to {ex.SEEDS_PROMOTE}. The sampled coordinates are unchanged by rule 4, and so is the relative dose, which is normalized at the run's own length. The centroid column of that table is in epochs at 100, so at {ab_decision["epochs"]} epochs each trial's centroid is half the value shown.
+    That is branch {ab_decision["anti_branch"]} of the frozen plan, so the trial list is the one shown under *The survey space* above: {ex.n_trials(_space)} scrambled-Sobol points at seed {ex.SOBOL_SEED}, run at one seed each, with the top {ex.N_PROMOTE} feasible trials promoted to {ex.SEEDS_PROMOTE}. The sampled coordinates are unchanged by the length rules, and so is the relative dose, which is normalized at the run's own length. The centroid column of that table is in epochs at 100, so at {ab_decision["epochs"]} epochs each trial's centroid scales down with it.
 
     <!-- REVIEW: added the centroid note. The frozen branch A table renders `dose_centroid` at its default 100 epochs, and rule 4 adopted 50, so the column's units are not the units the survey runs in. Nothing sampled or ranked changes; the marginals should be plotted at the survey's own length. -->
 

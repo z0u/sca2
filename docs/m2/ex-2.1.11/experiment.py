@@ -46,7 +46,8 @@ TRAJ_STRIDE = 50
 
 EPOCHS = 100
 EPOCHS_SHORT = 50
-"""The `short` condition's length. Every epoch keyframe below is a fraction of training, mapped onto the condition's length (the same rule that mapped M1's keyframes onto these 100 epochs), so the two lengths run the same schedule *shape*, LR warmup included."""
+EPOCHS_SHORTER = 25
+"""The `short` and `short25` conditions' lengths. Every epoch keyframe below is a fraction of training, mapped onto the condition's length (the same rule that mapped M1's keyframes onto these 100 epochs), so all three lengths run the same schedule *shape*, LR warmup included."""
 
 WARMUP_FRAC = 0.10
 ANNEAL_START_FRAC = 0.90
@@ -161,6 +162,20 @@ def anti_dose_ref(epochs: int = EPOCHS) -> float:
 ANTI_CENTROID_OP = dose_centroid(lambda e: anti_weight(e))
 """Epoch 26.5: where the operating point's repulsion is delivered, on average."""
 
+
+def anti_dose_matched_ratio(epochs: int = EPOCHS) -> float:
+    """The flat λ_s̄/λ_a delivering the reference schedule's dose over the same length.
+
+    Dose is linear in a flat arm's ratio, so this is the reference dose over the dose of a unit-ratio constant — the level at which a constant and the schedule differ in shape alone.
+    """
+    return anti_dose_ref(epochs) / anchor_dose(lambda e: np.ones_like(np.asarray(e, dtype=float)), epochs=epochs)
+
+
+ANTI_MID_RATIO = round(anti_dose_matched_ratio(), 2)
+"""1.77: the dose-matched flat level, rounded so the condition carries a legible number.
+
+The amendment's bracket point. The frozen design named this level and set it aside as "a different regime" (see `ABLATION_CONDITIONS`), which was the right call with no data in hand: bracketing the schedule's own range asks whether *any* constant substitutes for the shape, and needs no invariant to be chosen. Round 1 made the level informative, because containment came out monotone in dose while `ref` sat between both brackets and beat them on the other three statistics — the signature of an interior dose optimum with shape incidental. This arm separates that reading from the shape reading; `AMENDMENT_RULES` states the prediction each makes."""
+
 # --- Noise floors (calibration stage) ----------------------------------------
 
 NOISE_RUN = {
@@ -231,6 +246,25 @@ ABLATION_CONDITIONS: list[dict] = [
 # if the schedules interact, the signature is `flat-both` resolving worse while
 # each single flat arm passes.
 
+AMENDMENT_CONDITIONS: list[dict] = [
+    {"name": "anti-mid", "lam": SCORING_LAMBDA, "epochs": EPOCHS, "anti_shape": "flat", "anti_ratio": ANTI_MID_RATIO},
+    {
+        "name": "anti-mid-flat",
+        "lam": SCORING_LAMBDA,
+        "epochs": EPOCHS,
+        "anchor_shape": "flat",
+        "anti_shape": "flat",
+        "anti_ratio": ANTI_MID_RATIO,
+    },
+    {"name": "short25", "lam": SCORING_LAMBDA, "epochs": EPOCHS_SHORTER},
+    {"name": "short25-lam0", "lam": 0.0, "epochs": EPOCHS_SHORTER},
+]
+"""Four conditions × 3 seeds = 12 runs, added after round 1 settled and frozen before any of them ran. `AMENDMENT_RULES` says what each decides and what it predicts; the report's *An amendment to the search plan* section carries the warrant.
+
+- `anti-mid` holds λ_s̄/λ_a constant at the dose-matched level, so it differs from `ref` in shape alone. Round 1's two brackets differ from `ref` in shape *and* dose, which is why neither could separate the two.
+- `anti-mid-flat` pairs that constant with the flat anchor. With `ref` and `flat-anchor` already run, the four cells complete a 2 × 2 in (anchor shape) × (anti shape), which is what an interaction needs.
+- `short25` halves the adopted length again; `short25-lam0` is its task-cost control, since the un-anchored holdout EM is itself a function of length and a 50-epoch control cannot stand in for a 25-epoch one."""
+
 # --- Stage 2: decision rules -------------------------------------------------
 
 DECISION_RULES = """\
@@ -246,8 +280,23 @@ Resolution caveat, known going in: five statistics read at ±2 sd across six com
 5. `linear` within band → shapes are interchangeable; keep minimum-jerk everywhere and stop carrying the question. Resolved worse → keep minimum-jerk, note the shape as load-bearing. Either way no survey dimension: this arm only retires a todo item.
 """
 
-CONTROL_OF = {EPOCHS: "lam0", EPOCHS_SHORT: "short-lam0"}
+AMENDMENT_RULES = """\
+Frozen after round 1 settled and before any amendment run, and read the same way: "within band" is DECISION_STATS against `equiv_band`, the task gate, and the latch veto, as in DECISION_RULES. Rules 1–5 stand as they fired; these do not rewrite them, they extend the plan where round 1 showed it could not answer the question asked of it.
+
+6. `anti-mid` against `ref`. Within band, or better → the active ingredient is the dose, not the shape: the anti schedule collapses to a flat ratio and the survey searches branch B with ANTI_MID_RATIO as its reference level. Resolved worse → the shape is load-bearing, and rule 2's branch A is confirmed rather than merely un-overturned.
+   Prediction, from the two mechanisms round 1 identified: a constant at this level delivers ~0.7× the schedule's repulsion over the window where the latch is decided and ~4–6× its late repulsion over the window where grading is learned, so the shape reading predicts m_line and r2_sim below band with containment intact, and the dose reading predicts every statistic within band. Grading is the statistic to watch: it is what the M1 schedules bought, and it is the one both round-1 brackets lost.
+7. `anti-mid-flat` against `flat-anchor`. Rules 1 and 6 are one-factor readings, so their simplifications are adopted together only if this arm holds too — the same interaction gate rule 3 applies, now on a level that can pass. If rule 6 simplifies and this arm does not, keep the anchor schedule and adopt the flat anti, as in rule 3.
+8. `short25` within band (against `ref`, task-gated against `short25-lam0`) → the survey runs at EPOCHS_SHORTER. Otherwise rule 4's length stands. The margin peaks near epoch 10 and drifts down over the following forty, so a shorter run can score *better* on m_line while being the less converged model: the statistics that decide this arm are the task gate and r2_sim, and a lone m_line improvement does not carry it.
+
+Resolution caveat, restated for the amendment: rule 6 is a third constant tested against a "within band → simplify" rule, so it is a third chance to simplify by luck. It is not corrected for, and the reason is the survey contract rather than an argument that the risk is small — nothing this experiment reports is a result, and the proposed operating point is confirmed at fresh seeds by the next preregistered experiment, so a spurious pass costs a slightly wrong search space and is caught downstream. The direction of the risk is worth noting too: branch A is the more expensive branch, so the incumbent that a spurious pass would displace is the one that costs more to search.
+"""
+
+CONTROL_OF = {EPOCHS: "lam0", EPOCHS_SHORT: "short-lam0", EPOCHS_SHORTER: "short25-lam0"}
 """The un-anchored arm each length is task-gated against."""
+
+ALL_CONDITIONS: list[dict] = [*ABLATION_CONDITIONS, *AMENDMENT_CONDITIONS]
+CONTROLS = {*CONTROL_OF.values(), "ref"}
+"""Arms that are references rather than comparisons, so no verdict is computed for them."""
 
 STAT_DIRECTION = {"m_line": "up", "alpha_op1": "down", "retention": "up", "r2_sim": "up", "contrast": "up"}
 """Which side of `ref` counts as better, per decision statistic. Containment is the one that improves downward: ᾱ at op1 is a ceiling (`MEAN_ALIGN_GATE`), and a pull that spreads onto unlabeled states raises it."""
@@ -264,7 +313,7 @@ STAT_DIRECTION = {"m_line": "up", "alpha_op1": "down", "retention": "up", "r2_si
 def ablation_summary(cells: list[dict]) -> dict[str, dict]:
     """Seed means of every decision statistic per condition, plus the latch veto."""
     summary: dict[str, dict] = {}
-    for c in ABLATION_CONDITIONS:
+    for c in ALL_CONDITIONS:
         rows = [r for r in cells if r["condition"] == c["name"]]
         if not rows:
             continue
@@ -305,11 +354,12 @@ def arm_verdict(summary: dict[str, dict], arm: str, ref: str = "ref") -> dict:
 
 
 def decide(summary: dict[str, dict]) -> dict:
-    """Apply DECISION_RULES to the ablation seed means: the recipe and space the survey runs on.
+    """Apply DECISION_RULES to round 1's seed means: the recipe and space those rules name.
 
-    Deterministic given the ablation results, so the branch the survey takes is a function of published numbers rather than a judgement call made after seeing them.
+    Deterministic given the ablation results, so the branch the survey takes is a function of published numbers rather than a judgement call made after seeing them. Reads only `ABLATION_CONDITIONS`, whatever else the summary holds, so round 1's record stays what it was when its rules fired and the amendment's effect is visible as a diff against it.
     """
-    verdicts = {arm: arm_verdict(summary, arm) for arm in summary if arm not in ("lam0", "short-lam0", "ref")}
+    arms = [c["name"] for c in ABLATION_CONDITIONS if c["name"] in summary and c["name"] not in CONTROLS]
+    verdicts = {arm: arm_verdict(summary, arm) for arm in arms}
     flat_anchor = verdicts["flat-anchor"]["simplifies"]  # rule 1
     flat_anti = [a for a in ("anti-hold", "anti-peak") if verdicts[a]["simplifies"]]  # rule 2
     # Rule 3: the two flat simplifications are adopted together only if their
@@ -329,6 +379,48 @@ def decide(summary: dict[str, dict]) -> dict:
     }
 
 
+def decide_amended(summary: dict[str, dict]) -> dict:
+    """Apply AMENDMENT_RULES on top of `decide`: the recipe and space the survey actually runs on.
+
+    Falls back to the round-1 decision unchanged while the amendment arms are unrun, so the report renders either state. `round1` carries what rules 1–5 said on their own, which is what makes the amendment's effect readable rather than merely recorded.
+    """
+    base = decide(summary)
+    if not all(c["name"] in summary for c in AMENDMENT_CONDITIONS):
+        return {**base, "amended": False, "round1": base}
+
+    v = {
+        **base["verdicts"],
+        "anti-mid": arm_verdict(summary, "anti-mid"),  # rule 6
+        "anti-mid-flat": arm_verdict(summary, "anti-mid-flat", ref="flat-anchor"),  # rule 7
+        "short25": arm_verdict(summary, "short25"),  # rule 8
+    }
+    flat_anchor = base["anchor_shape"] == "flat"
+    flat_anti = base["anti_branch"] == "B" or v["anti-mid"]["simplifies"]
+    # Rule 7, mirroring rule 3: adopt both flat terms together only if the pair holds.
+    composes = v["anti-mid-flat"]["simplifies"] if (flat_anchor and flat_anti) else None
+    if flat_anchor and flat_anti and not composes:
+        flat_anchor = False
+    return {
+        "anchor_shape": "flat" if flat_anchor else "min-jerk",
+        "anti_branch": "B" if flat_anti else "A",
+        "anti_ratio_ref": base["anti_ratio_ref"]
+        if base["anti_branch"] == "B"
+        else (ANTI_MID_RATIO if flat_anti else None),
+        "epochs": EPOCHS_SHORTER if v["short25"]["simplifies"] else base["epochs"],
+        "shape_interchangeable": base["shape_interchangeable"],
+        "flat_both_read": base["flat_both_read"],
+        "mid_composes": composes,
+        "verdicts": v,
+        "amended": True,
+        "round1": base,
+    }
+
+
+def n_trials(space: dict[str, tuple[float, float, str]]) -> int:
+    """The Sobol budget for a space of this many dimensions."""
+    return N_TRIALS_BY_DIM[len(space)]
+
+
 def survey_space(decision: dict) -> dict[str, tuple[float, float, str]]:
     """The dimensions the survey samples, given the ablation decision."""
     return {**SPACE_COMMON, **(SPACE_ANTI_FLAT if decision["anti_branch"] == "B" else SPACE_ANTI_SCHED)}
@@ -337,7 +429,10 @@ def survey_space(decision: dict) -> dict[str, tuple[float, float, str]]:
 # --- Stage 3: the survey space -----------------------------------------------
 
 SOBOL_SEED = 0
-N_TRIALS = 32  # a power of two, so the scrambled Sobol set keeps its balance
+N_TRIALS_BY_DIM = {3: 32, 4: 64}
+"""The Sobol budget, by how many dimensions survive the ablations. Powers of two, so the scrambled set keeps its balance, and one step apart because 32 points thinly cover a 4-D box that they cover well in 3-D.
+
+Set in the amendment, before any trial ran. A trial budget is a resolution parameter — the same kind of choice as picking *n* from a target effect size — so fixing it from the surviving dimension count costs nothing, where fixing it after seeing which trials looked promising would cost everything. The sampling rule, its seed, the objective and the promotion rule are all unmoved. Scrambled Sobol is extensible at a fixed seed: the first 32 points of the 64-point set are the 32-point set, so raising the budget refines the design rather than replacing it."""
 N_PROMOTE = 6
 SEEDS_PROMOTE = 5  # total per promoted trial: the round-1 seed plus four more
 
@@ -371,7 +466,7 @@ SPACE_ANTI_FLAT: dict[str, tuple[float, float, str]] = {
 
 
 def sobol_trials(space: dict[str, tuple[float, float, str]], seed: int = SOBOL_SEED) -> list[dict]:
-    """The frozen trial list: a scrambled Sobol set over *space*, N_TRIALS points.
+    """The frozen trial list: a scrambled Sobol set over *space*, `n_trials(space)` points.
 
     Deterministic given (space, seed), so the list is reviewable before the run and identical when the run builds it. Sobol rather than uniform draws so the one-dimensional marginals stay even at this budget; scrambled so no trial sits exactly on a box edge.
     """
@@ -379,7 +474,7 @@ def sobol_trials(space: dict[str, tuple[float, float, str]], seed: int = SOBOL_S
 
     dims = list(space)
     sampler = qmc.Sobol(d=len(dims), scramble=True, seed=seed)
-    u = sampler.random_base2(int(np.log2(N_TRIALS)))
+    u = sampler.random_base2(int(np.log2(n_trials(space))))
     trials = []
     for i, row in enumerate(u):
         t: dict = {"trial": i}
@@ -450,8 +545,15 @@ Fixed budget, two rounds, no adaptive continuation: the survey ends when the pro
 
 MAX_CONTAINERS = 8
 N_RUNS_ABLATION = len(ABLATION_CONDITIONS) * N_SEEDS_ABLATION  # 27
-N_RUNS_SURVEY = N_TRIALS + N_PROMOTE * (SEEDS_PROMOTE - 1)  # 56 at most
-"""≈ 83 training runs in the worst case, ~25 min of L4 each with the slim eval. That is about 3.5 times the 24 runs of ex-2.1.10, or about twice the training time if `short` is adopted and the survey stage runs at half length. Each run is also cheaper, because the slim eval drops the readability, geometry, and leakage passes. Each stage is launched with --max-containers 8 and the stage's run count times a generous per-run bound as --budget."""
+N_RUNS_AMENDMENT = len(AMENDMENT_CONDITIONS) * N_SEEDS_ABLATION  # 12
+N_RUNS_SURVEY = max(N_TRIALS_BY_DIM.values()) + N_PROMOTE * (SEEDS_PROMOTE - 1)  # 88 at most
+"""≈ 127 training runs in the worst case. The design inherited a ~25 min per-run estimate from ex-2.1.10; the ablation stage then ran at 0.7–3.6 min of L4 each, because the slim eval drops the readability, geometry, and leakage passes and the corpus is prepared once for the whole DAG. At the observed rate the whole experiment is well under two hours of wall clock at 8 containers, which is why the amendment's twelve runs and the wider Sobol budget were affordable to decide on their merits. Each stage is launched with --max-containers 8 and the stage's run count times a generous per-run bound as --budget."""
+# REVIEW: worst case restated for the amendment (27 + 12 ablation runs, and a
+# survey budget that is now 64 + 24 rather than 32 + 24 whenever four
+# dimensions survive), and the per-run cost corrected to what the ablation
+# stage actually billed. The 25 min figure came from ex-2.1.10's full eval and
+# overstated this experiment by roughly an order of magnitude. Verify: the run
+# durations are in the ablation stage's published cells.
 # REVIEW: corrected 62 → 56 and 86 → 80 (arithmetic: 32 + 6×4 = 56, + the
 # ablation runs), then 80 → 83 when `flat-both` added three runs. The report
 # renders these from the constants, so only these comments were stale. Recast
@@ -708,7 +810,7 @@ def ablation_cells(prep: dict) -> list[dict]:
 
     tc = prep["meta"].tokenizer_config
     cells = []
-    for c in ABLATION_CONDITIONS:
+    for c in ALL_CONDITIONS:
         anchor_shape, anti_shape = condition_shapes(c)
         ratio = c.get("anti_ratio", ANTI_HOLD_RATIO)
         anchor, anti = schedules(
@@ -1010,14 +1112,14 @@ def publish_ablations(results: list[dict], stats: dict, evals, probes) -> dict:
         "cells": [{k: v for k, v in r.items() if k != "arrays"} for r in results],
         "corpus_stats": stats,
         "summary": summary,
-        "decision": decide(summary),
-        "conditions": ABLATION_CONDITIONS,
+        "decision": decide_amended(summary),
+        "conditions": ALL_CONDITIONS,
         "design": {
             "n_seeds": N_SEEDS_ABLATION,
             "scoring_lambda": SCORING_LAMBDA,
             "tau_ref": TAU_REF,
             "span": SPAN,
-            "epochs": {"long": EPOCHS, "short": EPOCHS_SHORT},
+            "epochs": {"long": EPOCHS, "short": EPOCHS_SHORT, "shorter": EPOCHS_SHORTER},
             "noise_run": NOISE_RUN,
             "decision_stats": DECISION_STATS,
             "stat_direction": STAT_DIRECTION,
@@ -1065,7 +1167,7 @@ def publish_survey(results: list[dict], trials: list[dict], decision: dict, scor
         "design": {
             "space": {k: list(v) for k, v in survey_space(decision).items()},
             "sobol_seed": SOBOL_SEED,
-            "n_trials": N_TRIALS,
+            "n_trials": n_trials(survey_space(decision)),
             "n_promote": N_PROMOTE,
             "seeds_promote": SEEDS_PROMOTE,
             "objective": OBJECTIVE,
@@ -1136,7 +1238,7 @@ def main(ctx: Ctx) -> dict:
     # --- Stage 2: the ablations, and the decision they fix.
     ablations = _run_cells(ctx, ablation_cells(prep), prep)
     summary = ablation_summary(ablations)
-    decision = decide(summary)
+    decision = decide_amended(summary)
     published = ctx.run(publish_ablations, ablations, prep["stats"], prep["evals"], prep["probes"], role="prep")
     if "survey" not in _stages():
         return {"stage": "ablations", **published}
