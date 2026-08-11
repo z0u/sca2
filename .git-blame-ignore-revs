@@ -15,3 +15,8 @@ af2a65a26b00ec327bde6e2f5ed73eda0e11cc01
 17bff0b1c5e5b7f5c18b501f6dad053b5fb621c6
 d716ba7625d596bbcd0e81c7315bc1cc7462e6e2
 2fa5dbe0cdc1dd50b322376ab0648da7d3e4aaaa
+f8dac7d0575a3662b2ddb2400643eaf8774a8e4d
+
+# Merge resolving the unwrap against local edits: its 8 merge-only lines are
+# local prose reflowed to match, in todo-science.md and docs/index.md
+299b5427e48793477c599ce2e05314cacfea6bba

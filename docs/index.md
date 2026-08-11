@@ -78,4 +78,8 @@ These experiments were preparation for the main work: exercising the infrastruct
 
 - [2.1.10. A label that doesn't point](./m2/ex-2.1.10/report.py)
 
-    Preregistered; not yet run. Ex-2.1.9's labels still keyed on op1, so the label itself said where the concept was. Now either operand can trigger the label (per-slot rate halved to keep the label budget), and the pooled pull has to find the red operand line by line. Two soft-τ arms ride along.
+    Ex-2.1.9's labels still keyed on op1, so the label itself said where the concept was. Here either operand can trigger the label, and the pooled pull finds the red operand line by line: the weight profiles track the label groups, the operating point survives, and selectivity matches the slot oracle. The soft-τ arms win margin but smear the grading.
+
+- [2.1.11. Ablations and a survey for the D2.1 operating point](./m2/ex-2.1.11/report.py)
+
+    Survey (preregistered search plan; not yet run). The recipe's schedules and weights were inherited piecewise and never tuned together. Flat arms bracket each schedule and a half-length condition trims the budget; a Sobol search over the surviving knobs (λ_a, τ, repulsion dose) then maps the good region and proposes the operating point D2.2 confirms.
