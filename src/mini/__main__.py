@@ -879,6 +879,17 @@ def _summarized(value: list | tuple) -> str | None:
     if any(isinstance(v, bool) or not isinstance(v, numbers.Real) for v in value):
         # `bool` is an `int` to Python, but a mean over elements that read as flags doesn't.
         return None
+    try:
+        return _stats(value)
+    except ArithmeticError, ValueError, TypeError:
+        # A real number that resists float arithmetic — a 10**400 int is the reachable one —
+        # gets the head view instead. This whole path is a nicety, and none of it is worth
+        # taking down the verb, which is the same call the bracket choice below makes.
+        return None
+
+
+def _stats(value: list | tuple) -> str:
+    """:func:`_summarized` once *value* is known to be a long sequence of real numbers."""
     integral = all(isinstance(v, numbers.Integral) for v in value)
     fmt = ".0f" if integral else _STATS_FMT
 

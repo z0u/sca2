@@ -904,6 +904,13 @@ def test_a_sequence_only_summarizes_when_the_summary_would_mean_something():
     assert _abbreviated(set(range(20))) == "{0, 1, 2, … +17}"
 
 
+def test_a_number_that_resists_arithmetic_costs_the_summary_not_the_verb():
+    """`math.isfinite` raises on an int too large to be a float, and the whole summary is a nicety — so it steps aside for the head view rather than taking `results` down with it."""
+    from mini.__main__ import _abbreviated
+
+    assert _abbreviated([10**400] * 10).endswith("… +7]")  # the head view, not an OverflowError
+
+
 def test_scalars_and_keys_survive_verbatim():
     """What a reader takes from the abbreviated view has to be what the result says, so only lengths are lost: no rounding, no reformatting, and every key kept."""
     from mini.__main__ import _abbreviated
