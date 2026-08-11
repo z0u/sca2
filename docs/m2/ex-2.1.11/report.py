@@ -1173,8 +1173,8 @@ def _():
             <tbody>{_rows}</tbody>
             </table>
             """,
-            caption=mo.md("""
-            **The amendment's conditions**, three seeds each. Dose is ∫ λ_s̄·lr d*e* divided by the same integral for the reference schedule, at the same length; centroid is where that dose is delivered, as a fraction of training. `anti-mid` and `anti-mid-flat` match the reference dose by construction, and differ from it in *when* the repulsion arrives: the reference delivers it at a centroid of 0.27, a constant at 0.34. That is the contrast rule 6 turns on. The two short arms carry the reference shape unchanged, so their doses scale with length rather than moving independently.
+            caption=mo.md(r"""
+            **The amendment's conditions**, three seeds each. Dose is $\int \lambda_{\bar{s}} \cdot \mathrm{lr} \, \mathrm{d}e$ divided by the same integral for the reference schedule, at the same length; centroid is where that dose is delivered, as a fraction of training. `anti-mid` and `anti-mid-flat` match the reference dose by construction, and differ from it in *when* the repulsion arrives: the reference delivers it at a centroid of 0.27, a constant at 0.34. That is the contrast rule 6 turns on. The two short arms carry the reference shape unchanged, so their doses scale with length rather than moving independently.
             """).text,
             class_="report-figure",
         )
@@ -1201,6 +1201,96 @@ def _():
 
     For rule 8, the trap runs the opposite way to the usual one. The margin peaks near epoch 10 and drifts down over the following forty, so a shorter run can score *better* on m_line while being the less converged model. The task gate and grading decide this arm; an m_line improvement on its own does not carry it.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    _n_a, _n_b = ex.N_TRIALS_BY_DIM[4], ex.N_TRIALS_BY_DIM[3]
+
+    @themed(
+        name="amendment-flow",
+        alt_text=f"""
+            Flowchart of amendment rules 6 to 8. A start box, round 1: flat anchor, scheduled anti, 50 epochs, feeds two lanes. Left lane: rule 6 compares anti-mid to ref. Resolved worse leads to branch A confirmed: scheduled anti, 4 dimensions, {_n_a} trials. Within band leads to rule 7, which compares anti-mid-flat to flat-anchor. There, within band leads to flat anchor with flat anti at {ex.ANTI_MID_RATIO:g}, 3 dimensions, {_n_b} trials; resolved worse leads to scheduled anchor with flat anti at {ex.ANTI_MID_RATIO:g}, also 3 dimensions, {_n_b} trials. Right lane: rule 8 compares short25 to ref, task-gated against short25-lam0. Both passing leads to 25 epochs; either failing leads to 50 epochs under rule 4.
+        """,
+        caption="""
+            **How rules 6–8 compose.** Each arrow is one frozen comparison, read once the amendment arms settle. The left lane decides what the survey searches: rule 6 sets the anti-subspace branch, and rule 7 — read only if rule 6 simplifies — decides whether the flat anchor and the flat anti are adopted together. The right lane decides how long each trial trains, and composes with any left-lane outcome. Grey boxes are outcomes; each names the surviving configuration and the trial budget its dimension count buys.
+        """,
+    )
+    def _plot():
+        ink = light_dark("#333", "#ccc")
+        edge = light_dark("#555", "#aaa")
+        dec_fc, dec_ec = light_dark("#e9f1f8", "#1b2733"), light_dark("#1f6fb4", "#5fa8dd")
+        out_fc, out_ec = light_dark("#f2f2f2", "#24272c"), light_dark("#999", "#666")
+
+        fig, ax = plt.subplots(figsize=(8.2, 4.8), layout="constrained")
+        ax.set_xlim(0, 100)
+        ax.set_ylim(0, 100)
+        ax.set_axis_off()
+
+        def box(x, y, text, fc, ec):
+            ax.text(
+                x,
+                y,
+                text,
+                ha="center",
+                va="center",
+                fontsize=7.5,
+                color=ink,
+                linespacing=1.4,
+                bbox=dict(boxstyle="round,pad=0.55", facecolor=fc, edgecolor=ec, lw=1.1),
+            )
+
+        def arrow(x0, y0, x1, y1, label=None, lx=0, ly=0):
+            ax.annotate(
+                "",
+                xy=(x1, y1),
+                xytext=(x0, y0),
+                arrowprops=dict(arrowstyle="-|>", color=edge, lw=1.0, shrinkA=0, shrinkB=0),
+            )
+            if label:
+                ax.text(
+                    (x0 + x1) / 2 + lx,
+                    (y0 + y1) / 2 + ly,
+                    label,
+                    fontsize=6.5,
+                    style="italic",
+                    color=ink,
+                    ha="center",
+                    va="center",
+                )
+
+        box(50, 92, "round 1 (rules 1–5): flat anchor · scheduled anti · 50 epochs", out_fc, out_ec)
+
+        box(36, 70, "rule 6\nanti-mid vs ref", dec_fc, dec_ec)
+        arrow(44, 88, 37, 76)
+
+        box(12, 44, f"branch A confirmed:\nscheduled anti\n4 dims · {_n_a} trials", out_fc, out_ec)
+        arrow(28, 65, 14, 51, "resolved\nworse", lx=-8, ly=0)
+
+        box(
+            48, 46, "rule 7\nanti-mid-flat vs flat-anchor\n(read because rule 1\nchose the flat anchor)", dec_fc, dec_ec
+        )
+        arrow(40, 64, 46, 55, "within band", lx=9, ly=1)
+
+        box(30, 16, f"flat anchor\nflat anti at {ex.ANTI_MID_RATIO:g}\n3 dims · {_n_b} trials", out_fc, out_ec)
+        arrow(42, 37, 32, 24, "within band", lx=-8, ly=0)
+
+        box(64, 16, f"scheduled anchor\nflat anti at {ex.ANTI_MID_RATIO:g}\n3 dims · {_n_b} trials", out_fc, out_ec)
+        arrow(54, 37, 62, 24, "resolved\nworse", lx=8, ly=1)
+
+        box(82, 70, "rule 8\nshort25 vs ref,\ntask-gated vs short25-lam0", dec_fc, dec_ec)
+        arrow(56, 88, 81, 77)
+
+        box(74, 44, "25 epochs", out_fc, out_ec)
+        arrow(78, 62, 75, 49, "both pass", lx=-8, ly=0)
+
+        box(92, 44, "50 epochs\n(rule 4)", out_fc, out_ec)
+        arrow(86, 62, 91, 51, "either\nfails", lx=7, ly=1)
+
+        return fig
+
+    mo.Html(_plot())
     return
 
 
