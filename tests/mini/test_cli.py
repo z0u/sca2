@@ -876,8 +876,8 @@ def test_a_summary_names_an_extreme_only_where_it_is_an_interior_one():
     assert _abbreviated([*descending, 20.0]) == "[11 floats: 10 → 20, min 1, mean 6.82, std 5.23]"
 
 
-def test_only_dropped_elements_are_ever_rounded():
-    """The summary is the one rounded thing in this view, so it is confined to sequences whose elements were going to be dropped anyway: a value shown in place of itself is still exact."""
+def test_a_sequence_short_enough_to_print_in_full_is_never_rounded():
+    """The summary is the one rounded thing in this view, so the length floor confines it to sequences already losing most of themselves to the elision."""
     from mini.__main__ import _STATS_MIN, _abbreviated
 
     exact = [1 / 3] * _STATS_MIN

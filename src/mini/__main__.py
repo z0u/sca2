@@ -872,7 +872,7 @@ def _summarized(value: list | tuple) -> str | None:
 
     This is the bulk the abbreviated view exists for, and a head of three floats out of hundreds answers almost nothing about it: not where the run ended, not whether it spiked, not what the best epoch reached. First and last, any interior extreme, and the mean and spread answer those in less width.
 
-    These numbers are rounded, which nothing else here is. The rule that keeps that honest is the length floor: a summary only ever stands in for elements that were going to be dropped, never for a value the view would otherwise have printed exactly. ``--full`` has the originals.
+    These numbers are rounded, which nothing else here is. The length floor is what contains that: a sequence short enough for the view to print in full still prints in full, and exact. Only one already losing most of itself to the elision trades the rest for a summary — so the choice is between three exact elements out of a hundred and a rounded account of all hundred, and it is the second that tells you what the run did. ``--full`` has the originals.
     """
     if len(value) <= _STATS_MIN:
         return None  # short enough that a head shows most of it, and a summary would be the longer line
