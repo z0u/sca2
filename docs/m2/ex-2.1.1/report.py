@@ -86,20 +86,12 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    A small transformer learns a character-level language of color-mixing
-    equations, solving the forms it saw in training and unseen hex pairs. Color
-    turns out to be linearly decodable from its residual stream, with each seed
-    putting *redness* in a different place. Held-out *named* pairs sit at zero
-    accuracy.
+    A small transformer learns a character-level language of color-mixing equations, solving the forms it saw in training and unseen hex pairs. Color turns out to be linearly decodable from its residual stream, with each seed putting *redness* in a different place. Held-out *named* pairs sit at zero accuracy.
     ///
 
-    In M2, we want to see whether Sparse Concept Anchoring carries over from
-    autoencoders to transformers. Before we anchor anything we need a baseline,
-    so this experiment trains a small transformer on a well-defined task.
+    In M2, we want to see whether Sparse Concept Anchoring carries over from autoencoders to transformers. Before we anchor anything we need a baseline, so this experiment trains a small transformer on a well-defined task.
 
-    The model must learn a character-level language of color mixing equations on
-    a 16-level RGB grid. Here are the sample types, which we will refer to
-    throughout:
+    The model must learn a character-level language of color mixing equations on a 16-level RGB grid. Here are the sample types, which we will refer to throughout:
 
     | Type | Example |
     |------|---------|
@@ -108,45 +100,26 @@ def _():
     | Cross-form  | `red + #00f = #808`   |
     | Alias       | `red = #f00`          |
 
-    Every operand spans several tokens in both of its spellings, to force the
-    model to perform two tasks simultaneously: it must mix the colors and spell
-    the result.
+    Every operand spans several tokens in both of its spellings, to force the model to perform two tasks simultaneously: it must mix the colors and spell the result.
 
-    Mixing (`+`) is the channel-wise round-half-up mean, so each prompt has one
-    correct completion.
+    Mixing (`+`) is the channel-wise round-half-up mean, so each prompt has one correct completion.
 
-    We sweep width {16, 32, 64} × depth {2, 4} × 3 seeds ([experiment
-    definition](./experiment.py)), and for each condition we measure:
+    We sweep width {16, 32, 64} × depth {2, 4} × 3 seeds ([experiment definition](./experiment.py)), and for each condition we measure:
 
-    - Completion accuracy: greedy decoding, scored as an exact string match,
-      over four evaluation sets. Those are named pairs seen in training;
-      held-out named pairs, which never appear as named equations, so the model
-      has to combine the alias dictionary with hex arithmetic to answer them;
-      hex-only equations; and cross-form operand pairs that were never shown
-      together.
+    - Completion accuracy: greedy decoding, scored as an exact string match, over four evaluation sets. Those are named pairs seen in training; held-out named pairs, which never appear as named equations, so the model has to combine the alias dictionary with hex arithmetic to answer them; hex-only equations; and cross-form operand pairs that were never shown together.
 
-    - Probe alignment [^probes]: ridge regression from the residual stream at
-      each depth out to the operand color, the result color, and the *redness*
-      of the result.
+    - Probe alignment [^probes]: ridge regression from the residual stream at each depth out to the operand color, the result color, and the *redness* of the result.
 
     ## Hypotheses
 
-    **H1.** A small nGPT should learn the task, with near-perfect accuracy on
-    seen forms and on unseen *hex* pairs; that leaves the anchored runs room to
-    show any degradation later.
+    **H1.** A small nGPT should learn the task, with near-perfect accuracy on seen forms and on unseen *hex* pairs; that leaves the anchored runs room to show any degradation later.
 
-    **H2.** Color should be linearly readable from the residual stream, more so
-    as depth increases.
+    **H2.** Color should be linearly readable from the residual stream, more so as depth increases.
 
-    **H3.** The *redness* probe directions should vary from seed to seed. This
-    is part of the motivation for this work: searching for a concept after
-    training turns up a different geometry every time, whereas SCA should let us
-    fix the location in advance.
+    **H3.** The *redness* probe directions should vary from seed to seed. This is part of the motivation for this work: searching for a concept after training turns up a different geometry every time, whereas SCA should let us fix the location in advance.
 
     [^probes]: A probe is a small linear model we fit on the internal
-    activations of the model to read out what those activations carry. Ridge regression is
-    linear regression with a penalty on large weights, which keeps the fit
-    stable.
+    activations of the model to read out what those activations carry. Ridge regression is linear regression with a penalty on large weights, which keeps the fit stable.
     """)
     return
 
@@ -156,9 +129,7 @@ def _():
     mo.md(r"""
     ## Training data
 
-    The corpus sampler is deterministic. Regenerating it here with the
-    constants defined in the experiment gives back the same training data the model saw,
-    and these are its first lines:
+    The corpus sampler is deterministic. Regenerating it here with the constants defined in the experiment gives back the same training data the model saw, and these are its first lines:
     """)
     return
 
@@ -185,9 +156,7 @@ def _():
     mo.md(f"""
     {figure_html(_body, caption=_caption, class_="report-figure")}
 
-    Between them they cover {len(_pairs):,} distinct operand pairs, **{len(_pairs) / _all_pairs:.2%}**
-    of the {_all_pairs / 1e6:.1f}M in the grid. So the unseen-pair eval sets, sampled to steer clear of
-    all of them, test the mixing rule rather than recall.
+    Between them they cover {len(_pairs):,} distinct operand pairs, **{len(_pairs) / _all_pairs:.2%}** of the {_all_pairs / 1e6:.1f}M in the grid. So the unseen-pair eval sets, sampled to steer clear of all of them, test the mixing rule rather than recall.
     """)
     return holdout, train_pairs
 
@@ -197,11 +166,7 @@ def _():
     mo.md(r"""
     ### The color space
 
-    Every color is a point on an RGB grid with 16 levels per channel, so 16³ =
-    4096 points in all. If we rotate the cube so its black-to-white diagonal
-    stands vertical, *value* runs up the page and hue wraps around it. That is
-    the figure below, seen front-on toward the *red* corner. Hex and cross
-    equations draw their operands from anywhere in this cube.
+    Every color is a point on an RGB grid with 16 levels per channel, so 16³ = 4096 points in all. If we rotate the cube so its black-to-white diagonal stands vertical, *value* runs up the page and hue wraps around it. That is the figure below, seen front-on toward the *red* corner. Hex and cross equations draw their operands from anywhere in this cube.
     """)
     return
 
@@ -210,12 +175,7 @@ def _():
 def _():
     @themed(
         name="color-space-cube",
-        alt_text=(
-            "An orthographic front view of the RGB grid, rotated so the black-to-white diagonal is vertical: "
-            "black at the bottom, white at the top, hues fanned around the middle, showing the red, green, and "
-            "magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a "
-            "smooth solid."
-        ),
+        alt_text="An orthographic front view of the RGB grid, rotated so the black-to-white diagonal is vertical: black at the bottom, white at the top, hues fanned around the middle, showing the red, green, and magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a smooth solid.",
         caption="The 16³ hex grid",
     )
     def _plot() -> plt.Figure:
@@ -232,11 +192,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    The 27 named colors sit only on the {0, 8, 15}³ sub-lattice, the corners
-    and edge midpoints of the cube. Note that no *color* is held out: every point
-    shows up in training, since hex operands are sampled over the whole grid and
-    each name appears in an alias line. What we hold out is operand pairs, both
-    named and hex.
+    The 27 named colors sit only on the {0, 8, 15}³ sub-lattice, the corners and edge midpoints of the cube. Note that no *color* is held out: every point shows up in training, since hex operands are sampled over the whole grid and each name appears in an alias line. What we hold out is operand pairs, both named and hex.
     """)
     return
 
@@ -309,22 +265,8 @@ def _(holdout, train_pairs):
         draw_cube_bound(ax)
         return fig
 
-    _train_alt = (
-        "An orthographic front view of the 27 named colors as a lattice in the rotated RGB cube, value "
-        "vertical with black at the bottom and white at the top. Each named color is a small dot in its true "
-        "color. The pairs used as named equations in training are bold and colored by the color their two "
-        "operands mix to; the held-out pairs are drawn faint for context. One training edge is picked out on "
-        "the cube silhouette with italic letters a and b at its endpoints (white and magenta), the worked "
-        "example a + b = orchid. The panel has no background fill or axes; front-facing edges are heavier than "
-        "back and interior ones, so the lattice reads three-dimensionally. Titled 'train'."
-    )
-    _holdout_alt = (
-        "The same orthographic front view of the 27 named colors in the rotated RGB cube, same orientation and "
-        "styling as the train panel. Here the pairs held out for the named-holdout evaluation are bold and "
-        "colored by their mixed result, with the training pairs drawn faint for context. One held-out edge is "
-        "picked out on the cube silhouette with italic letters c and d at its endpoints (magenta and blue), "
-        "the worked example c + d = violet. Titled 'held out for eval'."
-    )
+    _train_alt = "An orthographic front view of the 27 named colors as a lattice in the rotated RGB cube, value vertical with black at the bottom and white at the top. Each named color is a small dot in its true color. The pairs used as named equations in training are bold and colored by the color their two operands mix to; the held-out pairs are drawn faint for context. One training edge is picked out on the cube silhouette with italic letters a and b at its endpoints (white and magenta), the worked example a + b = orchid. The panel has no background fill or axes; front-facing edges are heavier than back and interior ones, so the lattice reads three-dimensionally. Titled 'train'."
+    _holdout_alt = "The same orthographic front view of the 27 named colors in the rotated RGB cube, same orientation and styling as the train panel. Here the pairs held out for the named-holdout evaluation are bold and colored by their mixed result, with the training pairs drawn faint for context. One held-out edge is picked out on the cube silhouette with italic letters c and d at its endpoints (magenta and blue), the worked example c + d = violet. Titled 'held out for eval'."
     _left = themed(
         lambda: _panel(_train_edges, holdout, ("white", "magenta", "ab")),
         name="named-pair-lattice-train",
@@ -355,28 +297,18 @@ def _(holdout, train_pairs):
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    Both figures show the same lattice from the front. The vertices are the
-    named colors, and each edge joins the two operands of a named pair. The midpoint
-    of an edge is the answer that equation should
-    produce.
+    Both figures show the same lattice from the front. The vertices are the named colors, and each edge joins the two operands of a named pair. The midpoint of an edge is the answer that equation should produce.
 
     Two edges are labeled as worked examples:
 
     - $\overline{{ab}}$: {colors.swatch("white")} + {colors.swatch("magenta")} = {colors.swatch("orchid")} (train)
     - $\overline{{cd}}$: {colors.swatch("magenta")} + {colors.swatch("blue")} = {colors.swatch("violet")} (held out)
 
-    Only the connected pairs ever appear as named equations *with a named
-    answer*. Every other operand pair the model sees is written in hex or cross
-    form, and those draw their operands from the full 16³ grid.
+    Only the connected pairs ever appear as named equations *with a named answer*. Every other operand pair the model sees is written in hex or cross form, and those draw their operands from the full 16³ grid.
 
-    A held-out edge like `magenta + blue = violet` can be answered two ways. One
-    is recall, which is ruled out here, since that named rendering never appears
-    in training. The other is composition: recognize both names as colors,
-    mix them as if they had been written in hex, and translate the result
-    back into a name. Composition is what the `named_holdout` eval set measures.
+    A held-out edge like `magenta + blue = violet` can be answered two ways. One is recall, which is ruled out here, since that named rendering never appears in training. The other is composition: recognize both names as colors, mix them as if they had been written in hex, and translate the result back into a name. Composition is what the `named_holdout` eval set measures.
 
-    The `hex_unseen` and `cross_unseen` sets are sampled at evaluation time from
-    the full grid, steering clear of every operand pair the corpus used.
+    The `hex_unseen` and `cross_unseen` sets are sampled at evaluation time from the full grid, steering clear of every operand pair the corpus used.
     """)
     return
 
@@ -405,10 +337,7 @@ def _(metrics):
     _hex = [acc(metrics, w, d, s, "hex_unseen") for w in WIDTHS for d in DEPTHS for s in SEEDS]
     _hold = [acc(metrics, w, d, s, "named_holdout") for w in WIDTHS for d in DEPTHS for s in SEEDS]
     mo.md(f"""
-    Results: Accuracy on unseen hex pairs spans
-    **{min(_hex):.2f}–{max(_hex):.2f}** across the sweep, while held-out named
-    pairs, the compositional test, span **{min(_hold):.2f}–{max(_hold):.2f}**.
-    The figures below break this down by condition and eval set.
+    Results: Accuracy on unseen hex pairs spans **{min(_hex):.2f}–{max(_hex):.2f}** across the sweep, while held-out named pairs, the compositional test, span **{min(_hold):.2f}–{max(_hold):.2f}**. The figures below break this down by condition and eval set.
     """)
     return
 
@@ -418,13 +347,9 @@ def _():
     mo.md(r"""
     ## Completion accuracy across the sweep
 
-    The figure below shows accuracy vs. model width, with one panel per eval set.
-    Each panel has one line per model depth (the mean over seeds).
-    Individual seeds are shown as faint points.
+    The figure below shows accuracy vs. model width, with one panel per eval set. Each panel has one line per model depth (the mean over seeds). Individual seeds are shown as faint points.
 
-    The named-holdout panel is interesting. It can only be solved by
-    combining the alias dictionary with the mixing arithmetic, and we find that
-    the model never learns to do that.
+    The named-holdout panel is interesting. It can only be solved by combining the alias dictionary with the mixing arithmetic, and we find that the model never learns to do that.
     """)
     return
 
@@ -433,12 +358,7 @@ def _():
 def _(metrics):
     @themed(
         name="accuracy-sweep",
-        alt_text=(
-            "Four line charts of completion accuracy (0 to 1) against model width (16, 32, 64), one panel "
-            "per eval set: named seen, named holdout, hex unseen, and cross unseen. Each panel has one line "
-            "per depth (2 and 4 layers, darker is deeper), averaged over three seeds, with individual seeds "
-            "as faint points."
-        ),
+        alt_text="Four line charts of completion accuracy (0 to 1) against model width (16, 32, 64), one panel per eval set: named seen, named holdout, hex unseen, and cross unseen. Each panel has one line per depth (2 and 4 layers, darker is deeper), averaged over three seeds, with individual seeds as faint points.",
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 4, figsize=(11.5, 3.2), sharey=True)
@@ -470,20 +390,9 @@ def _(metrics):
 
     Let's see where in each sequence the model was unsure.
 
-    For the d{_w}-L{_d} model (seed {SEEDS[0]}), we plot one example per eval set
-    and draw two series beneath the text, both as fractions of $\log |V|$, the
-    value a uniform guess over the vocabulary would give. The first is the
-    surprisal of the model at each character: how "surprised" it is by the character that
-    actually comes next. The second is the entropy of its predictive
-    distribution, the surprisal it expected on average before seeing that
-    character.
+    For the d{_w}-L{_d} model (seed {SEEDS[0]}), we plot one example per eval set and draw two series beneath the text, both as fractions of $\log |V|$, the value a uniform guess over the vocabulary would give. The first is the surprisal of the model at each character: how "surprised" it is by the character that actually comes next. The second is the entropy of its predictive distribution, the surprisal it expected on average before seeing that character.
 
-    Operands are unpredictable, so both series should spike at the
-    first characters of each operand and settle as the prefix pins down the rest.
-    Everything after `=` can be computed from the operands, so a model that has learnt
-    color mixing should coast through the answer at near-zero surprisal, even on
-    operand pairs it has never seen. If instead it guesses the answer,
-    surprisal should spike across the answer characters.
+    Operands are unpredictable, so both series should spike at the first characters of each operand and settle as the prefix pins down the rest. Everything after `=` can be computed from the operands, so a model that has learnt color mixing should coast through the answer at near-zero surprisal, even on operand pairs it has never seen. If instead it guesses the answer, surprisal should spike across the answer characters.
     """)
     return
 
@@ -553,12 +462,7 @@ def _():
 
     $$s_2 = \frac{i - h}{\log |V|}$$
 
-    where $i$ is the surprisal and $h$ the entropy. This sits near zero when the
-    model confidence matched the outcome, whether it was confident and right or
-    unsure and appropriately surprised. It goes positive when the model was confidently
-    wrong, and negative when the character was more predictable than its
-    distribution suggested. The sparkline clips at zero, so we draw the negative
-    values as a second, flipped series, $-s_2$.
+    where $i$ is the surprisal and $h$ the entropy. This sits near zero when the model confidence matched the outcome, whether it was confident and right or unsure and appropriately surprised. It goes positive when the model was confidently wrong, and negative when the character was more predictable than its distribution suggested. The sparkline clips at zero, so we draw the negative values as a second, flipped series, $-s_2$.
     """)
     return
 
@@ -590,9 +494,7 @@ def _(pad, rows, sublines):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    None spike except `named_holdout`, the one set this sweep never solves
-    (accuracy 0 above). The model is confident even on those wrong answers: entropy
-    stays low while the true characters arrive as a surprise. What is the model so sure of?
+    None spike except `named_holdout`, the one set this sweep never solves (accuracy 0 above). The model is confident even on those wrong answers: entropy stays low while the true characters arrive as a surprise. What is the model so sure of?
     """)
     return
 
@@ -607,37 +509,15 @@ def _(name_prob):
     mo.md(rf"""
     ## Why the named answers fail
 
-    The sparklines above are teacher-forced: the model is shown the true answer
-    from the validation set, and we watch how much each one surprises it.
-    `lime + black = green` is an interesting case.
+    The sparklines above are teacher-forced: the model is shown the true answer from the validation set, and we watch how much each one surprises it. `lime + black = green` is an interesting case.
 
-    Left to choose, this seed opens `lime + black` with `t`, for *teal*, so the
-    true `g` is mildly surprising. Once it is forced onto `g`, the model guesses
-    `r` correctly, since *gray* and *green* share the prefix `gr`. Then the true
-    `e` is very surprising: on the `gr…` branch the model is all but sure the
-    word is *gray*, but `e` rules that out. The spike is the model fluently
-    spelling a different palette name, then being surprised when the truth
-    arrives.
+    Left to choose, this seed opens `lime + black` with `t`, for *teal*, so the true `g` is mildly surprising. Once it is forced onto `g`, the model guesses `r` correctly, since *gray* and *green* share the prefix `gr`. Then the true `e` is very surprising: on the `gr…` branch the model is all but sure the word is *gray*, but `e` rules that out. The spike is the model fluently spelling a different palette name, then being surprised when the truth arrives.
 
-    *Teal* is a one-channel neighbor of the true mix, and the tall spike on the
-    `a` of `black` hints at why. After `lime + bl` the model puts
-    {_p_blue:.1%} on `u`, so it is all but certain the second operand is *blue*,
-    and `lime + blue = teal` is an equation it trained on.
+    *Teal* is a one-channel neighbor of the true mix, and the tall spike on the `a` of `black` hints at why. After `lime + bl` the model puts {_p_blue:.1%} on `u`, so it is all but certain the second operand is *blue*, and `lime + blue = teal` is an equation it trained on.
 
-    When it sees that the operand is different, the correction barely reaches the
-    answer. Going from the `lime + blue = ` prompt to `lime + black = ` lifts
-    *gray* by a factor of {_p("lime + black = ", "gray") / _p("lime + blue = ", "gray"):.0f},
-    from {_p("lime + blue = ", "gray"):.1%} to {_p("lime + black = ", "gray"):.0%}.
-    The true answer *green* moves by a similar factor and stays negligible, from
-    {_p("lime + blue = ", "green"):.0e} to {_p("lime + black = ", "green"):.0e},
-    while the trained *teal* keeps the top spot at {_p("lime + black = ", "teal"):.0%}.
-    So the operand correction redistributes mass among wrong names rather than
-    finding the arithmetic. The model does learn the result-form rule, which says
-    a named answer appears iff both operands are named. The difficulty is choosing
-    which name, and a trained neighbor seems to overrule.
+    When it sees that the operand is different, the correction barely reaches the answer. Going from the `lime + blue = ` prompt to `lime + black = ` lifts *gray* by a factor of {_p("lime + black = ", "gray") / _p("lime + blue = ", "gray"):.0f}, from {_p("lime + blue = ", "gray"):.1%} to {_p("lime + black = ", "gray"):.0%}. The true answer *green* moves by a similar factor and stays negligible, from {_p("lime + blue = ", "green"):.0e} to {_p("lime + black = ", "green"):.0e}, while the trained *teal* keeps the top spot at {_p("lime + black = ", "teal"):.0%}. So the operand correction redistributes mass among wrong names rather than finding the arithmetic. The model does learn the result-form rule, which says a named answer appears iff both operands are named. The difficulty is choosing which name, and a trained neighbor seems to overrule.
 
-    Below is every held-out pair, prompted exactly as in the `named_holdout`
-    eval set, with one column per seed of the chosen architecture.
+    Below is every held-out pair, prompted exactly as in the `named_holdout` eval set, with one column per seed of the chosen architecture.
     """)
     return
 
@@ -740,22 +620,11 @@ def _(complete, holdout, named_holdout_exs):
             _hits += _g in colors.PALETTE and _shell[_i][list(colors.PALETTE).index(_g)]
 
     mo.md(rf"""
-    The model never answers these in hex. It always reaches for a name, and
-    usually one adjacent to the true mix: {_hits} of {_tot} guesses land in the
-    one-step neighborhood of the mix, against {_null:.0%} for a name drawn uniformly
-    from the palette. Sometimes the name is an echo of one operand
-    (`olive + lavender = lavender`), though on this palette an operand is often a
-    neighbor anyway, so that part is weaker evidence than it looks.
+    The model never answers these in hex. It always reaches for a name, and usually one adjacent to the true mix: {_hits} of {_tot} guesses land in the one-step neighborhood of the mix, against {_null:.0%} for a name drawn uniformly from the palette. Sometimes the name is an echo of one operand (`olive + lavender = lavender`), though on this palette an operand is often a neighbor anyway, so that part is weaker evidence than it looks.
 
-    The seeds mostly agree: {_agree} of the {_n} pairs draw the same wrong answer
-    from all three. Independent guessing inside the neighborhood would produce
-    well under one such pair, so the bias is systematic; perhaps retrieval of the
-    nearest memorized named equation.
+    The seeds mostly agree: {_agree} of the {_n} pairs draw the same wrong answer from all three. Independent guessing inside the neighborhood would produce well under one such pair, so the bias is systematic; perhaps retrieval of the nearest memorized named equation.
 
-    The mixing arithmetic itself is fine. Prompted with the same held-out value
-    pairs, seed {SEEDS[0]} solves **{_scores["hex"]}/{_n}** in hex form and
-    **{_scores["cross"]}/{_n}** in cross form, against
-    **{_scores["named"]}/{_n}** as named equations.
+    The mixing arithmetic itself is fine. Prompted with the same held-out value pairs, seed {SEEDS[0]} solves **{_scores["hex"]}/{_n}** in hex form and **{_scores["cross"]}/{_n}** in cross form, against **{_scores["named"]}/{_n}** as named equations.
     """)
     return
 
@@ -766,22 +635,11 @@ def _(train_pairs):
     mo.md(rf"""
     The corpus may make this hard for the model. Possible causes:
 
-    - Named equations draw on only {len(train_pairs)} distinct pairs, so each
-      one is seen about {_reps} times in training. A lookup table is enough, and
-      the model may build one (`named_seen` ≈ 1). Once the loss on that slice
-      reaches zero, nothing nudges the model toward the compositional route.
-    - The alias dictionary runs one way. Alias lines are always `name = hex`.
-      This may be an instance of the *reversal curse*, where training on `A = B`
-      doesn't teach `B = A`.
-    - A hex answer can be computed channel-by-channel, whereas the first
-      character of a name depends on all three channels and the inverted dictionary at the
-      same time. The probe section below looks at this more.
+    - Named equations draw on only {len(train_pairs)} distinct pairs, so each one is seen about {_reps} times in training. A lookup table is enough, and the model may build one (`named_seen` ≈ 1). Once the loss on that slice reaches zero, nothing nudges the model toward the compositional route.
+    - The alias dictionary runs one way. Alias lines are always `name = hex`. This may be an instance of the *reversal curse*, where training on `A = B` doesn't teach `B = A`.
+    - A hex answer can be computed channel-by-channel, whereas the first character of a name depends on all three channels and the inverted dictionary at the same time. The probe section below looks at this more.
 
-    A few corpus changes might help: reverse some alias lines (`#f00 = red`);
-    add named operands whose off-palette mix forces a hex answer
-    (`red + navy = #804`), so that `name + name` prompts have to engage the
-    arithmetic instead of the lookup table; and use a denser named palette, so
-    memorization is harder.
+    A few corpus changes might help: reverse some alias lines (`#f00 = red`); add named operands whose off-palette mix forces a hex answer (`red + navy = #804`), so that `name + name` prompts have to engage the arithmetic instead of the lookup table; and use a denser named palette, so memorization is harder.
     """)
     return
 
@@ -792,14 +650,10 @@ def _(metrics):
     mo.md(rf"""
     ## Where color is represented
 
-    Here we fit the probes at each residual-stream depth (depth 0 is the
-    embedding) and plot their R² against depth[^rsquare]. The figure has one
-    panel per probe target and one line per width. We test only the deepest
-    models (L{_d}) and show the mean over seeds.
+    Here we fit the probes at each residual-stream depth (depth 0 is the embedding) and plot their R² against depth[^rsquare]. The figure has one panel per probe target and one line per width. We test only the deepest models (L{_d}) and show the mean over seeds.
 
     [^rsquare]: This R² is the fraction of target variance the probe
-    recovers, so 1 means the color is fully readable from the stream and 0 means
-    it is not there linearly.
+    recovers, so 1 means the color is fully readable from the stream and 0 means it is not there linearly.
     """)
     return
 
@@ -810,12 +664,7 @@ def _(metrics):
 
     @themed(
         name="probe-r2",
-        alt_text=(
-            "Three line charts of probe R-squared against residual-stream depth for the four-layer models, "
-            "one panel per probe target: operand RGB, result RGB, and result redness. One line per width "
-            "(16, 32, 64; darker is wider), averaged over seeds. R-squared for the operand rises within the "
-            "first layers; the result targets rise later in depth."
-        ),
+        alt_text="Three line charts of probe R-squared against residual-stream depth for the four-layer models, one panel per probe target: operand RGB, result RGB, and result redness. One line per width (16, 32, 64; darker is wider), averaged over seeds. R-squared for the operand rises within the first layers; the result targets rise later in depth.",
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 3, figsize=(9.8, 3.2), sharey=True)
@@ -839,15 +688,9 @@ def _(metrics):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Rising R² for the *result* means the mix becomes partly readable before the
-    answer starts. It plateaus well below the operand R², though, even in
-    conditions whose hex accuracy is perfect. Probing every answer position, per
-    channel, would map that spread-out schedule (to do).
+    Rising R² for the *result* means the mix becomes partly readable before the answer starts. It plateaus well below the operand R², though, even in conditions whose hex accuracy is perfect. Probing every answer position, per channel, would map that spread-out schedule (to do).
 
-    The probes read the residual stream at two positions, marked below. The first
-    is the last character of the first operand, where the whole operand has been read
-    in, so its value can be represented. The second is the space after `=`, the
-    last position before the answer begins, where the result has to be ready.
+    The probes read the residual stream at two positions, marked below. The first is the last character of the first operand, where the whole operand has been read in, so its value can be represented. The second is the space after `=`, the last position before the answer begins, where the result has to be ready.
     """)
     return
 
@@ -895,14 +738,9 @@ def _():
     mo.md(r"""
     ## Do seeds agree on where *redness* points?
 
-    For each pair of seeds trained with the same architecture, we take their
-    fitted redness-probe directions and measure the absolute cosine similarity
-    between them, layer by layer. Two random directions in n dimensions should
-    have |cos| ≈ 0.8/√n, drawn here as the dashed line.
+    For each pair of seeds trained with the same architecture, we take their fitted redness-probe directions and measure the absolute cosine similarity between them, layer by layer. Two random directions in n dimensions should have |cos| ≈ 0.8/√n, drawn here as the dashed line.
 
-    If this geometry were stable across seeds, there would be little point in
-    anchoring. The spread we see is part of why we want to pin the direction
-    down at training time.
+    If this geometry were stable across seeds, there would be little point in anchoring. The spread we see is part of why we want to pin the direction down at training time.
     """)
     return
 
@@ -917,11 +755,7 @@ def _(weights):
 
     @themed(
         name="probe-direction-agreement",
-        alt_text=(
-            "Line chart of the absolute cosine similarity between redness probe directions fitted on "
-            "different seeds, against residual-stream depth, one line per width for the four-layer models. "
-            "A dashed horizontal line marks the expected similarity of random directions for each width."
-        ),
+        alt_text="Line chart of the absolute cosine similarity between redness probe directions fitted on different seeds, against residual-stream depth, one line per width for the four-layer models. A dashed horizontal line marks the expected similarity of random directions for each width.",
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(6.2, 3.6))
@@ -948,16 +782,9 @@ def _(metrics):
         f"""
     ## Findings
 
-    The smallest condition that saturates the unseen-pair eval sets is
-    **width {_best[0]}, {_best[1]} layers**. For D2.1, we can take that
-    architecture as the baseline and add the anchor, which pulls sequences
-    labeled *red-ish* (supplied as sparse, noisy labels) toward a chosen
-    direction at chosen layers. Then we can re-run these measurements and
-    compare the anchored and baseline versions.
+    The smallest condition that saturates the unseen-pair eval sets is **width {_best[0]}, {_best[1]} layers**. For D2.1, we can take that architecture as the baseline and add the anchor, which pulls sequences labeled *red-ish* (supplied as sparse, noisy labels) toward a chosen direction at chosen layers. Then we can re-run these measurements and compare the anchored and baseline versions.
 
-    The held-out named pairs sit at zero validation accuracy, so that set gives
-    the anchored runs no headroom and probably can't help us spot any unintended
-    degradation.
+    The held-out named pairs sit at zero validation accuracy, so that set gives the anchored runs no headroom and probably can't help us spot any unintended degradation.
     """
     )
     return

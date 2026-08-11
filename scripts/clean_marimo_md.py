@@ -1,38 +1,20 @@
 #!/usr/bin/env python
 """Clean up ``marimo-md-export`` output into plain, LLM-friendly Markdown.
 
-``marimo-md-export`` (see ``pyproject.toml``) already does the hard part of
-converting a notebook to Markdown with all string interpolation resolved. But
-cells that build their output programmatically (``mo.md(f"...")`` composed
-with ``mo.hstack``/callouts/tables, or run through the same renderer as
-``mo.md``) come out as raw HTML fragments rather than Markdown, and figures
-are inlined as base64 PNGs. This script re-processes that output:
+``marimo-md-export`` (see ``pyproject.toml``) already does the hard part of converting a notebook to Markdown with all string interpolation resolved. But cells that build their output programmatically (``mo.md(f"...")`` composed with ``mo.hstack``/callouts/tables, or run through the same renderer as ``mo.md``) come out as raw HTML fragments rather than Markdown, and figures are inlined as base64 PNGs. This script re-processes that output:
 
 - drops the notebook frontmatter and ``<style>`` blocks
-- externalizes inlined images (the light-theme variant only) to sibling
-  files, referenced with normal ``![alt](...)`` Markdown
+- externalizes inlined images (the light-theme variant only) to sibling files, referenced with normal ``![alt](...)`` Markdown
 - converts ``<marimo-tex>`` spans to ``$...$`` / ``$$...$$``
 - converts footnote refs/definitions to Markdown footnote syntax
-- converts ``!!! type "Title"`` admonitions, and the ``<details>`` elements
-  the same source produces from an interpolated cell, to GFM blockquotes
-- converts the remaining HTML islands (``mo.md`` output, result tables) to
-  Markdown via ``markdownify``, treating ``span.paragraph`` as a block
-- keeps ``<figure>``/``<figcaption>`` tags, blank-line-separated so the
-  Markdown inside them (image, caption) still renders as Markdown rather
-  than being swallowed as raw HTML
-- reflows each paragraph onto one line (``--no-reflow`` to keep the source
-  wrapping), so a diff against an edited copy shows changed sentences rather
-  than re-wrapping noise
+- converts ``!!! type "Title"`` admonitions, and the ``<details>`` elements the same source produces from an interpolated cell, to GFM blockquotes
+- converts the remaining HTML islands (``mo.md`` output, result tables) to Markdown via ``markdownify``, treating ``span.paragraph`` as a block
+- keeps ``<figure>``/``<figcaption>`` tags, blank-line-separated so the Markdown inside them (image, caption) still renders as Markdown rather than being swallowed as raw HTML
+- reflows each paragraph onto one line (``--no-reflow`` to keep the source wrapping), so a diff against an edited copy shows changed sentences rather than re-wrapping noise
 
-Usage: ``uv run scripts/clean_marimo_md.py <in.md> [out.md]`` (defaults to
-overwriting in place). Images are written beside the output file, under
-``<output-stem>.assets/`` unless ``--assets-dir`` is given.
+Usage: ``uv run scripts/clean_marimo_md.py <in.md> [out.md]`` (defaults to overwriting in place). Images are written beside the output file, under ``<output-stem>.assets/`` unless ``--assets-dir`` is given.
 
-To go from a notebook to a cleaned document in one step, use
-``scripts/export_report_md.py``, which runs the export itself and then this
-pass. Prefer it over the ``marimo-md-export`` console script, which drops
-cells silently in a case that comes up in our reports — see that script's
-docstring.
+To go from a notebook to a cleaned document in one step, use ``scripts/export_report_md.py``, which runs the export itself and then this pass. Prefer it over the ``marimo-md-export`` console script, which drops cells silently in a case that comes up in our reports — see that script's docstring.
 """
 
 from __future__ import annotations

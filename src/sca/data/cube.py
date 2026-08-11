@@ -1,8 +1,6 @@
 """The RGB grid as data: the points the color domain is built from.
 
-Drawing them is :mod:`sca.vis`'s job — this module stays on the data side of
-the line, because experiments import it and mi-ni fingerprints project source
-transitively, so a figure tweak here would re-run them.
+Drawing them is :mod:`sca.vis`'s job — this module stays on the data side of the line, because experiments import it and mi-ni fingerprints project source transitively, so a figure tweak here would re-run them.
 """
 
 from __future__ import annotations

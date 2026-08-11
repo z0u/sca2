@@ -50,14 +50,8 @@ Use normal-weight sentence case for headings and descriptive lists.
 + - Foo bar: baz
 ```
 
-Prefer paragraphs for nuanced or complex explanations; use lists sparingly, for
-summarizing steps or where clarity benefits from the structure.
+Prefer paragraphs for nuanced or complex explanations; use lists sparingly, for summarizing steps or where clarity benefits from the structure.
 
-Emphasis is distracting to read, so it is reserved for specific jobs.
-Concepts like _red_ take italics whenever they appear.
-Named terms like _anchor_ take italics on first use in a section, and again later only if the role of the word would otherwise be ambiguous — to distinguish "anchor" the regularizer term from "the anchor point", say.
-Inline list markers like **(a)** and **Left:** should be bold, but only if they are short.
-Paragraph headings may be bolded instead of using a 4th or 5th-level heading. Try to avoid it though.
-Never use bold or italics for other emphasis. The user will add them if necessary.
+Emphasis is distracting to read, so it is reserved for specific jobs. Concepts like _red_ take italics whenever they appear. Named terms like _anchor_ take italics on first use in a section, and again later only if the role of the word would otherwise be ambiguous — to distinguish "anchor" the regularizer term from "the anchor point", say. Inline list markers like **(a)** and **Left:** should be bold, but only if they are short. Paragraph headings may be bolded instead of using a 4th or 5th-level heading. Try to avoid it though. Never use bold or italics for other emphasis. The user will add them if necessary.
 
 For syntax conventions, refer to the relevant `style-*` skill.

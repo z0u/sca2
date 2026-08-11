@@ -1,17 +1,9 @@
 """
 The tiny color-autoencoder testbed shared by experiments ex-2.9.1–2.9.4.
 
-Ported from ex-preppy (M1): an RGB autoencoder trained with Sparse Concept
-Anchoring so that *red* lands on axis 0 of a unit-normalized 5D bottleneck.
-This module holds what the ex-2.9.x experiments share — the data grids, the
-model, the raw loss terms, the weight-level interventions on the anchored
-axis, and the scoring and report helpers. Each experiment composes these with
-its own loss weighting, schedule, and training loop, which stay in the
-experiment's own file.
+Ported from ex-preppy (M1): an RGB autoencoder trained with Sparse Concept Anchoring so that *red* lands on axis 0 of a unit-normalized 5D bottleneck. This module holds what the ex-2.9.x experiments share — the data grids, the model, the raw loss terms, the weight-level interventions on the anchored axis, and the scoring and report helpers. Each experiment composes these with its own loss weighting, schedule, and training loop, which stay in the experiment's own file.
 
-Edits here are memoization *evidence* for every experiment that imports the
-edited definition (mi-ni tracks project source transitively), so a change
-re-runs the affected tasks on their next invocation.
+Edits here are memoization *evidence* for every experiment that imports the edited definition (mi-ni tracks project source transitively), so a change re-runs the affected tasks on their next invocation.
 """
 
 from __future__ import annotations
@@ -49,10 +41,7 @@ type Params = list[dict[str, jax.Array]]
 def make_dopesheet(peak_lr: float, anneal: bool) -> str:
     """Ex-2.9.1's dopesheet with a parameterized LR plateau and an optional regularizer anneal.
 
-    anneal=True reproduces the original: all four regularizer weights ramp to zero by step
-    1425 (90% through the second phase). anneal=False deletes that keyframe, so each weight
-    holds its last keyed value (anchor 0.1, anti-anchor 0.05, anti-subspace 0.003,
-    separate 0.001) to the end. The final LR is always half the peak, as in the original.
+    anneal=True reproduces the original: all four regularizer weights ramp to zero by step 1425 (90% through the second phase). anneal=False deletes that keyframe, so each weight holds its last keyed value (anchor 0.1, anti-anchor 0.05, anti-subspace 0.003, separate 0.001) to the end. The final LR is always half the peak, as in the original.
     """
     rows = [
         "STEP,PHASE,ACTION,lr,separate,anchor,anti-anchor,anti-subspace",
@@ -75,9 +64,7 @@ def _grid(coords: np.ndarray) -> np.ndarray:
 def redness(rgb: np.ndarray) -> np.ndarray:
     """M1's label affinity: 1 for pure red, falling off as green or blue is added.
 
-    The batched form, over unit-cube coordinates. `sca.data.colors.redness` is
-    the same formula for a single color in 16-level integer coordinates, which
-    is what the M2 corpora are written in.
+    The batched form, over unit-cube coordinates. `sca.data.colors.redness` is the same formula for a single color in 16-level integer coordinates, which is what the M2 corpora are written in.
     """
     r, g, b = rgb.T
     return r * (1 - g / 2 - b / 2)
@@ -187,9 +174,7 @@ def ablate(params: Params) -> Params:
 def edit_axis0(params: Params, *, bias: float | None = None, negate: bool = False) -> Params:
     """Weight-level interventions on latent axis 0, all edits to the encoder's output layer.
 
-    negate=True reflects (z₀ → −z₀ pre-norm). Otherwise row 0 is zeroed — the redness
-    computation is deleted — and the bias becomes *bias* (0 = ex-2.9.1's zero ablation,
-    a constant c = optimal ablation, −γ = redirect to the fallback direction).
+    negate=True reflects (z₀ → −z₀ pre-norm). Otherwise row 0 is zeroed — the redness computation is deleted — and the bias becomes *bias* (0 = ex-2.9.1's zero ablation, a constant c = optimal ablation, −γ = redirect to the fallback direction).
     """
     params = [dict(lyr) for lyr in params]
     if negate:
@@ -202,8 +187,7 @@ def edit_axis0(params: Params, *, bias: float | None = None, negate: bool = Fals
 def optimal_constant(params: Params, x: jax.Array, subset: np.ndarray | None = None) -> float:
     """Line-search the post-ablation bias c* that minimizes mean reconstruction error.
 
-    Li & Janson find a* by SGD; in 1D an exact line search is simpler. *subset* masks the
-    distribution the constant is optimized over (None = the full grid, per the paper).
+    Li & Janson find a* by SGD; in 1D an exact line search is simpler. *subset* masks the distribution the constant is optimized over (None = the full grid, per the paper).
     """
     xs = x if subset is None else x[np.flatnonzero(subset)]
     losses = [float(jnp.mean(eval_model(edit_axis0(params, bias=float(c)), xs)[0])) for c in OA_GRID]
@@ -243,9 +227,7 @@ def load_results(metrics_ref: str, trajs_ref: str) -> tuple[list[dict], dict[str
 def classify(r: dict) -> str:
     """Bucket a run by its endpoint health.
 
-    Thresholds sit in the gaps of clearly bimodal metrics: healthy runs end with
-    val_anchor ≤ 0.07, leak < 0.1, and val_recon ≤ 0.002; failures sit far beyond
-    (anchor 0.35+, leak 0.34+, recon 0.046+).
+    Thresholds sit in the gaps of clearly bimodal metrics: healthy runs end with val_anchor ≤ 0.07, leak < 0.1, and val_recon ≤ 0.002; failures sit far beyond (anchor 0.35+, leak 0.34+, recon 0.046+).
     """
     if r["val_anchor"] > 0.3 or r["val_recon"] > 0.01 or r["leak"] > 0.3:
         return "catastrophic"
@@ -257,9 +239,7 @@ def classify(r: dict) -> str:
 def plot_latent_disc(ax: Axes, z: np.ndarray, colors: np.ndarray, *, s: float = 20) -> None:
     """One latent-space panel, per the repo's figure conventions (see the style-fig skill).
 
-    The unit-hypersphere bound as a background disc, data-colored points at
-    (z₁, z₀) — the anchored axis points up — fixed domain limits, no axes.
-    Titles and annotations stay with the caller.
+    The unit-hypersphere bound as a background disc, data-colored points at (z₁, z₀) — the anchored axis points up — fixed domain limits, no axes. Titles and annotations stay with the caller.
     """
     from matplotlib.patches import Circle
 

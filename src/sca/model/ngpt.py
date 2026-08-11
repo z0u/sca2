@@ -1,14 +1,6 @@
 """nGPT: every activation and weight matrix lives on the unit hypersphere.
 
-A stripped-back take on the published recipe: scalar gains everywhere (in place
-of the per-channel eigen learning rates), and the residual step α *fixed* at
-1/n_layer rather than learned — the value the learned gates settled on anyway.
-What we keep from nGPT proper is the residual form itself: a LERP toward the
-sub-module's *normalized* output, `h ← Norm(h + α·(ĥ* − h))`. Normalizing the
-sub-module output (ĥ*) is load-bearing — it makes α the true step size,
-independent of the raw output's norm (which scales like √n_embd for the MLP),
-so the per-layer rotation stays ~α and the stack's travel holds O(1) regardless
-of width.
+A stripped-back take on the published recipe: scalar gains everywhere (in place of the per-channel eigen learning rates), and the residual step α *fixed* at 1/n_layer rather than learned — the value the learned gates settled on anyway. What we keep from nGPT proper is the residual form itself: a LERP toward the sub-module's *normalized* output, `h ← Norm(h + α·(ĥ* − h))`. Normalizing the sub-module output (ĥ*) is load-bearing — it makes α the true step size, independent of the raw output's norm (which scales like √n_embd for the MLP), so the per-layer rotation stays ~α and the stack's travel holds O(1) regardless of width.
 """
 
 import logging
@@ -130,8 +122,7 @@ class Block(eqx.Module):
     def _step(self, h, sublayer_out, s: Scale | None):
         """One residual update: a LERP toward the *normalized* sublayer output, re-projected.
 
-        Normalizing the target makes alpha the true interpolation fraction, so the
-        step is independent of the raw output's magnitude (~√n_embd for the MLP).
+        Normalizing the target makes alpha the true interpolation fraction, so the step is independent of the raw output's magnitude (~√n_embd for the MLP).
         """
         alpha = self.alpha if s is None else s()
         return normalize(h + alpha * (normalize(sublayer_out) - h))
@@ -194,12 +185,9 @@ class NGPT(LanguageModel):
         return (x @ self.transformer.wte.T) * self.s_z()
 
     def residual_stream(self, idx: Int[Array, "B T"]) -> Float[Array, "L1 B T C"]:
-        """The residual stream at every depth: the embedding plus the state after
-        each block (n_layer + 1 slices, all unit-norm).
+        """The residual stream at every depth: the embedding plus the state after each block (n_layer + 1 slices, all unit-norm).
 
-        The probing/anchoring readout for the M2 experiments. Mirrors
-        ``__call__`` without gradient checkpointing — intended for small eval
-        batches, not the training path.
+        The probing/anchoring readout for the M2 experiments. Mirrors ``__call__`` without gradient checkpointing — intended for small eval batches, not the training path.
         """
         x = normalize(self.transformer.wte[idx])
         states = [x]
@@ -211,10 +199,7 @@ class NGPT(LanguageModel):
     def stream_and_logits(self, idx: Int[Array, "B T"]) -> tuple[Float[Array, "L1 B T C"], Float[Array, "B T V"]]:
         """The residual stream at every depth *and* the logits, from one pass.
 
-        What a training step needs when the loss reads the stream directly, as
-        concept anchoring does (`sca.anchoring`): running ``__call__`` and
-        ``residual_stream`` separately would forward twice. Blocks stay
-        gradient-checkpointed, as in ``__call__``.
+        What a training step needs when the loss reads the stream directly, as concept anchoring does (`sca.anchoring`): running ``__call__`` and ``residual_stream`` separately would forward twice. Blocks stay gradient-checkpointed, as in ``__call__``.
         """
         x = normalize(self.transformer.wte[idx])
         states = [x]
@@ -228,11 +213,7 @@ class NGPT(LanguageModel):
     def normalize_weights(self) -> "NGPT":
         """Project every hidden-dim matrix back onto the unit hypersphere.
 
-        Apply after each optimizer step to enforce nGPT's weight constraint:
-        `model = model.normalize_weights()`. Matrices that read from the
-        residual stream are normalized over their input axis (axis=1); matrices
-        that write to it, over their output axis (axis=0). The LM head shares
-        the embedding array, so it is covered once.
+        Apply after each optimizer step to enforce nGPT's weight constraint: `model = model.normalize_weights()`. Matrices that read from the residual stream are normalized over their input axis (axis=1); matrices that write to it, over their output axis (axis=0). The LM head shares the embedding array, so it is covered once.
         """
 
         def where(m: NGPT):
@@ -258,9 +239,7 @@ class NGPT(LanguageModel):
     def scale_report(self) -> dict[str, list[float] | float]:
         """Read back the learned scalar temperatures, per layer.
 
-        These are all single numbers, so we can see exactly what training
-        settled on. The residual step is a fixed constant unless
-        ``learnable_alpha`` is set, in which case its learned gains appear too.
+        These are all single numbers, so we can see exactly what training settled on. The residual step is a fixed constant unless ``learnable_alpha`` is set, in which case its learned gains appear too.
         """
         blocks = self.transformer.blocks
         report: dict[str, list[float] | float] = {

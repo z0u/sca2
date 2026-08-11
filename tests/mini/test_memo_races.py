@@ -1,10 +1,6 @@
 """Concurrency safety of the memo control plane.
 
-Two writers can share a record: a second ticker racing the first to launch, a
-reaper racing a worker's final write, or a stale worker (superseded relaunch, or
-cancelled but surviving SIGTERM) racing its successor. The generation stamp on
-attempts plus the locked local record store keep every such race from corrupting
-the record, the result, or a mutable name in the artifact store.
+Two writers can share a record: a second ticker racing the first to launch, a reaper racing a worker's final write, or a stale worker (superseded relaunch, or cancelled but surviving SIGTERM) racing its successor. The generation stamp on attempts plus the locked local record store keep every such race from corrupting the record, the result, or a mutable name in the artifact store.
 """
 
 from __future__ import annotations
@@ -32,9 +28,7 @@ def _work(x):
 
 
 def test_mark_running_claim_is_exclusive(tmp_path: Path):
-    """Two tickers that both read "un-run" cannot both claim the launch: the
-    second write-if fails and returns None, so only one worker is ever spawned
-    (the double-spawn race between the record read and mark_running)."""
+    """Two tickers that both read "un-run" cannot both claim the launch: the second write-if fails and returns None, so only one worker is ever spawned (the double-spawn race between the record read and mark_running)."""
     store = MemoStore(tmp_path / "claim")
     key, parts = task_key_parts(_work, (1,))
     # Both tickers read the record first (both see no attempt), *then* both claim.
@@ -43,8 +37,7 @@ def test_mark_running_claim_is_exclusive(tmp_path: Path):
 
 
 def test_stale_worker_is_fenced_after_supersession(tmp_path: Path):
-    """Once a successor claims the record, the old attempt's writes stop landing:
-    no heartbeat resurrection, no DONE over the new attempt's RUNNING."""
+    """Once a successor claims the record, the old attempt's writes stop landing: no heartbeat resurrection, no DONE over the new attempt's RUNNING."""
     store = MemoStore(tmp_path / "fence")
     key, old = _claim(store, _work)
     _, new = _claim(store, _work)  # relaunch (e.g. after a cancel): new generation
@@ -71,9 +64,7 @@ def test_superseded_worker_exits_at_startup_without_writing(tmp_path: Path):
 
 
 def test_zombie_finishing_mid_run_cannot_overwrite_successor(tmp_path: Path):
-    """The todo.md hazard: a worker superseded *mid-run* completes anyway. Its
-    final state is fenced out and its result lands in its own generation's file,
-    so the successor's record and result both survive."""
+    """The todo.md hazard: a worker superseded *mid-run* completes anyway. Its final state is fenced out and its result lands in its own generation's file, so the successor's record and result both survive."""
     store = MemoStore(tmp_path / "zombie")
     taken: dict[str, str] = {}
 
@@ -93,9 +84,7 @@ def test_zombie_finishing_mid_run_cannot_overwrite_successor(tmp_path: Path):
 
 
 def test_cancel_releases_the_generation(tmp_path: Path):
-    """``cancel`` releases the record's gen, so a worker that survives SIGTERM
-    can't flip CANCELLED back to DONE and pass its half-cancelled result off as
-    current."""
+    """``cancel`` releases the record's gen, so a worker that survives SIGTERM can't flip CANCELLED back to DONE and pass its half-cancelled result off as current."""
     store = MemoStore(tmp_path / "cancel")
     key, gen = _claim(store, _work)
     app = LocalApparatus("cancel", data_dir=tmp_path / "cancel")
@@ -106,9 +95,7 @@ def test_cancel_releases_the_generation(tmp_path: Path):
 
 
 def test_stale_worker_cannot_move_a_ref(tmp_path: Path):
-    """A worker superseded mid-run that tries ``set_ref`` fails loudly with
-    ``StaleWriteError`` — the name never moves, and the successor's write is the
-    one that resolves (issue #46: refs were the last unfenced write path)."""
+    """A worker superseded mid-run that tries ``set_ref`` fails loudly with ``StaleWriteError`` — the name never moves, and the successor's write is the one that resolves (issue #46: refs were the last unfenced write path)."""
     from mini.store import put, set_ref
 
     store = MemoStore(tmp_path / "refs")
@@ -136,8 +123,7 @@ def test_stale_worker_cannot_move_a_ref(tmp_path: Path):
 
 
 def test_stale_worker_cannot_publish(tmp_path: Path):
-    """``publish`` is fenced like ``set_ref``: a superseded attempt cannot
-    last-writer-win a published path."""
+    """``publish`` is fenced like ``set_ref``: a superseded attempt cannot last-writer-win a published path."""
     from mini.store import publish, put
 
     store = MemoStore(tmp_path / "pub")
@@ -154,8 +140,7 @@ def test_stale_worker_cannot_publish(tmp_path: Path):
 
 
 def test_current_worker_name_writes_land(tmp_path: Path):
-    """The fence has no false positives: the attempt that owns the record can
-    ``set_ref`` and ``publish`` normally."""
+    """The fence has no false positives: the attempt that owns the record can ``set_ref`` and ``publish`` normally."""
     from mini.store import publish, put, set_ref
 
     store = MemoStore(tmp_path / "ok")
@@ -175,10 +160,7 @@ def test_current_worker_name_writes_land(tmp_path: Path):
 
 
 def test_concurrent_merges_do_not_drop_fields(tmp_path: Path):
-    """``merge`` is read-modify-write; unlocked, two mergers (heartbeat vs reaper)
-    each read the same base and silently drop the other's fields. The store-wide
-    lock serializes them: after a thrash of concurrent single-field merges, every
-    field is present with its final value."""
+    """``merge`` is read-modify-write; unlocked, two mergers (heartbeat vs reaper) each read the same base and silently drop the other's fields. The store-wide lock serializes them: after a thrash of concurrent single-field merges, every field is present with its final value."""
     backend = LocalRecordStore(tmp_path / "merge")
     backend.write("k", {"key": "k"})
 

@@ -1,11 +1,8 @@
 """The wedged-worker liveness guard: progress watchdog + staleness surfacing.
 
-A wedged worker (hung device call, deadlocked thread) holds its resources while
-making no step progress — and can keep emitting heartbeats, so heartbeat
-staleness never trips. The watchdog aborts it from inside (FAILED + stack dump
+A wedged worker (hung device call, deadlocked thread) holds its resources while making no step progress — and can keep emitting heartbeats, so heartbeat staleness never trips. The watchdog aborts it from inside (FAILED + stack dump
 + hard exit); the record carries the progress/heartbeat split so monitors can
-tell "dead" from "slow"; per-key cancel reaps one wedge without stopping its
-healthy siblings.
+tell "dead" from "slow"; per-key cancel reaps one wedge without stopping its healthy siblings.
 """
 
 from __future__ import annotations
@@ -181,9 +178,7 @@ def test_stale_progress_is_the_wedge_signature():
 
 
 def test_store_transfers_declare_a_phase_sized_from_the_payload(tmp_path: Path):
-    """A step that moves bytes gets its watchdog allowance without asking: ``put``
-    and ``get`` size a budget from the payload, so an experiment checkpointing
-    after its last step needs no code of its own."""
+    """A step that moves bytes gets its watchdog allowance without asking: ``put`` and ``get`` size a budget from the payload, so an experiment checkpointing after its last step needs no code of its own."""
     declared: list[tuple[str, float]] = []
 
     @contextmanager
@@ -222,10 +217,7 @@ def test_stale_progress_pauses_for_a_declared_blocking_phase():
 
 
 def test_nested_phases_hand_the_record_back_rather_than_clearing_it(monkeypatch: pytest.MonkeyPatch):
-    """Task code wrapping a `put` — which declares one of its own — leaves two
-    spans open. The record holds one label, so the inner exit has to restore the
-    outer's, not clear it: otherwise the badge calls the rest of the outer span
-    a wedge."""
+    """Task code wrapping a `put` — which declares one of its own — leaves two spans open. The record holds one label, so the inner exit has to restore the outer's, not clear it: otherwise the badge calls the rest of the outer span a wedge."""
     monkeypatch.setattr(time, "time", lambda: 1000.0)
     stamps: list[tuple[str | None, float | None]] = []
 
@@ -242,8 +234,7 @@ def test_nested_phases_hand_the_record_back_rather_than_clearing_it(monkeypatch:
 
 
 def test_status_json_surfaces_the_declared_phase():
-    """A frozen step reported alongside ``stale_progress: false`` reads as a
-    contradiction unless the span that explains it travels with it."""
+    """A frozen step reported alongside ``stale_progress: false`` reads as a contradiction unless the span that explains it travels with it."""
     from mini.__main__ import _task_json
 
     out = _task_json(
@@ -349,10 +340,7 @@ def test_grace_lets_slow_setup_finish_under_a_tight_watchdog(tmp_path: Path):
 
 
 def test_blocking_phase_lets_a_post_loop_upload_finish(tmp_path: Path):
-    """The ex-2.1.7 failure: training reached its last step, then the checkpoint
-    push to the artifact store took longer than the gap the watchdog allows
-    between steps — so a *finished* run was aborted and had to be re-trained. A
-    declared phase covers the tail, and the run settles DONE."""
+    """The ex-2.1.7 failure: training reached its last step, then the checkpoint push to the artifact store took longer than the gap the watchdog allows between steps — so a *finished* run was aborted and had to be re-trained. A declared phase covers the tail, and the run settles DONE."""
 
     def train_then_upload(x: int):
         from mini import blocking_phase, emit_progress
@@ -383,10 +371,7 @@ def test_blocking_phase_lets_a_post_loop_upload_finish(tmp_path: Path):
 
 
 def test_backend_rerun_of_settled_attempt_is_a_noop(tmp_path: Path):
-    """After a watchdog abort, Modal sees a container crash and re-schedules the
-    input (regardless of retries=0). The re-run carries the same gen, so it must
-    not flip the settled FAILED back to RUNNING and wedge again — it runs
-    nothing and returns, ending the reschedule loop."""
+    """After a watchdog abort, Modal sees a container crash and re-schedules the input (regardless of retries=0). The re-run carries the same gen, so it must not flip the settled FAILED back to RUNNING and wedge again — it runs nothing and returns, ending the reschedule loop."""
     from mini._taskworker import execute_task
     from mini.memo import task_key_parts
 

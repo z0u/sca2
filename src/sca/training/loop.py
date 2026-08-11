@@ -1,9 +1,6 @@
 """Jitted step functions for training and evaluation.
 
-This is what PyTorch Lightning used to provide; in JAX it's a handful of pure
-functions. The model is a pytree, so one training step is: differentiate the
-loss, apply the optimizer update, then let the model re-impose its weight
-constraint (nGPT's hypersphere projection).
+This is what PyTorch Lightning used to provide; in JAX it's a handful of pure functions. The model is a pytree, so one training step is: differentiate the loss, apply the optimizer update, then let the model re-impose its weight constraint (nGPT's hypersphere projection).
 """
 
 import equinox as eqx
@@ -50,8 +47,6 @@ def make_train_step(optimizer: optax.GradientTransformation):
 def eval_step(model: LanguageModel, x: Int[ArrayLike, "B T"], y: Int[ArrayLike, "B T"]) -> Float[Array, ""]:
     """Validation loss.
 
-    Batches arrive from ``sample_batches`` as numpy, which jit converts on the
-    way in — so this boundary is annotated for what callers actually hold, and
-    the ``asarray`` below (free under trace) narrows for the jax-typed interior.
+    Batches arrive from ``sample_batches`` as numpy, which jit converts on the way in — so this boundary is annotated for what callers actually hold, and the ``asarray`` below (free under trace) narrows for the jax-typed interior.
     """
     return loss_fn(model, jnp.asarray(x), jnp.asarray(y))

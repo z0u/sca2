@@ -1,31 +1,16 @@
 """
 Content-addressed artifact storage for experiments.
 
-A step's *result* (the small thing a memo record holds) and its *artifacts* (the
-large bytes a result points at) want different homes. Today a step that writes a
-file returns a ``Path``, which pickles a *location* into the result — and that
-location lives in a volume that may have evaporated by the time another process,
-another experiment, or a report reads the result back.
+A step's *result* (the small thing a memo record holds) and its *artifacts* (the large bytes a result points at) want different homes. Today a step that writes a file returns a ``Path``, which pickles a *location* into the result — and that location lives in a volume that may have evaporated by the time another process, another experiment, or a report reads the result back.
 
-This module fixes the asymmetry. A step ``put``s its bytes into a content-addressed
-store and returns an :class:`Artifact` — a small, location-free *handle* (a sha,
-a size, a logical name). The handle pickles durably into the result, and anyone
-holding it can ``get`` the bytes back from the store regardless of where they run.
+This module fixes the asymmetry. A step ``put``s its bytes into a content-addressed store and returns an :class:`Artifact` — a small, location-free *handle* (a sha, a size, a logical name). The handle pickles durably into the result, and anyone holding it can ``get`` the bytes back from the store regardless of where they run.
 
 Two properties make this more than a tidy file copy:
 
-- **The store is project-scoped, not experiment-scoped.** Blobs are keyed by
-  content (``cas/<sha256>``), so identical bytes coincide and distinct bytes
-  diverge — across experiments, for free. A small mutable *ref* layer
-  (``name -> Artifact``) names views over the immutable blobs (the git
-  objects-and-refs split), which is how one experiment hands an asset to another
-  by a stable name (:func:`set_ref` / :func:`get_ref`).
-- **Handles stabilize downstream keys.** Passing a ``Path`` into the next step
-  would fingerprint it by location; passing an ``Artifact`` fingerprints it by
-  content, so a consumer's memo key only moves when the bytes actually change.
+- **The store is project-scoped, not experiment-scoped.** Blobs are keyed by content (``cas/<sha256>``), so identical bytes coincide and distinct bytes diverge — across experiments, for free. A small mutable *ref* layer (``name -> Artifact``) names views over the immutable blobs (the git objects-and-refs split), which is how one experiment hands an asset to another by a stable name (:func:`set_ref` / :func:`get_ref`).
+- **Handles stabilize downstream keys.** Passing a ``Path`` into the next step would fingerprint it by location; passing an ``Artifact`` fingerprints it by content, so a consumer's memo key only moves when the bytes actually change.
 
-Steps reach the store the way they reach the data dir — through a context var the
-worker enters — so ``from mini.store import put, get`` works inside any step::
+Steps reach the store the way they reach the data dir — through a context var the worker enters — so ``from mini.store import put, get`` works inside any step::
 
     from mini.store import put, get_ref
 
@@ -34,9 +19,7 @@ worker enters — so ``from mini.store import put, get`` works inside any step::
         run_model(cfg, into=cache)
         return put(cache, name='activations')   # hashed into the store; handle returned
 
-The backend is swappable behind :class:`Store`. :class:`LocalStore` (a ``cas/``
-tree on disk) is the boring default and needs no network; a bucket- or repo-backed
-store for web-reachable :meth:`~Store.publish` slots in behind the same handle.
+The backend is swappable behind :class:`Store`. :class:`LocalStore` (a ``cas/`` tree on disk) is the boring default and needs no network; a bucket- or repo-backed store for web-reachable :meth:`~Store.publish` slots in behind the same handle.
 """
 
 from __future__ import annotations
@@ -105,11 +88,7 @@ log = logging.getLogger(__name__)
 class StaleWriteError(RuntimeError):
     """A superseded attempt tried a mutable-name write (``set_ref`` / ``publish``).
 
-    Raised inside a step whose attempt generation is no longer current — the task
-    was relaunched or cancelled while this worker ran. CAS blobs are immune
-    (write-once-by-hash), but a name write from a stale worker would silently
-    last-writer-win its successor's, so the worker is stopped loudly instead. See
-    the fence in :func:`mini._taskworker.execute_task`.
+    Raised inside a step whose attempt generation is no longer current — the task was relaunched or cancelled while this worker ran. CAS blobs are immune (write-once-by-hash), but a name write from a stale worker would silently last-writer-win its successor's, so the worker is stopped loudly instead. See the fence in :func:`mini._taskworker.execute_task`.
     """
 
 
@@ -122,15 +101,9 @@ class StaleWriteError(RuntimeError):
 class Artifact:
     """A small, location-free handle to immutable bytes in a :class:`Store`.
 
-    It carries enough to *resolve* the bytes (``sha256``) and to *serve* them
-    (``name`` carries the extension; ``media_type`` overrides the guess) without
-    carrying *where* they live — which is what lets it pickle durably into a
-    result and fingerprint a downstream step by content rather than path.
+    It carries enough to *resolve* the bytes (``sha256``) and to *serve* them (``name`` carries the extension; ``media_type`` overrides the guess) without carrying *where* they live — which is what lets it pickle durably into a result and fingerprint a downstream step by content rather than path.
 
-    ``kind='tree'`` is a manifest: ``children`` are themselves artifacts (each its
-    own blob), so a directory of many small files dedups per-file and resolves one
-    child without pulling the set. A tree's own ``sha256`` hashes its manifest, so
-    two identical directories still coincide.
+    ``kind='tree'`` is a manifest: ``children`` are themselves artifacts (each its own blob), so a directory of many small files dedups per-file and resolves one child without pulling the set. A tree's own ``sha256`` hashes its manifest, so two identical directories still coincide.
     """
 
     sha256: str
@@ -172,10 +145,7 @@ class Artifact:
 def _cas_key(sha256: str) -> str:
     """A blob's path within the store, sharded by a two-char prefix (``cas/ab/abcd…``).
 
-    Git and Git-LFS both fan blobs out under a short prefix dir so the CAS never
-    becomes one flat directory of thousands of entries — slow to list on disk and
-    unwieldy in a bucket's web UI. One level of two hex chars (256 buckets) is
-    plenty at our scale; the full sha still names the file, so it stays the id.
+    Git and Git-LFS both fan blobs out under a short prefix dir so the CAS never becomes one flat directory of thousands of entries — slow to list on disk and unwieldy in a bucket's web UI. One level of two hex chars (256 buckets) is plenty at our scale; the full sha still names the file, so it stays the id.
     """
     return f"cas/{sha256[:2]}/{sha256}"
 
@@ -237,11 +207,7 @@ _OPAQUE = (types.ModuleType, types.FunctionType, types.BuiltinFunctionType, type
 def artifact_shas(obj: Any) -> set[str]:
     """Every *blob* sha reachable from *obj* — the reference set GC marks from.
 
-    Walks the full object graph (``gc.get_referents``: containers, dataclass
-    fields, instance dicts — anything a result value can nest handles in),
-    pruned at code/module/class boundaries. A tree's own sha names a manifest,
-    not a stored blob, so only ``file`` artifacts (including tree children)
-    contribute.
+    Walks the full object graph (``gc.get_referents``: containers, dataclass fields, instance dicts — anything a result value can nest handles in), pruned at code/module/class boundaries. A tree's own sha names a manifest, not a stored blob, so only ``file`` artifacts (including tree children) contribute.
     """
     shas: set[str] = set()
     seen: set[int] = set()
@@ -282,9 +248,7 @@ _resolved: contextvars.ContextVar[dict[str, dict[str, Any] | None] | None] = con
 def producer_context(info: dict[str, Any]) -> Iterator[None]:
     """Bind *info* as the identity ``set_ref`` stamps into refs written in this context.
 
-    Set by the task worker around a step (experiment name, task key, and the run's
-    code state from its stored lineage). Refs written outside any producer context
-    are simply unstamped — capture degrades, it never blocks a write.
+    Set by the task worker around a step (experiment name, task key, and the run's code state from its stored lineage). Refs written outside any producer context are simply unstamped — capture degrades, it never blocks a write.
     """
     token = _producer.set(info)
     try:
@@ -297,8 +261,7 @@ def producer_context(info: dict[str, Any]) -> Iterator[None]:
 def resolved_refs_context(seen: dict[str, dict[str, Any] | None]) -> Iterator[None]:
     """Collect every ref resolved in this context into *seen* (name → stamped producer).
 
-    The task worker reads the collected set back after the step to record which
-    upstream experiments actually fed it (``upstream_refs`` on the task record).
+    The task worker reads the collected set back after the step to record which upstream experiments actually fed it (``upstream_refs`` on the task record).
     """
     token = _resolved.set(seen)
     try:
@@ -337,10 +300,7 @@ class BlobStat:
 class Store(ABC):
     """A content-addressed blob store with a small mutable ref layer.
 
-    Backends implement the four blob/ref primitives below; the high-level
-    :meth:`put` / :meth:`get` (including tree fan-out) and JSON ref handling are
-    shared. ``put`` is idempotent — hash first, skip the write if :meth:`has` —
-    so re-runs and cross-step duplicates cost nothing.
+    Backends implement the four blob/ref primitives below; the high-level :meth:`put` / :meth:`get` (including tree fan-out) and JSON ref handling are shared. ``put`` is idempotent — hash first, skip the write if :meth:`has` — so re-runs and cross-step duplicates cost nothing.
     """
 
     # -- backend primitives ---------------------------------------------------
@@ -369,10 +329,7 @@ class Store(ABC):
     def publish(self, art: Artifact, path: str) -> str:
         """Expose *art* at a named, extensioned *path* and return its URL.
 
-        A by-hash copy to a path whose extension drives the served ``Content-Type``
-        (a bare ``cas/<sha>`` has no extension, so a browser won't render it). Kept
-        separate from :meth:`put` and deliberately the only outward-facing verb, so
-        persisting a result never publishes it as a side effect.
+        A by-hash copy to a path whose extension drives the served ``Content-Type`` (a bare ``cas/<sha>`` has no extension, so a browser won't render it). Kept separate from :meth:`put` and deliberately the only outward-facing verb, so persisting a result never publishes it as a side effect.
         """
 
     # -- high-level surface (shared) ------------------------------------------
@@ -380,13 +337,9 @@ class Store(ABC):
     def put(self, data: bytes | Path, *, name: str) -> Artifact:
         """Store *data* (bytes, a file, or a directory) and return its handle.
 
-        A directory becomes a ``tree`` artifact: each file is stored as its own
-        blob and the returned handle carries the manifest. ``name`` is the logical
-        name (carry the extension — it sets the served media type).
+        A directory becomes a ``tree`` artifact: each file is stored as its own blob and the returned handle carries the manifest. ``name`` is the logical name (carry the extension — it sets the served media type).
 
-        Declares a watchdog phase for the upload, sized from the payload, so a
-        step that checkpoints after its last training step isn't mistaken for a
-        wedge (see :func:`_transfer_budget_s`).
+        Declares a watchdog phase for the upload, sized from the payload, so a step that checkpoints after its last training step isn't mistaken for a wedge (see :func:`_transfer_budget_s`).
         """
         if isinstance(data, (bytes, bytearray)):
             data = bytes(data)
@@ -422,15 +375,9 @@ class Store(ABC):
     def get(self, art: Artifact, dest: Path) -> Path:
         """Materialize *art* at *dest* and return it.
 
-        For a ``file`` artifact *dest* is the destination file; for a ``tree`` it's
-        the destination directory, and the children are prefetched in one batch
-        (the per-op latency of a remote backend is paid once, not per child).
+        For a ``file`` artifact *dest* is the destination file; for a ``tree`` it's the destination directory, and the children are prefetched in one batch (the per-op latency of a remote backend is paid once, not per child).
 
-        Declares a watchdog phase for the download, sized from the handle, so a
-        step that pulls a large artifact mid-run isn't mistaken for a wedge. The
-        recursive child calls land on pool threads, which don't carry the job
-        context — so the one phase opened here covers the whole tree, which is
-        what its ``art.size`` budget is sized for.
+        Declares a watchdog phase for the download, sized from the handle, so a step that pulls a large artifact mid-run isn't mistaken for a wedge. The recursive child calls land on pool threads, which don't carry the job context — so the one phase opened here covers the whole tree, which is what its ``art.size`` budget is sized for.
         """
         dest = Path(dest)
         with blocking_phase(f"get {art.name}", _transfer_budget_s(art.size)):
@@ -447,10 +394,7 @@ class Store(ABC):
     def get_many(self, items: Iterable[tuple[Artifact, Path]]) -> list[Path]:
         """Materialize several artifacts, batching the remote pull into one round trip.
 
-        The sibling of :meth:`get`'s per-tree fan-out: a caller resolving *n*
-        top-level artifacts one ``get`` at a time pays a remote backend's per-op
-        latency *n* times over, where one prefetch pays it once. Order follows
-        *items*; local materialization then overlaps in a small thread pool.
+        The sibling of :meth:`get`'s per-tree fan-out: a caller resolving *n* top-level artifacts one ``get`` at a time pays a remote backend's per-op latency *n* times over, where one prefetch pays it once. Order follows *items*; local materialization then overlaps in a small thread pool.
         """
         pairs = [(a, Path(d)) for a, d in items]
         with blocking_phase(f"get {len(pairs)} artifacts", _transfer_budget_s(sum(a.size for a, _ in pairs))):
@@ -461,17 +405,13 @@ class Store(ABC):
     def _prefetch(self, arts: Iterable[Artifact]) -> None:  # noqa: B027 — a hook: empty here, non-abstract
         """Warm whatever cache backs :meth:`_read_blob` for *arts*, in one batch.
 
-        The local backend has nothing to warm (this is a no-op), while a remote
-        one overrides it to pull every missing blob in a single request. Reads
-        must behave identically without it — it only moves latency, never bytes.
+        The local backend has nothing to warm (this is a no-op), while a remote one overrides it to pull every missing blob in a single request. Reads must behave identically without it — it only moves latency, never bytes.
         """
 
     def set_ref(self, name: str, art: Artifact) -> None:
         """Point the mutable name *name* at *art* — the cross-experiment by-name handle.
 
-        When an ambient :func:`producer_context` is set (the task worker binds one),
-        the writer's identity rides the payload as a ``producer`` key —
-        ``Artifact.from_dict`` ignores it, so old readers are unaffected.
+        When an ambient :func:`producer_context` is set (the task worker binds one), the writer's identity rides the payload as a ``producer`` key — ``Artifact.from_dict`` ignores it, so old readers are unaffected.
         """
         payload = art.to_dict()
         if producer := _producer.get():
@@ -481,9 +421,7 @@ class Store(ABC):
     def get_ref(self, name: str) -> Artifact | None:
         """Resolve the name *name* to its artifact handle, or ``None`` if unset.
 
-        Each resolution is announced (:func:`_note_resolution`) with the producer
-        stamped at ``set_ref`` time, so a consuming run records its upstream
-        experiments and a rendering report can cite where its data came from.
+        Each resolution is announced (:func:`_note_resolution`) with the producer stamped at ``set_ref`` time, so a consuming run records its upstream experiments and a rendering report can cite where its data came from.
         """
         payload = self._read_ref(name)
         if payload is None:
@@ -495,10 +433,7 @@ class Store(ABC):
     def get_refs(self, names: Iterable[str]) -> dict[str, Artifact | None]:
         """Resolve several names at once — one round trip on a remote backend.
 
-        The batch counterpart of :meth:`get_ref` (same resolution announcements,
-        ``None`` for unset names): a report or eval loop that resolves its refs
-        one at a time serializes the backend's per-op latency, where this pays it
-        once for the set.
+        The batch counterpart of :meth:`get_ref` (same resolution announcements, ``None`` for unset names): a report or eval loop that resolves its refs one at a time serializes the backend's per-op latency, where this pays it once for the set.
         """
         out: dict[str, Artifact | None] = {}
         for name, payload in self._read_refs(list(dict.fromkeys(names))).items():
@@ -555,11 +490,7 @@ def _spill(data: bytes) -> Iterator[Path]:
 def store_root_for(data_dir: Path | str) -> Path:
     """The project-scoped store root that sits beside an experiment's *data_dir*.
 
-    A volume path is ``<data_root>/<experiment>``, so its parent is the project
-    root and ``<parent>/store`` is shared by every experiment — content-addressed,
-    so identical bytes coincide and a named ref handed off by one experiment
-    resolves in another. Derived from the path (not the cwd), so a detached worker
-    under its own cwd lands on the same store.
+    A volume path is ``<data_root>/<experiment>``, so its parent is the project root and ``<parent>/store`` is shared by every experiment — content-addressed, so identical bytes coincide and a named ref handed off by one experiment resolves in another. Derived from the path (not the cwd), so a detached worker under its own cwd lands on the same store.
     """
     return Path(data_dir).parent / "store"
 
@@ -567,9 +498,7 @@ def store_root_for(data_dir: Path | str) -> Path:
 def _project_config() -> dict:
     """``[tool.mini]`` from the nearest ``pyproject.toml`` walking up from cwd, or ``{}``.
 
-    Read lazily off the live cwd (like :func:`~mini.runs.data_root`) so a ``chdir``
-    — or a test in a tmp dir — resolves the right project, and nothing parses TOML
-    at import time.
+    Read lazily off the live cwd (like :func:`~mini.runs.data_root`) so a ``chdir`` — or a test in a tmp dir — resolves the right project, and nothing parses TOML at import time.
     """
     cwd = Path.cwd().resolve()
     for d in (cwd, *cwd.parents):
@@ -585,11 +514,7 @@ def _project_config() -> dict:
 def store_bucket() -> str | None:
     """The configured Hugging Face bucket (``namespace/name``), or ``None`` for local.
 
-    Resolution order: the ``MINI_STORE_BUCKET`` env var first (so CI or a one-off
-    shell can override), else ``[tool.mini] store-bucket`` in ``pyproject.toml`` —
-    so the project's default *travels with the repo*, set once and shared by every
-    checkout, Modal worker, and CI run rather than re-set in three places. The
-    bucket name isn't a secret; the token still lives in the env / ``hf`` cache.
+    Resolution order: the ``MINI_STORE_BUCKET`` env var first (so CI or a one-off shell can override), else ``[tool.mini] store-bucket`` in ``pyproject.toml`` — so the project's default *travels with the repo*, set once and shared by every checkout, Modal worker, and CI run rather than re-set in three places. The bucket name isn't a secret; the token still lives in the env / ``hf`` cache.
     """
     return os.environ.get(STORE_BUCKET_ENV) or _project_config().get("store-bucket")
 
@@ -597,13 +522,7 @@ def store_bucket() -> str | None:
 def publish_repo() -> str | None:
     """The configured Hugging Face *dataset repo* for the publish tier, or ``None``.
 
-    When set, :meth:`~mini.hf_store.HFStore.publish` and the report-export methods
-    target this public, git-backed dataset repo instead of the durable bucket — so
-    the CAS bucket can be private (persisting an artifact never makes its bytes
-    world-readable) and published views get real history (a citation pins to a
-    commit sha). Unset → publish/exports stay in the bucket, the single-store
-    default. Resolution mirrors :func:`store_bucket` (``MINI_PUBLISH_REPO`` env
-    first, else ``[tool.mini] publish-repo``); the repo id isn't a secret.
+    When set, :meth:`~mini.hf_store.HFStore.publish` and the report-export methods target this public, git-backed dataset repo instead of the durable bucket — so the CAS bucket can be private (persisting an artifact never makes its bytes world-readable) and published views get real history (a citation pins to a commit sha). Unset → publish/exports stay in the bucket, the single-store default. Resolution mirrors :func:`store_bucket` (``MINI_PUBLISH_REPO`` env first, else ``[tool.mini] publish-repo``); the repo id isn't a secret.
     """
     return os.environ.get(PUBLISH_REPO_ENV) or _project_config().get("publish-repo")
 
@@ -623,26 +542,13 @@ def _hf_token() -> str | None:
 def store_for(root: Path | str, *, cache_root: Path | str | None = None) -> Store:
     """The project store for a given local *root* — bucket-backed if configured.
 
-    When a bucket is configured (:func:`store_bucket`) *and* a Hugging Face token is
-    available, the durable store is the shared bucket, warm-cached locally at
-    *cache_root* (default: ``store-cache/hf`` beside *root*); otherwise it's a
-    :class:`LocalStore` rooted at *root*. One switch flips every put/get/publish —
-    in a step, a report, or a worker — from on-disk to shared-and-web-reachable.
+    When a bucket is configured (:func:`store_bucket`) *and* a Hugging Face token is available, the durable store is the shared bucket, warm-cached locally at *cache_root* (default: ``store-cache/hf`` beside *root*); otherwise it's a :class:`LocalStore` rooted at *root*. One switch flips every put/get/publish — in a step, a report, or a worker — from on-disk to shared-and-web-reachable.
 
-    Pass *cache_root* when *root*'s neighbourhood is the wrong home for cached
-    bytes: a Modal worker points it at container-local disk, so the cache isn't
-    committed to the Volume alongside results — the bucket already holds the
-    durable copy, and a committed shadow would store every artifact twice.
+    Pass *cache_root* when *root*'s neighbourhood is the wrong home for cached bytes: a Modal worker points it at container-local disk, so the cache isn't committed to the Volume alongside results — the bucket already holds the durable copy, and a committed shadow would store every artifact twice.
 
-    A configured bucket with *no* token (someone trying the repo in Codespaces, or
-    a fresh checkout before ``./go auth``) falls back to the local store with a
-    warning rather than failing mid-run — the bucket name travels with the repo,
-    but using it needs auth the trier doesn't have yet.
+    A configured bucket with *no* token (someone trying the repo in Codespaces, or a fresh checkout before ``./go auth``) falls back to the local store with a warning rather than failing mid-run — the bucket name travels with the repo, but using it needs auth the trier doesn't have yet.
 
-    A :func:`publish_repo` alone (no bucket) also yields an :class:`HFStore`, but a
-    CAS-less one: it serves ``publish``/exports from the dataset repo and errors on
-    put/get/ref. That's the read-only site build's store — it reads exports off the
-    public repo, so CI needs only ``MINI_PUBLISH_REPO``, not the private bucket (#38).
+    A :func:`publish_repo` alone (no bucket) also yields an :class:`HFStore`, but a CAS-less one: it serves ``publish``/exports from the dataset repo and errors on put/get/ref. That's the read-only site build's store — it reads exports off the public repo, so CI needs only ``MINI_PUBLISH_REPO``, not the private bucket (#38).
     """
     root = Path(root)
     bucket, repo = store_bucket(), publish_repo()
@@ -670,11 +576,7 @@ def store_for(root: Path | str, *, cache_root: Path | str | None = None) -> Stor
 def project_store() -> Store:
     """The project-scoped artifact :class:`Store`, resolved from the project root.
 
-    The artifact store is one-per-project (a ``store/`` beside the experiment
-    volumes under ``.mini``), so it needs no experiment name. Use this *outside* a
-    step — a report or notebook reading a shared ref, a driver publishing one —
-    where there's no ambient store; *inside* a step the worker already binds the
-    same store, so bare :func:`put` / :func:`get` / :func:`get_ref` resolve here.
+    The artifact store is one-per-project (a ``store/`` beside the experiment volumes under ``.mini``), so it needs no experiment name. Use this *outside* a step — a report or notebook reading a shared ref, a driver publishing one — where there's no ambient store; *inside* a step the worker already binds the same store, so bare :func:`put` / :func:`get` / :func:`get_ref` resolve here.
     """
     from mini.runs import data_root
 
@@ -684,10 +586,7 @@ def project_store() -> Store:
 class LocalStore(Store):
     """A ``cas/<ab>/<sha256>`` blob tree on local disk, with file-backed refs and views.
 
-    The boring default: no network, immutability enforced by write-once-by-hash.
-    ``publish`` copies a blob to ``published/<path>`` and returns a ``file://`` URL
-    — the same shape a bucket-backed store returns as an ``https://`` resolve URL,
-    so a report reads one ``url`` either way.
+    The boring default: no network, immutability enforced by write-once-by-hash. ``publish`` copies a blob to ``published/<path>`` and returns a ``file://`` URL — the same shape a bucket-backed store returns as an ``https://`` resolve URL, so a report reads one ``url`` either way.
     """
 
     def __init__(self, root: Path | str):
@@ -778,8 +677,7 @@ def store_context(store: Store) -> Iterator[None]:
 def get_store() -> Store:
     """The ambient :class:`Store`, set by the apparatus around a step (or a report).
 
-    Raises if called outside a store context — the same contract as
-    :func:`~mini.volume.get_data_dir`.
+    Raises if called outside a store context — the same contract as :func:`~mini.volume.get_data_dir`.
     """
     s = _store.get()
     if s is None:

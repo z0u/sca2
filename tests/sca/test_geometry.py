@@ -40,10 +40,7 @@ def test_probe_maps_and_transfer_recover_a_shared_code():
 def test_strict_holdout_separates_a_lookup_from_a_geometry():
     """The two within-form estimators come apart exactly where memorization can carry a probe.
 
-    A planted linear code generalizes to a value the fit never saw, so both estimators
-    score it. A lookup table — each of a few identities given its own arbitrary direction —
-    is recoverable whenever the identity was in the fit, and nothing else, so per-equation
-    scores it and the strict holdout does not.
+    A planted linear code generalizes to a value the fit never saw, so both estimators score it. A lookup table — each of a few identities given its own arbitrary direction — is recoverable whenever the identity was in the fit, and nothing else, so per-equation scores it and the strict holdout does not.
     """
     n, c = 300, 16
     y = RNG.standard_normal((n, 3))

@@ -1,10 +1,7 @@
 """
 Detached worker for a single memoized task: ``python -m mini._taskworker <data_dir> <key>``.
 
-Loads the cloudpickled call, runs it with the data-dir + progress context (so
-``get_data_dir``/``emit_progress``/``emit_metrics`` work), and records the
-result or traceback under the content key. Spawned in its own session so it
-outlives the orchestration tick that launched it.
+Loads the cloudpickled call, runs it with the data-dir + progress context (so ``get_data_dir``/``emit_progress``/``emit_metrics`` work), and records the result or traceback under the content key. Spawned in its own session so it outlives the orchestration tick that launched it.
 """
 
 from __future__ import annotations
@@ -71,22 +68,11 @@ _GUESSED_GOALS = dict.fromkeys(
 class _MemoSink:
     """Writes the latest progress/metrics for a task straight to its memo record.
 
-    Writes are fenced on the attempt's *gen*: once a successor attempt (or a
-    ``cancel``) takes the record, this worker's progress stops landing — and stops
-    trying (``_fenced``), since a superseded attempt can never own it again.
+    Writes are fenced on the attempt's *gen*: once a successor attempt (or a ``cancel``) takes the record, this worker's progress stops landing — and stops trying (``_fenced``), since a superseded attempt can never own it again.
 
-    Beyond relaying emissions, the sink derives the record's liveness-vs-progress
-    split: ``heartbeat_at`` (any emission — the worker breathes) vs ``progress_at``
-    (the ``(step, total)`` pair advanced — the task *moves*), plus a
-    ``steps_per_min`` throughput and per-metric movement over a trailing window —
-    the numbers a monitor needs to judge a run against expectation instead of
-    eyeballing it. A wedged worker can keep the heartbeat fresh while progress
-    freezes; monitors key on the difference.
+    Beyond relaying emissions, the sink derives the record's liveness-vs-progress split: ``heartbeat_at`` (any emission — the worker breathes) vs ``progress_at`` (the ``(step, total)`` pair advanced — the task *moves*), plus a ``steps_per_min`` throughput and per-metric movement over a trailing window — the numbers a monitor needs to judge a run against expectation instead of eyeballing it. A wedged worker can keep the heartbeat fresh while progress freezes; monitors key on the difference.
 
-    Writes run on the progress emitter's own thread (see
-    :class:`~mini._debounce.BackgroundEmitter`), so nothing here is on the task's
-    critical path. The *watchdog* is fed separately, from the emitting thread, so
-    it measures the task rather than the control plane.
+    Writes run on the progress emitter's own thread (see :class:`~mini._debounce.BackgroundEmitter`), so nothing here is on the task's critical path. The *watchdog* is fed separately, from the emitting thread, so it measures the task rather than the control plane.
     """
 
     def __init__(self, store: MemoStore, key: str, gen: str | None = None):
@@ -147,22 +133,11 @@ class _MemoSink:
     def _close_metric_window(self, goals: dict[str, str]) -> dict[str, Any]:
         """Movement per metric across windows, and how long each has gone the wrong way.
 
-        Records keep only the latest value of each metric, so "is the loss coming
-        down?" is unanswerable from a snapshot. A per-window delta plus a count of
-        consecutive wrong-way windows makes the trend a number a tool can check —
-        one bad window is noise, several in a row is a run worth looking at.
+        Records keep only the latest value of each metric, so "is the loss coming down?" is unanswerable from a snapshot. A per-window delta plus a count of consecutive wrong-way windows makes the trend a number a tool can check — one bad window is noise, several in a row is a run worth looking at.
 
-        The delta compares window *means*, not the two samples that happened to land
-        on the boundaries. A per-step loss is noisy, and endpoint-to-endpoint on a
-        plateau is a coin flip per window — three in a row would then fire on ⅛ of
-        windows with nothing wrong, which on an hour-long run is several false
-        alarms. Averaging what the window actually saw costs a running sum, and
-        ``_MIN_WINDOW_SAMPLES`` is what makes the average worth having.
+        The delta compares window *means*, not the two samples that happened to land on the boundaries. A per-step loss is noisy, and endpoint-to-endpoint on a plateau is a coin flip per window — three in a row would then fire on ⅛ of windows with nothing wrong, which on an hour-long run is several false alarms. Averaging what the window actually saw costs a running sum, and ``_MIN_WINDOW_SAMPLES`` is what makes the average worth having.
 
-        *goals* is the job's own :func:`~mini.progress.expect_metrics` declaration;
-        a metric with no goal (declared or guessed) records its movement but is
-        never counted as wrong-way — this layer reports, the job decides what
-        "wrong" means.
+        *goals* is the job's own :func:`~mini.progress.expect_metrics` declaration; a metric with no goal (declared or guessed) records its movement but is never counted as wrong-way — this layer reports, the job decides what "wrong" means.
         """
         means = {k: total / n for k, (total, n) in self._window.items() if n}
         self._window, self._samples = {}, 0
@@ -191,15 +166,7 @@ class _MemoSink:
 class _FencedStore(Store):
     """The ambient store for one attempt, with mutable-name writes gen-fenced.
 
-    Record writes and results are already fenced on the attempt generation, but
-    ``set_ref`` / ``publish`` mutate *names* in the artifact store — unfenced,
-    a stale worker's name write would silently last-writer-win its successor's
-    (CAS blobs are immune, so everything else passes straight through). The name
-    lives in a different backend than the record (files/HF vs the record store),
-    so the fence is check → write → re-check rather than atomic: a supersession
-    landing *during* the write can't be prevented, but the re-check turns it from
-    silent corruption into a loud :class:`~mini.store.StaleWriteError` — and the
-    successor's own completing write then heals the name.
+    Record writes and results are already fenced on the attempt generation, but ``set_ref`` / ``publish`` mutate *names* in the artifact store — unfenced, a stale worker's name write would silently last-writer-win its successor's (CAS blobs are immune, so everything else passes straight through). The name lives in a different backend than the record (files/HF vs the record store), so the fence is check → write → re-check rather than atomic: a supersession landing *during* the write can't be prevented, but the re-check turns it from silent corruption into a loud :class:`~mini.store.StaleWriteError` — and the successor's own completing write then heals the name.
     """
 
     def __init__(self, inner: Store, memo: MemoStore, key: str, gen: str):
@@ -258,12 +225,7 @@ class _FencedStore(Store):
 def _producer_stamp(experiment: str | None, store: MemoStore, key: str) -> dict[str, Any] | None:
     """The identity ``set_ref`` stamps into refs this task writes, or ``None``.
 
-    A compact provenance record (the :func:`~mini.lineage.upstream_snapshot` shape
-    plus the task key): enough for a consumer — a downstream run, a report — to
-    attribute the bytes to this experiment and the code state that produced them,
-    without a lookup into this run's control plane. The code state comes from the
-    run's stored lineage (stamped by the driver at wake start); best-effort, since
-    provenance must never take a task down.
+    A compact provenance record (the :func:`~mini.lineage.upstream_snapshot` shape plus the task key): enough for a consumer — a downstream run, a report — to attribute the bytes to this experiment and the code state that produced them, without a lookup into this run's control plane. The code state comes from the run's stored lineage (stamped by the driver at wake start); best-effort, since provenance must never take a task down.
     """
     if experiment is None:
         return None
@@ -290,12 +252,7 @@ def _upstream_refs(resolved: dict[str, dict[str, Any] | None]) -> list[dict[str,
 def _attempt_already_settled(store: MemoStore, key: str, gen: str | None) -> bool:
     """Is this worker a backend re-run of an attempt that already settled?
 
-    Concretely: a watchdog abort exits the process, which Modal sees as a
-    *container crash* and re-schedules the input regardless of ``retries=0`` —
-    the re-run carries the same gen, so without this guard it would flip the
-    settled FAILED back to RUNNING, wedge again, and crash-loop until the role
-    timeout. The record already tells the story; the re-run should run nothing
-    and return cleanly, so the input completes and the loop ends.
+    Concretely: a watchdog abort exits the process, which Modal sees as a *container crash* and re-schedules the input regardless of ``retries=0`` — the re-run carries the same gen, so without this guard it would flip the settled FAILED back to RUNNING, wedge again, and crash-loop until the role timeout. The record already tells the story; the re-run should run nothing and return cleanly, so the input completes and the loop ends.
     """
     if gen is None:
         return False
@@ -314,8 +271,7 @@ def _arm_watchdog(
 ) -> tuple[Watchdog | None, dict[str, Any]]:
     """Build the progress watchdog (or not) plus the record fields that go with it.
 
-    The ``watchdog_s`` / ``watchdog_grace_s`` stamps land on the record so
-    client-side staleness views can match the worker's own thresholds.
+    The ``watchdog_s`` / ``watchdog_grace_s`` stamps land on the record so client-side staleness views can match the worker's own thresholds.
     """
     if not watchdog_s:
         return None, {}
@@ -331,16 +287,9 @@ def _phase_hook(
 ) -> Callable[[str, float], AbstractContextManager[None]]:
     """Back :func:`~mini.progress.blocking_phase` with the two things that read a stall.
 
-    A step-free span the task declares — a checkpoint upload, a dataset pull —
-    has to reach both judges of "is this worker wedged?", or one of them still
-    says yes. The *watchdog* is the one with teeth: without its phase, a
-    post-loop upload trips the tight step threshold and a finished task is
-    aborted and re-run from scratch. The *record* stamp is what
-    :func:`~mini.runs.stale_progress` reads, so the monitor doesn't badge a
-    healthy upload as a wedge for as long as it runs.
+    A step-free span the task declares — a checkpoint upload, a dataset pull — has to reach both judges of "is this worker wedged?", or one of them still says yes. The *watchdog* is the one with teeth: without its phase, a post-loop upload trips the tight step threshold and a finished task is aborted and re-run from scratch. The *record* stamp is what :func:`~mini.runs.stale_progress` reads, so the monitor doesn't badge a healthy upload as a wedge for as long as it runs.
 
-    The stamp is written whether or not a watchdog is armed: the badge is
-    computed from the record either way.
+    The stamp is written whether or not a watchdog is armed: the badge is computed from the record either way.
     """
     open_spans: dict[int, tuple[float, str]] = {}  # token -> (deadline, label)
     tokens = count()
@@ -349,11 +298,7 @@ def _phase_hook(
     def restamp() -> None:
         """Stamp the span with the latest deadline still open, or clear at the last exit.
 
-        Phases nest — task code can wrap a ``put`` that declares one of its own —
-        while the record holds a single label, so an inner exit has to hand the
-        record back to its parent rather than clear it. Keyed by the deadline
-        rather than the budget: what the badge needs is when the outstanding
-        allowance actually runs out.
+        Phases nest — task code can wrap a ``put`` that declares one of its own — while the record holds a single label, so an inner exit has to hand the record back to its parent rather than clear it. Keyed by the deadline rather than the budget: what the badge needs is when the outstanding allowance actually runs out.
         """
         with lock:
             spans = list(open_spans.values())
@@ -385,11 +330,7 @@ def _stall_handler(
 ) -> Callable[[str], None]:
     """The watchdog's ``on_stall``: persist the stall as a task failure.
 
-    The stall twin of ``execute_task``'s except-path, run on the watchdog's
-    thread while the main thread is presumed wedged: persist first (error file →
-    commit → settle FAILED, same order), then the watchdog exits the process.
-    Fenced like every other write — a superseded attempt settles nothing and
-    just dies.
+    The stall twin of ``execute_task``'s except-path, run on the watchdog's thread while the main thread is presumed wedged: persist first (error file → commit → settle FAILED, same order), then the watchdog exits the process. Fenced like every other write — a superseded attempt settles nothing and just dies.
     """
 
     def abort_stalled(diagnosis: str) -> None:
@@ -426,45 +367,17 @@ def execute_task(
 ) -> None:
     """Run one memoized call and persist its result/state — backend-agnostic.
 
-    Shared by the local subprocess worker and the Modal remote worker: only how
-    the call *arrives* (staged on disk vs passed to ``spawn``) and where state
-    lands (``RecordStore``) differ; the run/persist core is identical.
+    Shared by the local subprocess worker and the Modal remote worker: only how the call *arrives* (staged on disk vs passed to ``spawn``) and where state lands (``RecordStore``) differ; the run/persist core is identical.
 
-    *gen* is the attempt generation this worker runs under. Every record write is
-    fenced on it, and the result/error land in gen-qualified files — so a stale
-    worker (superseded by a relaunch, or cancelled but surviving SIGTERM) can
-    neither merge DONE over its successor's RUNNING nor overwrite its result. A
-    worker that finds itself already superseded at startup exits without running.
+    *gen* is the attempt generation this worker runs under. Every record write is fenced on it, and the result/error land in gen-qualified files — so a stale worker (superseded by a relaunch, or cancelled but surviving SIGTERM) can neither merge DONE over its successor's RUNNING nor overwrite its result. A worker that finds itself already superseded at startup exits without running.
 
-    *commit* is called after the result/error is written to the I/O plane and
-    *before* the record flips to DONE/FAILED — so a poller never sees a settled
-    state whose artifact hasn't been committed yet (the Modal Volume needs this).
+    *commit* is called after the result/error is written to the I/O plane and *before* the record flips to DONE/FAILED — so a poller never sees a settled state whose artifact hasn't been committed yet (the Modal Volume needs this).
 
-    *artifacts* binds the content-addressed :class:`~mini.store.Store` as ambient
-    for ``mini.store.put`` / ``get`` inside the step. Because ``put`` uploads
-    synchronously, by the time the result is written its handles already resolve —
-    so the existing write → commit → DONE order extends from "the volume flushed"
-    to "the referenced blobs are durable" for free. Its mutable-name verbs
-    (``set_ref`` / ``publish``) are fenced on *gen* via :class:`_FencedStore`, so
-    a stale worker fails loudly instead of clobbering a name its successor owns.
+    *artifacts* binds the content-addressed :class:`~mini.store.Store` as ambient for ``mini.store.put`` / ``get`` inside the step. Because ``put`` uploads synchronously, by the time the result is written its handles already resolve — so the existing write → commit → DONE order extends from "the volume flushed" to "the referenced blobs are durable" for free. Its mutable-name verbs (``set_ref`` / ``publish``) are fenced on *gen* via :class:`_FencedStore`, so a stale worker fails loudly instead of clobbering a name its successor owns.
 
-    *experiment* is the experiment this task belongs to. It powers ref provenance
-    both ways: refs the step writes are stamped with it (:func:`_producer_stamp`),
-    and refs the step *resolves* land on the settled record as ``upstream_refs`` —
-    the evidence the driver aggregates into ``lineage.upstreams``, without the
-    experiment declaring its deps by hand.
+    *experiment* is the experiment this task belongs to. It powers ref provenance both ways: refs the step writes are stamped with it (:func:`_producer_stamp`), and refs the step *resolves* land on the settled record as ``upstream_refs`` — the evidence the driver aggregates into ``lineage.upstreams``, without the experiment declaring its deps by hand.
 
-    *watchdog_s* arms the progress watchdog: if the task's ``(step, total)``
-    hasn't advanced in that many seconds, the worker settles its own record
-    FAILED (with an all-thread stack dump as the traceback) and hard-exits —
-    a silent wedge becomes a fast, retryable failure instead of burning the
-    whole role ``timeout`` (see :mod:`mini._watchdog`). It covers the task call
-    only — result upload rides on the role timeout as before. *watchdog_grace_s*
-    is the looser threshold that applies until the first progress emission, so
-    one-off setup (tokenization, compilation) doesn't force the watchdog loose.
-    Spans *inside* the call that legitimately make no step progress get the same
-    treatment on demand, via :func:`~mini.progress.blocking_phase` — which
-    ``mini.store``'s transfers already declare for themselves.
+    *watchdog_s* arms the progress watchdog: if the task's ``(step, total)`` hasn't advanced in that many seconds, the worker settles its own record FAILED (with an all-thread stack dump as the traceback) and hard-exits — a silent wedge becomes a fast, retryable failure instead of burning the whole role ``timeout`` (see :mod:`mini._watchdog`). It covers the task call only — result upload rides on the role timeout as before. *watchdog_grace_s* is the looser threshold that applies until the first progress emission, so one-off setup (tokenization, compilation) doesn't force the watchdog loose. Spans *inside* the call that legitimately make no step progress get the same treatment on demand, via :func:`~mini.progress.blocking_phase` — which ``mini.store``'s transfers already declare for themselves.
     """
 
     def record(**fields: Any) -> bool:
