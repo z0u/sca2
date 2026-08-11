@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sparse Concept Anchoring in transformers</title>
+<link rel="stylesheet" href="md.css">
+</head>
+<body>
+<h1>Sparse Concept Anchoring in transformers</h1>
+<p>Sparse Concept Anchoring (SCA) is a training-time method for concept control. A light geometric regularizer, driven by a small number of noisy labels, guides a chosen concept toward a known location in representation space. The geometry is shaped during training, so there is no need to reverse-engineer it afterwards: the concept lives where you put it, and the side effects of suppressing or ablating it can be bounded before running the intervention.</p>
+<p>The first milestone (M1) established the method in autoencoders: <a href="https://arxiv.org/abs/2512.12469">paper</a>, <a href="https://www.lesswrong.com/posts/sGskzx7LgsDkMLvcv/intervening-on-sparse-anchored-concepts">blog post</a>, <a href="https://github.com/z0u/ex-preppy">code</a>. This site holds the experiment reports for the second milestone (M2), which asks: does SCA transfer to transformers? We anchor concepts in the residual stream of a small transformer trained on a synthetic color-mixing task (<code>red + blue = purple</code>), where ground truth is unambiguous, so a negative result stays interpretable. The plan and deliverables are in the <a href="https://github.com/z0u/sca2">project README</a>.</p>
+<p>&nbsp;</p>
+<h2>Experiment reports</h2>
+<p>Each report is a <a href="https://marimo.io">Marimo</a> notebook that reads durable results produced by a separately-run experiment. Reports are published automatically, with their figures served from a Hugging Face dataset; the infrastructure is <a href="https://github.com/z0u/mi-ni">mi-ni</a>.</p>
+<!-- These URLs are rewritten to point to the published notebooks -->
+
+<details>
+<summary>
+<h3>Iteration 0 (prep)</h3>
+</summary>
+<p>These experiments were preparation for the main work: exercising the infrastructure, testing the normalized transformer architecture, and tying off some loose ends from M1.</p>
+<ul>
+<li>
+<p><a href="ngpt-scaling/">nGPT scaling</a></p>
+<p>Width × depth sweep of our simplified nGPT to check that it stays well-behaved as it grows. Converged loss improves with width and is flat across depth, and no condition spikes or stalls. The architecture seems safe to build the color-mixing experiments on.</p>
+</li>
+<li>
+<p><a href="m1/ex-2.9.1/">M1 2.9.1. Deleting <em>red</em>, now in JAX</a></p>
+<p>We ported the main M1 result from PyTorch to JAX: Anchor <em>red</em> to one latent axis of a small autoencoder, then zero the axis and watch red disappear. The result reproduces, seed sensitivity and all, and our new infrastructure holds up.</p>
+</li>
+<li>
+<p><a href="m1/ex-2.9.2/">M1 2.9.2. Fallback control</a></p>
+<p>We compared two remedies for ablation seed-sensitivity: <strong>1.</strong> optimal ablation, which picks a replacement constant after training, and <strong>2.</strong> fallback control, a decoder-only loss term that teaches the model what to output once the concept has been removed. Fallback control worked well. Neither remedy touches the other half of the variance, where anchoring itself fails.</p>
+</li>
+<li>
+<p><a href="m1/ex-2.9.3/">M1 2.9.3. When anchoring fails</a></p>
+<p>Every failing run anchors first and then comes apart during the high learning-rate plateau. Halving the peak learning rate removes the failures.</p>
+</li>
+<li>
+<p><a href="m1/ex-2.9.4/">M1 2.9.4. Closed-loop regularizer weights</a></p>
+<p>We replaced the timed regularizer anneal with a feedback controller, so that each weight climbs while its constraint is being violated and settles back once it is met. It kind of worked but not very well, and it adds complexity.</p>
+</li>
+</ul>
+</details>
+<h3>D2.1: anchoring in a transformer</h3>
+<ul>
+<li>
+<p><a href="m2/ex-2.1.1/">2.1.1. Un-anchored color-mixing transformer</a></p>
+<p>A small transformer learns a character-level language of color-mixing equations, solving the forms it saw in training and unseen hex pairs. Color turns out to be linearly decodable from its residual stream, with each seed putting <em>redness</em> in a different place. Held-out <em>named</em> pairs sit at zero accuracy.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.2/">2.1.2. Making composition necessary</a></p>
+<p>The previous model never answered a held-out <em>named</em> pair, so we changed the grammar to make composition the only route: reverse alias lines, and named equations whose mix falls off the palette. The model picks up both new skills and still won't chain them within one forward pass, leaving held-out named accuracy at zero.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.3/">2.1.3. Named colors only</a></p>
+<p>No hex codes, just one opaque token per color and nothing in the text to say that colors are values at all. The model infers the geometry from co-occurrence alone: its embeddings hold the RGB cube as a linear subspace, it computes mixes in value space just before answering, and its held-out guesses land on or beside the right color. Exact match rises and falls with vocabulary size, while geometric closeness improves steadily.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.4/">2.1.4. Spelling the names</a></p>
+<p>Does geometry inference need one token per concept? Not at 216 colors. We test the same equations but with every color spelled as an opaque four-letter name. There's a small drop in held-out accuracy, but the value subspace survives. Reading names takes most of the network's depth, leaving one layer for the mix to live in. The 27-color grid is too coarse.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.5/">2.1.5. Disjoint vocabularies and more named colors</a></p>
+<p>Names and hex codes. Both sublanguages train, and each builds its own linear color geometry. But the two geometries resist being combined, even under pressure from a narrow residual stream. Keeping them apart apparently costs less than merging them would.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.6/">2.1.6. Anchoring <em>red</em> in a transformer</a></p>
+<p>Our first anchored transformer, with a single attractive term. The anchor moved the activations to the chosen direction, and cost the task nothing measurable. But it moved the whole color cube, rather than <em>red</em> in particular.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.7/">2.1.7. A repulsive term and a narrower pull</a></p>
+<p>We tested two mechanisms to improve anchor selectivity: <strong>1.</strong> Apply the anchor term only to operand 1 (no other tokens), and <strong>2.</strong> Add a repulsive term to clear the target subspace. Both work, but 1. worked better, and their effects stack somewhat.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.8/">2.1.8. Repulsion tuning</a></p>
+<p>We tested anti-subspace schedules (trailing timing and strength) to find an operating point that contains the cube-wide drift without reducing selectivity. Holding the repulsion high for longer contains the drift and keeps the margin, which nothing before this did. It's unclear if the response is well-graded.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.9/">2.1.9. Softmin sequence pooling</a></p>
+<p>Anchoring on op1 alone worked best so far, but in natural language we won't know which tokens hold the concept. So we pool over sequences with a soft minimum (mellowmax) and let the pull choose its own position. At the embedding it picks op1 unaided, the operating point stays healthy, and grading improves. It wins no margin though, and only the softest pooling stays graded in every run.</p>
+</li>
+<li>
+<p><a href="m2/ex-2.1.10/">2.1.10. A label that doesn't point</a></p>
+<p>Preregistered; not yet run. Ex-2.1.9's labels still keyed on op1, so the label itself said where the concept was. Now either operand can trigger the label (per-slot rate halved to keep the label budget), and the pooled pull has to find the red operand line by line. Two soft-τ arms ride along.</p>
+</li>
+</ul>
+</body>
+</html>
