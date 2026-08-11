@@ -1,25 +1,8 @@
 """Layer × landmark probe maps, cross-form transfer, and probe-subspace angles.
 
-Ex-2.1.5's measurement kit. Earlier experiments probed hand-picked positions
-(`probe_residual_stream`); here the probe scan covers every layer at every
-grammar landmark (`sca.data.mixed_vocab.LANDMARKS`), producing a map per
-target. Alongside each map the full-data probe (weights and bias) is kept, which
-is what transfers: applying one form's fitted probe unchanged to the other
-form's activations gives the zero-shot cross-form R² that the transfer ratio ρ
-is built from, and the fitted weight matrices' column spaces are what the
-principal-angle measure compares.
+Ex-2.1.5's measurement kit. Earlier experiments probed hand-picked positions (`probe_residual_stream`); here the probe scan covers every layer at every grammar landmark (`sca.data.mixed_vocab.LANDMARKS`), producing a map per target. Alongside each map the full-data probe (weights and bias) is kept, which is what transfers: applying one form's fitted probe unchanged to the other form's activations gives the zero-shot cross-form R² that the transfer ratio ρ is built from, and the fitted weight matrices' column spaces are what the principal-angle measure compares.
 
-Within-form R² comes in two flavours, because "recoverable here" and
-"geometrically organized here" are different questions and this task pulls them
-apart. Leave-one-*equation*-out (`ridge_probe_loo`) answers the first: a colour
-or a hex digit appears in both the fit and the held-out row, so an identity →
-value table is memorizable, which is what you want when asking whether a value
-is present at all. Leave-one-*value*-out (`strict_r2`) answers the second: every
-row carrying that value — as either operand or the answer — leaves the fit
-together, so the probe has to place an unseen value from the others. Holding out
-only where the value is *scored* would not do it, since the same hex digit sits
-in all three channel slots and a colour can be operand 1 in one line and operand
-2 in another.
+Within-form R² comes in two flavours, because "recoverable here" and "geometrically organized here" are different questions and this task pulls them apart. Leave-one-*equation*-out (`ridge_probe_loo`) answers the first: a colour or a hex digit appears in both the fit and the held-out row, so an identity → value table is memorizable, which is what you want when asking whether a value is present at all. Leave-one-*value*-out (`strict_r2`) answers the second: every row carrying that value — as either operand or the answer — leaves the fit together, so the probe has to place an unseen value from the others. Holding out only where the value is *scored* would not do it, since the same hex digit sits in all three channel slots and a colour can be operand 1 in one line and operand 2 in another.
 """
 
 from typing import Mapping, Sequence
@@ -44,8 +27,7 @@ def collect_activations(
 ) -> tuple[Float[np.ndarray, "L1 N T C"], Float[np.ndarray, "N M"]]:
     """Residual stream over teacher-forced lines, plus each line's landmark columns.
 
-    Lines are left-padded to a common length, so landmark character positions
-    shift by each line's pad offset; the returned index array accounts for it.
+    Lines are left-padded to a common length, so landmark character positions shift by each line's pad offset; the returned index array accounts for it.
     """
     texts = [ex.prompt + ex.answer for ex in examples]
     seq = np.asarray(tokenizer.encode(texts))  # (N, T), left-padded
@@ -77,10 +59,7 @@ def strict_r2(
 ) -> float:
     """Out-of-sample R² over (held-out rows, scored rows) folds.
 
-    One uncentered Gram matrix serves every fold and each is downdated by its own
-    block — the group form of the rank-1 trick in ``ridge_probe_loo``, so this
-    costs one fit plus a small solve per fold rather than a fit per fold, which
-    makes it *cheaper* than the per-equation estimator it sits beside.
+    One uncentered Gram matrix serves every fold and each is downdated by its own block — the group form of the rank-1 trick in ``ridge_probe_loo``, so this costs one fit plus a small solve per fold rather than a fit per fold, which makes it *cheaper* than the per-equation estimator it sits beside.
     """
     x64, y64 = np.asarray(x, np.float64), np.asarray(y_col, np.float64)
     n, c = x64.shape
@@ -122,16 +101,11 @@ def probe_maps(
     Returns, keyed by target name:
 
     - ``r2``: (L+1, M) leave-one-equation-out R² — is the value recoverable here;
-    - ``r2_ch``: (L+1, M, K) the same, per target channel (``r2`` is its mean
-      over the last axis);
-    - ``r2_strict`` / ``r2_strict_ch``: the same pair under the leave-one-value-out
-      holdout — is the value geometrically organized here (see the module docstring);
-    - ``weights``: (L+1, M, C, K) and ``bias``: (L+1, M, K) — full-data fits,
-      for zero-shot transfer and subspace comparison.
+    - ``r2_ch``: (L+1, M, K) the same, per target channel (``r2`` is its mean over the last axis);
+    - ``r2_strict`` / ``r2_strict_ch``: the same pair under the leave-one-value-out holdout — is the value geometrically organized here (see the module docstring);
+    - ``weights``: (L+1, M, C, K) and ``bias``: (L+1, M, K) — full-data fits, for zero-shot transfer and subspace comparison.
 
-    The strict folds are built from *all* of ``targets``, so it must carry the
-    line's every value-bearing slot (both operands and the mix) for the holdout
-    to be airtight.
+    The strict folds are built from *all* of ``targets``, so it must carry the line's every value-bearing slot (both operands and the mix) for the holdout to be airtight.
     """
     n_depth, n_ex = acts.shape[0], acts.shape[1]
     at_lm = acts[:, np.arange(n_ex)[:, None], lm]  # (L+1, N, M, C)
@@ -169,9 +143,7 @@ def transfer_maps(
     lm: Float[np.ndarray, "N M"],
     targets: Mapping[str, Float[np.ndarray, "N K"]],
 ) -> dict[str, np.ndarray]:
-    """Zero-shot cross-form R²: probes from `probe_maps` (fit on form A),
-    applied unchanged to form B's activations at the same (layer, landmark).
-    """
+    """Zero-shot cross-form R²: probes from `probe_maps` (fit on form A), applied unchanged to form B's activations at the same (layer, landmark)."""
     n_ex = acts.shape[1]
     at_lm = acts[:, np.arange(n_ex)[:, None], lm]
     out = {}
@@ -191,14 +163,9 @@ def principal_angles(
 ) -> Float[np.ndarray, "*B K"]:
     """The K principal angles (degrees) between two probes' weight column spaces, ascending.
 
-    The first is the smallest — the closest the two subspaces come — so it bounds how much
-    they could share. 0° = a direction of the stream both decoders use; 90° = orthogonal.
+    The first is the smallest — the closest the two subspaces come — so it bounds how much they could share. 0° = a direction of the stream both decoders use; 90° = orthogonal.
 
-    Any leading batch dimensions are carried through: `qr` and `svd` are both
-    stacked-aware, so a (…, C, K) pair is one LAPACK call per routine rather than one
-    per subspace pair. A Python loop over slices gives bit-identical results — the
-    batch form is the same arithmetic, just handed over in bulk — so callers with many
-    pairs (a null distribution, a layer × landmark map) should pass the stack.
+    Any leading batch dimensions are carried through: `qr` and `svd` are both stacked-aware, so a (…, C, K) pair is one LAPACK call per routine rather than one per subspace pair. A Python loop over slices gives bit-identical results — the batch form is the same arithmetic, just handed over in bulk — so callers with many pairs (a null distribution, a layer × landmark map) should pass the stack.
     """
     qa, _ = np.linalg.qr(wa)
     qb, _ = np.linalg.qr(wb)
@@ -221,9 +188,7 @@ def rho(
 ) -> Float[np.ndarray, "L1 M"]:
     """Transfer ratio ρ = clip(cross, 0) / within, guarded.
 
-    Reported only where the within-form R² clears *floor* (NaN elsewhere) —
-    below that the site isn't measuring geometry and a small denominator makes
-    the ratio erratic. Negative cross-form R² clips to zero, so ρ ∈ [0, 1].
+    Reported only where the within-form R² clears *floor* (NaN elsewhere) — below that the site isn't measuring geometry and a small denominator makes the ratio erratic. Negative cross-form R² clips to zero, so ρ ∈ [0, 1].
     """
     with np.errstate(invalid="ignore"):
         out = np.clip(cross_r2, 0.0, None) / within_r2

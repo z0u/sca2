@@ -7,11 +7,7 @@ argument-hint: <document> [section] [line range]
 
 We're doing science, so we need rigor, but we also need to move fast: a little imprecision is an acceptable price for speed.
 
-This is the quick, inline pass: run it as you write, or when asked to lint a
-document, with whatever context you already have. For a full reshaping of a
-report section, use the `report-restructure` skill instead — it runs a
-fresh-eyes agent with no conversation context and adds a template check, and
-its agent spec carries the rules this lint borrows from.
+This is the quick, inline pass: run it as you write, or when asked to lint a document, with whatever context you already have. For a full reshaping of a report section, use the `report-restructure` skill instead — it runs a fresh-eyes agent with no conversation context and adds a template check, and its agent spec carries the rules this lint borrows from.
 
 By default, our docs and reports contain a lot of text that could be described as "fluff". Examples below, with bad text between `anti-example` tags, and better text (if any) between `corrected-example` tags. Parentheses in an anti-example list are for clarification of the role of the term (not things to remove, and not their replacements).
 
@@ -137,51 +133,32 @@ And this is very long for such a small amount of information:
 
 ## Keep
 
-Keep facts, as long as they are informative. Inline numbers that can be read
-from a chart or table add little, but insights _about_ the data are valuable.
+Keep facts, as long as they are informative. Inline numbers that can be read from a chart or table add little, but insights _about_ the data are valuable.
 
-Keep qualifiers that narrow scope ("at the scoring rung", "on seen pairs") to
-avoid widening a claim. Also keep the reason attached to a finding: "X fails
-because the gate applies to every run" is better than "X fails".
+Keep qualifiers that narrow scope ("at the scoring rung", "on seen pairs") to avoid widening a claim. Also keep the reason attached to a finding: "X fails because the gate applies to every run" is better than "X fails".
 
-Keep indicators of certainty: "would start to matter" is a weaker claim than
-"matters". Don't strengthen a claim while shortening it.
+Keep indicators of certainty: "would start to matter" is a weaker claim than "matters". Don't strengthen a claim while shortening it.
 
-Keep signposts. A sentence that changes how the reader weights a number ("The
-margin and retention rows are what make it a result") is information; a
-sentence that narrates the document ("Capacity is worth a sentence") is not.
+Keep signposts. A sentence that changes how the reader weights a number ("The margin and retention rows are what make it a result") is information; a sentence that narrates the document ("Capacity is worth a sentence") is not.
 
-Keep first-use definitions of terms, trimmed, and move them to footnotes or
-`/// details` admonitions.
+Keep first-use definitions of terms, trimmed, and move them to footnotes or `/// details` admonitions.
 
-Compress against the immediate context: after a cut, everything needed to
-understand what remains must still be visible nearby. The `report-restructure`
-agent spec lists the specific ways this goes wrong (stranded referents, lost
-baselines, flattened counts).
+Compress against the immediate context: after a cut, everything needed to understand what remains must still be visible nearby. The `report-restructure` agent spec lists the specific ways this goes wrong (stranded referents, lost baselines, flattened counts).
 
-If a report contains results, don't make material changes to preregistration
-text (e.g. the hypotheses). Follow the `REVIEW`-comment convention in the
-`science` skill if a change is warranted.
+If a report contains results, don't make material changes to preregistration text (e.g. the hypotheses). Follow the `REVIEW`-comment convention in the `science` skill if a change is warranted.
 
 ## Style
 
-We are the primary audience, so use an internal lab notes register. Aim for
-something less ceremonial than a paper, but not so terse that it reads like a
-telegram.
+We are the primary audience, so use an internal lab notes register. Aim for something less ceremonial than a paper, but not so terse that it reads like a telegram.
 
 ## Workflow
 
-When linting, assume the text is _correct_. Don't check numbers or verify
-claims, just:
+When linting, assume the text is _correct_. Don't check numbers or verify claims, just:
 
 1. Look for low-perplexity (boring) text
 2. Dedup and de-fluff, rephrasing as necessary
 3. Move asides to footnotes
-4. If the target is a Marimo notebook, run
-   `.agents/skills/report-restructure/scripts/check-templates <file>`. It
-   catches syntax errors, and reports dropped or frozen template expressions;
-   check that these were intentional.
-5. Give a short report of the flavor of the changes (not details; those will be
-   self-evident).
+4. If the target is a Marimo notebook, run `.agents/skills/report-restructure/scripts/check-templates <file>`. It catches syntax errors, and reports dropped or frozen template expressions; check that these were intentional.
+5. Give a short report of the flavor of the changes (not details; those will be self-evident).
 
 "Already clean, a few small edits" is a fine outcome.

@@ -1,13 +1,7 @@
 #!/usr/bin/env python
 """Export report notebooks to self-contained bundles, optionally syncing to the bucket.
 
-Each report (a ``docs/**/*.py`` declaring ``marimo.App(``) exports to its own bundle at
-``.mini/exports/<key>/`` — ``index.html`` plus the named-keyed ``_assets/`` its setup
-cell's :func:`~mini.reports.report_bundle` publisher wrote. With ``--publish`` each
-bundle is then mirrored to the configured HF bucket at ``exports/<key>/``: the
-authenticated half of publishing (it needs the data the report reads + a write token).
-``scripts/build_site.py`` assembles the site from these bundles — the synced ones in CI
-(read-only), the local ones offline.
+Each report (a ``docs/**/*.py`` declaring ``marimo.App(``) exports to its own bundle at ``.mini/exports/<key>/`` — ``index.html`` plus the named-keyed ``_assets/`` its setup cell's :func:`~mini.reports.report_bundle` publisher wrote. With ``--publish`` each bundle is then mirrored to the configured HF bucket at ``exports/<key>/``: the authenticated half of publishing (it needs the data the report reads + a write token). ``scripts/build_site.py`` assembles the site from these bundles — the synced ones in CI (read-only), the local ones offline.
 """
 
 import argparse
@@ -40,9 +34,7 @@ DOCS = ROOT / "docs"
 def notebooks_to_export(paths: list[str]) -> list[Path]:
     """The report notebooks to export — the given ones, or every report under ``docs/``.
 
-    Source-only example notebooks (``# mini:source-only``, e.g. ``docs/gpt.py``) are
-    skipped even when named explicitly: the site links to their GitHub source rather than
-    running them, so exporting one (which re-runs its inline compute) is never intended.
+    Source-only example notebooks (``# mini:source-only``, e.g. ``docs/gpt.py``) are skipped even when named explicitly: the site links to their GitHub source rather than running them, so exporting one (which re-runs its inline compute) is never intended.
     """
     if not paths:
         return report_notebooks(DOCS)
@@ -59,8 +51,7 @@ def notebooks_to_export(paths: list[str]) -> list[Path]:
 def is_stale(nb: Path) -> bool:
     """Whether *nb*'s bundle is missing or older than the notebook itself.
 
-    A cheap mtime heuristic: it misses edits to imported ``src/`` modules and to
-    the stored results a report reads, so callers offer ``--force`` (skip the check).
+    A cheap mtime heuristic: it misses edits to imported ``src/`` modules and to the stored results a report reads, so callers offer ``--force`` (skip the check).
     """
     out = export_dir(nb) / "index.html"
     return not out.exists() or out.stat().st_mtime < nb.stat().st_mtime
@@ -91,9 +82,7 @@ def export_one(nb: Path) -> Path:
 def publish_one(nb: Path, store) -> str | None:
     """Export *nb*, mirror its bundle to ``exports/<key>/``, and return its revision.
 
-    The revision (a publish-tier commit sha, ``None`` on a history-less bucket) is what
-    the caller pins in ``docs/publish.lock`` — the site serves the bundle at that exact
-    commit, so this publish changes nothing deployed until the pin lands on main.
+    The revision (a publish-tier commit sha, ``None`` on a history-less bucket) is what the caller pins in ``docs/publish.lock`` — the site serves the bundle at that exact commit, so this publish changes nothing deployed until the pin lands on main.
     """
     bundle = export_one(nb)
     key = export_key(nb)
@@ -104,10 +93,7 @@ def publish_one(nb: Path, store) -> str | None:
 def update_pins(new: dict[str, str]) -> None:
     """Fold this run's pins into ``docs/publish.lock``, pruning keys with no notebook.
 
-    Pruning uses the *full* report set (not just what was published now), so a partial
-    publish never drops other reports' pins, but a deleted notebook's pin doesn't
-    linger. The manifest must be committed for the pins to take effect — it's the
-    identity half of a publish; the upload was only evidence.
+    Pruning uses the *full* report set (not just what was published now), so a partial publish never drops other reports' pins, but a deleted notebook's pin doesn't linger. The manifest must be committed for the pins to take effect — it's the identity half of a publish; the upload was only evidence.
     """
     live = {export_key(nb) for nb in report_notebooks(DOCS)}
     pins = {k: v for k, v in (load_pins(ROOT) | new).items() if k in live}

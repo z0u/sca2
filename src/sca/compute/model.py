@@ -19,8 +19,7 @@ def save_checkpoint(
 ) -> None:
     """Save a model checkpoint to the given directory.
 
-    The file is a JSON header line (config and metrics) followed by the
-    serialized model arrays.
+    The file is a JSON header line (config and metrics) followed by the serialized model arrays.
     """
     model_path = data_dir / "model" / "checkpoint.eqx"
     model_path.parent.mkdir(parents=True, exist_ok=True)

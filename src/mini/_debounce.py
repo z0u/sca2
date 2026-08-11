@@ -17,13 +17,10 @@ class Debouncer:
     """
     Debounce calls to a function with leading and trailing edge semantics.
 
-    - **Leading edge:** first call (or first call after the interval elapses)
-      fires immediately.
-    - **Trailing edge:** rapid subsequent calls store only the latest arguments
-      and emit once after the interval.
+    - **Leading edge:** first call (or first call after the interval elapses) fires immediately.
+    - **Trailing edge:** rapid subsequent calls store only the latest arguments and emit once after the interval.
 
-    Thread-safe. The trailing-edge timer is daemonic, so it won't prevent
-    program exit — call :meth:`flush` to guarantee delivery.
+    Thread-safe. The trailing-edge timer is daemonic, so it won't prevent program exit — call :meth:`flush` to guarantee delivery.
     """
 
     def __init__(self, fn: Callable[..., Any], interval: float = 0.1) -> None:
@@ -85,23 +82,11 @@ class Debouncer:
 class BackgroundEmitter:
     """Deliver the most recent call's arguments to a slow *fn*, without blocking.
 
-    A debouncer runs its leading edge on the calling thread, which is fine when
-    the sink is local and quick. When the sink is a network write — a Modal Queue
-    put, a control-plane record merge — and its latency grows past the debounce
-    interval, *every* call fires the leading edge and the caller degrades to one
-    blocking round-trip per call. A training loop emitting progress each step then
-    runs at the speed of the network rather than the GPU (diagnosed in ex-2.1.5:
-    containers far from the control plane ran 15–30× slow, in order of distance).
+    A debouncer runs its leading edge on the calling thread, which is fine when the sink is local and quick. When the sink is a network write — a Modal Queue put, a control-plane record merge — and its latency grows past the debounce interval, *every* call fires the leading edge and the caller degrades to one blocking round-trip per call. A training loop emitting progress each step then runs at the speed of the network rather than the GPU (diagnosed in ex-2.1.5: containers far from the control plane ran 15–30× slow, in order of distance).
 
-    So: one slot, latest-wins, drained by a daemon thread. The caller stores its
-    arguments and returns immediately; the thread delivers whatever is in the slot
-    when it gets there and skips whatever was superseded meanwhile. Delivery rate
-    self-limits to the sink's own speed — a slow sink just means coarser progress,
-    which is exactly the right thing to trade away — and *interval* sets a floor on
-    the spacing so a fast sink isn't hammered.
+    So: one slot, latest-wins, drained by a daemon thread. The caller stores its arguments and returns immediately; the thread delivers whatever is in the slot when it gets there and skips whatever was superseded meanwhile. Delivery rate self-limits to the sink's own speed — a slow sink just means coarser progress, which is exactly the right thing to trade away — and *interval* sets a floor on the spacing so a fast sink isn't hammered.
 
-    Sink failures are logged and dropped: progress is diagnostic, and the caller is
-    no longer in a position to handle them anyway.
+    Sink failures are logged and dropped: progress is diagnostic, and the caller is no longer in a position to handle them anyway.
     """
 
     def __init__(self, fn: Callable[..., Any], interval: float = 0.1, name: str = "mini-emit") -> None:
@@ -156,9 +141,7 @@ class BackgroundEmitter:
     def flush(self, timeout: float = 30.0) -> bool:
         """Wait (up to *timeout*) for the slot to drain. True if it did.
 
-        The end-of-job barrier: a task's last progress update should land before
-        its record settles, and an in-flight write should finish before the
-        process exits.
+        The end-of-job barrier: a task's last progress update should land before its record settles, and an in-flight write should finish before the process exits.
         """
         deadline = time.monotonic() + timeout
         with self._cv:

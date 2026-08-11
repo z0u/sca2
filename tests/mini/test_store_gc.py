@@ -2,23 +2,12 @@
 
 The sweep's contract, in order of how much damage getting it wrong does:
 
-- **Fail closed.** ``collect_store_roots`` would rather refuse than under-mark:
-  an in-flight task, an unreadable result, or an unknown backend stamp aborts
-  with nothing deleted. Deleting a blob a running worker is about to reference
-  (it just saw ``has() == True``) would corrupt a result not yet written.
-- **Every record is a root** — current *and* superseded. Collecting a
-  superseded record's blob is ``mini gc <name>``'s call to make first; the store
-  sweep never second-guesses the memo layer, so a blob only becomes collectible
-  once the record referencing it is gone.
-- **Refs pin.** ``set_ref`` is the documented way to keep an artifact alive with
-  no record referencing it, so a ref-pinned blob survives the sweep.
-- **The grace window** keeps young blobs — the margin against writers the mark
-  phase cannot see (an unpushed checkout, a ``put`` that skipped its upload just
-  before the sweep judged the bytes garbage).
+- **Fail closed.** ``collect_store_roots`` would rather refuse than under-mark: an in-flight task, an unreadable result, or an unknown backend stamp aborts with nothing deleted. Deleting a blob a running worker is about to reference (it just saw ``has() == True``) would corrupt a result not yet written.
+- **Every record is a root** — current *and* superseded. Collecting a superseded record's blob is ``mini gc <name>``'s call to make first; the store sweep never second-guesses the memo layer, so a blob only becomes collectible once the record referencing it is gone.
+- **Refs pin.** ``set_ref`` is the documented way to keep an artifact alive with no record referencing it, so a ref-pinned blob survives the sweep.
+- **The grace window** keeps young blobs — the margin against writers the mark phase cannot see (an unpushed checkout, a ``put`` that skipped its upload just before the sweep judged the bytes garbage).
 
-The forward artifact index (the ``result-<gen>.artifacts.json`` sidecar) is what
-lets the mark phase read tiny JSON instead of unpickling every result; unpickling
-stays the fallback for pre-sidecar records.
+The forward artifact index (the ``result-<gen>.artifacts.json`` sidecar) is what lets the mark phase read tiny JSON instead of unpickling every result; unpickling stays the fallback for pre-sidecar records.
 """
 
 from __future__ import annotations
@@ -67,9 +56,7 @@ def _drive(exp: Experiment, app: LocalApparatus, timeout: float = 30.0) -> None:
 def _put_step():
     """A step that stores a per-input blob and returns its handle (distinct bytes → distinct sha).
 
-    Built as a local closure so cloudpickle serializes it *by value* — a
-    module-level function would pickle by reference, and the detached subprocess
-    worker can't import this test module.
+    Built as a local closure so cloudpickle serializes it *by value* — a module-level function would pickle by reference, and the detached subprocess worker can't import this test module.
     """
 
     def put_step(x):
@@ -122,8 +109,7 @@ def test_artifact_shas_empty_for_plain_values():
 
 
 def test_artifact_shas_prunes_at_callables():
-    """The walk stops at code/module boundaries: an Artifact reachable only through a
-    function's closure is invisible (crossing it would drag in unrelated module state)."""
+    """The walk stops at code/module boundaries: an Artifact reachable only through a function's closure is invisible (crossing it would drag in unrelated module state)."""
     hidden = _file("e" * 64)
 
     def fn():
@@ -281,8 +267,7 @@ def test_grace_window_keeps_young_blobs(tmp_path: Path, monkeypatch: pytest.Monk
 
 
 def test_superseded_record_pins_its_blob_until_memo_gc(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """A superseded record is still a mark root; its blob is collectible only once
-    ``mini gc <name>`` removes the record."""
+    """A superseded record is still a mark root; its blob is collectible only once ``mini gc <name>`` removes the record."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)
     monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)

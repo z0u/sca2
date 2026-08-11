@@ -1,34 +1,18 @@
 """
 Report bundles: produce a report's assets as relative URLs, then repoint them.
 
-A report is a **bundle** — one Marimo HTML document plus its heavy assets (figures,
-data blobs). The two halves of the bundle protocol both live here:
+A report is a **bundle** — one Marimo HTML document plus its heavy assets (figures, data blobs). The two halves of the bundle protocol both live here:
 
-**Produce.** A :class:`Publisher` writes each asset out as a file beside the exported
-HTML and hands back a *relative* URL like ``_assets/<name>.png``. The path is the
-asset's readable name (so a browser saving it suggests a sensible filename — the URL's
-last segment, since the bucket sets no ``Content-Disposition``), and the name *is* the
-key, so a re-render overwrites in place and the URL stays stable. ``themed`` figures
-externalize through a publisher when one is set; :meth:`Publisher.asset_url` is the
-general verb for any blob.
+**Produce.** A :class:`Publisher` writes each asset out as a file beside the exported HTML and hands back a *relative* URL like ``_assets/<name>.png``. The path is the asset's readable name (so a browser saving it suggests a sensible filename — the URL's last segment, since the bucket sets no ``Content-Disposition``), and the name *is* the key, so a re-render overwrites in place and the URL stays stable. ``themed`` figures externalize through a publisher when one is set; :meth:`Publisher.asset_url` is the general verb for any blob.
 
 **Publish.** That same HTML is consumed two ways:
 
 - **opened locally**, the relative URL resolves to the co-located ``_assets/`` files;
-- **served from Pages**, we want it to resolve to the assets we uploaded to the HF
-  bucket instead.
+- **served from Pages**, we want it to resolve to the assets we uploaded to the HF bucket instead.
 
-The bridge is a single ``<base href>`` in the ``<head>`` (:func:`insert_base`): it
-sets the document base that *every* relative URL resolves against, so one inserted
-tag repoints the whole report's assets at the bucket — no per-URL rewriting, and it
-works for the data URIs buried in Marimo's session JSON and a relative ``fetch()``
-alike.
+The bridge is a single ``<base href>`` in the ``<head>`` (:func:`insert_base`): it sets the document base that *every* relative URL resolves against, so one inserted tag repoints the whole report's assets at the bucket — no per-URL rewriting, and it works for the data URIs buried in Marimo's session JSON and a relative ``fetch()`` alike.
 
-The catch is that ``<base>`` is document-global, so an author-written relative *link*
-(a markdown ``[src](./experiment.py)``) would be repointed too — and 404 against the
-bucket. :func:`stray_links` finds those at build time; :func:`rewrite_links` turns
-them into absolute targets (their rendered page, or their source) so they survive the
-base. The convention is *the only relative URLs left in a report are store assets*.
+The catch is that ``<base>`` is document-global, so an author-written relative *link* (a markdown ``[src](./experiment.py)``) would be repointed too — and 404 against the bucket. :func:`stray_links` finds those at build time; :func:`rewrite_links` turns them into absolute targets (their rendered page, or their source) so they survive the base. The convention is *the only relative URLs left in a report are store assets*.
 """
 
 from __future__ import annotations
@@ -99,19 +83,9 @@ PROVENANCE_ASSET = "provenance.json"
 
 @dataclass(frozen=True)
 class Publisher:
-    """Writes a report's heavy assets out as files beside the exported HTML,
-    referenced by a **relative** URL.
+    """Writes a report's heavy assets out as files beside the exported HTML, referenced by a **relative** URL.
 
-    Each blob is written under ``asset_dir`` (the report's bundle ``_assets/`` —
-    :func:`report_bundle`) at its readable *name*. The name *is* the key, so the URL is stable across
-    re-exports — a re-render overwrites in place rather than piling up a new
-    content-addressed copy each time (which is what kept the bucket accumulating
-    orphans). The name is also what a browser "Save as" suggests (it derives the
-    filename from the URL's last segment, the bucket setting no
-    ``Content-Disposition``). The reference is ``<link>/<name>``; because it's
-    relative, the same HTML resolves to the local files when opened off disk and to
-    the HF bucket when published (a single ``<base href>`` is inserted at build time
-    — see ``scripts/build_site.py``).
+    Each blob is written under ``asset_dir`` (the report's bundle ``_assets/`` — :func:`report_bundle`) at its readable *name*. The name *is* the key, so the URL is stable across re-exports — a re-render overwrites in place rather than piling up a new content-addressed copy each time (which is what kept the bucket accumulating orphans). The name is also what a browser "Save as" suggests (it derives the filename from the URL's last segment, the bucket setting no ``Content-Disposition``). The reference is ``<link>/<name>``; because it's relative, the same HTML resolves to the local files when opened off disk and to the HF bucket when published (a single ``<base href>`` is inserted at build time — see ``scripts/build_site.py``).
     """
 
     asset_dir: Path
@@ -126,10 +100,7 @@ class Publisher:
     def note_ref(self, name: str, producer: dict[str, Any] | None) -> None:
         """Record that the report resolved store ref *name*, written by *producer*.
 
-        Called by ``mini.store`` on every ``get_ref`` while this publisher is
-        active, so the bundle's provenance sidecar always reflects the refs the
-        *current* render actually read. Deterministic given the store's refs —
-        re-rendering unchanged data rewrites the same sidecar.
+        Called by ``mini.store`` on every ``get_ref`` while this publisher is active, so the bundle's provenance sidecar always reflects the refs the *current* render actually read. Deterministic given the store's refs — re-rendering unchanged data rewrites the same sidecar.
         """
         self._refs[name] = producer
         dest = self.asset_dir / PROVENANCE_ASSET
@@ -141,10 +112,7 @@ class Publisher:
     def asset_url(self, data: bytes | Path, *, name: str) -> str:
         """Write *data* (bytes or a file) as ``<name>`` and return its relative URL.
 
-        The asset is keyed by its readable *name* (carry the extension — it sets the
-        served media type), so the URL is stable and a re-render overwrites in place.
-        Two *different* blobs written under the same name in one report is an authoring
-        bug (give each figure a distinct ``name=``), so it raises rather than clobber.
+        The asset is keyed by its readable *name* (carry the extension — it sets the served media type), so the URL is stable and a re-render overwrites in place. Two *different* blobs written under the same name in one report is an authoring bug (give each figure a distinct ``name=``), so it raises rather than clobber.
         """
         blob = bytes(data) if isinstance(data, (bytes, bytearray)) else Path(data).read_bytes()
         leaf = _safe_leaf(name)
@@ -168,8 +136,7 @@ class Publisher:
 def _project_root(start: Path) -> Path:
     """The project root (nearest ``pyproject.toml`` / ``.git``) walking up from *start*.
 
-    Anchored at the *path*, not the cwd, so it's stable during ``marimo export`` (which
-    may run from anywhere) — ``__file__`` is absolute there.
+    Anchored at the *path*, not the cwd, so it's stable during ``marimo export`` (which may run from anywhere) — ``__file__`` is absolute there.
     """
     start = start.resolve()
     for d in (start, *start.parents):
@@ -181,14 +148,7 @@ def _project_root(start: Path) -> Path:
 def export_key(notebook_file: str | Path) -> str:
     """The docs-relative, suffix-less key naming a report's self-contained bundle.
 
-    ``docs/gpt.py`` → ``gpt``; ``docs/gpt-sweep/report.py`` → ``gpt-sweep``. A report
-    named ``report.py`` takes its *directory* as the key, so the common one-experiment,
-    one-report split publishes at ``gpt-sweep/`` rather than the redundant
-    ``gpt-sweep/report/``. A second report alongside it keeps its own stem
-    (``docs/foo/aside.py`` → ``foo/aside``), so the convention extends to multiple
-    reports per experiment without collision. The key names the report's on-disk export
-    dir *and* its ``exports/<key>/`` prefix on the bucket, and (served as ``index.html``)
-    its URL ``<key>/`` — so each report is one independently syncable bundle.
+    ``docs/gpt.py`` → ``gpt``; ``docs/gpt-sweep/report.py`` → ``gpt-sweep``. A report named ``report.py`` takes its *directory* as the key, so the common one-experiment, one-report split publishes at ``gpt-sweep/`` rather than the redundant ``gpt-sweep/report/``. A second report alongside it keeps its own stem (``docs/foo/aside.py`` → ``foo/aside``), so the convention extends to multiple reports per experiment without collision. The key names the report's on-disk export dir *and* its ``exports/<key>/`` prefix on the bucket, and (served as ``index.html``) its URL ``<key>/`` — so each report is one independently syncable bundle.
     """
     p = Path(notebook_file).resolve()
     docs = _project_root(p) / "docs"
@@ -205,8 +165,7 @@ def export_key(notebook_file: str | Path) -> str:
 def export_dir(notebook_file: str | Path) -> Path:
     """The local (gitignored) dir holding a report's exported ``index.html`` + ``_assets/``.
 
-    ``<root>/.mini/exports/<key>/`` — the unit that mirrors to bucket ``exports/<key>/``.
-    Kept under ``.mini`` (already gitignored) so exported HTML never enters Git.
+    ``<root>/.mini/exports/<key>/`` — the unit that mirrors to bucket ``exports/<key>/``. Kept under ``.mini`` (already gitignored) so exported HTML never enters Git.
     """
     p = Path(notebook_file).resolve()
     return _project_root(p) / ".mini" / "exports" / export_key(p)
@@ -247,11 +206,7 @@ SOURCE_ONLY_MARKER = "mini:source-only"
 def is_report_notebook(path: str | Path) -> bool:
     """Whether *path* is a Marimo report the site renders.
 
-    A report is a ``.py`` that declares ``marimo.App(`` and is *not* flagged
-    ``# mini:source-only`` (:data:`SOURCE_ONLY_MARKER`): the marker opts a notebook out
-    of the published set, so the build neither runs nor renders it and links to it fall
-    back to its GitHub source. The notebooks are the only source of truth for the report
-    set — a report is on the site iff its ``.py`` is in the repo and its bundle is synced.
+    A report is a ``.py`` that declares ``marimo.App(`` and is *not* flagged ``# mini:source-only`` (:data:`SOURCE_ONLY_MARKER`): the marker opts a notebook out of the published set, so the build neither runs nor renders it and links to it fall back to its GitHub source. The notebooks are the only source of truth for the report set — a report is on the site iff its ``.py`` is in the repo and its bundle is synced.
     """
     p = Path(path)
     if p.suffix != ".py":
@@ -279,9 +234,7 @@ MANUAL_PUBLISH_MARKER = "mini:manual-publish"
 def is_manually_published(path: str | Path) -> bool:
     """Whether *path* opts out of the "you changed this without republishing" reminder.
 
-    The two markers answer different questions: :data:`SOURCE_ONLY_MARKER` says "not a
-    report at all", :data:`MANUAL_PUBLISH_MARKER` says "a report, but I'll decide when it
-    publishes". See :func:`is_report_notebook` for the first.
+    The two markers answer different questions: :data:`SOURCE_ONLY_MARKER` says "not a report at all", :data:`MANUAL_PUBLISH_MARKER` says "a report, but I'll decide when it publishes". See :func:`is_report_notebook` for the first.
     """
     return MANUAL_PUBLISH_MARKER in Path(path).read_text("utf-8", errors="ignore")
 
@@ -297,12 +250,7 @@ EXPORTING_ENV = "MINI_EXPORTING"
 def exporting() -> bool:
     """Whether this render is a bundle export, not an interactive ``marimo edit`` session.
 
-    Only during an export do externalized ``_assets/<name>`` URLs resolve — they sit
-    beside the exported ``index.html``. Under ``marimo edit`` there is no exported HTML
-    to resolve them against, and marimo's dev server can't serve files out of
-    ``.mini/exports/``, so a report must instead inline its figures as ``data:`` URIs
-    (the documented no-publisher fallback). ``scripts/export_reports.py`` marks its
-    export subprocess with :data:`EXPORTING_ENV`; nothing else sets it.
+    Only during an export do externalized ``_assets/<name>`` URLs resolve — they sit beside the exported ``index.html``. Under ``marimo edit`` there is no exported HTML to resolve them against, and marimo's dev server can't serve files out of ``.mini/exports/``, so a report must instead inline its figures as ``data:`` URIs (the documented no-publisher fallback). ``scripts/export_reports.py`` marks its export subprocess with :data:`EXPORTING_ENV`; nothing else sets it.
     """
     return os.environ.get(EXPORTING_ENV) == "1"
 
@@ -310,18 +258,11 @@ def exporting() -> bool:
 def report_bundle(notebook_file: str | Path, *, link: str = "_assets") -> Publisher | None:
     """A :class:`Publisher` writing assets beside a report's exported HTML — when exporting.
 
-    A report exports to its own self-contained dir :func:`export_dir` (HTML as
-    ``index.html``, assets under ``_assets/``); this points the publisher at that dir's
-    ``_assets/`` so the relative ``_assets/<name>`` URL resolves next to the HTML. Call
-    it from the report's setup cell with ``__file__``::
+    A report exports to its own self-contained dir :func:`export_dir` (HTML as ``index.html``, assets under ``_assets/``); this points the publisher at that dir's ``_assets/`` so the relative ``_assets/<name>`` URL resolves next to the HTML. Call it from the report's setup cell with ``__file__``::
 
         use_publisher(report_bundle(__file__))
 
-    Returns ``None`` outside an export (:func:`exporting`) — i.e. under interactive
-    ``marimo edit`` — so ``use_publisher(None)`` leaves figures inlining as ``data:``
-    URIs. A relative ``_assets/`` URL would 404 there: the assets live in
-    ``.mini/exports/``, which marimo's dev server doesn't serve. Externalization only
-    pays off for the export (keeping the shipped HTML light), so it's scoped to it.
+    Returns ``None`` outside an export (:func:`exporting`) — i.e. under interactive ``marimo edit`` — so ``use_publisher(None)`` leaves figures inlining as ``data:`` URIs. A relative ``_assets/`` URL would 404 there: the assets live in ``.mini/exports/``, which marimo's dev server doesn't serve. Externalization only pays off for the export (keeping the shipped HTML light), so it's scoped to it.
     """
     if not exporting():
         return None
@@ -334,10 +275,7 @@ _default_publisher: Publisher | None = None
 def use_publisher(publisher: Publisher | None) -> Publisher | None:
     """Set the report-wide default publisher; call once in a report's setup cell.
 
-    Every ``@themed`` figure then externalizes through it with no per-figure argument.
-    Pass a :class:`Publisher` (usually from :func:`report_bundle`), or ``None`` to clear
-    it (figures inline as self-contained ``data:`` URIs). Returns it, e.g. to call
-    :meth:`~Publisher.asset_url` for a data blob.
+    Every ``@themed`` figure then externalizes through it with no per-figure argument. Pass a :class:`Publisher` (usually from :func:`report_bundle`), or ``None`` to clear it (figures inline as self-contained ``data:`` URIs). Returns it, e.g. to call :meth:`~Publisher.asset_url` for a data blob.
     """
     global _default_publisher
     _default_publisher = publisher
@@ -350,17 +288,9 @@ def current_publisher() -> Publisher | None:
 
 
 def externalize_html(fragment: str, *, name: str, publish: Publisher | None = None) -> str:
-    """Write *fragment* (an HTML/SVG chunk) out as a named bundle asset, and return it
-    unchanged for inlining.
+    """Write *fragment* (an HTML/SVG chunk) out as a named bundle asset, and return it unchanged for inlining.
 
-    The inline copy is the one readers see — an inlined SVG participates in the page's
-    CSS (theming, fonts), which a referenced file can't. But a Marimo export buries
-    that markup in its client-rendered session JSON (HTML-escaped inside JSON inside
-    HTML), so tooling that can't run the frontend can't read it. The sidecar under
-    ``_assets/`` is the escape hatch: the same fragment as a plain file, like the PNGs
-    ``themed`` writes. *name* keeps its extension if it has one (``.svg`` for a bare
-    SVG element), else ``.html``. With no publisher (*publish* or the report default),
-    this is a no-op pass-through.
+    The inline copy is the one readers see — an inlined SVG participates in the page's CSS (theming, fonts), which a referenced file can't. But a Marimo export buries that markup in its client-rendered session JSON (HTML-escaped inside JSON inside HTML), so tooling that can't run the frontend can't read it. The sidecar under ``_assets/`` is the escape hatch: the same fragment as a plain file, like the PNGs ``themed`` writes. *name* keeps its extension if it has one (``.svg`` for a bare SVG element), else ``.html``. With no publisher (*publish* or the report default), this is a no-op pass-through.
     """
     publish = publish if publish is not None else current_publisher()
     if publish is not None:
@@ -392,8 +322,7 @@ def relative_urls(html: str) -> list[str]:
 def stray_links(html: str, *, link: str = "_assets") -> list[str]:
     """Relative URLs that are *not* store assets — the ones a ``<base>`` would break.
 
-    These are author-written nav/source links (``./experiment.py``) that should be
-    absolute. Returned sorted and de-duplicated so a build can resolve or warn on them.
+    These are author-written nav/source links (``./experiment.py``) that should be absolute. Returned sorted and de-duplicated so a build can resolve or warn on them.
     """
     prefix = f"{link}/"
     return sorted({u for u in relative_urls(html) if not u.startswith(prefix)})
@@ -402,12 +331,7 @@ def stray_links(html: str, *, link: str = "_assets") -> list[str]:
 def rewrite_links(html: str, mapping: dict[str, str]) -> str:
     r"""Replace each relative URL in *mapping* (token → absolute target) throughout *html*.
 
-    Targets the URL only where it sits as a quoted attribute value, in both plain
-    (``href="../a/report.py"``) and JSON-escaped (``href=\"../a/report.py\"``) form,
-    and either quote style — the same shapes :func:`relative_urls` matches. The
-    replacement is an absolute URL (no quotes/backslashes of its own), so it's valid in
-    either context; anchoring on the surrounding quotes keeps a short token from
-    matching inside an unrelated string.
+    Targets the URL only where it sits as a quoted attribute value, in both plain (``href="../a/report.py"``) and JSON-escaped (``href=\"../a/report.py\"``) form, and either quote style — the same shapes :func:`relative_urls` matches. The replacement is an absolute URL (no quotes/backslashes of its own), so it's valid in either context; anchoring on the surrounding quotes keeps a short token from matching inside an unrelated string.
     """
     for token, target in mapping.items():
         for q in ('"', "'"):
@@ -419,8 +343,7 @@ def rewrite_links(html: str, mapping: dict[str, str]) -> str:
 def insert_base(html: str, href: str) -> str:
     """Insert a single ``<base href>`` as the first thing in ``<head>``.
 
-    Placed before any resource reference so it governs all of them. Idempotent enough
-    for a build step: it rewrites the first ``<head>`` only.
+    Placed before any resource reference so it governs all of them. Idempotent enough for a build step: it rewrites the first ``<head>`` only.
     """
     return re.sub(r"(<head[^>]*>)", lambda m: f'{m.group(1)}\n    <base href="{href}" />', html, count=1)
 
@@ -454,15 +377,9 @@ _FLASH_GUARD = (
 def set_theme(html: str, theme: str = "system") -> str:
     """Rewrite a Marimo export's theme so a published report follows the device, flicker-free.
 
-    Marimo bakes the *exporting* machine's ``display.theme`` into the mount config and a
-    bit of JS applies it on load (``<body class="light light-theme" data-theme="light">``).
-    For a report served to other people that hard-codes one author's preference; rewriting
-    it to ``system`` makes the frontend honor the visitor's ``prefers-color-scheme``.
+    Marimo bakes the *exporting* machine's ``display.theme`` into the mount config and a bit of JS applies it on load (``<body class="light light-theme" data-theme="light">``). For a report served to other people that hard-codes one author's preference; rewriting it to ``system`` makes the frontend honor the visitor's ``prefers-color-scheme``.
 
-    Because that JS only runs once Marimo's bundle mounts, the page would otherwise paint
-    light first and flip — so for ``system`` we also declare ``<meta name="color-scheme">``
-    (UA chrome) and inject a tiny blocking :data:`_FLASH_GUARD` (the content) to get the
-    right theme on the first paint. A no-op if no theme is present (a non-Marimo page).
+    Because that JS only runs once Marimo's bundle mounts, the page would otherwise paint light first and flip — so for ``system`` we also declare ``<meta name="color-scheme">`` (UA chrome) and inject a tiny blocking :data:`_FLASH_GUARD` (the content) to get the right theme on the first paint. A no-op if no theme is present (a non-Marimo page).
     """
     html, n = _DISPLAY_THEME.subn(lambda m: f"{m.group(1)}{theme}{m.group(2)}", html, count=1)
     if not n:
@@ -502,18 +419,12 @@ _FIT_CONTENT_WIDTH = '[class~="min-w-[400px]"]{min-width:0!important}'
 def set_responsive(html: str) -> str:
     """Make a published Marimo export fit a phone and drop its "made with marimo" chip.
 
-    Two presentation fixes every report wants, independent of our nav/provenance chips
-    (so they run unconditionally, unlike :func:`set_banner`):
+    Two presentation fixes every report wants, independent of our nav/provenance chips (so they run unconditionally, unlike :func:`set_banner`):
 
-    - **Fit narrow screens.** Marimo pins the content column at ``min-width:400px`` and
-      clips ``#App``'s horizontal overflow, so under ~400px the right edge is cut off and
-      *can't be scrolled to*. Zeroing the min-width lets the column shrink to the viewport.
-    - **Hide the watermark**, the fixed bottom-right "made with marimo" chip Marimo paints
-      on static exports — distracting on a published report, and with no flag/config to
-      turn off (so, like its "Run or Edit" banner, we hide it by CSS on its testid).
+    - **Fit narrow screens.** Marimo pins the content column at ``min-width:400px`` and clips ``#App``'s horizontal overflow, so under ~400px the right edge is cut off and *can't be scrolled to*. Zeroing the min-width lets the column shrink to the viewport.
+    - **Hide the watermark**, the fixed bottom-right "made with marimo" chip Marimo paints on static exports — distracting on a published report, and with no flag/config to turn off (so, like its "Run or Edit" banner, we hide it by CSS on its testid).
 
-    A no-op on a non-Marimo page (the class/testid simply don't match anything). Applied
-    at build time alongside :func:`set_theme`, so it covers every published page.
+    A no-op on a non-Marimo page (the class/testid simply don't match anything). Applied at build time alongside :func:`set_theme`, so it covers every published page.
     """
     style = f"<style>{_FIT_CONTENT_WIDTH}\n    {_HIDE_MARIMO_WATERMARK}</style>"
     return re.sub(r"(</head>)", lambda m: f"    {style}\n{m.group(1)}", html, count=1)
@@ -522,14 +433,7 @@ def set_responsive(html: str) -> str:
 def set_report_styles(html: str, css: str) -> str:
     """Inline the shared report stylesheet (*css*) as the last thing in ``<head>``.
 
-    The reports carry the same sheet two ways. ``marimo.App(css_file=…/report.css)``
-    bakes it into each export (so authors see it in edit mode and it ships in the raw
-    bundle); this re-inlines the *current* source at build time, landing after that
-    baked copy — so editing ``docs/report.css`` restyles every published report with no
-    notebook re-export. It's inlined, not ``<link>``ed, because externalize mode inserts
-    a ``<base href>`` at the bucket that would repoint a relative stylesheet URL (and
-    inlining works offline too). A no-op on a non-Marimo page (no ``</head>`` to match)
-    or when *css* is empty. Apply it last, so report rules win any specificity tie.
+    The reports carry the same sheet two ways. ``marimo.App(css_file=…/report.css)`` bakes it into each export (so authors see it in edit mode and it ships in the raw bundle); this re-inlines the *current* source at build time, landing after that baked copy — so editing ``docs/report.css`` restyles every published report with no notebook re-export. It's inlined, not ``<link>``ed, because externalize mode inserts a ``<base href>`` at the bucket that would repoint a relative stylesheet URL (and inlining works offline too). A no-op on a non-Marimo page (no ``</head>`` to match) or when *css* is empty. Apply it last, so report rules win any specificity tie.
     """
     if not css.strip():
         return html
@@ -568,13 +472,7 @@ _BANNER_CLEARANCE = '[class~="min-w-[400px]"]{padding-top:3rem}'
 def set_banner(html: str, *, index_url: str | None = None, source_url: str | None = None) -> str:
     """Give a published report a floating nav — back to the index, out to the source.
 
-    Marimo's static export shows a "Run or Edit" banner whose only action is a download
-    popup; on a published site a back-link to the index and a link to the source notebook
-    are more useful. So we hide Marimo's banner (a CSS rule keyed on its ``data-testid``)
-    and inject our own — a small chip (``← Index`` · ``Source``) pinned top-left. It's
-    absolutely positioned (above Marimo's opaque app layer) and scrolls away with the
-    page; the content column is padded down so the title clears it. Either link is omitted
-    when its URL is ``None``; a no-op if neither is given.
+    Marimo's static export shows a "Run or Edit" banner whose only action is a download popup; on a published site a back-link to the index and a link to the source notebook are more useful. So we hide Marimo's banner (a CSS rule keyed on its ``data-testid``) and inject our own — a small chip (``← Index`` · ``Source``) pinned top-left. It's absolutely positioned (above Marimo's opaque app layer) and scrolls away with the page; the content column is padded down so the title clears it. Either link is omitted when its URL is ``None``; a no-op if neither is given.
     """
     if index_url is None and source_url is None:
         return html
@@ -616,8 +514,7 @@ _PROVENANCE_DIM = "color:color-mix(in srgb, CanvasText 60%, transparent)"
 def _provenance_entries(refs: dict[str, dict[str, Any] | None]) -> list[dict[str, Any]]:
     """Fold ref → producer down to one entry per producing experiment (sorted).
 
-    Unattributed refs (written before producer stamping, or outside a run) are
-    dropped — the footer only makes claims it has evidence for.
+    Unattributed refs (written before producer stamping, or outside a run) are dropped — the footer only makes claims it has evidence for.
     """
     by_exp: dict[str, dict[str, Any]] = {}
     for name, producer in sorted(refs.items()):
@@ -631,13 +528,7 @@ def _provenance_entries(refs: dict[str, dict[str, Any] | None]) -> list[dict[str
 def set_provenance(html: str, refs: dict[str, dict[str, Any] | None]) -> str:
     """Give a published report a folded data-provenance footer.
 
-    *refs* is the bundle's provenance sidecar content (ref name → the producer
-    stamped at ``set_ref`` time). Each producing experiment gets one line — name,
-    code state, run date — with the resolved ref names beneath it, inside a
-    ``<details>`` chip pinned bottom-left (above Marimo's app layer, scrolling to rest at
-    the foot of the report). A report whose refs carry no producer (or that read no refs
-    at all) is left untouched. Content is derived only from the store's refs, so
-    re-exporting unchanged data injects the same footer.
+    *refs* is the bundle's provenance sidecar content (ref name → the producer stamped at ``set_ref`` time). Each producing experiment gets one line — name, code state, run date — with the resolved ref names beneath it, inside a ``<details>`` chip pinned bottom-left (above Marimo's app layer, scrolling to rest at the foot of the report). A report whose refs carry no producer (or that read no refs at all) is left untouched. Content is derived only from the store's refs, so re-exporting unchanged data injects the same footer.
     """
     entries = _provenance_entries(refs)
     if not entries:

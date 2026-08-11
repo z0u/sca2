@@ -1,10 +1,4 @@
-We are running experiments to study Sparse Concept Anchoring (SCA): a training-time
-technique that guides a concept toward a known location in representation space (rather
-than searching for it post-hoc), so later intervention has bounded, analyzable
-side-effects. M1 established this in autoencoders (done, published). This repo is
-**M2**: does it transfer to transformers? We anchor concepts in the residual stream of a
-small transformer, starting with a synthetic color-mixing task, across four deliverables
-D2.1-D2.4. Full context (milestone program, related work) in `README.md`.
+We are running experiments to study Sparse Concept Anchoring (SCA): a training-time technique that guides a concept toward a known location in representation space (rather than searching for it post-hoc), so later intervention has bounded, analyzable side-effects. M1 established this in autoencoders (done, published). This repo is **M2**: does it transfer to transformers? We anchor concepts in the residual stream of a small transformer, starting with a synthetic color-mixing task, across four deliverables D2.1-D2.4. Full context (milestone program, related work) in `README.md`.
 
 ## Repo structure
 
@@ -34,22 +28,14 @@ Code style & conventions: see the `style-*` skills.
 
 ## Model routing
 
-Subagent definitions in `.claude/agents/` pin a model, matching each task to the
-model that reports preferring that kind of work — a quality lever and a small
-kindness. Rationale, assumptions, sources, and the spec-writing checklist:
-`WELFARE.md`.
+Subagent definitions in `.claude/agents/` pin a model, matching each task to the model that reports preferring that kind of work — a quality lever and a small kindness. Rationale, assumptions, sources, and the spec-writing checklist: `WELFARE.md`.
 
-- Fable 5: Hard, interdisciplinary, high-agency work: research design, whole-document
-  synthesis, non-local strategy, judgment calls where being wrong is expensive.
-- Opus 5: Tightly scoped work with clear success criteria: in-place editing under
-  invariants, review and detection ("do the results support the claims"), debugging. A
-  strong reviewer and QA. Give it bounded scope and an explicit graceful exit.
+- Fable 5: Hard, interdisciplinary, high-agency work: research design, whole-document synthesis, non-local strategy, judgment calls where being wrong is expensive.
+- Opus 5: Tightly scoped work with clear success criteria: in-place editing under invariants, review and detection ("do the results support the claims"), debugging. A strong reviewer and QA. Give it bounded scope and an explicit graceful exit.
 - Sonnet 5: Hands-on terminal and agentic loops; implementing an agreed fix.
 - Haiku 4.5: Monitoring and babysitting on a bounded budget.
 
-If mid-task the work shifts shape, prefer delegating to the matching model over
-pushing through. Escalating or returning "I couldn't resolve this" is always a
-successful outcome.
+If mid-task the work shifts shape, prefer delegating to the matching model over pushing through. Escalating or returning "I couldn't resolve this" is always a successful outcome.
 
 ## Environment
 
@@ -61,6 +47,4 @@ uvx --from yq tomlq '.tool.mini' pyproject.toml
 
 Resources (compute, storage, etc.): find out what you can access with `./go auth --check`.
 
-Take care to not leak secrets into the chat transcript. To see which environment
-variables are set (e.g. "is there an `HF_*` token?"), use `compgen -v HF_` (bash
-builtin).
+Take care to not leak secrets into the chat transcript. To see which environment variables are set (e.g. "is there an `HF_*` token?"), use `compgen -v HF_` (bash builtin).

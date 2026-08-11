@@ -1,7 +1,6 @@
 """Tests for memoized multi-step orchestration (ctx.run/ctx.map + tick).
 
-Task functions are *local* so cloudpickle serializes them by value; the
-orchestration ``main`` runs in-process in the driver.
+Task functions are *local* so cloudpickle serializes them by value; the orchestration ``main`` runs in-process in the driver.
 """
 
 from __future__ import annotations
@@ -86,9 +85,7 @@ def test_prep_runs_once_across_wakes(tmp_path: Path):
 
 
 def test_failed_is_terminal_until_retry(tmp_path: Path):
-    """A thrown task settles FAILED and does *not* auto-relaunch: the strict map
-    keeps raising on every wake. An explicit ``retry`` resets it so the next drive
-    reruns just that task and completes."""
+    """A thrown task settles FAILED and does *not* auto-relaunch: the strict map keeps raising on every wake. An explicit ``retry`` resets it so the next drive reruns just that task and completes."""
 
     def train(x):
         from mini import get_data_dir
@@ -126,9 +123,7 @@ def test_failed_is_terminal_until_retry(tmp_path: Path):
 
 
 def test_allow_partial_returns_sentinel_for_failed_cell(tmp_path: Path):
-    """``allow_partial=True`` lets a map settle with a failed cell instead of
-    blocking forever: the result stays index-aligned with the inputs, with
-    ``MISSING`` where a task failed, so a downstream reduce can run on the rest."""
+    """``allow_partial=True`` lets a map settle with a failed cell instead of blocking forever: the result stays index-aligned with the inputs, with ``MISSING`` where a task failed, so a downstream reduce can run on the rest."""
     from mini.orchestration import MISSING
 
     def train(x):
@@ -147,8 +142,7 @@ def test_allow_partial_returns_sentinel_for_failed_cell(tmp_path: Path):
 
 
 def test_allow_partial_still_waits_for_in_flight(tmp_path: Path):
-    """Partial is not best-effort: it waits for running tasks to settle before
-    returning, so a slow-but-fine cell still lands a real result (not a gap)."""
+    """Partial is not best-effort: it waits for running tasks to settle before returning, so a slow-but-fine cell still lands a real result (not a gap)."""
 
     def train(x):
         if x == 2:
@@ -165,9 +159,7 @@ def test_allow_partial_still_waits_for_in_flight(tmp_path: Path):
 
 
 def test_strict_map_surfaces_failures_as_group(tmp_path: Path):
-    """Without ``allow_partial`` failed cells are terminal: once the fan-out has
-    settled, the map raises an ``ExceptionGroup`` of ``TaskFailed`` — *all* the
-    failures at once, after waiting for the slower siblings to settle too."""
+    """Without ``allow_partial`` failed cells are terminal: once the fan-out has settled, the map raises an ``ExceptionGroup`` of ``TaskFailed`` — *all* the failures at once, after waiting for the slower siblings to settle too."""
 
     def train(x):
         if x in (2, 3):
@@ -194,9 +186,7 @@ def test_strict_map_surfaces_failures_as_group(tmp_path: Path):
 
 
 def test_missing_sentinel_is_falsey_singleton_and_pickles(tmp_path: Path):
-    """``MISSING`` is a falsey singleton distinct from ``None``, and survives a
-    (cloud)pickle round-trip as the *same* object — so ``r is MISSING`` holds in a
-    downstream task that receives a partial result over the wire."""
+    """``MISSING`` is a falsey singleton distinct from ``None``, and survives a (cloud)pickle round-trip as the *same* object — so ``r is MISSING`` holds in a downstream task that receives a partial result over the wire."""
     import pickle
 
     from mini import MISSING
@@ -217,9 +207,7 @@ def test_single_map(tmp_path: Path):
 
 
 def test_map_does_not_unpack_tuple_items(tmp_path: Path):
-    """A single-iterable map passes each element as *one* argument — an element
-    that happens to be a tuple stays a tuple. (The old items-based map unpacked
-    tuples as positional args, silently breaking tasks that take a tuple.)"""
+    """A single-iterable map passes each element as *one* argument — an element that happens to be a tuple stays a tuple. (The old items-based map unpacked tuples as positional args, silently breaking tasks that take a tuple.)"""
 
     def span(pair):
         lo, hi = pair
@@ -230,8 +218,7 @@ def test_map_does_not_unpack_tuple_items(tmp_path: Path):
 
 
 def test_map_zips_iterables_strictly(tmp_path: Path):
-    """Multiple iterables zip Executor-style into positional args — and
-    mismatched lengths raise rather than silently truncating the sweep."""
+    """Multiple iterables zip Executor-style into positional args — and mismatched lengths raise rather than silently truncating the sweep."""
 
     def add(a, b):
         return a + b
@@ -268,8 +255,7 @@ def test_env_recorded_on_task(tmp_path: Path):
 
 
 class _CountingStore(LocalRecordStore):
-    """A ``LocalRecordStore`` that records which keys were read, to assert the
-    cache stops re-reading the settled tail."""
+    """A ``LocalRecordStore`` that records which keys were read, to assert the cache stops re-reading the settled tail."""
 
     def __init__(self, root: Path):
         super().__init__(root)
@@ -281,8 +267,7 @@ class _CountingStore(LocalRecordStore):
 
 
 def test_poll_cache_reads_settled_records_once(tmp_path: Path):
-    """``PollCache`` serves the immutable settled tail from memory: a key is read
-    from the backend exactly once after it settles, then never again."""
+    """``PollCache`` serves the immutable settled tail from memory: a key is read from the backend exactly once after it settles, then never again."""
     from mini.memo import PollCache
 
     backend = _CountingStore(tmp_path / "pc")
@@ -304,8 +289,7 @@ def test_poll_cache_reads_settled_records_once(tmp_path: Path):
 
 
 def test_version_reruns_in_place(tmp_path: Path):
-    """``version=`` is evidence, not identity: a bump re-runs the task as a new
-    attempt on the *same* record, with the old attempt kept in its history."""
+    """``version=`` is evidence, not identity: a bump re-runs the task as a new attempt on the *same* record, with the old attempt kept in its history."""
 
     def t(x):
         return x
@@ -326,10 +310,7 @@ def test_version_reruns_in_place(tmp_path: Path):
 def test_prune_and_memo_hits_across_config_edits(tmp_path: Path):
     """Editing a sweep's config set re-runs only what changed.
 
-    The fix/prune/retry contract for a `ctx.map`: re-running with a different set
-    of items leaves unchanged items as memo hits (not relaunched), runs only the
-    new/changed items, and simply stops requesting a removed item. Proven with a
-    per-arg execution counter on the volume, so a memo hit shows count == 1."""
+    The fix/prune/retry contract for a `ctx.map`: re-running with a different set of items leaves unchanged items as memo hits (not relaunched), runs only the new/changed items, and simply stops requesting a removed item. Proven with a per-arg execution counter on the volume, so a memo hit shows count == 1."""
     counts = tmp_path / "counts"
     counts.mkdir()
 
@@ -353,9 +334,7 @@ def test_prune_and_memo_hits_across_config_edits(tmp_path: Path):
 
 
 def test_tick_persists_requested_keys(tmp_path: Path):
-    """Each tick records the keys the DAG requested (the ``__run__`` manifest), so
-    read-only views can split current records from superseded ones without
-    re-running ``main`` (reads must never tick)."""
+    """Each tick records the keys the DAG requested (the ``__run__`` manifest), so read-only views can split current records from superseded ones without re-running ``main`` (reads must never tick)."""
 
     def work(x):
         return x * 10
@@ -376,12 +355,7 @@ def test_tick_persists_requested_keys(tmp_path: Path):
 
 
 def test_superseded_records_are_excluded_and_not_retried(tmp_path: Path):
-    """*Renaming* (replacing) a task fn changes its identity, orphaning the old
-    records — an in-place edit does not (see the hotfix tests). The orphaned
-    FAILED record must not poison the run: ``retry`` skips it (resetting it would
-    plant a phantom no tick ever relaunches), and the manifest marks it
-    superseded for read-only views. Explicit ``--key`` intent still beats the
-    manifest."""
+    """*Renaming* (replacing) a task fn changes its identity, orphaning the old records — an in-place edit does not (see the hotfix tests). The orphaned FAILED record must not poison the run: ``retry`` skips it (resetting it would plant a phantom no tick ever relaunches), and the manifest marks it superseded for read-only views. Explicit ``--key`` intent still beats the manifest."""
 
     def bad(x):
         if x == 2:
@@ -414,8 +388,7 @@ def test_superseded_records_are_excluded_and_not_retried(tmp_path: Path):
 
 
 def _make_train(fixed: bool):
-    """Two variants of the *same* task fn — same module and qualname, different
-    source: an in-place edit, as far as identity is concerned."""
+    """Two variants of the *same* task fn — same module and qualname, different source: an in-place edit, as far as identity is concerned."""
     if fixed:
 
         def train(x):
@@ -443,11 +416,7 @@ def _hotfix_sweep(fixed: bool) -> Experiment:
 
 
 def test_hotfix_edit_relaunches_failed_cells_in_place(tmp_path: Path):
-    """The sweep-hotfix story. Editing the fn moves its *evidence*, not its keys:
-    the FAILED cell relaunches automatically (the fix is what it was waiting for
-    — no ``retry``), nothing is orphaned, and by default the stale DONE cell
-    re-runs too (bias to over-invalidate). The healed record keeps the failed
-    attempt in its history."""
+    """The sweep-hotfix story. Editing the fn moves its *evidence*, not its keys: the FAILED cell relaunches automatically (the fix is what it was waiting for — no ``retry``), nothing is orphaned, and by default the stale DONE cell re-runs too (bias to over-invalidate). The healed record keeps the failed attempt in its history."""
     data_dir = tmp_path / "hot"
     _drive_to_failure(_hotfix_sweep(False), LocalApparatus("hot", data_dir=data_dir))
     store = LocalApparatus("hot", data_dir=data_dir).memo_store()
@@ -465,9 +434,7 @@ def test_hotfix_edit_relaunches_failed_cells_in_place(tmp_path: Path):
 
 
 def test_keep_stale_bounds_hotfix_to_unfinished_cells(tmp_path: Path):
-    """``--keep-stale-done``: after an edit, DONE cells are served as-is and only
-    the cells that never finished re-run with the new code — the bounded hotfix.
-    The kept key lands in run meta so read-only views can badge it."""
+    """``--keep-stale-done``: after an edit, DONE cells are served as-is and only the cells that never finished re-run with the new code — the bounded hotfix. The kept key lands in run meta so read-only views can badge it."""
     data_dir = tmp_path / "hot"
     _drive_to_failure(_hotfix_sweep(False), LocalApparatus("hot", data_dir=data_dir))
     store = LocalApparatus("hot", data_dir=data_dir).memo_store()
@@ -506,8 +473,7 @@ def test_per_step_apparatus_uses_its_hooks(tmp_path: Path):
 
 
 def test_role_routes_to_its_apparatus(tmp_path: Path):
-    """``role=`` binds a label to a ``.w()`` variant via the experiment's ``roles``
-    table — proven (like ``on=``) through each variant's ``before_each`` hook."""
+    """``role=`` binds a label to a ``.w()`` variant via the experiment's ``roles`` table — proven (like ``on=``) through each variant's ``before_each`` hook."""
 
     def mark_prep():
         from mini import get_data_dir
@@ -540,8 +506,7 @@ def test_role_routes_to_its_apparatus(tmp_path: Path):
 
 
 def test_role_kwargs_table_applies_w(tmp_path: Path):
-    """The dict form maps a label to ``.w()`` kwargs; the base apparatus's ``.w``
-    interprets them (local ignores GPU knobs, so the same table runs locally)."""
+    """The dict form maps a label to ``.w()`` kwargs; the base apparatus's ``.w`` interprets them (local ignores GPU knobs, so the same table runs locally)."""
     captured: dict[str, Any] = {}
 
     class RecordingLocal(LocalApparatus):
@@ -572,10 +537,7 @@ def test_unknown_role_and_role_on_conflict_raise(tmp_path: Path):
 
 
 def test_ctx_spawns_via_the_apparatus(tmp_path: Path):
-    """``ctx`` launches tasks through ``apparatus.spawn_tasks`` — the seam the
-    Modal backend implements — and batches a map's fan-out into one call. Proven
-    by routing to an apparatus that runs tasks *synchronously in-process* instead
-    of spawning: if Ctx bypassed the seam, the drive would time out."""
+    """``ctx`` launches tasks through ``apparatus.spawn_tasks`` — the seam the Modal backend implements — and batches a map's fan-out into one call. Proven by routing to an apparatus that runs tasks *synchronously in-process* instead of spawning: if Ctx bypassed the seam, the drive would time out."""
     from mini._taskworker import run_task
     from mini.local_apparatus import LocalApparatus
 
@@ -606,10 +568,7 @@ def test_task_key_is_deterministic_and_input_sensitive():
 
 
 def test_input_fingerprint_stable_across_processes():
-    """Inputs containing a set (e.g. a Pydantic model's ``__pydantic_fields_set__``)
-    must fingerprint identically across processes — every agent wake is a fresh one,
-    and ``PYTHONHASHSEED`` randomizes set order. A plain ``pickle.dumps`` would differ.
-    """
+    """Inputs containing a set (e.g. a Pydantic model's ``__pydantic_fields_set__``) must fingerprint identically across processes — every agent wake is a fresh one, and ``PYTHONHASHSEED`` randomizes set order. A plain ``pickle.dumps`` would differ."""
     import os
     import subprocess
     import sys

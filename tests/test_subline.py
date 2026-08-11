@@ -15,9 +15,7 @@ def _series(n: int) -> Series:
 def test_exact_fit_stays_on_one_line(n):
     """`n` characters at `chars_per_line=n` fit on a single line.
 
-    Regression for a float-accumulation bug: summing char widths one token at a time
-    drifted past `n * char_width` (e.g. 10 * 8.4), wrapping a line one character early,
-    so callers padded `chars_per_line` by one to compensate.
+    Regression for a float-accumulation bug: summing char widths one token at a time drifted past `n * char_width` (e.g. 10 * 8.4), wrapping a line one character early, so callers padded `chars_per_line` by one to compensate.
     """
     sub = Subline(chars_per_line=n)
     lines = sub._wrap_tokens(sub._get_token_spans(list("x" * n)))

@@ -1,9 +1,6 @@
 """Random-crop batch sampling over a tokenized corpus.
 
-Replaces the torch Dataset/DataLoader/Sampler trio with plain numpy: each batch
-is a set of random substrings of the corpus (which may overlap), with the
-targets shifted right by one token. Sequences are occasionally given a padded
-(zeroed) prefix so the model learns to cope with short contexts.
+Replaces the torch Dataset/DataLoader/Sampler trio with plain numpy: each batch is a set of random substrings of the corpus (which may overlap), with the targets shifted right by one token. Sequences are occasionally given a padded (zeroed) prefix so the model learns to cope with short contexts.
 """
 
 import math
@@ -35,9 +32,7 @@ def batches_per_epoch(
 ) -> int:
     """Number of batches that make up one epoch over a corpus of *n_tokens*.
 
-    Each epoch covers roughly `oversample / batch_size` of the corpus. (Sizing
-    inherited from the original sampler-based loader, so notebook results stay
-    comparable across the JAX port.)
+    Each epoch covers roughly `oversample / batch_size` of the corpus. (Sizing inherited from the original sampler-based loader, so notebook results stay comparable across the JAX port.)
     """
     if oversample is None:
         oversample = data_config.oversample

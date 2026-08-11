@@ -25,8 +25,7 @@ Why the synthetic domain first, rather than language models straight away? A toy
 
 ## Working in this repo
 
-Use `./go` for the repo (deps, checks, reports, the site) and `mini` for
-experiments (compute, durable results).
+Use `./go` for the repo (deps, checks, reports, the site) and `mini` for experiments (compute, durable results).
 
 A full pass over one experiment looks like this:
 

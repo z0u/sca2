@@ -69,6 +69,12 @@ if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
     fi
 fi
 
+# 0.5. Skip mechanical-reformat commits in `git blame` (see .git-blame-ignore-revs).
+#      The dev container sets this in post-create.sh; the web image needs its own copy
+#      since it doesn't run that script. Fast and local, so it runs synchronously here
+#      rather than in the async block below.
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+
 # Everything below is slow; run it in the background so the session starts now.
 # `uv run` syncs on demand anyway, so the worst case is the first command
 # re-doing work this hook is also doing.

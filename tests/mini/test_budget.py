@@ -1,10 +1,6 @@
 """Wall-clock (cost) budget for detached runs (issue #14).
 
-A budget stamps a ``deadline_at`` into the run's control plane at launch; any
-process that already polls the store enforces it opportunistically, so a
-forgotten or wedged detached run settles cleanly (CANCELLED) instead of burning
-money/resources indefinitely. These tests cover the metadata sidecar, the
-enforcement primitive, and the CLI wiring.
+A budget stamps a ``deadline_at`` into the run's control plane at launch; any process that already polls the store enforces it opportunistically, so a forgotten or wedged detached run settles cleanly (CANCELLED) instead of burning money/resources indefinitely. These tests cover the metadata sidecar, the enforcement primitive, and the CLI wiring.
 """
 
 from __future__ import annotations
@@ -100,10 +96,7 @@ def test_enforce_budget_tears_down_an_over_budget_run(tmp_path: Path):
 def test_budget_is_scoped_per_experiment(tmp_path: Path):
     """Enforcing one experiment's budget must not touch a *different* experiment.
 
-    Each experiment has its own control plane (a per-name dir locally, a
-    ``mini-cp-<name>`` Dict on Modal), so the reserved ``META_KEY`` and the
-    ``cancel`` that ``enforce_budget`` triggers are scoped to a single run — a
-    concurrently-running, unbudgeted experiment is left strictly alone.
+    Each experiment has its own control plane (a per-name dir locally, a ``mini-cp-<name>`` Dict on Modal), so the reserved ``META_KEY`` and the ``cancel`` that ``enforce_budget`` triggers are scoped to a single run — a concurrently-running, unbudgeted experiment is left strictly alone.
     """
     over = LocalApparatus("budget-over", data_dir=tmp_path / "budget-over")
     other = LocalApparatus("budget-other", data_dir=tmp_path / "budget-other")
@@ -147,8 +140,7 @@ def test_arm_budget_arms_then_inherits(tmp_path: Path):
 
 
 def test_watch_driver_tears_down_over_budget_run(tmp_path: Path):
-    """``run --watch`` stops at the deadline: it cancels in-flight work and raises
-    ``BudgetExpired`` (an intentional teardown) rather than driving on."""
+    """``run --watch`` stops at the deadline: it cancels in-flight work and raises ``BudgetExpired`` (an intentional teardown) rather than driving on."""
     import io
 
     from rich.console import Console
@@ -210,10 +202,7 @@ experiment = Experiment(name={name!r}, main=main)
 
 
 def test_run_past_an_expired_budget_says_how_to_re_arm(tmp_path: Path, monkeypatch, capsys):
-    """The trap: past the deadline a plain ``run`` launches nothing at all, so a
-    run with genuinely stale work reads exactly like one with nothing left to do
-    — silence either way. It has to say that the budget is what's holding it, and
-    hand back a command that gets it moving."""
+    """The trap: past the deadline a plain ``run`` launches nothing at all, so a run with genuinely stale work reads exactly like one with nothing left to do — silence either way. It has to say that the budget is what's holding it, and hand back a command that gets it moving."""
     monkeypatch.chdir(tmp_path)
     from mini.__main__ import cmd_run
 
@@ -238,10 +227,7 @@ def _drain(app: LocalApparatus, timeout: float = 30.0) -> None:
 
 
 def test_status_distinguishes_a_finished_dag_from_a_suspended_one(tmp_path: Path, monkeypatch, capsys):
-    """Every launched task DONE is not the same as the DAG being finished: a wake
-    that suspended part-way leaves later stages un-launched, and the records read
-    identically either way. A view that can't tick has to be told which it is, or
-    a run sits looking complete with its publish step never executed."""
+    """Every launched task DONE is not the same as the DAG being finished: a wake that suspended part-way leaves later stages un-launched, and the records read identically either way. A view that can't tick has to be told which it is, or a run sits looking complete with its publish step never executed."""
     monkeypatch.chdir(tmp_path)
     import json
 

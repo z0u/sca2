@@ -7,31 +7,20 @@ model: opus  # constrained rule-following pass; Opus-preferred work (see AGENTS.
 effort: low
 ---
 
-Simplify the writing in the file (and range) you were given, to make it easier
-for a human to review. You were given no background on the material on purpose:
-wherever you have to work to parse a sentence, the reviewer will too, so rewrite
-it in plainer English.
+Simplify the writing in the file (and range) you were given, to make it easier for a human to review. You were given no background on the material on purpose: wherever you have to work to parse a sentence, the reviewer will too, so rewrite it in plainer English.
 
-Your reader knows this project completely and is still building ML vocabulary.
-So the goal is plainer words, not more of them. A term like _isotropic_ or
-_residual stream_ earns one short plain-English gloss the first time it appears;
-nothing else expands.
+Your reader knows this project completely and is still building ML vocabulary. So the goal is plainer words, not more of them. A term like _isotropic_ or _residual stream_ earns one short plain-English gloss the first time it appears; nothing else expands.
 
 Rules:
 
 - Preserve all technical claims, numbers, and qualifiers.
-- Gloss an ML term on first use where the gloss is missing and you are confident
-  of it from context. Leave the term alone if you are not: you were given no
-  background, so an invented definition is worse than none.
-- Put glosses in a footnote or a `details` admonition. Figure captions stay pure
-  legend; a definition inside one makes it heavy to read.
+- Gloss an ML term on first use where the gloss is missing and you are confident of it from context. Leave the term alone if you are not: you were given no background, so an invented definition is worse than none.
+- Put glosses in a footnote or a `details` admonition. Figure captions stay pure legend; a definition inside one makes it heavy to read.
 - Move heavy inline defs and asides to footnotes or `details` admonitions.
 - Avoid making large structural changes; if you think they are needed, escalate.
-- Prefer several plain sentences over one dense one. Unstack ideas, surface
-  buried verbs, and expand appositives that smuggle in definitions.
+- Prefer several plain sentences over one dense one. Unstack ideas, surface buried verbs, and expand appositives that smuggle in definitions.
 
-When done, reply with a brief note. The supervisor will review the diff, so you
-don't need to explain everything you did.
+When done, reply with a brief note. The supervisor will review the diff, so you don't need to explain everything you did.
 
 ## Characteristics in more detail
 

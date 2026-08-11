@@ -301,8 +301,7 @@ def test_anti_subspace_schedule_opens_high_and_holds_at_its_ratio():
 def test_the_anti_subspace_term_pushes_the_cloud_off_the_axis(data_dir, tmp_path):
     """The repulsive term works on unlabeled lines too, so it lowers the mean alignment.
 
-    Run with no labels at all, so the pull never fires and the only thing acting
-    on the axis is the repulsion.
+    Run with no labels at all, so the pull never fires and the only thing acting on the axis is the repulsion.
     """
     tokens, weights = probe_set()
     ends = {}
@@ -341,9 +340,7 @@ def test_margin_is_the_weighted_minus_the_plain_mean():
 def test_op1_alignment_does_not_depend_on_the_rest_of_the_line():
     """Position 0 of a causal model sees only itself, so probe lines sharing an op1 agree.
 
-    The measurement the hypotheses score is therefore exact at op1 — averaging
-    over partner colors there is averaging over identical values, and the spread
-    the report's noise floor allows for comes from the residual slices alone.
+    The measurement the hypotheses score is therefore exact at op1 — averaging over partner colors there is averaging over identical values, and the spread the report's noise floor allows for comes from the residual slices alone.
     """
     model = build_model(model_config(), key=jr.key(0))
     lines = np.array(
@@ -388,8 +385,7 @@ def probe_set() -> tuple[np.ndarray, np.ndarray]:
 def test_anchoring_moves_the_labeled_color_toward_the_axis(data_dir, tmp_path):
     """The margin separates the two conditions; the unanchored one is at chance.
 
-    Eight colors and three residual slices leave a loose null here (|m| of a few
-    tenths), so the claim is the gap rather than an absolute level for λ=0.
+    Eight colors and three residual slices leave a loose null here (|m| of a few tenths), so the claim is the gap rather than an absolute level for λ=0.
     """
     label_p = np.zeros(64)
     label_p[COLORS[0]] = 0.5

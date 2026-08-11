@@ -1,14 +1,9 @@
 """
 Drive a memoized experiment to completion with a live Rich progress display.
 
-``mini run <exp> --watch`` ticks the orchestration to launch each stage, then
-*polls the durable memo records* (never re-ticking to poll — see todo, "Keep
-`tick` (drive) distinct from polling (read)") and renders a live bar per task
-until the in-flight set settles, advancing the DAG stage by stage until done.
+``mini run <exp> --watch`` ticks the orchestration to launch each stage, then *polls the durable memo records* (never re-ticking to poll — see todo, "Keep `tick` (drive) distinct from polling (read)") and renders a live bar per task until the in-flight set settles, advancing the DAG stage by stage until done.
 
-Ctrl-C only stops *watching*: the task workers are detached subprocesses, so
-they keep running. Re-running the same command reattaches — completed steps are
-memo hits and in-flight tasks aren't relaunched — so monitoring just resumes.
+Ctrl-C only stops *watching*: the task workers are detached subprocesses, so they keep running. Re-running the same command reattaches — completed steps are memo hits and in-flight tasks aren't relaunched — so monitoring just resumes.
 """
 
 from __future__ import annotations
@@ -118,26 +113,15 @@ def watch(
 ) -> tuple[list[dict[str, Any]], str, str | None]:
     """Watch a run this process did *not* launch, until it settles or needs a hand.
 
-    The read-only twin of ``drive_and_watch``: it polls the durable records and
-    reaps vanished workers, but never ``tick``s — so it never launches work. Use
-    it to watch a detached/Modal run from another process (``mini watch <name>``);
-    contrast ``run --watch``, which also drives the DAG forward.
+    The read-only twin of ``drive_and_watch``: it polls the durable records and reaps vanished workers, but never ``tick``s — so it never launches work. Use it to watch a detached/Modal run from another process (``mini watch <name>``); contrast ``run --watch``, which also drives the DAG forward.
 
     Returns ``(current_records, outcome, reason)`` where *outcome* is:
 
     - ``"settled"`` — every current task settled (*reason* is ``None``);
-    - ``"attention"`` — something *happened* that a monitor should act on now,
-      rather than waiting for the rest of the stage: a task settled
-      FAILED/CANCELLED that wasn't terminal when the watch began (e.g. a
-      watchdog fired, or a vanished worker was reaped), or a RUNNING task's
-      liveness went stale (stale heartbeat / frozen step, held across two
-      consecutive polls — the thresholds themselves are the debounce);
+    - ``"attention"`` — something *happened* that a monitor should act on now, rather than waiting for the rest of the stage: a task settled FAILED/CANCELLED that wasn't terminal when the watch began (e.g. a watchdog fired, or a vanished worker was reaped), or a RUNNING task's liveness went stale (stale heartbeat / frozen step, held across two consecutive polls — the thresholds themselves are the debounce);
     - ``"timeout"`` — *timeout* seconds elapsed with work still in flight.
 
-    Terminal tasks from *before* the watch never trigger attention (a run
-    deliberately advanced past a failed cell would otherwise wake every watcher
-    immediately). Lets ``KeyboardInterrupt`` propagate (the caller reports;
-    workers live on).
+    Terminal tasks from *before* the watch never trigger attention (a run deliberately advanced past a failed cell would otherwise wake every watcher immediately). Lets ``KeyboardInterrupt`` propagate (the caller reports; workers live on).
     """
     store = apparatus.memo_store()
     cache = PollCache()  # serve the settled tail from memory; poll only what's in flight
@@ -185,12 +169,7 @@ def drive_and_watch(
 ) -> Any:
     """Drive *experiment* to completion on *apparatus*, rendering a live bar.
 
-    Returns the orchestration's payload on completion. Propagates ``TaskFailed``
-    (or an ``ExceptionGroup`` of them) raised by ``tick`` when a depended-on task
-    has settled terminally — ``tick`` won't relaunch it, so re-ticking surfaces the
-    failure rather than spinning. Lets ``KeyboardInterrupt`` propagate too (the
-    caller reports; detached workers live on). *keep_stale* is passed through to
-    each ``tick`` (serve DONE results whose code has since changed).
+    Returns the orchestration's payload on completion. Propagates ``TaskFailed`` (or an ``ExceptionGroup`` of them) raised by ``tick`` when a depended-on task has settled terminally — ``tick`` won't relaunch it, so re-ticking surfaces the failure rather than spinning. Lets ``KeyboardInterrupt`` propagate too (the caller reports; detached workers live on). *keep_stale* is passed through to each ``tick`` (serve DONE results whose code has since changed).
     """
     store = apparatus.memo_store()
     with _progress(console) as progress:

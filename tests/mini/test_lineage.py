@@ -1,9 +1,6 @@
 """Run-lineage capture: git state, identity, driver env, and the merge/snapshot helpers.
 
-The git tests build a throwaway repo under ``tmp_path`` so they exercise the real
-``git`` plumbing (sha, dirty diff, remote sanitizing) without touching the project
-repo. The identity/driver tests drive off an explicit ``env`` dict so they don't
-depend on the ambient environment.
+The git tests build a throwaway repo under ``tmp_path`` so they exercise the real ``git`` plumbing (sha, dirty diff, remote sanitizing) without touching the project repo. The identity/driver tests drive off an explicit ``env`` dict so they don't depend on the ambient environment.
 """
 
 from __future__ import annotations

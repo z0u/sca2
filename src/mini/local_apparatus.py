@@ -44,8 +44,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
     """
     Run functions locally using a thread pool.
 
-    Jobs can report progress via ``emit_progress()`` which is automatically
-    displayed using Rich progress bars when running in a terminal.
+    Jobs can report progress via ``emit_progress()`` which is automatically displayed using Rich progress bars when running in a terminal.
     """
 
     def __init__(self, name: str, max_workers: int = 1, data_dir: Path | str | None = None):
@@ -71,17 +70,9 @@ class LocalApparatus(Apparatus[LocalVolume]):
 
     @override
     def w(self, **kwargs: Any) -> LocalApparatus:
-        """Honor the backend-agnostic ``watchdog=`` (seconds without step
-        progress before the worker aborts itself), ``watchdog_grace=`` (the
-        looser threshold until the first emission) and ``env=`` (environment for
-        the task worker, merged key by key); every other option is a
-        backend-native knob this apparatus has no use for, ignored as before —
-        so a role table written for Modal still loads locally.
+        """Honor the backend-agnostic ``watchdog=`` (seconds without step progress before the worker aborts itself), ``watchdog_grace=`` (the looser threshold until the first emission) and ``env=`` (environment for the task worker, merged key by key); every other option is a backend-native knob this apparatus has no use for, ignored as before — so a role table written for Modal still loads locally.
 
-        ``env`` reaches the *memoized* path only, where each task is its own
-        subprocess. The interactive ``map``/``arun`` path runs threads in the
-        caller's process, which has one shared environment and, for anything that
-        reads env at init, has usually already read it.
+        ``env`` reaches the *memoized* path only, where each task is its own subprocess. The interactive ``map``/``arun`` path runs threads in the caller's process, which has one shared environment and, for anything that reads env at init, has usually already read it.
         """
         if not ({"watchdog", "watchdog_grace", "env"} & kwargs.keys()):
             return self
@@ -181,10 +172,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
 def _pid_alive(pid: int) -> bool:
     """Whether *pid* is a running process — counting a zombie as *not* alive.
 
-    ``os.kill(pid, 0)`` succeeds on a zombie (an exited child not yet reaped),
-    which would keep a hard-killed worker looking alive when it's a direct child
-    of the watcher. On Linux we read ``/proc/<pid>/stat`` and treat state ``Z`` as
-    dead; elsewhere we fall back to a signal-0 probe (no zombie distinction).
+    ``os.kill(pid, 0)`` succeeds on a zombie (an exited child not yet reaped), which would keep a hard-killed worker looking alive when it's a direct child of the watcher. On Linux we read ``/proc/<pid>/stat`` and treat state ``Z`` as dead; elsewhere we fall back to a signal-0 probe (no zombie distinction).
     """
     proc = Path("/proc") / str(pid)
     if Path("/proc").is_dir():

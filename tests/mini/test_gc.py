@@ -2,15 +2,9 @@
 
 The invariants under test, in order of how much damage violating them does:
 
-- **Current records are untouchable** — a DONE record is a future memo hit and
-  a FAILED one is terminal state; gc must not convert either into a relaunch.
-- **Superseded records are collectible only when the manifest is trustworthy**:
-  the last tick ran the DAG to completion (``complete``) and nothing is
-  unsettled. A suspended tick's manifest is complete only up to the suspension
-  point, so "not requested" doesn't yet mean "never requested again".
-- **Attempt files are judged by reachability**: readers resolve through the
-  record's current ``gen``, so files under a replaced generation are garbage,
-  while the legacy ``error.txt`` stays live as ``MemoStore.error``'s fallback.
+- **Current records are untouchable** — a DONE record is a future memo hit and a FAILED one is terminal state; gc must not convert either into a relaunch.
+- **Superseded records are collectible only when the manifest is trustworthy**: the last tick ran the DAG to completion (``complete``) and nothing is unsettled. A suspended tick's manifest is complete only up to the suspension point, so "not requested" doesn't yet mean "never requested again".
+- **Attempt files are judged by reachability**: readers resolve through the record's current ``gen``, so files under a replaced generation are garbage, while the legacy ``error.txt`` stays live as ``MemoStore.error``'s fallback.
 """
 
 from __future__ import annotations

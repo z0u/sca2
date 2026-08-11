@@ -1,9 +1,6 @@
 """Integration test for the Hugging Face bucket store — network-gated.
 
-Talks to a real bucket, so it's skipped unless ``MINI_STORE_BUCKET`` and
-``HF_TOKEN`` are set. It writes only under a unique ``cas/`` blob and a
-per-run ``refs/_test/<uuid>`` / ``published/_test/<uuid>`` prefix, and deletes
-everything it created in teardown, so it never collides with real artifacts.
+Talks to a real bucket, so it's skipped unless ``MINI_STORE_BUCKET`` and ``HF_TOKEN`` are set. It writes only under a unique ``cas/`` blob and a per-run ``refs/_test/<uuid>`` / ``published/_test/<uuid>`` prefix, and deletes everything it created in teardown, so it never collides with real artifacts.
 
 Run it with::
 
@@ -163,8 +160,7 @@ def test_export_round_trips_over_the_bucket(hf, tmp_path: Path):
 def hf_repo(tmp_path: Path):
     """An HFStore whose CAS is the bucket but whose publish tier is a dataset repo.
 
-    Cleans up both sides: the ``cas/`` blobs it wrote to the bucket and the
-    ``published/`` / ``exports/`` files it committed to the repo.
+    Cleans up both sides: the ``cas/`` blobs it wrote to the bucket and the ``published/`` / ``exports/`` files it committed to the repo.
     """
     from huggingface_hub import HfApi
 
@@ -237,8 +233,7 @@ def test_export_round_trips_over_the_repo(hf_repo, tmp_path: Path):
 def test_pinned_export_survives_a_republish(hf_repo, tmp_path: Path):
     """The staging guarantee: overwriting ``exports/<key>/`` can't touch a pinned revision.
 
-    This is what makes a pre-merge publish safe — production HTML is built against the
-    pinned commit, so a branch re-publishing the same key swaps only the mutable head.
+    This is what makes a pre-merge publish safe — production HTML is built against the pinned commit, so a branch re-publishing the same key swaps only the mutable head.
     """
     store, tag, cas_created, repo_paths = hf_repo
     key = f"_test/{tag}/report"

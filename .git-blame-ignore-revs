@@ -3,5 +3,16 @@
 
 # Switch Python string quote style from single to double
 91d519ebde7931ab1fcee857b3b4b0cd0aaa3aec
-# Unwrap prose lines in m2/ex-2.1.11
+
+# Unwrap hard-wrapped prose to one line per paragraph (Markdown, mo.md() report
+# cells, docstrings, and figure alt-text/captions)
+224915a75095a07afbf2185f9bce9adb9291d7fa
+7b27572b18216c450748021006312e442d1922ee
+3a764b5f20517014f97354d3ec30292b51506fb9
+95860c5886d4f8963c20887a9f967da746e35c76
+319c74a8bcc473a1b4378bb2fd274908af454473
+af2a65a26b00ec327bde6e2f5ed73eda0e11cc01
+17bff0b1c5e5b7f5c18b501f6dad053b5fb621c6
+d716ba7625d596bbcd0e81c7315bc1cc7462e6e2
+2fa5dbe0cdc1dd50b322376ab0648da7d3e4aaaa
 f8dac7d0575a3662b2ddb2400643eaf8774a8e4d

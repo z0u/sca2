@@ -1,12 +1,8 @@
 """Primitives the model is built from.
 
-The `ngpt` module tells the architecture's story end to end; the supporting
-pieces live here: the last-axis `Linear` layer, positional rotary encoding, the
-learnable `Scale`, and head reshaping.
+The `ngpt` module tells the architecture's story end to end; the supporting pieces live here: the last-axis `Linear` layer, positional rotary encoding, the learnable `Scale`, and head reshaping.
 
-Models here are Equinox modules: pytrees of arrays transformed by JAX. Forward
-passes are pure functions — randomness (sampling) enters only through explicit
-PRNG keys, and "mutating" weights means building a new model.
+Models here are Equinox modules: pytrees of arrays transformed by JAX. Forward passes are pure functions — randomness (sampling) enters only through explicit PRNG keys, and "mutating" weights means building a new model.
 """
 
 import equinox as eqx
@@ -24,9 +20,7 @@ def normalize(x: Array, axis: int = -1, eps: float = 1e-12) -> Array:
 class Linear(eqx.Module):
     """Affine map over the last axis of an input of any rank.
 
-    Unlike `eqx.nn.Linear` (which expects a single unbatched vector), this
-    broadcasts over leading axes, so modules can stay written in the batched
-    (B, T, C) style.
+    Unlike `eqx.nn.Linear` (which expects a single unbatched vector), this broadcasts over leading axes, so modules can stay written in the batched (B, T, C) style.
     """
 
     weight: Float[Array, "out in"]
@@ -46,11 +40,7 @@ class Linear(eqx.Module):
 class RotaryEncoding(eqx.Module):
     """Rotary positional encoding (RoPE), applied per head during attention.
 
-    Passed into the forward pass rather than owned by the attention module, so a
-    single instance can be shared across all layers. Holds no arrays — the
-    sin/cos tables are derived from the sequence length at call time (and
-    constant-folded under jit), so there are no buffers for the optimizer to
-    mistake for parameters.
+    Passed into the forward pass rather than owned by the attention module, so a single instance can be shared across all layers. Holds no arrays — the sin/cos tables are derived from the sequence length at call time (and constant-folded under jit), so there are no buffers for the optimizer to mistake for parameters.
     """
 
     n_head_dim: int = eqx.field(static=True)
@@ -77,8 +67,7 @@ class RotaryEncoding(eqx.Module):
 class Scale(eqx.Module):
     """Learnable scalar (n=1) or per-channel (n=d) gain with nGPT's reparametrization.
 
-    Store the parameter at `scale`; the effective value is `param * (init / scale)`,
-    so Adam's step dynamics are decoupled from the value's magnitude.
+    Store the parameter at `scale`; the effective value is `param * (init / scale)`, so Adam's step dynamics are decoupled from the value's magnitude.
     """
 
     weight: Float[Array, " n"]
@@ -107,10 +96,7 @@ def merge_heads(x: Float[Array, "B H T D"]) -> Float[Array, "B T C"]:
 class LanguageModel(eqx.Module):
     """Base for the model variants: holds the key dimensions and shared diagnostics.
 
-    Subclasses build `self.transformer` and implement `__call__` mapping token
-    indices (B, T) to logits (B, T, vocab). `normalize_weights` returns the model
-    unchanged here and is overridden by variants that enforce the
-    unit-hypersphere weight constraint.
+    Subclasses build `self.transformer` and implement `__call__` mapping token indices (B, T) to logits (B, T, vocab). `normalize_weights` returns the model unchanged here and is overridden by variants that enforce the unit-hypersphere weight constraint.
     """
 
     block_size: int = eqx.field(static=True)

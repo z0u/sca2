@@ -1,18 +1,9 @@
 """
 Memoized orchestration for multi-step experiments.
 
-An experiment is a plain function ``main(ctx)`` that expresses the DAG in
-ordinary Python. Each ``ctx.run`` / ``ctx.map`` resolves to an identity key
-(fn + inputs): a record with a *current* result -> return it; otherwise launch
-a detached task and *suspend* the wake by raising ``Pending``. A driver re-runs
-``main`` each wake; completed steps are memo hits, so only the un-run / stale /
-failed pieces execute — crash-recovery by re-run.
+An experiment is a plain function ``main(ctx)`` that expresses the DAG in ordinary Python. Each ``ctx.run`` / ``ctx.map`` resolves to an identity key (fn + inputs): a record with a *current* result -> return it; otherwise launch a detached task and *suspend* the wake by raising ``Pending``. A driver re-runs ``main`` each wake; completed steps are memo hits, so only the un-run / stale / failed pieces execute — crash-recovery by re-run.
 
-"Current" is judged per record against the attempt's stored evidence (code
-fingerprint + ``version=``): an edit re-runs the task **in place** under the
-same key. A FAILED task whose code has since changed relaunches automatically —
-the fix is what it was waiting for; a DONE one re-runs too unless the tick is
-told ``keep_stale`` (the bounded sweep-hotfix lever).
+"Current" is judged per record against the attempt's stored evidence (code fingerprint + ``version=``): an edit re-runs the task **in place** under the same key. A FAILED task whose code has since changed relaunches automatically — the fix is what it was waiting for; a DONE one re-runs too unless the tick is told ``keep_stale`` (the bounded sweep-hotfix lever).
 """
 
 from __future__ import annotations
@@ -40,10 +31,7 @@ class Pending(MemoError):
 class BudgetExpired(MemoError):
     """The run blew its wall-clock (cost) budget — in-flight tasks were cancelled.
 
-    Raised by the ``--watch`` driver when it tears a run down at its deadline, so
-    the caller can report the teardown distinctly from a task *failure*: the run
-    settled CANCELLED on purpose, not because anything went wrong. Carries the
-    keys it cancelled (may be empty if the deadline passed between stages).
+    Raised by the ``--watch`` driver when it tears a run down at its deadline, so the caller can report the teardown distinctly from a task *failure*: the run settled CANCELLED on purpose, not because anything went wrong. Carries the keys it cancelled (may be empty if the deadline passed between stages).
     """
 
     def __init__(self, cancelled: list[str]):
@@ -54,17 +42,9 @@ class BudgetExpired(MemoError):
 class TaskFailed(MemoError):
     """A task settled FAILED/CANCELLED — terminal, so the DAG can't progress past it.
 
-    ``ctx.run`` raises this directly; ``ctx.map`` (without ``allow_partial``) raises
-    an ``ExceptionGroup`` of them — one per failed cell — so a strict fan-out
-    surfaces *every* failure at once rather than the first. ``except* TaskFailed``
-    handles the group ergonomically.
+    ``ctx.run`` raises this directly; ``ctx.map`` (without ``allow_partial``) raises an ``ExceptionGroup`` of them — one per failed cell — so a strict fan-out surfaces *every* failure at once rather than the first. ``except* TaskFailed`` handles the group ergonomically.
 
-    This is a *report* of a past failure, not the failure itself: the task ran in a
-    detached worker that has already exited, so the original exception object is
-    gone. The worker's stored traceback rides along in ``.error`` (and the message),
-    and ``.exc_type`` carries the original exception's fully-qualified type name (a
-    plain string, so triage works even when the driver can't import the worker's
-    libraries) — bucket a fan-out's failures by kind without parsing tracebacks::
+    This is a *report* of a past failure, not the failure itself: the task ran in a detached worker that has already exited, so the original exception object is gone. The worker's stored traceback rides along in ``.error`` (and the message), and ``.exc_type`` carries the original exception's fully-qualified type name (a plain string, so triage works even when the driver can't import the worker's libraries) — bucket a fan-out's failures by kind without parsing tracebacks::
 
         except* TaskFailed as eg:
             oom = [e for e in eg.exceptions if 'OutOfMemory' in e.exc_type]
@@ -84,11 +64,7 @@ class TaskFailed(MemoError):
 class _Missing:
     """Sentinel for a ``map`` cell that produced no result.
 
-    ``ctx.map(..., allow_partial=True)`` returns this in the position of any task
-    that settled ``FAILED``/``CANCELLED``, so results stay index-aligned with the
-    inputs — downstream code commonly ``zip``s configs with results, and dropping
-    cells would misalign that. It is a *falsey* singleton distinct from ``None``
-    (which tasks may legitimately return), so both idioms work::
+    ``ctx.map(..., allow_partial=True)`` returns this in the position of any task that settled ``FAILED``/``CANCELLED``, so results stay index-aligned with the inputs — downstream code commonly ``zip``s configs with results, and dropping cells would misalign that. It is a *falsey* singleton distinct from ``None`` (which tasks may legitimately return), so both idioms work::
 
         present = [r for r in results if r]        # drop the gaps
         ok = [(c, r) for c, r in zip(cfgs, results) if r is not MISSING]
@@ -117,15 +93,9 @@ MISSING = _Missing()
 class Ctx:
     """The memoized, non-blocking ``run``/``map`` an orchestration calls.
 
-    ``run`` raises ``Pending`` the moment a result isn't ready, so code after it
-    only runs once the result exists. For parallel fan-out use ``map``, which
-    launches *all* missing tasks before suspending.
+    ``run`` raises ``Pending`` the moment a result isn't ready, so code after it only runs once the result exists. For parallel fan-out use ``map``, which launches *all* missing tasks before suspending.
 
-    Each call runs on the tick's *apparatus* by default. Route a step elsewhere
-    with ``role=`` (a label the experiment's ``roles`` table binds to hardware —
-    the file-experiment path, since the CLI holds no apparatus handles) or ``on=``
-    (a concrete apparatus — the notebook path). The apparatus also supplies the
-    per-step ``before_each`` hooks.
+    Each call runs on the tick's *apparatus* by default. Route a step elsewhere with ``role=`` (a label the experiment's ``roles`` table binds to hardware — the file-experiment path, since the CLI holds no apparatus handles) or ``on=`` (a concrete apparatus — the notebook path). The apparatus also supplies the per-step ``before_each`` hooks.
     """
 
     def __init__(
@@ -165,24 +135,11 @@ class Ctx:
     def _classify(
         self, fn: Callable, args: tuple, version: str | None, app: Apparatus
     ) -> tuple[str, RunState | None, tuple[str, str, Callable, tuple, list] | None]:
-        """Resolve a call's key/state and, if it needs launching, claim it RUNNING
-        and return its batch entry — *without* spawning. The caller batches the
-        spawn so a ``map`` fans out in one ``spawn_tasks`` call.
+        """Resolve a call's key/state and, if it needs launching, claim it RUNNING and return its batch entry — *without* spawning. The caller batches the spawn so a ``map`` fans out in one ``spawn_tasks`` call.
 
-        The key is identity; whether a settled record still *counts* is judged
-        against its attempt's evidence. Stale FAILED/CANCELLED relaunches — the
-        edit is the fix a terminal task was waiting for, so no ``retry`` needed.
-        Stale DONE re-runs too (bias to over-invalidate) unless ``keep_stale``,
-        which bounds a sweep hotfix to the cells that actually need the new code.
-        Same-evidence FAILED/CANCELLED stays terminal (retry takes intent), and a
-        RUNNING task is never relaunched out from under its worker — staleness
-        waits for it to settle.
+        The key is identity; whether a settled record still *counts* is judged against its attempt's evidence. Stale FAILED/CANCELLED relaunches — the edit is the fix a terminal task was waiting for, so no ``retry`` needed. Stale DONE re-runs too (bias to over-invalidate) unless ``keep_stale``, which bounds a sweep hotfix to the cells that actually need the new code. Same-evidence FAILED/CANCELLED stays terminal (retry takes intent), and a RUNNING task is never relaunched out from under its worker — staleness waits for it to settle.
 
-        Launching is a *claim*, not a blind write: ``mark_running`` replaces the
-        record only if its generation still matches what we read, so two
-        concurrent tickers (a cron routine and a human both waking the run)
-        can't both spawn a worker for one key — the loser sees RUNNING and
-        suspends like any other in-flight task.
+        Launching is a *claim*, not a blind write: ``mark_running`` replaces the record only if its generation still matches what we read, so two concurrent tickers (a cron routine and a human both waking the run) can't both spawn a worker for one key — the loser sees RUNNING and suspends like any other in-flight task.
         """
         key, parts = task_key_parts(fn, args, version)
         self.requested.append(key)
@@ -256,29 +213,13 @@ class Ctx:
         role: str | None = None,
         allow_partial: bool = False,
     ) -> list[R] | list[R | _Missing]:
-        """Fan out *fn* over the zipped *iterables*, suspending until the results
-        are ready.
+        """Fan out *fn* over the zipped *iterables*, suspending until the results are ready.
 
-        Like ``Executor.map`` / ``Apparatus.map``: the iterables are zipped and
-        each row is passed as positional arguments — ``ctx.map(train, lrs, sizes)``
-        runs ``train(lr, size)`` per pair. With a single iterable each
-        element is passed as *one* argument, never unpacked (an element that
-        happens to be a tuple stays a tuple). The iterables are collected
-        immediately rather than lazily. Unlike ``Executor.map``, mismatched
-        iterable lengths raise rather than silently truncating the sweep.
+        Like ``Executor.map`` / ``Apparatus.map``: the iterables are zipped and each row is passed as positional arguments — ``ctx.map(train, lrs, sizes)`` runs ``train(lr, size)`` per pair. With a single iterable each element is passed as *one* argument, never unpacked (an element that happens to be a tuple stays a tuple). The iterables are collected immediately rather than lazily. Unlike ``Executor.map``, mismatched iterable lengths raise rather than silently truncating the sweep.
 
-        Launches every missing cell in one batch, then raises ``Pending`` while
-        any task is still in flight. By default the map is all-or-nothing: once the
-        fan-out has *settled*, any cell that settled ``FAILED``/``CANCELLED`` raises
-        — all of them together, as an ``ExceptionGroup`` of ``TaskFailed`` (so you
-        see every failure, not just the first). ``tick`` won't relaunch a terminal
-        cell, so this is the DAG giving up rather than spinning; ``retry`` heals it.
+        Launches every missing cell in one batch, then raises ``Pending`` while any task is still in flight. By default the map is all-or-nothing: once the fan-out has *settled*, any cell that settled ``FAILED``/``CANCELLED`` raises — all of them together, as an ``ExceptionGroup`` of ``TaskFailed`` (so you see every failure, not just the first). ``tick`` won't relaunch a terminal cell, so this is the DAG giving up rather than spinning; ``retry`` heals it.
 
-        With ``allow_partial=True`` the map still waits for in-flight tasks, but
-        once everything has settled it returns instead of raising: the result list
-        stays index-aligned with the inputs, with ``MISSING`` in the position of
-        each failed/cancelled cell. This lets the pipeline's later steps run on the
-        subset that succeeded.
+        With ``allow_partial=True`` the map still waits for in-flight tasks, but once everything has settled it returns instead of raising: the result list stays index-aligned with the inputs, with ``MISSING`` in the position of each failed/cancelled cell. This lets the pipeline's later steps run on the subset that succeeded.
         """
         app = self._route(on, role)
         calls = list(zip(*iterables, strict=True))
@@ -315,16 +256,9 @@ class Ctx:
 def tick(experiment: Experiment, apparatus: Apparatus, keep_stale: bool = False) -> tuple[bool, Any]:
     """Run one wake of an experiment's orchestration on *apparatus*.
 
-    Returns ``(done, payload)``: ``(True, result)`` if the DAG completed, or
-    ``(False, reason)`` if it suspended waiting on in-flight tasks. Propagates
-    ``TaskFailed`` (or an ``ExceptionGroup`` of them, from a strict ``map``) when a
-    step the DAG depends on has settled terminally — the run can't progress without
-    a ``retry``. Steps can override the apparatus per call via ``ctx.run(...,
-    on=)`` / ``ctx.map(..., on=)``.
+    Returns ``(done, payload)``: ``(True, result)`` if the DAG completed, or ``(False, reason)`` if it suspended waiting on in-flight tasks. Propagates ``TaskFailed`` (or an ``ExceptionGroup`` of them, from a strict ``map``) when a step the DAG depends on has settled terminally — the run can't progress without a ``retry``. Steps can override the apparatus per call via ``ctx.run(..., on=)`` / ``ctx.map(..., on=)``.
 
-    *keep_stale* is the bounded-hotfix lever (``--keep-stale-done``): serve DONE
-    results even when their code has since changed, so an edit re-runs only the
-    cells that never finished. Stale FAILED/CANCELLED always relaunches.
+    *keep_stale* is the bounded-hotfix lever (``--keep-stale-done``): serve DONE results even when their code has since changed, so an edit re-runs only the cells that never finished. Stale FAILED/CANCELLED always relaunches.
     """
     store = apparatus.memo_store()
     ctx = Ctx(store, apparatus, experiment.resolve_roles(apparatus), keep_stale=keep_stale)
@@ -357,18 +291,9 @@ def tick(experiment: Experiment, apparatus: Apparatus, keep_stale: bool = False)
 def retry(store: MemoStore, key: str | None = None) -> list[str]:
     """Reset settled-but-not-DONE tasks so the next ``tick`` reruns them.
 
-    ``FAILED``/``CANCELLED`` are terminal *under the code that produced them* —
-    ``tick`` won't auto-relaunch them — so re-running takes intent: this, or
-    editing the fn (stale evidence relaunches on the next tick), or bumping
-    ``version=``. This clears their records (state → un-run, prior attempt kept
-    in history); the next ``tick`` then relaunches. Pass *key* to retry one task;
-    otherwise all failed/cancelled tasks. Returns the keys reset (a `DONE` task
-    is never reset — edit the fn or bump ``version=`` to force that).
+    ``FAILED``/``CANCELLED`` are terminal *under the code that produced them* — ``tick`` won't auto-relaunch them — so re-running takes intent: this, or editing the fn (stale evidence relaunches on the next tick), or bumping ``version=``. This clears their records (state → un-run, prior attempt kept in history); the next ``tick`` then relaunches. Pass *key* to retry one task; otherwise all failed/cancelled tasks. Returns the keys reset (a `DONE` task is never reset — edit the fn or bump ``version=`` to force that).
 
-    Superseded records — keys the last tick no longer requested (their fn was
-    renamed, their config removed) — are skipped: no tick will ever relaunch them,
-    so resetting one just plants a phantom forever-pending record. An explicit
-    *key* overrides (deliberate intent beats the manifest).
+    Superseded records — keys the last tick no longer requested (their fn was renamed, their config removed) — are skipped: no tick will ever relaunch them, so resetting one just plants a phantom forever-pending record. An explicit *key* overrides (deliberate intent beats the manifest).
     """
     requested = store.requested_keys()
     targets: list[str] = []

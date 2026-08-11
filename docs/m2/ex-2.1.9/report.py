@@ -63,12 +63,7 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    Anchoring on op1 alone worked best so far, but in natural language we won't
-    know which tokens hold the concept. So we pool over sequences with a soft
-    minimum (mellowmax) and let the pull choose its own position. At the
-    embedding it picks op1 unaided, the operating point stays healthy, and
-    grading improves. It wins no margin though, and only the softest pooling
-    stays graded in every run.
+    Anchoring on op1 alone worked best so far, but in natural language we won't know which tokens hold the concept. So we pool over sequences with a soft minimum (mellowmax) and let the pull choose its own position. At the embedding it picks op1 unaided, the operating point stays healthy, and grading improves. It wins no margin though, and only the softest pooling stays graded in every run.
     ///
     """)
     return
@@ -92,44 +87,17 @@ def _(a_op1, a_span, acc, grading_r2, m_span, pi_bar, read_gain, retention):
     _ret = retention(_P)
     assert _ret is not None
     mo.md(rf"""
-    **H1 (task cost) — holds.** The largest `named_holdout` exact-match gap
-    from the control across all five anchored conditions is
-    {max(abs(acc(c).mean() - _ctrl) for c in ["span-mean", *ex.POOLED_NAMES, ex.ORACLE_ARM]):.4f},
-    against a gate of {ex.TASK_GATE:g}.
+    **H1 (task cost) — holds.** The largest `named_holdout` exact-match gap from the control across all five anchored conditions is {max(abs(acc(c).mean() - _ctrl) for c in ["span-mean", *ex.POOLED_NAMES, ex.ORACLE_ARM]):.4f}, against a gate of {ex.TASK_GATE:g}.
 
-    **H2 (pooling increases selectivity) — unmet.** On the primary condition
-    (`{_P}`):
-    (a) the margin gain over the span mean is {_gain:+.3f} against a gate of
-    {ex.POOL_GAIN_GATE:g} (partial {ex.POOL_GAIN_PARTIAL:g}), and
-    (b) the syntax-role drift falls by {_drop:.3f} against a required
-    {ex.SYNTAX_DRIFT_GATE:g} — the predicted direction on both, short of both
-    gates, and neither partial applies. One piece of context, unpacked in the
-    selectivity section: the op1 oracle itself beats the span mean by only
-    {_headroom:.3f} on $m_\text{{span}}$ here, so H2(a)'s gate was out of
-    reach for any pull; `{_P}` recovered {_gain / _headroom:.0%} of the
-    headroom that existed.
+    **H2 (pooling increases selectivity) — unmet.** On the primary condition (`{_P}`):
+    (a) the margin gain over the span mean is {_gain:+.3f} against a gate of {ex.POOL_GAIN_GATE:g} (partial {ex.POOL_GAIN_PARTIAL:g}), and
+    (b) the syntax-role drift falls by {_drop:.3f} against a required {ex.SYNTAX_DRIFT_GATE:g} — the predicted direction on both, short of both gates, and neither partial applies. One piece of context, unpacked in the selectivity section: the op1 oracle itself beats the span mean by only {_headroom:.3f} on $m_\text{{span}}$ here, so H2(a)'s gate was out of reach for any pull; `{_P}` recovered {_gain / _headroom:.0%} of the headroom that existed.
 
-    **H3 (the operating point survives pooling) — holds.** On `{_P}`: containment
-    $\bar\alpha$ = {a_op1(_P).mean():.3f} (gate ≤ {ex.MEAN_ALIGN_GATE:g});
-    retention {_ret:.2f} (gate ≥ {ex.RETENTION_GATE:g}, minimum across seeds);
-    and grading $r^2$ = {grading_r2(_P):.2f} against the span mean's
-    {grading_r2(ex.MEAN_ARM):.2f} — the gate tolerated a drop of
-    {ex.GRADE_R2_DROP:g} and instead the response got better graded.
+    **H3 (the operating point survives pooling) — holds.** On `{_P}`: containment $\bar\alpha$ = {a_op1(_P).mean():.3f} (gate ≤ {ex.MEAN_ALIGN_GATE:g}); retention {_ret:.2f} (gate ≥ {ex.RETENTION_GATE:g}, minimum across seeds); and grading $r^2$ = {grading_r2(_P):.2f} against the span mean's {grading_r2(ex.MEAN_ARM):.2f} — the gate tolerated a drop of {ex.GRADE_R2_DROP:g} and instead the response got better graded.
 
-    **H4 (the weight lands where the concept lives) — holds.** At the
-    embedding slice `{_P}` puts {pi_bar(_P)[0, 0]:.2f} of the softmin weight
-    on op1 (gate ≥ {ex.LEAD_GATE:g}; uniform is 0.25) — the only span
-    position whose state can carry the concept there — and the weighted
-    readability gain is {read_gain(_P):+.2f} (gate ≥ {ex.READ_GAIN_GATE:g}).
-    At depth the concentration is winner-take-all seed by seed: at the two
-    sharper τ some seeds latch onto `+` in the first few epochs, and only
-    τ = 0.1 keeps a graded profile on op1 in every seed (*Where the weight
-    went*).
+    **H4 (the weight lands where the concept lives) — holds.** At the embedding slice `{_P}` puts {pi_bar(_P)[0, 0]:.2f} of the softmin weight on op1 (gate ≥ {ex.LEAD_GATE:g}; uniform is 0.25) — the only span position whose state can carry the concept there — and the weighted readability gain is {read_gain(_P):+.2f} (gate ≥ {ex.READ_GAIN_GATE:g}). At depth the concentration is winner-take-all seed by seed: at the two sharper τ some seeds latch onto `+` in the first few epochs, and only τ = 0.1 keeps a graded profile on op1 in every seed (*Where the weight went*).
 
-    So the pull finds the concept-bearing position without the oracle, and
-    holding the operating point costs nothing — but finding it buys almost no
-    additional margin here. What that means for M3's document-level labels is
-    taken up in the *Discussion*.
+    So the pull finds the concept-bearing position without the oracle, and holding the operating point costs nothing — but finding it buys almost no additional margin here. What that means for M3's document-level labels is taken up in the *Discussion*.
     """)
     return
 
@@ -138,11 +106,7 @@ def _(a_op1, a_span, acc, grading_r2, m_span, pi_bar, read_gain, retention):
 def _():
     mo.md(r"""
     /// admonition | How to read this report
-    This report was preregistered: the method, hypotheses and decision
-    thresholds were frozen before the experiment ran (commit `0abebb8`, with
-    pre-launch review corrections noted in comments). Results replaced the
-    `TODO` placeholders in place; everything conceived after seeing the data
-    is under *Exploratory analyses*, marked as post hoc.
+    This report was preregistered: the method, hypotheses and decision thresholds were frozen before the experiment ran (commit `0abebb8`, with pre-launch review corrections noted in comments). Results replaced the `TODO` placeholders in place; everything conceived after seeing the data is under *Exploratory analyses*, marked as post hoc.
     ///
     """)
     return
@@ -213,11 +177,7 @@ def _():
     mo.md(r"""
     ## Method
 
-    Everything follows ex-2.1.8 except the pooling: the word-level `v216`
-    corpus from ex-2.1.3 (216 colors, one token each, d64-L4), the same seeds,
-    sequence-level labels, measurements, anchor schedule, and the
-    anti-subspace schedule fixed at the operating point of that experiment
-    (`end90-hold30`) in every anchored cell.
+    Everything follows ex-2.1.8 except the pooling: the word-level `v216` corpus from ex-2.1.3 (216 colors, one token each, d64-L4), the same seeds, sequence-level labels, measurements, anchor schedule, and the anti-subspace schedule fixed at the operating point of that experiment (`end90-hold30`) in every anchored cell.
     """)
     return
 
@@ -324,11 +284,7 @@ def _():
     mo.md(r"""
     ### Calibrating τ
 
-    The interesting τ range depends on how much $x_t$ varies across the span,
-    which we can read off the stored alignment maps of ex-2.1.8 before running
-    anything. The figure below computes what the softmin weights *would* be on
-    two reference profiles: a fresh run (the un-anchored control) and a trained
-    one (the span pull at the operating point).
+    The interesting τ range depends on how much $x_t$ varies across the span, which we can read off the stored alignment maps of ex-2.1.8 before running anything. The figure below computes what the softmin weights *would* be on two reference profiles: a fresh run (the un-anchored control) and a trained one (the span pull at the operating point).
     """)
     return
 
@@ -364,25 +320,10 @@ def _(ALPHA218, leading_weight):
     @themed(
         name="tau-calibration",
         alt_text="""
-            Two line charts of leading softmin weight against temperature tau on a log
-            scale from 0.003 to 1. Left panel: the un-anchored control's alignment
-            profile; right panel: the ex-2.1.8 span pull at the operating point. Each
-            panel has five curves, one per residual slice, all starting near 1 at the
-            left edge and descending to 0.25 at the right edge. A horizontal band from
-            0.6 to 0.8 is shaded, and three vertical dashed lines mark tau = 0.01, 0.03
-            and 0.1. Most curves pass through the shaded band between tau = 0.005 and
-            0.03; in the right panel the last slice's curve sits noticeably higher,
-            crossing the band nearer 0.06 to 0.09.
+            Two line charts of leading softmin weight against temperature tau on a log scale from 0.003 to 1. Left panel: the un-anchored control's alignment profile; right panel: the ex-2.1.8 span pull at the operating point. Each panel has five curves, one per residual slice, all starting near 1 at the left edge and descending to 0.25 at the right edge. A horizontal band from 0.6 to 0.8 is shaded, and three vertical dashed lines mark tau = 0.01, 0.03 and 0.1. Most curves pass through the shaded band between tau = 0.005 and 0.03; in the right panel the last slice's curve sits noticeably higher, crossing the band nearer 0.06 to 0.09.
         """,
         caption=r"""
-            **Calibrating the τ grid from the ex-2.1.8 stored alignments.** The
-            leading span position's share of the softmin weight, by residual
-            slice, if the weights were computed from the alignment profile of
-            the un-anchored control (**left**) or the span pull at the
-            operating point (**right**). The shaded band is the 0.6–0.8 target
-            from the design note; dashed verticals are the chosen grid. Both
-            profiles put the band at τ ≈ 0.01–0.03, so the grid brackets it
-            with one rung toward the mean.
+            **Calibrating the τ grid from the ex-2.1.8 stored alignments.** The leading span position's share of the softmin weight, by residual slice, if the weights were computed from the alignment profile of the un-anchored control (**left**) or the span pull at the operating point (**right**). The shaded band is the 0.6–0.8 target from the design note; dashed verticals are the chosen grid. Both profiles put the band at τ ≈ 0.01–0.03, so the grid brackets it with one rung toward the mean.
         """,
     )
     def _plot():
@@ -436,25 +377,11 @@ def _(ALPHA218, arrays218):
     _as218c = _seed_mean(ex.alpha_span, "lam0")
     mo.md(
         rf"""
-    The design note targets a leading position taking 0.6–0.8 of the weight, which
-    lands at τ ≈ 0.01–0.03 on both profiles.
+    The design note targets a leading position taking 0.6–0.8 of the weight, which lands at τ ≈ 0.01–0.03 on both profiles.
 
-    So the grid is $\tau \in \{{{", ".join(f"{t:g}" for t in ex.TAUS)}\}}$: the
-    sharp edge of the band, the soft edge, and one rung toward the mean end of
-    the τ axis (τ = 0.1, weights nearer uniform); the mean itself is the
-    τ = ∞ condition, which closes the family. τ = 0.01 sits below the per-seed margin noise
-    ({ex.NOISE_PER_SEED:g}), so at that rung the pool will commit hard to early differences
-    that may just be noise. That is the winner-take-most end of the sweep.
+    So the grid is $\tau \in \{{{", ".join(f"{t:g}" for t in ex.TAUS)}\}}$: the sharp edge of the band, the soft edge, and one rung toward the mean end of the τ axis (τ = 0.1, weights nearer uniform); the mean itself is the τ = ∞ condition, which closes the family. τ = 0.01 sits below the per-seed margin noise ({ex.NOISE_PER_SEED:g}), so at that rung the pool will commit hard to early differences that may just be noise. That is the winner-take-most end of the sweep.
 
-    The ex-2.1.8 arrays give the reproduction targets for the `span-mean` condition,
-    as means of per-run statistics — the convention the results are scored
-    under: pooled margin m_span = {_m218:.2f} (control {_m218c:.2f})
-    and ᾱ_span = {_as218:.2f} (control {_as218c:.2f}). They also put numbers
-    on the syntax latch: at the embedding slice, the alignment
-    $\cos(h, \hat v)$ of the span-pull run's states, averaged over colors with
-    label-affinity weights, is `+` {1 - _x0[1]:.2f} and `=` {1 - _x0[3]:.2f},
-    against op1 {1 - _x0[0]:.2f} and op2 {1 - _x0[2]:.2f} — a pool applied to
-    *this* profile would close on the syntax tokens.
+    The ex-2.1.8 arrays give the reproduction targets for the `span-mean` condition, as means of per-run statistics — the convention the results are scored under: pooled margin m_span = {_m218:.2f} (control {_m218c:.2f}) and ᾱ_span = {_as218:.2f} (control {_as218c:.2f}). They also put numbers on the syntax latch: at the embedding slice, the alignment $\cos(h, \hat v)$ of the span-pull run's states, averaged over colors with label-affinity weights, is `+` {1 - _x0[1]:.2f} and `=` {1 - _x0[3]:.2f}, against op1 {1 - _x0[0]:.2f} and op2 {1 - _x0[2]:.2f} — a pool applied to *this* profile would close on the syntax tokens.
     """
     )
     return
@@ -465,54 +392,17 @@ def _():
     mo.md(r"""
     ### Measurements
 
-    Alignment maps ($\cos(h, \hat v)$ at every slice, color, and role, each
-    color averaged over its 27 probe lines), task evals, trajectories and
-    probes are from ex-2.1.8 unchanged. Labels also still key on the color of
-    op1 alone, as in every experiment since ex-2.1.6: pooling moves where the
-    *pull* acts, never which lines are labeled. Three statistics are new or
-    newly scored, all computed from the same maps:
+    Alignment maps ($\cos(h, \hat v)$ at every slice, color, and role, each color averaged over its 27 probe lines), task evals, trajectories and probes are from ex-2.1.8 unchanged. Labels also still key on the color of op1 alone, as in every experiment since ex-2.1.6: pooling moves where the *pull* acts, never which lines are labeled. Three statistics are new or newly scored, all computed from the same maps:
 
-    **The pooled margin m_span** is the mean over slices of the max-over-span
-    margin: for each slice, take the margin at each span role and keep the
-    largest, then average over slices. The margin at a role is selectivity
-    rather than raw alignment: over the 216 colors, the affinity-weighted mean
-    alignment of their states at that (slice, role), minus the unweighted
-    mean — how much closer a line sits to the axis for having a red op1. At
-    depth the syntax roles' states vary with the color of op1 too (they attend
-    back to it), so the margin means the same thing at every role; there is no
-    separate notion of how aligned a role *should* be. We can't score the
-    margin at op1 alone, because one condition pulls exactly where we would be
-    scoring, and op1 may not be where the concept belongs at depth anyway.
+    **The pooled margin m_span** is the mean over slices of the max-over-span margin: for each slice, take the margin at each span role and keep the largest, then average over slices. The margin at a role is selectivity rather than raw alignment: over the 216 colors, the affinity-weighted mean alignment of their states at that (slice, role), minus the unweighted mean — how much closer a line sits to the axis for having a red op1. At depth the syntax roles' states vary with the color of op1 too (they attend back to it), so the margin means the same thing at every role; there is no separate notion of how aligned a role *should* be. We can't score the margin at op1 alone, because one condition pulls exactly where we would be scoring, and op1 may not be where the concept belongs at depth anyway.
 
-    The max is applied identically to every condition and to the control, so
-    the maximum-of-noise inflation it invites cancels out in the
-    control-subtracted comparisons the hypotheses make. We report
-    $m_\text{op1}$ beside it for continuity with ex-2.1.7 and ex-2.1.8.
+    The max is applied identically to every condition and to the control, so the maximum-of-noise inflation it invites cancels out in the control-subtracted comparisons the hypotheses make. We report $m_\text{op1}$ beside it for continuity with ex-2.1.7 and ex-2.1.8.
 
-    **ᾱ_span** is the counterpart for containment, with the same max
-    treatment: for each slice, the unweighted mean alignment over the 216
-    colors' states at each span role, keeping the largest role; then the mean
-    over slices. Color enters only through that mean — this is drift of the
-    whole cloud, not selectivity. The usual ᾱ reads at op1 only, which the
-    ex-2.1.8 operating point shows isn't enough here: its cube-wide drift sits
-    on the syntax roles, where the op1 statistic can't see it.
+    **ᾱ_span** is the counterpart for containment, with the same max treatment: for each slice, the unweighted mean alignment over the 216 colors' states at each span role, keeping the largest role; then the mean over slices. Color enters only through that mean — this is drift of the whole cloud, not selectivity. The usual ᾱ reads at op1 only, which the ex-2.1.8 operating point shows isn't enough here: its cube-wide drift sits on the syntax roles, where the op1 statistic can't see it.
 
-    **The softmin weight profile** $\bar\pi(l, t)$ records what the pull
-    actually chose. (π, since $w$ collides with model weights.) At the end of
-    training we compute the weights $\mathrm{softmax}(-x/\tau)$ on the
-    alignment probe set (every color as op1 against all 27 closed partners),
-    per slice and span role, weighted by label affinity over colors.
+    **The softmin weight profile** $\bar\pi(l, t)$ records what the pull actually chose. (π, since $w$ collides with model weights.) At the end of training we compute the weights $\mathrm{softmax}(-x/\tau)$ on the alignment probe set (every color as op1 against all 27 closed partners), per slice and span role, weighted by label affinity over colors.
 
-    Its reference is **the readability profile of the control** $R^2(l, t)$: a
-    ridge probe predicting the redness of op1 from the state of the
-    *un-anchored control* at each (slice, role), with one op1 color held out
-    at a time. This $R^2$ is the probe's held-out coefficient of
-    determination (negative on a role that carries nothing), a different
-    quantity from the squared Pearson correlation that grading uses; earlier
-    reports wrote both as $R^2$, so here they are $R^2$ (probes) and $r^2$
-    (grading). At the embedding we know this profile in advance, since op1 is
-    the only span position whose state varies with the color of op1. H4(a)
-    relies on this for its prediction.
+    Its reference is **the readability profile of the control** $R^2(l, t)$: a ridge probe predicting the redness of op1 from the state of the *un-anchored control* at each (slice, role), with one op1 color held out at a time. This $R^2$ is the probe's held-out coefficient of determination (negative on a role that carries nothing), a different quantity from the squared Pearson correlation that grading uses; earlier reports wrote both as $R^2$, so here they are $R^2$ (probes) and $r^2$ (grading). At the embedding we know this profile in advance, since op1 is the only span position whose state varies with the color of op1. H4(a) relies on this for its prediction.
     """)
     return
 
@@ -764,12 +654,7 @@ def _(CONDS: list[str], acc):
     </table></div>
     """
     _caption = f"""
-    Behavior by condition. Each value is the seed mean, with half the seed
-    range beside it. EM is exact match on the answer token, NLL its surprise
-    in nats, and <code>open</code> dist the RGB distance from the guessed
-    color to the true mix on pairs with no named answer. Δ holdout EM is the
-    signed gap to the in-experiment control, which the H1 gate scores at
-    {ex.TASK_GATE:g}.
+    Behavior by condition. Each value is the seed mean, with half the seed range beside it. EM is exact match on the answer token, NLL its surprise in nats, and <code>open</code> dist the RGB distance from the guessed color to the true mix on pairs with no named answer. Δ holdout EM is the signed gap to the in-experiment control, which the H1 gate scores at {ex.TASK_GATE:g}.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -780,12 +665,7 @@ def _(CONDS: list[str], acc):
     _ctrl = float(acc("lam0").mean())
     _worst = max((c for c in CONDS if c != "lam0"), key=lambda c: abs(acc(c).mean() - _ctrl))
     mo.md(rf"""
-    **H1 holds.** The largest gap from the control is
-    {abs(acc(_worst).mean() - _ctrl):.4f}, at `{_worst}`, against a gate of
-    {ex.TASK_GATE:g}. Every condition solves the task, so H2–H4 are all
-    scored. Concentrating the whole pull budget of a line onto one position —
-    which at τ = 0.01 is nearly a hard min — costs nothing the task loss can
-    see, consistent with every anchored experiment on this testbed so far.
+    **H1 holds.** The largest gap from the control is {abs(acc(_worst).mean() - _ctrl):.4f}, at `{_worst}`, against a gate of {ex.TASK_GATE:g}. Every condition solves the task, so H2–H4 are all scored. Concentrating the whole pull budget of a line onto one position — which at τ = 0.01 is nearly a hard min — costs nothing the task loss can see, consistent with every anchored experiment on this testbed so far.
     """)
     return
 
@@ -799,10 +679,7 @@ def _():
     mo.md(r"""
     ## Selectivity against the span mean (H2)
 
-    First the reproduction check the method promises, so any drift introduced
-    by the new code path is visible before a pooled condition is read: the
-    `span-mean` condition re-runs ex-2.1.8's operating point through the pooled
-    code at τ = ∞, so it should land on that experiment's numbers.
+    First the reproduction check the method promises, so any drift introduced by the new code path is visible before a pooled condition is read: the `span-mean` condition re-runs ex-2.1.8's operating point through the pooled code at τ = ∞, so it should land on that experiment's numbers.
     """)
     return
 
@@ -843,11 +720,7 @@ def _(a_op1, a_span, m_op1, m_span):
     </table></div>
     """
     _caption = """
-    The reproduction check. Each statistic is this experiment's seed mean (±
-    seed standard deviation) beside the same statistic recomputed from
-    ex-2.1.8's published arrays under the same per-run convention, and the
-    difference. <code>span-mean</code> re-runs <code>end90-hold30</code>
-    through the pooled code path; <code>lam0</code> re-runs its control.
+    The reproduction check. Each statistic is this experiment's seed mean (± seed standard deviation) beside the same statistic recomputed from ex-2.1.8's published arrays under the same per-run convention, and the difference. <code>span-mean</code> re-runs <code>end90-hold30</code> through the pooled code path; <code>lam0</code> re-runs its control.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -858,12 +731,7 @@ def _(a_span, m_span):
     _dm = m_span("span-mean").mean() - ex.EX218_REFERENCE["end90-hold30"]["m_span"]
     _da = a_span("span-mean").mean() - ex.EX218_REFERENCE["end90-hold30"]["alpha_span"]
     mo.md(rf"""
-    The largest differences — {_dm:+.3f} on $m_\text{{span}}$ and {_da:+.3f}
-    on ᾱ_span — sit within a seed spread of the targets, and the same is true
-    of the control. So the per-line mean-of-means (which differs from
-    ex-2.1.8's flat mean only on crop-truncated lines) reproduces the
-    operating point, and the pooled conditions can be read against
-    `span-mean` as a like-for-like baseline.
+    The largest differences — {_dm:+.3f} on $m_\text{{span}}$ and {_da:+.3f} on ᾱ_span — sit within a seed spread of the targets, and the same is true of the control. So the per-line mean-of-means (which differs from ex-2.1.8's flat mean only on crop-truncated lines) reproduces the operating point, and the pooled conditions can be read against `span-mean` as a like-for-like baseline.
     """)
     return
 
@@ -881,30 +749,10 @@ def _(ANCHORED, a_span, m_span):
     @themed(
         name="h2-dots",
         alt_text="""
-            Two dot-plot panels sharing a horizontal cosine axis from 0 to about
-            0.75, with five condition rows ordered by temperature: span-mean
-            (tau infinite) on top, then the pooled conditions with tau falling
-            0.1, 0.03, 0.01, then op1-oracle. Each row shows three small seed
-            dots and a vertical tick at their mean. Left panel, margin: all
-            five rows cluster between 0.62 and 0.69, with a dotted partial line
-            at 0.71 and a dashed gate line at 0.78, both to the right of every
-            row; pool-t100 sits highest of the pooled rows and the means fall
-            back toward span-mean as tau sharpens. Right panel, drift:
-            span-mean sits at 0.32 and op1-oracle at 0.11; the pooled rows land
-            between them, pool-t100 leftmost at 0.21 and the means walking back
-            toward span-mean as tau sharpens, with the dashed gate at 0.22
-            between pool-t100 and pool-t030.
+            Two dot-plot panels sharing a horizontal cosine axis from 0 to about 0.75, with five condition rows ordered by temperature: span-mean (tau infinite) on top, then the pooled conditions with tau falling 0.1, 0.03, 0.01, then op1-oracle. Each row shows three small seed dots and a vertical tick at their mean. Left panel, margin: all five rows cluster between 0.62 and 0.69, with a dotted partial line at 0.71 and a dashed gate line at 0.78, both to the right of every row; pool-t100 sits highest of the pooled rows and the means fall back toward span-mean as tau sharpens. Right panel, drift: span-mean sits at 0.32 and op1-oracle at 0.11; the pooled rows land between them, pool-t100 leftmost at 0.21 and the means walking back toward span-mean as tau sharpens, with the dashed gate at 0.22 between pool-t100 and pool-t030.
         """,
         caption=rf"""
-            **The H2 statistics, control-subtracted.** Left:
-            $m_\text{{span}}$; right: ᾱ_span. Rows run from the span mean
-            (τ = ∞) down the sweep to the oracle. Small dots are seeds, the
-            tick their mean; the τ = ∞ and oracle reference rows are greyed.
-            Dashed carets mark the H2 gates for P: a margin gain of
-            {ex.POOL_GAIN_GATE:g} over `span-mean` (dotted: the
-            {ex.POOL_GAIN_PARTIAL:g} partial) and a drift drop of
-            {ex.SYNTAX_DRIFT_GATE:g} below it. The two panels share their
-            scale, so the sizes of margin and drift compare directly.
+            **The H2 statistics, control-subtracted.** Left: $m_\text{{span}}$; right: ᾱ_span. Rows run from the span mean (τ = ∞) down the sweep to the oracle. Small dots are seeds, the tick their mean; the τ = ∞ and oracle reference rows are greyed. Dashed carets mark the H2 gates for P: a margin gain of {ex.POOL_GAIN_GATE:g} over `span-mean` (dotted: the {ex.POOL_GAIN_PARTIAL:g} partial) and a drift drop of {ex.SYNTAX_DRIFT_GATE:g} below it. The two panels share their scale, so the sizes of margin and drift compare directly.
         """,
     )
     def _plot() -> plt.Figure:
@@ -977,12 +825,7 @@ def _(ANCHORED, a_span, grading_r2, m_op1, m_span):
     </table></div>
     """
     _caption = f"""
-    The τ sweep beside its references, seed means (± seed standard deviation
-    where quoted). Only the primary condition (<strong>bold</strong>) is
-    gated; "oracle frac" is
-    the fraction of the span-mean-to-oracle gap recovered, whose denominator
-    is {_headroom:.3f}. m<sub>op1</sub> is carried for continuity with
-    ex-2.1.7/8, and r² previews the grading track scored under H3.
+    The τ sweep beside its references, seed means (± seed standard deviation where quoted). Only the primary condition (<strong>bold</strong>) is gated; "oracle frac" is the fraction of the span-mean-to-oracle gap recovered, whose denominator is {_headroom:.3f}. m<sub>op1</sub> is carried for continuity with ex-2.1.7/8, and r² previews the grading track scored under H3.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -1004,60 +847,15 @@ def _(a_span, cells, m_span, pi_bar):
 
     _l30 = _latched(_P)[0]
     mo.md(rf"""
-    **H2 is unmet.** On the primary condition `{_P}`, (a) the margin gain is
-    {_gain:+.3f} against a gate of {ex.POOL_GAIN_GATE:g} (partial
-    {ex.POOL_GAIN_PARTIAL:g}), and (b) the syntax-role drift falls by
-    {_drop:.3f} against a required {ex.SYNTAX_DRIFT_GATE:g}. Both moved the
-    way the mechanism predicts and neither reaches its gate, so neither
-    partial applies.
+    **H2 is unmet.** On the primary condition `{_P}`, (a) the margin gain is {_gain:+.3f} against a gate of {ex.POOL_GAIN_GATE:g} (partial {ex.POOL_GAIN_PARTIAL:g}), and (b) the syntax-role drift falls by {_drop:.3f} against a required {ex.SYNTAX_DRIFT_GATE:g}. Both moved the way the mechanism predicts and neither reaches its gate, so neither partial applies.
 
     Three things the gate arithmetic hides:
 
-    1. **The margin headroom collapsed before the sweep began.** The gate was
-       sized from the op1 oracle's +{ex.EX217_OP1_GAIN:g} margin gain in
-       ex-2.1.7 — measured at op1, under the old schedule. Here, scored as
-       $m_\text{{span}}$ at the ex-2.1.8 operating point, the oracle's whole
-       advantage over the span mean is {_headroom:.3f}: less than half the
-       gate. No condition, oracle included, could have passed H2(a) as
-       preregistered. The primary recovered {_gain / _headroom:.0%} of the
-       headroom that existed.
+    1. **The margin headroom collapsed before the sweep began.** The gate was sized from the op1 oracle's +{ex.EX217_OP1_GAIN:g} margin gain in ex-2.1.7 — measured at op1, under the old schedule. Here, scored as $m_\text{{span}}$ at the ex-2.1.8 operating point, the oracle's whole advantage over the span mean is {_headroom:.3f}: less than half the gate. No condition, oracle included, could have passed H2(a) as preregistered. The primary recovered {_gain / _headroom:.0%} of the headroom that existed.
 
-    2. **Neither statistic is monotone in τ.** In the dot chart both panels
-       walk from `span-mean` toward the oracle only as far as τ = 0.1, then
-       step back: the sharper the pool, the closer the condition sits to
-       the span mean again. What the statistics do track is op1's share of
-       the pull budget — 0.25 for the span mean by construction, then
-       {_share["pool-t100"]:.2f} at τ = 0.1, {_share[_P]:.2f} at τ = 0.03,
-       {_share["pool-t010"]:.2f} at τ = 0.01 (mean over slices of the
-       weight profiles under H4), and 1.0 for the oracle. The share peaks
-       at τ = 0.1 because a sharper pool concentrates the budget harder
-       but risks putting it on the wrong role: at depth, each seed of the
-       two sharper rungs commits everything to a single role, and at
-       τ = 0.01 two seeds of three commit to `+` (at τ = 0.03, one; at
-       τ = 0.1, none). The same decomposition holds within a condition —
-       `{_P}`'s committed-to-`+` seed (s{_l30}) scores
-       $m_\text{{span}}$ {m_span(_P)[_l30]:.2f} and ᾱ_span
-       {a_span(_P)[_l30]:.2f} where its op1-keeping seeds score
-       ≈{np.mean(np.delete(m_span(_P), _l30)):.2f} and
-       ≈{np.mean(np.delete(a_span(_P), _l30)):.2f}. So the finite-τ means
-       differ mostly through how many seeds latched, and the sweep's message
-       is a latch-rate trend rather than a smooth dose response; with three
-       seeds per rung the rates themselves are coarse, so carrying a τ
-       forward should rest on the latch mechanism (*Where the weight went*),
-       with more seeds at the chosen rung in the next design.
+    2. **Neither statistic is monotone in τ.** In the dot chart both panels walk from `span-mean` toward the oracle only as far as τ = 0.1, then step back: the sharper the pool, the closer the condition sits to the span mean again. What the statistics do track is op1's share of the pull budget — 0.25 for the span mean by construction, then {_share["pool-t100"]:.2f} at τ = 0.1, {_share[_P]:.2f} at τ = 0.03, {_share["pool-t010"]:.2f} at τ = 0.01 (mean over slices of the weight profiles under H4), and 1.0 for the oracle. The share peaks at τ = 0.1 because a sharper pool concentrates the budget harder but risks putting it on the wrong role: at depth, each seed of the two sharper rungs commits everything to a single role, and at τ = 0.01 two seeds of three commit to `+` (at τ = 0.03, one; at τ = 0.1, none). The same decomposition holds within a condition — `{_P}`'s committed-to-`+` seed (s{_l30}) scores $m_\text{{span}}$ {m_span(_P)[_l30]:.2f} and ᾱ_span {a_span(_P)[_l30]:.2f} where its op1-keeping seeds score ≈{np.mean(np.delete(m_span(_P), _l30)):.2f} and ≈{np.mean(np.delete(a_span(_P), _l30)):.2f}. So the finite-τ means differ mostly through how many seeds latched, and the sweep's message is a latch-rate trend rather than a smooth dose response; with three seeds per rung the rates themselves are coarse, so carrying a τ forward should rest on the latch mechanism (*Where the weight went*), with more seeds at the chosen rung in the next design.
 
-    3. **Why the span mean scores near the oracle.** Near on the absolute
-       scale: its $m_\text{{span}}$ is
-       {m_span(ex.MEAN_ARM).mean() / m_span(ex.ORACLE_ARM).mean():.0%} of
-       the oracle's, where the un-anchored control sits at
-       {m_span("lam0").mean():.2f} — the whole sweep lives in the table's
-       last few hundredths. The role profiles below show why: at depth,
-       every span role of the `span-mean` condition
-       carries margin (its syntax-role states attend back to op1, so they
-       become selective too), and a max over roles only needs one good role.
-       Pooling *did* change the shape — margin and drift both withdraw from
-       op2 and `=` almost entirely — but op1's own margin is nearly the same
-       in every anchored condition, so the max barely moves.
+    3. **Why the span mean scores near the oracle.** Near on the absolute scale: its $m_\text{{span}}$ is {m_span(ex.MEAN_ARM).mean() / m_span(ex.ORACLE_ARM).mean():.0%} of the oracle's, where the un-anchored control sits at {m_span("lam0").mean():.2f} — the whole sweep lives in the table's last few hundredths. The role profiles below show why: at depth, every span role of the `span-mean` condition carries margin (its syntax-role states attend back to op1, so they become selective too), and a max over roles only needs one good role. Pooling *did* change the shape — margin and drift both withdraw from op2 and `=` almost entirely — but op1's own margin is nearly the same in every anchored condition, so the max barely moves.
     """)
     return
 
@@ -1074,27 +872,10 @@ def _(alpha_map):
     @themed(
         name="role-profiles",
         alt_text="""
-            Six panels in a two-by-three grid: columns are span-mean, pool-t030
-            and op1-oracle; the top row plots margin by role against slice, the
-            bottom row drift by role, both from about -0.1 to 0.9. Four
-            marked lines per panel, one per span role. Top left: all
-            four roles rise together to between 0.5 and 0.8 after the
-            embedding. Top middle and top right: the op1 line alone stays high,
-            about 0.8 at slice 1 falling to 0.4 (middle) or 0.5 (right) at slice 4, while
-            the plus, op2 and equals lines sit below 0.3. Bottom left: plus and
-            equals start near 0.55 at the embedding and fall with depth while
-            op2 rises to about 0.28. Bottom middle: the plus line starts at
-            0.49 and decays to near zero; op2 and equals stay low. Bottom
-            right: the same shape with plus starting lower, at 0.3.
+            Six panels in a two-by-three grid: columns are span-mean, pool-t030 and op1-oracle; the top row plots margin by role against slice, the bottom row drift by role, both from about -0.1 to 0.9. Four marked lines per panel, one per span role. Top left: all four roles rise together to between 0.5 and 0.8 after the embedding. Top middle and top right: the op1 line alone stays high, about 0.8 at slice 1 falling to 0.4 (middle) or 0.5 (right) at slice 4, while the plus, op2 and equals lines sit below 0.3. Bottom left: plus and equals start near 0.55 at the embedding and fall with depth while op2 rises to about 0.28. Bottom middle: the plus line starts at 0.49 and decays to near zero; op2 and equals stay low. Bottom right: the same shape with plus starting lower, at 0.3.
         """,
         caption=r"""
-            **Where the margin and the drift live.** Margin (top) and drift
-            (bottom) by span role, per slice, seed means: $m(\ell, t)$ and the
-            unweighted mean alignment $\bar\alpha(\ell, t)$. Columns:
-            the span mean, the primary, and the op1 oracle. The scored
-            statistics take the per-slice max over these lines
-            ($m_\text{span}$ from the top row, ᾱ_span from the bottom), so a
-            single high line is all either statistic sees.
+            **Where the margin and the drift live.** Margin (top) and drift (bottom) by span role, per slice, seed means: $m(\ell, t)$ and the unweighted mean alignment $\bar\alpha(\ell, t)$. Columns: the span mean, the primary, and the op1 oracle. The scored statistics take the per-slice max over these lines ($m_\text{span}$ from the top row, ᾱ_span from the bottom), so a single high line is all either statistic sees.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1143,28 +924,10 @@ def _(alpha_map):
     @themed(
         name="position-profiles",
         alt_text="""
-            A five-by-three grid of small flush panels: the same margin and
-            drift data as the previous figure, transposed. Columns are
-            span-mean, pool-t030 and op1-oracle; rows are residual slices
-            with the last slice on top and the embedding at the bottom; each
-            panel spans the four span roles op1, plus, op2 and equals, from 0
-            to about 0.95 vertically. A shaded smooth-step area shows the
-            margin and a solid line the drift. In the span-mean column every
-            row above the embedding is a wide raised block: margin between
-            0.5 and 0.8 at all four roles. In the pool-t030 and oracle
-            columns the block narrows to a single tall step at op1, with the
-            other roles below 0.3. The drift line roughly shadows the margin
-            at about half its height in every panel; on the embedding row it
-            is a step at plus and equals for span-mean, at plus alone for
-            pool-t030, and lower, about 0.3 at plus, for the oracle.
+            A five-by-three grid of small flush panels: the same margin and drift data as the previous figure, transposed. Columns are span-mean, pool-t030 and op1-oracle; rows are residual slices with the last slice on top and the embedding at the bottom; each panel spans the four span roles op1, plus, op2 and equals, from 0 to about 0.95 vertically. A shaded smooth-step area shows the margin and a solid line the drift. In the span-mean column every row above the embedding is a wide raised block: margin between 0.5 and 0.8 at all four roles. In the pool-t030 and oracle columns the block narrows to a single tall step at op1, with the other roles below 0.3. The drift line roughly shadows the margin at about half its height in every panel; on the embedding row it is a step at plus and equals for span-mean, at plus alone for pool-t030, and lower, about 0.3 at plus, for the oracle.
         """,
         caption=r"""
-            **The same profiles, position-major.** Margin $m(\ell, t)$
-            (shaded area) and drift $\bar\alpha(\ell, t)$ (line) over the
-            four span roles, one panel per residual slice with the embedding
-            at the bottom — the transpose of the figure above, in the layout
-            the weight profiles under H4 use. Columns: the span mean, the
-            primary, and the op1 oracle.
+            **The same profiles, position-major.** Margin $m(\ell, t)$ (shaded area) and drift $\bar\alpha(\ell, t)$ (line) over the four span roles, one panel per residual slice with the embedding at the bottom — the transpose of the figure above, in the layout the weight profiles under H4 use. Columns: the span mean, the primary, and the op1 oracle.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1215,22 +978,7 @@ def _(alpha_map):
 def _(alpha_map):
     _emb = {c: alpha_map(c)[0, :, : ex.SPAN].mean(axis=0) for c in [ex.MEAN_ARM, ex.PRIMARY, ex.ORACLE_ARM]}
     mo.md(rf"""
-    The drift survives pooling only at the `+` role.
-    On the embedding row, the primary's pooling released `=` almost entirely
-    (drift {_emb[ex.MEAN_ARM][3]:.2f} under the span mean →
-    {_emb[ex.PRIMARY][3]:.2f}) but left {_emb[ex.PRIMARY][1]:.2f} on `+`,
-    barely below the span mean's {_emb[ex.MEAN_ARM][1]:.2f} — consistent
-    with the ~0.2 of softmin weight the pull still spends there (H4 below).
-    The op1 oracle complicates that account: it never pulls `+` at any
-    slice, and its op1 states cannot even read the `+` embedding (position 0
-    attends only to itself), yet its `+` embedding still ends at
-    {_emb[ex.ORACLE_ARM][1]:.2f}. So over half of the `+` drift is paid for
-    by something other than the pull — and whatever pays for it does so
-    against the repulsion, which runs from the first epoch and still holds
-    at the end. The trajectory records no per-role drift, so this run can't
-    say whether that alignment climbs early (against the repulsion's peak)
-    or late (as the anneal decays); the candidate mechanism and the timing
-    are both queued as exploratory questions rather than interpreted here.
+    The drift survives pooling only at the `+` role. On the embedding row, the primary's pooling released `=` almost entirely (drift {_emb[ex.MEAN_ARM][3]:.2f} under the span mean → {_emb[ex.PRIMARY][3]:.2f}) but left {_emb[ex.PRIMARY][1]:.2f} on `+`, barely below the span mean's {_emb[ex.MEAN_ARM][1]:.2f} — consistent with the ~0.2 of softmin weight the pull still spends there (H4 below). The op1 oracle complicates that account: it never pulls `+` at any slice, and its op1 states cannot even read the `+` embedding (position 0 attends only to itself), yet its `+` embedding still ends at {_emb[ex.ORACLE_ARM][1]:.2f}. So over half of the `+` drift is paid for by something other than the pull — and whatever pays for it does so against the repulsion, which runs from the first epoch and still holds at the end. The trajectory records no per-role drift, so this run can't say whether that alignment climbs early (against the repulsion's peak) or late (as the anneal decays); the candidate mechanism and the timing are both queued as exploratory questions rather than interpreted here.
     """)
     return
 
@@ -1240,10 +988,7 @@ def _():
     mo.md(r"""
     ## The operating point under pooling (H3)
 
-    The endpoint numbers say where each run finished; the trajectories say
-    how it got there — in particular whether a pull that concentrated early
-    slid once the repulsion annealed away, which was the contrary outcome H3
-    named.
+    The endpoint numbers say where each run finished; the trajectories say how it got there — in particular whether a pull that concentrated early slid once the repulsion annealed away, which was the contrary outcome H3 named.
     """)
     return
 
@@ -1266,31 +1011,10 @@ def _(ANCHORED, retention, traj):
     @themed(
         name="trajectories",
         alt_text="""
-            Five trajectory panels and one schedule panel in a two-by-three
-            grid sharing the epoch axis from 0 to 100. Each trajectory panel
-            plots mean alignment at op1 as a solid line staying below 0.15,
-            and the span margin as a dashed line climbing to between 0.6 and
-            0.75 by epoch 40 and holding roughly level to the end, over a flat
-            grey control pair near zero. The dashed line dips slightly after
-            epoch 90 in every panel. The schedule panel, bottom right, shows
-            the anchor weight ramping up to a plateau and annealing after
-            epoch 90, and the repulsion weight starting high, crossing below
-            the anchor around epoch 60 and settling at about a third of it.
+            Five trajectory panels and one schedule panel in a two-by-three grid sharing the epoch axis from 0 to 100. Each trajectory panel plots mean alignment at op1 as a solid line staying below 0.15, and the span margin as a dashed line climbing to between 0.6 and 0.75 by epoch 40 and holding roughly level to the end, over a flat grey control pair near zero. The dashed line dips slightly after epoch 90 in every panel. The schedule panel, bottom right, shows the anchor weight ramping up to a plateau and annealing after epoch 90, and the repulsion weight starting high, crossing below the anchor around epoch 60 and settling at about a third of it.
         """,
         caption=rf"""
-            **Training dynamics by condition.** Seed means of the two cosines
-            on the anchor axis, on one shared scale: solid is $\bar\alpha$ at
-            op1 (contained at the left caret, {ex.MEAN_ALIGN_GATE:g}); dashed
-            is $m_\text{{span}}$ (its retention floor of
-            {ex.RETENTION_FLOOR:g} at the right caret). The grey pair is the
-            un-anchored control, and the number in each panel is that
-            condition's retention (final over peak $m_\text{{span}}$, minimum
-            across seeds; gate ≥ {ex.RETENTION_GATE:g}). Bottom right: the
-            weight schedule every anchored condition trained under — anchor
-            $\lambda_\mathrm{{a}}$ in red, repulsion
-            $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue, log scale — shared
-            here because the anti-subspace term is fixed at the ex-2.1.8
-            operating point in every anchored condition.
+            **Training dynamics by condition.** Seed means of the two cosines on the anchor axis, on one shared scale: solid is $\bar\alpha$ at op1 (contained at the left caret, {ex.MEAN_ALIGN_GATE:g}); dashed is $m_\text{{span}}$ (its retention floor of {ex.RETENTION_FLOOR:g} at the right caret). The grey pair is the un-anchored control, and the number in each panel is that condition's retention (final over peak $m_\text{{span}}$, minimum across seeds; gate ≥ {ex.RETENTION_GATE:g}). Bottom right: the weight schedule every anchored condition trained under — anchor $\lambda_\mathrm{{a}}$ in red, repulsion $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue, log scale — shared here because the anti-subspace term is fixed at the ex-2.1.8 operating point in every anchored condition.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1353,15 +1077,7 @@ def _(ANCHORED, a_op1, retention):
     assert _ret is not None
     _worst = min((r for c in ANCHORED if (r := retention(c)) is not None))
     mo.md(rf"""
-    **H3(a) and (b) hold.** On the primary condition, $\bar\alpha$ at op1 ends at
-    {a_op1(_P).mean():.3f} <span class='range'>±{a_op1(_P).std(ddof=1):.3f}</span>
-    against the {ex.MEAN_ALIGN_GATE:g} gate, and retention is {_ret:.2f}
-    against {ex.RETENTION_GATE:g}. The contrary outcome — a concentrated pull
-    sliding once the anti anneal ends at epoch {ex.ANTI_ANNEAL_END:g} — shows
-    up only as the small end-of-training dip every condition shares (the
-    anchor's own anneal), and the worst retention anywhere in the sweep is
-    {_worst:.2f}. Pooling redirects the budget of the pull without
-    destabilizing what ex-2.1.8 found.
+    **H3(a) and (b) hold.** On the primary condition, $\bar\alpha$ at op1 ends at {a_op1(_P).mean():.3f} <span class='range'>±{a_op1(_P).std(ddof=1):.3f}</span> against the {ex.MEAN_ALIGN_GATE:g} gate, and retention is {_ret:.2f} against {ex.RETENTION_GATE:g}. The contrary outcome — a concentrated pull sliding once the anti anneal ends at epoch {ex.ANTI_ANNEAL_END:g} — shows up only as the small end-of-training dip every condition shares (the anchor's own anneal), and the worst retention anywhere in the sweep is {_worst:.2f}. Pooling redirects the budget of the pull without destabilizing what ex-2.1.8 found.
     """)
     return
 
@@ -1388,31 +1104,10 @@ def _(ANCHORED, alpha_map, grading_r2, m_span):
     @themed(
         name="grading",
         alt_text="""
-            Six panels in a two-by-three grid sharing both axes: per-color
-            alignment at the first operand, from about -0.2 to 1.2, against
-            the redness of that color from 0 to 1. Panels are the control,
-            span-mean, and the three pooled conditions and the oracle. The control
-            panel is flat near zero. Every other panel scatters 216 marks
-            drawn in the color each stands for, forming a flat cluster at low
-            redness and a rising tail of oranges and reds, with a thin
-            conditional-mean line and a dashed reference curve through it.
-            The flat cluster sits slightly lower and the rise slightly
-            straighter in the pooled and oracle panels than in span-mean; in
-            the pool-t010 panel the rise has a visible shelf between redness
-            0.7 and 0.8.
+            Six panels in a two-by-three grid sharing both axes: per-color alignment at the first operand, from about -0.2 to 1.2, against the redness of that color from 0 to 1. Panels are the control, span-mean, and the three pooled conditions and the oracle. The control panel is flat near zero. Every other panel scatters 216 marks drawn in the color each stands for, forming a flat cluster at low redness and a rising tail of oranges and reds, with a thin conditional-mean line and a dashed reference curve through it. The flat cluster sits slightly lower and the rise slightly straighter in the pooled and oracle panels than in span-mean; in the pool-t010 panel the rise has a visible shelf between redness 0.7 and 0.8.
         """,
         caption=r"""
-            **Grading: alignment at op1, per color.** $\alpha_c$, the mean
-            over slices of $\cos(h, \hat v_{\text{red}})$ at op1, seed mean,
-            against the redness of the color. One mark per color, drawn in
-            that color; the thin dark line is the mean response at each of
-            the 29 distinct redness levels, the flat grey band the same line
-            for the control, and the dashed line `sim¹·⁵` rescaled onto the
-            response by least squares — the shape the $r^2$ statistic scores
-            against. The dashed line wobbles because `sim` depends on the
-            full color (hue angle, weighted by vibrancy), so its mean at a
-            redness level moves with the mix of colors that share the level.
-            H3(c) gates the primary's $r^2$ relative to `span-mean`'s.
+            **Grading: alignment at op1, per color.** $\alpha_c$, the mean over slices of $\cos(h, \hat v_{\text{red}})$ at op1, seed mean, against the redness of the color. One mark per color, drawn in that color; the thin dark line is the mean response at each of the 29 distinct redness levels, the flat grey band the same line for the control, and the dashed line `sim¹·⁵` rescaled onto the response by least squares — the shape the $r^2$ statistic scores against. The dashed line wobbles because `sim` depends on the full color (hue angle, weighted by vibrancy), so its mean at a redness level moves with the mix of colors that share the level. H3(c) gates the primary's $r^2$ relative to `span-mean`'s.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1457,20 +1152,7 @@ def _(ANCHORED, alpha_map, grading_r2, m_span):
 def _(grading_r2):
     _P = ex.PRIMARY
     mo.md(rf"""
-    **H3(c) holds, with the sign reversed.** The gate would have tolerated $r^2$
-    on the primary falling {ex.GRADE_R2_DROP:g} below the span mean's;
-    instead it lands {grading_r2(_P) - grading_r2(ex.MEAN_ARM):+.2f} *above*
-    it ({grading_r2(_P):.2f} against {grading_r2(ex.MEAN_ARM):.2f}). The
-    contrary expectation — that concentrating the pull would sharpen the
-    response into a step — mostly has it backwards: every pooled condition
-    grades at or above the span mean, and the oracle best of all
-    ({grading_r2(ex.ORACLE_ARM):.2f}). Withdrawing the pull from positions
-    that don't carry the concept apparently cleans the response shape at the
-    one that does. The exception is visible in the `pool-t010` panel: a
-    shelf in the rise near redness 0.8, which turns out to belong to the
-    latched seeds (*Exploratory analyses*). As a footnote to ex-2.1.8's open
-    question about where a realistic absolute grading bar sits: the primary
-    and the oracle both clear the 0.8 that experiment couldn't reach.
+    **H3(c) holds, with the sign reversed.** The gate would have tolerated $r^2$ on the primary falling {ex.GRADE_R2_DROP:g} below the span mean's; instead it lands {grading_r2(_P) - grading_r2(ex.MEAN_ARM):+.2f} *above* it ({grading_r2(_P):.2f} against {grading_r2(ex.MEAN_ARM):.2f}). The contrary expectation — that concentrating the pull would sharpen the response into a step — mostly has it backwards: every pooled condition grades at or above the span mean, and the oracle best of all ({grading_r2(ex.ORACLE_ARM):.2f}). Withdrawing the pull from positions that don't carry the concept apparently cleans the response shape at the one that does. The exception is visible in the `pool-t010` panel: a shelf in the rise near redness 0.8, which turns out to belong to the latched seeds (*Exploratory analyses*). As a footnote to ex-2.1.8's open question about where a realistic absolute grading bar sits: the primary and the oracle both clear the 0.8 that experiment couldn't reach.
     """)
     return
 
@@ -1480,15 +1162,7 @@ def _():
     mo.md(r"""
     ## Where the weight went (H4)
 
-    The weight profile is the pull's own account of where each line's
-    budget goes: the softmin weights, recomputed after training from the
-    final model's alignments on the probe set — the same formula the loss's
-    gradient uses, so this is what the pull was spending as training ended
-    (the timing section below reads the logged version over training). The
-    control's readability profile is the reference for where the concept
-    actually lives. H4 asks whether they agree — at the embedding, where
-    only op1 can carry the concept, and across depth, where the syntax
-    roles pick it up through attention.
+    The weight profile is the pull's own account of where each line's budget goes: the softmin weights, recomputed after training from the final model's alignments on the probe set — the same formula the loss's gradient uses, so this is what the pull was spending as training ended (the timing section below reads the logged version over training). The control's readability profile is the reference for where the concept actually lives. H4 asks whether they agree — at the embedding, where only op1 can carry the concept, and across depth, where the syntax roles pick it up through attention.
     """)
     return
 
@@ -1505,45 +1179,10 @@ def _(READ: np.ndarray, cells, pi_bar, read_gain):
     @themed(
         name="weight-profiles",
         alt_text="""
-            A five-by-three grid of small flush panels. Columns are the pooled
-            conditions at tau 0.01, 0.03 and 0.1; rows are residual slices with the
-            last slice on top and the embedding at the bottom; each panel
-            spans the four span roles op1, plus, op2 and equals on its
-            horizontal axis, from 0 to 1 vertically. A shaded smooth-step
-            area shows the seed-mean softmin weight, three hairlines the
-            individual seeds, and a dashed line the control's
-            readability, which is identical across the columns of a row: op1
-            near 0.85 everywhere, plus and equals near 0.8 on all rows but
-            the embedding, where both drop to zero, and op2 never above 0.2.
-            In the bottom (embedding) row of every column, the weight area is
-            a tall block at op1, about 0.77, with a small step at plus, and
-            the hairlines hug the mean. On the deeper rows of the tau 0.01
-            and 0.03 columns the hairlines separate completely: each seed's
-            profile is a full-height block at a single role — plus in two
-            seeds of three at tau 0.01, one of three at 0.03 — so the mean
-            area, op1 at about a third or two thirds with plus taking the
-            rest, is a mixture of one-hot seeds. In the tau 0.1 column op1
-            grows toward 0.95 with the other roles near zero and the
-            hairlines stay together.
+            A five-by-three grid of small flush panels. Columns are the pooled conditions at tau 0.01, 0.03 and 0.1; rows are residual slices with the last slice on top and the embedding at the bottom; each panel spans the four span roles op1, plus, op2 and equals on its horizontal axis, from 0 to 1 vertically. A shaded smooth-step area shows the seed-mean softmin weight, three hairlines the individual seeds, and a dashed line the control's readability, which is identical across the columns of a row: op1 near 0.85 everywhere, plus and equals near 0.8 on all rows but the embedding, where both drop to zero, and op2 never above 0.2. In the bottom (embedding) row of every column, the weight area is a tall block at op1, about 0.77, with a small step at plus, and the hairlines hug the mean. On the deeper rows of the tau 0.01 and 0.03 columns the hairlines separate completely: each seed's profile is a full-height block at a single role — plus in two seeds of three at tau 0.01, one of three at 0.03 — so the mean area, op1 at about a third or two thirds with plus taking the rest, is a mixture of one-hot seeds. In the tau 0.1 column op1 grows toward 0.95 with the other roles near zero and the hairlines stay together.
         """,
         caption=rf"""
-            **What the pull chose, against where the concept is readable.**
-            The trained softmin weight profile of each pooled condition
-            (shaded area, seed mean $\bar\pi(\ell, t)$; hairlines, the three
-            seeds individually), over the four span roles, one panel per
-            residual slice with the embedding at the bottom. Where the
-            hairlines separate — the deep slices at τ ≤ 0.03 — each seed's
-            profile is one-hot on a single role, and the mean is a mixture
-            of seeds rather than a shape any run has. The dashed line
-            is the readability profile of the *un-anchored control*,
-            $R^2(\ell, t)$ — a ridge probe predicting op1's redness from the
-            state at each (slice, role), one color held out at a time — the
-            same reference in every column of a row (its own seed spread is
-            ≤ 0.09 everywhere except op2 at depth, ≈ 0.2). The caret on the
-            embedding row marks the H4(a) gate: op1's weight ≥
-            {ex.LEAD_GATE:g} (uniform is 0.25). The number atop each column
-            is its H4(b) weighted readability gain (gate ≥
-            {ex.READ_GAIN_GATE:g}, scored on the primary).
+            **What the pull chose, against where the concept is readable.** The trained softmin weight profile of each pooled condition (shaded area, seed mean $\bar\pi(\ell, t)$; hairlines, the three seeds individually), over the four span roles, one panel per residual slice with the embedding at the bottom. Where the hairlines separate — the deep slices at τ ≤ 0.03 — each seed's profile is one-hot on a single role, and the mean is a mixture of seeds rather than a shape any run has. The dashed line is the readability profile of the *un-anchored control*, $R^2(\ell, t)$ — a ridge probe predicting op1's redness from the state at each (slice, role), one color held out at a time — the same reference in every column of a row (its own seed spread is ≤ 0.09 everywhere except op2 at depth, ≈ 0.2). The caret on the embedding row marks the H4(a) gate: op1's weight ≥ {ex.LEAD_GATE:g} (uniform is 0.25). The number atop each column is its H4(b) weighted readability gain (gate ≥ {ex.READ_GAIN_GATE:g}, scored on the primary).
         """,
     )
     def _plot() -> plt.Figure:
@@ -1615,41 +1254,11 @@ def _(READ: np.ndarray, cells, pi_bar, read_gain):
     }
     _n_plus = {c: sum(1 for r in roles if r == 1) for c, roles in _s4.items()}
     mo.md(rf"""
-    **H4(a) holds.** At the embedding, the primary's leading role is op1
-    with weight {_emb[_P][0]:.2f} against the {ex.LEAD_GATE:g} gate — and
-    the same is true at every τ ({_emb["pool-t010"][0]:.2f} at 0.01,
-    {_emb["pool-t100"][0]:.2f} at 0.1). Neither contrary outcome occurred
-    where the gate reads: no condition latched the embedding onto `+` or `=`
-    (readability ≈ 0 there), and none stayed uniform. The trained weights
-    concentrate harder than the 0.6–0.8 calibration band predicted from the
-    reference profiles, which is the softmin's self-reinforcement doing what
-    the introduction said it would — just in the right place.
+    **H4(a) holds.** At the embedding, the primary's leading role is op1 with weight {_emb[_P][0]:.2f} against the {ex.LEAD_GATE:g} gate — and the same is true at every τ ({_emb["pool-t010"][0]:.2f} at 0.01, {_emb["pool-t100"][0]:.2f} at 0.1). Neither contrary outcome occurred where the gate reads: no condition latched the embedding onto `+` or `=` (readability ≈ 0 there), and none stayed uniform. The trained weights concentrate harder than the 0.6–0.8 calibration band predicted from the reference profiles, which is the softmin's self-reinforcement doing what the introduction said it would — just in the right place.
 
-    **H4(b) holds.** The primary's weighted readability gain is
-    {read_gain(_P):+.2f}
-    against the {ex.READ_GAIN_GATE:g} gate (pool-t010
-    {read_gain("pool-t010"):+.2f}, pool-t100 {read_gain("pool-t100"):+.2f}).
-    Most of the gain comes from avoiding op2 — the one span role that stays
-    hard to read at depth ($R^2$ {READ[1:, 2].mean():.2f} averaged over the
-    four deep slices, against {READ[1:, [0, 1, 3]].mean():.2f} for the other
-    three roles).
+    **H4(b) holds.** The primary's weighted readability gain is {read_gain(_P):+.2f} against the {ex.READ_GAIN_GATE:g} gate (pool-t010 {read_gain("pool-t010"):+.2f}, pool-t100 {read_gain("pool-t100"):+.2f}). Most of the gain comes from avoiding op2 — the one span role that stays hard to read at depth ($R^2$ {READ[1:, 2].mean():.2f} averaged over the four deep slices, against {READ[1:, [0, 1, 3]].mean():.2f} for the other three roles).
 
-    Across depth the conditions diverge, and seed by seed the divergence is
-    all-or-nothing: the hairlines show each run of the two sharper rungs
-    committing its entire deep-slice weight to a single role. At τ = 0.01
-    that role is `+` in {_n_plus["pool-t010"]} seeds of three and op1 in the
-    other; at τ = 0.03, `+` in {_n_plus["pool-t030"]}; at τ = 0.1 none
-    commit to `+`, and the profile is the sweep's only genuinely graded one
-    at depth (op1 at 0.87–0.97 per seed, with real weight left elsewhere).
-    So the seed-mean's apparent `+` minority at τ = 0.03 is a mixture of
-    one-hot seeds, and the τ trend is a latch-rate trend: 2/3 → 1/3 → 0/3.
-    A `+` latch is a cheap early choice rather than a ruinous one, since `+`
-    at depth reads op1's redness at $R^2$ ≈ {READ[1:, 1].mean():.2f}. The
-    prereg expected migration *toward* the syntax roles with depth in step
-    with readability; what actually distinguishes the healthy runs is that
-    they keep op1 — which stays the *most* readable role at every slice —
-    and the pull only leaves it where τ is sharp enough to lock in an early
-    accident.
+    Across depth the conditions diverge, and seed by seed the divergence is all-or-nothing: the hairlines show each run of the two sharper rungs committing its entire deep-slice weight to a single role. At τ = 0.01 that role is `+` in {_n_plus["pool-t010"]} seeds of three and op1 in the other; at τ = 0.03, `+` in {_n_plus["pool-t030"]}; at τ = 0.1 none commit to `+`, and the profile is the sweep's only genuinely graded one at depth (op1 at 0.87–0.97 per seed, with real weight left elsewhere). So the seed-mean's apparent `+` minority at τ = 0.03 is a mixture of one-hot seeds, and the τ trend is a latch-rate trend: 2/3 → 1/3 → 0/3. A `+` latch is a cheap early choice rather than a ruinous one, since `+` at depth reads op1's redness at $R^2$ ≈ {READ[1:, 1].mean():.2f}. The prereg expected migration *toward* the syntax roles with depth in step with readability; what actually distinguishes the healthy runs is that they keep op1 — which stays the *most* readable role at every slice — and the pull only leaves it where τ is sharp enough to lock in an early accident.
     """)
     return
 
@@ -1674,25 +1283,10 @@ def _(traj):
     @themed(
         name="concentration-timing",
         alt_text="""
-            Two line panels sharing an epoch axis from 0 to 100, each with
-            nine thin curves — one per run, three per pooled condition at tau
-            0.01, 0.03 and 0.1 — and a horizontal reference line at 0.25 for
-            uniform weights. Left panel, op1's weight at the embedding: the
-            nine curves scatter over 0 to 0.8 for the first few epochs, then
-            converge to about 0.8 by epoch 20 and stay flat to the end.
-            Right panel, op1's
-            weight at the last slice: every curve saturates by epoch 8 and
-            never moves again. Two of the three tau 0.01 curves fall to 0 by
-            epoch 3 and the third rises to 1; one tau 0.03 curve falls to 0
-            while the other two rise to 1; all three tau 0.1 curves rise to
-            about 0.9 and hold there, short of saturation.
+            Two line panels sharing an epoch axis from 0 to 100, each with nine thin curves — one per run, three per pooled condition at tau 0.01, 0.03 and 0.1 — and a horizontal reference line at 0.25 for uniform weights. Left panel, op1's weight at the embedding: the nine curves scatter over 0 to 0.8 for the first few epochs, then converge to about 0.8 by epoch 20 and stay flat to the end. Right panel, op1's weight at the last slice: every curve saturates by epoch 8 and never moves again. Two of the three tau 0.01 curves fall to 0 by epoch 3 and the third rises to 1; one tau 0.03 curve falls to 0 while the other two rise to 1; all three tau 0.1 curves rise to about 0.9 and hold there, short of saturation.
         """,
         caption=r"""
-            **When the pull decides.** op1's share of the softmin weight
-            over training, at the embedding (**left**) and at the last slice
-            (**right**), one line per run; the thin rule is uniform (0.25).
-            The vertical band is the anchor's warmup window (epochs 0–10);
-            the repulsion anneal runs to epoch 90.
+            **When the pull decides.** op1's share of the softmin weight over training, at the embedding (**left**) and at the last slice (**right**), one line per run; the thin rule is uniform (0.25). The vertical band is the anchor's warmup window (epochs 0–10); the repulsion anneal runs to epoch 90.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1731,23 +1325,7 @@ def _(traj):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    The choice is made during the anchor ramp, run by run. Every run's
-    embedding weight settles by about epoch 20, and every run's deep-slice
-    choice is committed by epoch 8 — the τ = 0.01 latches by epoch 2–3,
-    before the anchor has even finished warming up — and no choice changes
-    for the rest of training. Nor is there much reason it should: once the
-    softmin has concentrated, the losing roles receive no pull, and late
-    training supplies no perturbation of the needed size — the learning
-    rate is decaying, the regularizer weights are annealing, and 100 epochs
-    is generous for this corpus, so the task loss has long converged. Two
-    consequences: the long repulsion anneal that ex-2.1.8 tuned matters for
-    containment rather than for position choice (whatever the repulsion
-    contributes to the choice, it contributes in the first few epochs,
-    before the softmin closes), and any intervention on the choice — a τ
-    schedule that starts soft and sharpens, say — has to land in that same
-    window. The latch, then, is a race at initialization: whichever role
-    happens to align cheapest in the first few hundred steps keeps the
-    weight, which is why the winner-take-most rung latches most often.
+    The choice is made during the anchor ramp, run by run. Every run's embedding weight settles by about epoch 20, and every run's deep-slice choice is committed by epoch 8 — the τ = 0.01 latches by epoch 2–3, before the anchor has even finished warming up — and no choice changes for the rest of training. Nor is there much reason it should: once the softmin has concentrated, the losing roles receive no pull, and late training supplies no perturbation of the needed size — the learning rate is decaying, the regularizer weights are annealing, and 100 epochs is generous for this corpus, so the task loss has long converged. Two consequences: the long repulsion anneal that ex-2.1.8 tuned matters for containment rather than for position choice (whatever the repulsion contributes to the choice, it contributes in the first few epochs, before the softmin closes), and any intervention on the choice — a τ schedule that starts soft and sharpens, say — has to land in that same window. The latch, then, is a race at initialization: whichever role happens to align cheapest in the first few hundred steps keeps the weight, which is why the winner-take-most rung latches most often.
     """)
     return
 
@@ -1771,22 +1349,10 @@ def _(arrays, cells):
     @themed(
         name="grading-by-seed",
         alt_text="""
-            Three line panels, one per pooled condition at tau 0.01, 0.03 and
-            0.1, sharing axes: mean response against redness of op1 from 0 to
-            1, three lines per panel, one per run, colored red if the run's
-            deep slices kept op1 and blue if they latched onto plus. Red
-            lines rise smoothly from near 0 at low redness to about 0.9 at
-            redness 1 in every panel. Blue lines — two in the tau 0.01 panel,
-            one in the tau 0.03 panel, none at tau 0.1 — track near zero all
-            the way to redness 0.72, then jump to about 0.5 at redness 0.8
-            and 0.7 by redness 1: a step where the red lines have a slope.
+            Three line panels, one per pooled condition at tau 0.01, 0.03 and 0.1, sharing axes: mean response against redness of op1 from 0 to 1, three lines per panel, one per run, colored red if the run's deep slices kept op1 and blue if they latched onto plus. Red lines rise smoothly from near 0 at low redness to about 0.9 at redness 1 in every panel. Blue lines — two in the tau 0.01 panel, one in the tau 0.03 panel, none at tau 0.1 — track near zero all the way to redness 0.72, then jump to about 0.5 at redness 0.8 and 0.7 by redness 1: a step where the red lines have a slope.
         """,
         caption=r"""
-            **The shelf, split by each run's deep-slice choice.** The
-            grading response of every pooled run — the mean response at each
-            of the 29 redness levels, as in the H3(c) figure but one line
-            per run — colored by where that run's slice-4 softmin weight
-            ended: op1 kept (red) or latched onto `+` (blue).
+            **The shelf, split by each run's deep-slice choice.** The grading response of every pooled run — the mean response at each of the 29 redness levels, as in the H3(c) figure but one line per run — colored by where that run's slice-4 softmin weight ended: op1 kept (red) or latched onto `+` (blue).
         """,
     )
     def _plot() -> plt.Figure:
@@ -1826,18 +1392,7 @@ def _(arrays, cells):
     _hi = np.mean([_resp_at("pool-t010", s, 0.8) for s in _latched])
     _lo = np.mean([_resp_at("pool-t010", s, 0.72) for s in _latched])
     mo.md(rf"""
-    The shelf belongs to the latched runs. In the runs whose deep slices
-    kept op1, the response grades smoothly with redness at every τ. In the
-    runs that latched onto `+`, it holds up only at the red end and drops
-    sharply below redness 0.8 — `pool-t010`'s two latched runs average
-    {_hi:.2f} at redness 0.8 and {_lo:.2f} at 0.72, where its op1-keeping
-    run reads {_resp_at("pool-t010", _kept, 0.72):.2f} — which is also where
-    the label affinity falls away steeply. That reading makes sense of the
-    mechanism: in a latched run only the embedding slice still pulls op1, so
-    a color keeps its alignment only to the extent that its lines keep
-    getting labeled, and the graded contribution the deep slices add in
-    healthy runs is missing. The seed-mean scatter under H3(c) blends the
-    two shapes, which is what the `pool-t010` panel's shelf is.
+    The shelf belongs to the latched runs. In the runs whose deep slices kept op1, the response grades smoothly with redness at every τ. In the runs that latched onto `+`, it holds up only at the red end and drops sharply below redness 0.8 — `pool-t010`'s two latched runs average {_hi:.2f} at redness 0.8 and {_lo:.2f} at 0.72, where its op1-keeping run reads {_resp_at("pool-t010", _kept, 0.72):.2f} — which is also where the label affinity falls away steeply. That reading makes sense of the mechanism: in a latched run only the embedding slice still pulls op1, so a color keeps its alignment only to the extent that its lines keep getting labeled, and the graded contribution the deep slices add in healthy runs is missing. The seed-mean scatter under H3(c) blends the two shapes, which is what the `pool-t010` panel's shelf is.
     """)
     return
 
@@ -1855,27 +1410,10 @@ def _(ANCHORED, READ: np.ndarray, metrics):
     @themed(
         name="readability-profiles",
         alt_text="""
-            A five-by-five grid of small flush panels. Columns are the five
-            anchored conditions from span-mean through the pooled taus to
-            op1-oracle; rows are residual slices with the last slice on top
-            and the embedding at the bottom; each panel spans the four span
-            roles op1, plus, op2 and equals horizontally, 0 to 1 vertically.
-            A solid line with three faint hairlines shows each condition's
-            own readability, a dashed line the un-anchored control's. In
-            every column the solid line sits at or slightly above the dashed
-            one: op1 about 0.9 on every row, plus and equals about 0.8 to
-            0.9 on all rows but the embedding, where both drop to zero, op2
-            low. The one departure is the span-mean column, where op2 rises
-            to about 0.7 on the deep rows against about 0.2 in the dashed
-            control and in every other column.
+            A five-by-five grid of small flush panels. Columns are the five anchored conditions from span-mean through the pooled taus to op1-oracle; rows are residual slices with the last slice on top and the embedding at the bottom; each panel spans the four span roles op1, plus, op2 and equals horizontally, 0 to 1 vertically. A solid line with three faint hairlines shows each condition's own readability, a dashed line the un-anchored control's. In every column the solid line sits at or slightly above the dashed one: op1 about 0.9 on every row, plus and equals about 0.8 to 0.9 on all rows but the embedding, where both drop to zero, op2 low. The one departure is the span-mean column, where op2 rises to about 0.7 on the deep rows against about 0.2 in the dashed control and in every other column.
         """,
         caption=r"""
-            **Where redness is readable, once a pull has acted.** The same
-            leave-one-color-out ridge probe as H4(b)'s reference, run on the
-            anchored checkpoints: each condition's own $R^2(\ell, t)$ (solid,
-            seed mean; hairlines, seeds) against the un-anchored control's
-            (dashed). Compare the weight profiles above: the pull's weight
-            is far sharper than readability anywhere it concentrates.
+            **Where redness is readable, once a pull has acted.** The same leave-one-color-out ridge probe as H4(b)'s reference, run on the anchored checkpoints: each condition's own $R^2(\ell, t)$ (solid, seed mean; hairlines, seeds) against the un-anchored control's (dashed). Compare the weight profiles above: the pull's weight is far sharper than readability anywhere it concentrates.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1937,29 +1475,11 @@ def _(ANCHORED, READ: np.ndarray, cells, metrics):
         [np.asarray(metrics["readability"][f"pool-t010-s{s}"], dtype=float)[4, 0] for s in _latched10]
     )
     mo.md(rf"""
-    Redness is readable almost everywhere in the anchored runs. In every
-    anchored condition, op1 reads at $R^2$ ≥ {_op1_min:.2f} at every
-    slice, so the anchor axis itself now encodes redness. Past the
-    embedding, `+` and `=` read at {_syn.mean():.2f} on average and never
-    below {_syn.min():.2f}, much as in the control: attention copies the
-    operand's color into each syntax role, whether or not anything pulls
-    there.
+    Redness is readable almost everywhere in the anchored runs. In every anchored condition, op1 reads at $R^2$ ≥ {_op1_min:.2f} at every slice, so the anchor axis itself now encodes redness. Past the embedding, `+` and `=` read at {_syn.mean():.2f} on average and never below {_syn.min():.2f}, much as in the control: attention copies the operand's color into each syntax role, whether or not anything pulls there.
 
-    So the weight profile is not proportional to readability, and it
-    couldn't be: at depth π̄ is one-hot, while $R^2$ is high at three roles
-    of four. The softmin allocates by *alignment cost* among positions
-    nearly all of which could host the concept, which is part of why the
-    latch is a race rather than a search. The latched runs of `pool-t010`
-    still read op1 at {_latched_op1:.2f} at the last slice: the pull
-    wasn't blind there; it had found `+` cheaper first.
+    So the weight profile is not proportional to readability, and it couldn't be: at depth π̄ is one-hot, while $R^2$ is high at three roles of four. The softmin allocates by *alignment cost* among positions nearly all of which could host the concept, which is part of why the latch is a race rather than a search. The latched runs of `pool-t010` still read op1 at {_latched_op1:.2f} at the last slice: the pull wasn't blind there; it had found `+` cheaper first.
 
-    The influence also runs the other way: where the pull keeps spending,
-    it *creates* readability. op2 is the one role the control barely reads,
-    at {READ[3:, 2].mean():.2f} across the two deepest slices. The span
-    mean never stops pulling op2, and there it reads
-    {_R["span-mean"][3:, 2].mean():.2f}; the primary condition's pool
-    withdrew from op2, and there it reads
-    {_R["pool-t030"][3:, 2].mean():.2f}, back at the control's level.
+    The influence also runs the other way: where the pull keeps spending, it *creates* readability. op2 is the one role the control barely reads, at {READ[3:, 2].mean():.2f} across the two deepest slices. The span mean never stops pulling op2, and there it reads {_R["span-mean"][3:, 2].mean():.2f}; the primary condition's pool withdrew from op2, and there it reads {_R["pool-t030"][3:, 2].mean():.2f}, back at the control's level.
     """)
     return
 
@@ -1969,17 +1489,10 @@ def _():
     mo.md(r"""
     Candidates we didn't run, queued in the project backlog:
 
-    - Per-color weight maps: do strongly-red lines concentrate
-      differently from weakly-red ones?
-    - Where the `+` embedding drift comes from, and when: it persists
-      even under the op1 oracle, as noted under H2. Recording drift per
-      role in the trajectory would settle the timing.
-    - Two ways to avoid the latch: a τ schedule that starts soft and
-      sharpens, or position dropout in the pool — mask a random subset
-      of span positions out of the softmin each step, so no single
-      position can absorb the whole pull early.
-    - More seeds at the chosen rung. Three per condition gives only a
-      coarse estimate of the latch rate.
+    - Per-color weight maps: do strongly-red lines concentrate differently from weakly-red ones?
+    - Where the `+` embedding drift comes from, and when: it persists even under the op1 oracle, as noted under H2. Recording drift per role in the trajectory would settle the timing.
+    - Two ways to avoid the latch: a τ schedule that starts soft and sharpens, or position dropout in the pool — mask a random subset of span positions out of the softmin each step, so no single position can absorb the whole pull early.
+    - More seeds at the chosen rung. Three per condition gives only a coarse estimate of the latch rate.
     """)
     return
 
@@ -1989,61 +1502,21 @@ def _():
     mo.md(r"""
     ## Discussion
 
-    What this experiment adds to the program is placement *along the
-    sequence*. Where the concept lives in representation space is still
-    chosen up front, as everywhere in SCA: the pull aims at the same
-    fixed anchor direction throughout. The mellowmax adds one further
-    choice: which token positions receive that pull. Left to choose, the
-    pull chooses correctly at the embedding — the one slice where the
-    architecture fixes the right answer, rather than the pull picking a
-    favorite. Later milestones need that, because natural-language labels
-    name concepts, not token positions.
+    What this experiment adds to the program is placement *along the sequence*. Where the concept lives in representation space is still chosen up front, as everywhere in SCA: the pull aims at the same fixed anchor direction throughout. The mellowmax adds one further choice: which token positions receive that pull. Left to choose, the pull chooses correctly at the embedding — the one slice where the architecture fixes the right answer, rather than the pull picking a favorite. Later milestones need that, because natural-language labels name concepts, not token positions.
 
-    The margin question mostly dissolved. Under the max-over-roles
-    statistic, the span mean is already near the oracle, so
-    position-finding was never going to improve the margin much. What it
-    improves is the shape: the pooled pull withdraws drift from op2 and
-    `=` nearly entirely, and the response it leaves at op1 grades better
-    than the response under the span mean.
+    The margin question mostly dissolved. Under the max-over-roles statistic, the span mean is already near the oracle, so position-finding was never going to improve the margin much. What it improves is the shape: the pooled pull withdraws drift from op2 and `=` nearly entirely, and the response it leaves at op1 grades better than the response under the span mean.
 
-    The qualification is the latch. Below τ = 0.1, the deep-slice choice
-    is a per-run race (see the readability probe above): it settles in
-    the first few epochs, is never revisited, and a run that latches onto
-    `+` loses some of the graded response that makes the anchor usable.
-    So sharpening τ is not free — more concentration comes with more risk
-    of committing to the wrong role before the representation has formed.
+    The qualification is the latch. Below τ = 0.1, the deep-slice choice is a per-run race (see the readability probe above): it settles in the first few epochs, is never revisited, and a run that latches onto `+` loses some of the graded response that makes the anchor usable. So sharpening τ is not free — more concentration comes with more risk of committing to the wrong role before the representation has formed.
 
-    One possible remedy is a τ schedule that starts soft and sharpens as
-    the geometry stabilizes. M1 makes that plausible: there, schedules
-    that shaped the latent space at the right time worked where curricula
-    didn't.[^untested] It may be hard to design in a larger model,
-    though. A concept that only forms late in training would meet a pull
-    that has already sharpened around whatever was cheap early. The
-    schedule has to anticipate that timing, and three seeds per rung is
-    too few to estimate the latch rates that would score it.
+    One possible remedy is a τ schedule that starts soft and sharpens as the geometry stabilizes. M1 makes that plausible: there, schedules that shaped the latent space at the right time worked where curricula didn't.[^untested] It may be hard to design in a larger model, though. A concept that only forms late in training would meet a pull that has already sharpened around whatever was cheap early. The schedule has to anticipate that timing, and three seeds per rung is too few to estimate the latch rates that would score it.
 
-    Mellowmax is an interesting finding for M3, where labels get coarser.
-    Its softmin weights are the same per-position responsibilities that
-    an EM-flavored label-assignment scheme would compute,[^em] so the
-    pooled term is already such a scheme, with single tokens as the unit.
-    This experiment says it can locate a concept when the label covers a
-    whole line, although our lines only had four tokens to pool over.
+    Mellowmax is an interesting finding for M3, where labels get coarser. Its softmin weights are the same per-position responsibilities that an EM-flavored label-assignment scheme would compute,[^em] so the pooled term is already such a scheme, with single tokens as the unit. This experiment says it can locate a concept when the label covers a whole line, although our lines only had four tokens to pool over.
 
-    Coarser labels, whether per sentence, per document, or a sliding
-    window with graded scores, would widen the pool: more candidates, and
-    cheaper wrong ones. Nothing here rules that in or out, but this
-    experiment does name the failure mode to design for: early winner-take-all latching,
-    not diffuse smearing. The softest rung suggests the useful regime is
-    soft pooling with a considered choice of *when* to sharpen, rather
-    than hard selection from the start.
+    Coarser labels, whether per sentence, per document, or a sliding window with graded scores, would widen the pool: more candidates, and cheaper wrong ones. Nothing here rules that in or out, but this experiment does name the failure mode to design for: early winner-take-all latching, not diffuse smearing. The softest rung suggests the useful regime is soft pooling with a considered choice of *when* to sharpen, rather than hard selection from the start.
 
-    [^untested]: Regularizer weight schedules are an inheritance from M1.
-        We haven't tested whether this architecture *needs* them: perhaps
-        constant term weights would work.
+    [^untested]: Regularizer weight schedules are an inheritance from M1. We haven't tested whether this architecture *needs* them: perhaps constant term weights would work.
 
-    [^em]: Expectation-maximization: alternate between assigning each item
-        a soft share of responsibility to each component, and refitting
-        the components to those shares.
+    [^em]: Expectation-maximization: alternate between assigning each item a soft share of responsibility to each component, and refitting the components to those shares.
     """)
     return
 

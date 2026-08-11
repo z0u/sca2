@@ -1,20 +1,10 @@
 """Opaque spelled-out names for the char-level name-only language (ex-2.1.4).
 
-Ex-2.1.3's language gives every color a single atomic token, so a name *is* an
-embedding row. This module re-renders the same language for a character-level
-tokenizer, where a name is something the model must read and write one letter
-at a time. The design trap it exists to avoid: the synthetic grid names
-(``c05f``) spell the color's value per character, which at char level is just
-hex with a prefix — and even the classic palette names vary in length, which
-would confound the answer-emission schedule. So every color gets a random
-fixed-length letter string, assigned independently of its value::
+Ex-2.1.3's language gives every color a single atomic token, so a name *is* an embedding row. This module re-renders the same language for a character-level tokenizer, where a name is something the model must read and write one letter at a time. The design trap it exists to avoid: the synthetic grid names (``c05f``) spell the color's value per character, which at char level is just hex with a prefix — and even the classic palette names vary in length, which would confound the answer-emission schedule. So every color gets a random fixed-length letter string, assigned independently of its value::
 
     tkzk + qwfd = hjnp
 
-No character carries channel information; the binding from spelling to value
-is holistic. Corpora and eval sets come from re-rendering
-`sca.data.named_colors` examples (same pairs, same splits, same operand
-orders), so the only difference from ex-2.1.3 is the tokenizer's view.
+No character carries channel information; the binding from spelling to value is holistic. Corpora and eval sets come from re-rendering `sca.data.named_colors` examples (same pairs, same splits, same operand orders), so the only difference from ex-2.1.3 is the tokenizer's view.
 """
 
 from typing import Iterable
@@ -38,8 +28,7 @@ def alphabet() -> list[str]:
 def opaque_names(levels: Iterable[int], seed: int) -> dict[str, Rgb]:
     """A random fixed-length letter name for every grid color (name → value).
 
-    Names are drawn without replacement from the length-``NAME_LEN`` strings
-    and assigned to colors independently of their values.
+    Names are drawn without replacement from the length-``NAME_LEN`` strings and assigned to colors independently of their values.
     """
     colors = list(grid_palette(levels).values())
     rng = np.random.default_rng(seed)
@@ -51,8 +40,7 @@ def opaque_names(levels: Iterable[int], seed: int) -> dict[str, Rgb]:
 def rename(ex: Example, names: dict[Rgb, str]) -> Example:
     """Re-render a named-only example under different names, preserving operand order.
 
-    `named_colors.make_example` renders ``lhs`` first, so the operand order
-    survives the round trip; open pairs keep their empty answer.
+    `named_colors.make_example` renders ``lhs`` first, so the operand order survives the round trip; open pairs keep their empty answer.
     """
     assert ex.rhs is not None
     return Example(f"{names[ex.lhs]} + {names[ex.rhs]} = ", names.get(ex.result, ""), ex.lhs, ex.rhs, ex.result)

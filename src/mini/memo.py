@@ -3,20 +3,10 @@ Identity-keyed memoization for multi-step orchestration.
 
 A task record answers two different questions, and the store keeps them apart:
 
-- **Identity — which task is this?** The key: the fn's qualified name plus a
-  fingerprint of its inputs. Stable across code edits, so a record (and its
-  logs, results, history) keeps one address for the task's whole life.
-- **Validity — is the cached result current?** The *evidence* stored on each
-  attempt: a fingerprint of the fn's source plus the source of the project
-  functions/classes it references (transitively), whatever it imports *inside
-  its own body*, and the explicit ``version=``. Stale evidence re-runs the task
-  **in place** — a new attempt under the same key, with the prior attempt
-  compacted into the record's ``history``.
+- **Identity — which task is this?** The key: the fn's qualified name plus a fingerprint of its inputs. Stable across code edits, so a record (and its logs, results, history) keeps one address for the task's whole life.
+- **Validity — is the cached result current?** The *evidence* stored on each attempt: a fingerprint of the fn's source plus the source of the project functions/classes it references (transitively), whatever it imports *inside its own body*, and the explicit ``version=``. Stale evidence re-runs the task **in place** — a new attempt under the same key, with the prior attempt compacted into the record's ``history``.
 
-Both fingerprints must be **deterministic across processes** (every agent wake
-is a fresh process) — hashing ``cloudpickle.dumps(fn)`` fails that (its bytes
-vary run to run), so we fingerprint *source*, which also ignores library churn
-(site-packages and the mini framework itself are excluded).
+Both fingerprints must be **deterministic across processes** (every agent wake is a fresh process) — hashing ``cloudpickle.dumps(fn)`` fails that (its bytes vary run to run), so we fingerprint *source*, which also ignores library churn (site-packages and the mini framework itself are excluded).
 """
 
 from __future__ import annotations
@@ -78,8 +68,7 @@ def _is_project_source(obj: Any) -> bool:
 def _nested_codes(code: types.CodeType) -> Iterator[types.CodeType]:
     """*code* plus every code object nested in it (inner defs, lambdas, genexprs).
 
-    A helper referenced only inside a nested function lives in the *inner* code
-    object's ``co_names``; walking just the outer one would miss it.
+    A helper referenced only inside a nested function lives in the *inner* code object's ``co_names``; walking just the outer one would miss it.
     """
     yield code
     for const in code.co_consts:
@@ -90,13 +79,7 @@ def _nested_codes(code: types.CodeType) -> Iterator[types.CodeType]:
 def _attr_chain_refs(fn: Callable) -> list[Any]:
     """Objects reached through attribute chains rooted at a global (``utils.helper``).
 
-    Bare names are resolved via ``co_names`` ∩ globals, but a helper called as a
-    module attribute never appears in globals under its own name — so without this
-    walk, ``import utils; utils.helper()`` would be *invisible* to the fingerprint
-    and editing the helper would silently serve stale results. We scan the bytecode
-    for ``LOAD_GLOBAL`` → ``LOAD_ATTR``… chains and resolve each step with
-    ``getattr``, collecting any function/class the chain lands on (``pkg.mod.fn``
-    resolves through the intermediate modules).
+    Bare names are resolved via ``co_names`` ∩ globals, but a helper called as a module attribute never appears in globals under its own name — so without this walk, ``import utils; utils.helper()`` would be *invisible* to the fingerprint and editing the helper would silently serve stale results. We scan the bytecode for ``LOAD_GLOBAL`` → ``LOAD_ATTR``… chains and resolve each step with ``getattr``, collecting any function/class the chain lands on (``pkg.mod.fn`` resolves through the intermediate modules).
     """
     code = getattr(fn, "__code__", None)
     g = getattr(fn, "__globals__", {})
@@ -120,9 +103,7 @@ def _attr_chain_refs(fn: Callable) -> list[Any]:
 def _collect_class(cls: type, seen: dict[str, str]) -> None:
     """Collect a class's source, then traverse its methods' *references*.
 
-    The class source already contains the method bodies textually (so editing a
-    method invalidates); traversing the methods is what picks up the helpers and
-    project bases they *call*, which the text alone doesn't reach.
+    The class source already contains the method bodies textually (so editing a method invalidates); traversing the methods is what picks up the helpers and project bases they *call*, which the text alone doesn't reach.
     """
     if cls.__qualname__ in seen:
         return
@@ -143,9 +124,7 @@ def _collect_class(cls: type, seen: dict[str, str]) -> None:
 def _value_json(obj: Any) -> str | None:
     """A stable JSON encoding of a plain value, or ``None`` if it has none.
 
-    No ``default=`` fallback here: an exotic object's ``repr`` can embed a memory
-    address, which would make the fingerprint differ every process — worse than
-    not tracking the value at all. Stable-or-skip.
+    No ``default=`` fallback here: an exotic object's ``repr`` can embed a memory address, which would make the fingerprint differ every process — worse than not tracking the value at all. Stable-or-skip.
     """
     try:
         return json.dumps(_canonical(obj), sort_keys=True)
@@ -156,9 +135,7 @@ def _value_json(obj: Any) -> str | None:
 def _named_refs(fn: Callable) -> list[tuple[str | None, Any]]:
     """Everything *fn* references, as ``(name, object)`` pairs.
 
-    Bare globals (from every nested code object), closure cells (named via
-    ``co_freevars``), and attribute-chain targets (unnamed — they're never
-    treated as values, only as code).
+    Bare globals (from every nested code object), closure cells (named via ``co_freevars``), and attribute-chain targets (unnamed — they're never treated as values, only as code).
     """
     code = getattr(fn, "__code__", None)
     g = getattr(fn, "__globals__", {})
@@ -212,10 +189,7 @@ _PRELUDE = "<module>"
 def _module_file(name: str) -> Path | None:
     """The source file for dotted module *name*, found by searching ``sys.path``.
 
-    Deliberately not ``importlib.util.find_spec``: that imports parent packages,
-    and a deferred import exists precisely because importing here is expensive.
-    A plain path search reads nothing and executes nothing. Cached — ``sys.path``
-    doesn't meaningfully move within a process.
+    Deliberately not ``importlib.util.find_spec``: that imports parent packages, and a deferred import exists precisely because importing here is expensive. A plain path search reads nothing and executes nothing. Cached — ``sys.path`` doesn't meaningfully move within a process.
     """
     rel = Path(*name.split("."))
     for entry in sys.path:
@@ -242,11 +216,7 @@ def _resolve_relative(pkg: str, module: str | None, level: int) -> str | None:
 class _ModuleIndex:
     """A project module's top-level namespace, read from its source file.
 
-    Enough to answer "what does this imported name bind, and what does *it*
-    reach" without importing: the definitions by name, the module's own import
-    bindings, the statements that are neither (they run on import, and can bind
-    names no source read can see), and which names are ever used as something
-    other than the root of an attribute access.
+    Enough to answer "what does this imported name bind, and what does *it* reach" without importing: the definitions by name, the module's own import bindings, the statements that are neither (they run on import, and can bind names no source read can see), and which names are ever used as something other than the root of an attribute access.
     """
 
     name: str
@@ -263,10 +233,7 @@ class _ModuleIndex:
 def _bare_names(tree: ast.AST) -> frozenset[str]:
     """Names loaded somewhere other than as the root of an attribute access.
 
-    A module alias narrows to the attributes actually reached (``mv.lift``) only
-    while *every* use is an attribute access. Once the bare name goes somewhere
-    else — passed to a function, stored in a dict — what it reaches is anyone's
-    guess, and the whole module has to count.
+    A module alias narrows to the attributes actually reached (``mv.lift``) only while *every* use is an attribute access. Once the bare name goes somewhere else — passed to a function, stored in a dict — what it reaches is anyone's guess, and the whole module has to count.
     """
     rooted = {id(n.value) for n in ast.walk(tree) if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)}
     return frozenset(n.id for n in ast.walk(tree) if isinstance(n, ast.Name) and id(n) not in rooted)
@@ -275,9 +242,7 @@ def _bare_names(tree: ast.AST) -> frozenset[str]:
 def _segment(source: str, node: ast.stmt) -> str:
     """A definition's source text, decorators included.
 
-    Whole lines from the first decorator (``ast``'s ``lineno`` for a decorated
-    def points at the ``def`` itself, so a decorator — which changes what the
-    name binds — would otherwise sit outside the text and its edits go unseen).
+    Whole lines from the first decorator (``ast``'s ``lineno`` for a decorated def points at the ``def`` itself, so a decorator — which changes what the name binds — would otherwise sit outside the text and its edits go unseen).
     """
     start = min([node.lineno, *(d.lineno for d in getattr(node, "decorator_list", ()))]) - 1
     return "".join(source.splitlines(keepends=True)[start : node.end_lineno or node.lineno])
@@ -319,8 +284,7 @@ def _is_docstring(node: ast.stmt) -> bool:
 def _module_index(name: str) -> _ModuleIndex | None:
     """Read *name*'s top-level namespace from source.
 
-    ``None`` for anything that isn't project code — the stdlib, an installed
-    package, ``mini`` itself, or a name that resolves to no file at all.
+    ``None`` for anything that isn't project code — the stdlib, an installed package, ``mini`` itself, or a name that resolves to no file at all.
     """
     path = _module_file(name)
     if path is None or not _is_project_file(path):
@@ -349,9 +313,7 @@ def _module_index(name: str) -> _ModuleIndex | None:
 def _package_chain(module: str) -> list[_Ref]:
     """The packages executed on the way down to *module*.
 
-    Their ``__init__`` runs before it does, and that can matter well beyond
-    re-exports — ``sca/__init__.py`` sets ``XLA_FLAGS``, which changes what the
-    task computes.
+    Their ``__init__`` runs before it does, and that can matter well beyond re-exports — ``sca/__init__.py`` sets ``XLA_FLAGS``, which changes what the task computes.
     """
     parts = module.split(".")[:-1]
     return [(".".join(parts[: i + 1]), None) for i in range(len(parts))]
@@ -360,8 +322,7 @@ def _package_chain(module: str) -> list[_Ref]:
 def _imports_within(node: ast.AST, idx: _ModuleIndex) -> list[_Ref]:
     """Every project reference the ``import`` statements inside *node* name.
 
-    At any depth, so a module's own function-local imports are followed the same
-    way the task's are.
+    At any depth, so a module's own function-local imports are followed the same way the task's are.
     """
     out: list[_Ref] = []
     for n in ast.walk(node):
@@ -377,9 +338,7 @@ def _imports_within(node: ast.AST, idx: _ModuleIndex) -> list[_Ref]:
 def _through_attr(idx: _ModuleIndex, root: str, attr: str) -> list[_Ref]:
     """The narrowest reference an ``root.attr`` access implies.
 
-    Through a *module* alias it's the single attribute reached; through anything
-    else — a class, a function, a name defined right here — it's that whole
-    object, whose own source already contains the attribute.
+    Through a *module* alias it's the single attribute reached; through anything else — a class, a function, a name defined right here — it's that whole object, whose own source already contains the attribute.
     """
     if (ref := idx.imports.get(root)) is None:
         return [(idx.name, root)] if root in idx.defs else []
@@ -389,9 +348,7 @@ def _through_attr(idx: _ModuleIndex, root: str, attr: str) -> list[_Ref]:
 
 
 def _node_refs(node: ast.stmt, idx: _ModuleIndex) -> list[_Ref]:
-    """What one definition reaches: names from its own module, attributes through
-    a module alias, and whatever it imports inside its own body.
-    """
+    """What one definition reaches: names from its own module, attributes through a module alias, and whatever it imports inside its own body."""
     out = _imports_within(node, idx)
     for n in ast.walk(node):
         match n:
@@ -440,8 +397,7 @@ def _resolve_ref(ref: _Ref, seen: dict[str, str]) -> list[_Ref]:
 def _collect_deferred(refs: list[_Ref], seen: dict[str, str]) -> None:
     """Fold the source behind each reference into *seen*, transitively.
 
-    A work list rather than recursion: the graph reaches a project's whole import
-    closure in the worst case, and the ceiling wants one place to live.
+    A work list rather than recursion: the graph reaches a project's whole import closure in the worst case, and the ceiling wants one place to live.
     """
     queue, done = list(refs), set[_Ref]()
     while queue:
@@ -466,18 +422,9 @@ def _scan_code(
 ) -> None:
     """Fold one code object's imports and name uses into the shared maps.
 
-    ``IMPORT_NAME`` carries the module and the two values pushed before it are
-    the relative level and the fromlist; the ``IMPORT_FROM``s that follow name
-    what came out of it, and the ``STORE`` after each names the local it lands
-    in. Tracking that local is what lets ``from sca.data import mixed_vocab as
-    mv`` narrow to the ``mv.lift`` the body actually reaches, instead of taking
-    the module whole.
+    ``IMPORT_NAME`` carries the module and the two values pushed before it are the relative level and the fromlist; the ``IMPORT_FROM``s that follow name what came out of it, and the ``STORE`` after each names the local it lands in. Tracking that local is what lets ``from sca.data import mixed_vocab as mv`` narrow to the ``mv.lift`` the body actually reaches, instead of taking the module whole.
 
-    The maps are shared across a function's nested code objects because the two
-    halves usually *are* in different ones: the import binds in the outer body
-    while the attribute is reached from a closure or comprehension inside it.
-    A name reused for something unrelated in a nested scope only ever reads as
-    "used bare", which costs the whole module — the safe direction.
+    The maps are shared across a function's nested code objects because the two halves usually *are* in different ones: the import binds in the outer body while the attribute is reached from a closure or comprehension inside it. A name reused for something unrelated in a nested scope only ever reads as "used bare", which costs the whole module — the safe direction.
     """
     consts: list[Any] = []  # the last two values pushed (level, fromlist)
     module: str | None = None
@@ -577,9 +524,7 @@ def _collect_sources(fn: Callable, seen: dict[str, str]) -> None:
 def _sources_for(fn: Callable) -> tuple[tuple[str, str], ...]:
     """The (cached) sorted dependency manifest for *fn*: ``(name, source-or-value)``.
 
-    Source never changes within one process (every wake is a fresh process), so
-    this caches per fn object — a ``ctx.map`` fingerprints its fn once per wake
-    instead of re-walking the reference graph for every cell.
+    Source never changes within one process (every wake is a fresh process), so this caches per fn object — a ``ctx.map`` fingerprints its fn once per wake instead of re-walking the reference graph for every cell.
     """
     seen: dict[str, str] = {}
     _collect_sources(fn, seen)
@@ -594,13 +539,7 @@ def _code_fingerprint(fn: Callable) -> str:
 def _canonical(o: Any) -> Any:
     """Normalize *o* into a JSON-stable structure — deterministic across processes.
 
-    ``pickle.dumps`` is *not* stable run-to-run for values containing sets, and a
-    Pydantic model carries one (``__pydantic_fields_set__``); set iteration order
-    is hash-randomized per process, so the same config would fingerprint
-    differently each wake and miss the cache (the same trap that ruled out
-    cloudpickle for the *code* fingerprint). So we canonicalize first: models and
-    dataclasses to their field dicts, sets to sorted lists, then JSON with sorted
-    keys downstream.
+    ``pickle.dumps`` is *not* stable run-to-run for values containing sets, and a Pydantic model carries one (``__pydantic_fields_set__``); set iteration order is hash-randomized per process, so the same config would fingerprint differently each wake and miss the cache (the same trap that ruled out cloudpickle for the *code* fingerprint). So we canonicalize first: models and dataclasses to their field dicts, sets to sorted lists, then JSON with sorted keys downstream.
     """
     dump = getattr(o, "model_dump", None)  # pydantic v2, duck-typed (no hard dep on pydantic)
     if callable(dump):
@@ -628,9 +567,7 @@ def _canonical(o: Any) -> Any:
 def _canonical_code(o: Any) -> list | None:
     """Canonical forms for *code passed as data* — keyed by source, not identity.
 
-    A callable's repr embeds a memory address, so without these a callable input
-    would produce a fresh key every process — relaunching the task on every wake.
-    Returns ``None`` for non-code values (handled by :func:`_canonical`).
+    A callable's repr embeds a memory address, so without these a callable input would produce a fresh key every process — relaunching the task on every wake. Returns ``None`` for non-code values (handled by :func:`_canonical`).
     """
     if isinstance(o, types.MethodType):
         return ["method", o.__func__.__qualname__, _code_fingerprint(o.__func__)[:12], _canonical(o.__self__)]
@@ -690,11 +627,7 @@ def _manifest(fn: Callable) -> tuple[tuple[str, str], ...]:
 def task_key(fn: Callable, args: tuple) -> str:
     """The stable *identity* key for calling *fn* with *args*.
 
-    Identity is which task this is — the fn's qualified name plus its inputs —
-    deliberately excluding code: an edited fn re-runs under the **same** key (a
-    new attempt on the same record) instead of orphaning it. Whether the cached
-    result is still *valid* is judged against the evidence from
-    :func:`task_key_parts`, stored per attempt.
+    Identity is which task this is — the fn's qualified name plus its inputs — deliberately excluding code: an edited fn re-runs under the **same** key (a new attempt on the same record) instead of orphaning it. Whether the cached result is still *valid* is judged against the evidence from :func:`task_key_parts`, stored per attempt.
     """
     return task_key_parts(fn, args)[0]
 
@@ -702,12 +635,7 @@ def task_key(fn: Callable, args: tuple) -> str:
 def task_key_parts(fn: Callable, args: tuple, version: str | None = None) -> tuple[str, dict[str, Any]]:
     """The identity key plus the validity evidence to stamp on its next attempt.
 
-    Returns ``(key, parts)``. The key hashes only the fn's module-qualified name
-    and the input fingerprint. *parts* carries what decides staleness — the code
-    fingerprint, ``version=``, and ``deps``: a short hash per tracked dependency
-    (the fn itself, each project helper/class it references, each plain-value
-    global) — so ``mini explain`` can diff two attempts down to *which*
-    dependency moved.
+    Returns ``(key, parts)``. The key hashes only the fn's module-qualified name and the input fingerprint. *parts* carries what decides staleness — the code fingerprint, ``version=``, and ``deps``: a short hash per tracked dependency (the fn itself, each project helper/class it references, each plain-value global) — so ``mini explain`` can diff two attempts down to *which* dependency moved.
     """
     manifest = _manifest(fn)
     blob = "\n--\n".join(f"{k}:{v}" for k, v in manifest)
@@ -736,10 +664,7 @@ def _compact_attempt(rec: dict[str, Any]) -> dict[str, Any]:
 class RecordStore(ABC):
     """A small, flat ``key -> record`` store: the memo's control plane.
 
-    Records are tiny and hot (state, step, latest metrics, heartbeat),
-    last-writer-wins. The local backend is JSON files; the Modal backend is a
-    named ``modal.Dict`` (readable from the client with no remote function). The
-    interface is deliberately minimal so a ``modal.Dict`` satisfies it directly.
+    Records are tiny and hot (state, step, latest metrics, heartbeat), last-writer-wins. The local backend is JSON files; the Modal backend is a named ``modal.Dict`` (readable from the client with no remote function). The interface is deliberately minimal so a ``modal.Dict`` satisfies it directly.
     """
 
     @abstractmethod
@@ -785,13 +710,7 @@ class RecordStore(ABC):
 class LocalRecordStore(RecordStore):
     """``RecordStore`` backed by JSON files under a directory.
 
-    All mutations serialize on one store-wide ``flock``: ``merge`` is
-    read-modify-write, so without the lock two concurrent mergers (a worker's
-    final DONE vs the reaper's FAILED, a heartbeat vs the tick's pid stamp)
-    could each read the same base record and silently drop the other's fields.
-    Reads stay lock-free — ``_atomic_write`` renames, so a reader never sees a
-    half-written file. The lock also makes ``write_if``/``merge_if`` genuinely
-    atomic (check and write under one critical section).
+    All mutations serialize on one store-wide ``flock``: ``merge`` is read-modify-write, so without the lock two concurrent mergers (a worker's final DONE vs the reaper's FAILED, a heartbeat vs the tick's pid stamp) could each read the same base record and silently drop the other's fields. Reads stay lock-free — ``_atomic_write`` renames, so a reader never sees a half-written file. The lock also makes ``write_if``/``merge_if`` genuinely atomic (check and write under one critical section).
     """
 
     def __init__(self, root: Path):
@@ -841,15 +760,9 @@ class LocalRecordStore(RecordStore):
 class MemoStore:
     """Per-experiment content-addressed task store (the orchestration backend).
 
-    Two planes: records (small: state,
-    metrics, heartbeat) live on a ``RecordStore`` control plane; results and
-    tracebacks (large) live on the I/O plane. Locally both are files under
-    ``data_dir``; on Modal the records go to a ``modal.Dict`` and results to the
-    Volume, so the same ``MemoStore`` serves the client (poll/gather) and the
-    remote worker (write-back) without either touching the other's filesystem.
+    Two planes: records (small: state, metrics, heartbeat) live on a ``RecordStore`` control plane; results and tracebacks (large) live on the I/O plane. Locally both are files under ``data_dir``; on Modal the records go to a ``modal.Dict`` and results to the Volume, so the same ``MemoStore`` serves the client (poll/gather) and the remote worker (write-back) without either touching the other's filesystem.
 
-    The cloudpickled *call* is not part of either plane: locally it's staged to
-    disk for the subprocess worker; on Modal it's passed straight to ``spawn``.
+    The cloudpickled *call* is not part of either plane: locally it's staged to disk for the subprocess worker; on Modal it's passed straight to ``spawn``.
     """
 
     def __init__(self, data_dir: Path, records: RecordStore | None = None):
@@ -873,10 +786,7 @@ class MemoStore:
     def result_path(self, key: str, gen: str | None) -> Path:
         """Where attempt *gen* of *key* writes its result.
 
-        Generation-qualified so a superseded worker that survives ``cancel``
-        physically *cannot* overwrite its successor's result — each attempt owns
-        its own file, and readers resolve through the record's current ``gen``.
-        (``None`` — a record from before generations — reads the legacy name.)
+        Generation-qualified so a superseded worker that survives ``cancel`` physically *cannot* overwrite its successor's result — each attempt owns its own file, and readers resolve through the record's current ``gen``. (``None`` — a record from before generations — reads the legacy name.)
         """
         return self.result_dir(key) / (f"result-{gen}.pkl" if gen else "result.pkl")
 
@@ -886,17 +796,12 @@ class MemoStore:
     def artifacts_path(self, key: str, gen: str | None) -> Path:
         """Where attempt *gen* records the blob shas its result references.
 
-        The worker stamps this sidecar next to the result (see
-        :func:`mini._taskworker.execute_task`), so the artifact GC can mark a
-        result's references without unpickling it — no project imports, no
-        arbitrary code, one small read per record however large the result.
+        The worker stamps this sidecar next to the result (see :func:`mini._taskworker.execute_task`), so the artifact GC can mark a result's references without unpickling it — no project imports, no arbitrary code, one small read per record however large the result.
         """
         return self.result_dir(key) / (f"result-{gen}.artifacts.json" if gen else "result.artifacts.json")
 
     def result_artifacts(self, key: str) -> list[str] | None:
-        """Blob shas the current result references, or ``None`` for a record
-        from before the sidecar existed (unpickle the result to find out).
-        """
+        """Blob shas the current result references, or ``None`` for a record from before the sidecar existed (unpickle the result to find out)."""
         p = self.artifacts_path(key, self._gen(key))
         return json.loads(p.read_text()) if p.exists() else None
 
@@ -918,10 +823,7 @@ class MemoStore:
     def update_if(self, key: str, gen: str, **fields: Any) -> bool:
         """Merge *fields* only while attempt *gen* still owns the record.
 
-        The worker-side fence: every write a worker makes passes through here, so
-        once its record is claimed by a successor attempt (or released by
-        ``cancel``/``reap_dead``), a lingering worker can no longer heartbeat, merge
-        DONE over the new attempt's RUNNING, or resurrect cleared fields.
+        The worker-side fence: every write a worker makes passes through here, so once its record is claimed by a successor attempt (or released by ``cancel``/``reap_dead``), a lingering worker can no longer heartbeat, merge DONE over the new attempt's RUNNING, or resurrect cleared fields.
         """
         return self.records_backend.merge_if(key, fields, gen)
 
@@ -933,8 +835,7 @@ class MemoStore:
     def meta(self) -> dict[str, Any]:
         """Run-level metadata (the wall-clock budget / ``deadline_at``), or ``{}``.
 
-        Stored under the reserved ``META_KEY`` so it shares the run's control plane
-        (local JSON / Modal ``Dict``) without ever surfacing as a task.
+        Stored under the reserved ``META_KEY`` so it shares the run's control plane (local JSON / Modal ``Dict``) without ever surfacing as a task.
         """
         return self.records_backend.read(META_KEY) or {}
 
@@ -945,12 +846,7 @@ class MemoStore:
     def requested_keys(self) -> list[str] | None:
         """The keys the DAG requested on its last tick, or ``None`` if never recorded.
 
-        Records are content-keyed, so an edited fn or a removed config leaves its old
-        record behind under a key no wake will request again. This manifest is what
-        lets a read-only view (``status``/``ls``/``watch``) aggregate over the run's
-        *current* records and mark the rest superseded — without re-running ``main``
-        (reads must never tick). ``None`` (a store written before the manifest, or a
-        run never ticked) means "unknown": treat every record as current.
+        Records are content-keyed, so an edited fn or a removed config leaves its old record behind under a key no wake will request again. This manifest is what lets a read-only view (``status``/``ls``/``watch``) aggregate over the run's *current* records and mark the rest superseded — without re-running ``main`` (reads must never tick). ``None`` (a store written before the manifest, or a run never ticked) means "unknown": treat every record as current.
         """
         return self.meta().get("requested")
 
@@ -969,10 +865,7 @@ class MemoStore:
     def dag_complete(self) -> bool | None:
         """Did the last tick run ``main`` to the end, or suspend part-way?
 
-        ``None`` when no tick has recorded it. The distinction a read-only view
-        can't derive for itself: with every launched task DONE, a run whose DAG
-        suspended still has stages to go and needs another ``run`` — while one
-        whose ``main`` returned is finished. Both read "all tasks done".
+        ``None`` when no tick has recorded it. The distinction a read-only view can't derive for itself: with every launched task DONE, a run whose DAG suspended still has stages to go and needs another ``run`` — while one whose ``main`` returned is finished. Both read "all tasks done".
         """
         return self.meta().get("complete")
 
@@ -983,8 +876,7 @@ class MemoStore:
     def budget_expired(self) -> bool:
         """Whether a budget is set *and* its deadline has passed.
 
-        The gate both for tearing a run down (cancel in-flight tasks) and for
-        refusing to launch new work past the deadline.
+        The gate both for tearing a run down (cancel in-flight tasks) and for refusing to launch new work past the deadline.
         """
         d = self.deadline()
         return d is not None and time.time() >= d
@@ -992,9 +884,7 @@ class MemoStore:
     def _with_history(self, key: str, rec: dict[str, Any]) -> dict[str, Any]:
         """Fold the record's prior attempt (if any ran) into *rec*'s ``history``.
 
-        Keys are identity, so a re-run replaces the record in place; compacting
-        the outgoing attempt first is what keeps the task's story — every attempt,
-        its evidence, its outcome — on the one record (``mini explain``).
+        Keys are identity, so a re-run replaces the record in place; compacting the outgoing attempt first is what keeps the task's story — every attempt, its evidence, its outcome — on the one record (``mini explain``).
         """
         prior = self.records_backend.read(key) or {}
         history: list[dict[str, Any]] = list(prior.get("history") or ())
@@ -1007,30 +897,18 @@ class MemoStore:
     def reset(self, key: str) -> None:
         """Clear a record back to un-run (state → None) so the next tick reruns it.
 
-        The retry primitive: a settled-but-not-DONE task is terminal, so re-running
-        takes intent. The cleared attempt is kept in the record's history; stale
-        result/error artifacts are overwritten on the rerun.
+        The retry primitive: a settled-but-not-DONE task is terminal, so re-running takes intent. The cleared attempt is kept in the record's history; stale result/error artifacts are overwritten on the rerun.
         """
         self.records_backend.write(key, self._with_history(key, {"key": key, "state": None}))
 
     def mark_running(
         self, fn: Callable, key: str, parts: dict[str, Any] | None = None, expect_gen: str | None = None
     ) -> str | None:
-        """Claim the record for a fresh attempt: flip it to RUNNING (wholesale,
-        clearing any prior error) under a new generation stamp.
+        """Claim the record for a fresh attempt: flip it to RUNNING (wholesale, clearing any prior error) under a new generation stamp.
 
-        Called by ``Ctx`` before the apparatus spawns the worker, so a poll
-        between stage and first heartbeat sees RUNNING rather than a stale state.
-        *parts* is the validity evidence (``code_fp``/``version``/``deps`` from
-        :func:`task_key_parts`) this attempt runs under; any prior attempt is
-        compacted into ``history``, so ``mini explain`` can answer "why did this
-        re-run" after the fact.
+        Called by ``Ctx`` before the apparatus spawns the worker, so a poll between stage and first heartbeat sees RUNNING rather than a stale state. *parts* is the validity evidence (``code_fp``/``version``/``deps`` from :func:`task_key_parts`) this attempt runs under; any prior attempt is compacted into ``history``, so ``mini explain`` can answer "why did this re-run" after the fact.
 
-        The claim is conditional on *expect_gen* — the ``gen`` the caller read
-        when it classified the record (``None`` = unclaimed). If another ticker
-        claimed the key in between, nothing is written and ``None`` returns
-        (don't spawn — theirs is running). On success, returns the new attempt's
-        ``gen``: the fence every write from that worker must carry.
+        The claim is conditional on *expect_gen* — the ``gen`` the caller read when it classified the record (``None`` = unclaimed). If another ticker claimed the key in between, nothing is written and ``None`` returns (don't spawn — theirs is running). On success, returns the new attempt's ``gen``: the fence every write from that worker must carry.
         """
         gen = secrets.token_hex(4)
         rec = self._with_history(
@@ -1073,22 +951,11 @@ class MemoStore:
 class PollCache:
     """Cheap repeated polling of a ``MemoStore``'s records for large sweeps.
 
-    A settled record (``DONE``/``FAILED``/``CANCELLED``) is immutable, so once
-    seen it never needs re-reading. Each ``records`` call re-reads only the
-    unsettled subset (plus any keys not seen yet); the settled tail is served
-    from memory. On Modal every record read is a ``modal.Dict`` round-trip, so a
-    long sweep that's mostly done stops paying for the part that can't change —
-    the watch loops poll just the handful still in flight.
+    A settled record (``DONE``/``FAILED``/``CANCELLED``) is immutable, so once seen it never needs re-reading. Each ``records`` call re-reads only the unsettled subset (plus any keys not seen yet); the settled tail is served from memory. On Modal every record read is a ``modal.Dict`` round-trip, so a long sweep that's mostly done stops paying for the part that can't change — the watch loops poll just the handful still in flight.
 
-    A reaper may settle a stale ``RUNNING`` record out from under us. That key was
-    unsettled (so not cached), and the reaper writes it through ``MemoStore``, so
-    the next ``records`` re-reads it once and caches the now-terminal record —
-    nothing stale lingers.
+    A reaper may settle a stale ``RUNNING`` record out from under us. That key was unsettled (so not cached), and the reaper writes it through ``MemoStore``, so the next ``records`` re-reads it once and caches the now-terminal record — nothing stale lingers.
 
-    A *tick* can relaunch a settled record in place (keys are identity; an edit
-    makes a new attempt, it doesn't re-key), so a cache must not outlive a tick —
-    ``drive_and_watch`` rebuilds its cache per stage. Between ticks, settled is
-    settled.
+    A *tick* can relaunch a settled record in place (keys are identity; an edit makes a new attempt, it doesn't re-key), so a cache must not outlive a tick — ``drive_and_watch`` rebuilds its cache per stage. Between ticks, settled is settled.
     """
 
     def __init__(self) -> None:

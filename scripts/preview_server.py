@@ -1,17 +1,9 @@
 #!/usr/bin/env python
 """Serve a locally-assembled ``_site/`` with GitHub Pages semantics.
 
-``npx serve`` (serve-handler) decides file-vs-directory from ``path.extname()``, a
-string check — so it mistakes our dotted report dirs (``m1/ex-2.9.1``) for files,
-skips its ``index.html`` lookup, and renders a directory listing. Working around it
-with redirects means emitting 301s, which browsers cache permanently and replay as
-loops long after the config is fixed.
+``npx serve`` (serve-handler) decides file-vs-directory from ``path.extname()``, a string check — so it mistakes our dotted report dirs (``m1/ex-2.9.1``) for files, skips its ``index.html`` lookup, and renders a directory listing. Working around it with redirects means emitting 301s, which browsers cache permanently and replay as loops long after the config is fixed.
 
-So we stat the filesystem instead, matching GitHub Pages: a directory with no
-``index.html`` is a 404; one that has it redirects to the trailing-slash form (so the
-page's relative ``_assets/`` resolve against ``…/ex-2.1.1/``, not its parent) and then
-serves the index. The redirect is a 302, not GitHub's 301 — a preview server churns,
-and a cached permanent redirect is the exact footgun that made us drop ``npx serve``.
+So we stat the filesystem instead, matching GitHub Pages: a directory with no ``index.html`` is a 404; one that has it redirects to the trailing-slash form (so the page's relative ``_assets/`` resolve against ``…/ex-2.1.1/``, not its parent) and then serves the index. The redirect is a 302, not GitHub's 301 — a preview server churns, and a cached permanent redirect is the exact footgun that made us drop ``npx serve``.
 """
 
 import sys

@@ -1,14 +1,9 @@
 #!/usr/bin/env python
 """Fast, non-interactive credential status check (`./go auth --check`).
 
-Agents (and humans) often don't realise Modal and Hugging Face are already
-authenticated in a fresh shell — and poking at the raw tools to find out can
-spill a token into a transcript. This runs each provider's real CLI
-concurrently and reports only whether the credential works plus safe metadata
-(workspace, bucket, user); never the secret itself.
+Agents (and humans) often don't realise Modal and Hugging Face are already authenticated in a fresh shell — and poking at the raw tools to find out can spill a token into a transcript. This runs each provider's real CLI concurrently and reports only whether the credential works plus safe metadata (workspace, bucket, user); never the secret itself.
 
-Every probe runs with stdin closed and a timeout, so an unauthenticated tool
-reports "not logged in" instead of blocking on a prompt.
+Every probe runs with stdin closed and a timeout, so an unauthenticated tool reports "not logged in" instead of blocking on a prompt.
 """
 
 from __future__ import annotations
@@ -37,8 +32,7 @@ class Status:
 async def _run(*cmd: str, timeout: float = 15.0) -> tuple[int, str, str]:
     """Run *cmd*, returning ``(returncode, stdout, stderr)``.
 
-    Closes stdin so a tool that would prompt fails fast, and kills the child on
-    timeout. A missing binary is reported as code 127 (like a shell would).
+    Closes stdin so a tool that would prompt fails fast, and kills the child on timeout. A missing binary is reported as code 127 (like a shell would).
     """
     try:
         proc = await asyncio.create_subprocess_exec(*cmd, stdin=DEVNULL, stdout=PIPE, stderr=PIPE)
@@ -124,14 +118,10 @@ async def check_claude() -> Status:
 def _relevant_checks() -> list[Callable[[], Coroutine[Any, Any, Status]]]:
     """The probes worth running in this environment.
 
-    Modal and Hugging Face (the resources agents miss) always run. The other two
-    are context-dependent:
+    Modal and Hugging Face (the resources agents miss) always run. The other two are context-dependent:
 
-    - Skip GitHub on Claude Code for the web (``CLAUDE_CODE_REMOTE``): there GitHub
-      is reached through the MCP tools, ``gh`` isn't installed, and the network
-      policy blocks its API — so a ❌ would be noise, not signal.
-    - Skip the Claude Code check when Claude itself is the caller (``CLAUDECODE``):
-      its own auth is irrelevant to the run.
+    - Skip GitHub on Claude Code for the web (``CLAUDE_CODE_REMOTE``): there GitHub is reached through the MCP tools, ``gh`` isn't installed, and the network policy blocks its API — so a ❌ would be noise, not signal.
+    - Skip the Claude Code check when Claude itself is the caller (``CLAUDECODE``): its own auth is irrelevant to the run.
     """
     checks: list[Callable[[], Coroutine[Any, Any, Status]]] = [check_modal, check_hf]
     if os.environ.get("CLAUDE_CODE_REMOTE") != "true":

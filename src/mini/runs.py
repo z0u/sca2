@@ -1,11 +1,7 @@
 """
 Shared durable-state primitives for the memoized orchestration.
 
-The control plane is small, hot, last-writer-wins JSON (per-task state, metrics,
-heartbeat); the I/O plane holds the large artifacts. This module owns the bits
-both planes and both backends need: the ``RunState`` enum, atomic/merge JSON
-writes (so concurrent readers never see a half-written file), and the detached
-task-worker spawn. The rest of the state model lives in ``mini.memo``.
+The control plane is small, hot, last-writer-wins JSON (per-task state, metrics, heartbeat); the I/O plane holds the large artifacts. This module owns the bits both planes and both backends need: the ``RunState`` enum, atomic/merge JSON writes (so concurrent readers never see a half-written file), and the detached task-worker spawn. The rest of the state model lives in ``mini.memo``.
 """
 
 from __future__ import annotations
@@ -40,12 +36,7 @@ _ROOT_MARKERS = ("pyproject.toml", ".git")
 def data_root() -> Path:
     """The project's ``.mini`` store, anchored at the project root.
 
-    Every ``mini`` command shares one store regardless of cwd: we walk up from the
-    current directory for a project marker (``pyproject.toml`` / ``.git``) and put
-    ``.mini`` beside it, falling back to cwd if none is found. Resolved *lazily*
-    (per call, off the live cwd) — not frozen at import — so a process that changes
-    directory, and tests that ``chdir`` into a tmp dir, both see the right root.
-    The path is absolute, so detached workers stay correct under their own cwd.
+    Every ``mini`` command shares one store regardless of cwd: we walk up from the current directory for a project marker (``pyproject.toml`` / ``.git``) and put ``.mini`` beside it, falling back to cwd if none is found. Resolved *lazily* (per call, off the live cwd) — not frozen at import — so a process that changes directory, and tests that ``chdir`` into a tmp dir, both see the right root. The path is absolute, so detached workers stay correct under their own cwd.
     """
     cwd = Path.cwd().resolve()
     for d in (cwd, *cwd.parents):
@@ -55,9 +46,7 @@ def data_root() -> Path:
 
 
 def _gpus() -> tuple[str | None, int]:
-    """Best-effort GPU model + count, dependency-free. NVIDIA exposes a per-GPU
-    info file on Linux; we don't import torch/jax just to name the card.
-    """
+    """Best-effort GPU model + count, dependency-free. NVIDIA exposes a per-GPU info file on Linux; we don't import torch/jax just to name the card."""
     model, count = None, 0
     for info in sorted(Path("/proc/driver/nvidia/gpus").glob("*/information")):
         count += 1
@@ -107,12 +96,7 @@ _NUMERICS_ENV_KEYS = ("XLA_FLAGS",)
 def compute_env() -> dict[str, Any]:
     """A snapshot of *what a task actually ran on*, recorded by the worker.
 
-    Captured inside the worker process (local subprocess or Modal container), so it
-    reflects the real execution environment rather than the requested backend —
-    useful when a sweep fans out across heterogeneous Modal containers. Kept small
-    (it rides the hot control-plane record): host, OS/arch, Python, CPU/RAM, the GPU
-    model + count if any, the numerics env (``_NUMERICS_ENV_KEYS``), and — on Modal —
-    the container/region/cloud ids (never any token or secret; see ``_MODAL_ENV_KEYS``).
+    Captured inside the worker process (local subprocess or Modal container), so it reflects the real execution environment rather than the requested backend — useful when a sweep fans out across heterogeneous Modal containers. Kept small (it rides the hot control-plane record): host, OS/arch, Python, CPU/RAM, the GPU model + count if any, the numerics env (``_NUMERICS_ENV_KEYS``), and — on Modal — the container/region/cloud ids (never any token or secret; see ``_MODAL_ENV_KEYS``).
     """
     env: dict[str, Any] = {
         "host": platform.node(),
@@ -149,12 +133,7 @@ SETTLED = {RunState.DONE, RunState.FAILED, RunState.CANCELLED}
 def is_queued(rec: dict) -> bool:
     """Launched but no worker has started yet — queued, not actually running.
 
-    The client claims RUNNING *before* the apparatus spawns the worker, and
-    ``env`` is the worker's first write once it truly starts. So RUNNING with no
-    ``env`` means the task is still waiting to be scheduled: a momentary blip
-    locally, but on Modal a capacity-starved task can sit here indefinitely
-    (only the wall-clock budget reaps it). Display-only — settling stays with
-    ``reap_dead``/``enforce_budget``.
+    The client claims RUNNING *before* the apparatus spawns the worker, and ``env`` is the worker's first write once it truly starts. So RUNNING with no ``env`` means the task is still waiting to be scheduled: a momentary blip locally, but on Modal a capacity-starved task can sit here indefinitely (only the wall-clock budget reaps it). Display-only — settling stays with ``reap_dead``/``enforce_budget``.
     """
     return rec.get("state") == RunState.RUNNING and not rec.get("env")
 
@@ -172,11 +151,7 @@ any healthy emission gap we've seen while still catching zombies early.
 def stale_heartbeat(rec: dict, now: float | None = None) -> bool:
     """Is this RUNNING task's heartbeat suspiciously old — worker possibly dead?
 
-    Backend-agnostic and *display-only*: badges in ``status``/``watch`` use it to
-    keep the human/agent-visible signal honest even where a backend liveness
-    probe has a blind spot (#20). Settling stays with ``reap_dead``/
-    ``enforce_budget``; a queued record's heartbeat is just its launch stamp, so
-    queued tasks are never stale (they get the ``⧖`` treatment instead).
+    Backend-agnostic and *display-only*: badges in ``status``/``watch`` use it to keep the human/agent-visible signal honest even where a backend liveness probe has a blind spot (#20). Settling stays with ``reap_dead``/ ``enforce_budget``; a queued record's heartbeat is just its launch stamp, so queued tasks are never stale (they get the ``⧖`` treatment instead).
     """
     if rec.get("state") != RunState.RUNNING or is_queued(rec):
         return False
@@ -187,10 +162,7 @@ def stale_heartbeat(rec: dict, now: float | None = None) -> bool:
 def progress_age(rec: dict, now: float | None = None) -> float | None:
     """Seconds since this RUNNING task's step last advanced, or ``None``.
 
-    Anchored on ``progress_at`` (the worker's last ``(step, total)`` advance) and
-    falling back to ``started_at`` for a worker that hasn't emitted yet — so the
-    age is meaningful from the moment the worker truly starts. ``None`` for
-    queued/settled records, where "progress" has no referent.
+    Anchored on ``progress_at`` (the worker's last ``(step, total)`` advance) and falling back to ``started_at`` for a worker that hasn't emitted yet — so the age is meaningful from the moment the worker truly starts. ``None`` for queued/settled records, where "progress" has no referent.
     """
     if rec.get("state") != RunState.RUNNING or is_queued(rec):
         return None
@@ -201,20 +173,9 @@ def progress_age(rec: dict, now: float | None = None) -> float | None:
 def stale_progress(rec: dict, now: float | None = None) -> bool:
     """Is this RUNNING task's *step* frozen suspiciously long — worker possibly wedged?
 
-    The companion to :func:`stale_heartbeat` for the wedge failure mode: a
-    hung device call or deadlocked thread can leave emissions (heartbeats)
-    flowing while ``step`` never advances, so heartbeat staleness never trips.
-    Display-only, like the heartbeat badge. The threshold is the worker's own
-    watchdog threshold when it stamped one (past it, the watchdog itself has
-    evidently failed to fire — worth flagging loudly), else the generic
-    ``STALE_HEARTBEAT_S``. Before the first emission the watchdog applies its
-    startup grace instead of the tight timeout, so the badge matches: a worker
-    legitimately tokenizing for ten minutes is not "possibly wedged" yet.
+    The companion to :func:`stale_heartbeat` for the wedge failure mode: a hung device call or deadlocked thread can leave emissions (heartbeats) flowing while ``step`` never advances, so heartbeat staleness never trips. Display-only, like the heartbeat badge. The threshold is the worker's own watchdog threshold when it stamped one (past it, the watchdog itself has evidently failed to fire — worth flagging loudly), else the generic ``STALE_HEARTBEAT_S``. Before the first emission the watchdog applies its startup grace instead of the tight timeout, so the badge matches: a worker legitimately tokenizing for ten minutes is not "possibly wedged" yet.
 
-    A task inside a declared blocking phase (:func:`~mini.progress.blocking_phase`
-    — a checkpoint upload, a large pull) stamps ``phase_until``, and is not
-    stale until that budget runs out. Same reasoning as the grace: the span has
-    no steps to report and is healthy anyway.
+    A task inside a declared blocking phase (:func:`~mini.progress.blocking_phase` — a checkpoint upload, a large pull) stamps ``phase_until``, and is not stale until that budget runs out. Same reasoning as the grace: the span has no steps to report and is healthy anyway.
     """
     age = progress_age(rec, now)
     if age is None:
@@ -245,13 +206,9 @@ def _merge_json(path: Path, fields: dict) -> None:
 def spawn_taskworker(data_dir: Path, key: str, env: dict[str, str] | None = None) -> int:
     """Launch a detached worker for one memoized task *key*; return its pid.
 
-    The local implementation of ``Apparatus.spawn_task``: a subprocess that runs
-    the staged call (``MemoStore._call``) and persists its result/state under the
-    content key, outliving the orchestration tick that launched it.
+    The local implementation of ``Apparatus.spawn_task``: a subprocess that runs the staged call (``MemoStore._call``) and persists its result/state under the content key, outliving the orchestration tick that launched it.
 
-    *env* is overlaid on the parent environment, the local counterpart of Modal's
-    per-container env: a fresh process per task, so a library that reads its env
-    once at init sees this task's setting rather than an earlier task's.
+    *env* is overlaid on the parent environment, the local counterpart of Modal's per-container env: a fresh process per task, so a library that reads its env once at init sees this task's setting rather than an earlier task's.
     """
     proc = subprocess.Popen(
         [sys.executable, "-m", "mini._taskworker", str(data_dir), key],

@@ -1,20 +1,9 @@
 """
 Figures for the landmark probe maps.
 
-:mod:`sca.compute.geometry` scores a leave-one-out probe at every depth × grammar
-landmark, per surface form and per target (the two operands and their mix). The
-heatmap view of a map averages its three RGB channels into one number per cell;
-the traces here keep the channels apart — one step-line each — and stack the
-depths vertically, so a column of panels reads as a column of the heatmap and the
-mean of a panel's three lines is the matching heatmap cell.
+:mod:`sca.compute.geometry` scores a leave-one-out probe at every depth × grammar landmark, per surface form and per target (the two operands and their mix). The heatmap view of a map averages its three RGB channels into one number per cell; the traces here keep the channels apart — one step-line each — and stack the depths vertically, so a column of panels reads as a column of the heatmap and the mean of a panel's three lines is the matching heatmap cell.
 
-The x axis is ordinal: each landmark is one character position, and consecutive
-landmarks are usually *not* consecutive characters. Two things follow, and the
-drawing conventions here exist for them. Values are drawn as plateaus joined by
-risers (:func:`~mini.vis.smooth_step`), because a straight line between landmarks
-would claim measurements that were never made. And risers that jump a stretch of
-unprobed text are *elided* — drawn in lighter ink — so the reader can tell an
-interpolation from a step between neighbours.
+The x axis is ordinal: each landmark is one character position, and consecutive landmarks are usually *not* consecutive characters. Two things follow, and the drawing conventions here exist for them. Values are drawn as plateaus joined by risers (:func:`~mini.vis.smooth_step`), because a straight line between landmarks would claim measurements that were never made. And risers that jump a stretch of unprobed text are *elided* — drawn in lighter ink — so the reader can tell an interpolation from a step between neighbours.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
@@ -71,8 +60,7 @@ def channel_colors() -> tuple[str, str, str]:
 def mean_color() -> str:
     """Ink for the channel mean.
 
-    Deliberately hueless: the channels own the hues, and the mean is a summary of them
-    rather than a fourth thing measured alongside them.
+    Deliberately hueless: the channels own the hues, and the mean is a summary of them rather than a fourth thing measured alongside them.
     """
     return light_dark("#444", "#ccc")
 
@@ -80,9 +68,7 @@ def mean_color() -> str:
 def transfer_color() -> str:
     """Ink for a zero-shot cross-form reading, drawn over the within-form area.
 
-    Amber, which is outside the R/G/B hues :func:`channel_colors` spends: a cross-form
-    trace is a whole-value reading, and a red line here would invite the channel reading
-    the rest of the report has trained.
+    Amber, which is outside the R/G/B hues :func:`channel_colors` spends: a cross-form trace is a whole-value reading, and a red line here would invite the channel reading the rest of the report has trained.
     """
     return light_dark("#b06a00", "#e0a458")
 
@@ -90,11 +76,7 @@ def transfer_color() -> str:
 def aliased_risers(stack: np.ndarray) -> frozenset[int]:
     """Risers between landmarks that resolved to the same character, so their columns match bit for bit.
 
-    A riser there would span zero real distance and read as a wide plateau, inflating how
-    much of the equation looks flat — so break the line instead. Pass the result as
-    ``breaks``. The current landmark scheme has no such pair (the answer is sampled like
-    an operand, two characters in from each end), so this is normally empty; it is a
-    safety net for a scheme that reintroduces one.
+    A riser there would span zero real distance and read as a wide plateau, inflating how much of the equation looks flat — so break the line instead. Pass the result as ``breaks``. The current landmark scheme has no such pair (the answer is sampled like an operand, two characters in from each end), so this is normally empty; it is a safety net for a scheme that reintroduces one.
     """
     return frozenset(i for i in range(stack.shape[1] - 1) if np.array_equal(stack[:, i], stack[:, i + 1]))
 
@@ -116,35 +98,15 @@ def draw_traces(
 ) -> None:
     """Draw one panel: a step-line per channel of *values*, shaped ``(landmark, channel)``.
 
-    *ramp* below 1 leaves a flat shoulder at each landmark, which is what makes the
-    discrete character positions legible. *elide* and *breaks* are the two ways a pair of
-    landmarks can fail to be neighbours — see :func:`~mini.vis.smooth_step`.
+    *ramp* below 1 leaves a flat shoulder at each landmark, which is what makes the discrete character positions legible. *elide* and *breaks* are the two ways a pair of landmarks can fail to be neighbours — see :func:`~mini.vis.smooth_step`.
 
-    *fill* shades the area under the traces, which gives the panel a height a reader can
-    take in without tracing a line. ``"mean"`` fills once, in neutral grey, under the mean
-    of the channels — the quantity a probe heatmap of the same data would show as one
-    cell's brightness, so the panel carries both readings at once. ``"channel"`` fills
-    under each channel in its own hue instead; the areas then overlap, and their combined
-    silhouette is the channel *maximum* rather than the mean, so the summary reading is
-    lost wherever the channels disagree.
+    *fill* shades the area under the traces, which gives the panel a height a reader can take in without tracing a line. ``"mean"`` fills once, in neutral grey, under the mean of the channels — the quantity a probe heatmap of the same data would show as one cell's brightness, so the panel carries both readings at once. ``"channel"`` fills under each channel in its own hue instead; the areas then overlap, and their combined silhouette is the channel *maximum* rather than the mean, so the summary reading is lost wherever the channels disagree.
 
-    *spread* holds the replicates *values* summarises, shaped ``(replicate, landmark,
-    channel)`` — the per-seed maps behind a seed mean. It turns "and the other seeds agree"
-    from a claim in the prose into something the reader can see: the fill gets an outline at
-    *edge_alpha*, and the replicate minimum and maximum are drawn as fainter hairlines. Where
-    the replicates agree all three coincide, so the panel reads as a crisply outlined area;
-    where they part, two hairlines drift off a silhouette that stays where the summary is.
+    *spread* holds the replicates *values* summarises, shaped ``(replicate, landmark, channel)`` — the per-seed maps behind a seed mean. It turns "and the other seeds agree" from a claim in the prose into something the reader can see: the fill gets an outline at *edge_alpha*, and the replicate minimum and maximum are drawn as fainter hairlines. Where the replicates agree all three coincide, so the panel reads as a crisply outlined area; where they part, two hairlines drift off a silhouette that stays where the summary is.
 
-    That hierarchy is the point of drawing the spread as lines rather than as more shading.
-    Three stacked tones (under the minimum, the summary, the maximum) put only a few points
-    of opacity between neighbouring levels, which is below what a 0.45in panel can show; and
-    the more obvious arrangement — a min–max ribbon over a summary fill — makes their
-    *overlap* the darkest part of the panel, so a reader sees a dark stripe floating between
-    two lighter ones with nothing in the data to match it.
+    That hierarchy is the point of drawing the spread as lines rather than as more shading. Three stacked tones (under the minimum, the summary, the maximum) put only a few points of opacity between neighbouring levels, which is below what a 0.45in panel can show; and the more obvious arrangement — a min–max ribbon over a summary fill — makes their *overlap* the darkest part of the panel, so a reader sees a dark stripe floating between two lighter ones with nothing in the data to match it.
 
-    *fill_alpha* defaults per theme. A pale fill lightens a white page but has to lighten a
-    near-black one by more to travel the same visual distance, so the dark figure needs a
-    stronger value to read as the same shade of quiet.
+    *fill_alpha* defaults per theme. A pale fill lightens a white page but has to lighten a near-black one by more to travel the same visual distance, so the dark figure needs a stronger value to read as the same shade of quiet.
     """
     fill_alpha = light_dark(0.18, 0.22) if fill_alpha is None else fill_alpha
     colors = colors or channel_colors()
@@ -196,9 +158,7 @@ def draw_traces(
 def style_trace_panel(ax: Axes, *, ylim: tuple[float, float] = (-0.2, 1.2)) -> None:
     """Panel furniture for one depth's traces: rules at the dividers, no frame, ticks turned inward.
 
-    The panels sit flush in a vertical stack, so a frame around each would draw a ladder of
-    doubled lines up the figure. The unit gridlines and the inward y ticks carry the scale
-    instead, and the dividers continue across the whole stack.
+    The panels sit flush in a vertical stack, so a frame around each would draw a ladder of doubled lines up the figure. The unit gridlines and the inward y ticks carry the scale instead, and the dividers continue across the whole stack.
     """
     ax.vlines([LANDMARKS.index(lm) for lm in MAJOR_LANDMARKS], -1, 2, "#8882", lw=0.5)
     ax.set(ylim=ylim, xlim=(-0.5, len(LANDMARKS) - 0.5), yticks=[0, 1], yticklabels=[])
@@ -211,14 +171,9 @@ def style_trace_panel(ax: Axes, *, ylim: tuple[float, float] = (-0.2, 1.2)) -> N
 def label_scale(axes: "Sequence[Axes] | np.ndarray", *, show: bool = True) -> None:
     """Number the 0 and 1 gridlines on the right of the bottom panel of a stack.
 
-    Every panel in the figure is on the same scale, so one of them can say what it is and
-    the rest stay clean: numbering all thirty spends a lot of ink on a fact stated once. It
-    goes on the right because the left margin already carries the depth numbers.
+    Every panel in the figure is on the same scale, so one of them can say what it is and the rest stay clean: numbering all thirty spends a lot of ink on a fact stated once. It goes on the right because the left margin already carries the depth numbers.
 
-    *show* off still writes the numbers and still lets the layout engine measure them, but
-    paints them in no color. Tick labels take width from the block they sit in, so a block
-    that alone carried real ones would end up narrower than the block above it and the two
-    landmark axes would stop lining up — which is the comparison the stacked layout is for.
+    *show* off still writes the numbers and still lets the layout engine measure them, but paints them in no color. Tick labels take width from the block they sit in, so a block that alone carried real ones would end up narrower than the block above it and the two landmark axes would stop lining up — which is the comparison the stacked layout is for.
     """
     for ax in axes:
         ax.tick_params(axis="y", labelleft=False, labelright=False)
@@ -230,16 +185,9 @@ def label_scale(axes: "Sequence[Axes] | np.ndarray", *, show: bool = True) -> No
 def label_landmarks(ax: Axes, *, sparse: bool = False, labels: bool = True) -> None:
     """Put the landmark names on *ax*'s x axis, as major ticks for the dividers and minor for the rest.
 
-    *sparse* drops the inner characters of each token ($a_2$, $a_{n-1}$, …), keeping only
-    its first and last. Use it when panels are narrow enough that the full set collides:
-    the dropped labels sit one slot from a label that survives, so the axis still reads,
-    and the traces are still drawn at every landmark. *labels* off keeps the tick
-    positions but writes nothing, which is what a panel above the bottom row wants —
-    matplotlib would otherwise fall back to numbering the landmarks.
+    *sparse* drops the inner characters of each token ($a_2$, $a_{n-1}$, …), keeping only its first and last. Use it when panels are narrow enough that the full set collides: the dropped labels sit one slot from a label that survives, so the axis still reads, and the traces are still drawn at every landmark. *labels* off keeps the tick positions but writes nothing, which is what a panel above the bottom row wants — matplotlib would otherwise fall back to numbering the landmarks.
 
-    The dividers hang on a second line below the characters. They sit one slot from their
-    neighbours ($a_n$, ``+``, $b_1$ are consecutive landmarks), so on one line they would
-    touch; on two, the axis reads as characters over the grammar that groups them.
+    The dividers hang on a second line below the characters. They sit one slot from their neighbours ($a_n$, ``+``, $b_1$ are consecutive landmarks), so on one line they would touch; on two, the axis reads as characters over the grammar that groups them.
     """
 
     def ticks(lms: Sequence[str]) -> tuple[list[int], list[str]]:
@@ -272,19 +220,13 @@ def draw_depth_stack(
 ) -> None:
     """Fill *sfig* with one panel per depth of *stack*, shaped ``(depth, landmark, channel)``.
 
-    *scale_key* numbers this block's y axis — see :func:`label_scale`. Exactly one block in
-    a figure should carry it, and every other block still reserves the room for it.
+    *scale_key* numbers this block's y axis — see :func:`label_scale`. Exactly one block in a figure should carry it, and every other block still reserves the room for it.
 
-    A four-dimensional *stack* is read as ``(replicate, depth, landmark, channel)`` — the
-    per-seed maps rather than their average. The panels then plot the mean over replicates
-    and shade their spread, so nothing upstream has to decide which of the two to keep.
+    A four-dimensional *stack* is read as ``(replicate, depth, landmark, channel)`` — the per-seed maps rather than their average. The panels then plot the mean over replicates and shade their spread, so nothing upstream has to decide which of the two to keep.
 
-    Depth 0 (the embedding) goes at the bottom and the last layer at the top, matching the
-    heatmaps, so height on the page means depth in the network in both figures.
+    Depth 0 (the embedding) goes at the bottom and the last layer at the top, matching the heatmaps, so height on the page means depth in the network in both figures.
 
-    The panels are pushed flush against each other: a stack is one picture of how a probe
-    fares through the network, and a gap between rows would break it into five pictures.
-    Blocks stay apart because each is its own sub-figure.
+    The panels are pushed flush against each other: a stack is one picture of how a probe fares through the network, and a gap between rows would break it into five pictures. Blocks stay apart because each is its own sub-figure.
     """
     spread = stack if stack.ndim == 4 else None
     means = stack.mean(axis=0) if spread is not None else stack
@@ -331,20 +273,11 @@ def probe_trace_grid(
 ) -> Figure:
     """Lay out a depth stack per (form, target) pair, as a grid of blocks.
 
-    *stacks* maps ``(form, target)`` to an array of shape ``(depth, landmark, channel)``, or
-    ``(replicate, depth, landmark, channel)`` to shade the spread across replicates.
-    *form_axis* picks which way the grid runs: ``"row"`` puts the forms on separate rows
-    and the targets across the columns, which is the heatmap's own arrangement — the two
-    forms then sit one above the other over a shared x axis, which is the comparison the
-    figure exists to invite. ``"col"`` transposes that, giving each form a column; with a
-    single target it is the wide, one-target-per-figure layout.
+    *stacks* maps ``(form, target)`` to an array of shape ``(depth, landmark, channel)``, or ``(replicate, depth, landmark, channel)`` to shade the spread across replicates. *form_axis* picks which way the grid runs: ``"row"`` puts the forms on separate rows and the targets across the columns, which is the heatmap's own arrangement — the two forms then sit one above the other over a shared x axis, which is the comparison the figure exists to invite. ``"col"`` transposes that, giving each form a column; with a single target it is the wide, one-target-per-figure layout.
 
-    *sparse_ticks* defaults to whether the grid is more than two blocks wide, since that is
-    when the full landmark labels start to collide.
+    *sparse_ticks* defaults to whether the grid is more than two blocks wide, since that is when the full landmark labels start to collide.
 
-    The bottom-right block carries the scale key — the only 0 and 1 numbered in the figure,
-    on the right where nothing else is written. Every panel is on the same scale, so the
-    reader needs it once, near the corner they end up in after reading the landmark axis.
+    The bottom-right block carries the scale key — the only 0 and 1 numbered in the figure, on the right where nothing else is written. Every panel is on the same scale, so the reader needs it once, near the corner they end up in after reading the landmark axis.
     """
     rows, cols = (forms, targets) if form_axis == "row" else (targets, forms)
     pair = (lambda r, c: (r, c)) if form_axis == "row" else (lambda r, c: (c, r))
@@ -387,17 +320,9 @@ def draw_transfer_stack(
 ) -> None:
     """One block of :func:`transfer_trace_grid`: within-form area with the cross-form area over it.
 
-    Both arrays are shaped ``(replicate, depth, landmark)`` — the channel-mean maps, since
-    the question is whether a value transfers at all rather than which channel does. The
-    within-form reading is the grey area (the same ink the per-channel figure gives a
-    channel mean) and the cross-form reading is drawn over it in amber, so the amber
-    fraction of the grey *is* the transfer ratio ρ, read off the panel rather than
-    tabulated.
+    Both arrays are shaped ``(replicate, depth, landmark)`` — the channel-mean maps, since the question is whether a value transfers at all rather than which channel does. The within-form reading is the grey area (the same ink the per-channel figure gives a channel mean) and the cross-form reading is drawn over it in amber, so the amber fraction of the grey *is* the transfer ratio ρ, read off the panel rather than tabulated.
 
-    Negative scores clip to the floor, as everywhere in these figures: a probe that does
-    worse than predicting the mean has failed, and how much worse is not a finer grade of
-    failure. Where that matters — a cross-form reading pinned at zero could be −0.01 or
-    −30 — the caption has to say so.
+    Negative scores clip to the floor, as everywhere in these figures: a probe that does worse than predicting the mean has failed, and how much worse is not a finer grade of failure. Where that matters — a cross-form reading pinned at zero could be −0.01 or −30 — the caption has to say so.
     """
     means = (within.mean(0), cross.mean(0))
     breaks = aliased_risers(means[0])
@@ -445,13 +370,9 @@ def transfer_trace_grid(
 ) -> Figure:
     """A block per (form, target): what the form's own probe reads, and what the other form's does.
 
-    Both mappings are keyed by the form the probes are *applied* to — which is also the form
-    whose landmarks the x axis belongs to, and whose within-form score is ρ's denominator.
-    Rows are forms, columns are targets, matching the per-channel figure's arrangement so
-    the two can be read against each other.
+    Both mappings are keyed by the form the probes are *applied* to — which is also the form whose landmarks the x axis belongs to, and whose within-form score is ρ's denominator. Rows are forms, columns are targets, matching the per-channel figure's arrangement so the two can be read against each other.
 
-    *titles* overrides a form's block heading; the default names the direction, e.g.
-    ``named ← hex``, since a block's subject is the pair and not either form alone.
+    *titles* overrides a form's block heading; the default names the direction, e.g. ``named ← hex``, since a block's subject is the pair and not either form alone.
     """
     elided = ELIDED_RISERS if elided is None else elided
     other = {f: next(g for g in forms if g != f) for f in forms} if len(forms) == 2 else {}

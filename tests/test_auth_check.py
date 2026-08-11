@@ -1,7 +1,6 @@
 """Tests for the credential status probe (`./go auth --check`).
 
-The parsing helpers are pure; the per-provider checks shell out through a single
-`_run`, so we drive them by swapping in a fake that returns canned tool output.
+The parsing helpers are pure; the per-provider checks shell out through a single `_run`, so we drive them by swapping in a fake that returns canned tool output.
 """
 
 import asyncio

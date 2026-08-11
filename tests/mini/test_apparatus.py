@@ -249,8 +249,7 @@ def test_modal_auth_error_has_actionable_message(monkeypatch):
 def test_memo_worker_mounts_hf_cache(monkeypatch):
     """The remote worker gets the shared HF cache Volume, with HF_HOME pointing at it.
 
-    That's what lets a multi-stage pipeline's ``from_pretrained`` reuse weights
-    across containers instead of re-downloading per container (#50).
+    That's what lets a multi-stage pipeline's ``from_pretrained`` reuse weights across containers instead of re-downloading per container (#50).
     """
     from mini.modal_apparatus import HF_CACHE_MOUNT
 
@@ -380,8 +379,7 @@ def test_get_data_dir_available_in_mapped_function(apparatus):
 
 
 def test_interactive_local_map_resolves_ambient_store(tmp_path: Path, local_store):
-    """A fn mapped via LocalApparatus (not the memo worker) can put/get artifacts;
-    the blob lands under the ``store/`` root sibling to the experiment's data dir."""
+    """A fn mapped via LocalApparatus (not the memo worker) can put/get artifacts; the blob lands under the ``store/`` root sibling to the experiment's data dir."""
     from mini.store import get, put
 
     app = LocalApparatus("exp", data_dir=tmp_path / "exp")
@@ -396,8 +394,7 @@ def test_interactive_local_map_resolves_ambient_store(tmp_path: Path, local_stor
 
 
 def test_wrap_for_modal_binds_store_under_data_dir(tmp_path: Path, local_store):
-    """The Modal-wrapped fn binds an ambient store rooted at ``data_dir/store`` —
-    under the mounted Volume, since the parent isn't shared remotely."""
+    """The Modal-wrapped fn binds an ambient store rooted at ``data_dir/store`` — under the mounted Volume, since the parent isn't shared remotely."""
     from mini.local_queue import LocalQueue
     from mini.modal_apparatus import _wrap_for_modal
     from mini.store import LocalStore, get_store
@@ -436,9 +433,7 @@ class _FakeModalDict(dict):
 
 
 def test_modal_write_if_claims_fresh_key_via_insert_if_absent():
-    """The double-spawn race on a never-run key resolves atomically: the claim
-    goes through ``put(skip_if_exists=True)``, so the second ticker loses even
-    with no compare-and-swap."""
+    """The double-spawn race on a never-run key resolves atomically: the claim goes through ``put(skip_if_exists=True)``, so the second ticker loses even with no compare-and-swap."""
     from mini.modal_apparatus import ModalRecordStore
 
     store = ModalRecordStore(_FakeModalDict())
@@ -448,8 +443,7 @@ def test_modal_write_if_claims_fresh_key_via_insert_if_absent():
 
 
 def test_modal_write_if_reclaims_reset_record():
-    """A reset record (present but unclaimed) defeats insert-if-absent, so the
-    claim falls through to read-check-write — and still lands."""
+    """A reset record (present but unclaimed) defeats insert-if-absent, so the claim falls through to read-check-write — and still lands."""
     from mini.modal_apparatus import ModalRecordStore
 
     store = ModalRecordStore(_FakeModalDict({"k": {"key": "k", "state": None}}))
@@ -475,10 +469,7 @@ class _CountingModalDict(_FakeModalDict):
 
 
 def test_modal_merge_if_costs_one_round_trip_each_way():
-    """Every progress update from every worker lands through ``merge_if``, and on
-    Modal each step of it is a network call. The inherited version reads to check
-    the fence and then reads again for something to merge onto — three round-trips
-    where one read serves both. A fenced-out merge writes nothing at all."""
+    """Every progress update from every worker lands through ``merge_if``, and on Modal each step of it is a network call. The inherited version reads to check the fence and then reads again for something to merge onto — three round-trips where one read serves both. A fenced-out merge writes nothing at all."""
     from mini.modal_apparatus import ModalRecordStore
 
     d = _CountingModalDict({"k": {"key": "k", "gen": "a", "state": "running"}})
@@ -567,8 +558,7 @@ def test_liveness_settled_states(monkeypatch):
 
 
 def test_reap_settles_timeout_killed_modal_task(monkeypatch, tmp_path):
-    """End to end: a timeout-killed call's RUNNING record settles FAILED on reap,
-    so ``status``/``watch`` can't read it as running forever (sca2#20)."""
+    """End to end: a timeout-killed call's RUNNING record settles FAILED on reap, so ``status``/``watch`` can't read it as running forever (sca2#20)."""
     from modal.exception import FunctionTimeoutError
 
     from mini.memo import MemoStore
@@ -588,10 +578,7 @@ def test_reap_settles_timeout_killed_modal_task(monkeypatch, tmp_path):
 
 
 def test_modal_env_becomes_a_container_secret():
-    """``env=`` reaches the container as a Secret, and never as a ``@function``
-    kwarg — Modal has no ``env`` parameter, so a leak would be a TypeError at
-    registration. The container is the right level: a task that set it in-process
-    would be too late for anything that reads its env once at init."""
+    """``env=`` reaches the container as a Secret, and never as a ``@function`` kwarg — Modal has no ``env`` parameter, so a leak would be a TypeError at registration. The container is the right level: a task that set it in-process would be too late for anything that reads its env once at init."""
     from mini.modal_apparatus import _attach_env
 
     fn_kwargs: dict = {"gpu": "L4", "env": {"XLA_FLAGS": "--xla_gpu_deterministic_ops=true"}}
@@ -603,8 +590,7 @@ def test_modal_env_becomes_a_container_secret():
 
 
 def test_modal_env_appends_to_existing_secrets_and_no_ops_when_empty():
-    """The HF store/cache secrets are attached alongside, so ``env`` must append
-    rather than replace; an absent or empty mapping adds nothing at all."""
+    """The HF store/cache secrets are attached alongside, so ``env`` must append rather than replace; an absent or empty mapping adds nothing at all."""
     from mini.modal_apparatus import _attach_env
 
     sentinel = modal.Secret.from_dict({"EXISTING": "1"})
@@ -619,8 +605,7 @@ def test_modal_env_appends_to_existing_secrets_and_no_ops_when_empty():
 
 
 def test_modal_w_merges_env_key_by_key(monkeypatch):
-    """Unlike every other option, ``env`` merges: a role adds one variable without
-    having to restate the project-wide defaults it inherits."""
+    """Unlike every other option, ``env`` merges: a role adds one variable without having to restate the project-wide defaults it inherits."""
     app = _make_modal(monkeypatch).w(env={"XLA_FLAGS": "-x", "KEEP": "1"}, gpu="T4")
     role = app.w(env={"XLA_FLAGS": "-y"}, gpu="L4")
     assert role.modal_fn_kwargs["env"] == {"XLA_FLAGS": "-y", "KEEP": "1"}
@@ -629,9 +614,7 @@ def test_modal_w_merges_env_key_by_key(monkeypatch):
 
 
 def test_local_env_reaches_the_task_worker_subprocess(tmp_path, monkeypatch):
-    """Locally the memoized path is a subprocess per task, so it can carry the same
-    env. ``.w(env=)`` merges like Modal's, and the value lands in the child's
-    environment rather than only the parent's."""
+    """Locally the memoized path is a subprocess per task, so it can carry the same env. ``.w(env=)`` merges like Modal's, and the value lands in the child's environment rather than only the parent's."""
     captured: dict = {}
 
     def fake_popen(argv, **kwargs):

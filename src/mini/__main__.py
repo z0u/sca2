@@ -1,33 +1,11 @@
 """
 ``python -m mini`` — run and monitor memoized experiments across short-lived processes.
 
-An experiment is a ``main(ctx)`` DAG (or a single sweep, lowered to one ``ctx.map``).
-Each subcommand is a quick, stateless call against the durable memo store, so an
-agent (or you) can drive, poll, and gather without holding a session open:
+An experiment is a ``main(ctx)`` DAG (or a single sweep, lowered to one ``ctx.map``). Each subcommand is a quick, stateless call against the durable memo store, so an agent (or you) can drive, poll, and gather without holding a session open:
 
-    python -m mini run    docs/pipeline/experiment.py --watch  # drive a DAG to completion (live bar)
-    python -m mini run    docs/pipeline/experiment.py          # advance one wake, then return
-    python -m mini run    docs/pipeline/experiment.py --budget 2h  # auto-cancel the run past a wall-clock budget
-    python -m mini retry  docs/pipeline/experiment.py          # reset FAILED/CANCELLED, then advance
-    python -m mini ls                                          # experiments + task state
-    python -m mini watch  pipeline                             # block until the run settles, read-only (exit 0 iff DONE)
-    python -m mini watch  pipeline --timeout 10m --json        # bounded wait: exit 0 done / 1 failed / 3 attention / 124 timeout
-    python -m mini status pipeline                             # per-task state + metrics, by NAME (--json for scripts)
-    python -m mini status pipeline --brief                     # aggregate + counts + only tasks needing attention
-    python -m mini results pipeline                            # per-task results
-    python -m mini logs   pipeline <key>                       # a failed task's traceback
-    python -m mini explain pipeline <key>                      # why this re-ran: evidence + attempt timeline
-    python -m mini lineage pipeline                            # provenance: git, who/what ran it, environment, upstreams
-    python -m mini cost    pipeline                            # reconcile the run's Modal cost (post-run billing)
-    python -m mini cancel pipeline                             # stop in-flight tasks
-    python -m mini gc     pipeline                             # plan a memo-storage sweep (--apply to delete)
-    python -m mini gc     --store                              # plan an artifact-CAS sweep (--apply to delete)
+    python -m mini run    docs/pipeline/experiment.py --watch  # drive a DAG to completion (live bar) python -m mini run    docs/pipeline/experiment.py          # advance one wake, then return python -m mini run    docs/pipeline/experiment.py --budget 2h  # auto-cancel the run past a wall-clock budget python -m mini retry  docs/pipeline/experiment.py          # reset FAILED/CANCELLED, then advance python -m mini ls                                          # experiments + task state python -m mini watch  pipeline                             # block until the run settles, read-only (exit 0 iff DONE) python -m mini watch  pipeline --timeout 10m --json        # bounded wait: exit 0 done / 1 failed / 3 attention / 124 timeout python -m mini status pipeline                             # per-task state + metrics, by NAME (--json for scripts) python -m mini status pipeline --brief                     # aggregate + counts + only tasks needing attention python -m mini results pipeline                            # per-task results python -m mini logs   pipeline <key>                       # a failed task's traceback python -m mini explain pipeline <key>                      # why this re-ran: evidence + attempt timeline python -m mini lineage pipeline                            # provenance: git, who/what ran it, environment, upstreams python -m mini cost    pipeline                            # reconcile the run's Modal cost (post-run billing) python -m mini cancel pipeline                             # stop in-flight tasks python -m mini gc     pipeline                             # plan a memo-storage sweep (--apply to delete) python -m mini gc     --store                              # plan an artifact-CAS sweep (--apply to delete)
 
-State is addressed by experiment NAME (one memo store per experiment). ``--app``
-picks the backend; when omitted, every verb follows the backend the experiment
-was launched on (stamped in ``.mini/<name>/.app``), then ``$MINI_APP`` /
-``[tool.mini] app``, then local — so after ``run --app modal``, a plain
-``status`` reads the Modal control plane.
+State is addressed by experiment NAME (one memo store per experiment). ``--app`` picks the backend; when omitted, every verb follows the backend the experiment was launched on (stamped in ``.mini/<name>/.app``), then ``$MINI_APP`` / ``[tool.mini] app``, then local — so after ``run --app modal``, a plain ``status`` reads the Modal control plane.
 """
 
 from __future__ import annotations
@@ -37,6 +15,7 @@ import json
 import os
 import sys
 import time
+from dataclasses import fields, is_dataclass
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -57,7 +36,7 @@ from mini.runs import (
     stale_heartbeat,
     stale_progress,
 )
-from mini.store import _project_config
+from mini.store import Artifact, _project_config
 from utils.time import duration
 
 _GLYPH = {
@@ -85,12 +64,7 @@ def _app_suffix(args: argparse.Namespace) -> str:
 def _resolve_app(name: str, args: argparse.Namespace) -> str:
     """The backend to act on when ``--app`` isn't passed (#47).
 
-    Explicit flag first; then the ``.mini/<name>/.app`` marker stamped at launch
-    (per-experiment ground truth — after ``run --app modal``, a plain ``status``
-    just works); then the ``MINI_APP`` env var and the ``[tool.mini] app``
-    pyproject key (the marker is per-checkout, so a fresh clone — CI, a scheduled
-    monitor's new environment — needs one of these to be Modal-first); finally
-    ``'local'``.
+    Explicit flag first; then the ``.mini/<name>/.app`` marker stamped at launch (per-experiment ground truth — after ``run --app modal``, a plain ``status`` just works); then the ``MINI_APP`` env var and the ``[tool.mini] app`` pyproject key (the marker is per-checkout, so a fresh clone — CI, a scheduled monitor's new environment — needs one of these to be Modal-first); finally ``'local'``.
     """
     if app := getattr(args, "app", None):
         return app
@@ -108,9 +82,7 @@ def _remember_app(name: str, args: argparse.Namespace) -> None:
 
 
 def _peek(name: str, backend: str) -> int:
-    """Best-effort task count on *backend*, for the empty-read hint. Never raises
-    and never creates state — Modal may not even be configured here.
-    """
+    """Best-effort task count on *backend*, for the empty-read hint. Never raises and never creates state — Modal may not even be configured here."""
     try:
         if backend == "local":
             return len(MemoStore(data_root() / name).records())
@@ -135,10 +107,7 @@ def _known_names() -> list[str]:
 def _load_experiment_or_hint(path: str) -> Experiment:
     """``load_experiment``, but turn the name-vs-path mistake into a hint (#57).
 
-    ``run``/``retry`` tick the DAG, so they import the experiment module and take
-    a *file*; the read verbs (``status``/``results``/``cancel``/…) address the
-    store by *name*. Typing a name here otherwise dies in an unhandled
-    ``ImportError`` — instead, if the argument is a known experiment name, say so.
+    ``run``/``retry`` tick the DAG, so they import the experiment module and take a *file*; the read verbs (``status``/``results``/``cancel``/…) address the store by *name*. Typing a name here otherwise dies in an unhandled ``ImportError`` — instead, if the argument is a known experiment name, say so.
     """
     if not Path(path).is_file():
         hint = ""
@@ -152,9 +121,7 @@ def _load_experiment_or_hint(path: str) -> Experiment:
 
 
 def _no_tasks(name: str, args: argparse.Namespace, extra: str = "") -> SystemExit:
-    """The empty-read exit: name the backend we looked on, and peek at the other
-    one so a wrong default points at the right flag instead of a dead end (#47).
-    """
+    """The empty-read exit: name the backend we looked on, and peek at the other one so a wrong default points at the right flag instead of a dead end (#47)."""
     backend = _resolve_app(name, args)
     other = "modal" if backend == "local" else "local"
     msg = f"no tasks found for experiment {name!r} on {backend}{extra}"
@@ -212,8 +179,7 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
 def _store_for(name: str, args: argparse.Namespace) -> MemoStore:
     """The memo store for an experiment by name, on the selected backend.
 
-    Local reads straight off disk (no apparatus needed); ``--app modal`` builds
-    the apparatus so reads hit the Modal control plane (a named ``modal.Dict``).
+    Local reads straight off disk (no apparatus needed); ``--app modal`` builds the apparatus so reads hit the Modal control plane (a named ``modal.Dict``).
     """
     if _resolve_app(name, args) == "local":
         return MemoStore(data_root() / name)
@@ -231,12 +197,7 @@ def _age(ts: float | None) -> str:
 def _arm_budget(store: MemoStore, args: argparse.Namespace) -> None:
     """Stamp a wall-clock (cost) budget into the run's control plane.
 
-    ``--budget 30m`` bounds the *whole* detached sweep: a forgotten or wedged run
-    settles CANCELLED once the deadline passes, enforced opportunistically by any
-    later ``status`` / ``watch`` / ``--watch`` poll. Passing the flag (re)arms the
-    deadline relative to now — so it also re-arms a ``retry`` past an expired
-    budget — while plain re-runs that advance a multi-step DAG inherit the
-    existing deadline (no flag → no change).
+    ``--budget 30m`` bounds the *whole* detached sweep: a forgotten or wedged run settles CANCELLED once the deadline passes, enforced opportunistically by any later ``status`` / ``watch`` / ``--watch`` poll. Passing the flag (re)arms the deadline relative to now — so it also re-arms a ``retry`` past an expired budget — while plain re-runs that advance a multi-step DAG inherit the existing deadline (no flag → no change).
     """
     if not (budget := getattr(args, "budget", None)):
         return
@@ -256,9 +217,7 @@ def _budget_suffix(store: MemoStore) -> str:
 def _rearm_hint(store: MemoStore, path: str, args: argparse.Namespace) -> str:
     """How to get a run moving again past an expired budget, as a runnable line.
 
-    Worth spelling out because the symptom is *silence*: past the deadline a
-    plain ``run`` launches nothing and settles what's in flight, so a run with
-    genuinely stale work reads exactly like one with nothing left to do.
+    Worth spelling out because the symptom is *silence*: past the deadline a plain ``run`` launches nothing and settles what's in flight, so a run with genuinely stale work reads exactly like one with nothing left to do.
     """
     return f"  nothing launches past an expired budget — re-arm with: {PROG} run {path} --budget {store.meta().get('budget') or '30m'}{_app_suffix(args)}"
 
@@ -266,10 +225,7 @@ def _rearm_hint(store: MemoStore, path: str, args: argparse.Namespace) -> str:
 def _dag_note(store: MemoStore, state: RunState) -> str:
     """The caveat on an all-DONE run whose ``main`` hasn't reached its end yet.
 
-    Every launched task can be DONE while the DAG still has stages to go — the
-    last tick suspended at a ``Pending`` rather than returning. Both read "done"
-    from the records alone, and mistaking one for the other is how a run sits
-    finished-looking with a publish step never executed.
+    Every launched task can be DONE while the DAG still has stages to go — the last tick suspended at a ``Pending`` rather than returning. Both read "done" from the records alone, and mistaking one for the other is how a run sits finished-looking with a publish step never executed.
     """
     if state != RunState.DONE or store.dag_complete() is not False:
         return ""
@@ -294,11 +250,7 @@ def _rec_state(rec: dict) -> RunState:
 def _print_records(store: MemoStore, records: list[dict] | None = None) -> tuple[list[dict], list[dict]]:
     """Print every record — current first, superseded marked — and return the split.
 
-    A superseded record's key is one the last tick no longer requested (its fn was
-    edited, its config removed). It stays visible (it may hold a result someone
-    cares about, or an orphaned worker still burning), but it is *not* part of the
-    run's state: aggregates and the failed-task hint consider current records only,
-    so a completed run reads DONE even when an old key settled FAILED.
+    A superseded record's key is one the last tick no longer requested (its fn was edited, its config removed). It stays visible (it may hold a result someone cares about, or an orphaned worker still burning), but it is *not* part of the run's state: aggregates and the failed-task hint consider current records only, so a completed run reads DONE even when an old key settled FAILED.
     """
     current, stale = store.split_current(store.records() if records is None else records)
     kept = set(store.meta().get("kept_stale") or ())  # DONE served under old code (--keep-stale-done)
@@ -311,9 +263,7 @@ def _print_records(store: MemoStore, records: list[dict] | None = None) -> tuple
 
 
 def _launch_order(rec: dict) -> tuple:
-    """Sort records for display: launch order, so a sweep's stages read as stages
-    (store order is hash order — a jumble for a human scanning 50 lines).
-    """
+    """Sort records for display: launch order, so a sweep's stages read as stages (store order is hash order — a jumble for a human scanning 50 lines)."""
     return (rec.get("started_at") or float("inf"), rec.get("fn") or "", rec["key"])
 
 
@@ -331,11 +281,7 @@ def _worry(rec: dict, rates: dict[str, float]) -> str:
 def _memo_line(rec: dict, rates: dict[str, float] | None = None) -> str:
     """One status line for a memoized task record (shared by `run`/`status`).
 
-    A RUNNING record with no ``env`` yet reads ``queued`` — launched, but no
-    worker has started (see :func:`mini.runs.is_queued`). Its ``heartbeat_at``
-    is still the launch stamp, so it's shown as time-in-queue, not liveness.
-    *rates* (sibling throughput medians) enables the deviation flags — a cell
-    running far behind its siblings, or projected to overrun its timeout.
+    A RUNNING record with no ``env`` yet reads ``queued`` — launched, but no worker has started (see :func:`mini.runs.is_queued`). Its ``heartbeat_at`` is still the launch stamp, so it's shown as time-in-queue, not liveness. *rates* (sibling throughput medians) enables the deviation flags — a cell running far behind its siblings, or projected to overrun its timeout.
     """
     state = _rec_state(rec)
     queued = is_queued(rec)
@@ -362,8 +308,7 @@ def _memo_line(rec: dict, rates: dict[str, float] | None = None) -> str:
 def cmd_run(args: argparse.Namespace) -> None:
     """One wake of a (possibly multi-step) orchestration: advance + report.
 
-    With ``--watch``, instead drive the DAG to completion with a live progress
-    bar; Ctrl-C stops watching (detached workers live on — re-run to resume).
+    With ``--watch``, instead drive the DAG to completion with a live progress bar; Ctrl-C stops watching (detached workers live on — re-run to resume).
     """
     exp = _load_experiment_or_hint(args.path)
     apparatus = _build_apparatus(exp.name, args)
@@ -374,11 +319,7 @@ def cmd_run(args: argparse.Namespace) -> None:
 def cmd_retry(args: argparse.Namespace) -> None:
     """Reset FAILED/CANCELLED tasks (or one ``--key``) then advance the DAG.
 
-    FAILED/CANCELLED are terminal under unchanged code, so a plain ``run`` won't
-    re-launch them; this is the explicit lever for a *flaky* failure. (After a
-    code fix, plain ``run`` relaunches them by itself — the record's evidence is
-    stale.) Fresh DONE tasks stay memo hits — to re-run one, edit its fn or bump
-    ``version=``.
+    FAILED/CANCELLED are terminal under unchanged code, so a plain ``run`` won't re-launch them; this is the explicit lever for a *flaky* failure. (After a code fix, plain ``run`` relaunches them by itself — the record's evidence is stale.) Fresh DONE tasks stay memo hits — to re-run one, edit its fn or bump ``version=``.
     """
     exp = _load_experiment_or_hint(args.path)
     apparatus = _build_apparatus(exp.name, args)
@@ -391,10 +332,7 @@ def cmd_retry(args: argparse.Namespace) -> None:
 def _detected_upstreams(exp: Experiment, store: MemoStore) -> dict[str, list[str]]:
     """Upstream experiments detected from the refs this run's tasks resolved.
 
-    Each settled task records the shared refs it read and the experiment stamped
-    on each at ``set_ref`` time (``upstream_refs`` — see ``mini._taskworker``).
-    Rolled up here to producer → the resolved ref names (the evidence), with
-    self-reads dropped (an experiment reading its own refs is not a dependency).
+    Each settled task records the shared refs it read and the experiment stamped on each at ``set_ref`` time (``upstream_refs`` — see ``mini._taskworker``). Rolled up here to producer → the resolved ref names (the evidence), with self-reads dropped (an experiment reading its own refs is not a dependency).
     """
     found: dict[str, set[str]] = {}
     for rec in store.records():
@@ -407,11 +345,7 @@ def _detected_upstreams(exp: Experiment, store: MemoStore) -> dict[str, list[str
 def _stamp_lineage(exp: Experiment, store: MemoStore, args: argparse.Namespace) -> None:
     """Capture run-level lineage into meta at each wake (never fails a run).
 
-    The latest capture wins (edits re-run tasks, so the final code state is what
-    produced the current results) while first-run breadcrumbs survive across wakes.
-    Upstream experiments are the declared ones (``Experiment.deps``) plus the ones
-    *detected* from the refs this run's tasks resolved; each is snapshotted from
-    its own stored lineage, so a run records exactly which A its inputs came from.
+    The latest capture wins (edits re-run tasks, so the final code state is what produced the current results) while first-run breadcrumbs survive across wakes. Upstream experiments are the declared ones (``Experiment.deps``) plus the ones *detected* from the refs this run's tasks resolved; each is snapshotted from its own stored lineage, so a run records exactly which A its inputs came from.
     """
     from mini.lineage import merge_run_lineage, run_lineage, upstream_snapshot
 
@@ -483,9 +417,7 @@ def _run(exp, apparatus: Apparatus, args: argparse.Namespace) -> None:
 
 
 def _logs_hint(name: str, keys: list[str]) -> None:
-    """Point at the traceback with a command that runs as printed — the first
-    failing key filled in, not a ``<key>`` placeholder to go hunting for.
-    """
+    """Point at the traceback with a command that runs as printed — the first failing key filled in, not a ``<key>`` placeholder to go hunting for."""
     print(f"  see a traceback with:  {PROG} logs {name} {keys[0]}")
     if rest := keys[1:]:
         print(f"  (+{len(rest)} more failed key(s) — see: {PROG} status {name})")
@@ -574,9 +506,7 @@ _ATTENTION_CAP = 6  # attention groups listed before an "+N more" rollup (mirror
 
 
 def _display_state(rec: dict) -> str:
-    """The state a human reads: ``queued`` for a launched-but-unstarted RUNNING
-    record (no worker yet), else the raw state — so counts and groupings line up.
-    """
+    """The state a human reads: ``queued`` for a launched-but-unstarted RUNNING record (no worker yet), else the raw state — so counts and groupings line up."""
     return "queued" if is_queued(rec) else str(_rec_state(rec))
 
 
@@ -607,9 +537,7 @@ _WRONG_WAY_WINDOWS = 3  # consecutive minutes a metric may drift the wrong way b
 def _fleet_rates(current: list[dict]) -> dict[str, float]:
     """Median throughput (steps/min) per task fn, over the running cells reporting one.
 
-    A sweep's own cells are the fair yardstick for each other: same code, same
-    shape of work, different container. Below ``_MIN_SIBLINGS`` reporters there's
-    no fleet to compare against and the fn is left out.
+    A sweep's own cells are the fair yardstick for each other: same code, same shape of work, different container. Below ``_MIN_SIBLINGS`` reporters there's no fleet to compare against and the fn is left out.
     """
     rates: dict[str, list[float]] = {}
     for rec in current:
@@ -621,8 +549,7 @@ def _fleet_rates(current: list[dict]) -> dict[str, float]:
 def _slow_outlier(rec: dict, rates: dict[str, float]) -> str | None:
     """Is this cell crawling relative to its siblings?
 
-    Placement, throttling, a cross-region control plane — all invisible to a
-    liveness probe, which reads green throughout.
+    Placement, throttling, a cross-region control plane — all invisible to a liveness probe, which reads green throughout.
     """
     rate, med = rec.get("steps_per_min"), rates.get(rec.get("fn") or "")
     if not rate or not med or rate >= med * _SLOW_FRACTION:
@@ -633,11 +560,7 @@ def _slow_outlier(rec: dict, rates: dict[str, float]) -> str | None:
 def _timeout_projection(rec: dict, now: float | None = None) -> str | None:
     """Will this task hit its role timeout before it finishes, at its current rate?
 
-    A timeout sized as a multiple of the expected duration is a safety net right
-    up until throughput drops, at which point it turns into a kill switch — and
-    the task is killed near the end, having burned the whole budget (ex-2.1.5 lost
-    a cell at step 7,895 of 7,900). Projecting it is the difference between
-    finding out now and finding out at the timeout.
+    A timeout sized as a multiple of the expected duration is a safety net right up until throughput drops, at which point it turns into a kill switch — and the task is killed near the end, having burned the whole budget (ex-2.1.5 lost a cell at step 7,895 of 7,900). Projecting it is the difference between finding out now and finding out at the timeout.
     """
     rate, total, timeout_s = rec.get("steps_per_min"), rec.get("total"), rec.get("timeout_s")
     started = rec.get("started_at")
@@ -653,14 +576,9 @@ def _timeout_projection(rec: dict, now: float | None = None) -> str | None:
 def _metric_trouble(rec: dict) -> str | None:
     """Have the task's own numbers gone wrong — diverged, or steadily drifting?
 
-    Records keep the latest value of each metric plus the movement the worker
-    measured over trailing windows, so this is a check rather than an eyeball.
+    Records keep the latest value of each metric plus the movement the worker measured over trailing windows, so this is a check rather than an eyeball.
 
-    Which way is *wrong* is settled at the worker, from the job's own
-    ``expect_metrics`` declaration — nothing here matches on metric names, because
-    a name can't tell you whether a number is meant to climb. A metric with no
-    declared direction still reports its movement (``metrics_delta``); it just
-    never lands here.
+    Which way is *wrong* is settled at the worker, from the job's own ``expect_metrics`` declaration — nothing here matches on metric names, because a name can't tell you whether a number is meant to climb. A metric with no declared direction still reports its movement (``metrics_delta``); it just never lands here.
     """
     if nonfinite := rec.get("metrics_nonfinite"):
         return f"{', '.join(nonfinite)} is not finite — the run has diverged"
@@ -675,10 +593,7 @@ def _metric_trouble(rec: dict) -> str | None:
 def _attention_cause(rec: dict, rates: dict[str, float] | None = None) -> str | None:
     """Why this task needs a look, or ``None`` if it looks healthy.
 
-    Doubles as the grouping label, which is what collapses a homogeneous mass
-    failure (30 identical OOMs → one line) while keeping distinct causes apart.
-    Ordered by how much it costs to be wrong: terminal first, then liveness, then
-    the softer deviation-from-expected signals.
+    Doubles as the grouping label, which is what collapses a homogeneous mass failure (30 identical OOMs → one line) while keeping distinct causes apart. Ordered by how much it costs to be wrong: terminal first, then liveness, then the softer deviation-from-expected signals.
     """
     if _rec_state(rec) in (RunState.FAILED, RunState.CANCELLED):
         return rec.get("error") or str(_rec_state(rec))
@@ -708,11 +623,7 @@ def _needs_attention(rec: dict, rates: dict[str, float] | None = None) -> bool:
 def _attention_groups(current: list[dict]) -> list[dict[str, Any]]:
     """Attention tasks grouped by ``(fn, state, cause)``, launch-ordered by first member.
 
-    Collapsing identical failures is what keeps a wide fan-out's mass failure
-    legible — one ``30× train_one failed`` line instead of 30 near-identical
-    ones, the difference between noise and a diagnosis. Each group keeps its
-    first record (``sample``) and every key, so the caller can render a one-off
-    in full (with its key) and a mass as a counted line.
+    Collapsing identical failures is what keeps a wide fan-out's mass failure legible — one ``30× train_one failed`` line instead of 30 near-identical ones, the difference between noise and a diagnosis. Each group keeps its first record (``sample``) and every key, so the caller can render a one-off in full (with its key) and a mass as a counted line.
     """
     groups: dict[tuple, dict[str, Any]] = {}
     keys: dict[tuple, list[str]] = {}
@@ -727,9 +638,7 @@ def _attention_groups(current: list[dict]) -> list[dict[str, Any]]:
 
 
 def _grouped_attention_line(g: dict[str, Any]) -> str:
-    """One collapsed line for a multi-task attention group, keeping a sample key
-    so a human can still pull a traceback (``logs <exp> <key>``).
-    """
+    """One collapsed line for a multi-task attention group, keeping a sample key so a human can still pull a traceback (``logs <exp> <key>``)."""
     state = g["state"]
     glyph = "◌" if state == "queued" else _GLYPH.get(RunState(state), "?")
     line = f"  {glyph} {len(g['keys'])}× {g['fn'] or 'task':13} {state:9}"
@@ -742,10 +651,7 @@ def _grouped_attention_line(g: dict[str, Any]) -> str:
 
 
 def _attention_json(rec: dict) -> dict[str, Any]:
-    """A task entry for the ``attention`` list: the full record trimmed to what
-    acting on it needs — key/state/error/liveness (and ``fc_id`` for Modal log
-    lookup), without the env/metrics/timestamps bulk of the full ``--json``.
-    """
+    """A task entry for the ``attention`` list: the full record trimmed to what acting on it needs — key/state/error/liveness (and ``fc_id`` for Modal log lookup), without the env/metrics/timestamps bulk of the full ``--json``."""
     out = _task_json(rec)
     for f in ("env", "started_at", "finished_at", "watchdog_s", "watchdog_grace_s"):
         out.pop(f, None)  # metrics and throughput stay: they're what the deviation flags are about
@@ -774,12 +680,7 @@ def _budget_json(meta: dict[str, Any]) -> dict[str, Any] | None:
 def _brief_json(
     name: str, args: argparse.Namespace, state: RunState, store: MemoStore, current: list[dict], stale: list[dict]
 ) -> dict[str, Any]:
-    """The compact ``--brief`` twin of :func:`_status_json` (also ``watch --json``'s
-    summary): aggregate state, counts by state, and *only* the tasks needing
-    attention — a sweep's healthy lines carry no signal a monitor acts on, and on
-    a big fan-out they dominate the payload. Field names are a stable contract:
-    change additively only.
-    """
+    """The compact ``--brief`` twin of :func:`_status_json` (also ``watch --json``'s summary): aggregate state, counts by state, and *only* the tasks needing attention — a sweep's healthy lines carry no signal a monitor acts on, and on a big fan-out they dominate the payload. Field names are a stable contract: change additively only."""
     out: dict[str, Any] = {
         "experiment": name,
         "app": _resolve_app(name, args),
@@ -815,11 +716,7 @@ def _status_json(
 ) -> dict[str, Any]:
     """The ``status --json`` payload — the agent-facing twin of the human lines.
 
-    One JSON object on stdout, keyed for scripts (``jq -r .state``), with the
-    same read-path semantics as plain ``status`` (reap + budget enforcement have
-    already run). Field names are a stable contract: change additively only.
-    ``state`` aggregates *current* tasks; superseded records ride along flagged,
-    since an orphaned old-code worker may still be burning money.
+    One JSON object on stdout, keyed for scripts (``jq -r .state``), with the same read-path semantics as plain ``status`` (reap + budget enforcement have already run). Field names are a stable contract: change additively only. ``state`` aggregates *current* tasks; superseded records ride along flagged, since an orphaned old-code worker may still be burning money.
     """
     out: dict[str, Any] = {
         "experiment": name,
@@ -890,16 +787,9 @@ def _task_json(rec: dict) -> dict[str, Any]:
 def cmd_watch(args: argparse.Namespace) -> None:
     """Block on a run by NAME until it settles or needs attention — read-only (never ticks).
 
-    The read-only twin of ``run --watch``: it renders a run this process didn't
-    launch (e.g. a detached/Modal run), polling the durable records without ever
-    advancing the DAG. Ctrl-C stops watching; the workers live on.
+    The read-only twin of ``run --watch``: it renders a run this process didn't launch (e.g. a detached/Modal run), polling the durable records without ever advancing the DAG. Ctrl-C stops watching; the workers live on.
 
-    The exit code names the branch, so a monitor never parses the output to
-    decide: 0 = settled all-DONE; 1 = settled with FAILED/CANCELLED; 3 = needs
-    attention *now* (a task settled terminally mid-stage — e.g. a watchdog fired
-    — or a worker went stale/wedged); 124 = ``--timeout`` elapsed with work
-    still in flight. ``--json`` swaps the live bars for one compact summary
-    object (the ``status --brief --json`` shape plus ``outcome``/``reason``).
+    The exit code names the branch, so a monitor never parses the output to decide: 0 = settled all-DONE; 1 = settled with FAILED/CANCELLED; 3 = needs attention *now* (a task settled terminally mid-stage — e.g. a watchdog fired — or a worker went stale/wedged); 124 = ``--timeout`` elapsed with work still in flight. ``--json`` swaps the live bars for one compact summary object (the ``status --brief --json`` shape plus ``outcome``/``reason``).
     """
     from mini.monitor import watch
 
@@ -942,7 +832,71 @@ def cmd_watch(args: argparse.Namespace) -> None:
         raise SystemExit(code)
 
 
+# A result routinely carries a per-step metric list — a training task's `val_loss` is
+# one float per step — so a sweep's raw reprs run to ~120 KB of floats, and the scalars
+# worth reading are buried in them (and, for an agent, the dump lands in its context).
+# The default view elides the bulk and nothing else: every mapping key and every scalar
+# prints verbatim, so what a reader takes from it is what the result says. Only lengths
+# are lost, and each elision states how much it stands for. `--full` prints the repr.
+_SEQ_HEAD = 3  # elements of a sequence shown before the elision
+_STR_CAP = 80  # characters of a string shown before the elision (a sha256 still fits)
+_MAX_DEPTH = 6  # nesting deeper than this is elided rather than walked
+
+
+def _elided(parts: list[str], total: int, brackets: str) -> str:
+    """*parts* (already rendered) inside *brackets*, capped at :data:`_SEQ_HEAD` with a count."""
+    open_c, close_c = brackets
+    shown = parts[:_SEQ_HEAD]
+    if total > len(shown):
+        shown.append(f"… +{total - len(shown)}")
+    return f"{open_c}{', '.join(shown)}{close_c}"
+
+
+def _capped(text: str, *, quoted: bool) -> str:
+    """*text* cut to :data:`_STR_CAP` characters, saying how many it dropped.
+
+    *quoted* distinguishes a string value, which prints as its repr, from an already rendered one — a number's repr must not pick up a second set of quotes.
+    """
+    shown = text[:_STR_CAP]
+    return (repr(shown) if quoted else shown) + (f"… +{len(text) - _STR_CAP} chars" if len(text) > _STR_CAP else "")
+
+
+def _abbreviated(value: Any, depth: int = 0) -> str:
+    """A one-line rendering of *value* with its bulk elided — for reading, not parsing.
+
+    Containers are walked so their shape survives: a mapping keeps every key, and a sequence keeps its first few elements plus a count of the rest. Dataclasses walk as their fields, which is what keeps an :class:`~mini.store.Artifact` tree from printing every child. Scalars are never rounded or reformatted — an abbreviated number that read as exact would be worse than no number at all.
+    """
+    if depth > _MAX_DEPTH:
+        return "…"
+    match value:
+        case str():
+            return _capped(value, quoted=True)
+        case dict():
+            rendered = [f"{k!r}: {_abbreviated(v, depth + 1)}" for k, v in value.items()]
+            return f"{{{', '.join(rendered)}}}"  # every key, however many: the keys are the map
+        case list() | tuple() | set() | frozenset():
+            # By instance, not by exact type: a namedtuple is a tuple, and a KeyError
+            # here would take down the verb over a cosmetic choice of bracket.
+            brackets = "[]" if isinstance(value, list) else "()" if isinstance(value, tuple) else "{}"
+            head = [_abbreviated(v, depth + 1) for v in list(value)[:_SEQ_HEAD]]
+            return _elided(head, len(value), brackets)
+    if hasattr(value, "shape") and hasattr(value, "dtype"):  # numpy/jax array: shape, not payload
+        return f"{value.dtype}{list(value.shape)}"
+    if isinstance(value, Artifact):
+        # Returning bulk as an artifact is the house pattern, so this is the handle a
+        # listing meets most. What identifies it here is the name and the size; the
+        # sha is 64 characters no `mini` verb takes as input, and a tree's children are
+        # per-file blobs that would crowd out the rest of the result. `--full` has them.
+        children = f", {len(value.children)} files" if value.kind == "tree" else ""
+        return f"Artifact({value.name!r}, {value.size} bytes{children}, sha256={value.sha256[:12]}…)"
+    if is_dataclass(value) and not isinstance(value, type):
+        rendered = [f"{f.name}={_abbreviated(getattr(value, f.name), depth + 1)}" for f in fields(value)]
+        return f"{type(value).__name__}({', '.join(rendered)})"
+    return _capped(repr(value), quoted=False)  # anything else — scalars included — through the cap
+
+
 def cmd_results(args: argparse.Namespace) -> None:
+    """Print each task's result, with long sequences elided unless ``--full``."""
     store = _store_for(args.name, args)
     recs = store.records()
     if not recs:
@@ -953,10 +907,11 @@ def cmd_results(args: argparse.Namespace) -> None:
         if not matches:
             raise SystemExit(f"no record for key {args.key!r} in experiment {args.name!r} — keys are listed by: status")
         current, stale = matches, []
+    render = repr if args.full else _abbreviated
     for rec in sorted(current, key=_launch_order):
         key = rec["key"]
         if _rec_state(rec) == RunState.DONE:
-            print(f"{key}  {store.result(key)}")
+            print(f"{key}  {render(store.result(key))}")
         else:
             print(f"{key}  ({_rec_state(rec)} — no result)")
     if stale:  # results under keys the DAG no longer requests would mislead a gather
@@ -992,10 +947,7 @@ def _attempt_delta(prev: dict, cur: dict) -> str:
 def _exec_env_summary(store: MemoStore) -> dict[str, Any]:
     """Aggregate the per-task execution environments a run actually ran on.
 
-    Each settled task carries an ``env`` (see :func:`mini.runs.compute_env`); this
-    rolls the fan-out up into the distinct GPUs / regions / clouds / hosts and the
-    number of Modal containers, plus the summed execution wall time — the "what did
-    this run *on*" companion to the driver-side lineage.
+    Each settled task carries an ``env`` (see :func:`mini.runs.compute_env`); this rolls the fan-out up into the distinct GPUs / regions / clouds / hosts and the number of Modal containers, plus the summed execution wall time — the "what did this run *on*" companion to the driver-side lineage.
     """
     # env field -> the distinct values seen across tasks (each rolled up below).
     seen: dict[str, set[str]] = {k: set() for k in ("gpu", "region", "cloud", "host", "modal_task_id")}
@@ -1041,10 +993,7 @@ def _print_git_lineage(git: dict[str, Any], name: str) -> None:
 def cmd_lineage(args: argparse.Namespace) -> None:
     """Print a run's captured provenance — enough to reproduce or forensically trace it.
 
-    Shows the code state (git sha/branch/tags/remote, and whether the tree was
-    dirty), who and what drove it (operator handle + AI agents), the spawning environment,
-    the timeline, any upstream experiments it built on, and a rollup of what the
-    tasks actually executed on. ``--diff`` dumps the recorded working-tree diff.
+    Shows the code state (git sha/branch/tags/remote, and whether the tree was dirty), who and what drove it (operator handle + AI agents), the spawning environment, the timeline, any upstream experiments it built on, and a rollup of what the tasks actually executed on. ``--diff`` dumps the recorded working-tree diff.
     """
     store = _store_for(args.name, args)
     lin = store.meta().get("lineage")
@@ -1116,10 +1065,7 @@ def _fmt_agent(a: dict[str, str]) -> str:
 def cmd_cost(args: argparse.Namespace) -> None:
     """Reconcile a run's Modal cost from the billing API (post-run; billing lags).
 
-    Sums the cost of every Modal app instance this run launched (recorded in meta at
-    spawn), with a per-resource breakdown (CPU / Memory / each GPU type). Only Modal
-    runs have a cost; billing is at daily resolution and lags the run, so a
-    just-finished run may report nothing yet.
+    Sums the cost of every Modal app instance this run launched (recorded in meta at spawn), with a per-resource breakdown (CPU / Memory / each GPU type). Only Modal runs have a cost; billing is at daily resolution and lags the run, so a just-finished run may report nothing yet.
     """
     store = _store_for(args.name, args)
     meta = store.meta()
@@ -1149,11 +1095,7 @@ def cmd_cost(args: argparse.Namespace) -> None:
 def cmd_explain(args: argparse.Namespace) -> None:
     """Show a task's identity evidence and its attempt timeline.
 
-    A record's key is *identity* (fn + inputs); each launch stamps the evidence it
-    ran under (code hash, ``version=``, a short hash per tracked dependency), and
-    prior attempts stay compacted on the record. ``explain`` prints the current
-    evidence and walks the timeline, answering "why did this re-run" down to the
-    dependency that moved between attempts.
+    A record's key is *identity* (fn + inputs); each launch stamps the evidence it ran under (code hash, ``version=``, a short hash per tracked dependency), and prior attempts stay compacted on the record. ``explain`` prints the current evidence and walks the timeline, answering "why did this re-run" down to the dependency that moved between attempts.
     """
     store = _store_for(args.name, args)
     rec = store.record(args.key)
@@ -1202,13 +1144,7 @@ _GC_LABEL = {
 def cmd_gc(args: argparse.Namespace) -> None:
     """Reclaim storage no current read path can reach. Dry run unless ``--apply``.
 
-    Two scopes: ``mini gc <name>`` sweeps one experiment's memo state
-    (superseded records with their result dirs, replaced attempt files,
-    orphaned result dirs, staged calls) on whichever backend it ran on;
-    ``mini gc --store`` mark-and-sweeps the project artifact CAS. Neither
-    touches a current record — a DONE result is a future memo hit, and
-    deleting a FAILED record would silently turn a terminal failure into a
-    relaunch.
+    Two scopes: ``mini gc <name>`` sweeps one experiment's memo state (superseded records with their result dirs, replaced attempt files, orphaned result dirs, staged calls) on whichever backend it ran on; ``mini gc --store`` mark-and-sweeps the project artifact CAS. Neither touches a current record — a DONE result is a future memo hit, and deleting a FAILED record would silently turn a terminal failure into a relaunch.
     """
     if args.store and args.name:
         raise SystemExit("pass an experiment name or --store, not both (the store sweep is project-wide)")
@@ -1248,11 +1184,7 @@ def cmd_gc(args: argparse.Namespace) -> None:
 def _gc_store(args: argparse.Namespace) -> None:
     """Mark-and-sweep the project artifact store (CAS). Dry run unless ``--apply``.
 
-    Fails closed: any in-flight task, unreadable result, or unreachable
-    backend aborts the sweep with nothing deleted. Unreferenced blobs younger
-    than ``--grace`` are kept — the window that protects writers this checkout
-    can't see (an unpushed colleague's records, a ``put`` that skipped its
-    upload just before the sweep).
+    Fails closed: any in-flight task, unreadable result, or unreachable backend aborts the sweep with nothing deleted. Unreferenced blobs younger than ``--grace`` are kept — the window that protects writers this checkout can't see (an unpushed colleague's records, a ``put`` that skipped its upload just before the sweep).
     """
     from mini.gc import StoreGcError, apply_store_gc, collect_store_roots, plan_store_gc
     from mini.local_apparatus import LocalApparatus
@@ -1440,6 +1372,12 @@ def main() -> None:
     p = sub.add_parser("results", help="print per-task results, by experiment NAME")
     _add_name_arg(p)
     p.add_argument("key", nargs="?", default=None, help="print just this task's result (default: every task)")
+    p.add_argument(
+        "--full",
+        action="store_true",
+        help=f"print each result's whole repr; by default sequences past {_SEQ_HEAD} elements are "
+        "elided with a count (a per-step metric list is otherwise thousands of floats)",
+    )
     _add_app_flag(p)
     p.set_defaults(func=cmd_results)
 

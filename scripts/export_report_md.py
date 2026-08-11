@@ -1,37 +1,13 @@
 #!/usr/bin/env python
 """Export a Marimo notebook to Markdown with its outputs, then clean it up.
 
-This replaces the ``marimo-md-export`` console script. It reuses that
-package's library — which does the hard part: running both the Markdown and
-HTML exports, scraping rendered outputs out of the HTML session JSON, and
-injecting them back into the Markdown — but fixes two things in how its CLI
-drives that library:
+This replaces the ``marimo-md-export`` console script. It reuses that package's library — which does the hard part: running both the Markdown and HTML exports, scraping rendered outputs out of the HTML session JSON, and injecting them back into the Markdown — but fixes two things in how its CLI drives that library:
 
-**Admonitions were rewritten inside code fences.** ``marimo-md-export``
-applies its ``/// type | Title`` → ``!!! type "Title"`` conversion to the
-whole Markdown document before collecting cells. Cells are matched to their
-rendered output by MD5 of the cell source, so rewriting a ``///`` block that
-lives *inside* a cell's Python source changes that cell's hash, and the
-output no longer matches. A cell whose code is hidden and whose output does
-not match is deleted outright, so the cell silently disappears from the
-export. This hits any ``mo.md(f"...")`` cell containing an admonition:
-interpolated cells stay code fences in the Markdown export, whereas literal
-``mo.md("...")`` cells are unwrapped to plain Markdown and are unaffected.
-:func:`convert_admonitions` here applies the same transform outside fenced
-code blocks only.
+**Admonitions were rewritten inside code fences.** ``marimo-md-export`` applies its ``/// type | Title`` → ``!!! type "Title"`` conversion to the whole Markdown document before collecting cells. Cells are matched to their rendered output by MD5 of the cell source, so rewriting a ``///`` block that lives *inside* a cell's Python source changes that cell's hash, and the output no longer matches. A cell whose code is hidden and whose output does not match is deleted outright, so the cell silently disappears from the export. This hits any ``mo.md(f"...")`` cell containing an admonition: interpolated cells stay code fences in the Markdown export, whereas literal ``mo.md("...")`` cells are unwrapped to plain Markdown and are unaffected. :func:`convert_admonitions` here applies the same transform outside fenced code blocks only.
 
-**Dropped cells were unreported.** ``inject_outputs`` cannot tell a cell that
-genuinely produces no output from one whose hash failed to match, so it says
-nothing either way. Checking the source text instead is decisive, and catches
-the whole class rather than this one instance: the HTML export lists a hash
-for every cell in the notebook, so a code fence in the Markdown whose hash is
-absent from that list is a fence some transform has rewritten.
-:func:`check_sources_agree` raises on that rather than letting the gap reach
-the published document.
+**Dropped cells were unreported.** ``inject_outputs`` cannot tell a cell that genuinely produces no output from one whose hash failed to match, so it says nothing either way. Checking the source text instead is decisive, and catches the whole class rather than this one instance: the HTML export lists a hash for every cell in the notebook, so a code fence in the Markdown whose hash is absent from that list is a fence some transform has rewritten. :func:`check_sources_agree` raises on that rather than letting the gap reach the published document.
 
-Usage: ``uv run scripts/export_report_md.py <notebook.py> <out.md>``. Images
-are externalized beside the output; see ``clean_marimo_md.py`` for what the
-cleanup pass does and for the options this script forwards to it.
+Usage: ``uv run scripts/export_report_md.py <notebook.py> <out.md>``. Images are externalized beside the output; see ``clean_marimo_md.py`` for what the cleanup pass does and for the options this script forwards to it.
 """
 
 from __future__ import annotations
@@ -61,11 +37,7 @@ FENCE_RE = re.compile(r"(`{3,}|~{3,})")
 def fenced_spans(md: str) -> list[tuple[int, int]]:
     """Return the ``(start, end)`` character offsets of each fenced code block.
 
-    Follows CommonMark's rules for the cases that come up in a Marimo export:
-    a closing fence uses the same character as its opener and is at least as
-    long, and carries no info string. Both matter here, because Marimo widens
-    a cell's fence when the cell's own source contains backticks — the inner
-    ones must not read as the close.
+    Follows CommonMark's rules for the cases that come up in a Marimo export: a closing fence uses the same character as its opener and is at least as long, and carries no info string. Both matter here, because Marimo widens a cell's fence when the cell's own source contains backticks — the inner ones must not read as the close.
     """
     spans: list[tuple[int, int]] = []
     open_fence: str | None = None
@@ -103,9 +75,7 @@ def convert_admonitions(md: str) -> str:
 def notebook_source_hashes(html: bytes) -> set[str]:
     """Return the MD5 of every cell source in the notebook, per the HTML export.
 
-    The session JSON carries a ``code_hash`` for every cell, including the ones
-    that render nothing; ``extract_outputs`` keeps only the cells that produced
-    output, so it can't serve as the reference set here.
+    The session JSON carries a ``code_hash`` for every cell, including the ones that render nothing; ``extract_outputs`` keeps only the cells that produced output, so it can't serve as the reference set here.
     """
     return {cell["code_hash"] for cell in json.loads(_extract_session_cells_raw(html))}
 
@@ -113,11 +83,7 @@ def notebook_source_hashes(html: bytes) -> set[str]:
 def check_sources_agree(cells: list[Cell], source_hashes: set[str]) -> None:
     """Raise if a code fence in the Markdown carries a source no notebook cell has.
 
-    Cells are matched to their rendered output by MD5 of the source, so any
-    rewriting of a fence's contents between the two exports costs that cell its
-    output — and, if its code is hidden, the cell itself. Cells that Marimo
-    unwrapped into plain Markdown have no fence and so aren't checked; their
-    text is in the document either way.
+    Cells are matched to their rendered output by MD5 of the source, so any rewriting of a fence's contents between the two exports costs that cell its output — and, if its code is hidden, the cell itself. Cells that Marimo unwrapped into plain Markdown have no fence and so aren't checked; their text is in the document either way.
     """
     unknown = [cell for cell in cells if cell.source_hash not in source_hashes]
     if not unknown:
