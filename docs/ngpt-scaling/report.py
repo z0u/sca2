@@ -119,12 +119,7 @@ def _():
 def _(curves):
     @themed(
         name="plateau-vs-depth",
-        alt_text=(
-            "Line chart of converged validation loss against depth (4, 8, and 12 layers), with one line "
-            "per width. All three lines are close to flat: width 32 sits near 1.5, width 64 near 1.4, and "
-            "width 128 near 1.33, at every depth. Deeper models are no worse than shallow ones at any "
-            "width, and each wider model sits uniformly below the narrower ones."
-        ),
+        alt_text="Line chart of converged validation loss against depth (4, 8, and 12 layers), with one line per width. All three lines are close to flat: width 32 sits near 1.5, width 64 near 1.4, and width 128 near 1.33, at every depth. Deeper models are no worse than shallow ones at any width, and each wider model sits uniformly below the narrower ones.",
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(6.2, 3.8))
@@ -156,13 +151,7 @@ def _():
 def _(curves):
     @themed(
         name="convergence",
-        alt_text=(
-            "Three line charts of validation loss against epoch, one per width (32, 64, and 128), sharing "
-            "a y-axis, each with one line per depth (4, 8, and 12 layers). In every panel, all three depth "
-            "lines fall together through the first ten epochs of warmup and converge onto a single plateau, "
-            "with no spikes or divergence. The plateau drops from about 1.5 in the width-32 panel to about "
-            "1.4 at width 64 to about 1.33 at width 128."
-        ),
+        alt_text="Three line charts of validation loss against epoch, one per width (32, 64, and 128), sharing a y-axis, each with one line per depth (4, 8, and 12 layers). In every panel, all three depth lines fall together through the first ten epochs of warmup and converge onto a single plateau, with no spikes or divergence. The plateau drops from about 1.5 in the width-32 panel to about 1.4 at width 64 to about 1.33 at width 128.",
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 3, figsize=(10.5, 3.4), sharey=True)

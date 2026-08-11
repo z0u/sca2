@@ -349,28 +349,10 @@ def _(arrays219):
     @themed(
         name="tau-ladder",
         alt_text="""
-            Two line charts of leading softmin weight against temperature tau
-            on a log scale from 0.003 to 8. Left panel: the un-anchored
-            control's alignment profile from ex-2.1.9; right panel: its
-            pool-t100 condition. Each panel has five curves, one per residual
-            slice, descending from near 1 at the left edge to 0.25 at the
-            right edge. Three vertical dashed lines mark tau = 0.1, 0.5 and
-            2.5. At tau = 2.5 every curve has flattened to within a few
-            hundredths of 0.25, the uniform value marked by a faint
-            horizontal line.
+            Two line charts of leading softmin weight against temperature tau on a log scale from 0.003 to 8. Left panel: the un-anchored control's alignment profile from ex-2.1.9; right panel: its pool-t100 condition. Each panel has five curves, one per residual slice, descending from near 1 at the left edge to 0.25 at the right edge. Three vertical dashed lines mark tau = 0.1, 0.5 and 2.5. At tau = 2.5 every curve has flattened to within a few hundredths of 0.25, the uniform value marked by a faint horizontal line.
         """,
         caption=r"""
-            **Where the soft-τ rungs land.** The check the ladder was chosen
-            by (the rungs are not derivable from first principles): the share
-            of softmin weight held by the leading span position, as a
-            function of τ, computed on the stored alignments from ex-2.1.9
-            under the un-anchored control (**left**) and under `pool-t100`
-            (**right**). Dashed verticals mark the rungs chosen here, and the
-            curves say what each will do. τ = 0.1 keeps a clear leader on the
-            trained profile; τ = 2.5 sits within a few hundredths of uniform
-            (0.25) on both, so it *is* the tiny-bias arm and a τ = ∞ arm
-            would add nothing; τ = 0.5 splits the gap. Had a rung landed on
-            the flat shoulder next to another, we would have moved it.
+            **Where the soft-τ rungs land.** The check the ladder was chosen by (the rungs are not derivable from first principles): the share of softmin weight held by the leading span position, as a function of τ, computed on the stored alignments from ex-2.1.9 under the un-anchored control (**left**) and under `pool-t100` (**right**). Dashed verticals mark the rungs chosen here, and the curves say what each will do. τ = 0.1 keeps a clear leader on the trained profile; τ = 2.5 sits within a few hundredths of uniform (0.25) on both, so it *is* the tiny-bias arm and a τ = ∞ arm would add nothing; τ = 0.5 splits the gap. Had a rung landed on the flat shoulder next to another, we would have moved it.
         """,
     )
     def _plot():
@@ -723,12 +705,7 @@ def _(CONDS: list[str], acc):
     </table></div>
     """
     _caption = f"""
-    Behavior by condition. Each value is the seed mean, with half the seed
-    range beside it. EM is exact match on the answer token, NLL its surprise
-    in nats, and <code>open</code> dist the RGB distance from the guessed
-    color to the true mix on pairs with no named answer. Δ holdout EM is the
-    signed gap to the in-experiment control, which the H1 gate scores at
-    {ex.TASK_GATE:g}.
+    Behavior by condition. Each value is the seed mean, with half the seed range beside it. EM is exact match on the answer token, NLL its surprise in nats, and <code>open</code> dist the RGB distance from the guessed color to the true mix on pairs with no named answer. Δ holdout EM is the signed gap to the in-experiment control, which the H1 gate scores at {ex.TASK_GATE:g}.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -781,12 +758,7 @@ def _(a_op1, a_span, m_op1, m_span):
     </table></div>
     """
     _caption = """
-    The reproduction check. Each statistic is this experiment's seed mean (±
-    seed standard deviation) beside the same statistic recomputed from
-    ex-2.1.9's published arrays under the same per-run convention, and the
-    difference. <code>op1-labels</code> re-runs <code>pool-t100</code>
-    through the widened labelling code; <code>lam0</code> runs the either-slot
-    labeller, so it is a new draw of the control rather than a re-run.
+    The reproduction check. Each statistic is this experiment's seed mean (± seed standard deviation) beside the same statistic recomputed from ex-2.1.9's published arrays under the same per-run convention, and the difference. <code>op1-labels</code> re-runs <code>pool-t100</code> through the widened labelling code; <code>lam0</code> runs the either-slot labeller, so it is a new draw of the control rather than a re-run.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -815,29 +787,13 @@ def _(N_SEEDS, READ: np.ndarray, contrast, pi_group, pi_group_mean):
     }
     _ALT = {
         "either-t100": """
-            Ten small panels in two columns labeled G1, op1 drew, and G2, op2
-            drew: five residual slices per column with the embedding at the
-            bottom, each spanning the roles op1, plus, op2 and equals. In the
-            G1 column every slice shows a tall block at op1 — 0.77 at the
-            embedding, near 0.9 at depth — with a small step at equals in the
-            embedding row only. The G2 column is the mirror image: the block
-            sits at op2 at every slice, 0.77 at the embedding rising to 0.95
-            at depth. Nine per-seed hairlines hug the mean everywhere. A
-            dashed readability line in the G1 column is high at op1 on every
-            slice; at the embedding it falls to near zero at the other three
-            roles, while at depth it dips at plus and rises again at equals.
+            Ten small panels in two columns labeled G1, op1 drew, and G2, op2 drew: five residual slices per column with the embedding at the bottom, each spanning the roles op1, plus, op2 and equals. In the G1 column every slice shows a tall block at op1 — 0.77 at the embedding, near 0.9 at depth — with a small step at equals in the embedding row only. The G2 column is the mirror image: the block sits at op2 at every slice, 0.77 at the embedding rising to 0.95 at depth. Nine per-seed hairlines hug the mean everywhere. A dashed readability line in the G1 column is high at op1 on every slice; at the embedding it falls to near zero at the other three roles, while at depth it dips at plus and rises again at equals.
         """,
         "either-t500": """
-            The same ten-panel layout for tau 0.5. Both columns are nearly
-            flat around 0.25 at the embedding with a slight op1 tilt in G1
-            and op2 tilt in G2; at depth the G2 column's op2 weight grows to
-            about 0.44 while the G1 column stays diffuse. Hairlines stay
-            close to the mean.
+            The same ten-panel layout for tau 0.5. Both columns are nearly flat around 0.25 at the embedding with a slight op1 tilt in G1 and op2 tilt in G2; at depth the G2 column's op2 weight grows to about 0.44 while the G1 column stays diffuse. Hairlines stay close to the mean.
         """,
         "either-t2500": """
-            The same ten-panel layout for tau 2.5. Every panel in both
-            columns is flat at about 0.25 with tilts of a few hundredths, the
-            span mean in all but name.
+            The same ten-panel layout for tau 2.5. Every panel in both columns is flat at about 0.25 with tilts of a few hundredths, the span mean in all but name.
         """,
     }
 
@@ -850,8 +806,7 @@ def _(N_SEEDS, READ: np.ndarray, contrast, pi_group, pi_group_mean):
             name=f"group-profiles-{cond}",
             alt_text=_ALT[cond],
             caption=rf"""
-                **{title}** — τ = {dict(zip(ex.EITHER_NAMES, ex.TAUS, strict=True))[cond]:g};
-                deep-slice op2 contrast {_con.mean():+.2f}
+                **{title}** — τ = {dict(zip(ex.EITHER_NAMES, ex.TAUS, strict=True))[cond]:g}; deep-slice op2 contrast {_con.mean():+.2f}
                 <span class='range'>±{_con.std(ddof=1):.2f}</span>.
             """,
         )
@@ -973,39 +928,10 @@ def _(ANCHORED, N_SEEDS, retention, traj):
     @themed(
         name="trajectories",
         alt_text="""
-            Five trajectory panels and one schedule panel in a two-by-three
-            grid sharing the epoch axis from 0 to 100. Each trajectory panel
-            plots mean alignment at op1 as a solid line staying below 0.1,
-            and the line margin as a dashed line climbing to about 0.6 by
-            epoch 30 and on to roughly 0.7 by the end, over a flat grey
-            control pair near zero. The dashed line dips slightly after epoch
-            90 in every panel, and every panel's retention annotation reads
-            0.96 or higher. Faint ghost lines repeat the other conditions'
-            margin curves in each panel and lie almost on top of the panel's
-            own: the five trajectory panels are near copies of one another.
-            The schedule panel, bottom right, shows the anchor
-            weight ramping to a plateau and annealing after epoch 90, and the
-            repulsion weight starting high, crossing below the anchor around
-            epoch 60 and settling at about a third of it.
+            Five trajectory panels and one schedule panel in a two-by-three grid sharing the epoch axis from 0 to 100. Each trajectory panel plots mean alignment at op1 as a solid line staying below 0.1, and the line margin as a dashed line climbing to about 0.6 by epoch 30 and on to roughly 0.7 by the end, over a flat grey control pair near zero. The dashed line dips slightly after epoch 90 in every panel, and every panel's retention annotation reads 0.96 or higher. Faint ghost lines repeat the other conditions' margin curves in each panel and lie almost on top of the panel's own: the five trajectory panels are near copies of one another. The schedule panel, bottom right, shows the anchor weight ramping to a plateau and annealing after epoch 90, and the repulsion weight starting high, crossing below the anchor around epoch 60 and settling at about a third of it.
         """,
         caption=rf"""
-            **Training dynamics by condition.** Seed means of the two cosines
-            on the anchor axis, on one shared scale: solid is $\bar\alpha$ at
-            op1 (contained at the filled caret ▶, {ex.MEAN_ALIGN_GATE:g});
-            dashed is m_line (its retention floor of {ex.RETENTION_FLOOR:g}
-            at the open caret ◁). The grey pair is the un-anchored control;
-            the faint lines behind each panel are the m_line trajectories of
-            the other four anchored conditions, for comparison in place. The
-            number in each panel is that condition's retention (final over
-            peak m_line, minimum across seeds; gate ≥ {ex.RETENTION_GATE:g},
-            scored on the primary). The trajectory instrument reads one line
-            per color, so its level sits above the endpoint statistic's,
-            which averages all 27 partners; retention compares within the
-            curve, where the instrument is constant. Bottom right: the weight
-            schedule every anchored condition trained under — anchor
-            $\lambda_\mathrm{{a}}$ in red, repulsion
-            $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue, log scale — shared
-            because the anti-subspace term is fixed at the operating point.
+            **Training dynamics by condition.** Seed means of the two cosines on the anchor axis, on one shared scale: solid is $\bar\alpha$ at op1 (contained at the filled caret ▶, {ex.MEAN_ALIGN_GATE:g}); dashed is m_line (its retention floor of {ex.RETENTION_FLOOR:g} at the open caret ◁). The grey pair is the un-anchored control; the faint lines behind each panel are the m_line trajectories of the other four anchored conditions, for comparison in place. The number in each panel is that condition's retention (final over peak m_line, minimum across seeds; gate ≥ {ex.RETENTION_GATE:g}, scored on the primary). The trajectory instrument reads one line per color, so its level sits above the endpoint statistic's, which averages all 27 partners; retention compares within the curve, where the instrument is constant. Bottom right: the weight schedule every anchored condition trained under — anchor $\lambda_\mathrm{{a}}$ in red, repulsion $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue, log scale — shared because the anti-subspace term is fixed at the operating point.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1105,35 +1031,10 @@ def _(CONDS: list[str], alpha_map, grading_r2, m_line):
     @themed(
         name="grading",
         alt_text="""
-            Six panels in a two-by-three grid sharing both axes: per-color
-            alignment at the first operand, from about -0.2 to 1.2, against
-            the redness of that color from 0 to 1. Panels are the control,
-            op1-labels, the primary either-t100, the two softer arms and the
-            slot oracle. The control panel is flat near zero. The op1-labels,
-            either-t100 and slot-oracle panels each scatter 216 marks drawn
-            in the color they stand for, forming a flat cluster at low
-            redness and a rising tail of oranges and reds that tracks the
-            dashed reference curve closely. In the either-t500 and
-            either-t2500 panels the low-redness cluster scatters much more
-            widely, from about -0.2 to 0.5, and the conditional-mean line
-            wanders around a slightly raised level before rising, hugging
-            the reference less tightly.
+            Six panels in a two-by-three grid sharing both axes: per-color alignment at the first operand, from about -0.2 to 1.2, against the redness of that color from 0 to 1. Panels are the control, op1-labels, the primary either-t100, the two softer arms and the slot oracle. The control panel is flat near zero. The op1-labels, either-t100 and slot-oracle panels each scatter 216 marks drawn in the color they stand for, forming a flat cluster at low redness and a rising tail of oranges and reds that tracks the dashed reference curve closely. In the either-t500 and either-t2500 panels the low-redness cluster scatters much more widely, from about -0.2 to 0.5, and the conditional-mean line wanders around a slightly raised level before rising, hugging the reference less tightly.
         """,
         caption=rf"""
-            **Grading: alignment at op1, per color.** $\alpha_c$, the mean
-            over slices of $\cos(h, \hat v_{{\text{{red}}}})$ at op1, seed
-            mean, against the redness of the color. One mark per color, drawn
-            in that color; the thin dark line is the mean response at each of
-            the 29 distinct redness levels, the flat grey band the same line
-            for the control, and the dashed line `sim¹·⁵` rescaled onto the
-            response by least squares — the shape the $r^2$ statistic scores
-            against. $r^2$ is computed per color, with no binning, so scatter
-            about the conditional-mean line counts against it even where that
-            line tracks the reference; the exploratory section separates the
-            two. H3(c) gates the primary's $r^2$ at no more than
-            {ex.GRADE_R2_DROP:g} below `op1-labels`'s, whose own $r^2$
-            ({grading_r2(ex.REFERENCE_ARM):.2f}) reproduces ex-2.1.9's
-            `pool-t100` ({ex.EX219_REFERENCE["pool-t100"]["r2"]:g}).
+            **Grading: alignment at op1, per color.** $\alpha_c$, the mean over slices of $\cos(h, \hat v_{{\text{{red}}}})$ at op1, seed mean, against the redness of the color. One mark per color, drawn in that color; the thin dark line is the mean response at each of the 29 distinct redness levels, the flat grey band the same line for the control, and the dashed line `sim¹·⁵` rescaled onto the response by least squares — the shape the $r^2$ statistic scores against. $r^2$ is computed per color, with no binning, so scatter about the conditional-mean line counts against it even where that line tracks the reference; the exploratory section separates the two. H3(c) gates the primary's $r^2$ at no more than {ex.GRADE_R2_DROP:g} below `op1-labels`'s, whose own $r^2$ ({grading_r2(ex.REFERENCE_ARM):.2f}) reproduces ex-2.1.9's `pool-t100` ({ex.EX219_REFERENCE["pool-t100"]["r2"]:g}).
         """,
     )
     def _plot() -> plt.Figure:
@@ -1201,24 +1102,10 @@ def _(ANCHORED, m_line):
     @themed(
         name="h4-dots",
         alt_text="""
-            A dot plot with five condition rows against control-subtracted
-            line margin from 0 to about 0.5. From top: op1-labels at 0.36,
-            either-t100 with nine tightly clustered dots at 0.40, either-t500
-            and either-t2500 both near 0.46, and slot-oracle at 0.39. Small
-            dots are individual runs and a vertical tick marks each mean; the
-            seed spread within any row is a few thousandths. A dashed gate
-            line at 0.29 and a dotted partial line at 0.19 sit well left of
-            every row.
+            A dot plot with five condition rows against control-subtracted line margin from 0 to about 0.5. From top: op1-labels at 0.36, either-t100 with nine tightly clustered dots at 0.40, either-t500 and either-t2500 both near 0.46, and slot-oracle at 0.39. Small dots are individual runs and a vertical tick marks each mean; the seed spread within any row is a few thousandths. A dashed gate line at 0.29 and a dotted partial line at 0.19 sit well left of every row.
         """,
         caption=rf"""
-            **Control-subtracted m_line by condition.** Small dots are runs
-            (nine on the primary), the tick their mean; the reference arms
-            are greyed. Dashed caret: the H4 gate,
-            {ex.ORACLE_FRAC_GATE:.0%} of the slot oracle's control-subtracted
-            mean ({_ORACLE:.3f}); dotted, the {ex.ORACLE_FRAC_PARTIAL:.0%}
-            partial. The latch account — a pull stuck on op1 serving only the
-            op1-triggered half of the label mass — predicts landing near the
-            partial line.
+            **Control-subtracted m_line by condition.** Small dots are runs (nine on the primary), the tick their mean; the reference arms are greyed. Dashed caret: the H4 gate, {ex.ORACLE_FRAC_GATE:.0%} of the slot oracle's control-subtracted mean ({_ORACLE:.3f}); dotted, the {ex.ORACLE_FRAC_PARTIAL:.0%} partial. The latch account — a pull stuck on op1 serving only the op1-triggered half of the label mass — predicts landing near the partial line.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1286,13 +1173,7 @@ def _(ANCHORED, a_op1, a_span, grading_r2, m_line, m_op1, m_span):
     </table></div>
     """
     _caption = f"""
-    The anchored conditions, seed means (± seed standard deviation on the
-    scored statistic). Only the primary (so marked) is gated;
-    "oracle frac" is control-subtracted m<sub>line</sub> as a fraction of the
-    slot oracle's {_ORACLE:.3f}. m<sub>span</sub> and m<sub>op1</sub> are
-    carried for continuity with ex-2.1.9 (both key their line weights on op1
-    alone), ᾱ<sub>span</sub> and ᾱ (op1) are the drift statistics, and r²
-    repeats the grading track scored under H3.
+    The anchored conditions, seed means (± seed standard deviation on the scored statistic). Only the primary (so marked) is gated; "oracle frac" is control-subtracted m<sub>line</sub> as a fraction of the slot oracle's {_ORACLE:.3f}. m<sub>span</sub> and m<sub>op1</sub> are carried for continuity with ex-2.1.9 (both key their line weights on op1 alone), ᾱ<sub>span</sub> and ᾱ (op1) are the drift statistics, and r² repeats the grading track scored under H3.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -1337,24 +1218,10 @@ def _(N_SEEDS, traj):
     @themed(
         name="role-drift",
         alt_text="""
-            Two panels sharing an epoch axis from 0 to 100 and an alignment
-            axis from about -0.1 to 0.45, with the repulsion schedule shaded
-            faintly behind each. Left panel, the embedding slice: the equals
-            and plus curves rise to about 0.13 by epoch 15, hold flat to
-            epoch 35, then climb to 0.40 and 0.28 respectively by epoch 90;
-            op1 and op2 dip to about -0.12 near epoch 8 and return to within
-            a few hundredths of zero. Right panel, the last
-            slice: op1 and op2 rise gently to 0.15 and 0.12 while plus and
-            equals stay near zero.
+            Two panels sharing an epoch axis from 0 to 100 and an alignment axis from about -0.1 to 0.45, with the repulsion schedule shaded faintly behind each. Left panel, the embedding slice: the equals and plus curves rise to about 0.13 by epoch 15, hold flat to epoch 35, then climb to 0.40 and 0.28 respectively by epoch 90; op1 and op2 dip to about -0.12 near epoch 8 and return to within a few hundredths of zero. Right panel, the last slice: op1 and op2 rise gently to 0.15 and 0.12 while plus and equals stay near zero.
         """,
         caption=r"""
-            **Unweighted drift by role, over training (primary, seed mean).**
-            $\bar\alpha(\ell, t)$ over all 216 colors at the embedding slice
-            (**left**) and the last slice (**right**), one curve per span
-            role; the shaded band is the repulsion weight
-            $\lambda_{\bar{\mathrm{s}}}$ on its own scale, for timing.
-            The trajectory instrument reads one line per color, as in the
-            dynamics figure.
+            **Unweighted drift by role, over training (primary, seed mean).** $\bar\alpha(\ell, t)$ over all 216 colors at the embedding slice (**left**) and the last slice (**right**), one curve per span role; the shaded band is the repulsion weight $\lambda_{\bar{\mathrm{s}}}$ on its own scale, for timing. The trajectory instrument reads one line per color, as in the dynamics figure.
         """,
     )
     def _plot() -> plt.Figure:

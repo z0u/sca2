@@ -267,15 +267,10 @@ def _(metrics):
     @themed(
         name="val-loss",
         alt_text="""
-            Validation loss over training epochs, with one line per vocabulary grid
-            (v27, v64, v216, v4096) and three thin overlapping lines per grid, one per
-            seed. Larger vocabularies start at higher loss, because a larger vocabulary
-            means higher chance cross-entropy.
+            Validation loss over training epochs, with one line per vocabulary grid (v27, v64, v216, v4096) and three thin overlapping lines per grid, one per seed. Larger vocabularies start at higher loss, because a larger vocabulary means higher chance cross-entropy.
         """,
         caption="""
-            Validation loss per epoch, with three thin lines per grid, one per seed.
-            The grids aren't comparable to each other, since chance loss grows with the
-            vocabulary size; what matters here is that each curve settles.
+            Validation loss per epoch, with three thin lines per grid, one per seed. The grids aren't comparable to each other, since chance loss grows with the vocabulary size; what matters here is that each curve settles.
         """,
     )
     def _plot() -> plt.Figure:
@@ -311,11 +306,7 @@ def _(metrics):
     @themed(
         name="accuracy",
         alt_text="""
-            Two bar panels of exact-match accuracy (0 to 1) by vocabulary grid (v27,
-            v64, v216, v4096), one panel for seen pairs and one for held-out pairs. Bars
-            show the mean over three seeds, and dots show the individual seeds. Seen
-            accuracy is 1.0 everywhere except v4096 (0.85). Held-out accuracy is
-            non-monotonic: 0.27, 0.59, essentially 1.0 at v216, then 0.65 at v4096.
+            Two bar panels of exact-match accuracy (0 to 1) by vocabulary grid (v27, v64, v216, v4096), one panel for seen pairs and one for held-out pairs. Bars show the mean over three seeds, and dots show the individual seeds. Seen accuracy is 1.0 everywhere except v4096 (0.85). Held-out accuracy is non-monotonic: 0.27, 0.59, essentially 1.0 at v216, then 0.65 at v4096.
         """,
         caption=mo.md("""
             Exact-match accuracy by grid. Bars show the mean over three seeds; dots are individual seeds. **Left:** Seen pairs show whether training worked at all; **Right:** held-out pairs show generalization.
@@ -412,23 +403,10 @@ def _(arrays, evals, metrics):
     @themed(
         name="distance-ecdf",
         alt_text="""
-            Two panels of cumulative distributions of the RGB distance from the guessed
-            color to the true mix, pooled over three seeds, one panel for
-            held-out pairs and one for open pairs. One line per vocabulary grid. A dashed
-            line shows the nearest-name floor on open pairs. Triangles under the x-axis
-            mark the prompt-blind constant baseline. The curve for every grid stays close to its
-            floor and well to the left of the reference; v216 and v4096 rise to 1 within a
-            fraction of the chance distance.
+            Two panels of cumulative distributions of the RGB distance from the guessed color to the true mix, pooled over three seeds, one panel for held-out pairs and one for open pairs. One line per vocabulary grid. A dashed line shows the nearest-name floor on open pairs. Triangles under the x-axis mark the prompt-blind constant baseline. The curve for every grid stays close to its floor and well to the left of the reference; v216 and v4096 rise to 1 within a fraction of the chance distance.
         """,
         caption="""
-            How close do guesses land? Each line is the cumulative distribution of the
-            distance from the guess to the true mix (in unit-cube units, pooled over
-            seeds); higher and further to the left is better. On held-out pairs an exact
-            answer exists, so the height at distance 0 is the exact-match accuracy. On
-            open pairs no name is quite right, so the dashed line shows the best
-            achievable (nearest-name) distance there. The triangles under the x-axis are
-            the prompt-blind constant, the score for always answering the center of the
-            training answers.
+            How close do guesses land? Each line is the cumulative distribution of the distance from the guess to the true mix (in unit-cube units, pooled over seeds); higher and further to the left is better. On held-out pairs an exact answer exists, so the height at distance 0 is the exact-match accuracy. On open pairs no name is quite right, so the dashed line shows the best achievable (nearest-name) distance there. The triangles under the x-axis are the prompt-blind constant, the score for always answering the center of the training answers.
         """,
     )
     def _plot() -> plt.Figure:
@@ -565,19 +543,10 @@ def _(arrays, metrics):
     @themed(
         name="embedding-pca",
         alt_text="""
-            Four scatter panels, one per vocabulary grid, showing the first two
-            principal components of the color-token embeddings of each grid, with every point
-            drawn in the color it names. v27 and v64 show loose clusters with only rough
-            color grouping; v216 shows a clear gradient organized by hue; v4096 shows a
-            smooth color wheel, with hues arranged around a disc and darker colors toward
-            the middle.
+            Four scatter panels, one per vocabulary grid, showing the first two principal components of the color-token embeddings of each grid, with every point drawn in the color it names. v27 and v64 show loose clusters with only rough color grouping; v216 shows a clear gradient organized by hue; v4096 shows a smooth color wheel, with hues arranged around a disc and darker colors toward the middle.
         """,
         caption="""
-            The embedding table, projected onto its own first two principal components
-            (seed 0), with each token drawn in the color it names. Only `v4096` shows the
-            hue wheel we thought we might find. The percentage is how much of the table
-            variance its leading *three* components hold — the most any three directions
-            could — of which the panel draws the leading two.
+            The embedding table, projected onto its own first two principal components (seed 0), with each token drawn in the color it names. Only `v4096` shows the hue wheel we thought we might find. The percentage is how much of the table variance its leading *three* components hold — the most any three directions could — of which the panel draws the leading two.
         """,
     )
     def _plot() -> plt.Figure:
@@ -624,21 +593,10 @@ def _(geom, geometry):
     @themed(
         name="embedding-probe-cube",
         alt_text="""
-            Four hexagonal panels, one per vocabulary grid, showing where the probe places
-            each color token in the RGB cube, viewed down the grey diagonal of the cube so hue
-            runs around the panel and the six chromatic corners sit on the rim. Filled dots
-            are where a token landed, open rings its true position, joined by a short stub.
-            At v27 many dots sit well away from their rings; v64 is closer; v216 has dots
-            almost on top of their rings, forming an even hue wheel; v4096 is a dense wheel
-            shown without rings.
+            Four hexagonal panels, one per vocabulary grid, showing where the probe places each color token in the RGB cube, viewed down the grey diagonal of the cube so hue runs around the panel and the six chromatic corners sit on the rim. Filled dots are where a token landed, open rings its true position, joined by a short stub. At v27 many dots sit well away from their rings; v64 is closer; v216 has dots almost on top of their rings, forming an even hue wheel; v4096 is a dense wheel shown without rings.
         """,
         caption="""
-            The same embedding tables (seed 0), now read through the probe instead of
-            through variance: each token is placed at the RGB the probe predicts for it,
-            and drawn in the color it actually names. Open rings mark where a token should
-            sit, so the displacement (lines) show the error. `R²` is the same fit as a
-            single number, averaged over seeds. Rings are left off at `v4096`, where 4096
-            of them would bury the colors.
+            The same embedding tables (seed 0), now read through the probe instead of through variance: each token is placed at the RGB the probe predicts for it, and drawn in the color it actually names. Open rings mark where a token should sit, so the displacement (lines) show the error. `R²` is the same fit as a single number, averaged over seeds. Rings are left off at `v4096`, where 4096 of them would bury the colors.
         """,
     )
     def _plot() -> plt.Figure:
@@ -706,17 +664,10 @@ def _(metrics):
     @themed(
         name="residual-probes",
         alt_text="""
-            Four line panels, one per vocabulary grid, of ridge-probe R-squared for the
-            mix RGB read from the residual stream at the pre-answer position, over
-            residual depth 0 to 4. Each panel has three lines: seen pairs (the probe fit
-            set), held-out pairs, and open pairs.
+            Four line panels, one per vocabulary grid, of ridge-probe R-squared for the mix RGB read from the residual stream at the pre-answer position, over residual depth 0 to 4. Each panel has three lines: seen pairs (the probe fit set), held-out pairs, and open pairs.
         """,
         caption="""
-            Ridge probes from the pre-answer residual stream to the RGB of the
-            true mix, one per depth (0 = embeddings, 4 = final layer), fit on half
-            the seen prompts (seed 0). Transfer to held-out and open prompts
-            tells a genuine value-space computation apart from a probe that
-            memorized its fit set.
+            Ridge probes from the pre-answer residual stream to the RGB of the true mix, one per depth (0 = embeddings, 4 = final layer), fit on half the seen prompts (seed 0). Transfer to held-out and open prompts tells a genuine value-space computation apart from a probe that memorized its fit set.
         """,
     )
     def _plot() -> plt.Figure:

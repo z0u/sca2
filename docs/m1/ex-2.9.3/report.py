@@ -125,17 +125,7 @@ def _(arm, steps, traj):
     @themed(
         name="trajectories",
         alt_text=f"""
-        Three charts stacked on a shared step axis from 0 to 1500. Top: anchor progress, the
-        z0 of pure red, for all 32 seeds. Every line, including the {len(_bad)} failures drawn
-        in color, climbs from near 0 to about 1 by step 750. After that the gray healthy lines
-        hold at 1 while the colored ones diverge. Seeds 22 and 8 dip briefly as the learning
-        rate reaches its peak, and both recover on this metric, though reconstruction for seed 22
-        does not. Seed 15 breaks away to about 0.65 from step 900, and seed 27 falls to about
-        0.4 after step 1100. Middle: leakage for the same runs. Healthy lines settle near 0.05
-        while the failures climb to 0.1 to 0.6 in the same late window. Bottom: the schedule,
-        with the learning rate ramping to 0.1 at step 750 and holding, and the regularizer
-        weights annealing to zero by step 1425. A shaded band marks the high-LR plateau, where
-        every failure occurs.
+        Three charts stacked on a shared step axis from 0 to 1500. Top: anchor progress, the z0 of pure red, for all 32 seeds. Every line, including the {len(_bad)} failures drawn in color, climbs from near 0 to about 1 by step 750. After that the gray healthy lines hold at 1 while the colored ones diverge. Seeds 22 and 8 dip briefly as the learning rate reaches its peak, and both recover on this metric, though reconstruction for seed 22 does not. Seed 15 breaks away to about 0.65 from step 900, and seed 27 falls to about 0.4 after step 1100. Middle: leakage for the same runs. Healthy lines settle near 0.05 while the failures climb to 0.1 to 0.6 in the same late window. Bottom: the schedule, with the learning rate ramping to 0.1 at step 750 and holding, and the regularizer weights annealing to zero by step 1425. A shaded band marks the high-LR plateau, where every failure occurs.
         """,
     )
     def _plot() -> plt.Figure:
@@ -219,12 +209,7 @@ def _(arm):
     @themed(
         name="attribution",
         alt_text=f"""
-        Heatmap of final leakage over a 16-by-8 grid. Model inits run down the rows (0 through
-        13, then the two earlier catastrophic inits 22 and 27), and batch/label streams run
-        across the columns. Most cells are pale, with leak around {np.median(_leak):.2f}. The
-        {int(_fail.sum())} failed cells are marked with crosses and scatter across the grid: no
-        row has more than {int(_fail.sum(1).max())} of 8, and the rows for inits 22 and 27 are
-        entirely clean. The darkest cell is init 1 under stream 1, with leak {_leak.max():.2f}.
+        Heatmap of final leakage over a 16-by-8 grid. Model inits run down the rows (0 through 13, then the two earlier catastrophic inits 22 and 27), and batch/label streams run across the columns. Most cells are pale, with leak around {np.median(_leak):.2f}. The {int(_fail.sum())} failed cells are marked with crosses and scatter across the grid: no row has more than {int(_fail.sum(1).max())} of 8, and the rows for inits 22 and 27 are entirely clean. The darkest cell is init 1 under stream 1, with leak {_leak.max():.2f}.
         """,
     )
     def _plot() -> plt.Figure:
@@ -291,14 +276,7 @@ def _(sweep_cell):
     @themed(
         name="sweep",
         alt_text=f"""
-        Two strip plots stacked over eight conditions: peak learning rates 0.10, 0.07, 0.05,
-        and 0.03, each with the regularizer anneal on (blue) or off (gray), 32 seeds per
-        condition. Top: redirect selectivity scores. Medians hover around 0.87 to 0.91
-        everywhere, but 0.03 with anneal sits lower at {np.median(_scores[(0.03, True)]):.2f},
-        and one blue outlier at 0.10 falls to {_scores[(0.10, True)].min():.2f}. Bottom: final
-        leakage on a log scale, with a dashed line at the 0.1 degraded threshold. With the
-        anneal on, leak tightens as the peak drops, and at 0.05 no seed crosses the line. With
-        the anneal off, every condition has a tail of 4 to 8 seeds above the line.
+        Two strip plots stacked over eight conditions: peak learning rates 0.10, 0.07, 0.05, and 0.03, each with the regularizer anneal on (blue) or off (gray), 32 seeds per condition. Top: redirect selectivity scores. Medians hover around 0.87 to 0.91 everywhere, but 0.03 with anneal sits lower at {np.median(_scores[(0.03, True)]):.2f}, and one blue outlier at 0.10 falls to {_scores[(0.10, True)].min():.2f}. Bottom: final leakage on a log scale, with a dashed line at the 0.1 degraded threshold. With the anneal on, leak tightens as the peak drops, and at 0.05 no seed crosses the line. With the anneal off, every condition has a tail of 4 to 8 seeds above the line.
         """,
     )
     def _plot() -> plt.Figure:

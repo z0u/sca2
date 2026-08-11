@@ -334,14 +334,10 @@ def _(metrics):
     @themed(
         name="val-loss",
         alt_text="""
-            Validation loss versus training epoch for the two grids, v27 and v216,
-            with three seeds each drawn as thin overlapping lines. Every curve settles
-            smoothly inside the 100-epoch budget.
+            Validation loss versus training epoch for the two grids, v27 and v216, with three seeds each drawn as thin overlapping lines. Every curve settles smoothly inside the 100-epoch budget.
         """,
         caption="""
-            Validation loss per epoch, with three thin lines per grid, one per seed.
-            This is per-token loss over characters, so it does not line up with the
-            curves of the word-level experiment; what matters is that each curve converges.
+            Validation loss per epoch, with three thin lines per grid, one per seed. This is per-token loss over characters, so it does not line up with the curves of the word-level experiment; what matters is that each curve converges.
         """,
     )
     def _plot() -> plt.Figure:
@@ -378,21 +374,10 @@ def _(metrics):
     @themed(
         name="accuracy",
         alt_text="""
-            Two bar panels of exact-match accuracy (0 to 1) for grids v27 and v216,
-            one panel for seen pairs and one for held-out pairs. Each grid shows a
-            greedy bar and a candidate (argmax over teacher-forced names) bar in the
-            grid color, with a dashed horizontal line over the group marking the
-            ex-2.1.3 word-level accuracy on the same pairs. Bars are means over three
-            seeds, dots the individual seeds. On seen pairs all bars are at 1.0. On
-            held-out pairs the v27 bars sit at zero, below the word-level line at 0.27,
-            while the v216 bars reach 0.91, just under the word-level line near 1.0.
+            Two bar panels of exact-match accuracy (0 to 1) for grids v27 and v216, one panel for seen pairs and one for held-out pairs. Each grid shows a greedy bar and a candidate (argmax over teacher-forced names) bar in the grid color, with a dashed horizontal line over the group marking the ex-2.1.3 word-level accuracy on the same pairs. Bars are means over three seeds, dots the individual seeds. On seen pairs all bars are at 1.0. On held-out pairs the v27 bars sit at zero, below the word-level line at 0.27, while the v216 bars reach 0.91, just under the word-level line near 1.0.
         """,
         caption="""
-            Exact match by grid and eval set; bars are means over three seeds, dots the
-            individual seeds. Greedy decoding writes freely, so spelling mistakes count
-            as misses; candidate scoring picks the highest-probability vocabulary name
-            and so cannot misspell. The dashed line over each group is the word-level
-            benchmark, the ex-2.1.3 accuracy on the same pairs with one-token names.
+            Exact match by grid and eval set; bars are means over three seeds, dots the individual seeds. Greedy decoding writes freely, so spelling mistakes count as misses; candidate scoring picks the highest-probability vocabulary name and so cannot misspell. The dashed line over each group is the word-level benchmark, the ex-2.1.3 accuracy on the same pairs with one-token names.
         """,
     )
     def _plot() -> plt.Figure:
@@ -490,19 +475,10 @@ def _(arrays, evals):
     @themed(
         name="distance-ecdf",
         alt_text="""
-            Two panels of cumulative distributions of the RGB distance from the chosen
-            name to the true mix, pooled over three seeds, one panel for held-out
-            pairs and one for open pairs. One line per grid (v27, v216). Dashed lines
-            show the nearest-name floor on open pairs. Under each axis a triangle marks
-            the prompt-blind constant baseline.
+            Two panels of cumulative distributions of the RGB distance from the chosen name to the true mix, pooled over three seeds, one panel for held-out pairs and one for open pairs. One line per grid (v27, v216). Dashed lines show the nearest-name floor on open pairs. Under each axis a triangle marks the prompt-blind constant baseline.
         """,
         caption="""
-            Distance from the chosen name to the true mix, in unit-cube units, pooled
-            over seeds; a curve that climbs sooner (further left) is better. On held-out
-            pairs the height at distance 0 is the candidate exact-match accuracy. On open
-            pairs no name is exactly right, so the dashed line marks the best reachable
-            distance (the nearest name). The triangles on the x-axis are the prompt-blind
-            constant (always answering the centre of the training answers).
+            Distance from the chosen name to the true mix, in unit-cube units, pooled over seeds; a curve that climbs sooner (further left) is better. On held-out pairs the height at distance 0 is the candidate exact-match accuracy. On open pairs no name is exactly right, so the dashed line marks the best reachable distance (the nearest name). The triangles on the x-axis are the prompt-blind constant (always answering the centre of the training answers).
         """,
     )
     def _plot() -> plt.Figure:
@@ -586,20 +562,10 @@ def _(arrays, evals):
     @themed(
         name="distance-kl",
         alt_text="""
-            Two panels (held-out pairs, open pairs) of KL divergence from a
-            distance-shaped target distribution to the model answer distribution,
-            against the target temperature tau on a log axis. One solid line per grid
-            (v27, v216); dashed lines show the same divergence to a uniform
-            distribution, the value-blind reference.
+            Two panels (held-out pairs, open pairs) of KL divergence from a distance-shaped target distribution to the model answer distribution, against the target temperature tau on a log axis. One solid line per grid (v27, v216); dashed lines show the same divergence to a uniform distribution, the value-blind reference.
         """,
         caption="""
-            How well does the model answer distribution match distance-shaped
-            targets? Solid lines: mean KL(q_τ ‖ model), pooled over seeds and prompts,
-            where q_τ is a softmax of −distance/τ around the true mix. Dashed lines:
-            KL(q_τ ‖ uniform), the score a value-blind guesser gets. A dip well below
-            the dashed line at moderate τ means the model probability mass gathers
-            near the true mix, spread over its neighbors rather than resting on one
-            best guess.
+            How well does the model answer distribution match distance-shaped targets? Solid lines: mean KL(q_τ ‖ model), pooled over seeds and prompts, where q_τ is a softmax of −distance/τ around the true mix. Dashed lines: KL(q_τ ‖ uniform), the score a value-blind guesser gets. A dip well below the dashed line at moderate τ means the model probability mass gathers near the true mix, spread over its neighbors rather than resting on one best guess.
         """,
     )
     def _plot() -> plt.Figure:
@@ -649,15 +615,10 @@ def _(metrics):
     @themed(
         name="residual-probes",
         alt_text="""
-            Two line panels, one per grid (v27, v216), of ridge-probe R-squared for the
-            mix RGB read from the pre-answer residual stream, against depth 0 to 4.
-            Lines show the probe fit set (in-training lines) and its transfer to seen,
-            held-out, and open prompts.
+            Two line panels, one per grid (v27, v216), of ridge-probe R-squared for the mix RGB read from the pre-answer residual stream, against depth 0 to 4. Lines show the probe fit set (in-training lines) and its transfer to seen, held-out, and open prompts.
         """,
         caption="""
-            Ridge probes from the pre-answer residual stream to the RGB of the true mix, per
-            depth (0 is embeddings, 4 is the final block), fit on half the in-training
-            probe lines (seed 0) and transferred to the eval sets.
+            Ridge probes from the pre-answer residual stream to the RGB of the true mix, per depth (0 is embeddings, 4 is the final block), fit on half the in-training probe lines (seed 0) and transferred to the eval sets.
         """,
     )
     def _plot() -> plt.Figure:
@@ -706,25 +667,10 @@ def _(arrays, metrics):
     @themed(
         name="answer-schedule",
         alt_text="""
-            Line panels of probe R-squared against position around the answer (offsets −4
-            to 3), read from the final residual layer, with one line per RGB channel drawn
-            in its own color. Left panels show the opaque names of this experiment (v27, v216),
-            where the three channel lines run together at every offset. The right panel, if
-            available, shows the ex-2.1.2 hex answers, where the three separate into a
-            staircase, each channel high only around its own emission position.
+            Line panels of probe R-squared against position around the answer (offsets −4 to 3), read from the final residual layer, with one line per RGB channel drawn in its own color. Left panels show the opaque names of this experiment (v27, v216), where the three channel lines run together at every offset. The right panel, if available, shows the ex-2.1.2 hex answers, where the three separate into a staircase, each channel high only around its own emission position.
         """,
         caption="""
-            The answer-emission schedule at the final residual depth (seed 0). Each line is
-            R² for one RGB channel across offsets from the first character of the answer; the
-            answer sits at offsets 0–3, and the last characters of the prompt are the negative
-            offsets. Lines are drawn as steps because each offset is a separate character
-            position, with the value held across the position and ramping between; line
-            width tapers R → G → B so an offset where all three agree reads as nested bands
-            rather than as whichever channel drew last. Hex answers (right, from the ex-2.1.2
-            base-grammar conditions) spell one channel per digit, and the probe found each
-            channel computed just in time and dropped once emitted. Opaque names cannot be
-            written that way, and H4 predicts all three channels stay decodable across the
-            window.
+            The answer-emission schedule at the final residual depth (seed 0). Each line is R² for one RGB channel across offsets from the first character of the answer; the answer sits at offsets 0–3, and the last characters of the prompt are the negative offsets. Lines are drawn as steps because each offset is a separate character position, with the value held across the position and ramping between; line width tapers R → G → B so an offset where all three agree reads as nested bands rather than as whichever channel drew last. Hex answers (right, from the ex-2.1.2 base-grammar conditions) spell one channel per digit, and the probe found each channel computed just in time and dropped once emitted. Opaque names cannot be written that way, and H4 predicts all three channels stay decodable across the window.
         """,
     )
     def _plot() -> plt.Figure:

@@ -175,12 +175,7 @@ def _():
 def _():
     @themed(
         name="color-space-cube",
-        alt_text=(
-            "An orthographic front view of the RGB grid, rotated so the black-to-white diagonal is vertical: "
-            "black at the bottom, white at the top, hues fanned around the middle, showing the red, green, and "
-            "magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a "
-            "smooth solid."
-        ),
+        alt_text="An orthographic front view of the RGB grid, rotated so the black-to-white diagonal is vertical: black at the bottom, white at the top, hues fanned around the middle, showing the red, green, and magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a smooth solid.",
         caption="The 16³ hex grid",
     )
     def _plot() -> plt.Figure:
@@ -270,22 +265,8 @@ def _(holdout, train_pairs):
         draw_cube_bound(ax)
         return fig
 
-    _train_alt = (
-        "An orthographic front view of the 27 named colors as a lattice in the rotated RGB cube, value "
-        "vertical with black at the bottom and white at the top. Each named color is a small dot in its true "
-        "color. The pairs used as named equations in training are bold and colored by the color their two "
-        "operands mix to; the held-out pairs are drawn faint for context. One training edge is picked out on "
-        "the cube silhouette with italic letters a and b at its endpoints (white and magenta), the worked "
-        "example a + b = orchid. The panel has no background fill or axes; front-facing edges are heavier than "
-        "back and interior ones, so the lattice reads three-dimensionally. Titled 'train'."
-    )
-    _holdout_alt = (
-        "The same orthographic front view of the 27 named colors in the rotated RGB cube, same orientation and "
-        "styling as the train panel. Here the pairs held out for the named-holdout evaluation are bold and "
-        "colored by their mixed result, with the training pairs drawn faint for context. One held-out edge is "
-        "picked out on the cube silhouette with italic letters c and d at its endpoints (magenta and blue), "
-        "the worked example c + d = violet. Titled 'held out for eval'."
-    )
+    _train_alt = "An orthographic front view of the 27 named colors as a lattice in the rotated RGB cube, value vertical with black at the bottom and white at the top. Each named color is a small dot in its true color. The pairs used as named equations in training are bold and colored by the color their two operands mix to; the held-out pairs are drawn faint for context. One training edge is picked out on the cube silhouette with italic letters a and b at its endpoints (white and magenta), the worked example a + b = orchid. The panel has no background fill or axes; front-facing edges are heavier than back and interior ones, so the lattice reads three-dimensionally. Titled 'train'."
+    _holdout_alt = "The same orthographic front view of the 27 named colors in the rotated RGB cube, same orientation and styling as the train panel. Here the pairs held out for the named-holdout evaluation are bold and colored by their mixed result, with the training pairs drawn faint for context. One held-out edge is picked out on the cube silhouette with italic letters c and d at its endpoints (magenta and blue), the worked example c + d = violet. Titled 'held out for eval'."
     _left = themed(
         lambda: _panel(_train_edges, holdout, ("white", "magenta", "ab")),
         name="named-pair-lattice-train",
@@ -377,12 +358,7 @@ def _():
 def _(metrics):
     @themed(
         name="accuracy-sweep",
-        alt_text=(
-            "Four line charts of completion accuracy (0 to 1) against model width (16, 32, 64), one panel "
-            "per eval set: named seen, named holdout, hex unseen, and cross unseen. Each panel has one line "
-            "per depth (2 and 4 layers, darker is deeper), averaged over three seeds, with individual seeds "
-            "as faint points."
-        ),
+        alt_text="Four line charts of completion accuracy (0 to 1) against model width (16, 32, 64), one panel per eval set: named seen, named holdout, hex unseen, and cross unseen. Each panel has one line per depth (2 and 4 layers, darker is deeper), averaged over three seeds, with individual seeds as faint points.",
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 4, figsize=(11.5, 3.2), sharey=True)
@@ -688,12 +664,7 @@ def _(metrics):
 
     @themed(
         name="probe-r2",
-        alt_text=(
-            "Three line charts of probe R-squared against residual-stream depth for the four-layer models, "
-            "one panel per probe target: operand RGB, result RGB, and result redness. One line per width "
-            "(16, 32, 64; darker is wider), averaged over seeds. R-squared for the operand rises within the "
-            "first layers; the result targets rise later in depth."
-        ),
+        alt_text="Three line charts of probe R-squared against residual-stream depth for the four-layer models, one panel per probe target: operand RGB, result RGB, and result redness. One line per width (16, 32, 64; darker is wider), averaged over seeds. R-squared for the operand rises within the first layers; the result targets rise later in depth.",
     )
     def _plot() -> plt.Figure:
         fig, axes = plt.subplots(1, 3, figsize=(9.8, 3.2), sharey=True)
@@ -784,11 +755,7 @@ def _(weights):
 
     @themed(
         name="probe-direction-agreement",
-        alt_text=(
-            "Line chart of the absolute cosine similarity between redness probe directions fitted on "
-            "different seeds, against residual-stream depth, one line per width for the four-layer models. "
-            "A dashed horizontal line marks the expected similarity of random directions for each width."
-        ),
+        alt_text="Line chart of the absolute cosine similarity between redness probe directions fitted on different seeds, against residual-stream depth, one line per width for the four-layer models. A dashed horizontal line marks the expected similarity of random directions for each width.",
     )
     def _plot() -> plt.Figure:
         fig, ax = plt.subplots(figsize=(6.2, 3.6))

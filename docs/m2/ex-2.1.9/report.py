@@ -320,25 +320,10 @@ def _(ALPHA218, leading_weight):
     @themed(
         name="tau-calibration",
         alt_text="""
-            Two line charts of leading softmin weight against temperature tau on a log
-            scale from 0.003 to 1. Left panel: the un-anchored control's alignment
-            profile; right panel: the ex-2.1.8 span pull at the operating point. Each
-            panel has five curves, one per residual slice, all starting near 1 at the
-            left edge and descending to 0.25 at the right edge. A horizontal band from
-            0.6 to 0.8 is shaded, and three vertical dashed lines mark tau = 0.01, 0.03
-            and 0.1. Most curves pass through the shaded band between tau = 0.005 and
-            0.03; in the right panel the last slice's curve sits noticeably higher,
-            crossing the band nearer 0.06 to 0.09.
+            Two line charts of leading softmin weight against temperature tau on a log scale from 0.003 to 1. Left panel: the un-anchored control's alignment profile; right panel: the ex-2.1.8 span pull at the operating point. Each panel has five curves, one per residual slice, all starting near 1 at the left edge and descending to 0.25 at the right edge. A horizontal band from 0.6 to 0.8 is shaded, and three vertical dashed lines mark tau = 0.01, 0.03 and 0.1. Most curves pass through the shaded band between tau = 0.005 and 0.03; in the right panel the last slice's curve sits noticeably higher, crossing the band nearer 0.06 to 0.09.
         """,
         caption=r"""
-            **Calibrating the τ grid from the ex-2.1.8 stored alignments.** The
-            leading span position's share of the softmin weight, by residual
-            slice, if the weights were computed from the alignment profile of
-            the un-anchored control (**left**) or the span pull at the
-            operating point (**right**). The shaded band is the 0.6–0.8 target
-            from the design note; dashed verticals are the chosen grid. Both
-            profiles put the band at τ ≈ 0.01–0.03, so the grid brackets it
-            with one rung toward the mean.
+            **Calibrating the τ grid from the ex-2.1.8 stored alignments.** The leading span position's share of the softmin weight, by residual slice, if the weights were computed from the alignment profile of the un-anchored control (**left**) or the span pull at the operating point (**right**). The shaded band is the 0.6–0.8 target from the design note; dashed verticals are the chosen grid. Both profiles put the band at τ ≈ 0.01–0.03, so the grid brackets it with one rung toward the mean.
         """,
     )
     def _plot():
@@ -669,12 +654,7 @@ def _(CONDS: list[str], acc):
     </table></div>
     """
     _caption = f"""
-    Behavior by condition. Each value is the seed mean, with half the seed
-    range beside it. EM is exact match on the answer token, NLL its surprise
-    in nats, and <code>open</code> dist the RGB distance from the guessed
-    color to the true mix on pairs with no named answer. Δ holdout EM is the
-    signed gap to the in-experiment control, which the H1 gate scores at
-    {ex.TASK_GATE:g}.
+    Behavior by condition. Each value is the seed mean, with half the seed range beside it. EM is exact match on the answer token, NLL its surprise in nats, and <code>open</code> dist the RGB distance from the guessed color to the true mix on pairs with no named answer. Δ holdout EM is the signed gap to the in-experiment control, which the H1 gate scores at {ex.TASK_GATE:g}.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -740,11 +720,7 @@ def _(a_op1, a_span, m_op1, m_span):
     </table></div>
     """
     _caption = """
-    The reproduction check. Each statistic is this experiment's seed mean (±
-    seed standard deviation) beside the same statistic recomputed from
-    ex-2.1.8's published arrays under the same per-run convention, and the
-    difference. <code>span-mean</code> re-runs <code>end90-hold30</code>
-    through the pooled code path; <code>lam0</code> re-runs its control.
+    The reproduction check. Each statistic is this experiment's seed mean (± seed standard deviation) beside the same statistic recomputed from ex-2.1.8's published arrays under the same per-run convention, and the difference. <code>span-mean</code> re-runs <code>end90-hold30</code> through the pooled code path; <code>lam0</code> re-runs its control.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -773,30 +749,10 @@ def _(ANCHORED, a_span, m_span):
     @themed(
         name="h2-dots",
         alt_text="""
-            Two dot-plot panels sharing a horizontal cosine axis from 0 to about
-            0.75, with five condition rows ordered by temperature: span-mean
-            (tau infinite) on top, then the pooled conditions with tau falling
-            0.1, 0.03, 0.01, then op1-oracle. Each row shows three small seed
-            dots and a vertical tick at their mean. Left panel, margin: all
-            five rows cluster between 0.62 and 0.69, with a dotted partial line
-            at 0.71 and a dashed gate line at 0.78, both to the right of every
-            row; pool-t100 sits highest of the pooled rows and the means fall
-            back toward span-mean as tau sharpens. Right panel, drift:
-            span-mean sits at 0.32 and op1-oracle at 0.11; the pooled rows land
-            between them, pool-t100 leftmost at 0.21 and the means walking back
-            toward span-mean as tau sharpens, with the dashed gate at 0.22
-            between pool-t100 and pool-t030.
+            Two dot-plot panels sharing a horizontal cosine axis from 0 to about 0.75, with five condition rows ordered by temperature: span-mean (tau infinite) on top, then the pooled conditions with tau falling 0.1, 0.03, 0.01, then op1-oracle. Each row shows three small seed dots and a vertical tick at their mean. Left panel, margin: all five rows cluster between 0.62 and 0.69, with a dotted partial line at 0.71 and a dashed gate line at 0.78, both to the right of every row; pool-t100 sits highest of the pooled rows and the means fall back toward span-mean as tau sharpens. Right panel, drift: span-mean sits at 0.32 and op1-oracle at 0.11; the pooled rows land between them, pool-t100 leftmost at 0.21 and the means walking back toward span-mean as tau sharpens, with the dashed gate at 0.22 between pool-t100 and pool-t030.
         """,
         caption=rf"""
-            **The H2 statistics, control-subtracted.** Left:
-            $m_\text{{span}}$; right: ᾱ_span. Rows run from the span mean
-            (τ = ∞) down the sweep to the oracle. Small dots are seeds, the
-            tick their mean; the τ = ∞ and oracle reference rows are greyed.
-            Dashed carets mark the H2 gates for P: a margin gain of
-            {ex.POOL_GAIN_GATE:g} over `span-mean` (dotted: the
-            {ex.POOL_GAIN_PARTIAL:g} partial) and a drift drop of
-            {ex.SYNTAX_DRIFT_GATE:g} below it. The two panels share their
-            scale, so the sizes of margin and drift compare directly.
+            **The H2 statistics, control-subtracted.** Left: $m_\text{{span}}$; right: ᾱ_span. Rows run from the span mean (τ = ∞) down the sweep to the oracle. Small dots are seeds, the tick their mean; the τ = ∞ and oracle reference rows are greyed. Dashed carets mark the H2 gates for P: a margin gain of {ex.POOL_GAIN_GATE:g} over `span-mean` (dotted: the {ex.POOL_GAIN_PARTIAL:g} partial) and a drift drop of {ex.SYNTAX_DRIFT_GATE:g} below it. The two panels share their scale, so the sizes of margin and drift compare directly.
         """,
     )
     def _plot() -> plt.Figure:
@@ -869,12 +825,7 @@ def _(ANCHORED, a_span, grading_r2, m_op1, m_span):
     </table></div>
     """
     _caption = f"""
-    The τ sweep beside its references, seed means (± seed standard deviation
-    where quoted). Only the primary condition (<strong>bold</strong>) is
-    gated; "oracle frac" is
-    the fraction of the span-mean-to-oracle gap recovered, whose denominator
-    is {_headroom:.3f}. m<sub>op1</sub> is carried for continuity with
-    ex-2.1.7/8, and r² previews the grading track scored under H3.
+    The τ sweep beside its references, seed means (± seed standard deviation where quoted). Only the primary condition (<strong>bold</strong>) is gated; "oracle frac" is the fraction of the span-mean-to-oracle gap recovered, whose denominator is {_headroom:.3f}. m<sub>op1</sub> is carried for continuity with ex-2.1.7/8, and r² previews the grading track scored under H3.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -921,27 +872,10 @@ def _(alpha_map):
     @themed(
         name="role-profiles",
         alt_text="""
-            Six panels in a two-by-three grid: columns are span-mean, pool-t030
-            and op1-oracle; the top row plots margin by role against slice, the
-            bottom row drift by role, both from about -0.1 to 0.9. Four
-            marked lines per panel, one per span role. Top left: all
-            four roles rise together to between 0.5 and 0.8 after the
-            embedding. Top middle and top right: the op1 line alone stays high,
-            about 0.8 at slice 1 falling to 0.4 (middle) or 0.5 (right) at slice 4, while
-            the plus, op2 and equals lines sit below 0.3. Bottom left: plus and
-            equals start near 0.55 at the embedding and fall with depth while
-            op2 rises to about 0.28. Bottom middle: the plus line starts at
-            0.49 and decays to near zero; op2 and equals stay low. Bottom
-            right: the same shape with plus starting lower, at 0.3.
+            Six panels in a two-by-three grid: columns are span-mean, pool-t030 and op1-oracle; the top row plots margin by role against slice, the bottom row drift by role, both from about -0.1 to 0.9. Four marked lines per panel, one per span role. Top left: all four roles rise together to between 0.5 and 0.8 after the embedding. Top middle and top right: the op1 line alone stays high, about 0.8 at slice 1 falling to 0.4 (middle) or 0.5 (right) at slice 4, while the plus, op2 and equals lines sit below 0.3. Bottom left: plus and equals start near 0.55 at the embedding and fall with depth while op2 rises to about 0.28. Bottom middle: the plus line starts at 0.49 and decays to near zero; op2 and equals stay low. Bottom right: the same shape with plus starting lower, at 0.3.
         """,
         caption=r"""
-            **Where the margin and the drift live.** Margin (top) and drift
-            (bottom) by span role, per slice, seed means: $m(\ell, t)$ and the
-            unweighted mean alignment $\bar\alpha(\ell, t)$. Columns:
-            the span mean, the primary, and the op1 oracle. The scored
-            statistics take the per-slice max over these lines
-            ($m_\text{span}$ from the top row, ᾱ_span from the bottom), so a
-            single high line is all either statistic sees.
+            **Where the margin and the drift live.** Margin (top) and drift (bottom) by span role, per slice, seed means: $m(\ell, t)$ and the unweighted mean alignment $\bar\alpha(\ell, t)$. Columns: the span mean, the primary, and the op1 oracle. The scored statistics take the per-slice max over these lines ($m_\text{span}$ from the top row, ᾱ_span from the bottom), so a single high line is all either statistic sees.
         """,
     )
     def _plot() -> plt.Figure:
@@ -990,28 +924,10 @@ def _(alpha_map):
     @themed(
         name="position-profiles",
         alt_text="""
-            A five-by-three grid of small flush panels: the same margin and
-            drift data as the previous figure, transposed. Columns are
-            span-mean, pool-t030 and op1-oracle; rows are residual slices
-            with the last slice on top and the embedding at the bottom; each
-            panel spans the four span roles op1, plus, op2 and equals, from 0
-            to about 0.95 vertically. A shaded smooth-step area shows the
-            margin and a solid line the drift. In the span-mean column every
-            row above the embedding is a wide raised block: margin between
-            0.5 and 0.8 at all four roles. In the pool-t030 and oracle
-            columns the block narrows to a single tall step at op1, with the
-            other roles below 0.3. The drift line roughly shadows the margin
-            at about half its height in every panel; on the embedding row it
-            is a step at plus and equals for span-mean, at plus alone for
-            pool-t030, and lower, about 0.3 at plus, for the oracle.
+            A five-by-three grid of small flush panels: the same margin and drift data as the previous figure, transposed. Columns are span-mean, pool-t030 and op1-oracle; rows are residual slices with the last slice on top and the embedding at the bottom; each panel spans the four span roles op1, plus, op2 and equals, from 0 to about 0.95 vertically. A shaded smooth-step area shows the margin and a solid line the drift. In the span-mean column every row above the embedding is a wide raised block: margin between 0.5 and 0.8 at all four roles. In the pool-t030 and oracle columns the block narrows to a single tall step at op1, with the other roles below 0.3. The drift line roughly shadows the margin at about half its height in every panel; on the embedding row it is a step at plus and equals for span-mean, at plus alone for pool-t030, and lower, about 0.3 at plus, for the oracle.
         """,
         caption=r"""
-            **The same profiles, position-major.** Margin $m(\ell, t)$
-            (shaded area) and drift $\bar\alpha(\ell, t)$ (line) over the
-            four span roles, one panel per residual slice with the embedding
-            at the bottom — the transpose of the figure above, in the layout
-            the weight profiles under H4 use. Columns: the span mean, the
-            primary, and the op1 oracle.
+            **The same profiles, position-major.** Margin $m(\ell, t)$ (shaded area) and drift $\bar\alpha(\ell, t)$ (line) over the four span roles, one panel per residual slice with the embedding at the bottom — the transpose of the figure above, in the layout the weight profiles under H4 use. Columns: the span mean, the primary, and the op1 oracle.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1095,31 +1011,10 @@ def _(ANCHORED, retention, traj):
     @themed(
         name="trajectories",
         alt_text="""
-            Five trajectory panels and one schedule panel in a two-by-three
-            grid sharing the epoch axis from 0 to 100. Each trajectory panel
-            plots mean alignment at op1 as a solid line staying below 0.15,
-            and the span margin as a dashed line climbing to between 0.6 and
-            0.75 by epoch 40 and holding roughly level to the end, over a flat
-            grey control pair near zero. The dashed line dips slightly after
-            epoch 90 in every panel. The schedule panel, bottom right, shows
-            the anchor weight ramping up to a plateau and annealing after
-            epoch 90, and the repulsion weight starting high, crossing below
-            the anchor around epoch 60 and settling at about a third of it.
+            Five trajectory panels and one schedule panel in a two-by-three grid sharing the epoch axis from 0 to 100. Each trajectory panel plots mean alignment at op1 as a solid line staying below 0.15, and the span margin as a dashed line climbing to between 0.6 and 0.75 by epoch 40 and holding roughly level to the end, over a flat grey control pair near zero. The dashed line dips slightly after epoch 90 in every panel. The schedule panel, bottom right, shows the anchor weight ramping up to a plateau and annealing after epoch 90, and the repulsion weight starting high, crossing below the anchor around epoch 60 and settling at about a third of it.
         """,
         caption=rf"""
-            **Training dynamics by condition.** Seed means of the two cosines
-            on the anchor axis, on one shared scale: solid is $\bar\alpha$ at
-            op1 (contained at the left caret, {ex.MEAN_ALIGN_GATE:g}); dashed
-            is $m_\text{{span}}$ (its retention floor of
-            {ex.RETENTION_FLOOR:g} at the right caret). The grey pair is the
-            un-anchored control, and the number in each panel is that
-            condition's retention (final over peak $m_\text{{span}}$, minimum
-            across seeds; gate ≥ {ex.RETENTION_GATE:g}). Bottom right: the
-            weight schedule every anchored condition trained under — anchor
-            $\lambda_\mathrm{{a}}$ in red, repulsion
-            $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue, log scale — shared
-            here because the anti-subspace term is fixed at the ex-2.1.8
-            operating point in every anchored condition.
+            **Training dynamics by condition.** Seed means of the two cosines on the anchor axis, on one shared scale: solid is $\bar\alpha$ at op1 (contained at the left caret, {ex.MEAN_ALIGN_GATE:g}); dashed is $m_\text{{span}}$ (its retention floor of {ex.RETENTION_FLOOR:g} at the right caret). The grey pair is the un-anchored control, and the number in each panel is that condition's retention (final over peak $m_\text{{span}}$, minimum across seeds; gate ≥ {ex.RETENTION_GATE:g}). Bottom right: the weight schedule every anchored condition trained under — anchor $\lambda_\mathrm{{a}}$ in red, repulsion $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue, log scale — shared here because the anti-subspace term is fixed at the ex-2.1.8 operating point in every anchored condition.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1209,31 +1104,10 @@ def _(ANCHORED, alpha_map, grading_r2, m_span):
     @themed(
         name="grading",
         alt_text="""
-            Six panels in a two-by-three grid sharing both axes: per-color
-            alignment at the first operand, from about -0.2 to 1.2, against
-            the redness of that color from 0 to 1. Panels are the control,
-            span-mean, and the three pooled conditions and the oracle. The control
-            panel is flat near zero. Every other panel scatters 216 marks
-            drawn in the color each stands for, forming a flat cluster at low
-            redness and a rising tail of oranges and reds, with a thin
-            conditional-mean line and a dashed reference curve through it.
-            The flat cluster sits slightly lower and the rise slightly
-            straighter in the pooled and oracle panels than in span-mean; in
-            the pool-t010 panel the rise has a visible shelf between redness
-            0.7 and 0.8.
+            Six panels in a two-by-three grid sharing both axes: per-color alignment at the first operand, from about -0.2 to 1.2, against the redness of that color from 0 to 1. Panels are the control, span-mean, and the three pooled conditions and the oracle. The control panel is flat near zero. Every other panel scatters 216 marks drawn in the color each stands for, forming a flat cluster at low redness and a rising tail of oranges and reds, with a thin conditional-mean line and a dashed reference curve through it. The flat cluster sits slightly lower and the rise slightly straighter in the pooled and oracle panels than in span-mean; in the pool-t010 panel the rise has a visible shelf between redness 0.7 and 0.8.
         """,
         caption=r"""
-            **Grading: alignment at op1, per color.** $\alpha_c$, the mean
-            over slices of $\cos(h, \hat v_{\text{red}})$ at op1, seed mean,
-            against the redness of the color. One mark per color, drawn in
-            that color; the thin dark line is the mean response at each of
-            the 29 distinct redness levels, the flat grey band the same line
-            for the control, and the dashed line `sim¹·⁵` rescaled onto the
-            response by least squares — the shape the $r^2$ statistic scores
-            against. The dashed line wobbles because `sim` depends on the
-            full color (hue angle, weighted by vibrancy), so its mean at a
-            redness level moves with the mix of colors that share the level.
-            H3(c) gates the primary's $r^2$ relative to `span-mean`'s.
+            **Grading: alignment at op1, per color.** $\alpha_c$, the mean over slices of $\cos(h, \hat v_{\text{red}})$ at op1, seed mean, against the redness of the color. One mark per color, drawn in that color; the thin dark line is the mean response at each of the 29 distinct redness levels, the flat grey band the same line for the control, and the dashed line `sim¹·⁵` rescaled onto the response by least squares — the shape the $r^2$ statistic scores against. The dashed line wobbles because `sim` depends on the full color (hue angle, weighted by vibrancy), so its mean at a redness level moves with the mix of colors that share the level. H3(c) gates the primary's $r^2$ relative to `span-mean`'s.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1305,45 +1179,10 @@ def _(READ: np.ndarray, cells, pi_bar, read_gain):
     @themed(
         name="weight-profiles",
         alt_text="""
-            A five-by-three grid of small flush panels. Columns are the pooled
-            conditions at tau 0.01, 0.03 and 0.1; rows are residual slices with the
-            last slice on top and the embedding at the bottom; each panel
-            spans the four span roles op1, plus, op2 and equals on its
-            horizontal axis, from 0 to 1 vertically. A shaded smooth-step
-            area shows the seed-mean softmin weight, three hairlines the
-            individual seeds, and a dashed line the control's
-            readability, which is identical across the columns of a row: op1
-            near 0.85 everywhere, plus and equals near 0.8 on all rows but
-            the embedding, where both drop to zero, and op2 never above 0.2.
-            In the bottom (embedding) row of every column, the weight area is
-            a tall block at op1, about 0.77, with a small step at plus, and
-            the hairlines hug the mean. On the deeper rows of the tau 0.01
-            and 0.03 columns the hairlines separate completely: each seed's
-            profile is a full-height block at a single role — plus in two
-            seeds of three at tau 0.01, one of three at 0.03 — so the mean
-            area, op1 at about a third or two thirds with plus taking the
-            rest, is a mixture of one-hot seeds. In the tau 0.1 column op1
-            grows toward 0.95 with the other roles near zero and the
-            hairlines stay together.
+            A five-by-three grid of small flush panels. Columns are the pooled conditions at tau 0.01, 0.03 and 0.1; rows are residual slices with the last slice on top and the embedding at the bottom; each panel spans the four span roles op1, plus, op2 and equals on its horizontal axis, from 0 to 1 vertically. A shaded smooth-step area shows the seed-mean softmin weight, three hairlines the individual seeds, and a dashed line the control's readability, which is identical across the columns of a row: op1 near 0.85 everywhere, plus and equals near 0.8 on all rows but the embedding, where both drop to zero, and op2 never above 0.2. In the bottom (embedding) row of every column, the weight area is a tall block at op1, about 0.77, with a small step at plus, and the hairlines hug the mean. On the deeper rows of the tau 0.01 and 0.03 columns the hairlines separate completely: each seed's profile is a full-height block at a single role — plus in two seeds of three at tau 0.01, one of three at 0.03 — so the mean area, op1 at about a third or two thirds with plus taking the rest, is a mixture of one-hot seeds. In the tau 0.1 column op1 grows toward 0.95 with the other roles near zero and the hairlines stay together.
         """,
         caption=rf"""
-            **What the pull chose, against where the concept is readable.**
-            The trained softmin weight profile of each pooled condition
-            (shaded area, seed mean $\bar\pi(\ell, t)$; hairlines, the three
-            seeds individually), over the four span roles, one panel per
-            residual slice with the embedding at the bottom. Where the
-            hairlines separate — the deep slices at τ ≤ 0.03 — each seed's
-            profile is one-hot on a single role, and the mean is a mixture
-            of seeds rather than a shape any run has. The dashed line
-            is the readability profile of the *un-anchored control*,
-            $R^2(\ell, t)$ — a ridge probe predicting op1's redness from the
-            state at each (slice, role), one color held out at a time — the
-            same reference in every column of a row (its own seed spread is
-            ≤ 0.09 everywhere except op2 at depth, ≈ 0.2). The caret on the
-            embedding row marks the H4(a) gate: op1's weight ≥
-            {ex.LEAD_GATE:g} (uniform is 0.25). The number atop each column
-            is its H4(b) weighted readability gain (gate ≥
-            {ex.READ_GAIN_GATE:g}, scored on the primary).
+            **What the pull chose, against where the concept is readable.** The trained softmin weight profile of each pooled condition (shaded area, seed mean $\bar\pi(\ell, t)$; hairlines, the three seeds individually), over the four span roles, one panel per residual slice with the embedding at the bottom. Where the hairlines separate — the deep slices at τ ≤ 0.03 — each seed's profile is one-hot on a single role, and the mean is a mixture of seeds rather than a shape any run has. The dashed line is the readability profile of the *un-anchored control*, $R^2(\ell, t)$ — a ridge probe predicting op1's redness from the state at each (slice, role), one color held out at a time — the same reference in every column of a row (its own seed spread is ≤ 0.09 everywhere except op2 at depth, ≈ 0.2). The caret on the embedding row marks the H4(a) gate: op1's weight ≥ {ex.LEAD_GATE:g} (uniform is 0.25). The number atop each column is its H4(b) weighted readability gain (gate ≥ {ex.READ_GAIN_GATE:g}, scored on the primary).
         """,
     )
     def _plot() -> plt.Figure:
@@ -1444,25 +1283,10 @@ def _(traj):
     @themed(
         name="concentration-timing",
         alt_text="""
-            Two line panels sharing an epoch axis from 0 to 100, each with
-            nine thin curves — one per run, three per pooled condition at tau
-            0.01, 0.03 and 0.1 — and a horizontal reference line at 0.25 for
-            uniform weights. Left panel, op1's weight at the embedding: the
-            nine curves scatter over 0 to 0.8 for the first few epochs, then
-            converge to about 0.8 by epoch 20 and stay flat to the end.
-            Right panel, op1's
-            weight at the last slice: every curve saturates by epoch 8 and
-            never moves again. Two of the three tau 0.01 curves fall to 0 by
-            epoch 3 and the third rises to 1; one tau 0.03 curve falls to 0
-            while the other two rise to 1; all three tau 0.1 curves rise to
-            about 0.9 and hold there, short of saturation.
+            Two line panels sharing an epoch axis from 0 to 100, each with nine thin curves — one per run, three per pooled condition at tau 0.01, 0.03 and 0.1 — and a horizontal reference line at 0.25 for uniform weights. Left panel, op1's weight at the embedding: the nine curves scatter over 0 to 0.8 for the first few epochs, then converge to about 0.8 by epoch 20 and stay flat to the end. Right panel, op1's weight at the last slice: every curve saturates by epoch 8 and never moves again. Two of the three tau 0.01 curves fall to 0 by epoch 3 and the third rises to 1; one tau 0.03 curve falls to 0 while the other two rise to 1; all three tau 0.1 curves rise to about 0.9 and hold there, short of saturation.
         """,
         caption=r"""
-            **When the pull decides.** op1's share of the softmin weight
-            over training, at the embedding (**left**) and at the last slice
-            (**right**), one line per run; the thin rule is uniform (0.25).
-            The vertical band is the anchor's warmup window (epochs 0–10);
-            the repulsion anneal runs to epoch 90.
+            **When the pull decides.** op1's share of the softmin weight over training, at the embedding (**left**) and at the last slice (**right**), one line per run; the thin rule is uniform (0.25). The vertical band is the anchor's warmup window (epochs 0–10); the repulsion anneal runs to epoch 90.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1525,22 +1349,10 @@ def _(arrays, cells):
     @themed(
         name="grading-by-seed",
         alt_text="""
-            Three line panels, one per pooled condition at tau 0.01, 0.03 and
-            0.1, sharing axes: mean response against redness of op1 from 0 to
-            1, three lines per panel, one per run, colored red if the run's
-            deep slices kept op1 and blue if they latched onto plus. Red
-            lines rise smoothly from near 0 at low redness to about 0.9 at
-            redness 1 in every panel. Blue lines — two in the tau 0.01 panel,
-            one in the tau 0.03 panel, none at tau 0.1 — track near zero all
-            the way to redness 0.72, then jump to about 0.5 at redness 0.8
-            and 0.7 by redness 1: a step where the red lines have a slope.
+            Three line panels, one per pooled condition at tau 0.01, 0.03 and 0.1, sharing axes: mean response against redness of op1 from 0 to 1, three lines per panel, one per run, colored red if the run's deep slices kept op1 and blue if they latched onto plus. Red lines rise smoothly from near 0 at low redness to about 0.9 at redness 1 in every panel. Blue lines — two in the tau 0.01 panel, one in the tau 0.03 panel, none at tau 0.1 — track near zero all the way to redness 0.72, then jump to about 0.5 at redness 0.8 and 0.7 by redness 1: a step where the red lines have a slope.
         """,
         caption=r"""
-            **The shelf, split by each run's deep-slice choice.** The
-            grading response of every pooled run — the mean response at each
-            of the 29 redness levels, as in the H3(c) figure but one line
-            per run — colored by where that run's slice-4 softmin weight
-            ended: op1 kept (red) or latched onto `+` (blue).
+            **The shelf, split by each run's deep-slice choice.** The grading response of every pooled run — the mean response at each of the 29 redness levels, as in the H3(c) figure but one line per run — colored by where that run's slice-4 softmin weight ended: op1 kept (red) or latched onto `+` (blue).
         """,
     )
     def _plot() -> plt.Figure:
@@ -1598,27 +1410,10 @@ def _(ANCHORED, READ: np.ndarray, metrics):
     @themed(
         name="readability-profiles",
         alt_text="""
-            A five-by-five grid of small flush panels. Columns are the five
-            anchored conditions from span-mean through the pooled taus to
-            op1-oracle; rows are residual slices with the last slice on top
-            and the embedding at the bottom; each panel spans the four span
-            roles op1, plus, op2 and equals horizontally, 0 to 1 vertically.
-            A solid line with three faint hairlines shows each condition's
-            own readability, a dashed line the un-anchored control's. In
-            every column the solid line sits at or slightly above the dashed
-            one: op1 about 0.9 on every row, plus and equals about 0.8 to
-            0.9 on all rows but the embedding, where both drop to zero, op2
-            low. The one departure is the span-mean column, where op2 rises
-            to about 0.7 on the deep rows against about 0.2 in the dashed
-            control and in every other column.
+            A five-by-five grid of small flush panels. Columns are the five anchored conditions from span-mean through the pooled taus to op1-oracle; rows are residual slices with the last slice on top and the embedding at the bottom; each panel spans the four span roles op1, plus, op2 and equals horizontally, 0 to 1 vertically. A solid line with three faint hairlines shows each condition's own readability, a dashed line the un-anchored control's. In every column the solid line sits at or slightly above the dashed one: op1 about 0.9 on every row, plus and equals about 0.8 to 0.9 on all rows but the embedding, where both drop to zero, op2 low. The one departure is the span-mean column, where op2 rises to about 0.7 on the deep rows against about 0.2 in the dashed control and in every other column.
         """,
         caption=r"""
-            **Where redness is readable, once a pull has acted.** The same
-            leave-one-color-out ridge probe as H4(b)'s reference, run on the
-            anchored checkpoints: each condition's own $R^2(\ell, t)$ (solid,
-            seed mean; hairlines, seeds) against the un-anchored control's
-            (dashed). Compare the weight profiles above: the pull's weight
-            is far sharper than readability anywhere it concentrates.
+            **Where redness is readable, once a pull has acted.** The same leave-one-color-out ridge probe as H4(b)'s reference, run on the anchored checkpoints: each condition's own $R^2(\ell, t)$ (solid, seed mean; hairlines, seeds) against the un-anchored control's (dashed). Compare the weight profiles above: the pull's weight is far sharper than readability anywhere it concentrates.
         """,
     )
     def _plot() -> plt.Figure:

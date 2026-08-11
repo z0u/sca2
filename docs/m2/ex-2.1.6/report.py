@@ -156,17 +156,10 @@ def _():
     @themed(
         name="labels",
         alt_text="""
-            The labels concentrate hard on the red corner: on the color cube only a
-            handful of marks near pure red are large, and label probability climbs
-            four orders of magnitude between redness 0.3 and 1.
+            The labels concentrate hard on the red corner: on the color cube only a handful of marks near pure red are large, and label probability climbs four orders of magnitude between redness 0.3 and 1.
         """,
         caption="""
-            The label distribution over the 216 colors. Left: the cube with mark
-            area proportional to a color's share of all labeled lines, floored so
-            that never-labeled colors still show. Right: per-color label
-            probability against redness (log scale, the eighth-power curve
-            behind it), with the dashed line at the corpus mean and the grey
-            area giving the cumulative share of labels below each redness.
+            The label distribution over the 216 colors. Left: the cube with mark area proportional to a color's share of all labeled lines, floored so that never-labeled colors still show. Right: per-color label probability against redness (log scale, the eighth-power curve behind it), with the dashed line at the corpus mean and the grey area giving the cumulative share of labels below each redness.
         """,
     )
     def _plot() -> plt.Figure:
@@ -269,18 +262,10 @@ def _():
     @themed(
         name="schedules",
         alt_text="""
-            The anchor weight holds at peak until epoch 90, by which point the
-            learning rate has decayed to 4% of peak; the star arm starts down
-            at epoch 50, while the learning rate is still around 60%, and takes
-            the rest of training to reach the same floor.
+            The anchor weight holds at peak until epoch 90, by which point the learning rate has decayed to 4% of peak; the star arm starts down at epoch 50, while the learning rate is still around 60%, and takes the rest of training to reach the same floor.
         """,
         caption="""
-            Learning rate and anchor weight over training, each as a fraction of its own peak —
-            the LR peak is fixed at 1e-2, the anchor weight's is the swept
-            $\\lambda$. The anchor weight's ramp and anneal are minimum-jerk;
-            both anneals end at epoch 100 on a floor of 10% rather than zero,
-            so the star arm's is the longer and gentler of the two. Dots mark
-            the learning rate at the moment each anneal begins.
+            Learning rate and anchor weight over training, each as a fraction of its own peak — the LR peak is fixed at 1e-2, the anchor weight's is the swept $\\lambda$. The anchor weight's ramp and anneal are minimum-jerk; both anneals end at epoch 100 on a floor of 10% rather than zero, so the star arm's is the longer and gentler of the two. Dots mark the learning rate at the moment each anneal begins.
         """,
     )
     def _plot() -> plt.Figure:
@@ -532,14 +517,7 @@ def _(CONDS, CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
     </table></div>
     """
     _caption = """
-    Behavior by condition. Each cell is the seed mean, with half the seed range
-    beside it. EM is exact match on the answer token. NLL is the surprise of
-    that token in nats. <code>open</code> dist is the RGB distance from the
-    guessed color to the true mix, on pairs with no named answer. Δ holdout EM
-    is the signed gap to the λ = 0 control, and the last column reports the H1
-    gate, which passes when that gap is within 0.02. The first row is the
-    published ex-2.1.3 <code>v216</code> condition; it is an external
-    reference, not part of this sweep.
+    Behavior by condition. Each cell is the seed mean, with half the seed range beside it. EM is exact match on the answer token. NLL is the surprise of that token in nats. <code>open</code> dist is the RGB distance from the guessed color to the true mix, on pairs with no named answer. Δ holdout EM is the signed gap to the λ = 0 control, and the last column reports the H1 gate, which passes when that gap is within 0.02. The first row is the published ex-2.1.3 <code>v216</code> condition; it is an external reference, not part of this sweep.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -583,20 +561,10 @@ def _(LABELS, RUNGS, grading, m_op1):
     @themed(
         name="grading",
         alt_text="""
-            Three panels, one per anchored rung. In each, the 216 colors sit in a
-            broad band well above the flat control at zero, and the band rises
-            gently with redness — from roughly 0.4–0.5 at the grey end to
-            0.7–0.9 at the red end — rather than separating the reds from the
-            rest.
+            Three panels, one per anchored rung. In each, the 216 colors sit in a broad band well above the flat control at zero, and the band rises gently with redness — from roughly 0.4–0.5 at the grey end to 0.7–0.9 at the red end — rather than separating the reds from the rest.
         """,
         caption=r"""
-            Alignment at op1, per color: $\alpha_c$, the layer mean of
-            $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the
-            redness of the color. One mark per color, drawn in that color; the
-            heavy line is a 25-color sliding mean over the redness ordering, and
-            the flat grey band underneath is the sliding mean of the
-            $\lambda{=}0$ control. The grading statistics and $m_{\text{op1}}$ are quoted
-            per panel; both H2(b) gates sit at 0.8.
+            Alignment at op1, per color: $\alpha_c$, the layer mean of $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the redness of the color. One mark per color, drawn in that color; the heavy line is a 25-color sliding mean over the redness ordering, and the flat grey band underneath is the sliding mean of the $\lambda{=}0$ control. The grading statistics and $m_{\text{op1}}$ are quoted per panel; both H2(b) gates sit at 0.8.
         """,
     )
     def _plot() -> plt.Figure:
@@ -650,19 +618,10 @@ def _(CONDS, LABELS, RUNGS, arrays, margin_map):
     @themed(
         name="margin-by-layer",
         alt_text="""
-            The margin at op1 falls with depth at every anchored weight. At the
-            largest weight it starts near 0.56 in the embedding and decays to
-            below 0.1 by the last layer; at the smallest it starts near 0.35,
-            peaks in the first block, and decays less thereafter. The control is
-            flat and slightly negative.
+            The margin at op1 falls with depth at every anchored weight. At the largest weight it starts near 0.56 in the embedding and decays to below 0.1 by the last layer; at the smallest it starts near 0.35, peaks in the first block, and decays less thereafter. The control is flat and slightly negative.
         """,
         caption=r"""
-            Where the margin lives in the stack: the alignment margin at op1 by layer — the
-            per-depth terms whose mean is $m_{\text{op1}}$. Depth 0 is the token
-            embedding, depth 4 the last block's output. Lines are seed means;
-            the shaded band around the control is its seed min–max, as the scale
-            of a null. The anchor pulls all five layers equally, so the slope
-            comes from the network, not from the pull schedule.
+            Where the margin lives in the stack: the alignment margin at op1 by layer — the per-depth terms whose mean is $m_{\text{op1}}$. Depth 0 is the token embedding, depth 4 the last block's output. Lines are seed means; the shaded band around the control is its seed min–max, as the scale of a null. The anchor pulls all five layers equally, so the slope comes from the network, not from the pull schedule.
         """,
     )
     def _plot() -> plt.Figure:
@@ -722,19 +681,10 @@ def _(arrays):
     @themed(
         name="positions",
         alt_text="""
-            Six panels stacked by depth. op1 dominates in the embedding and the
-            first block, but by the last two blocks the plus and equals
-            positions overtake it; op2 stays the smallest of the pulled
-            positions, and the newline is near zero throughout.
+            Six panels stacked by depth. op1 dominates in the embedding and the first block, but by the last two blocks the plus and equals positions overtake it; op2 stays the smallest of the pulled positions, and the newline is near zero throughout.
         """,
         caption=r"""
-            Margin by position and depth: $m(\ell, t)$ across the six positions of a line, on
-            $\lambda{=}0.1$, seed mean. One panel per layer, and the
-            seed mean over layers in the bottom panel, drawn heavier. The
-            shaded area runs from zero to the seed mean; the hairlines are the seed
-            minimum and maximum. Positions are ordinal, so the risers are sloped,
-            but nothing is measured between them. The four pulled positions sit left
-            of the dashed rule; the answer and newline are measured only.
+            Margin by position and depth: $m(\ell, t)$ across the six positions of a line, on $\lambda{=}0.1$, seed mean. One panel per layer, and the seed mean over layers in the bottom panel, drawn heavier. The shaded area runs from zero to the seed mean; the hairlines are the seed minimum and maximum. Positions are ordinal, so the risers are sloped, but nothing is measured between them. The four pulled positions sit left of the dashed rule; the answer and newline are measured only.
         """,
     )
     def _plot() -> plt.Figure:
@@ -833,21 +783,10 @@ def _(CONDS, LABELS, cells):
     @themed(
         name="trajectories",
         alt_text="""
-            Four panels of alignment against epoch. In every anchored condition
-            the margin rises through the learning-rate warmup to a peak between
-            epochs 9 and 17, then slides back to about 0.27 and stays there; the
-            slide happens while the anchor weight is still at its peak, not at
-            the anneal. The control stays flat at zero.
+            Four panels of alignment against epoch. In every anchored condition the margin rises through the learning-rate warmup to a peak between epochs 9 and 17, then slides back to about 0.27 and stays there; the slide happens while the anchor weight is still at its peak, not at the anneal. The control stays flat at zero.
         """,
         caption=r"""
-            Alignment over training: $m_{\text{op1}}$ measured every 50 steps. One panel
-            per condition, one line per seed. The pale band behind is the
-            anchor weight as a fraction of its peak, so its descent marks the
-            anneal window; the dotted line is the learning rate. Both use the
-            right-hand scale, numbered on the last panel. The dashed
-            horizontal rule is the 0.2 floor of H4; a run below it is reported
-            but not scored. Ratios are the end-of-training value of each seed
-            over its running maximum.
+            Alignment over training: $m_{\text{op1}}$ measured every 50 steps. One panel per condition, one line per seed. The pale band behind is the anchor weight as a fraction of its peak, so its descent marks the anneal window; the dotted line is the learning rate. Both use the right-hand scale, numbered on the last panel. The dashed horizontal rule is the 0.2 floor of H4; a run below it is reported but not scored. Ratios are the end-of-training value of each seed over its running maximum.
         """,
     )
     def _plot() -> plt.Figure:
@@ -920,21 +859,10 @@ def _(CONDS, LABELS, RUNGS, cells):
     @themed(
         name="leakage",
         alt_text="""
-            Two panels. On the left, the off-axis redness probe scores about 0.8
-            at every depth in every condition including the control, dipping
-            slightly at depth with the anchor on. On the right, the redness
-            variance carried by the anchor axis alone rises from near zero in the
-            control to between 0.2 and 0.5 with the anchor on.
+            Two panels. On the left, the off-axis redness probe scores about 0.8 at every depth in every condition including the control, dipping slightly at depth with the anchor on. On the right, the redness variance carried by the anchor axis alone rises from near zero in the control to between 0.2 and 0.5 with the anchor on.
         """,
         caption=r"""
-            Where redness is readable at op1. Left: held-out R² for a ridge probe that predicts redness from the
-            residual stream at op1, with the $\hat v_{\text{red}}$ component
-            removed first. This measures how well *red* can still be read from
-            the other 63 directions. Right: the same target predicted from the
-            anchor component alone, as squared correlation. Both panels show
-            per-layer seed means. The sample is the 216 op1 colors, with a
-            5-fold split so no color is scored by a probe that saw it during
-            fitting. Neither measurement has a pass/fail threshold.
+            Where redness is readable at op1. Left: held-out R² for a ridge probe that predicts redness from the residual stream at op1, with the $\hat v_{\text{red}}$ component removed first. This measures how well *red* can still be read from the other 63 directions. Right: the same target predicted from the anchor component alone, as squared correlation. Both panels show per-layer seed means. The sample is the 216 op1 colors, with a 5-fold split so no color is scored by a probe that saw it during fitting. Neither measurement has a pass/fail threshold.
         """,
     )
     def _plot() -> plt.Figure:
@@ -999,23 +927,10 @@ def _(CONDS, LABELS, RUNGS, geometry):
     @themed(
         name="cloud",
         alt_text="""
-            Two panels. On the left, the extent of the 216-color cloud falls
-            steeply with depth in every condition, control included, from about
-            0.92 at the embedding to near 0.1 at the last layer; mid-stack the
-            anchored conditions sit clearly below the control, at roughly 70% of
-            it at λ=0.1 and 50% at λ=0.3. On the right, the direction of the cloud's centre is
-            unrelated to the anchor in the control and almost parallel to it
-            from the first block onward once the anchor is on.
+            Two panels. On the left, the extent of the 216-color cloud falls steeply with depth in every condition, control included, from about 0.92 at the embedding to near 0.1 at the last layer; mid-stack the anchored conditions sit clearly below the control, at roughly 70% of it at λ=0.1 and 50% at λ=0.3. On the right, the direction of the cloud's centre is unrelated to the anchor in the control and almost parallel to it from the first block onward once the anchor is on.
         """,
         caption=r"""
-            Where the color cloud is, and how big: the shape of the 216 op1
-            states, seed means, per layer. Left: the
-            extent of the cloud, the mean squared distance of a color from the
-            centre (states are unit-norm, so this runs from 0 for a collapsed
-            cloud to 1 for a spread one). Right: the cosine between that centre
-            and the anchor direction — where the cloud sits, as opposed to how
-            big it is. In the control that value is the scale of an unrelated
-            direction in 64 dimensions.
+            Where the color cloud is, and how big: the shape of the 216 op1 states, seed means, per layer. Left: the extent of the cloud, the mean squared distance of a color from the centre (states are unit-norm, so this runs from 0 for a collapsed cloud to 1 for a spread one). Right: the cosine between that centre and the anchor direction — where the cloud sits, as opposed to how big it is. In the control that value is the scale of an unrelated direction in 64 dimensions.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1102,14 +1017,7 @@ def _(geometry):
     </table></div>
     """
     _caption = """
-    What is recoverable from the op1 residual stream, per target. Each cell is
-    the seed mean, with half the seed range beside it. Rows are the property
-    being predicted: redness; the same formula rotated onto the green and blue
-    corners; the raw channels; and the sim¹·⁵ shape that H2(b) scores against.
-    The left pair of columns is held-out ridge R² with the anchor direction
-    removed, averaged over layers. The right pair is squared correlation with
-    the anchor component alone. Reading down a column compares redness against
-    targets the anchor never pulled.
+    What is recoverable from the op1 residual stream, per target. Each cell is the seed mean, with half the seed range beside it. Rows are the property being predicted: redness; the same formula rotated onto the green and blue corners; the raw channels; and the sim¹·⁵ shape that H2(b) scores against. The left pair of columns is held-out ridge R² with the anchor direction removed, averaged over layers. The right pair is squared correlation with the anchor component alone. Reading down a column compares redness against targets the anchor never pulled.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return

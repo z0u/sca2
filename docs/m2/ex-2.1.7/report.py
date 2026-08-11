@@ -215,12 +215,7 @@ def _():
     </table></div>
     """
     _caption = f"""
-    The seven conditions, each run at seeds {ex.SEEDS} — {len(ex.CONDITIONS) * len(ex.SEEDS)}
-    runs. The four factorial conditions share λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} and carry the H2
-    and H3 gates; the two arms add none of their own, though H1 and H4 reach them by their
-    stated scopes — the timing arm is a λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} anti condition,
-    and H4(b) covers every anchored run. λ<sub>s̄</sub>/λ<sub>a</sub> is
-    the anti-subspace weight relative to the anchor peak.
+    The seven conditions, each run at seeds {ex.SEEDS} — {len(ex.CONDITIONS) * len(ex.SEEDS)} runs. The four factorial conditions share λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} and carry the H2 and H3 gates; the two arms add none of their own, though H1 and H4 reach them by their stated scopes — the timing arm is a λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} anti condition, and H4(b) covers every anchored run. λ<sub>s̄</sub>/λ<sub>a</sub> is the anti-subspace weight relative to the anchor peak.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -233,24 +228,10 @@ def _():
     @themed(
         name="schedules",
         alt_text="""
-            Weight schedules over 100 epochs on a log axis. The learning rate warms up
-            by epoch 10 and decays smoothly. The anchor weight ramps up with the warmup,
-            holds at 0.1, and anneals to a floor after epoch 90. The anti-subspace
-            weight starts at 0.25 — above everything else — and descends to 0.003 by
-            epoch 50, where it holds; a dashed variant descends to the same level by
-            epoch 90 instead.
+            Weight schedules over 100 epochs on a log axis. The learning rate warms up by epoch 10 and decays smoothly. The anchor weight ramps up with the warmup, holds at 0.1, and anneals to a floor after epoch 90. The anti-subspace weight starts at 0.25 — above everything else — and descends to 0.003 by epoch 50, where it holds; a dashed variant descends to the same level by epoch 90 instead.
         """,
         caption=f"""
-            The three schedules at the scoring rung (λ<sub>a</sub> = {ex.SCORING_LAMBDA:g}),
-            log scale. The anti-subspace term opens at {ex.ANTI_PEAK_RATIO:g}λ<sub>a</sub>,
-            dominant before the anchor arrives, and anneals to
-            {ex.ANTI_HOLD_RATIO:g}λ<sub>a</sub> by epoch {ex.ANTI_ANNEAL_END:g}
-            (the M1/ex-2.9.1 keyframes, mapped by fraction of training). The
-            dashed line is the `span-anti-late` arm, which reaches the hold
-            ratio at epoch {ex.ANTI_ANNEAL_END_LATE:g} instead. From epoch
-            {ex.ANNEAL_START:g} the anchor and anti-subspace weights share the
-            end-of-training anneal to a floor of {ex.ANNEAL_FLOOR:g}× their held
-            values.
+            The three schedules at the scoring rung (λ<sub>a</sub> = {ex.SCORING_LAMBDA:g}), log scale. The anti-subspace term opens at {ex.ANTI_PEAK_RATIO:g}λ<sub>a</sub>, dominant before the anchor arrives, and anneals to {ex.ANTI_HOLD_RATIO:g}λ<sub>a</sub> by epoch {ex.ANTI_ANNEAL_END:g} (the M1/ex-2.9.1 keyframes, mapped by fraction of training). The dashed line is the `span-anti-late` arm, which reaches the hold ratio at epoch {ex.ANTI_ANNEAL_END_LATE:g} instead. From epoch {ex.ANNEAL_START:g} the anchor and anti-subspace weights share the end-of-training anneal to a floor of {ex.ANNEAL_FLOOR:g}× their held values.
         """,
     )
     def _plot() -> plt.Figure:
@@ -467,13 +448,7 @@ def _(CONDS: list[str], CONTROL_ACC, LABELS_TXT, TASK_CLEAN, acc):
     </table></div>
     """
     _caption = f"""
-    Behavior by condition. Each cell is the seed mean, with half the seed range
-    beside it. EM is exact match on the answer token. NLL is the surprise of
-    that token in nats. <code>open</code> dist is the RGB distance from the
-    guessed color to the true mix, on pairs with no named answer. Δ holdout EM
-    is the signed gap to the in-experiment control, and the last column reports
-    the H1 gate, which passes when that gap is within {ex.TASK_GATE:g}. The two
-    top rows are published conditions from earlier experiments, shown for comparison.
+    Behavior by condition. Each cell is the seed mean, with half the seed range beside it. EM is exact match on the answer token. NLL is the surprise of that token in nats. <code>open</code> dist is the RGB distance from the guessed color to the true mix, on pairs with no named answer. Δ holdout EM is the signed gap to the in-experiment control, and the last column reports the H1 gate, which passes when that gap is within {ex.TASK_GATE:g}. The two top rows are published conditions from earlier experiments, shown for comparison.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -510,16 +485,10 @@ def _(CONDS: list[str], LABELS, m_op1):
     @themed(
         name="margin-by-condition",
         alt_text="""
-            Per-seed margin at op1 for each of the seven conditions, with the
-            seed mean drawn as a bar. Reference rules mark the 0.5 gate, the
-            0.35 partial level, and the published ex-2.1.6 value of 0.27.
+            Per-seed margin at op1 for each of the seven conditions, with the seed mean drawn as a bar. Reference rules mark the 0.5 gate, the 0.35 partial level, and the published ex-2.1.6 value of 0.27.
         """,
         caption=rf"""
-            The statistic H2(a) scores: $m_{{\text{{op1}}}}$, the layer-mean
-            alignment margin at the first operand. One dot per seed, with the
-            seed mean as the heavy bar. The solid rule is the H2(a) gate of
-            {ex.MARGIN_GATE:g} and the dashed rule the {0.35:g} partial; the dotted
-            rule is the published ex-2.1.6 value of {_EX216_MARGIN:.2f}, which the
+            The statistic H2(a) scores: $m_{{\text{{op1}}}}$, the layer-mean alignment margin at the first operand. One dot per seed, with the seed mean as the heavy bar. The solid rule is the H2(a) gate of {ex.MARGIN_GATE:g} and the dashed rule the {0.35:g} partial; the dotted rule is the published ex-2.1.6 value of {_EX216_MARGIN:.2f}, which the
             <code>span-bare</code> condition re-runs. The four factorial
             conditions are drawn solid, the two arms hollow, and the control grey.
         """,
@@ -570,25 +539,10 @@ def _(LABELS, grading, m_op1):
     @themed(
         name="grading",
         alt_text="""
-            Four panels, one per factorial condition, showing the per-color
-            alignment at the first operand against the redness of that color.
-            The panels grade progressively from top left to bottom right. Span
-            with a bare anchor is a nearly flat band near 0.5 across every
-            color, barely rising with redness. Adding the repulsive term drops
-            the grey and green end to about 0.25 while the red end stays near
-            0.9. Narrowing the pull to op1 drops the low end further, to about
-            0.15 bare and 0.05 with the repulsive term, giving a clean rise from
-            near the control baseline up to about 0.9 at the reddest colors.
+            Four panels, one per factorial condition, showing the per-color alignment at the first operand against the redness of that color. The panels grade progressively from top left to bottom right. Span with a bare anchor is a nearly flat band near 0.5 across every color, barely rising with redness. Adding the repulsive term drops the grey and green end to about 0.25 while the red end stays near 0.9. Narrowing the pull to op1 drops the low end further, to about 0.15 bare and 0.05 with the repulsive term, giving a clean rise from near the control baseline up to about 0.9 at the reddest colors.
         """,
         caption=r"""
-            Alignment at op1, per color: $\alpha_c$, the layer mean of
-            $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the
-            redness of the color. One mark per color, drawn in that color; the
-            heavy line is a 25-color sliding mean over the redness ordering, and
-            the flat grey band underneath is the same sliding mean for the
-            control. The grading statistics and $m_{\text{op1}}$ are quoted per
-            panel; both H2(b) gates sit at 0.8. The panels are the 2×2: pull
-            span across, repulsive term down.
+            Alignment at op1, per color: $\alpha_c$, the layer mean of $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the redness of the color. One mark per color, drawn in that color; the heavy line is a 25-color sliding mean over the redness ordering, and the flat grey band underneath is the same sliding mean for the control. The grading statistics and $m_{\text{op1}}$ are quoted per panel; both H2(b) gates sit at 0.8. The panels are the 2×2: pull span across, repulsive term down.
         """,
     )
     def _plot() -> plt.Figure:
@@ -786,36 +740,10 @@ def _(ANCHORED, CONDS: list[str], LABELS, SCHEDULES, SCHED_E, traj):
     @themed(
         name="trajectories",
         alt_text="""
-            Six pairs of panels in a three-by-two grid, one pair per condition,
-            sharing the epoch axis. In each pair, the upper panel shows mean
-            alignment (solid) and margin (dashed) over a grey control pair and
-            faint traces of the other conditions; the shorter log-scale panel
-            below shows that condition's weight schedule, anchor in red and
-            repulsion in blue. Carets on the left spine mark the containment
-            gates at 0.1 and 0.25; one on the right marks the margin floor at
-            0.2. A dotted rule at the ex-2.1.6 endpoint of 0.53, labeled in the
-            first panel, meets the solid line there. In the anti conditions the
-            margin climbs early, while the repulsion is strong; mean alignment
-            stays near the control until the anneal lowers the repulsion, then
-            climbs, latest in the late arm, whose blue curve descends latest.
+            Six pairs of panels in a three-by-two grid, one pair per condition, sharing the epoch axis. In each pair, the upper panel shows mean alignment (solid) and margin (dashed) over a grey control pair and faint traces of the other conditions; the shorter log-scale panel below shows that condition's weight schedule, anchor in red and repulsion in blue. Carets on the left spine mark the containment gates at 0.1 and 0.25; one on the right marks the margin floor at 0.2. A dotted rule at the ex-2.1.6 endpoint of 0.53, labeled in the first panel, meets the solid line there. In the anti conditions the margin climbs early, while the repulsion is strong; mean alignment stays near the control until the anneal lowers the repulsion, then climbs, latest in the late arm, whose blue curve descends latest.
         """,
         caption=rf"""
-            Training dynamics, one pair of panels per condition. Above: seed
-            means of the two cosines on the anchor axis, on one shared scale.
-            Solid is $\bar\alpha$, the mean alignment over all 216 colors at
-            op1; dashed is the margin $m_{{\text{{op1}}}}$. The grey pair is
-            the control; the faint lines are the other conditions. The carets
-            on the left spine are the H4(a) grading levels for $\bar\alpha$,
-            and the one on the right is the H4(b) floor for
-            $m_{{\text{{op1}}}}$. The dotted rule is the published ex-2.1.6
-            endpoint of {_EX216_ALPHA:.2f}. Since span-bare re-runs that
-            condition, its solid line landing on the rule is the reproduction
-            check. Seed spread is given in the H4 table below.
-            Below each: the weight schedule that condition trained under, in
-            the colors of the schedules figure above: anchor $\lambda_\mathrm{{a}}$
-            in red, repulsion $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue (absent
-            in the bare conditions). The two arms in the third column also show
-            the primary schedule in ghost ink, since each is a variation on it.
+            Training dynamics, one pair of panels per condition. Above: seed means of the two cosines on the anchor axis, on one shared scale. Solid is $\bar\alpha$, the mean alignment over all 216 colors at op1; dashed is the margin $m_{{\text{{op1}}}}$. The grey pair is the control; the faint lines are the other conditions. The carets on the left spine are the H4(a) grading levels for $\bar\alpha$, and the one on the right is the H4(b) floor for $m_{{\text{{op1}}}}$. The dotted rule is the published ex-2.1.6 endpoint of {_EX216_ALPHA:.2f}. Since span-bare re-runs that condition, its solid line landing on the rule is the reproduction check. Seed spread is given in the H4 table below. Below each: the weight schedule that condition trained under, in the colors of the schedules figure above: anchor $\lambda_\mathrm{{a}}$ in red, repulsion $\lambda_{{\bar{{\mathrm{{s}}}}}}$ in blue (absent in the bare conditions). The two arms in the third column also show the primary schedule in ghost ink, since each is a variation on it.
         """,
     )
     def _plot() -> plt.Figure:
@@ -967,14 +895,7 @@ def _(ANCHORED, LABELS_TXT, alpha_bar, traj):
     </table></div>
     """
     _caption = f"""
-    The two H4 gates. ᾱ is the end-of-training mean alignment over all 216
-    colors at op1, seed mean with half the seed range. H4(a) scores the
-    λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} anti conditions against a ceiling of
-    {ex.MEAN_ALIGN_GATE:g}, with <em>partial</em> marking a condition that clears
-    the {ex.MEAN_ALIGN_PARTIAL:g} level without reaching it. Retention is each
-    run's final margin over its running maximum; runs whose maximum never
-    reaches {ex.H4_FLOOR:g} are reported but not scored, and H4(b) passes when
-    every scored run holds {ex.H4_RETENTION:g}× its peak.
+    The two H4 gates. ᾱ is the end-of-training mean alignment over all 216 colors at op1, seed mean with half the seed range. H4(a) scores the λ<sub>a</sub> = {ex.SCORING_LAMBDA:g} anti conditions against a ceiling of {ex.MEAN_ALIGN_GATE:g}, with <em>partial</em> marking a condition that clears the {ex.MEAN_ALIGN_PARTIAL:g} level without reaching it. Retention is each run's final margin over its running maximum; runs whose maximum never reaches {ex.H4_FLOOR:g} are reported but not scored, and H4(b) passes when every scored run holds {ex.H4_RETENTION:g}× its peak.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -1024,26 +945,10 @@ def _(CONDS: list[str], LABELS, arrays, geometry, margin_map):
     @themed(
         name="by-layer",
         alt_text="""
-            Three panels against layer depth, one line per condition. The margin
-            decays with depth in every condition, least in the timing arm; the
-            cloud centre swings far onto the anchor direction under the bare
-            span pull and much less under every other condition; and the cloud's
-            extent shrinks with depth, with the bare span pull and the ceiling
-            arm the narrowest.
+            Three panels against layer depth, one line per condition. The margin decays with depth in every condition, least in the timing arm; the cloud centre swings far onto the anchor direction under the bare span pull and much less under every other condition; and the cloud's extent shrinks with depth, with the bare span pull and the ceiling arm the narrowest.
         """,
         caption=r"""
-            Margin and cloud geometry by layer, seed means. Depth 0 is
-            the token embedding and depth 4 the last block's output.
-            **Left:** the margin at op1 by layer — the per-depth terms whose
-            mean is $m_{\text{op1}}$; the shaded band around the control is its
-            seed min–max, as the scale of a null.
-            **Middle:** the cosine between the centre of the 216 op1 states and
-            the anchor direction — where the cloud sits.
-            **Right:** the extent of that cloud, the mean squared
-            distance of a color from the centre (states are unit-norm, so this
-            runs from 0 for a collapsed cloud to 1 for a spread one). The
-            repulsive term acts on the middle panel by construction; the right
-            panel is what it costs.
+            Margin and cloud geometry by layer, seed means. Depth 0 is the token embedding and depth 4 the last block's output. **Left:** the margin at op1 by layer — the per-depth terms whose mean is $m_{\text{op1}}$; the shaded band around the control is its seed min–max, as the scale of a null. **Middle:** the cosine between the centre of the 216 op1 states and the anchor direction — where the cloud sits. **Right:** the extent of that cloud, the mean squared distance of a color from the centre (states are unit-norm, so this runs from 0 for a collapsed cloud to 1 for a spread one). The repulsive term acts on the middle panel by construction; the right panel is what it costs.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1179,21 +1084,10 @@ def _(CONDS: list[str], LABELS, cells):
     @themed(
         name="leakage",
         alt_text=f"""
-            Two panels against layer depth, sharing a vertical R² scale. Left:
-            how well redness reads from the other 63 directions once the anchor
-            coordinate is removed, for each condition. Every line sits in a
-            narrow band near the top, at the caret marking the R² =
-            {_floor:.2f} floor. Right: the same target read from the anchor
-            coordinate alone, where the conditions separate widely and the
-            control sits near zero.
+            Two panels against layer depth, sharing a vertical R² scale. Left: how well redness reads from the other 63 directions once the anchor coordinate is removed, for each condition. Every line sits in a narrow band near the top, at the caret marking the R² = {_floor:.2f} floor. Right: the same target read from the anchor coordinate alone, where the conditions separate widely and the control sits near zero.
         """,
         caption=rf"""
-            How strongly redness is encoded at op1, read two ways on one R² scale.
-            **Left:** held-out R² for a ridge probe predicting redness from the residual stream at op1 with the $\hat v_{{\text{{red}}}}$ coordinate deleted.
-            The caret marks R² = {_floor:.2f}, the score the same probe gets from the raw RGB values, which no condition can fall far below while the cube is intact.
-            **Right:** the same target read from the anchor coordinate alone, as squared correlation, which starts at zero and has room to reach 1.
-            Per-layer seed means. The sample is the 216 op1 colors, with a 5-fold split so no color is scored by a probe that saw it during fitting.
-            Neither panel has a pass/fail threshold.
+            How strongly redness is encoded at op1, read two ways on one R² scale. **Left:** held-out R² for a ridge probe predicting redness from the residual stream at op1 with the $\hat v_{{\text{{red}}}}$ coordinate deleted. The caret marks R² = {_floor:.2f}, the score the same probe gets from the raw RGB values, which no condition can fall far below while the cube is intact. **Right:** the same target read from the anchor coordinate alone, as squared correlation, which starts at zero and has room to reach 1. Per-layer seed means. The sample is the 216 op1 colors, with a 5-fold split so no color is scored by a probe that saw it during fitting. Neither panel has a pass/fail threshold.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1334,11 +1228,7 @@ def _(CONDS: list[str], arrays):
     </table></div>
     """
     _caption = f"""
-    The margin split into the two quantities it differences. The first column is
-    the mean alignment of the ten reddest colors — the ones carrying
-    {ex.LABEL_W[_top].sum():.0%} of the label mass, so effectively "where the
-    anchored concept sits". The second is the mean over all 216, the quantity the
-    repulsive term penalizes. Comparing <code>span-anti</code> with
+    The margin split into the two quantities it differences. The first column is the mean alignment of the ten reddest colors — the ones carrying {ex.LABEL_W[_top].sum():.0%} of the label mass, so effectively "where the anchored concept sits". The second is the mean over all 216, the quantity the repulsive term penalizes. Comparing <code>span-anti</code> with
     <code>span-anti-late</code> is the case of interest: sustained repulsion costs
     the reddest colors a little and the rest of the cube a great deal.
     """

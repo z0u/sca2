@@ -158,17 +158,10 @@ def _(stats):
     @themed(
         name="palettes",
         alt_text="""
-            Two color-cube panels, each a hexagonal silhouette of the RGB cube
-            standing on its black corner, with data-colored dots. Left: named
-            colors shown as dots, evenly spaced through the whole solid with no
-            two dots touching. Right: hex colors, reaching the same extent but
-            visibly lumpy at close range — touching pairs and triples in some
-            places, bare patches in others.
+            Two color-cube panels, each a hexagonal silhouette of the RGB cube standing on its black corner, with data-colored dots. Left: named colors shown as dots, evenly spaced through the whole solid with no two dots touching. Right: hex colors, reaching the same extent but visibly lumpy at close range — touching pairs and triples in some places, bare patches in others.
         """,
         caption="""
-            The two operand sets in the RGB cube (center corpus). Left: the 140
-            named colors, spaced by farthest-point selection; right: the 216
-            hex operands, a uniform draw from the 4,096-point grid.
+            The two operand sets in the RGB cube (center corpus). Left: the 140 named colors, spaced by farthest-point selection; right: the 216 hex operands, a uniform draw from the 4,096-point grid.
         """,
     )
     def _plot() -> plt.Figure:
@@ -370,15 +363,10 @@ def _(cells):
     @themed(
         name="loss-curves",
         alt_text="""
-            Eight small panels of loss versus epoch, one per sweep condition, each
-            with three validation curves (one per seed) and three fainter
-            training curves. Every curve descends smoothly and flattens within
-            the 100-epoch budget; no panel shows divergence or oscillation.
+            Eight small panels of loss versus epoch, one per sweep condition, each with three validation curves (one per seed) and three fainter training curves. Every curve descends smoothly and flattens within the 100-epoch budget; no panel shows divergence or oscillation.
         """,
         caption="""
-            Loss per epoch for every condition: validation solid, training faint,
-            one line per seed. All conditions share the character vocabulary, so
-            per-token losses are comparable across panels.
+            Loss per epoch for every condition: validation solid, training faint, one line per seed. All conditions share the character vocabulary, so per-token losses are comparable across panels.
         """,
     )
     def _plot() -> plt.Figure:
@@ -458,15 +446,10 @@ def _(arrays):
     @themed(
         name="miss-ranks",
         alt_text="""
-            Two bar panels of guess rank. For named held-out prompts, about two
-            thirds of the mass is at rank 0 and most of the rest at ranks 1 and
-            2, with a small tail beyond 6. For hex held-out prompts virtually
-            all mass is at rank 0.
+            Two bar panels of guess rank. For named held-out prompts, about two thirds of the mass is at rank 0 and most of the rest at ranks 1 and 2, with a small tail beyond 6. For hex held-out prompts virtually all mass is at rank 0.
         """,
         caption="""
-            Rank of the emitted answer among the candidate vocabulary of the form,
-            ordered by distance to the true mix; rank 0 is the correct answer.
-            Center condition, pooled over seeds.
+            Rank of the emitted answer among the candidate vocabulary of the form, ordered by distance to the true mix; rank 0 is the correct answer. Center condition, pooled over seeds.
         """,
     )
     def _plot() -> plt.Figure:
@@ -611,20 +594,10 @@ def _(arrays):
     @themed(
         name="probe-channels",
         alt_text="""
-            Probe R² traced across the equation for each RGB channel, stacked
-            by depth, with the named form on top and hex below. The named
-            panels are flat over the names themselves and rise at the spaces
-            that follow them, peaking at the pre-answer position; the hex
-            panels show each channel legible only at its own digit. Only named
-            brings all three channels high together at the mix.
+            Probe R² traced across the equation for each RGB channel, stacked by depth, with the named form on top and hex below. The named panels are flat over the names themselves and rise at the spaces that follow them, peaking at the pre-answer position; the hex panels show each channel legible only at its own digit. Only named brings all three channels high together at the mix.
         """,
         caption="""
-            Per-channel probe $R^2$ under the strict holdout, center condition.
-            Named form on top, hex below; columns are operand 1, operand 2, and
-            the mix. Within a block, depth runs upward from the embedding and
-            the x axis across the grammar landmarks, one step-line per RGB
-            channel. The grey area is the three-channel mean, and the two
-            hairlines are the highest and lowest of the three seeds.
+            Per-channel probe $R^2$ under the strict holdout, center condition. Named form on top, hex below; columns are operand 1, operand 2, and the mix. Within a block, depth runs upward from the embedding and the x axis across the grammar landmarks, one step-line per RGB channel. The grey area is the three-channel mean, and the two hairlines are the highest and lowest of the three seeds.
         """,
     )
     def _plot() -> plt.Figure:
@@ -768,25 +741,10 @@ def _(arrays):
     @themed(
         name="cross-form-transfer",
         alt_text="""
-            Six blocks of stacked step-line panels, two rows by three columns:
-            named activations on the top row and hex on the bottom, with columns
-            for operand 1, operand 2 and the mix. Each panel is one residual
-            depth, embedding at the bottom, plotted across the grammar landmarks.
-            A grey filled area shows what the own-form probe reads — rising
-            over the operands and, in the named mix panel, high at the pre-answer
-            position of the last layer. An amber line for the other-form probe
-            applied to the same activations lies flat on the floor in every panel,
-            at every depth and every landmark.
+            Six blocks of stacked step-line panels, two rows by three columns: named activations on the top row and hex on the bottom, with columns for operand 1, operand 2 and the mix. Each panel is one residual depth, embedding at the bottom, plotted across the grammar landmarks. A grey filled area shows what the own-form probe reads — rising over the operands and, in the named mix panel, high at the pre-answer position of the last layer. An amber line for the other-form probe applied to the same activations lies flat on the floor in every panel, at every depth and every landmark.
         """,
         caption=r"""
-            Zero-shot cross-form transfer at the center condition, seed-averaged.
-            Rows are the form the probes are applied to; columns are the probe
-            target; within a panel, depth runs upward from the embedding and
-            the x axis across the grammar landmarks. Grey is the own-form
-            probe under the strict holdout (the same quantity as the
-            per-channel figure under H2), with its three-seed envelope; amber
-            is the other-form probe applied unchanged. Both are floored at
-            zero for drawing.
+            Zero-shot cross-form transfer at the center condition, seed-averaged. Rows are the form the probes are applied to; columns are the probe target; within a panel, depth runs upward from the embedding and the x axis across the grammar landmarks. Grey is the own-form probe under the strict holdout (the same quantity as the per-channel figure under H2), with its three-seed envelope; amber is the other-form probe applied unchanged. Both are floored at zero for drawing.
         """,
     )
     def _plot() -> plt.Figure:
@@ -967,26 +925,10 @@ def _(angles_at, cells, maps):
     @themed(
         name="compression",
         alt_text="""
-            Three panels against residual width, plotted at 16, 32 and 64. Left:
-            held-out exact match. The hex curve runs 1.00, 1.00, 0.72 as the
-            stream narrows; the named curve falls much further, 0.67, 0.43, 0.05.
-            Middle: the named mix probe R² at the pre-answer position follows
-            the named curve down, 0.94, 0.80, 0.35. Right: the first principal
-            angle between the mix decoders of the two forms falls from about 75° to 60°
-            to 51°, and a shaded band for random subspaces of the same size falls
-            with it, covering every observed point. Open markers for the 8-layer
-            conditions sit clearly above the 4-layer ones at width 16 and coincide
-            with them at width 64.
+            Three panels against residual width, plotted at 16, 32 and 64. Left: held-out exact match. The hex curve runs 1.00, 1.00, 0.72 as the stream narrows; the named curve falls much further, 0.67, 0.43, 0.05. Middle: the named mix probe R² at the pre-answer position follows the named curve down, 0.94, 0.80, 0.35. Right: the first principal angle between the mix decoders of the two forms falls from about 75° to 60° to 51°, and a shaded band for random subspaces of the same size falls with it, covering every observed point. Open markers for the 8-layer conditions sit clearly above the 4-layer ones at width 16 and coincide with them at width 64.
         """,
         caption=r"""
-            Effects of narrowing the residual stream, across the width arms.
-            Filled $\bullet$ markers joined by lines are the 4-layer conditions;
-            open $\scriptstyle\Box$ markers are the 8-layer conditions, dashed
-            because there is no d32-L8 condition to run a line through. Right:
-            the first principal angle between the named and hex mix decoders at
-            the pre-answer position (amber), with two references: the angle
-            between two random 3-planes at that width (grey band, mean ± 1
-            s.d.) and between the named probes of two seeds (red).
+            Effects of narrowing the residual stream, across the width arms. Filled $\bullet$ markers joined by lines are the 4-layer conditions; open $\scriptstyle\Box$ markers are the 8-layer conditions, dashed because there is no d32-L8 condition to run a line through. Right: the first principal angle between the named and hex mix decoders at the pre-answer position (amber), with two references: the angle between two random 3-planes at that width (grey band, mean ± 1 s.d.) and between the named probes of two seeds (red).
         """,
     )
     def _plot() -> plt.Figure:
@@ -1177,20 +1119,10 @@ def _(arrays):
     @themed(
         name="bridge-transfer",
         alt_text="""
-            Six blocks of stacked step-line panels, two rows by three columns,
-            in the same layout as the cross-form transfer figure under H3, but
-            for the bridge condition. A grey filled area shows what the own-form
-            probe reads, rising over the operands and peaking at the pre-answer
-            position of the named mix panel. The amber line for the other-form
-            probe lies flat on the floor in every panel, at every depth and every
-            landmark, exactly as it does without a bridge.
+            Six blocks of stacked step-line panels, two rows by three columns, in the same layout as the cross-form transfer figure under H3, but for the bridge condition. A grey filled area shows what the own-form probe reads, rising over the operands and peaking at the pre-answer position of the named mix panel. The amber line for the other-form probe lies flat on the floor in every panel, at every depth and every landmark, exactly as it does without a bridge.
         """,
         caption="""
-            Zero-shot cross-form transfer at the bridge condition, seed-averaged,
-            drawn exactly as the H3 figure so the two can be laid side by side.
-            Rows are the form the probes are applied to; columns are the probe
-            target; grey is the own-form probe under the strict holdout and
-            amber is the other-form probe applied unchanged.
+            Zero-shot cross-form transfer at the bridge condition, seed-averaged, drawn exactly as the H3 figure so the two can be laid side by side. Rows are the form the probes are applied to; columns are the probe target; grey is the own-form probe under the strict holdout and amber is the other-form probe applied unchanged.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1263,25 +1195,10 @@ def _(arrays):
     @themed(
         name="depth-profiles",
         alt_text="""
-            Two panels of named mix probe R² against relative depth, from the
-            embedding at 0 to the last layer at 1. Left panel, at the equals
-            sign; right panel, at the pre-answer space. Four curves in each. The
-            two width-64 conditions rise late and steeply, ending near 0.6 (4 layers)
-            and 0.75 (8 layers) at the equals sign and near 0.95 at the
-            pre-answer space, where the 8-layer curve reaches its ceiling one
-            layer before the end and holds it. The two width-16 conditions stay far
-            lower throughout, the 8-layer one about twice as high as the 4-layer
-            one and flattening from mid-depth. Shaded bands show the seed spread,
-            which is widest in the layers just before the rise of each curve.
+            Two panels of named mix probe R² against relative depth, from the embedding at 0 to the last layer at 1. Left panel, at the equals sign; right panel, at the pre-answer space. Four curves in each. The two width-64 conditions rise late and steeply, ending near 0.6 (4 layers) and 0.75 (8 layers) at the equals sign and near 0.95 at the pre-answer space, where the 8-layer curve reaches its ceiling one layer before the end and holds it. The two width-16 conditions stay far lower throughout, the 8-layer one about twice as high as the 4-layer one and flattening from mid-depth. Shaded bands show the seed spread, which is widest in the layers just before the rise of each curve.
         """,
         caption="""
-            Where the named mix becomes readable, at the `=` sign (left) and the
-            pre-answer space (right, the site H2 uses). The x axis is depth as a
-            fraction of the layers in the condition, so the 4-layer and 8-layer
-            curves overlay; 0 is the token embedding and 1 the last layer.
-            Solid lines are the 4-layer conditions and dashed the 8-layer ones,
-            blue for width 64 and purple for width 16; bands span the three
-            seeds.
+            Where the named mix becomes readable, at the `=` sign (left) and the pre-answer space (right, the site H2 uses). The x axis is depth as a fraction of the layers in the condition, so the 4-layer and 8-layer curves overlay; 0 is the token embedding and 1 the last layer. Solid lines are the 4-layer conditions and dashed the 8-layer ones, blue for width 64 and purple for width 16; bands span the three seeds.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1424,22 +1341,10 @@ def _(precision):
     @themed(
         name="snap-margin",
         alt_text="""
-            Four panels of exact-match rate against snap margin, one per palette
-            size and eval set. In every panel the observed rate climbs steadily
-            from about 0.4 at the tightest margins to near 1 at the widest, and a
-            line for the resolution-limited reference guesser runs through the
-            observed points. A faint histogram along the bottom shows most
-            prompts have small margins, and the 250-name panels are shifted
-            further toward the tight end than the 140-name ones.
+            Four panels of exact-match rate against snap margin, one per palette size and eval set. In every panel the observed rate climbs steadily from about 0.4 at the tightest margins to near 1 at the widest, and a line for the resolution-limited reference guesser runs through the observed points. A faint histogram along the bottom shows most prompts have small margins, and the 250-name panels are shifted further toward the tight end than the 140-name ones.
         """,
         caption="""
-            Exact match against the snap margin (the distance from the exact mix
-            to the runner-up name, minus the distance to the correct one, in
-            unit-cube units). Points are the observed rate in each margin bin,
-            pooled over three seeds, with binomial standard errors; the line is
-            the resolution-limited reference at the $\\sigma$ fitted to that
-            overall accuracy of that panel, so its level is fitted but its slope is
-            not. The shaded profile along the bottom is the margin distribution.
+            Exact match against the snap margin (the distance from the exact mix to the runner-up name, minus the distance to the correct one, in unit-cube units). Points are the observed rate in each margin bin, pooled over three seeds, with binomial standard errors; the line is the resolution-limited reference at the $\\sigma$ fitted to that overall accuracy of that panel, so its level is fitted but its slope is not. The shaded profile along the bottom is the margin distribution.
         """,
     )
     def _plot() -> plt.Figure:

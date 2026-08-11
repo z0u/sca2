@@ -315,30 +315,10 @@ def _():
     @themed(
         name="schedules",
         alt_text="""
-            Two line charts against epoch, 0 to 100, side by side. Left: six regularizer weight curves,
-            all starting near 0.25 and descending, separating into a lower group that
-            settles near 0.003 and an upper group that settles near 0.03, with the
-            descent finishing at three different epochs. A seventh
-            curve starts lower, near 0.14, crosses the others around epoch 25, and
-            joins the lower group.
-            Right: the same weight schedule, but with the dose shown as shaded areas.
-            Two humps that rise from zero, peak in the first third of training and
-            decay to zero by about epoch 80.
-            The two crescents where they differ are hatched — grey where the dose arm falls short early, purple
-            where it runs higher late. The two crescents are about the same size.
-            Faint reference curves show the anchor weight in both panels, and the
-            unscaled late schedule on the right.
+            Two line charts against epoch, 0 to 100, side by side. Left: six regularizer weight curves, all starting near 0.25 and descending, separating into a lower group that settles near 0.003 and an upper group that settles near 0.03, with the descent finishing at three different epochs. A seventh curve starts lower, near 0.14, crosses the others around epoch 25, and joins the lower group. Right: the same weight schedule, but with the dose shown as shaded areas. Two humps that rise from zero, peak in the first third of training and decay to zero by about epoch 80. The two crescents where they differ are hatched — grey where the dose arm falls short early, purple where it runs higher late. The two crescents are about the same size. Faint reference curves show the anchor weight in both panels, and the unscaled late schedule on the right.
         """,
         caption=r"""
-            **The schedules under test.** **Left:** anti-subspace weight
-            $\lambda_{\bar{\mathrm{s}}}$ over training, for the six factorial conditions and the dose arm.
-            **Right:** the dose itself, as its integrand
-            $\lambda_{\bar{\mathrm{s}}}\cdot$lr, so area on the page
-            is repulsion delivered. Hatching shows where the dose arm
-            falls short of the reference early and where it makes that back late.
-            Ghost ink in both panels: the anchor weight $\lambda_\mathrm{a}$; on
-            the right, also `end90-hold03`, the schedule the arm was scaled down
-            from.
+            **The schedules under test.** **Left:** anti-subspace weight $\lambda_{\bar{\mathrm{s}}}$ over training, for the six factorial conditions and the dose arm. **Right:** the dose itself, as its integrand $\lambda_{\bar{\mathrm{s}}}\cdot$lr, so area on the page is repulsion delivered. Hatching shows where the dose arm falls short of the reference early and where it makes that back late. Ghost ink in both panels: the anchor weight $\lambda_\mathrm{a}$; on the right, also `end90-hold03`, the schedule the arm was scaled down from.
         """,
     )
     def _plot():
@@ -797,8 +777,7 @@ def _(alpha_bar, m_op1):
     </table></div>
     """
     _caption = f"""
-    The two conditions this grid shares with ex-2.1.7, against that report's published
-    seed means. <code>end50-hold03</code> repeats its <code>span-anti</code> and
+    The two conditions this grid shares with ex-2.1.7, against that report's published seed means. <code>end50-hold03</code> repeats its <code>span-anti</code> and
     <code>end90-hold03</code> its <code>span-anti-late</code>. The margin
     tolerance is the carried seed-mean noise floor, {ex.NOISE_SEED_MEAN:g}; the
     ᾱ tolerance is two seed-mean spreads from this experiment's own seeds, in
@@ -855,11 +834,7 @@ def _(CONDS: list[str], CONTROL_ACC, TASK_CLEAN, acc):
     </table></div>
     """
     _caption = f"""
-    Behavior by condition. Each cell is the seed mean, with half the seed range
-    beside it. EM is exact match on the answer token, NLL its surprise in nats,
-    and <code>open</code> dist the RGB distance from the guessed color to the
-    true mix on pairs with no named answer. Δ holdout EM is the signed gap to
-    the in-experiment control, which the H1 gate scores at {ex.TASK_GATE:g}.
+    Behavior by condition. Each cell is the seed mean, with half the seed range beside it. EM is exact match on the answer token, NLL its surprise in nats, and <code>open</code> dist the RGB distance from the guessed color to the true mix on pairs with no named answer. Δ holdout EM is the signed gap to the in-experiment control, which the H1 gate scores at {ex.TASK_GATE:g}.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -931,13 +906,7 @@ def _(BY_NAME, MEETS, alpha_bar, grading, h2_conditions, m_op1, retention):
     </table></div>
     """
     _caption = f"""
-    The H2 scoring table, one row per factorial condition. <strong>Bold</strong>
-    marks a value that passes its gate: ᾱ ≤ {ex.MEAN_ALIGN_GATE:g},
-    m<sub>op1</sub> ≥ {ex.MARGIN_GATE:g}, ρ ≥ {ex.GRADE_RHO_GATE:g} or R² ≥
-    {ex.GRADE_R2_GATE:g}, retention ≥ {ex.H4_RETENTION:g}. ᾱ and m<sub>op1</sub>
-    carry the seed standard deviation; grading is read off the seed-mean
-    response, and retention is the minimum across seeds. The last column names
-    every criterion a condition misses, or reports that it meets all four.
+    The H2 scoring table, one row per factorial condition. <strong>Bold</strong> marks a value that passes its gate: ᾱ ≤ {ex.MEAN_ALIGN_GATE:g}, m<sub>op1</sub> ≥ {ex.MARGIN_GATE:g}, ρ ≥ {ex.GRADE_RHO_GATE:g} or R² ≥ {ex.GRADE_R2_GATE:g}, retention ≥ {ex.H4_RETENTION:g}. ᾱ and m<sub>op1</sub> carry the seed standard deviation; grading is read off the seed-mean response, and retention is the minimum across seeds. The last column names every criterion a condition misses, or reports that it meets all four.
     <code>end50-hold03</code> and <code>end90-hold03</code> are ex-2.1.7's
     <code>span-anti</code> and <code>span-anti-late</code>.
     """
@@ -1008,32 +977,10 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, traj):
     @themed(
         name="trajectories",
         alt_text="""
-            Six pairs of panels in a three-by-two grid, sharing the epoch axis from 0 to 100.
-            Columns are anneal endpoints 50, 70 and 90; the upper row of pairs is hold
-            ratio 0.03 and the lower is 0.30. In each pair the upper panel plots mean
-            alignment as a solid line and margin as a dashed line, over a flat grey
-            control pair near zero; the shorter log-scale panel beneath plots that
-            condition's two weight schedules, anchor in red and repulsion in blue.
-            In the upper row of pairs, the solid line stays low while the blue
-            repulsion curve is above the red anchor curve, then climbs steeply once the
-            blue curve drops below it — later in each successive column, and reaching a
-            lower final height. In the lower row the blue curve settles only a little
-            below the red one rather than far below it, and the solid line rises
-            gently in all three columns without ever climbing steeply. The dashed
-            margin line climbs early and stays up in every panel.
+            Six pairs of panels in a three-by-two grid, sharing the epoch axis from 0 to 100. Columns are anneal endpoints 50, 70 and 90; the upper row of pairs is hold ratio 0.03 and the lower is 0.30. In each pair the upper panel plots mean alignment as a solid line and margin as a dashed line, over a flat grey control pair near zero; the shorter log-scale panel beneath plots that condition's two weight schedules, anchor in red and repulsion in blue. In the upper row of pairs, the solid line stays low while the blue repulsion curve is above the red anchor curve, then climbs steeply once the blue curve drops below it — later in each successive column, and reaching a lower final height. In the lower row the blue curve settles only a little below the red one rather than far below it, and the solid line rises gently in all three columns without ever climbing steeply. The dashed margin line climbs early and stays up in every panel.
         """,
         caption=r"""
-            **Training dynamics across the grid.** Columns are the anneal
-            endpoint, rows the hold ratio. Above each pair: seed means of the
-            two cosines on the anchor axis, on one shared scale. Solid is
-            $\bar\alpha$, the mean alignment over all 216 colors at op1; dashed
-            is the margin $m_{\text{op1}}$; the grey pair is the un-anchored
-            control. The caret on the left spine is the containment gate, the
-            one on the right the margin floor that retention is scored from.
-            Below each: the weight schedule that condition trained under, anchor
-            $\lambda_\mathrm{a}$ in red and repulsion
-            $\lambda_{\bar{\mathrm{s}}}$ in blue, on a log scale shared by all
-            six so schedules compare across the grid as well as down a pair.
+            **Training dynamics across the grid.** Columns are the anneal endpoint, rows the hold ratio. Above each pair: seed means of the two cosines on the anchor axis, on one shared scale. Solid is $\bar\alpha$, the mean alignment over all 216 colors at op1; dashed is the margin $m_{\text{op1}}$; the grey pair is the un-anchored control. The caret on the left spine is the containment gate, the one on the right the margin floor that retention is scored from. Below each: the weight schedule that condition trained under, anchor $\lambda_\mathrm{a}$ in red and repulsion $\lambda_{\bar{\mathrm{s}}}$ in blue, on a log scale shared by all six so schedules compare across the grid as well as down a pair.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1154,10 +1101,7 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, alpha_bar, traj):
     </table></div>
     """
     _caption = """
-    Two epochs read off each condition. Crossing is the first epoch at which the
-    repulsion falls below the pull, computed from the schedules. Departure is
-    the last epoch at which ᾱ is still within 0.05 of the control, read off the
-    recorded trajectory. Runway is the training left after departure.
+    Two epochs read off each condition. Crossing is the first epoch at which the repulsion falls below the pull, computed from the schedules. Departure is the last epoch at which ᾱ is still within 0.05 of the control, read off the recorded trajectory. Runway is the training left after departure.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -1214,9 +1158,7 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, m_op1):
     </table></div>
     """
     _caption = """
-    The factorial, as condition means on both statistics. Above: ᾱ, which H3 is
-    scored on. Below: the margin, repeated because a factor that contains the
-    drift while losing the margin does not give an operating point.
+    The factorial, as condition means on both statistics. Above: ᾱ, which H3 is scored on. Below: the margin, repeated because a factor that contains the drift while losing the margin does not give an operating point.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -1338,14 +1280,7 @@ def _(CONDS: list[str], cells, geometry):
     </table></div>
     """
     _caption = f"""
-    Where redness is readable at op1, and what the color cloud looks like there.
-    On-axis R² is redness read from the anchor coordinate alone, averaged over
-    layers. The two off-axis columns are the ridge probe on the other 63
-    directions, at the token embedding and at the last layer, and the next
-    column is the last-layer value against the RGB floor of {_floor:.3f}. Cube
-    spread is the mean squared distance of the 216 op1 states from their
-    centroid at the last layer: how much extent the cloud keeps. All are seed
-    means, and none is scored.
+    Where redness is readable at op1, and what the color cloud looks like there. On-axis R² is redness read from the anchor coordinate alone, averaged over layers. The two off-axis columns are the ridge probe on the other 63 directions, at the token embedding and at the last layer, and the next column is the last-layer value against the RGB floor of {_floor:.3f}. Cube spread is the mean squared distance of the 216 op1 states from their centroid at the last layer: how much extent the cloud keeps. All are seed means, and none is scored.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return
@@ -1430,31 +1365,10 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, alpha_map, grading, m_op1):
     @themed(
         name="grading",
         alt_text="""
-            Six panels in a three-by-two grid sharing both axes: per-color alignment at
-            the first operand, from about -0.1 to 1, against the redness of that color,
-            from 0 to 1. Columns are anneal endpoints 50, 70 and 90; the upper row is
-            hold ratio 0.03 and the lower 0.30. Each panel scatters 216 marks drawn in
-            the color each stands for, with a heavy sliding-mean line through them, a
-            flat grey control band near zero, and a dashed straight reference line.
-            In every panel the marks form a dense flat cluster of greys, greens and
-            blues at low redness, then a sparse rising tail of oranges and reds. The
-            flat cluster sits higher in the upper row than the lower. The sliding mean
-            is close to flat across the left two-thirds of every panel and rises
-            steeply only in the right third, staying below the dashed line at low
-            redness and crossing it near the top.
+            Six panels in a three-by-two grid sharing both axes: per-color alignment at the first operand, from about -0.1 to 1, against the redness of that color, from 0 to 1. Columns are anneal endpoints 50, 70 and 90; the upper row is hold ratio 0.03 and the lower 0.30. Each panel scatters 216 marks drawn in the color each stands for, with a heavy sliding-mean line through them, a flat grey control band near zero, and a dashed straight reference line. In every panel the marks form a dense flat cluster of greys, greens and blues at low redness, then a sparse rising tail of oranges and reds. The flat cluster sits higher in the upper row than the lower. The sliding mean is close to flat across the left two-thirds of every panel and rises steeply only in the right third, staying below the dashed line at low redness and crossing it near the top.
         """,
         caption=r"""
-            **Alignment at op1, per color.** $\alpha_c$, the layer mean of
-            $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the
-            redness of the color. Columns are the anneal endpoint, rows the hold
-            ratio, as in the trajectory figure. One mark per color, drawn in that
-            color; the heavy line is a 25-color sliding mean over the redness
-            ordering, and the flat grey band is the same sliding mean for the
-            un-anchored control. The dashed line is `sim¹·⁵` rescaled onto the
-            response by least squares — the shape the $R^2$ track scores
-            against, so the marks' distance from it is what that statistic
-            measures. Per-panel statistics: both grading gates sit at 0.8, and
-            a pure step response can reach at most ρ = 0.75 or $R^2$ = 0.73.
+            **Alignment at op1, per color.** $\alpha_c$, the layer mean of $\cos(h, \hat v_{\text{red}})$ averaged over seeds, against the redness of the color. Columns are the anneal endpoint, rows the hold ratio, as in the trajectory figure. One mark per color, drawn in that color; the heavy line is a 25-color sliding mean over the redness ordering, and the flat grey band is the same sliding mean for the un-anchored control. The dashed line is `sim¹·⁵` rescaled onto the response by least squares — the shape the $R^2$ track scores against, so the marks' distance from it is what that statistic measures. Per-panel statistics: both grading gates sit at 0.8, and a pure step response can reach at most ρ = 0.75 or $R^2$ = 0.73.
         """,
     )
     def _plot() -> plt.Figure:
@@ -1539,9 +1453,7 @@ def _(alpha_map):
     </table></div>
     """
     _caption = f"""
-    Spearman ρ against <code>redness</code>, computed over all 216 colors and
-    then over the colors above each redness cut, with the number of colors
-    remaining in each header. The gate is {ex.GRADE_RHO_GATE:g}.
+    Spearman ρ against <code>redness</code>, computed over all 216 colors and then over the colors above each redness cut, with the number of colors remaining in each header. The gate is {ex.GRADE_RHO_GATE:g}.
     """
     mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
     return

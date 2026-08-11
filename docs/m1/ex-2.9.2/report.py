@@ -145,14 +145,7 @@ def _(stat):
     @themed(
         name="scores",
         alt_text=f"""
-        Strip plot of selectivity scores (R squared) for ten conditions: five interventions,
-        each under base and fallback training, with about 32 dots per condition.
-        Base plus zero, the status quo, has a median of {_med[("base", "zero")]:.2f}, with dots
-        scattered down to {_scores[("base", "zero")].min():.2f}. The oa condition sits lower
-        (median {_med[("base", "oa")]:.2f} under base training). Reflect and redirect under
-        fallback training form the tightest, highest clusters, with medians of
-        {_med[("fallback", "reflect")]:.2f} and {_med[("fallback", "redirect")]:.2f} and
-        no dot below {min(_scores[("fallback", "reflect")].min(), _scores[("fallback", "redirect")].min()):.2f}.
+        Strip plot of selectivity scores (R squared) for ten conditions: five interventions, each under base and fallback training, with about 32 dots per condition. Base plus zero, the status quo, has a median of {_med[("base", "zero")]:.2f}, with dots scattered down to {_scores[("base", "zero")].min():.2f}. The oa condition sits lower (median {_med[("base", "oa")]:.2f} under base training). Reflect and redirect under fallback training form the tightest, highest clusters, with medians of {_med[("fallback", "reflect")]:.2f} and {_med[("fallback", "redirect")]:.2f} and no dot below {min(_scores[("fallback", "reflect")].min(), _scores[("fallback", "redirect")].min()):.2f}.
         """,
     )
     def _plot() -> plt.Figure:
@@ -214,13 +207,7 @@ def _(stat):
     @themed(
         name="red-damage",
         alt_text=f"""
-        Strip plot of reconstruction error for pure red after intervention, across four conditions,
-        with dashed reference lines at one quarter (the gray-fallback bound) and one third
-        (the value expected for a random on-manifold direction). Base plus zero scatters widely, from
-        {_vals[("base", "zero")].min():.2f} to {_vals[("base", "zero")].max():.2f}; base plus
-        reflect scatters even wider and higher. Fallback plus reflect collapses to a tight
-        cluster on the one-quarter line (spread {_vals[("fallback", "reflect")].std():.3f});
-        fallback plus redirect clusters almost as tightly just below it.
+        Strip plot of reconstruction error for pure red after intervention, across four conditions, with dashed reference lines at one quarter (the gray-fallback bound) and one third (the value expected for a random on-manifold direction). Base plus zero scatters widely, from {_vals[("base", "zero")].min():.2f} to {_vals[("base", "zero")].max():.2f}; base plus reflect scatters even wider and higher. Fallback plus reflect collapses to a tight cluster on the one-quarter line (spread {_vals[("fallback", "reflect")].std():.3f}); fallback plus redirect clusters almost as tightly just below it.
         """,
     )
     def _plot() -> plt.Figure:
@@ -279,14 +266,7 @@ def _(exemplars):
     @themed(
         name="error-vs-similarity",
         alt_text=f"""
-        Two scatter plots of post-intervention reconstruction error against cubed HSV similarity
-        to red, one point per grid color, each drawn in its own color. On the left, the median seed
-        of the base variant under zero ablation (R squared {_r2[("base", "zero")]:.2f}): error rises
-        with similarity and tops out wherever redistribution happened to put red for this seed,
-        here about {float(_panels[0][2]["mse_zero"].max()):.2f}. On the right, the median seed of
-        the fallback variant under redirect (R squared {_r2[("fallback", "redirect")]:.2f}): points rise
-        from gray colors at zero error up to red points clustered together at about
-        {float(_panels[1][2]["mse_redirect"].max()):.2f}.
+        Two scatter plots of post-intervention reconstruction error against cubed HSV similarity to red, one point per grid color, each drawn in its own color. On the left, the median seed of the base variant under zero ablation (R squared {_r2[("base", "zero")]:.2f}): error rises with similarity and tops out wherever redistribution happened to put red for this seed, here about {float(_panels[0][2]["mse_zero"].max()):.2f}. On the right, the median seed of the fallback variant under redirect (R squared {_r2[("fallback", "redirect")]:.2f}): points rise from gray colors at zero error up to red points clustered together at about {float(_panels[1][2]["mse_redirect"].max()):.2f}.
         """,
     )
     def _plot() -> plt.Figure:
@@ -311,13 +291,7 @@ def _(exemplars):
     @themed(
         name="latents",
         alt_text="""
-        Three disc-shaped scatter plots of bottleneck latents, one point per grid color, each
-        drawn in its own color, inside a circle marking the unit hypersphere bound. The anchored
-        axis points up, labeled (1, 0, 0, 0, 0); the fallback direction points down, labeled
-        minus e0. On the left, baseline: blues, greens, and grays hug the horizontal diameter and reds
-        reach the top of the circle. In the middle, reflected: the arrangement is mirrored, reds now at
-        the bottom of the circle on the fallback direction. On the right, redirected: non-red colors
-        stay near the horizontal diameter while reds sit at the bottom.
+        Three disc-shaped scatter plots of bottleneck latents, one point per grid color, each drawn in its own color, inside a circle marking the unit hypersphere bound. The anchored axis points up, labeled (1, 0, 0, 0, 0); the fallback direction points down, labeled minus e0. On the left, baseline: blues, greens, and grays hug the horizontal diameter and reds reach the top of the circle. In the middle, reflected: the arrangement is mirrored, reds now at the bottom of the circle on the fallback direction. On the right, redirected: non-red colors stay near the horizontal diameter while reds sit at the bottom.
         """,
     )
     def _plot() -> plt.Figure:

@@ -130,18 +130,7 @@ def _(cond, steps, traj):
     @themed(
         name="nofb-trajectories",
         alt_text=f"""
-        Four charts in a two-by-two grid. Rows are the static schedule and the controller,
-        both without the fallback term; columns are anchor progress and leakage, 32 seeds
-        each, with catastrophic runs drawn in color over gray healthy ones. Top left, static
-        anchor progress: all runs reach 1 by step 750; of the {_ncat["static-nofb"]} colored
-        runs, one falls away late to about 0.6 while the other keeps its anchor, failing
-        instead by reconstruction collapse. Top right, static leak: the colored runs climb to
-        {max(r["leak"] for r in cond("static-nofb")):.2f}. Bottom left, controller anchor
-        progress: colored runs dip sharply in the middle of the plateau, one to about minus
-        0.25, and the feedback pulls most of them back to 1; one ends near 0.15, not
-        recovered. Bottom right, controller leak: {_ncat["ctrl-nofb"]} colored runs blow up,
-        the worst reaching {max(r["leak"] for r in cond("ctrl-nofb")):.2f}, from
-        over-anchoring under a sustained maximum penalty.
+        Four charts in a two-by-two grid. Rows are the static schedule and the controller, both without the fallback term; columns are anchor progress and leakage, 32 seeds each, with catastrophic runs drawn in color over gray healthy ones. Top left, static anchor progress: all runs reach 1 by step 750; of the {_ncat["static-nofb"]} colored runs, one falls away late to about 0.6 while the other keeps its anchor, failing instead by reconstruction collapse. Top right, static leak: the colored runs climb to {max(r["leak"] for r in cond("static-nofb")):.2f}. Bottom left, controller anchor progress: colored runs dip sharply in the middle of the plateau, one to about minus 0.25, and the feedback pulls most of them back to 1; one ends near 0.15, not recovered. Bottom right, controller leak: {_ncat["ctrl-nofb"]} colored runs blow up, the worst reaching {max(r["leak"] for r in cond("ctrl-nofb")):.2f}, from over-anchoring under a sustained maximum penalty.
         """,
     )
     def _plot() -> plt.Figure:
@@ -224,16 +213,7 @@ def _(cond, n_cat, rd):
     @themed(
         name="fallback-cells",
         alt_text=f"""
-        Two stacked strip plots over eight fallback-trained conditions: the static schedule
-        and the controller at peak LR 0.10 and 0.05, then four controller variants at 0.10
-        with shifted targets (×0.75, ×1.5) and gains (×0.5, ×2). Top: redirect scores, with
-        medians all between {min(np.median(v) for v in _scores.values()):.2f} and
-        {max(np.median(v) for v in _scores.values()):.2f} and a few scattered outliers below
-        0.5. Bottom: final leakage on a log scale, with a dashed line at the 0.1 degraded
-        threshold and a dotted line at the 0.3 catastrophic threshold; the number of
-        catastrophic runs is printed under each condition. The τ×0.75, η×0.5, and η×2 variants
-        show {_ncats["ctrl\nτ×0.75"]}, {_ncats["ctrl\nη×0.5"]}, and {_ncats["ctrl\nη×2"]}
-        catastrophic runs with leak reaching 0.4 to 0.8; every static condition shows zero.
+        Two stacked strip plots over eight fallback-trained conditions: the static schedule and the controller at peak LR 0.10 and 0.05, then four controller variants at 0.10 with shifted targets (×0.75, ×1.5) and gains (×0.5, ×2). Top: redirect scores, with medians all between {min(np.median(v) for v in _scores.values()):.2f} and {max(np.median(v) for v in _scores.values()):.2f} and a few scattered outliers below 0.5. Bottom: final leakage on a log scale, with a dashed line at the 0.1 degraded threshold and a dotted line at the 0.3 catastrophic threshold; the number of catastrophic runs is printed under each condition. The τ×0.75, η×0.5, and η×2 variants show {_ncats["ctrl\nτ×0.75"]}, {_ncats["ctrl\nη×0.5"]}, and {_ncats["ctrl\nη×2"]} catastrophic runs with leak reaching 0.4 to 0.8; every static condition shows zero.
         """,
     )
     def _plot() -> plt.Figure:

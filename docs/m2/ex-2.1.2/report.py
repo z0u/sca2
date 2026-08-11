@@ -233,19 +233,10 @@ def _(metrics):
     @themed(
         name="accuracy-factorial",
         alt_text="""
-            Seven bar-and-dot panels of completion accuracy (0 to 1) against condition
-            (control, rev, open, both), one panel per eval set: named seen, named holdout,
-            hex unseen, cross unseen, open seen, open holdout, and reverse alias. Bars show
-            the mean over three seeds, dots the individual seeds.
+            Seven bar-and-dot panels of completion accuracy (0 to 1) against condition (control, rev, open, both), one panel per eval set: named seen, named holdout, hex unseen, cross unseen, open seen, open holdout, and reverse alias. Bars show the mean over three seeds, dots the individual seeds.
         """,
         caption="""
-            Each panel is one eval set: the bar is the mean over three seeds and the dots
-            are the individual seeds. `named_holdout` is the set H1 is about; `open_holdout`
-            asks whether the forced computation carries over to off-palette pairs never seen
-            in training; `alias_rev` checks the reverse-alias supervision. In `control` and
-            `rev`, the open-form sets ask for a surface form those corpora never train on (a
-            name + name prompt), so a low score there means the grammar is simply missing
-            from that corpus, rather than a genuine attempt that fell short.
+            Each panel is one eval set: the bar is the mean over three seeds and the dots are the individual seeds. `named_holdout` is the set H1 is about; `open_holdout` asks whether the forced computation carries over to off-palette pairs never seen in training; `alias_rev` checks the reverse-alias supervision. In `control` and `rev`, the open-form sets ask for a surface form those corpora never train on (a name + name prompt), so a low score there means the grammar is simply missing from that corpus, rather than a genuine attempt that fell short.
         """,
     )
     def _plot() -> plt.Figure:
@@ -421,17 +412,10 @@ def _(holdout_exs, m_hold, m_seen):
     @themed(
         name="margin-trajectories",
         alt_text="""
-            Line chart of the answer margin (log-probability of the true name minus the best
-            competitor) against condition (control, rev, open, both), one line per held-out
-            named pair, averaged over seeds. A horizontal line marks zero, where the true
-            answer starts to come out ahead; a shaded band shows the range of margins on the seen named
-            pairs.
+            Line chart of the answer margin (log-probability of the true name minus the best competitor) against condition (control, rev, open, both), one line per held-out named pair, averaged over seeds. A horizontal line marks zero, where the true answer starts to come out ahead; a shaded band shows the range of margins on the seen named pairs.
         """,
         caption="""
-            Margins between predicted and true named colors. Positive means the true name comes out
-            ahead of the other names, and the magnitude says by how much. One line per
-            held-out pair, averaged over seeds and traced across the four conditions; the
-            shaded band is the range of `named_seen` margins, for reference.
+            Margins between predicted and true named colors. Positive means the true name comes out ahead of the other names, and the magnitude says by how much. One line per held-out pair, averaged over seeds and traced across the four conditions; the shaded band is the range of `named_seen` margins, for reference.
         """,
     )
     def _plot() -> plt.Figure:
@@ -516,20 +500,10 @@ def _(sched_offsets, sched_r2):
     @themed(
         name="answer-schedule",
         alt_text="""
-            Line charts of probe R-squared against position offset around the answer, one
-            panel per residual-stream depth, three lines per panel for the R, G, and B
-            channels of the result. Lines are solid before the digit of each channel enters the
-            context and dotted after. In the deeper layers each channel peaks near 1 at its
-            own emission position and falls away on either side, so the three channels form a
-            sequence of staggered peaks rather than a cumulative plateau; at depth 0 the
-            dotted segments jump to 1 as each digit becomes readable from the context.
+            Line charts of probe R-squared against position offset around the answer, one panel per residual-stream depth, three lines per panel for the R, G, and B channels of the result. Lines are solid before the digit of each channel enters the context and dotted after. In the deeper layers each channel peaks near 1 at its own emission position and falls away on either side, so the three channels form a sequence of staggered peaks rather than a cumulative plateau; at depth 0 the dotted segments jump to 1 as each digit becomes readable from the context.
         """,
         caption="""
-            Probe alignment per color channel of the answer.
-            One panel per transformer layer. Offset 0 is the `#`, digit k sits at offset k + 1 and is
-            emitted from offset k. A line is solid where its digit is not yet in the context
-            (so decoding it is computation) and dotted once it has landed (decoding is
-            copying).
+            Probe alignment per color channel of the answer. One panel per transformer layer. Offset 0 is the `#`, digit k sits at offset k + 1 and is emitted from offset k. A line is solid where its digit is not yet in the context (so decoding it is computation) and dotted once it has landed (decoding is copying).
         """,
     )
     def _plot() -> plt.Figure:
@@ -581,16 +555,10 @@ def _(metrics):
     @themed(
         name="transfer-probe",
         alt_text="""
-            Four line charts of probe R-squared against residual-stream depth, one panel per
-            prompt set: the held-back half of the fit set, open holdout, named seen, and named
-            holdout. One line per condition (control, rev, open, both; darker means richer
-            corpus). The probes were fit on open-pair prompts at the pre-answer position.
+            Four line charts of probe R-squared against residual-stream depth, one panel per prompt set: the held-back half of the fit set, open holdout, named seen, and named holdout. One line per condition (control, rev, open, both; darker means richer corpus). The probes were fit on open-pair prompts at the pre-answer position.
         """,
         caption="""
-            One panel per scored set: the held-back half of the fit set, open holdout, named seen,
-            and named holdout. R² against residual depth, one line per condition (darker means
-            a richer corpus). Depth 0 is left out, since the pre-answer embedding is constant
-            across prompts until attention runs.
+            One panel per scored set: the held-back half of the fit set, open holdout, named seen, and named holdout. R² against residual depth, one line per condition (darker means a richer corpus). Depth 0 is left out, since the pre-answer embedding is constant across prompts until attention runs.
         """,
     )
     def _plot() -> plt.Figure:
@@ -701,9 +669,7 @@ def _(gp_idx, holdout_exs, metrics):
     _html = figure_html(
         "".join(_one(cond, row) for cond, row in _rows_by_cond),
         aria_label="""
-            The equation lime plus black equals green, repeated once per condition, each with a
-            sparkline of per-character surprisal (solid) and predictive entropy (dashed) under
-            the text on a shared 0-to-log-V scale.
+            The equation lime plus black equals green, repeated once per condition, each with a sparkline of per-character surprisal (solid) and predictive entropy (dashed) under the text on a shared 0-to-log-V scale.
         """,
     )
     mo.Html(externalize_html(_html, name="sublines-garden-path"))

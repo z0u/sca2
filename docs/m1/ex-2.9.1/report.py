@@ -115,10 +115,7 @@ def _():
     @themed(
         name="schedule",
         alt_text="""
-            Two stacked line charts of hyperparameter values against training step. Top: the four
-            regularizer weights — anti-subspace starts high at 0.25 and eases down; anchor and
-            anti-anchor ramp up over the first 250 steps; all four reach zero by step 1425. Bottom:
-            the learning rate ramps from near zero to 0.1 by step 750, holds, then anneals to 0.05.
+            Two stacked line charts of hyperparameter values against training step. Top: the four regularizer weights — anti-subspace starts high at 0.25 and eases down; anchor and anti-anchor ramp up over the first 250 steps; all four reach zero by step 1425. Bottom: the learning rate ramps from near zero to 0.1 by step 750, holds, then anneals to 0.05.
         """,
     )
     def _plot() -> plt.Figure:
@@ -154,8 +151,7 @@ def _(best, metrics):
     @themed(
         name="scores",
         alt_text="""
-            Dot plot of ablation score by seed for 16 runs. Most seeds score between 0.7 and 1.0,
-            a few fall lower, and the best seed is circled at the top of the range.
+            Dot plot of ablation score by seed for 16 runs. Most seeds score between 0.7 and 1.0, a few fall lower, and the best seed is circled at the top of the range.
         """,
     )
     def _plot() -> plt.Figure:
@@ -189,10 +185,7 @@ def _(best, best_eval):
     @themed(
         name="error-vs-similarity",
         alt_text="""
-            Scatter plot of post-ablation reconstruction error against cubed HSV similarity to red,
-            one point per grid color, each drawn in its own color. Points fall close to a straight
-            line from the origin: gray, blue, and green points cluster at zero error, while red and
-            red-adjacent points climb to the highest errors.
+            Scatter plot of post-ablation reconstruction error against cubed HSV similarity to red, one point per grid color, each drawn in its own color. Points fall close to a straight line from the origin: gray, blue, and green points cluster at zero error, while red and red-adjacent points climb to the highest errors.
         """,
     )
     def _plot() -> plt.Figure:
@@ -235,12 +228,7 @@ def _(best_eval):
     @themed(
         name="latents",
         alt_text="""
-            Two disc-shaped scatter plots of bottleneck latents, one point per grid color, each drawn
-            in its own color, inside a circle marking the unit hypersphere bound. The anchored axis
-            points up, labeled (1, 0, 0, 0, 0). Left, baseline: blues, greens, and grays hug the
-            horizontal diameter, warm colors spread upward, and pure reds reach the top of the circle.
-            Right, ablated: every point sits exactly on the horizontal diameter, the reds folded in
-            among the other colors.
+            Two disc-shaped scatter plots of bottleneck latents, one point per grid color, each drawn in its own color, inside a circle marking the unit hypersphere bound. The anchored axis points up, labeled (1, 0, 0, 0, 0). Left, baseline: blues, greens, and grays hug the horizontal diameter, warm colors spread upward, and pure reds reach the top of the circle. Right, ablated: every point sits exactly on the horizontal diameter, the reds folded in among the other colors.
         """,
     )
     def _plot() -> plt.Figure:
