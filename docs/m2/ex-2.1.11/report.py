@@ -88,7 +88,17 @@ def _():
     mo.md(r"""
     ## Observations
 
-    *Empty until results land. Every line will report its noise floor alongside the number, and one line will give the proposed operating point.*
+    **The reference recipe reproduces.** `ref` re-runs the primary condition of ex-2.1.10 through the code path of this experiment. It lands within one per-run standard deviation on every statistic: m_line 0.4204 against 0.4202 (σ 0.0088), group contrast 0.8562 against 0.8542 (σ 0.0057), holdout exact match 0.9961 against 0.9948 (σ 0.0087).
+
+    **The anchor schedule can go.** `flat-anchor` stays within band on all five decision statistics, and no run latches (m_line +0.0039, band 0.0144). Rule 1: the survey runs a flat anchor weight.
+
+    **The anti-subspace schedule cannot.** Both flat brackets come out worse. `anti-hold` loses the group contrast (−0.4667, band 0.0093), grading (−0.2199, band 0.0392), and containment (+0.1275, band 0.0346), and two of its three runs latch onto `+`. `anti-peak` keeps containment and contrast, but loses grading (−0.1283) and m_line (−0.0282, band 0.0144). Rule 2: the survey searches the schedule family, branch A.
+
+    **Half the training is enough.** `short` stays within band on every statistic (m_line +0.0014), and costs 0.0013 on the task against its own control. Rule 4: every survey trial runs 50 epochs.
+
+    **Nothing resolves on the interpolation shape.** `linear` stays within band throughout; its largest excursion is grading, at −0.0248 against a band of 0.0392. Rule 5: keep minimum-jerk, and the question retires.
+
+    **Proposed operating point.** *Lands when the survey has run.*
     """)
     return
 
@@ -97,7 +107,7 @@ def _():
 def _():
     mo.md(r"""
     /// admonition | How to read this draft
-    This is a survey, not a hypothesis-scoring experiment: it preregisters a *search plan* and scores nothing. The plan covers the space, the sampling rule, the objective and its constraints, the seed budget, and the decision rules that stage the work. Once agreed it is frozen (aside from immaterial edits). Results replace the `TODO` placeholders in place, and anything we think of after seeing the data goes under *Exploratory analyses*, marked as post hoc.
+    This is a survey, not a hypothesis-scoring experiment. It preregisters a *search plan* and scores nothing. The plan covers the space to search, the sampling rule, the objective and its constraints, the seed budget, and the decision rules that stage the work. Once we agree on it, it is frozen (aside from immaterial edits). Results replace the `TODO` placeholders in place, and anything we think of after seeing the data goes under *Exploratory analyses*, marked as post hoc.
 
     Nothing this report finds may be quoted as a result. It proposes an operating point. The next preregistered experiment adopts that point, re-measures it at fresh seeds, and reports the survey value next to the confirmed one. The gap between the two is the winner's-curse correction: the best point in a search looks better than it really is, because part of what put it on top was luck.
     ///
@@ -717,6 +727,9 @@ def _():
     {len(ex.ABLATION_CONDITIONS)} ablation conditions × {ex.N_SEEDS_ABLATION} seeds = {ex.N_RUNS_ABLATION} runs, then at most {ex.N_TRIALS} + {ex.N_PROMOTE} × {ex.SEEDS_PROMOTE - 1} = {ex.N_RUNS_SURVEY} survey runs. That is about {ex.N_RUNS_ABLATION + ex.N_RUNS_SURVEY} training runs in the worst case, each roughly 25 minutes of L4 time with the slim eval. Ex-2.1.10 was 24 runs, so this is about 3.5 times as many, or about twice the training time if we adopt `short` and the survey stage runs at half length. Each run is also cheaper, because the slim eval drops the readability, geometry, and leakage passes.
 
     Each stage launches with `--max-containers {ex.MAX_CONTAINERS}` and a `--budget` sized from its run count. Memoization means the promoted round re-runs only the new seeds, and `ctx.map` with `allow_partial=True` lets diverged trials land as data rather than failures.
+
+    <!-- Observed after the run, not a design change. -->
+    The 25-minute figure was inherited from ex-2.1.10, which carried a much heavier eval. The ablation stage's runs took 0.7 to 3.6 minutes of L4 time each, training and eval together, and all 27 settled in about 25 minutes of wall clock at eight containers.
     """)
     return
 
@@ -726,8 +739,54 @@ def _():
     mo.md(r"""
     ## Ablations
 
-    *Results land here; the decision each subsection feeds is fixed above.*
+    Nine conditions, three seeds each. Each subsection reads one arm against `ref` on the five decision statistics, and the rule it feeds was fixed before the run.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    _res = load_results()
+    mo.stop(_res is None, mo.md("_The ablation results aren't published yet; the stage-2 cells need them._"))
+    assert _res is not None
+    ab_metrics, ab_arrays = _res
+    ab_cells: list[dict] = ab_metrics["cells"]
+    # Re-derived from the published per-run numbers rather than read off the
+    # stored summary, so the decision in this report is the frozen rule applied
+    # to data the reader can see.
+    ab_summary = ex.ablation_summary(ab_cells)
+    ab_decision = ex.decide(ab_summary)
+    return ab_arrays, ab_cells, ab_decision, ab_summary
+
+
+@app.cell(hide_code=True)
+def _(ab_summary: dict):
+    _rows = "".join(
+        f"<tr><td><code>{name}</code></td><td class='num'>{s['n']}</td>"
+        + "".join(f"<td class='num'>{s[k]:+.4f}</td>" for k in ex.DECISION_STATS)
+        + f"<td class='num'>{s['holdout_em']:.4f}</td>"
+        + f"<td class='num'>{len(s['latched'])}</td></tr>"
+        for c in ex.ABLATION_CONDITIONS
+        if (name := c["name"]) and (s := ab_summary[name])
+    )
+    _head = "".join(
+        f"<th class='num'>{k} {'↑' if ex.STAT_DIRECTION[k] == 'up' else '↓'}</th>" for k in ex.DECISION_STATS
+    )
+    mo.Html(
+        figure_html(
+            f"""
+            <div class="report-table-scroll"><table class="report-table">
+            <thead><tr><th>condition</th><th class="num">seeds</th>{_head}
+            <th class="num">holdout EM ↑</th><th class="num">latched ↓</th></tr></thead>
+            <tbody>{_rows}</tbody>
+            </table></div>
+            """,
+            caption=mo.md("""
+            **Every arm, every decision statistic.** Seed means over three runs per condition. Arrows give the direction that counts as better; containment (`alpha_op1`) is the one that improves downward. The subsections below take the differences from `ref` and read each against its band.
+            """).text,
+            class_="report-figure",
+        )
+    )
     return
 
 
@@ -736,12 +795,81 @@ def _():
     mo.md(r"""
     ### Is the anchor schedule needed?
 
-    /// admonition | TODO
-    Table: `flat-anchor` − `ref` seed-mean differences for each decision statistic, each against its band. Then the per-run deep-slice weight profiles beside the latch table from ex-2.1.9, and the m_line trajectories of all six runs overlaid: does the margin of the flat arm arrive earlier, and does it hold?
+    No. `flat-anchor` holds λ_a at 0.1 from step 0, with no ramp, no end anneal, and no floor. It matches `ref` on every decision statistic, and no run latches. The largest excursion is grading, +0.0361 against a band of 0.0392, and it falls on the better side. Rule 1 fires: the survey runs a flat anchor weight.
 
-    If the commit-window account is right, we expect the flat arm either to latch a syntax role in at least one run or to hold a resolvably lower m_line. The dose columns tell us any such difference is about timing rather than dose. The contrary result is a flat arm within band with no latch, in which case the survey runs flat and four schedule parameters go away.
-    ///
+    We had predicted the other outcome. Ex-2.1.9 found that the pooled pull commits by epoch 8, inside the 10-epoch warmup, and the `AnchorSpec` docstring says the ramp exists so that the anchor arrives with the optimizer rather than ahead of it. Applying full weight to a still-random model looked like a way to latch a syntax role. It isn't: all six runs put 0.85–0.89 of their deep-slice weight on op1, and the flat arm reaches its margin sooner and then holds it (retention 0.9975).
+
+    The end anneal is the half we were least willing to lose, since M1/ex-2.9.3 found that withdrawing protection entirely lets the task loss reclaim the axis. Flattening does not withdraw it, because the weight stays at full strength through the last step. So that lesson is untouched here.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_summary: dict, delta_table):
+    mo.Html(
+        figure_html(
+            delta_table(ab_summary, ["flat-anchor"]),
+            caption=mo.md("""
+            **`flat-anchor` against `ref`.** Seed-mean differences, three runs a side. Bold marks a difference the band can resolve; ✓ and ✗ say which side of `ref` it landed on. The band is 2σ·√(2/3) from the nine-seed noise floors of ex-2.1.10, and the two gate rows carry absolute bars rather than bands.
+            """).text,
+            class_="report-figure",
+        )
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_cells: list[dict], traj_of):
+    _pi = {
+        c["condition"]: [
+            np.asarray(r["pi"], dtype=float)[1:].mean(axis=0) for r in ab_cells if r["condition"] == c["condition"]
+        ]
+        for c in ab_cells
+    }
+    _traj = {k: traj_of(ab_cells, k, "m_line") for k in ("ref", "flat-anchor", "lam0")}
+
+    @themed(
+        name="flat-anchor",
+        alt_text="""
+            Two panels. Left: per-line margin m_line against epoch for three reference runs, three flat-anchor runs and three un-anchored controls; the anchored curves rise over the first twenty epochs and then hold, while the controls stay near zero. Right: the deep-slice softmin weight each run puts on the four span roles, one dot per run, with a dashed line at the latch threshold of 0.5.
+        """,
+        caption=r"""
+            **What the ramp buys.** **Left:** the m_line trajectory of every run, each on its own epoch axis. It sits above the endpoint value in the tables: the trajectory measures one fixed partner line per color, where the endpoint eval averages all 27. That makes it a cheaper instrument, but a consistent one within a run, which is what retention compares. **Right:** the post-attention mean softmin weight on each span role, one mark per run. The dashed line is the latch veto at $\pi = 0.5$; a run above it on `+` or `=` has committed to a syntax role. The reference and flat arms differ only over the warmup window, so a difference here says when the pull arrives rather than how much of it arrives.
+        """,
+    )
+    def _plot():
+        grey = light_dark("#666", "#999")
+        colors = {
+            "ref": light_dark("#1f6fb4", "#5fa8dd"),
+            "flat-anchor": light_dark("#b4531f", "#dd8f5f"),
+            "lam0": grey,
+        }
+        fig, (ax_t, ax_p) = plt.subplots(1, 2, figsize=(7.2, 2.9), layout="constrained")
+        for name, runs in _traj.items():
+            for i, (e, y) in enumerate(runs):
+                ax_t.plot(e, y, color=colors[name], lw=1.0, alpha=0.8, label=name if i == 0 else None)
+        ax_t.set_xlabel("epoch", fontsize="x-small")
+        ax_t.set_ylabel("m_line (trajectory probe)", fontsize="x-small")
+        ax_t.legend(fontsize="x-small", frameon=False, loc="center right")
+        for name in ("ref", "flat-anchor"):
+            for i, p in enumerate(_pi.get(name, [])):
+                ax_p.scatter(
+                    np.arange(ex.SPAN) + (0.12 if name == "flat-anchor" else -0.12),
+                    p,
+                    s=22,
+                    color=colors[name],
+                    alpha=0.8,
+                    lw=0,
+                    label=name if i == 0 else None,
+                )
+        ax_p.axhline(ex.LATCH_PI, color=grey, ls=(0, (4, 3)), lw=0.8)
+        ax_p.set_xticks(range(ex.SPAN), ex.ROLES)
+        ax_p.set_ylim(0, 1)
+        ax_p.set_ylabel("deep-slice weight", fontsize="x-small")
+        ax_p.legend(fontsize="x-small", frameon=False, loc="upper right")
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -750,14 +878,33 @@ def _():
     mo.md(r"""
     ### Does the anti-subspace schedule beat a constant?
 
-    /// admonition | TODO
-    Table: `anti-hold` and `anti-peak` against `ref`, same statistics, same bands, with the delivered dose and centroid of each arm restated from the conditions table.
+    It comes out ahead of both constants, and at each end for a different reason.
 
-    The mechanism proposed in ex-2.1.8 is that early repulsion pushes the syntax roles out of reach before the pull commits. Under that account we expect `anti-hold` to lose containment or contrast, and `anti-peak` to hold the statistics but pay somewhere visible.
+    `anti-hold` holds the low ratio for all of training, which removes the early repulsion. The pull then goes where ex-2.1.8 said it would: two of three runs put more than half their deep-slice weight on `+` and trip the latch veto, and the third sits at 0.482, just under. Containment, grading, and the group contrast all come out worse, the contrast by fifty times its band.
 
-    If `anti-peak` pays nothing, the schedule was a constant in disguise and branch B runs. The other outcome worth naming is `anti-hold` within band, which would say the timing of the repulsion never mattered at this operating point, and branch B runs at the lower level.
-    ///
+    `anti-peak` holds the high ratio instead. The early repulsion does its job: op1 keeps 0.86–0.88 of the deep-slice weight, and the contrast survives at 0.839. The cost is grading, with r² falling from 0.78 to 0.65 and m_line falling with it. Repulsion that never comes down leaves the color response less graded, which is the failure the constraints exist to catch.
+
+    So both ends of the schedule do real work. The peak keeps the pull off the syntax roles while the model is still random, and the anneal down to the hold ratio is what leaves the response graded once it has committed. Rule 2 sends the survey to branch A, the schedule family, with the hold ratio fixed and the peak and the anneal endpoint sampled.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_summary: dict, delta_table):
+    _dose = {
+        "ref": ex.anchor_dose(lambda e: ex.anti_weight(e)),
+        "anti-hold": ex.anchor_dose(lambda e: ex.ANTI_HOLD_RATIO * ex.SCORING_LAMBDA * np.ones_like(e)),
+        "anti-peak": ex.anchor_dose(lambda e: ex.ANTI_PEAK_RATIO * ex.SCORING_LAMBDA * np.ones_like(e)),
+    }
+    mo.Html(
+        figure_html(
+            delta_table(ab_summary, ["anti-hold", "anti-peak"]),
+            caption=mo.md(f"""
+            **The two flat brackets against `ref`.** Read as the table above. The arms bracket the dose of the schedule rather than matching it: `anti-hold` delivers {_dose["anti-hold"] / _dose["ref"]:.2f}× and `anti-peak` {_dose["anti-peak"] / _dose["ref"]:.2f}× of what the schedule delivers. So an arm that holds every statistic while delivering a different dose tells us the dose was not the active ingredient.
+            """).text,
+            class_="report-figure",
+        )
+    )
     return
 
 
@@ -766,10 +913,27 @@ def _():
     mo.md(r"""
     ### Do the flat arms compose?
 
-    /// admonition | TODO
-    One row, read only if rules 1 and 2 both simplify: `flat-both` − `ref` for each decision statistic, compared against its band. An arm that changes one schedule at a time cannot show an interaction between the two, and flattening both is the recipe the survey would actually run. If each flat arm passes on its own but the two together fail, rule 3 keeps the anchor schedule and adopts only the flat anti-subspace term.
-    ///
+    Rule 3 does not read this arm: it is read only when rules 1 and 2 both simplify, and rule 2 did not, so nothing here changes the survey. The arm was insurance against an outcome that did not happen, and it cost three runs.
+
+    The numbers are worth a look anyway. `flat-both` fails on all five statistics, and its runs disagree about how: two put their deep-slice weight on `=` and op2, and the third on `+`. So the failure is not even stable across seeds. This is what `anti-hold` does on its own, and that is the reading to prefer, since the flat anchor contributes nothing to it. Pairing `flat-anchor` with the *scheduled* anti term is exactly the arm that passed.
+
+    Note that the recipe the survey runs is `flat-anchor`, a condition that ran here, rather than a combination no arm tested.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_decision: dict, ab_summary: dict, delta_table):
+    _read = ab_decision["flat_both_read"]
+    mo.Html(
+        figure_html(
+            delta_table(ab_summary, ["flat-both"]),
+            caption=mo.md(f"""
+            **The composition against `ref`.** Read as the tables above. Rule 3 {"reads this arm, because rules 1 and 2 both simplify" if _read is not None else "does not read this arm: rules 1 and 2 did not both simplify, so there is no composition to adopt"}; the numbers are shown either way, since a survey that publishes only the arms it acted on is not a complete map.
+            """).text,
+            class_="report-figure",
+        )
+    )
     return
 
 
@@ -778,12 +942,56 @@ def _():
     mo.md(r"""
     ### Is 100 epochs buying anything?
 
-    /// admonition | TODO
-    Table: `short` − `ref` on the decision statistics, with the task gate measured against `short-lam0`. Then the m_line and validation-loss trajectories on a shared fraction-of-training axis.
+    Nothing we can measure. `short` runs the whole recipe in 50 epochs with every keyframe scaled, and lands within band on all five statistics (m_line +0.0014 against a band of 0.0144), at a task cost of 0.0013 against its own control. On the shared clock below, the two lengths trace the same curves.
 
-    Ex-2.1.6 saw margins flat from about epoch 50 and validation loss settling earlier, so we expect `short` to land within band and the survey to cost half as much. The contrary result is a resolved gap in m_line or retention, which would mean the last 50 epochs do some consolidation the trajectory statistics haven't shown. Either way it is worth knowing before D2.2 scales anything.
-    ///
+    Ex-2.1.6 suggested as much when its margins went flat from about epoch 50. That was read off runs scored for something else; here it is measured directly. Rule 4: the survey runs at 50 epochs, halving its cost.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_summary: dict, delta_table):
+    mo.Html(
+        figure_html(
+            delta_table(ab_summary, ["short"]),
+            caption=mo.md("""
+            **`short` against `ref`.** Read as the tables above, with one difference: the task gate compares `short` against `short-lam0`, the un-anchored control at the same length, so that whatever the shorter run costs the task is not charged to the anchor.
+            """).text,
+            class_="report-figure",
+        )
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_cells: list[dict], traj_of):
+    _keys = ("m_line", "val_loss")
+    _traj = {k: {c: traj_of(ab_cells, c, k) for c in ("ref", "short")} for k in _keys}
+
+    @themed(
+        name="short",
+        alt_text="""
+            Two line charts sharing a horizontal axis of fraction of training. Left: per-line margin m_line for three hundred-epoch runs and three fifty-epoch runs; both groups rise over the first fifth of training and hold. Right: validation loss for the same runs, falling steeply and then flattening. The two lengths track each other closely on both panels.
+        """,
+        caption=r"""
+            **A hundred epochs against fifty, on a shared clock.** Both panels put fraction of training on the horizontal axis, so the two lengths run the same schedule shape and land at the same place on it. **Left:** m_line, measured with the cheaper one-partner-per-color probe, which is why it sits above the endpoint values in the tables. **Right:** validation loss. If the second half of training consolidates anything, it would show as the hundred-epoch curves pulling away over the right half of the left panel.
+        """,
+    )
+    def _plot():
+        colors = {"ref": light_dark("#1f6fb4", "#5fa8dd"), "short": light_dark("#2a9d8f", "#5fc9bd")}
+        labels = {"m_line": "m_line (trajectory probe)", "val_loss": "validation loss"}
+        fig, _axs = plt.subplots(1, 2, figsize=(7.2, 2.9), layout="constrained", sharex=True)
+        ax_m, ax_v = cast(tuple, _axs)
+        for ax, key in ((ax_m, "m_line"), (ax_v, "val_loss")):
+            for name, runs in _traj[key].items():
+                for i, (e, y) in enumerate(runs):
+                    ax.plot(e / e.max(), y, color=colors[name], lw=1.0, alpha=0.8, label=name if i == 0 else None)
+            ax.set_xlabel("fraction of training", fontsize="x-small")
+            ax.set_ylabel(labels[key], fontsize="x-small")
+        ax_m.legend(fontsize="x-small", frameon=False, loc="lower right")
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -792,9 +1000,55 @@ def _():
     mo.md(r"""
     ### Does the anneal shape matter?
 
-    /// admonition | TODO
-    One row: `linear` − `ref` per decision statistic against its band. M1 only ever compared against a stepped anneal, which needed an accommodation in the LR warmup. The linear arm has a milder discontinuity, a jump in the derivative of λ_a at each keyframe, and is the cheapest version of the question. We expect it within band, which would retire the todo item. Neither outcome changes a survey dimension.
-    ///
+    No. Straightening every ramp and anneal in both terms leaves all five statistics within band, the largest excursion being grading at −0.0248 against a band of 0.0392. Minimum-jerk stays, now on evidence rather than by inheritance from M1, and the question retires.
+
+    A straight line and a smoothstep both cover half their window, so the anchor dose barely moves. The anti-subspace ratio interpolates over 90 epochs, and over that span the two shapes differ enough to change its dose by 6%. No statistic resolved: near the operating point the repulsion is insensitive to dose changes of that size, worth holding beside the previous section, where what the flat brackets changed was mostly something other than the dose.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_summary: dict, delta_table):
+    _sched = ex.anchor_dose(lambda e: ex.anti_weight(e))
+    _lin = ex.anchor_dose(lambda e: ex.anti_weight(e, shape="linear"))
+    mo.Html(
+        figure_html(
+            delta_table(ab_summary, ["linear"]),
+            caption=mo.md(f"""
+            **`linear` against `ref`.** Read as the tables above. Straightening the ramps moves the anchor dose by under a percent, since a smoothstep and a straight line both cover half their window. It moves the anti-subspace dose by {abs(_lin - _sched) / _sched:.0%}, because that term interpolates over 90 epochs, and the two shapes differ most over the early part of that window, where the learning rate is highest.
+            """).text,
+            class_="report-figure",
+        )
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### What the survey runs
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_decision: dict):
+    _space = ex.survey_space(ab_decision)
+    _rows = "".join(
+        f"<tr><td><code>{d}</code></td><td class='num'>{lo:g}</td><td class='num'>{hi:g}</td><td>{scale}</td></tr>"
+        for d, (lo, hi, scale) in _space.items()
+    )
+    mo.md(f"""
+    The four rules that touch the survey resolve to one recipe and one box. The anchor weight is flat at the sampled λ_a; the anti-subspace term keeps its schedule, with the hold ratio fixed at {ex.ANTI_HOLD_RATIO:g} and its peak and anneal endpoint sampled; every trial runs {ab_decision["epochs"]} epochs.
+
+    <table class="report-table">
+    <thead><tr><th>dimension</th><th class="num">low</th><th class="num">high</th><th>scale</th></tr></thead>
+    <tbody>{_rows}</tbody>
+    </table>
+
+    That is branch {ab_decision["anti_branch"]} of the frozen plan, so the trial list is the one shown under *The survey space* above: {ex.N_TRIALS} scrambled-Sobol points at seed {ex.SOBOL_SEED}, run at one seed each, with the top {ex.N_PROMOTE} feasible trials promoted to {ex.SEEDS_PROMOTE}.
+
+    Two of the ablations paid for themselves in survey cost rather than in dimensions. `short` halves every trial, and `flat-anchor` removes four parameters that would otherwise have been carried untested.
     """)
     return
 
@@ -841,7 +1095,13 @@ def _():
     mo.md(r"""
     ## Exploratory analyses
 
-    *Empty until results land; anything conceived after seeing the data goes here, marked as post hoc.*
+    *Post hoc: noticed after the ablation results, not part of the frozen plan.*
+
+    ### The latch veto fires on an un-anchored control
+
+    One of the three `lam0` runs puts 0.55 of its deep-slice weight on `+`, above the 0.5 threshold of the veto. The detector is reading a profile that only means something when there is a pull. With λ_a = 0, the softmin weights describe whatever alignment structure the task happens to leave behind, and there is no pull that could have latched. The veto is calibrated on the anchored runs of ex-2.1.9, and the controls were never going to be judged by it, so nothing here is affected.
+
+    It does bear on the survey. λ_a runs down to 0.02, a fifth of the scored rung, and a trial that weak may look like the control rather than like a pull that committed. Such a trial would be marked infeasible for a reason other than the one the veto is named for. It would fail the contrast constraint too, so the error goes in the safe direction: we would reject a trial that was never going to be proposed. We are leaving the veto frozen and reporting the λ_a of every vetoed trial, so the two readings can be told apart in the map.
     """)
     return
 
@@ -875,6 +1135,61 @@ def _():
         return g1 / g1.sum(), g2 / g2.sum()
 
     return group_weights, softmin_weights_np
+
+
+@app.cell(hide_code=True)
+def _():
+    # Shared by the ablation sections: every arm is read against `ref` the same
+    # way, through the frozen `experiment.arm_verdict`.
+    MARK = {"within band": "", "better": " ✓", "regression": " ✗"}
+
+    def _cell(text: str, resolved: bool) -> str:
+        return f"<td class='num'>{f'<b>{text}</b>' if resolved else text}</td>"
+
+    def delta_table(summary: dict, arms: list[str], ref: str = "ref") -> str:
+        """Each arm against *ref*, one row per decision statistic, plus the two gates."""
+        v = {a: ex.arm_verdict(summary, a, ref) for a in arms}
+        rows = []
+        for s in ex.DECISION_STATS:
+            arrow = "↑" if ex.STAT_DIRECTION[s] == "up" else "↓"
+            stats = [v[a]["stats"][s] for a in arms]
+            cells = "".join(
+                _cell(f"{d['delta']:+.4f}{MARK[d['verdict']]}", d["verdict"] != "within band") for d in stats
+            )
+            rows.append(
+                f"<tr><td><code>{s}</code> {arrow}</td>"
+                f"<td class='num'>{summary[ref][s]:+.4f}</td>"
+                f"<td class='num'>{ex.equiv_band(s):.4f}</td>{cells}</tr>"
+            )
+        ref_cost = abs(summary[ref]["holdout_em"] - summary[ex.CONTROL_OF[summary[ref]["epochs"]]]["holdout_em"])
+        rows.append(
+            f"<tr><td>holdout EM − control ↓</td><td class='num'>{ref_cost:.4f}</td>"
+            f"<td class='num'>{ex.TASK_GATE:.4f}</td>"
+            + "".join(_cell(f"{v[a]['task_cost']:.4f}", not v[a]["task_ok"]) for a in arms)
+            + "</tr>"
+        )
+        rows.append(
+            f"<tr><td>latched runs ↓</td><td class='num'>{len(summary[ref]['latched'])}</td><td class='num'>—</td>"
+            + "".join(_cell(str(len(v[a]["latched"])), bool(v[a]["latched"])) for a in arms)
+            + "</tr>"
+        )
+        head = "".join(f"<th class='num'>{a}</th>" for a in arms)
+        return f"""
+        <div class="report-table-scroll"><table class="report-table">
+        <thead><tr><th>statistic</th><th class="num">{ref}</th><th class="num">band</th>{head}</tr></thead>
+        <tbody>{"".join(rows)}</tbody>
+        </table></div>
+        """
+
+    def traj_of(cells: list[dict], condition: str, key: str) -> list[tuple[np.ndarray, np.ndarray]]:
+        """(epoch, value) per run of *condition*, on that run's own epoch axis."""
+        return [
+            (np.asarray(c["traj"]["epoch"], dtype=float), np.asarray(c["traj"][key], dtype=float))
+            for c in cells
+            if c["condition"] == condition
+        ]
+
+    return delta_table, traj_of
 
 
 if __name__ == "__main__":

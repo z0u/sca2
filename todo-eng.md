@@ -6,6 +6,18 @@ Scratch items sit under Scratch; everything below that is the prioritized index 
 
 ## Scratch
 
+- A task whose whole body is store transfers reads as `⚠ stale — worker may be
+  dead` (2026-08-11, ex-2.1.11). `publish_ablations` downloads 27 array
+  artifacts and uploads one, so it emits no step progress for its entire run;
+  `status` badged it stale at 300s+ and `watch` exited 3 (attention) three times
+  while it was healthy. The record has the evidence to know better — `phase` was
+  advancing through the `get`/`put` names each poll, which is exactly the
+  blocking-phase declaration `put`/`get` already make. So the fix is probably in
+  the staleness check: an in-flight `blocking_phase` whose label has changed
+  since the last poll should suppress the stale-heartbeat badge (or beat the
+  heartbeat on phase entry). As it stands the false alarm trains you to ignore a
+  real signal, and it will recur on every publish step that fans in.
+
 - The `report-review` skill's `context: fork` frontmatter drops the Agent tool
   (2026-08-10). Forked skill executions don't carry `Agent`, so the runbook's
   "spawn the reviewer subagent" step can't run locally; the ex-2.1.11 round-1

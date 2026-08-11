@@ -82,4 +82,4 @@ These experiments were preparation for the main work: exercising the infrastruct
 
 - [2.1.11. Ablations and a survey for the D2.1 operating point](./m2/ex-2.1.11/report.py)
 
-    Survey (preregistered search plan; not yet run). The recipe's schedules and weights were inherited piecewise and never tuned together. Flat arms bracket each schedule and a half-length condition trims the budget; a Sobol search over the surviving knobs (λ_a, τ, repulsion dose) then maps the good region and proposes the operating point D2.2 confirms.
+    Survey (preregistered search plan; ablations in, search running). The recipe's schedules and weights were inherited piecewise and never tuned together, so flat arms bracket each schedule and a half-length condition trims the budget. The anchor schedule turns out to be replaceable by a constant and 50 epochs is enough, but the repulsion schedule earns its shape at both ends. A Sobol search over what is left (λ_a, τ, repulsion peak and timing) then maps the good region and proposes the operating point D2.2 confirms.
