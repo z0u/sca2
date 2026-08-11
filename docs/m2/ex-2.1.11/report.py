@@ -44,9 +44,7 @@ with app.setup(hide_code=True):
     def load_prior() -> dict | None:
         """The published inputs to the calibration stage, or None if any is unreachable.
 
-        Ex-2.1.10's metrics, arrays and probe tables (the nine-seed floors, the
-        trade, the τ map), ex-2.1.9's metrics (the latch calibration), and
-        ex-2.1.8's metrics (the across-point correlation).
+        Ex-2.1.10's metrics, arrays and probe tables (the nine-seed floors, the trade, the τ map), ex-2.1.9's metrics (the latch calibration), and ex-2.1.8's metrics (the across-point correlation).
         """
         store = project_store()
         refs = [
@@ -79,12 +77,7 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    A survey to close out D2.1. The schedules and weights in the recipe were
-    inherited piece by piece and never tuned together. So we ablate first:
-    flat arms that bracket each schedule, plus a half-length condition. Every
-    "no difference" lets us drop a dimension. Then a Sobol search over what
-    is left (anchor weight, pooling temperature, repulsion dose) maps the good
-    region and proposes the operating point the next milestone inherits.
+    A survey to close out D2.1. The schedules and weights in the recipe were inherited piece by piece and never tuned together. So we ablate first: flat arms that bracket each schedule, plus a half-length condition. Every "no difference" lets us drop a dimension. Then a Sobol search over what is left (anchor weight, pooling temperature, repulsion dose) maps the good region and proposes the operating point the next milestone inherits.
     ///
     """)
     return
@@ -106,20 +99,9 @@ def _():
 def _():
     mo.md(r"""
     /// admonition | How to read this draft
-    This is a survey, not a hypothesis-scoring experiment: it preregisters a
-    *search plan* and scores nothing. The plan covers the space, the sampling
-    rule, the objective and its constraints, the seed budget, and the decision
-    rules that stage the work. Once agreed it is frozen (aside from immaterial
-    edits). Results replace the `TODO` placeholders in place, and anything we
-    think of after seeing the data goes under *Exploratory analyses*, marked
-    as post hoc.
+    This is a survey, not a hypothesis-scoring experiment: it preregisters a *search plan* and scores nothing. The plan covers the space, the sampling rule, the objective and its constraints, the seed budget, and the decision rules that stage the work. Once agreed it is frozen (aside from immaterial edits). Results replace the `TODO` placeholders in place, and anything we think of after seeing the data goes under *Exploratory analyses*, marked as post hoc.
 
-    Nothing this report finds may be quoted as a result. It proposes an
-    operating point. The next preregistered experiment adopts that point,
-    re-measures it at fresh seeds, and reports the survey value next to the
-    confirmed one. The gap between the two is the winner's-curse correction:
-    the best point in a search looks better than it really is, because part of
-    what put it on top was luck.
+    Nothing this report finds may be quoted as a result. It proposes an operating point. The next preregistered experiment adopts that point, re-measures it at fresh seeds, and reports the survey value next to the confirmed one. The gap between the two is the winner's-curse correction: the best point in a search looks better than it really is, because part of what put it on top was luck.
     ///
     """)
     return
@@ -128,34 +110,15 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    Every knob in the D2.1 recipe has a history rather than a justification.
-    The anchor schedule (warmup, hold, then anneal at the end down to a floor)
-    and the anti-subspace schedule (2.5 → 0.3 of the anchor weight) come
-    straight from M1, mapped onto 100 epochs by fraction of training. Those
-    keyframes were tuned for a 5-dimensional autoencoder bottleneck and are
-    now applied to a 64-dimensional residual stream.[^rs]
+    Every knob in the D2.1 recipe has a history rather than a justification. The anchor schedule (warmup, hold, then anneal at the end down to a floor) and the anti-subspace schedule (2.5 → 0.3 of the anchor weight) come straight from M1, mapped onto 100 epochs by fraction of training. Those keyframes were tuned for a 5-dimensional autoencoder bottleneck and are now applied to a 64-dimensional residual stream.[^rs]
 
-    The anchor weight λ = 0.1 is the rung ex-2.1.6 scored at, chosen to sit
-    safely inside the region where the task is unharmed. Ex-2.1.7 showed that
-    selectivity is gone by λ = 1, without finding where it goes.
+    The anchor weight λ = 0.1 is the rung ex-2.1.6 scored at, chosen to sit safely inside the region where the task is unharmed. Ex-2.1.7 showed that selectivity is gone by λ = 1, without finding where it goes.
 
-    τ = 0.1 is the one rung of the coarse ladders that stayed graded in every
-    seed: the rungs below it latch per run (ex-2.1.9, ÷3 and ÷10), and the
-    rung above it loses the group contrast and the grading in a single step
-    (ex-2.1.10, ×5). So we don't know whether the primary sits on a plateau or
-    on a knife edge. D2.2 fixes an operating point and builds interventions on
-    it, so this is where that point stops being a pile of inherited choices.
+    τ = 0.1 is the one rung of the coarse ladders that stayed graded in every seed: the rungs below it latch per run (ex-2.1.9, ÷3 and ÷10), and the rung above it loses the group contrast and the grading in a single step (ex-2.1.10, ×5). So we don't know whether the primary sits on a plateau or on a knife edge. D2.2 fixes an operating point and builds interventions on it, so this is where that point stops being a pile of inherited choices.
 
-    We ablate first and search second, because deleting a dimension is cheaper
-    than searching it. If a constant can replace a schedule, four knobs go
-    away; if the testbed converges in 50 epochs, every later trial is half the
-    cost. Before either, a calibration stage fixes the noise floors that decide
-    what "no difference" means, and settles the shape of the objective.
+    We ablate first and search second, because deleting a dimension is cheaper than searching it. If a constant can replace a schedule, four knobs go away; if the testbed converges in 50 epochs, every later trial is half the cost. Before either, a calibration stage fixes the noise floors that decide what "no difference" means, and settles the shape of the objective.
 
-    Out of scope: the position-dropout mechanism raised in the ex-2.1.9 review,
-    which is not part of the recipe; and the grammar, corpus, labeller, and
-    architecture, which stay fixed at the ex-2.1.10 primary throughout. We tune
-    the recipe we have, on the testbed we have.
+    Out of scope: the position-dropout mechanism raised in the ex-2.1.9 review, which is not part of the recipe; and the grammar, corpus, labeller, and architecture, which stay fixed at the ex-2.1.10 primary throughout. We tune the recipe we have, on the testbed we have.
 
     [^rs]: The residual stream is the running vector of activations that each
         transformer layer reads from and writes back into.
@@ -167,34 +130,13 @@ def _():
 def _():
     mo.md(r"""
     /// details | Glossary
-    - **trial** — one sampled point in the search space, aggregated over
-      seeds. It is sampled, so unlike a *condition* its levels weren't
-      chosen by hand.
-    - **round** — one pass over trials at a given seed budget. Round 1 is
-      every trial at one seed; round 2 is the promoted trials at five.
-    - **feasible** — a trial that satisfies every constraint: task gate,
-      containment, retention, grading, contrast, and no latch. Only feasible
-      trials are ranked.
-    - **dose** — how much weight a schedule delivers in total,
-      ∫ w(e)·lr(e) de over training. The learning rate is inside the
-      integral because it multiplies the gradient of every term. The
-      **centroid** is the dose-weighted mean epoch, i.e. *when* the dose
-      arrives.
-    - **band** — how small a difference between seed means we can resolve,
-      2σ·√(1/n₁ + 1/n₂) from the per-run σ over nine seeds. A difference
-      inside the band is unresolved. That says something about our
-      resolution, and is never evidence that two things are equal.
-    - **latch** — a run in which the pooled pull commits its deep-slice
-      weight to a syntax role (`+` or `=`). This is the winner-take-all
-      failure ex-2.1.9 found at small τ.
-    - **m_line** — per-line selectivity: label-weighted minus unweighted
-      mean alignment, at the best span role, averaged over slices. This is
-      the statistic ex-2.1.10 scored. **ᾱ** at op1 measures containment.
-      **retention** is the final value of the m_line trajectory divided by
-      its running peak. **r²** is the squared Pearson correlation between
-      the per-color op1 response and the sim^1.5 target, and measures
-      grading. **contrast** is the difference in op2 softmin weight between
-      the two label groups, and measures per-line localization.
+    - **trial** — one sampled point in the search space, aggregated over seeds. It is sampled, so unlike a *condition* its levels weren't chosen by hand.
+    - **round** — one pass over trials at a given seed budget. Round 1 is every trial at one seed; round 2 is the promoted trials at five.
+    - **feasible** — a trial that satisfies every constraint: task gate, containment, retention, grading, contrast, and no latch. Only feasible trials are ranked.
+    - **dose** — how much weight a schedule delivers in total, ∫ w(e)·lr(e) de over training. The learning rate is inside the integral because it multiplies the gradient of every term. The **centroid** is the dose-weighted mean epoch, i.e. *when* the dose arrives.
+    - **band** — how small a difference between seed means we can resolve, 2σ·√(1/n₁ + 1/n₂) from the per-run σ over nine seeds. A difference inside the band is unresolved. That says something about our resolution, and is never evidence that two things are equal.
+    - **latch** — a run in which the pooled pull commits its deep-slice weight to a syntax role (`+` or `=`). This is the winner-take-all failure ex-2.1.9 found at small τ.
+    - **m_line** — per-line selectivity: label-weighted minus unweighted mean alignment, at the best span role, averaged over slices. This is the statistic ex-2.1.10 scored. **ᾱ** at op1 measures containment. **retention** is the final value of the m_line trajectory divided by its running peak. **r²** is the squared Pearson correlation between the per-color op1 response and the sim^1.5 target, and measures grading. **contrast** is the difference in op2 softmin weight between the two label groups, and measures per-line localization.
     ///
     """)
     return
@@ -205,18 +147,9 @@ def _():
     mo.md(r"""
     ## Method
 
-    The testbed is the ex-2.1.10 primary, unchanged: the word-level `v216`
-    corpus (216 colors, one token each, d64-L4), the either-slot labeller,
-    the mellowmax-pooled anchor term over the four span roles, and the
-    anti-subspace term. Under the either-slot labeller, each operand draws
-    with probability redness⁸ · 0.04, and a line is labeled if either operand
-    draws.
+    The testbed is the ex-2.1.10 primary, unchanged: the word-level `v216` corpus (216 colors, one token each, d64-L4), the either-slot labeller, the mellowmax-pooled anchor term over the four span roles, and the anti-subspace term. Under the either-slot labeller, each operand draws with probability redness⁸ · 0.04, and a line is labeled if either operand draws.
 
-    The reference recipe is the operating point of that experiment:
-    λ = 0.1, τ = 0.1, anchor schedule with warmup over 0–10% and anneal over
-    90–100% down to a 0.1 floor, and anti-subspace 2.5 → 0.30 (μ/λ) by 90%.
-    Schedule keyframes are given as fractions of training, so the half-length
-    condition runs the same shape.
+    The reference recipe is the operating point of that experiment: λ = 0.1, τ = 0.1, anchor schedule with warmup over 0–10% and anneal over 90–100% down to a 0.1 floor, and anti-subspace 2.5 → 0.30 (μ/λ) by 90%. Schedule keyframes are given as fractions of training, so the half-length condition runs the same shape.
     """)
     return
 
@@ -226,17 +159,9 @@ def _():
     mo.md(r"""
     ### Measurements
 
-    Every run, ablation or trial, records the same slim set of measurements,
-    all of them defined in earlier experiments: the three behavior sets
-    (holdout exact match is the task gate), the alignment map on the probe
-    lines (m_line, ᾱ at op1, r² against the sim^1.5 target), the softmin
-    weight profiles (the group contrast and the latch detector), and the
-    training trajectory of m_line (retention).
+    Every run, ablation or trial, records the same slim set of measurements, all of them defined in earlier experiments: the three behavior sets (holdout exact match is the task gate), the alignment map on the probe lines (m_line, ᾱ at op1, r² against the sim^1.5 target), the softmin weight profiles (the group contrast and the latch detector), and the training trajectory of m_line (retention).
 
-    That costs one eval pass per run. We do not run the readability, geometry,
-    and leakage passes that a scoring experiment carries. Those belong to the
-    confirming experiment, which measures one point properly rather than eighty
-    points thinly.
+    That costs one eval pass per run. We do not run the readability, geometry, and leakage passes that a scoring experiment carries. Those belong to the confirming experiment, which measures one point properly rather than eighty points thinly.
     """)
     return
 
@@ -246,14 +171,9 @@ def _():
     mo.md(r"""
     ## Search plan
 
-    Calibration has already run; it reads only published results, and its
-    numbers are frozen into the design constants. The ablation stage runs eight
-    conditions and applies the decision rules below, which fix the recipe, the
-    length, and the space for the survey. The survey stage then draws its
-    trials from a rule that is deterministic given this document.
+    Calibration has already run; it reads only published results, and its numbers are frozen into the design constants. The ablation stage runs eight conditions and applies the decision rules below, which fix the recipe, the length, and the space for the survey. The survey stage then draws its trials from a rule that is deterministic given this document.
 
-    The decision rules are the only branch points; everything downstream of the
-    data is fixed.
+    The decision rules are the only branch points; everything downstream of the data is fixed.
     """)
     return
 
@@ -263,23 +183,11 @@ def _():
     mo.md(r"""
     ### Calibration: noise floors
 
-    Ex-2.1.10 ran nine seeds on its primary, which is the reference recipe
-    here, so the per-run spread of every statistic at the operating point is
-    already in the store. The table below re-derives the floors from the
-    published arrays. The design constants freeze the same numbers
-    (`NOISE_RUN`), and the ablation bands follow as 2σ·√(2/3) for a
-    three-seed against three-seed comparison.
+    Ex-2.1.10 ran nine seeds on its primary, which is the reference recipe here, so the per-run spread of every statistic at the operating point is already in the store. The table below re-derives the floors from the published arrays. The design constants freeze the same numbers (`NOISE_RUN`), and the ablation bands follow as 2σ·√(2/3) for a three-seed against three-seed comparison.
 
-    The margin statistics are tight compared to the effects worth chasing;
-    the τ ladder in ex-2.1.10 spans several standard deviations on m_line.
-    That is what lets us run survey trials at a single seed. Containment is
-    the opposite, with a standard deviation about 40% of its own mean, so it
-    enters the survey as a constraint rather than something we rank on.
+    The margin statistics are tight compared to the effects worth chasing; the τ ladder in ex-2.1.10 spans several standard deviations on m_line. That is what lets us run survey trials at a single seed. Containment is the opposite, with a standard deviation about 40% of its own mean, so it enters the survey as a constraint rather than something we rank on.
 
-    These floors carry a caveat: they are measured in the graded regime, at
-    τ = 0.1. At τ ≲ 0.03 the pull latches from run to run, the statistics
-    become bimodal, and no per-run standard deviation describes them. So the
-    survey keeps τ above that regime and uses a per-run latch veto instead.
+    These floors carry a caveat: they are measured in the graded regime, at τ = 0.1. At τ ≲ 0.03 the pull latches from run to run, the statistics become bimodal, and no per-run standard deviation describes them. So the survey keeps τ above that regime and uses a per-run latch veto instead.
     """)
     return
 
@@ -347,12 +255,7 @@ def _(per_run):
         figure_html(
             _table,
             caption="""
-            **Noise floors at the operating point.** Per-run mean and sd over
-            ex-2.1.10's nine-seed primary, re-derived from its published
-            arrays; the *frozen σ* column is the value the design constants
-            carry, and the *band* is the smallest seed-mean difference the
-            ablation stage may call a difference (2σ·√(2/3), three seeds a
-            side).
+            **Noise floors at the operating point.** Per-run mean and sd over ex-2.1.10's nine-seed primary, re-derived from its published arrays; the *frozen σ* column is the value the design constants carry, and the *band* is the smallest seed-mean difference the ablation stage may call a difference (2σ·√(2/3), three seeds a side).
             """,
             class_="report-figure",
         )
@@ -365,32 +268,13 @@ def _():
     mo.md(r"""
     ### Calibration: the shape of the objective
 
-    Across the anchored operating points already in the store, margin and
-    containment don't trade: their correlation is negative on both available
-    readings (computed live below the figure), meaning the better operating
-    points improved both at once. The trade that does bind is margin against
-    grading, and it runs along the τ axis: softening τ raises m_line while
-    the per-color grading and the group contrast collapse, so selectivity
-    smears out into "everything red-ish moves".
-    <!-- REVIEW: the correlation was a hard-coded −0.19 credited to all three
-    prior experiments; it is now computed in the figure cell from the loaded
-    metrics, on two bases: m_span over the ten ex-2.1.9/ex-2.1.10 points (the
-    original number — ex-2.1.8 publishes no m_span, so it never contributed),
-    and m_op1 over all seventeen points including the ex-2.1.8 grid. Verify:
-    both print beneath the trade figure. -->
+    Across the anchored operating points already in the store, margin and containment don't trade: their correlation is negative on both available readings (computed live below the figure), meaning the better operating points improved both at once. The trade that does bind is margin against grading, and it runs along the τ axis: softening τ raises m_line while the per-color grading and the group contrast collapse, so selectivity smears out into "everything red-ish moves".
+    <!-- REVIEW: the correlation was a hard-coded −0.19 credited to all three prior experiments; it is now computed in the figure cell from the loaded metrics, on two bases: m_span over the ten ex-2.1.9/ex-2.1.10 points (the original number — ex-2.1.8 publishes no m_span, so it never contributed), and m_op1 over all seventeen points including the ex-2.1.8 grid. Verify: both print beneath the trade figure. -->
 
 
-    That structure decides the shape of the search. A two-way trade would
-    need a Pareto front,[^pareto] but objectives that move together can
-    be constraints around a single scalar. So the objective is one number:
-    maximize m_line, subject to the task gate, containment, retention,
-    grading, contrast, and the latch veto, with the values under *Objective,
-    constraints, and rounds* below.
+    That structure decides the shape of the search. A two-way trade would need a Pareto front,[^pareto] but objectives that move together can be constraints around a single scalar. So the objective is one number: maximize m_line, subject to the task gate, containment, retention, grading, contrast, and the latch veto, with the values under *Objective, constraints, and rounds* below.
 
-    A search on margin alone would walk to the smeared end of the τ range, and
-    the grading and contrast constraints are what keep it out. We still report
-    the m_line against r² plane for every trial, so if the interesting points
-    turn out to sit on the constraint boundary, the map will show it.
+    A search on margin alone would walk to the smeared end of the τ range, and the grading and contrast constraints are what keep it out. We still report the m_line against r² plane for every trial, so if the interesting points turn out to sit on the constraint boundary, the map will show it.
 
     [^pareto]: The set of points at which no objective can be improved without
         giving up some of another. It is a curve to choose along, rather than
@@ -418,23 +302,10 @@ def _(per_run, prior):
     @themed(
         name="trade",
         alt_text="""
-            Scatter chart of grading r squared against per-line margin
-            m_line. Five clusters of small dots, one per ex-2.1.10
-            condition, each with a larger ringed mark at its seed mean. The
-            reference arm, the primary and the slot oracle cluster at the
-            upper left, near m_line 0.4 and r squared around 0.8. The two
-            soft-tau arms sit to the lower right, near m_line 0.49 and r
-            squared 0.65 and 0.58: margin rises as grading falls along the
-            tau axis.
+            Scatter chart of grading r squared against per-line margin m_line. Five clusters of small dots, one per ex-2.1.10 condition, each with a larger ringed mark at its seed mean. The reference arm, the primary and the slot oracle cluster at the upper left, near m_line 0.4 and r squared around 0.8. The two soft-tau arms sit to the lower right, near m_line 0.49 and r squared 0.65 and 0.58: margin rises as grading falls along the tau axis.
         """,
         caption=r"""
-            **The trade the constraints must hold.** Per-run grading $r^2$
-            against per-run m_line for ex-2.1.10's five anchored conditions
-            (small marks; large ring = seed mean). Softening τ (0.1 → 0.5 →
-            2.5, left to right) buys margin and spends grading; ranking on
-            m_line alone would pick the right-hand end. The survey caps that
-            walk with the grading and contrast constraints instead of a
-            second objective.
+            **The trade the constraints must hold.** Per-run grading $r^2$ against per-run m_line for ex-2.1.10's five anchored conditions (small marks; large ring = seed mean). Softening τ (0.1 → 0.5 → 2.5, left to right) buys margin and spends grading; ranking on m_line alone would pick the right-hand end. The survey caps that walk with the grading and contrast constraints instead of a second objective.
         """,
     )
     def _plot():
@@ -476,14 +347,7 @@ def _(per_run, prior):
     _r_op1, _n_op1 = _corr("m_op1", [prior["m8"], prior["m9"], prior["m10"]])
 
     _corr_note = mo.md(rf"""
-    Margin–containment correlation across the stored anchored operating
-    points: $r$ = {_r_span:+.2f} over the {_n_span} ex-2.1.9/ex-2.1.10 points
-    (m_span basis), and $r$ = {_r_op1:+.2f} over all {_n_op1} points including
-    the ex-2.1.8 grid (m_op1 basis, the statistic all three share). No trade
-    on either reading; both improve together along the design line. For
-    scale, the primary's nine runs put per-run grading at
-    {per_run["r2_sim"].mean():.2f} ± {per_run["r2_sim"].std(ddof=1):.3f}
-    against {_pts["either-t2500"][1].mean():.2f} for the softest arm.
+    Margin–containment correlation across the stored anchored operating points: $r$ = {_r_span:+.2f} over the {_n_span} ex-2.1.9/ex-2.1.10 points (m_span basis), and $r$ = {_r_op1:+.2f} over all {_n_op1} points including the ex-2.1.8 grid (m_op1 basis, the statistic all three share). No trade on either reading; both improve together along the design line. For scale, the primary's nine runs put per-run grading at {per_run["r2_sim"].mean():.2f} ± {per_run["r2_sim"].std(ddof=1):.3f} against {_pts["either-t2500"][1].mean():.2f} for the softest arm.
     """)
     mo.vstack([mo.Html(_plot()), _corr_note])
     return
@@ -494,23 +358,10 @@ def _():
     mo.md(r"""
     ### Calibration: the τ range
 
-    τ only matters through the weights it produces, so we set its bounds on
-    the weight scale: the share of the pooled pull held by the leading span
-    position, computed from the stored alignment profiles of the primary.
+    τ only matters through the weights it produces, so we set its bounds on the weight scale: the share of the pooled pull held by the leading span position, computed from the stored alignment profiles of the primary.
 
-    The bounds [0.05, 0.30] keep that leading weight between about 0.74 and
-    about 0.42 on the trained profile, which covers the lower part of the
-    0.6–0.8 target band from ex-2.1.9. Reaching 0.8 would need τ of about
-    0.04. The lower bound sits above that, keeping a margin over the latching
-    regime, where τ ≲ 0.03, the leading weight is ≳ 0.82, and the profile goes
-    one-hot per run at depth. The upper bound stops short of τ = 0.5, which
-    the trade figure above shows is already smeared.
-    <!-- REVIEW: was "contains the 0.6-0.8 target band". The stated range of
-    the leading weight is [0.42, 0.74], so it meets the band only over
-    0.6-0.74; the figure's alt text already described the two as overlapping.
-    The exclusion of the top of the band is a margin choice rather than a
-    consequence of the latching regime, so it is now stated as one. Verify: if
-    the survey shows τ ≈ 0.04 stays graded, the lower bound can widen. -->
+    The bounds [0.05, 0.30] keep that leading weight between about 0.74 and about 0.42 on the trained profile, which covers the lower part of the 0.6–0.8 target band from ex-2.1.9. Reaching 0.8 would need τ of about 0.04. The lower bound sits above that, keeping a margin over the latching regime, where τ ≲ 0.03, the leading weight is ≳ 0.82, and the profile goes one-hot per run at depth. The upper bound stops short of τ = 0.5, which the trade figure above shows is already smeared.
+    <!-- REVIEW: was "contains the 0.6-0.8 target band". The stated range of the leading weight is [0.42, 0.74], so it meets the band only over 0.6-0.74; the figure's alt text already described the two as overlapping. The exclusion of the top of the band is a margin choice rather than a consequence of the latching regime, so it is now stated as one. Verify: if the survey shows τ ≈ 0.04 stays graded, the lower bound can widen. -->
     """)
     return
 
@@ -529,21 +380,10 @@ def _(prior, softmin_weights_np):
     @themed(
         name="tau-range",
         alt_text="""
-            Line chart of leading softmin weight against temperature tau on
-            a log scale from 0.01 to 1. Five curves, one per residual slice,
-            fall from near 1 at the left to about 0.3 at the right. A shaded
-            vertical band marks the survey range 0.05 to 0.3, and a shaded
-            horizontal band marks the target leading-weight range 0.6 to
-            0.8. The two bands overlap around tau 0.05 to 0.1. A dashed
-            vertical line marks the reference tau of 0.1.
+            Line chart of leading softmin weight against temperature tau on a log scale from 0.01 to 1. Five curves, one per residual slice, fall from near 1 at the left to about 0.3 at the right. A shaded vertical band marks the survey range 0.05 to 0.3, and a shaded horizontal band marks the target leading-weight range 0.6 to 0.8. The two bands overlap around tau 0.05 to 0.1. A dashed vertical line marks the reference tau of 0.1.
         """,
         caption=r"""
-            **Where the survey's τ bounds sit on the weight scale.** The
-            label-weighted share of softmin weight held by the leading span
-            position, per residual slice, on the primary's seed-mean
-            alignment profile. Vertical shading: the survey range
-            [0.05, 0.30]; horizontal shading: ex-2.1.9's 0.6–0.8 target
-            band; dashed line: the reference τ = 0.1.
+            **Where the survey's τ bounds sit on the weight scale.** The label-weighted share of softmin weight held by the leading span position, per residual slice, on the primary's seed-mean alignment profile. Vertical shading: the survey range [0.05, 0.30]; horizontal shading: ex-2.1.9's 0.6–0.8 target band; dashed line: the reference τ = 0.1.
         """,
     )
     def _plot():
@@ -576,31 +416,15 @@ def _():
     mo.md(r"""
     ### Calibration: doses, and why the flat arms are shaped as they are
 
-    One flat arm is enough to ablate the anchor schedule, because flat at the
-    peak and flat at matched dose are the same thing here. The schedule
-    delivers 97% of the flat-at-peak dose, and that 3% gap sits well inside
-    the noise floor, so we don't have to pick which quantity to match on.
+    One flat arm is enough to ablate the anchor schedule, because flat at the peak and flat at matched dose are the same thing here. The schedule delivers 97% of the flat-at-peak dose, and that 3% gap sits well inside the noise floor, so we don't have to pick which quantity to match on.
 
-    What the flat arm does change is timing. The ramp carries 7.3% of the dose
-    across the same window in which ex-2.1.9 found the pooled pull commits, by
-    epoch 8, inside the 10-epoch warmup. The `AnchorSpec` docstring says the
-    ramp is there so the anchor arrives with the optimizer rather than ahead
-    of it.
+    What the flat arm does change is timing. The ramp carries 7.3% of the dose across the same window in which ex-2.1.9 found the pooled pull commits, by epoch 8, inside the 10-epoch warmup. The `AnchorSpec` docstring says the ramp is there so the anchor arrives with the optimizer rather than ahead of it.
 
-    So we don't expect a dose effect from `flat-anchor`. Full λ against a
-    still-random model risks latching, so the reading will come from the latch
-    veto and the deep-slice weight profile.
+    So we don't expect a dose effect from `flat-anchor`. Full λ against a still-random model risks latching, so the reading will come from the latch veto and the deep-slice weight profile.
 
-    No constant can match the anti-subspace term on dose. Its schedule spans an
-    83× range of weights, and the constant that matched its dose would sit at
-    1.7× the anchor peak for the whole of training, which is a different
-    regime; the dose arm in ex-2.1.8 documented that trap.
+    No constant can match the anti-subspace term on dose. Its schedule spans an 83× range of weights, and the constant that matched its dose would sit at 1.7× the anchor peak for the whole of training, which is a different regime; the dose arm in ex-2.1.8 documented that trap.
 
-    So two arms bracket it instead: flat at the hold ratio (0.17× the dose of
-    the schedule) and flat at the peak ratio (1.41×). We gate the effect of the
-    schedule on the peak-matched arm, and read the dose alignment as a stated
-    secondary. The conditions table below reports the delivered dose and
-    centroid for every arm.
+    So two arms bracket it instead: flat at the hold ratio (0.17× the dose of the schedule) and flat at the peak ratio (1.41×). We gate the effect of the schedule on the peak-matched arm, and read the dose alignment as a stated secondary. The conditions table below reports the delivered dose and centroid for every arm.
     """)
     return
 
@@ -618,24 +442,12 @@ def _():
     @themed(
         name="doses",
         alt_text="""
-            Two line charts of effective weight, schedule times learning
-            rate, against epoch from 0 to 100. Left panel, the anchor term:
-            the scheduled curve and the flat-at-peak curve lie nearly on top
-            of each other except during the first ten epochs, where the flat
-            curve is higher. Right panel, the anti-subspace term: the
-            scheduled curve starts high and decays to a low hold level by
-            epoch 90, the flat-at-hold curve stays low throughout, and the
-            flat-at-peak curve stays high throughout, so the two flat curves
-            bracket the scheduled one.
+            Two line charts of effective weight, schedule times learning rate, against epoch from 0 to 100. Left panel, the anchor term: the scheduled curve and the flat-at-peak curve lie nearly on top of each other except during the first ten epochs, where the flat curve is higher. Right panel, the anti-subspace term: the scheduled curve starts high and decays to a low hold level by epoch 90, the flat-at-hold curve stays low throughout, and the flat-at-peak curve stays high throughout, so the two flat curves bracket the scheduled one.
         """,
         caption=r"""
-            **What each arm delivers, when.** Effective weight (schedule ×
-            learning rate) over training. **Left:** the anchor term — the
-            schedule and `flat-anchor` differ visibly only in the warmup
-            window, and their doses agree to 3%. **Right:** the
-            anti-subspace term — `anti-hold` and `anti-peak` bracket the
-            schedule from below (0.17× its dose) and above (1.41×); no
-            constant matches it without leaving the regime.
+            **What each arm delivers, when.** Effective weight (schedule × learning rate) over training.
+            **Left:** the anchor term — the schedule and `flat-anchor` differ visibly only in the warmup window, and their doses agree to 3%.
+            **Right:** the anti-subspace term — `anti-hold` and `anti-peak` bracket the schedule from below (0.17× its dose) and above (1.41×); no constant matches it without leaving the regime.
         """,
     )
     def _plot():
@@ -692,12 +504,7 @@ def _(prior):
         figure_html(
             _table,
             caption=f"""
-            **The latch detector, calibrated on ex-2.1.9.** Deep-slice
-            (post-attention) mean softmin weight per span role, per stored
-            run of the pooled conditions. Latched runs put ≥ 0.85 on `+`;
-            healthy runs ≤ 0.03 on any syntax role (bold = over the
-            {ex.LATCH_PI:g} veto). The threshold sits in a wide gap, so the
-            veto is insensitive to its exact value.
+            **The latch detector, calibrated on ex-2.1.9.** Deep-slice (post-attention) mean softmin weight per span role, per stored run of the pooled conditions. Latched runs put ≥ 0.85 on `+`; healthy runs ≤ 0.03 on any syntax role (bold = over the {ex.LATCH_PI:g} veto). The threshold sits in a wide gap, so the veto is insensitive to its exact value.
             """,
             class_="report-figure",
         )
@@ -710,12 +517,7 @@ def _():
     mo.md(r"""
     ### The ablation conditions
 
-    There are eight conditions, three seeds each, all at the reference λ and τ
-    under the either-slot labeller. `ref` re-runs the ex-2.1.10 primary recipe
-    through the code path of this experiment, so every comparison is between
-    runs of identical code. `lam0` and `short-lam0` are the task-cost controls
-    at each length. The dose and centroid columns report both quantities for
-    each arm, so the outcomes can tell us which one was doing the work.
+    There are eight conditions, three seeds each, all at the reference λ and τ under the either-slot labeller. `ref` re-runs the ex-2.1.10 primary recipe through the code path of this experiment, so every comparison is between runs of identical code. `lam0` and `short-lam0` are the task-cost controls at each length. The dose and centroid columns report both quantities for each arm, so the outcomes can tell us which one was doing the work.
     """)
     return
 
@@ -773,11 +575,7 @@ def _():
         figure_html(
             _table,
             caption="""
-            **The ablation conditions and their delivered invariants.** Dose
-            is ∫ w·lr de over that condition's training; centroid is the
-            dose-weighted mean epoch. Doses are reported, not matched — the
-            flat arms change shape and timing, and the columns say by how
-            much.
+            **The ablation conditions and their delivered invariants.** Dose is ∫ w·lr de over that condition's training; centroid is the dose-weighted mean epoch. Doses are reported, not matched — the flat arms change shape and timing, and the columns say by how much.
             """,
             class_="report-figure",
         )
@@ -790,8 +588,7 @@ def _():
     mo.md(r"""
     ### The decision rules
 
-    Rendered from the design constants (`experiment.DECISION_RULES`), so the
-    frozen text has one home:
+    Rendered from the design constants (`experiment.DECISION_RULES`), so the frozen text has one home:
     """)
     return
 
@@ -807,37 +604,16 @@ def _():
     mo.md(r"""
     ### The survey space
 
-    Two dimensions are always sampled, both on a log scale. λ_a spans
-    [0.02, 1.0]: from a fifth of the rung we scored at, below which the ladder
-    in ex-2.1.6 suggests the pull is weak, up to the weight of the ex-2.1.7
-    ceiling arm, where selectivity was already gone. So we believe the optimum
-    is somewhere inside. τ spans [0.05, 0.30], on the weight-scale argument
-    above.
-    <!-- REVIEW: "half the rung" → "a fifth"; the scored rung is λ = 0.1 and
-    the bound is 0.02. Same correction in the SPACE_COMMON docstring. -->
+    Two dimensions are always sampled, both on a log scale. λ_a spans [0.02, 1.0]: from a fifth of the rung we scored at, below which the ladder in ex-2.1.6 suggests the pull is weak, up to the weight of the ex-2.1.7 ceiling arm, where selectivity was already gone. So we believe the optimum is somewhere inside. τ spans [0.05, 0.30], on the weight-scale argument above.
+    <!-- REVIEW: "half the rung" → "a fifth"; the scored rung is λ = 0.1 and the bound is 0.02. Same correction in the SPACE_COMMON docstring. -->
 
-    The anti-subspace dimension depends on decision rule 2. If a flat ratio is
-    enough (branch B), it is one knob: μ/λ ∈ [0.10, 3.0], log, running from a
-    third of the hold level up past the peak. If the shape of the schedule
-    matters (branch A), the family keeps that shape with the hold ratio fixed
-    at 0.30, and we sample two knobs: peak ratio ∈ [0.75, 4.0] (log) and
-    anneal endpoint ∈ [30%, 95%] of training.
+    The anti-subspace dimension depends on decision rule 2. If a flat ratio is enough (branch B), it is one knob: μ/λ ∈ [0.10, 3.0], log, running from a third of the hold level up past the peak. If the shape of the schedule matters (branch A), the family keeps that shape with the hold ratio fixed at 0.30, and we sample two knobs: peak ratio ∈ [0.75, 4.0] (log) and anneal endpoint ∈ [30%, 95%] of training.
 
-    For branch A the analysis reports marginals in derived coordinates,
-    delivered dose and timing centroid, rather than in the raw knobs. The raw
-    knobs form a correlated ridge, since the endpoint is effectively the dose
-    axis (ex-2.1.8). Sampling still happens in the box of raw knobs, because
-    every point in it is a valid schedule, whereas a box in (dose, centroid)
-    has corners we can't reach.
+    For branch A the analysis reports marginals in derived coordinates, delivered dose and timing centroid, rather than in the raw knobs. The raw knobs form a correlated ridge, since the endpoint is effectively the dose axis (ex-2.1.8). Sampling still happens in the box of raw knobs, because every point in it is a valid schedule, whereas a box in (dose, centroid) has corners we can't reach.
 
-    Trials come from a scrambled Sobol set, which gives even one-dimensional
-    marginals at this budget with no two trials aligned on any axis. The
-    scramble seed is frozen in the design constants, so the run rebuilds the
-    trial list below identically.
+    Trials come from a scrambled Sobol set, which gives even one-dimensional marginals at this budget with no two trials aligned on any axis. The scramble seed is frozen in the design constants, so the run rebuilds the trial list below identically.
 
-    We deliberately don't use Bayesian optimization: it returns a single best
-    point where D2.2 needs a map, and given the noise in the containment
-    constraint it would chase seed luck.
+    We deliberately don't use Bayesian optimization: it returns a single best point where D2.2 needs a map, and given the noise in the containment constraint it would chase seed luck.
     """)
     return
 
@@ -877,11 +653,7 @@ def _():
             f"<details><summary>Branch A trial list (schedule retained)</summary>{_a}</details>"
             f"<details><summary>Branch B trial list (flat anti)</summary>{_b}</details>",
             caption=f"""
-            **The frozen trial lists**, {ex.N_TRIALS} scrambled-Sobol points
-            per branch (seed {ex.SOBOL_SEED}), shown for review before any
-            run. Branch A adds the derived (relative dose, centroid)
-            coordinates its marginals will be reported in; relative dose is
-            the trial's ∫ μ/λ·lr de over the operating point's.
+            **The frozen trial lists**, {ex.N_TRIALS} scrambled-Sobol points per branch (seed {ex.SOBOL_SEED}), shown for review before any run. Branch A adds the derived (relative dose, centroid) coordinates its marginals will be reported in; relative dose is the trial's ∫ μ/λ·lr de over the operating point's.
             """,
             class_="report-figure",
         )
@@ -900,9 +672,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    **Objective** (from `experiment.OBJECTIVE`): rank feasible trials by
-    seed-mean m_line, largest first. m_line is the one statistic tight enough
-    to rank on, so everything else is a constraint:
+    **Objective** (from `experiment.OBJECTIVE`): rank feasible trials by seed-mean m_line, largest first. m_line is the one statistic tight enough to rank on, so everything else is a constraint:
 
     | constraint | bar | source |
     |---|---|---|
@@ -913,20 +683,11 @@ def _():
     | contrast | group contrast ≥ {ex.CONTRAST_MIN:g} | ex-2.1.10's partial bar |
     | latch | no run with deep-slice syntax weight > {ex.LATCH_PI:g} | calibrated above |
 
-    **Rounds.** Round 1 runs all {ex.N_TRIALS} trials at seed 0, which the
-    noise floors allow. The {ex.N_PROMOTE} feasible trials with the highest
-    m_line are promoted to {ex.SEEDS_PROMOTE} seeds. If fewer are feasible, we
-    promote all of them; if none are, we publish the infeasibility map and
-    propose nothing.
+    **Rounds.** Round 1 runs all {ex.N_TRIALS} trials at seed 0, which the noise floors allow. The {ex.N_PROMOTE} feasible trials with the highest m_line are promoted to {ex.SEEDS_PROMOTE} seeds. If fewer are feasible, we promote all of them; if none are, we publish the infeasibility map and propose nothing.
 
-    The proposed operating point is the promoted trial with the highest
-    seed-mean m_line that is still feasible on seed means; the latch veto stays
-    per-run. Promotion only partly corrects the winner's curse.
+    The proposed operating point is the promoted trial with the highest seed-mean m_line that is still feasible on seed means; the latch veto stays per-run. Promotion only partly corrects the winner's curse.
 
-    **Stopping rule.** Fixed budget, two rounds, no adaptive continuation.
-    Trials that diverge or fail are published as failures rather than
-    resampled. Memoization keeps them anyway, and a complete table is what
-    makes the map from a search trustworthy.
+    **Stopping rule.** Fixed budget, two rounds, no adaptive continuation. Trials that diverge or fail are published as failures rather than resampled. Memoization keeps them anyway, and a complete table is what makes the map from a search trustworthy.
     """)
     return
 
@@ -942,20 +703,9 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(rf"""
-    {len(ex.ABLATION_CONDITIONS)} ablation conditions × {ex.N_SEEDS_ABLATION}
-    seeds = {ex.N_RUNS_ABLATION} runs, then at most {ex.N_TRIALS} +
-    {ex.N_PROMOTE} × {ex.SEEDS_PROMOTE - 1} = {ex.N_RUNS_SURVEY} survey runs.
-    That is about {ex.N_RUNS_ABLATION + ex.N_RUNS_SURVEY} training runs in the
-    worst case, each roughly 25 minutes of L4 time with the slim eval.
-    Ex-2.1.10 was 24 runs, so this is about three times as many, or about
-    twice the training time if we adopt `short` and the survey stage runs at
-    half length. Each run is also cheaper, because the slim eval drops the
-    readability, geometry, and leakage passes.
+    {len(ex.ABLATION_CONDITIONS)} ablation conditions × {ex.N_SEEDS_ABLATION} seeds = {ex.N_RUNS_ABLATION} runs, then at most {ex.N_TRIALS} + {ex.N_PROMOTE} × {ex.SEEDS_PROMOTE - 1} = {ex.N_RUNS_SURVEY} survey runs. That is about {ex.N_RUNS_ABLATION + ex.N_RUNS_SURVEY} training runs in the worst case, each roughly 25 minutes of L4 time with the slim eval. Ex-2.1.10 was 24 runs, so this is about three times as many, or about twice the training time if we adopt `short` and the survey stage runs at half length. Each run is also cheaper, because the slim eval drops the readability, geometry, and leakage passes.
 
-    Each stage launches with `--max-containers {ex.MAX_CONTAINERS}` and a
-    `--budget` sized from its run count. Memoization means the promoted round
-    re-runs only the new seeds, and `ctx.map` with `allow_partial=True` lets
-    diverged trials land as data rather than failures.
+    Each stage launches with `--max-containers {ex.MAX_CONTAINERS}` and a `--budget` sized from its run count. Memoization means the promoted round re-runs only the new seeds, and `ctx.map` with `allow_partial=True` lets diverged trials land as data rather than failures.
     """)
     return
 
@@ -976,18 +726,9 @@ def _():
     ### Is the anchor schedule needed?
 
     /// admonition | TODO
-    Table: `flat-anchor` − `ref` seed-mean differences for each decision
-    statistic, each against its band. Then the per-run deep-slice weight
-    profiles beside the latch table from ex-2.1.9, and the m_line
-    trajectories of all six runs overlaid: does the margin of the flat arm
-    arrive earlier, and does it hold?
+    Table: `flat-anchor` − `ref` seed-mean differences for each decision statistic, each against its band. Then the per-run deep-slice weight profiles beside the latch table from ex-2.1.9, and the m_line trajectories of all six runs overlaid: does the margin of the flat arm arrive earlier, and does it hold?
 
-    If the commit-window account is right, we expect the flat arm either to
-    latch a syntax role in at least one run or to hold a resolvably lower
-    m_line. The dose columns tell us any such difference is about timing
-    rather than dose. The contrary result is a flat arm within band with no
-    latch, in which case the survey runs flat and four schedule knobs go
-    away.
+    If the commit-window account is right, we expect the flat arm either to latch a syntax role in at least one run or to hold a resolvably lower m_line. The dose columns tell us any such difference is about timing rather than dose. The contrary result is a flat arm within band with no latch, in which case the survey runs flat and four schedule knobs go away.
     ///
     """)
     return
@@ -999,19 +740,11 @@ def _():
     ### Does the anti-subspace schedule beat a constant?
 
     /// admonition | TODO
-    Table: `anti-hold` and `anti-peak` against `ref`, same statistics, same
-    bands, with the delivered dose and centroid of each arm restated from the
-    conditions table.
+    Table: `anti-hold` and `anti-peak` against `ref`, same statistics, same bands, with the delivered dose and centroid of each arm restated from the conditions table.
 
-    The mechanism proposed in ex-2.1.8 is that early repulsion pushes the
-    syntax roles out of reach before the pull commits. Under that account we
-    expect `anti-hold` to lose containment or contrast, and `anti-peak` to
-    hold the statistics but pay somewhere visible.
+    The mechanism proposed in ex-2.1.8 is that early repulsion pushes the syntax roles out of reach before the pull commits. Under that account we expect `anti-hold` to lose containment or contrast, and `anti-peak` to hold the statistics but pay somewhere visible.
 
-    If `anti-peak` pays nothing, the schedule was a constant in disguise and
-    branch B runs. The other outcome worth naming is `anti-hold` within band,
-    which would say the timing of the repulsion never mattered at this
-    operating point, and branch B runs at the lower level.
+    If `anti-peak` pays nothing, the schedule was a constant in disguise and branch B runs. The other outcome worth naming is `anti-hold` within band, which would say the timing of the repulsion never mattered at this operating point, and branch B runs at the lower level.
     ///
     """)
     return
@@ -1023,16 +756,9 @@ def _():
     ### Is 100 epochs buying anything?
 
     /// admonition | TODO
-    Table: `short` − `ref` on the decision statistics, with the task gate
-    measured against `short-lam0`. Then the m_line and validation-loss
-    trajectories on a shared fraction-of-training axis.
+    Table: `short` − `ref` on the decision statistics, with the task gate measured against `short-lam0`. Then the m_line and validation-loss trajectories on a shared fraction-of-training axis.
 
-    Ex-2.1.6 saw margins flat from about epoch 50 and validation loss settling
-    earlier, so we expect `short` to land within band and the survey to cost
-    half as much. The contrary result is a resolved gap in m_line or retention,
-    which would mean the last 50 epochs do some consolidation the trajectory
-    statistics haven't shown. Either way it is worth knowing before D2.2 scales
-    anything.
+    Ex-2.1.6 saw margins flat from about epoch 50 and validation loss settling earlier, so we expect `short` to land within band and the survey to cost half as much. The contrary result is a resolved gap in m_line or retention, which would mean the last 50 epochs do some consolidation the trajectory statistics haven't shown. Either way it is worth knowing before D2.2 scales anything.
     ///
     """)
     return
@@ -1044,12 +770,7 @@ def _():
     ### Does the anneal shape matter?
 
     /// admonition | TODO
-    One row: `linear` − `ref` per decision statistic against its band. M1 only
-    ever compared against a stepped anneal, which needed an accommodation in
-    the LR warmup. The linear arm has a milder discontinuity, a jump in the
-    derivative of λ at each keyframe, and is the cheapest version of the
-    question. We expect it within band, which would retire the todo item.
-    Neither outcome changes a survey dimension.
+    One row: `linear` − `ref` per decision statistic against its band. M1 only ever compared against a stepped anneal, which needed an accommodation in the LR warmup. The linear arm has a milder discontinuity, a jump in the derivative of λ at each keyframe, and is the cheapest version of the question. We expect it within band, which would retire the todo item. Neither outcome changes a survey dimension.
     ///
     """)
     return
@@ -1071,24 +792,10 @@ def _():
     /// admonition | TODO
     Four views, all built from the published per-trial table.
 
-    1. The full trial table: sampled coordinates, every statistic,
-       feasibility against each constraint, and round-2 seed means where a
-       trial was promoted. No trial is omitted.
-    2. Marginals: m_line and each constraint statistic against each
-       dimension, with the branch A anti axes shown in dose and centroid
-       coordinates, and feasible trials distinguished from infeasible ones.
-       We read off where the feasible region sits and how flat m_line is
-       across it; a wide plateau is itself the result D2.2 wants.
-    3. The m_line against r² plane with the constraint boundary drawn,
-       showing what the grading constraint excluded. Alongside the per-color
-       r², we report the conditional-mean r² over redness levels. The
-       ex-2.1.10 review found that the two together separate graded on
-       average from graded color by color, and only the per-color reading
-       constrains anything.
-    4. The λ_a marginal on its own. Ex-2.1.7 predicts a selectivity optimum
-       below λ = 1, and where the containment and grading constraints
-       actually bind along λ is the single most valuable reading in the
-       survey.
+    1. The full trial table: sampled coordinates, every statistic, feasibility against each constraint, and round-2 seed means where a trial was promoted. No trial is omitted.
+    2. Marginals: m_line and each constraint statistic against each dimension, with the branch A anti axes shown in dose and centroid coordinates, and feasible trials distinguished from infeasible ones. We read off where the feasible region sits and how flat m_line is across it; a wide plateau is itself the result D2.2 wants.
+    3. The m_line against r² plane with the constraint boundary drawn, showing what the grading constraint excluded. Alongside the per-color r², we report the conditional-mean r² over redness levels. The ex-2.1.10 review found that the two together separate graded on average from graded color by color, and only the per-color reading constrains anything.
+    4. The λ_a marginal on its own. Ex-2.1.7 predicts a selectivity optimum below λ = 1, and where the containment and grading constraints actually bind along λ is the single most valuable reading in the survey.
     ///
     """)
     return
@@ -1100,11 +807,7 @@ def _():
     ## Proposed operating point
 
     /// admonition | TODO
-    One line: the coordinates and seed-mean statistics of the winning trial,
-    each with its noise floor. Beside it, the values for the reference recipe
-    and the width of the plateau it sits on. Then the handoff: which
-    experiment confirms the point, and at how many fresh seeds, before any of
-    these numbers is quoted.
+    One line: the coordinates and seed-mean statistics of the winning trial, each with its noise floor. Beside it, the values for the reference recipe and the width of the plateau it sits on. Then the handoff: which experiment confirms the point, and at how many fresh seeds, before any of these numbers is quoted.
     ///
     """)
     return
@@ -1115,8 +818,7 @@ def _():
     mo.md(r"""
     ## Exploratory analyses
 
-    *Empty until results land; anything conceived after seeing the data goes
-    here, marked as post hoc.*
+    *Empty until results land; anything conceived after seeing the data goes here, marked as post hoc.*
     """)
     return
 
@@ -1127,11 +829,7 @@ def _():
     ## Discussion
 
     /// admonition | TODO
-    Interpretation only, once the observations exist: what the ablations say
-    about carrying the M1 schedules into this architecture, what the map says
-    about how carefully M3 will need to tune, and what the survey format
-    itself cost or saved. This is the first time we've used that format, so
-    note any friction for the science skill.
+    Interpretation only, once the observations exist: what the ablations say about carrying the M1 schedules into this architecture, what the map says about how carefully M3 will need to tune, and what the survey format itself cost or saved. This is the first time we've used that format, so note any friction for the science skill.
     ///
     """)
     return
