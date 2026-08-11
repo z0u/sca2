@@ -204,7 +204,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(group_weights, prior):
+def _(group_weights, prior: dict):
     # Per-run statistics of the nine-seed primary, re-derived from the arrays.
     _m10: dict = prior["m10"]
     _primary = [c for c in _m10["cells"] if c["condition"] == "either-t100"]
@@ -235,7 +235,7 @@ def _(group_weights, prior):
 
 
 @app.cell(hide_code=True)
-def _(per_run):
+def _(per_run: dict[str, np.ndarray]):
     _rows = "".join(
         f"<tr><td><code>{k}</code></td>"
         f"<td class='num'>{v.mean():+.4f}</td>"
@@ -254,9 +254,9 @@ def _(per_run):
     mo.Html(
         figure_html(
             _table,
-            caption="""
+            caption=mo.md("""
             **Noise floors at the operating point.** Per-run mean and sd over ex-2.1.10's nine-seed primary, re-derived from its published arrays; the *frozen σ* column is the value the design constants carry, and the *band* is the smallest seed-mean difference the ablation stage may call a difference (2σ·√(2/3), three seeds a side).
-            """,
+            """).text,
             class_="report-figure",
         )
     )
@@ -284,7 +284,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(per_run, prior):
+def _(per_run: dict[str, np.ndarray], prior: dict):
     _m10: dict = prior["m10"]
     _conds = ["op1-labels", "either-t100", "either-t500", "either-t2500", "slot-oracle"]
     _pts: dict[str, tuple[np.ndarray, np.ndarray]] = {}
@@ -367,7 +367,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(prior, softmin_weights_np):
+def _(prior: dict, softmin_weights_np):
     _m10: dict = prior["m10"]
     _labels = [c["label"] for c in _m10["cells"] if c["condition"] == "either-t100"]
     _alpha = np.mean([prior["a10"][f"{la}/alpha_lines"] for la in _labels], axis=0)  # (L1, N, T), seed mean
@@ -476,7 +476,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(prior):
+def _(prior: dict):
     _m9: dict = prior["m9"]
     _rows = []
     for _c in _m9["cells"]:
@@ -503,9 +503,9 @@ def _(prior):
     mo.Html(
         figure_html(
             _table,
-            caption=f"""
+            caption=mo.md(f"""
             **The latch detector, calibrated on ex-2.1.9.** Deep-slice (post-attention) mean softmin weight per span role, per stored run of the pooled conditions. Latched runs put ≥ 0.85 on `+`; healthy runs ≤ 0.03 on any syntax role (bold = over the {ex.LATCH_PI:g} veto). The threshold sits in a wide gap, so the veto is insensitive to its exact value.
-            """,
+            """).text,
             class_="report-figure",
         )
     )
@@ -574,9 +574,9 @@ def _():
     mo.Html(
         figure_html(
             _table,
-            caption="""
+            caption=mo.md("""
             **The ablation conditions and their delivered invariants.** Dose is ∫ w·lr de over that condition's training; centroid is the dose-weighted mean epoch. Doses are reported, not matched — the flat arms change shape and timing, and the columns say by how much.
-            """,
+            """).text,
             class_="report-figure",
         )
     )
@@ -595,7 +595,13 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md("\n".join("> " + line for line in ex.DECISION_RULES.splitlines()))
+    mo.md(f"""
+    ---
+
+    {ex.DECISION_RULES}
+
+    ---
+    """)
     return
 
 
@@ -652,9 +658,9 @@ def _():
         figure_html(
             f"<details><summary>Branch A trial list (schedule retained)</summary>{_a}</details>"
             f"<details><summary>Branch B trial list (flat anti)</summary>{_b}</details>",
-            caption=f"""
+            caption=mo.md(f"""
             **The frozen trial lists**, {ex.N_TRIALS} scrambled-Sobol points per branch (seed {ex.SOBOL_SEED}), shown for review before any run. Branch A adds the derived (relative dose, centroid) coordinates its marginals will be reported in; relative dose is the trial's ∫ μ/λ·lr de over the operating point's.
-            """,
+            """).text,
             class_="report-figure",
         )
     )
