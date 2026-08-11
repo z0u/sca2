@@ -79,8 +79,7 @@ def test_non_notebooks_are_not_reports(repo):
 
 
 def test_a_notebook_outside_docs_is_not_a_report(repo):
-    """`marimo.App(` appears in plenty of files that aren't reports — this repo's own
-    tests among them. Only `docs/` is the report tree."""
+    """`marimo.App(` appears in plenty of files that aren't reports — this repo's own tests among them. Only `docs/` is the report tree."""
     (tests := repo / "tests").mkdir()
     (tests / "test_something.py").write_text(f'SAMPLE = """{_APP}"""\n')
     (repo / "notebook.py").write_text(_APP)
@@ -141,8 +140,7 @@ def test_the_marker_opts_out_of_the_reminder(repo):
 
 
 def test_a_stale_base_does_not_produce_noise(repo):
-    """A container's `origin/main` is often behind. That makes more reports look changed,
-    but their pins moved in the same range, so they don't read as unpublished."""
+    """A container's `origin/main` is often behind. That makes more reports look changed, but their pins moved in the same range, so they don't read as unpublished."""
     (repo / "docs" / "ex-1" / "report.py").write_text(_APP + "# edited\n")
     pin(repo, "ex-1", "ccc")
     commit(repo, "edit and publish")
