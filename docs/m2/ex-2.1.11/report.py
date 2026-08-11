@@ -523,16 +523,21 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
+    # REVIEW: the shapes now come from `experiment.condition_shapes`, the same
+    # mapping the runs are built from, rather than being re-derived here. The
+    # `linear` arm was previously reported at the minimum-jerk schedule's dose,
+    # which is not what it delivers: the anti-subspace ratio interpolates over
+    # 90 epochs, where a straight line and a smoothstep differ well outside
+    # rounding. Verify: every other row is unchanged, since flat and minimum-jerk
+    # were already read correctly.
     def _invariants(c: dict) -> tuple[float, float, float, float]:
         epochs: int = c["epochs"]
-        if c.get("anchor_shape") == "flat":
-            anchor = lambda e: c["lam"] * np.ones_like(np.asarray(e, dtype=float))  # noqa: E731
-        else:
-            anchor = lambda e: ex.anchor_weight(e, peak=c["lam"], epochs=epochs)  # noqa: E731
-        if c.get("anti_shape") == "flat":
-            anti = lambda e: c["anti_ratio"] * c["lam"] * np.ones_like(np.asarray(e, dtype=float))  # noqa: E731
-        else:
-            anti = lambda e: ex.anti_weight(e, lam=c["lam"], epochs=epochs)  # noqa: E731
+        anchor_shape, anti_shape = ex.condition_shapes(c)
+        ratio = c.get("anti_ratio", ex.ANTI_HOLD_RATIO)
+        anchor = lambda e: ex.anchor_weight(e, peak=c["lam"], epochs=epochs, shape=anchor_shape)  # noqa: E731
+        anti = lambda e: ex.anti_weight(  # noqa: E731
+            e, lam=c["lam"], epochs=epochs, shape=anti_shape, hold_ratio=ratio
+        )
         return (
             ex.anchor_dose(anchor, epochs=epochs),
             ex.dose_centroid(anchor, epochs=epochs) if c["lam"] > 0 else float("nan"),
