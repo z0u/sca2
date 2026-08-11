@@ -58,8 +58,7 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    We tested anti-subspace schedules (trailing timing and strength) to find an operating point that contains the cube-wide drift without reducing selectivity.
-    Holding the repulsion high for longer contains the drift and keeps the margin, which nothing before this did. It's unclear if the response is well-graded.
+    We tested anti-subspace schedules (trailing timing and strength) to find an operating point that contains the cube-wide drift without reducing selectivity. Holding the repulsion high for longer contains the drift and keeps the margin, which nothing before this did. It's unclear if the response is well-graded.
     ///
     """)
     return
@@ -155,32 +154,13 @@ def _(
     _p = ex.PRIMARY
     _best_r2 = max(ex.FACTORIAL_NAMES, key=lambda c: grading(c)[1])
     mo.md(rf"""
-    **H1 (task cost) — holds.** Largest `named_holdout` exact-match gap from the
-    control, across all {len(CONDS)} conditions:
-    {max(abs(acc(c).mean() - CONTROL_ACC) for c in CONDS):.4f}. Gate:
-    {ex.TASK_GATE:g}.
+    **H1 (task cost) — holds.** Largest `named_holdout` exact-match gap from the control, across all {len(CONDS)} conditions: {max(abs(acc(c).mean() - CONTROL_ACC) for c in CONDS):.4f}. Gate: {ex.TASK_GATE:g}.
 
-    **H2 (an operating point exists) — fails, on grading.** `{_p}`, the
-    preregistered primary condition, meets containment
-    ($\bar\alpha = {alpha_bar(_p).mean():.3f}$, gate {ex.MEAN_ALIGN_GATE:g}),
-    margin ({m_op1(_p).mean():.3f}, gate {ex.MARGIN_GATE:g}) and retention
-    ({retention(_p):.2f}, gate {ex.H4_RETENTION:g}). No condition in the grid reaches
-    the grading gate of {ex.GRADE_R2_GATE:g} on either track; the best R² is
-    {grading(_best_r2)[1]:.2f}. Neither named partial applies.
+    **H2 (an operating point exists) — fails, on grading.** `{_p}`, the preregistered primary condition, meets containment ($\bar\alpha = {alpha_bar(_p).mean():.3f}$, gate {ex.MEAN_ALIGN_GATE:g}), margin ({m_op1(_p).mean():.3f}, gate {ex.MARGIN_GATE:g}) and retention ({retention(_p):.2f}, gate {ex.H4_RETENTION:g}). No condition in the grid reaches the grading gate of {ex.GRADE_R2_GATE:g} on either track; the best R² is {grading(_best_r2)[1]:.2f}. Neither named partial applies.
 
-    **H3 (a sustained floor makes the anneal endpoint redundant) — holds.**
-    Hold-ratio main effect on $\bar\alpha$: {HOLD_EFFECT:+.3f}, gate
-    {EFFECT_GATE:.3f}. Interaction: {INTERACTION:+.3f}, gate
-    {INTERACTION_GATE:.3f} — a pass by
-    {(INTERACTION - INTERACTION_GATE) / INTERACTION_GATE * 100:.0f}%. Both gates
-    are the preregistered values rescaled by this experiment's own seed spread,
-    as the H3 footnote directs.
+    **H3 (a sustained floor makes the anneal endpoint redundant) — holds.** Hold-ratio main effect on $\bar\alpha$: {HOLD_EFFECT:+.3f}, gate {EFFECT_GATE:.3f}. Interaction: {INTERACTION:+.3f}, gate {INTERACTION_GATE:.3f} — a pass by {(INTERACTION - INTERACTION_GATE) / INTERACTION_GATE * 100:.0f}%. Both gates are the preregistered values rescaled by this experiment's own seed spread, as the H3 footnote directs.
 
-    **Containment is now newly reachable.** `{_p}` is the first
-    condition in M2 to hold $\bar\alpha$ near the control while keeping the
-    margin. The best in ex-2.1.7 was
-    {ex.EX217_REFERENCE["end90-hold03"]["alpha"]:.2f} and its gate went unmet
-    everywhere.
+    **Containment is now newly reachable.** `{_p}` is the first condition in M2 to hold $\bar\alpha$ near the control while keeping the margin. The best in ex-2.1.7 was {ex.EX217_REFERENCE["end90-hold03"]["alpha"]:.2f} and its gate went unmet everywhere.
     """)
     return
 
@@ -204,8 +184,7 @@ def _():
 
     We use the same *anchor* schedule, but vary the *anti-subspace* schedule.
 
-    Since we're using sequence-level labels, this experiment is like the `span-*` conditions in ex-2.1.7.
-    The op1-only pull in ex-2.1.7 scored higher, but that option exists only because this synthetic language has a known position carrying the concept. Once we retire that position oracle we have to pull on a span.
+    Since we're using sequence-level labels, this experiment is like the `span-*` conditions in ex-2.1.7. The op1-only pull in ex-2.1.7 scored higher, but that option exists only because this synthetic language has a known position carrying the concept. Once we retire that position oracle we have to pull on a span.
     """)
     return
 
@@ -273,17 +252,9 @@ def _():
     mo.md(r"""
     ### A confound, and its mitigation
 
-    The two factors are not symmetric. Changing the hold ratio barely changes
-    the total repulsion delivered. Changing the endpoint does, because a later
-    anneal spends longer at a high weight. So along factor A, *when* the
-    repulsion acts and *how much* of it there is move together.
+    The two factors are not symmetric. Changing the hold ratio barely changes the total repulsion delivered. Changing the endpoint does, because a later anneal spends longer at a high weight. So along factor A, *when* the repulsion acts and *how much* of it there is move together.
 
-    We call that total the *dose*, and measure it as
-    $\int \lambda_{\bar{\text{s}}}(e)\cdot\text{lr}(e)\,de$ over training. The
-    learning rate belongs inside the integral because it multiplies the
-    gradient of every term, and it is itself warming up and annealing across
-    the same window. A weight-only integral would call two schedules equal even
-    when they deliver visibly different pushes.
+    We call that total the *dose*, and measure it as $\int \lambda_{\bar{\text{s}}}(e)\cdot\text{lr}(e)\,de$ over training. The learning rate belongs inside the integral because it multiplies the gradient of every term, and it is itself warming up and annealing across the same window. A weight-only integral would call two schedules equal even when they deliver visibly different pushes.
     """)
     return
 
@@ -318,8 +289,7 @@ def _():
 
     [^cant]: Reaching the endpoint-90 dose from endpoint 50 would need $\\lambda_{{\\bar{{\\text{{s}}}}}}/\\lambda_\\text{{a}} \\approx 1.18$, which would hold the repulsion above the anchor weight for half of training. We could do that, but that's a different experiment.
 
-    Instead, we add an arm: `{ex.DOSE_ARM}` is `end90-hold03` with the opening ratio scaled {ex.ANTI_PEAK_RATIO:g} → {ex.DOSE_MATCHED_PEAK_RATIO:g}, so it delivers the dose of `{ex.DOSE_ARM_REFERENCE}` on the late schedule.
-    That's still asymmetrical: this arm has less repulsion through the epochs where the anchor is first ramping in. If it tracks `{ex.DOSE_ARM_REFERENCE}` rather than `end90-hold03`, weak early repulsion may be the cause. This should be visible in the trajectory figure.
+    Instead, we add an arm: `{ex.DOSE_ARM}` is `end90-hold03` with the opening ratio scaled {ex.ANTI_PEAK_RATIO:g} → {ex.DOSE_MATCHED_PEAK_RATIO:g}, so it delivers the dose of `{ex.DOSE_ARM_REFERENCE}` on the late schedule. That's still asymmetrical: this arm has less repulsion through the epochs where the anchor is first ramping in. If it tracks `{ex.DOSE_ARM_REFERENCE}` rather than `end90-hold03`, weak early repulsion may be the cause. This should be visible in the trajectory figure.
     """)
     return
 
@@ -469,12 +439,9 @@ def _():
     Like ex-2.1.7:
 
     - `named_holdout` exact match, against the in-experiment control (H1).
-    - $m_{\text{op1}}$: the label-affinity-weighted alignment at op1 minus the
-      cube mean, averaged over layers (H2, H3).
-    - $\bar\alpha$: mean alignment over all 216 colors at op1, layer-averaged
-      (H2, H3). This is the quantity the repulsive term is defined on.
-    - Grading: Spearman $\rho$ against `redness` and Pearson $R^2$ against
-      `sim¹·⁵` over the 216 colors (H2).
+    - $m_{\text{op1}}$: the label-affinity-weighted alignment at op1 minus the cube mean, averaged over layers (H2, H3).
+    - $\bar\alpha$: mean alignment over all 216 colors at op1, layer-averaged (H2, H3). This is the quantity the repulsive term is defined on.
+    - Grading: Spearman $\rho$ against `redness` and Pearson $R^2$ against `sim¹·⁵` over the 216 colors (H2).
     - Per-run margin trajectories, for retention (H2).
     """)
     return
@@ -499,9 +466,7 @@ def _():
     mo.md(r"""
     ## Hypotheses
 
-    Gates and noise floors carry over from ex-2.1.7 with their thresholds and
-    rationale, since we have the same architecture, the same measurement, and
-    the same statistics.
+    Gates and noise floors carry over from ex-2.1.7 with their thresholds and rationale, since we have the same architecture, the same measurement, and the same statistics.
     """)
     return
 
@@ -848,15 +813,9 @@ def _(alpha_bar, grading, m_op1):
     _dm = max(abs(m_op1(c).mean() - r["m_op1"]) for c, r in ex.EX217_REFERENCE.items())
     _da = max(abs(alpha_bar(c).mean() - r["alpha"]) for c, r in ex.EX217_REFERENCE.items())
     mo.md(rf"""
-    Both conditions reproduce. The margins land {_dm:.3f} from the published values
-    against a floor of {ex.NOISE_SEED_MEAN:g}, and ᾱ within {_da:.3f}, inside
-    the tolerance in either row. Grading agrees as well: `end90-hold03` scores
-    R² = {grading("end90-hold03")[1]:.2f} here, the value ex-2.1.7 published for
-    the same condition.
+    Both conditions reproduce. The margins land {_dm:.3f} from the published values against a floor of {ex.NOISE_SEED_MEAN:g}, and ᾱ within {_da:.3f}, inside the tolerance in either row. Grading agrees as well: `end90-hold03` scores R² = {grading("end90-hold03")[1]:.2f} here, the value ex-2.1.7 published for the same condition.
 
-    So the two experiments measure the same thing, and this grid can be read
-    against the ex-2.1.7 numbers — which the H2 partials and the H3 power
-    argument both rely on.
+    So the two experiments measure the same thing, and this grid can be read against the ex-2.1.7 numbers — which the H2 partials and the H3 power argument both rely on.
     """)
     return
 
@@ -911,16 +870,9 @@ def _(CONDS: list[str], CONTROL_ACC, HOLD_HI, ROW, acc):
     _worst = max(CONDS, key=lambda c: abs(acc(c).mean() - CONTROL_ACC))
     _hi = max(ROW[HOLD_HI], key=lambda c: abs(acc(c).mean() - CONTROL_ACC))
     mo.md(rf"""
-    **H1 holds.** The largest gap from the control is
-    {abs(acc(_worst).mean() - CONTROL_ACC):.4f}, at `{_worst}`, against a gate
-    of {ex.TASK_GATE:g}. Every condition solves the task.
+    **H1 holds.** The largest gap from the control is {abs(acc(_worst).mean() - CONTROL_ACC):.4f}, at `{_worst}`, against a gate of {ex.TASK_GATE:g}. Every condition solves the task.
 
-    The preregistration named the `hold{HOLD_HI * 100:02.0f}` row as the place a
-    task cost would show up, since it sustains a repulsive weight no earlier
-    experiment held. It does not: the worst condition in that row is `{_hi}` at
-    {abs(acc(_hi).mean() - CONTROL_ACC):.4f}, the same size as the gaps
-    elsewhere. Holding the repulsion an order of magnitude above the M1 floor for
-    the rest of training costs nothing the task loss can see.
+    The preregistration named the `hold{HOLD_HI * 100:02.0f}` row as the place a task cost would show up, since it sustains a repulsive weight no earlier experiment held. It does not: the worst condition in that row is `{_hi}` at {abs(acc(_hi).mean() - CONTROL_ACC):.4f}, the same size as the gaps elsewhere. Holding the repulsion an order of magnitude above the M1 floor for the rest of training costs nothing the task loss can see.
     """)
     return
 
@@ -1000,39 +952,13 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, grading, m_op1, retention):
     _contained = [c for c in ex.FACTORIAL_NAMES if alpha_bar(c).mean() <= ex.MEAN_ALIGN_GATE]
     _p = ex.PRIMARY
     mo.md(rf"""
-    **H2 fails, on grading.** The condition the preregistration named,
-    `{_p}`, meets three of the four criteria: it contains the drift at
-    ᾱ = {alpha_bar(_p).mean():.3f} against a gate of {ex.MEAN_ALIGN_GATE:g},
-    holds the margin at {m_op1(_p).mean():.3f} against {ex.MARGIN_GATE:g}, and
-    retains {retention(_p):.2f}× its peak against {ex.H4_RETENTION:g}. But its
-    response is graded at ρ = {grading(_p)[0]:.2f} and R² = {grading(_p)[1]:.2f},
-    and the gate is {ex.GRADE_R2_GATE:g} on either track.
+    **H2 fails, on grading.** The condition the preregistration named, `{_p}`, meets three of the four criteria: it contains the drift at ᾱ = {alpha_bar(_p).mean():.3f} against a gate of {ex.MEAN_ALIGN_GATE:g}, holds the margin at {m_op1(_p).mean():.3f} against {ex.MARGIN_GATE:g}, and retains {retention(_p):.2f}× its peak against {ex.H4_RETENTION:g}. But its response is graded at ρ = {grading(_p)[0]:.2f} and R² = {grading(_p)[1]:.2f}, and the gate is {ex.GRADE_R2_GATE:g} on either track.
 
-    Every condition misses on grading. The best R² in the grid is
-    {grading(_best_r2)[1]:.2f} (`{_best_r2}`) and the best ρ is
-    {grading(_best_rho)[0]:.2f} (`{_best_rho}`), so no condition comes within
-    {ex.GRADE_R2_GATE - grading(_best_r2)[1]:.2f} of passing. Neither named
-    partial applies, since both assume grading holds and vary the containment
-    or margin around it.
+    Every condition misses on grading. The best R² in the grid is {grading(_best_r2)[1]:.2f} (`{_best_r2}`) and the best ρ is {grading(_best_rho)[0]:.2f} (`{_best_rho}`), so no condition comes within {ex.GRADE_R2_GATE - grading(_best_r2)[1]:.2f} of passing. Neither named partial applies, since both assume grading holds and vary the containment or margin around it.
 
-    The contrary result the preregistration named — containment bought by
-    flattening the response — is not what happened. As the anneal is stretched, ᾱ falls
-    and the margin rises together: `{ROW[HOLD_LO][0]}` sits at
-    ᾱ {alpha_bar(ROW[HOLD_LO][0]).mean():.3f} with margin
-    {m_op1(ROW[HOLD_LO][0]).mean():.3f}, and `{ROW[HOLD_LO][-1]}` at
-    {alpha_bar(ROW[HOLD_LO][-1]).mean():.3f} with {m_op1(ROW[HOLD_LO][-1]).mean():.3f}.
-    Grading rises with them, from {grading(ROW[HOLD_LO][0])[1]:.2f} to
-    {grading(ROW[HOLD_LO][-1])[1]:.2f}. So stretching the anneal buys
-    selectivity, and just stops short of the level H2 asked for.
+    The contrary result the preregistration named — containment bought by flattening the response — is not what happened. As the anneal is stretched, ᾱ falls and the margin rises together: `{ROW[HOLD_LO][0]}` sits at ᾱ {alpha_bar(ROW[HOLD_LO][0]).mean():.3f} with margin {m_op1(ROW[HOLD_LO][0]).mean():.3f}, and `{ROW[HOLD_LO][-1]}` at {alpha_bar(ROW[HOLD_LO][-1]).mean():.3f} with {m_op1(ROW[HOLD_LO][-1]).mean():.3f}. Grading rises with them, from {grading(ROW[HOLD_LO][0])[1]:.2f} to {grading(ROW[HOLD_LO][-1])[1]:.2f}. So stretching the anneal buys selectivity, and just stops short of the level H2 asked for.
 
-    Containment on its own is now reachable, which it was not in ex-2.1.7.
-    One condition of the six falls to ᾱ ≤ {ex.MEAN_ALIGN_GATE:g}
-    ({", ".join(f"`{c}`" for c in _contained)}), and a second comes within
-    {min(alpha_bar(c).mean() for c in ROW[HOLD_HI] if c not in _contained) - ex.MEAN_ALIGN_GATE:.3f}
-    of it. That experiment's best was
-    {ex.EX217_REFERENCE["end90-hold03"]["alpha"]:.2f}, and its gate went unmet
-    everywhere. Both of the near conditions are in the
-    `hold{HOLD_HI * 100:02.0f}` row.
+    Containment on its own is now reachable, which it was not in ex-2.1.7. One condition of the six falls to ᾱ ≤ {ex.MEAN_ALIGN_GATE:g} ({", ".join(f"`{c}`" for c in _contained)}), and a second comes within {min(alpha_bar(c).mean() for c in ROW[HOLD_HI] if c not in _contained) - ex.MEAN_ALIGN_GATE:.3f} of it. That experiment's best was {ex.EX217_REFERENCE["end90-hold03"]["alpha"]:.2f}, and its gate went unmet everywhere. Both of the near conditions are in the `hold{HOLD_HI * 100:02.0f}` row.
     """)
     return
 
@@ -1040,8 +966,7 @@ def _(HOLD_HI, HOLD_LO, ROW, alpha_bar, grading, m_op1, retention):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    The endpoint table says where each run finished. The trajectories say how it
-    got there, which separates the two accounts H3 is built on.
+    The endpoint table says where each run finished. The trajectories say how it got there, which separates the two accounts H3 is built on.
     """)
     return
 
@@ -1241,24 +1166,11 @@ def _(BY_NAME, HOLD_HI, HOLD_LO, ROW, alpha_bar, traj):
 @app.cell(hide_code=True)
 def _(HOLD_HI, HOLD_LO, ROW, alpha_bar):
     mo.md(rf"""
-    Every condition departs, including the three at the sustained floor. So the
-    strong form of the level account — a floor high enough that the crossing
-    never happens — is not what the trajectories show. All six cross, and all
-    six climb afterwards.
+    Every condition departs, including the three at the sustained floor. So the strong form of the level account — a floor high enough that the crossing never happens — is not what the trajectories show. All six cross, and all six climb afterwards.
 
-    What the floor does is move the crossing later and flatten what follows.
-    Departure tracks the crossing in every condition, and raising the hold ratio
-    pushes both later, the departure by more than the crossing. That is the
-    delay. The flattening shows up when the departure epoch is held roughly
-    fixed and the row changes: `{ROW[HOLD_HI][1]}` and `{ROW[HOLD_LO][2]}` leave
-    the control within two epochs of each other, and finish at
-    ᾱ = {alpha_bar(ROW[HOLD_HI][1]).mean():.3f} against
-    {alpha_bar(ROW[HOLD_LO][2]).mean():.3f}. Same runway, different climb rate.
+    What the floor does is move the crossing later and flatten what follows. Departure tracks the crossing in every condition, and raising the hold ratio pushes both later, the departure by more than the crossing. That is the delay. The flattening shows up when the departure epoch is held roughly fixed and the row changes: `{ROW[HOLD_HI][1]}` and `{ROW[HOLD_LO][2]}` leave the control within two epochs of each other, and finish at ᾱ = {alpha_bar(ROW[HOLD_HI][1]).mean():.3f} against {alpha_bar(ROW[HOLD_LO][2]).mean():.3f}. Same runway, different climb rate.
 
-    Both effects run the same way, which is why the endpoint and the floor look
-    interchangeable in the endpoint table and are not. The margin, dashed in
-    every panel, climbs early while the repulsion is strong and then holds
-    across the whole anneal; nothing in the grid costs it.
+    Both effects run the same way, which is why the endpoint and the floor look interchangeable in the endpoint table and are not. The margin, dashed in every panel, climbs early while the repulsion is strong and then holds across the whole anneal; nothing in the grid costs it.
     """)
     return
 
@@ -1275,17 +1187,9 @@ def _():
 def _(ALPHA_SPREAD, CONTROL_SPREAD, EFFECT_GATE, GATE_SCALE, INTERACTION_GATE):
     _moved = GATE_SCALE > 1.0
     mo.md(rf"""
-    H3 has a footnote that asks for the seed spread before either statistic is used, and
-    allows the gates to move with it. Pooled over the six factorial conditions, the seed spread of ᾱ
-    is {ALPHA_SPREAD:.4f}, against the ex-2.1.6 control value of
-    {CONTROL_SPREAD:g} the gates were sized on. The anchored conditions do not hold
-    it, so the gates move by {GATE_SCALE:.2f}×: the main effect is scored at
-    {EFFECT_GATE:.3f} and the interaction at {INTERACTION_GATE:.3f}. Those are
-    the numbers used below{"" if _moved else " (unmoved)"}.
+    H3 has a footnote that asks for the seed spread before either statistic is used, and allows the gates to move with it. Pooled over the six factorial conditions, the seed spread of ᾱ is {ALPHA_SPREAD:.4f}, against the ex-2.1.6 control value of {CONTROL_SPREAD:g} the gates were sized on. The anchored conditions do not hold it, so the gates move by {GATE_SCALE:.2f}×: the main effect is scored at {EFFECT_GATE:.3f} and the interaction at {INTERACTION_GATE:.3f}. Those are the numbers used below{"" if _moved else " (unmoved)"}.
 
-    One condition accounts for most of that spread. The rest sit between 0.006 and 0.027,
-    so the rescaling is driven by a single condition rather than by the grid
-    being noisy throughout.
+    One condition accounts for most of that spread. The rest sit between 0.006 and 0.027, so the rescaling is driven by a single condition rather than by the grid being noisy throughout.
     """)
     return
 
@@ -1331,40 +1235,15 @@ def _(
     end_effect,
 ):
     mo.md(rf"""
-    **H3 holds, on both conditions.** The hold-ratio main effect is
-    {HOLD_EFFECT:+.3f} against a gate of {EFFECT_GATE:.3f}, so the floor does
-    something. The interaction is {INTERACTION:+.3f} against
-    {INTERACTION_GATE:.3f}: the end{END_LO:.0f} − end{END_HI:.0f} difference is
-    {end_effect(HOLD_LO):+.3f} in the `hold{HOLD_LO * 100:02.0f}` row and
-    {end_effect(HOLD_HI):+.3f} in the `hold{HOLD_HI * 100:02.0f}` row, so the
-    endpoint has about {end_effect(HOLD_LO) / end_effect(HOLD_HI):.1f} times as
-    much leverage at the low floor as at the high one.
+    **H3 holds, on both conditions.** The hold-ratio main effect is {HOLD_EFFECT:+.3f} against a gate of {EFFECT_GATE:.3f}, so the floor does something. The interaction is {INTERACTION:+.3f} against {INTERACTION_GATE:.3f}: the end{END_LO:.0f} − end{END_HI:.0f} difference is {end_effect(HOLD_LO):+.3f} in the `hold{HOLD_LO * 100:02.0f}` row and {end_effect(HOLD_HI):+.3f} in the `hold{HOLD_HI * 100:02.0f}` row, so the endpoint has about {end_effect(HOLD_LO) / end_effect(HOLD_HI):.1f} times as much leverage at the low floor as at the high one.
 
-    Neither named miss occurred. Miss 1 needed the endpoint effect to clear
-    {EFFECT_GATE:.3f} in both rows with the interaction under its gate; the
-    interaction is over it. Miss 2 needed the main effect to fail, and it
-    passes by a factor of {HOLD_EFFECT / EFFECT_GATE:.1f}.
+    Neither named miss occurred. Miss 1 needed the endpoint effect to clear {EFFECT_GATE:.3f} in both rows with the interaction under its gate; the interaction is over it. Miss 2 needed the main effect to fail, and it passes by a factor of {HOLD_EFFECT / EFFECT_GATE:.1f}.
 
-    However, the interaction only clears its gate by
-    {INTERACTION - INTERACTION_GATE:.3f}, about
-    {(INTERACTION - INTERACTION_GATE) / INTERACTION_GATE * 100:.0f}% — on a gate that moved because of this experiment's own
-    seed spread. And the level account predicted about +0.20, with the whole
-    endpoint effect inside the low row; the observed {INTERACTION:+.3f} is
-    below that, because the endpoint still moves ᾱ by
-    {end_effect(HOLD_HI):+.3f} in the high row, where that account expects
-    nothing.
+    However, the interaction only clears its gate by {INTERACTION - INTERACTION_GATE:.3f}, about {(INTERACTION - INTERACTION_GATE) / INTERACTION_GATE * 100:.0f}% — on a gate that moved because of this experiment's own seed spread. And the level account predicted about +0.20, with the whole endpoint effect inside the low row; the observed {INTERACTION:+.3f} is below that, because the endpoint still moves ᾱ by {end_effect(HOLD_HI):+.3f} in the high row, where that account expects nothing.
 
-    So the endpoint keeps some leverage even at the sustained floor. The
-    trajectories show that the floor postpones the crossing and slows the climb
-    after it, but it still crosses. The statistic H3 was
-    built on separates the accounts in the direction it was meant to, and the
-    mechanism behind it is milder than the account it favors.
+    So the endpoint keeps some leverage even at the sustained floor. The trajectories show that the floor postpones the crossing and slows the climb after it, but it still crosses. The statistic H3 was built on separates the accounts in the direction it was meant to, and the mechanism behind it is milder than the account it favors.
 
-    We also said we would report the ordering of the main effects without
-    scoring it. The hold-ratio effect ({HOLD_EFFECT:+.3f}) is larger than the
-    endpoint effect averaged over the two rows
-    ({(end_effect(HOLD_LO) + end_effect(HOLD_HI)) / 2:+.3f}), which agrees with
-    the interaction.
+    We also said we would report the ordering of the main effects without scoring it. The hold-ratio effect ({HOLD_EFFECT:+.3f}) is larger than the endpoint effect averaged over the two rows ({(end_effect(HOLD_LO) + end_effect(HOLD_HI)) / 2:+.3f}), which agrees with the interaction.
     """)
     return
 
@@ -1417,17 +1296,9 @@ def _(BY_NAME, alpha_bar, grading, m_op1, retention):
 def _(alpha_bar):
     _ref, _late, _arm = (float(alpha_bar(c).mean()) for c in (ex.DOSE_ARM_REFERENCE, "end90-hold03", ex.DOSE_ARM))
     mo.md(rf"""
-    The arm lands at ᾱ = {_arm:.3f}, between `{ex.DOSE_ARM_REFERENCE}`
-    ({_ref:.3f}) and `end90-hold03` ({_late:.3f}), and about
-    {(_ref - _arm) / (_ref - _late) * 100:.0f}% of the way across. So most of
-    what the endpoint buys is timing, and some of it is dose.
+    The arm lands at ᾱ = {_arm:.3f}, between `{ex.DOSE_ARM_REFERENCE}` ({_ref:.3f}) and `end90-hold03` ({_late:.3f}), and about {(_ref - _arm) / (_ref - _late) * 100:.0f}% of the way across. So most of what the endpoint buys is timing, and some of it is dose.
 
-    That should be taken loosely: this is one condition on three seeds, it scores nothing, and scaling the opening ratio to
-    {ex.DOSE_MATCHED_PEAK_RATIO:g} weakens the repulsion through the epochs
-    where the anchor first ramps in, which the Method section named as a
-    confound of its own. The reading it does support is that the
-    endpoint effect is not *merely* a dose effect,
-    because holding the dose fixed leaves most of the gap intact.
+    That should be taken loosely: this is one condition on three seeds, it scores nothing, and scaling the opening ratio to {ex.DOSE_MATCHED_PEAK_RATIO:g} weakens the repulsion through the epochs where the anchor first ramps in, which the Method section named as a confound of its own. The reading it does support is that the endpoint effect is not *merely* a dose effect, because holding the dose fixed leaves most of the gap intact.
     """)
     return
 
@@ -1437,13 +1308,7 @@ def _():
     mo.md(r"""
     ## Secondary measurements
 
-    Carried from ex-2.1.7 without a gate. Two probes read redness from
-    complementary parts of the residual stream at op1: one from the anchor
-    coordinate alone, and one from the other 63 directions. The first starts
-    empty and measures how much redness anchoring put there. The second has an
-    RGB floor it cannot go far below, since redness is a function of color and
-    the task needs the color cube, so it reports whether the cube survived
-    rather than whether the concept moved.
+    Carried from ex-2.1.7 without a gate. Two probes read redness from complementary parts of the residual stream at op1: one from the anchor coordinate alone, and one from the other 63 directions. The first starts empty and measures how much redness anchoring put there. The second has an RGB floor it cannot go far below, since redness is a function of color and the task needs the color cube, so it reports whether the cube survived rather than whether the concept moved.
     """)
     return
 
@@ -1494,28 +1359,11 @@ def _(ANCHORED, CONDS: list[str], cells, geometry):
     _floor = ex.redness_rgb_floor()
     _hi = max(ANCHORED, key=lambda c: _axis[c])
     mo.md(rf"""
-    The anchor coordinate carries redness in every anchored condition, from
-    R² = {min(_axis[c] for c in ANCHORED):.2f} to
-    {_axis[_hi]:.2f} (`{_hi}`), against {_axis["lam0"]:.2f} in the control. The
-    spread across the grid is narrow, and it does not order the conditions the
-    way ᾱ does, so this is not a second containment measurement.
+    The anchor coordinate carries redness in every anchored condition, from R² = {min(_axis[c] for c in ANCHORED):.2f} to {_axis[_hi]:.2f} (`{_hi}`), against {_axis["lam0"]:.2f} in the control. The spread across the grid is narrow, and it does not order the conditions the way ᾱ does, so this is not a second containment measurement.
 
-    Off the axis, every condition sits within
-    {max(abs(v[-1] - _floor) for v in _leak.values()):.2f} of the RGB floor at
-    the last layer, and the anchored conditions all sit slightly above it
-    ({min(_leak[c][-1] for c in ANCHORED):.2f}–{max(_leak[c][-1] for c in ANCHORED):.2f})
-    where the control sits just below ({_leak["lam0"][-1]:.2f}). Above the floor
-    is reachable because the residual stream encodes color nonlinearly and
-    redness is quadratic in RGB, so a linear probe does better there than on raw
-    channels. Nothing here reads as a second copy of the concept living off the
-    axis, and nothing reads as the cube being lost: spread at the last layer
-    runs {min(_spread[c][-1] for c in CONDS):.3f}–{max(_spread[c][-1] for c in CONDS):.3f},
-    with the control at {_spread["lam0"][-1]:.3f} in the middle of that range.
+    Off the axis, every condition sits within {max(abs(v[-1] - _floor) for v in _leak.values()):.2f} of the RGB floor at the last layer, and the anchored conditions all sit slightly above it ({min(_leak[c][-1] for c in ANCHORED):.2f}–{max(_leak[c][-1] for c in ANCHORED):.2f}) where the control sits just below ({_leak["lam0"][-1]:.2f}). Above the floor is reachable because the residual stream encodes color nonlinearly and redness is quadratic in RGB, so a linear probe does better there than on raw channels. Nothing here reads as a second copy of the concept living off the axis, and nothing reads as the cube being lost: spread at the last layer runs {min(_spread[c][-1] for c in CONDS):.3f}–{max(_spread[c][-1] for c in CONDS):.3f}, with the control at {_spread["lam0"][-1]:.3f} in the middle of that range.
 
-    This is the point ex-2.1.7 made and this grid does not change: containment
-    is not exclusivity. Holding ᾱ near the control keeps the cube off the anchor
-    direction; it does not stop redness being readable from everywhere else,
-    because the task needs the color cube either way.
+    This is the point ex-2.1.7 made and this grid does not change: containment is not exclusivity. Holding ᾱ near the control keeps the cube off the anchor direction; it does not stop redness being readable from everywhere else, because the task needs the color cube either way.
     """)
     return
 
@@ -1705,11 +1553,7 @@ def _(alpha_map):
     _hi = _R >= 0.4
     _rho_hi = [float(ex.spearman(a[_hi], _R[_hi])) for a in (alpha_map(c)[:, :, 0].mean(axis=0) for c in ex.FACTORIAL_NAMES)]  # fmt: skip
     mo.md(rf"""
-    Above the knee the ordering is good in every condition — ρ runs
-    {min(_rho_hi):.2f} to {max(_rho_hi):.2f} on the {_hi.sum()} colors with redness ≥
-    0.4, against a gate of {ex.GRADE_RHO_GATE:g} — and it climbs monotonically
-    as the flat colors are excluded. So the graded part of the response is
-    graded, but the full-set statistic is dominated by the flat part.
+    Above the knee the ordering is good in every condition — ρ runs {min(_rho_hi):.2f} to {max(_rho_hi):.2f} on the {_hi.sum()} colors with redness ≥ 0.4, against a gate of {ex.GRADE_RHO_GATE:g} — and it climbs monotonically as the flat colors are excluded. So the graded part of the response is graded, but the full-set statistic is dominated by the flat part.
     """)
     return
 
@@ -1803,45 +1647,18 @@ def _(ceiling, grading):
     _open, _mid, _knee, _deep = (ceiling(k) for k in (0.0, 0.3, 0.4, 0.5))
     _half = ceiling(0.2, scale=0.5)
     mo.md(rf"""
-    The two tracks come apart. Even with no containment at all, the best ρ a
-    perfect `sim¹·⁵` response reaches is {_open[0]:.2f}, barely over the gate, because
-    `sim¹·⁵` is not a monotone function of `redness` (they correlate at {_corr:.2f}, not 1).
-    With the {(ex.REDNESS < 0.4).sum()} colors below `redness` 0.4 contained, the ceiling falls
-    to {_knee[0]:.2f}, under the observed values. So past a light knee the ρ track
-    penalizes containment, and at the containment this grid achieves it cannot reach
-    {ex.GRADE_RHO_GATE:g} however well the response is graded.
+    The two tracks come apart. Even with no containment at all, the best ρ a perfect `sim¹·⁵` response reaches is {_open[0]:.2f}, barely over the gate, because `sim¹·⁵` is not a monotone function of `redness` (they correlate at {_corr:.2f}, not 1). With the {(ex.REDNESS < 0.4).sum()} colors below `redness` 0.4 contained, the ceiling falls to {_knee[0]:.2f}, under the observed values. So past a light knee the ρ track penalizes containment, and at the containment this grid achieves it cannot reach {ex.GRADE_RHO_GATE:g} however well the response is graded.
 
-    R² behaves the other way. Its target is near zero for the colors
-    containment collapses, so containment moves the response toward the target
-    rather than away: the ceiling is {_knee[1]:.2f} at a knee of 0.4 and
-    {_deep[1]:.2f} even at 0.5. That track is reachable, and the best condition
-    in this grid gets {_best_r2:.2f} of it.[^m1r2]
+    R² behaves the other way. Its target is near zero for the colors containment collapses, so containment moves the response toward the target rather than away: the ceiling is {_knee[1]:.2f} at a knee of 0.4 and {_deep[1]:.2f} even at 0.5. That track is reachable, and the best condition in this grid gets {_best_r2:.2f} of it.[^m1r2]
 
-    Within that family — `sim¹·⁵` at full amplitude — the ρ gate and the
-    containment H2 also asks for cannot both be met. ᾱ crosses under
-    {ex.MEAN_ALIGN_GATE:g} somewhere between a knee of 0.3 and 0.4, and by
-    there ρ has fallen from {_mid[0]:.2f} to {_knee[0]:.2f}.
+    Within that family — `sim¹·⁵` at full amplitude — the ρ gate and the containment H2 also asks for cannot both be met. ᾱ crosses under {ex.MEAN_ALIGN_GATE:g} somewhere between a knee of 0.3 and 0.4, and by there ρ has fallen from {_mid[0]:.2f} to {_knee[0]:.2f}.
 
-    That family is narrow, though. ρ ranks colors, so it is blind to the
-    amplitude the ᾱ gate measures: scale the above-knee response to half of
-    `sim¹·⁵` at a knee of 0.2, and both gates clear at once, at ρ =
-    {_half[0]:.2f} and ᾱ = {_half[2]:.3f}. What the two gates jointly exclude
-    is a response that is both steeply graded and full-amplitude on the reds,
-    which is narrower than the gates being incompatible. Either way the ρ gate
-    is doing something the preregistration did not say it was doing, and a
-    future design should settle the amplitude question before reusing it.
+    That family is narrow, though. ρ ranks colors, so it is blind to the amplitude the ᾱ gate measures: scale the above-knee response to half of `sim¹·⁵` at a knee of 0.2, and both gates clear at once, at ρ = {_half[0]:.2f} and ᾱ = {_half[2]:.3f}. What the two gates jointly exclude is a response that is both steeply graded and full-amplitude on the reds, which is narrower than the gates being incompatible. Either way the ρ gate is doing something the preregistration did not say it was doing, and a future design should settle the amplitude question before reusing it.
 
-    The R² shortfall is in the response itself: against an achievable
-    {_knee[1]:.2f}, {_best_r2:.2f} is a real gap. Setting a realistic R² gate
-    for future work would take more than this one grid.
+    The R² shortfall is in the response itself: against an achievable {_knee[1]:.2f}, {_best_r2:.2f} is a real gap. Setting a realistic R² gate for future work would take more than this one grid.
 
     [^m1r2]: M1 scored proportionality with a Pearson R² as well, but of a
-    different quantity: reconstruction error under intervention against
-    $\cos^2$ similarity to *red* (D1.3), where the square is what the
-    projection predicts. Here it is training-time alignment against
-    `sim¹·⁵`, an exponent chosen as a shape between linear and quadratic rather
-    than derived. Same statistic, different response variable and target, so
-    M1's values are not a benchmark for this gate.
+    different quantity: reconstruction error under intervention against $\cos^2$ similarity to *red* (D1.3), where the square is what the projection predicts. Here it is training-time alignment against `sim¹·⁵`, an exponent chosen as a shape between linear and quadratic rather than derived. Same statistic, different response variable and target, so M1's values are not a benchmark for this gate.
     """)
     return
 
@@ -1853,37 +1670,15 @@ def _(alpha_bar, grading, m_op1, retention):
     mo.md(rf"""
     ## Discussion
 
-    The operating point to carry forward is `{_p}`: ᾱ =
-    {alpha_bar(_p).mean():.3f}, margin {m_op1(_p).mean():.2f}, retention
-    {retention(_p):.2f}, task-clean. `{_alt}` grades slightly better, but ᾱ
-    decides it: ᾱ predicts how much of the color cube an edit along the anchor
-    axis would drag with it, and the two conditions differ by
-    {alpha_bar(_alt).mean() / alpha_bar(_p).mean():.1f}× on it, against a
-    {grading(_alt)[1] - grading(_p)[1]:.2f} difference on the reachable grading
-    track. Anything that pulls without a position oracle, and any intervention
-    experiment, wants the smaller spread of side-effects.
+    The operating point to carry forward is `{_p}`: ᾱ = {alpha_bar(_p).mean():.3f}, margin {m_op1(_p).mean():.2f}, retention {retention(_p):.2f}, task-clean. `{_alt}` grades slightly better, but ᾱ decides it: ᾱ predicts how much of the color cube an edit along the anchor axis would drag with it, and the two conditions differ by {alpha_bar(_alt).mean() / alpha_bar(_p).mean():.1f}× on it, against a {grading(_alt)[1] - grading(_p)[1]:.2f} difference on the reachable grading track. Anything that pulls without a position oracle, and any intervention experiment, wants the smaller spread of side-effects.
 
-    The M1 keyframes were fractions of training, and those did not transfer.
-    The trajectories suggest carrying something dimensionless instead: ᾱ
-    departs the control shortly after the repulsion falls below the pull, and
-    the floor sets how fast it climbs after that crossing. If that mechanism
-    holds elsewhere, the design variables are the crossing epoch and the ratio
-    of the floor to the containment threshold. This grid measures one
-    architecture on one task, so that is a reading to test; the reproduction
-    check here shows the kind of evidence that would count.
+    The M1 keyframes were fractions of training, and those did not transfer. The trajectories suggest carrying something dimensionless instead: ᾱ departs the control shortly after the repulsion falls below the pull, and the floor sets how fast it climbs after that crossing. If that mechanism holds elsewhere, the design variables are the crossing epoch and the ratio of the floor to the containment threshold. This grid measures one architecture on one task, so that is a reading to test; the reproduction check here shows the kind of evidence that would count.
 
-    Three things this experiment does not settle. Containment is not
-    exclusivity: redness stays as readable off the anchor axis as it is in the
-    control, down at the floor the RGB task itself sets. So an edit to the axis
-    moves less of the cube, but the axis is not the only place *red* lives.
+    Three things this experiment does not settle. Containment is not exclusivity: redness stays as readable off the anchor axis as it is in the control, down at the floor the RGB task itself sets. So an edit to the axis moves less of the cube, but the axis is not the only place *red* lives.
 
-    The grading gate needs a decision before the next report scores it: the ρ
-    track cannot reach its gate alongside full-amplitude containment, and one
-    grid is not enough to say where a realistic R² gate sits.
+    The grading gate needs a decision before the next report scores it: the ρ track cannot reach its gate alongside full-amplitude containment, and one grid is not enough to say where a realistic R² gate sits.
 
-    And the best floor here is also the highest floor tested, so whether a
-    higher or flat-held repulsion does better, or starts to cost the margin, is
-    outside the range this grid measured.
+    And the best floor here is also the highest floor tested, so whether a higher or flat-held repulsion does better, or starts to cost the margin, is outside the range this grid measured.
     """)
     return
 
