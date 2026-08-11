@@ -3,3 +3,5 @@
 
 # Switch Python string quote style from single to double
 91d519ebde7931ab1fcee857b3b4b0cd0aaa3aec
+# Unwrap prose lines in m2/ex-2.1.11
+f8dac7d0575a3662b2ddb2400643eaf8774a8e4d
