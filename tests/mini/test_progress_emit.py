@@ -1,11 +1,6 @@
 """Progress emission must never charge the task for the sink's latency.
 
-The failure this guards against was measured, not imagined: with the emission
-running inline, containers far from the control plane ran identical training
-cells 15–30× slower than their siblings, in order of distance, because every
-step paid a network round-trip. So the contract is: emitting is cheap for the
-caller whatever the sink costs, the *last* update still lands before the job
-ends, and a slow sink is never mistaken for a wedged worker.
+The failure this guards against was measured, not imagined: with the emission running inline, containers far from the control plane ran identical training cells 15–30× slower than their siblings, in order of distance, because every step paid a network round-trip. So the contract is: emitting is cheap for the caller whatever the sink costs, the *last* update still lands before the job ends, and a slow sink is never mistaken for a wedged worker.
 """
 
 from __future__ import annotations
@@ -48,8 +43,7 @@ class SlowSink(_Sink):
 
 
 def test_emitting_does_not_wait_for_the_sink():
-    """100 emissions into a 20 ms sink must cost the caller ~nothing — inline that
-    would be two seconds of training time — and only the survivors get delivered."""
+    """100 emissions into a 20 ms sink must cost the caller ~nothing — inline that would be two seconds of training time — and only the survivors get delivered."""
     sink = SlowSink(delay=0.02)
     emitter = BackgroundEmitter(sink.put, interval=0.0)
     t0 = time.monotonic()
@@ -74,8 +68,7 @@ def test_flush_waits_for_the_last_update():
 
 
 def test_sink_failures_do_not_reach_the_caller():
-    """Progress is diagnostic: a control plane having a bad minute must not take
-    the task down (and the caller is off the thread by then anyway)."""
+    """Progress is diagnostic: a control plane having a bad minute must not take the task down (and the caller is off the thread by then anyway)."""
     calls: list[int] = []
 
     def boom(i: int) -> None:
@@ -92,9 +85,7 @@ def test_sink_failures_do_not_reach_the_caller():
 
 
 def test_watchdog_sees_progress_through_a_stalled_sink():
-    """The watchdog measures the *task*, not the control plane: with the sink
-    wedged, a task that keeps stepping must keep poking it — otherwise the
-    background emitter would turn a network problem into a killed training run."""
+    """The watchdog measures the *task*, not the control plane: with the sink wedged, a task that keeps stepping must keep poking it — otherwise the background emitter would turn a network problem into a killed training run."""
     poked: list[tuple[int, int]] = []
     blocked = threading.Event()
 
@@ -112,8 +103,7 @@ def test_watchdog_sees_progress_through_a_stalled_sink():
 
 
 def test_metrics_ride_along_with_progress():
-    """``emit_metrics`` merges into the job's metrics and travels on the next
-    update, so a monitor reads numbers rather than parsing a message string."""
+    """``emit_metrics`` merges into the job's metrics and travels on the next update, so a monitor reads numbers rather than parsing a message string."""
     sink = SlowSink(delay=0.0)
     with progress_context("run", "job", queue=sink, emission_interval=0.0):
         emit_metrics(loss=0.5)
@@ -130,8 +120,7 @@ def test_metrics_ride_along_with_progress():
 
 
 def test_declared_directions_travel_with_the_numbers():
-    """A name can't say whether a number should climb, so the job says it, and the
-    declaration rides on every update from then on."""
+    """A name can't say whether a number should climb, so the job says it, and the declaration rides on every update from then on."""
     sink = SlowSink(delay=0.0)
     with progress_context("run", "job", queue=sink, emission_interval=0.0):
         expect_metrics(accuracy="up", loss="down")
@@ -148,10 +137,7 @@ def _windows(
 ) -> dict:
     """Feed ``(time, value)`` samples through a sink and return the final record.
 
-    The rate window is 60 s, so a sample ≥60 s after the window opened closes it.
-    The sample floor is dropped to one for these, so a handful of hand-picked
-    values can make a point about *which way* a window read without twenty
-    samples of padding around each. The floor has its own test below.
+    The rate window is 60 s, so a sample ≥60 s after the window opened closes it. The sample floor is dropped to one for these, so a handful of hand-picked values can make a point about *which way* a window read without twenty samples of padding around each. The floor has its own test below.
     """
     monkeypatch.setattr(_taskworker, "_MIN_WINDOW_SAMPLES", 1)
     now = [series[0][0]]
@@ -164,10 +150,7 @@ def _windows(
 
 
 def test_a_window_is_judged_by_its_mean_not_its_last_sample(tmp_path: Path, monkeypatch):
-    """A per-step loss is noisy, and comparing the two samples that happen to land on
-    the window boundaries is a coin flip. Here the loss is flat — every window means
-    exactly 2.0 — but the closing samples climb 1, 2, 3, 4, so endpoint comparison
-    would have called three consecutive rises and flagged a run doing nothing wrong."""
+    """A per-step loss is noisy, and comparing the two samples that happen to land on the window boundaries is a coin flip. Here the loss is flat — every window means exactly 2.0 — but the closing samples climb 1, 2, 3, 4, so endpoint comparison would have called three consecutive rises and flagged a run doing nothing wrong."""
     rec = _windows(
         MemoStore(tmp_path / "mean"),
         "k",
@@ -185,13 +168,9 @@ def test_a_window_is_judged_by_its_mean_not_its_last_sample(tmp_path: Path, monk
 
 
 def test_a_metric_going_the_wrong_way_accumulates_windows(tmp_path: Path, monkeypatch):
-    """Steadily climbing where it should fall, window over window — the count is what
-    ``status`` thresholds on, so one bad window stays quiet and a trend doesn't.
+    """Steadily climbing where it should fall, window over window — the count is what ``status`` thresholds on, so one bad window stays quiet and a trend doesn't.
 
-    Five samples a minute apart close four windows, and the first close only *sets*
-    the anchor there's nothing yet to compare against — so the count is three. Worth
-    knowing when reading a young run: the flag needs one window more than its
-    threshold before it can fire."""
+    Five samples a minute apart close four windows, and the first close only *sets* the anchor there's nothing yet to compare against — so the count is three. Worth knowing when reading a young run: the flag needs one window more than its threshold before it can fire."""
     rec = _windows(
         MemoStore(tmp_path / "wrong"),
         "k",
@@ -212,9 +191,7 @@ def test_the_same_climb_is_fine_when_the_job_says_it_should_climb(tmp_path: Path
 
 
 def test_an_undeclared_metric_is_measured_but_not_judged(tmp_path: Path, monkeypatch):
-    """A domain-specific score gives away nothing about which way it ought to go, so
-    an undeclared one records its movement and is never flagged — silence beats a
-    wrong guess. The few names that can only mean one thing are the exception."""
+    """A domain-specific score gives away nothing about which way it ought to go, so an undeclared one records its movement and is never flagged — silence beats a wrong guess. The few names that can only mean one thing are the exception."""
     series = [(1000.0 + 60 * i, 1.0 + i) for i in range(5)]
 
     quiet = _windows(MemoStore(tmp_path / "mute"), "k", monkeypatch, series, metric="rho")
@@ -243,15 +220,9 @@ def _feed(store: MemoStore, key: str, monkeypatch, per_minute: int, minutes: int
 
 
 def test_a_metric_window_waits_for_enough_samples_to_mean_something(tmp_path: Path, monkeypatch):
-    """A window's verdict is a comparison of means, so it's worth what the sample
-    count makes it worth — and that has nothing to do with elapsed time. A job
-    emitting twice a minute would otherwise have two-sample means judged as
-    confidently as a training loop's three hundred.
+    """A window's verdict is a comparison of means, so it's worth what the sample count makes it worth — and that has nothing to do with elapsed time. A job emitting twice a minute would otherwise have two-sample means judged as confidently as a training loop's three hundred.
 
-    So the window closes on the rate interval *or* the sample floor, whichever
-    comes later. Both jobs below climb identically for ten minutes; the fast one
-    fills a window a minute and flags it, the slow one has yet to reach a verdict
-    — and gets there later, on its own terms, rather than never."""
+    So the window closes on the rate interval *or* the sample floor, whichever comes later. Both jobs below climb identically for ten minutes; the fast one fills a window a minute and flags it, the slow one has yet to reach a verdict — and gets there later, on its own terms, rather than never."""
     fast = _feed(MemoStore(tmp_path / "fast"), "k", monkeypatch, per_minute=60, minutes=10)
     assert fast["metrics_wrong_way"] == {"loss": 8}, "a window a minute, minus the one that set the anchor"
 

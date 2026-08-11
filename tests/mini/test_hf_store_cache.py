@@ -1,9 +1,6 @@
 """Offline unit tests for the HFStore warm cache — no network, fake ``api``.
 
-These exercise the local cache path (``_local_blob`` / ``_pull_blobs``) and the
-batched read surface (``get_refs`` / ``get_many``) with a stub bucket API, so
-they run without a bucket or token (unlike the integration suite in
-``test_hf_store.py``).
+These exercise the local cache path (``_local_blob`` / ``_pull_blobs``) and the batched read surface (``get_refs`` / ``get_many``) with a stub bucket API, so they run without a bucket or token (unlike the integration suite in ``test_hf_store.py``).
 """
 
 from __future__ import annotations

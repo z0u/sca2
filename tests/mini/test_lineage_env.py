@@ -1,9 +1,6 @@
 """Execution-environment capture and the Modal lineage/cost helpers.
 
-``compute_env`` runs inside the worker to record what a task *actually* ran on; the
-Modal helpers name worker functions for the dashboard and aggregate billing. All
-pure enough to test without a live backend — the Modal env allowlist and cost
-aggregation are the security- and correctness-sensitive bits.
+``compute_env`` runs inside the worker to record what a task *actually* ran on; the Modal helpers name worker functions for the dashboard and aggregate billing. All pure enough to test without a live backend — the Modal env allowlist and cost aggregation are the security- and correctness-sensitive bits.
 """
 
 from __future__ import annotations
@@ -95,11 +92,7 @@ def test_aggregate_cost_empty_when_no_match():
 
 
 def test_compute_env_records_the_numerics_env(monkeypatch):
-    """``XLA_FLAGS`` decides whether a GPU reduction is deterministic, so two
-    attempts can agree on code and inputs and still disagree on results across a
-    change to it. Recorded per attempt, from the worker's own environment — so a
-    setting that never reached the container reads as absent rather than as
-    whatever the client asked for."""
+    """``XLA_FLAGS`` decides whether a GPU reduction is deterministic, so two attempts can agree on code and inputs and still disagree on results across a change to it. Recorded per attempt, from the worker's own environment — so a setting that never reached the container reads as absent rather than as whatever the client asked for."""
     monkeypatch.delenv("XLA_FLAGS", raising=False)
     assert "numerics_env" not in runs.compute_env()
 

@@ -1,8 +1,6 @@
 """Tests for the content-addressed artifact store.
 
-Two layers: the :class:`~mini.store.LocalStore` backend (hashing, idempotency,
-trees, refs, publish) and the contextvar front door (``put``/``get`` resolving
-the ambient store, the same shape as ``get_data_dir``).
+Two layers: the :class:`~mini.store.LocalStore` backend (hashing, idempotency, trees, refs, publish) and the contextvar front door (``put``/``get`` resolving the ambient store, the same shape as ``get_data_dir``).
 """
 
 from __future__ import annotations

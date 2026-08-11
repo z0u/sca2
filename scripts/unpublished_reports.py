@@ -1,19 +1,11 @@
 #!/usr/bin/env python
 """Report notebooks this branch changed without republishing — the forgotten-publish check.
 
-``./go publish`` is the step of the loop that has to be remembered, and forgetting it
-fails quietly: the notebook merges, the site keeps serving the previous export's figures,
-and nothing says so. This is the tripwire. It compares what the branch *changed* against
-what it *repinned* in ``docs/publish.lock``, and names the gap.
+``./go publish`` is the step of the loop that has to be remembered, and forgetting it fails quietly: the notebook merges, the site keeps serving the previous export's figures, and nothing says so. This is the tripwire. It compares what the branch *changed* against what it *repinned* in ``docs/publish.lock``, and names the gap.
 
-Both halves are cheap and local — a git diff and a JSON file — so the check needs no
-store access, no render, and no write credentials. That's the point: the publish itself
-stays where the data is (a session with a warm store), and CI only has to notice when it
-didn't happen.
+Both halves are cheap and local — a git diff and a JSON file — so the check needs no store access, no render, and no write credentials. That's the point: the publish itself stays where the data is (a session with a warm store), and CI only has to notice when it didn't happen.
 
-The comparison is also self-correcting when ``origin/main`` is behind, which it often is
-in a fresh container: a stale base makes *more* reports look changed, but their pins moved
-in that same range, so they don't register as unpublished.
+The comparison is also self-correcting when ``origin/main`` is behind, which it often is in a fresh container: a stale base makes *more* reports look changed, but their pins moved in that same range, so they don't register as unpublished.
 """
 
 import argparse
@@ -37,14 +29,9 @@ from mini.reports import (  # noqa: E402
 def changed_reports(base: str, root: Path = ROOT) -> list[Path]:
     """The report notebooks this branch changed since *base*.
 
-    The diff is three-dot (``base...HEAD``), i.e. against the merge base, so commits that
-    landed on the base branch meanwhile aren't mistaken for ours. Deletions drop out —
-    a report that's gone has no bundle to publish, and the next publish prunes its pin
-    (``export_reports.update_pins``).
+    The diff is three-dot (``base...HEAD``), i.e. against the merge base, so commits that landed on the base branch meanwhile aren't mistaken for ours. Deletions drop out — a report that's gone has no bundle to publish, and the next publish prunes its pin (``export_reports.update_pins``).
 
-    Scoped to ``docs/`` by the same reasoning as :func:`~mini.reports.report_notebooks`:
-    a report is a notebook *there*. Without the pathspec, anything in the repo carrying
-    the text ``marimo.App(`` reads as a report — this module's own tests, for instance.
+    Scoped to ``docs/`` by the same reasoning as :func:`~mini.reports.report_notebooks`: a report is a notebook *there*. Without the pathspec, anything in the repo carrying the text ``marimo.App(`` reads as a report — this module's own tests, for instance.
     """
     diff = subprocess.run(
         ["git", "diff", "--name-only", "--diff-filter=d", f"{base}...HEAD", "--", "docs"],
@@ -72,8 +59,7 @@ def pins_at(base: str, root: Path = ROOT) -> dict[str, str]:
 def unpublished(base: str, root: Path = ROOT) -> list[Path]:
     """Changed reports whose pin hasn't moved since *base* — the ones to publish.
 
-    A report that was never published reads as unpublished too: its key is absent from
-    both manifests, so the pin is unchanged in the sense that matters.
+    A report that was never published reads as unpublished too: its key is absent from both manifests, so the pin is unchanged in the sense that matters.
     """
     before, after = pins_at(base, root), load_pins(root)
     return [nb for nb in changed_reports(base, root) if after.get(key := export_key(nb)) == before.get(key)]

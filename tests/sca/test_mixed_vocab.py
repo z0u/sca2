@@ -126,9 +126,7 @@ def test_landmarks_point_at_the_right_characters():
 
 
 def test_a_hex_line_is_measured_at_every_character():
-    """Hex operands and answers are four characters and all four are landmarks, so with the
-    delimiters covered nothing in a hex line goes unprobed — the elision in the trace
-    figures is named-only, and `GAP_RISERS` is empty because of it."""
+    """Hex operands and answers are four characters and all four are landmarks, so with the delimiters covered nothing in a hex line goes unprobed — the elision in the trace figures is named-only, and `GAP_RISERS` is empty because of it."""
     rng = np.random.default_rng(0)
     palette = mv.xkcd_palette(140)
     names = {v: k for k, v in palette.items()}

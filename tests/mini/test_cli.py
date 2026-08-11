@@ -1,8 +1,6 @@
 """CLI inspect/cancel commands over the memo store.
 
-`ls`/`status` surface memo-orchestration experiments (state lives in the memo
-store, addressed by name); `cancel` stops in-flight tasks. Commands are driven
-against ``.mini`` under a tmp cwd, so DATA_ROOT (a relative path) resolves there.
+`ls`/`status` surface memo-orchestration experiments (state lives in the memo store, addressed by name); `cancel` stops in-flight tasks. Commands are driven against ``.mini`` under a tmp cwd, so DATA_ROOT (a relative path) resolves there.
 """
 
 from __future__ import annotations
@@ -32,8 +30,7 @@ def _drive(exp: Experiment, app: LocalApparatus, timeout: float = 30.0) -> None:
 
 
 def test_data_root_anchors_at_project_root(tmp_path: Path, monkeypatch):
-    """`.mini` follows the project root (a marker dir), not the cwd, so `mini`
-    finds the same store from any subdirectory; with no marker it falls back to cwd."""
+    """`.mini` follows the project root (a marker dir), not the cwd, so `mini` finds the same store from any subdirectory; with no marker it falls back to cwd."""
     from mini.runs import data_root
 
     proj = tmp_path / "proj"
@@ -69,11 +66,7 @@ def test_ls_and_status_surface_memo_experiments(tmp_path: Path, monkeypatch, cap
 
 
 def test_status_and_ls_report_done_despite_superseded_failure(tmp_path: Path, monkeypatch, capsys):
-    """The scenario a monitor agent hits: a task fails, the fn is *replaced* by
-    one with a new name (a new identity — re-keying every cell), and the run
-    completes under the new keys. ``status``/``ls`` must report the *run* as done
-    — aggregating over the requested set — with the orphaned old records shown
-    but marked, not poisoning the state a poller acts on."""
+    """The scenario a monitor agent hits: a task fails, the fn is *replaced* by one with a new name (a new identity — re-keying every cell), and the run completes under the new keys. ``status``/``ls`` must report the *run* as done — aggregating over the requested set — with the orphaned old records shown but marked, not poisoning the state a poller acts on."""
     monkeypatch.chdir(tmp_path)
 
     def bad(x):
@@ -110,10 +103,7 @@ def test_status_and_ls_report_done_despite_superseded_failure(tmp_path: Path, mo
 
 
 def test_explain_walks_the_attempt_timeline_after_a_hotfix(tmp_path: Path, monkeypatch, capsys):
-    """After a hotfix, ``explain <key>`` must answer "why did this re-run": the
-    record healed *in place* (same identity), so the story is its attempt
-    timeline — the failed attempt under the old code, then the current one,
-    naming the dependency that moved."""
+    """After a hotfix, ``explain <key>`` must answer "why did this re-run": the record healed *in place* (same identity), so the story is its attempt timeline — the failed attempt under the old code, then the current one, naming the dependency that moved."""
     monkeypatch.chdir(tmp_path)
 
     def make(fixed: bool):
@@ -158,9 +148,7 @@ def test_explain_walks_the_attempt_timeline_after_a_hotfix(tmp_path: Path, monke
 
 
 def test_status_shows_queued_distinct_from_running(tmp_path: Path, monkeypatch, capsys):
-    """A RUNNING record with no ``env`` is launched-but-unstarted (the worker
-    writes ``env`` as its first action): ``status`` must read it as *queued*,
-    not silently lump it in with tasks actually running on a worker."""
+    """A RUNNING record with no ``env`` is launched-but-unstarted (the worker writes ``env`` as its first action): ``status`` must read it as *queued*, not silently lump it in with tasks actually running on a worker."""
     monkeypatch.chdir(tmp_path)
     from mini.memo import MemoStore
     from mini.runs import data_root
@@ -183,9 +171,7 @@ def test_status_shows_queued_distinct_from_running(tmp_path: Path, monkeypatch, 
 
 
 def test_status_badges_stale_heartbeat(tmp_path: Path, monkeypatch, capsys):
-    """A RUNNING task whose heartbeat has gone quiet for minutes gets an advisory
-    badge — the honest signal when a backend liveness probe has a blind spot
-    (#20). Queued tasks never badge: their heartbeat is just the launch stamp."""
+    """A RUNNING task whose heartbeat has gone quiet for minutes gets an advisory badge — the honest signal when a backend liveness probe has a blind spot (#20). Queued tasks never badge: their heartbeat is just the launch stamp."""
     monkeypatch.chdir(tmp_path)
     from mini.memo import MemoStore
     from mini.runs import STALE_HEARTBEAT_S, data_root
@@ -212,9 +198,7 @@ def test_status_badges_stale_heartbeat(tmp_path: Path, monkeypatch, capsys):
 
 
 def test_status_json_is_machine_readable(tmp_path: Path, monkeypatch, capsys):
-    """``status --json`` emits one stable JSON object — the agent-facing signal
-    (#20): aggregate state, per-task state, and honest liveness hints
-    (queued / heartbeat age / stale), instead of grepping the human lines."""
+    """``status --json`` emits one stable JSON object — the agent-facing signal (#20): aggregate state, per-task state, and honest liveness hints (queued / heartbeat age / stale), instead of grepping the human lines."""
     import json
     from unittest.mock import ANY
 
@@ -276,10 +260,7 @@ def test_status_json_is_machine_readable(tmp_path: Path, monkeypatch, capsys):
 
 
 def test_status_brief_is_counts_plus_attention_only(tmp_path: Path, monkeypatch, capsys):
-    """``status --brief`` answers the monitor's question — "anything to act on?" —
-    without one line per task: counts by state, plus only the tasks needing
-    attention (here a failed cell and a long-queued one; the healthy lines are
-    the payload bulk on a big sweep and carry no actionable signal)."""
+    """``status --brief`` answers the monitor's question — "anything to act on?" — without one line per task: counts by state, plus only the tasks needing attention (here a failed cell and a long-queued one; the healthy lines are the payload bulk on a big sweep and carry no actionable signal)."""
     import json
     from unittest.mock import ANY
 
@@ -339,10 +320,7 @@ def test_status_brief_is_counts_plus_attention_only(tmp_path: Path, monkeypatch,
 
 
 def test_status_brief_collapses_a_mass_failure(tmp_path: Path, monkeypatch, capsys):
-    """The 30-containers-all-die case: identical failures must collapse to one
-    counted line (and a bounded JSON list + cause rollup), not N near-identical
-    lines — the difference between noise and a diagnosis, and the whole point of
-    --brief on a wide fan-out."""
+    """The 30-containers-all-die case: identical failures must collapse to one counted line (and a bounded JSON list + cause rollup), not N near-identical lines — the difference between noise and a diagnosis, and the whole point of --brief on a wide fan-out."""
     import json
 
     monkeypatch.chdir(tmp_path)
@@ -374,9 +352,7 @@ def test_status_brief_collapses_a_mass_failure(tmp_path: Path, monkeypatch, caps
 
 
 def test_status_brief_caps_many_distinct_causes(tmp_path: Path, monkeypatch, capsys):
-    """When the causes really are distinct, the per-task listing is bounded with a
-    ``+N more`` rollup (mirroring the failed-task hint), so the payload can't blow
-    up however wide the fan-out — while the summary still names every cause."""
+    """When the causes really are distinct, the per-task listing is bounded with a ``+N more`` rollup (mirroring the failed-task hint), so the payload can't blow up however wide the fan-out — while the summary still names every cause."""
     import json
 
     monkeypatch.chdir(tmp_path)
@@ -402,8 +378,7 @@ def test_status_brief_caps_many_distinct_causes(tmp_path: Path, monkeypatch, cap
 
 
 def test_watch_timeout_exits_124_with_brief_summary(tmp_path: Path, monkeypatch, capsys):
-    """A bounded ``watch --timeout`` must come back by itself — exit 124 with a
-    compact JSON summary — so a monitor's wait can't hang past its budget."""
+    """A bounded ``watch --timeout`` must come back by itself — exit 124 with a compact JSON summary — so a monitor's wait can't hang past its budget."""
     import json
 
     monkeypatch.chdir(tmp_path)
@@ -434,8 +409,7 @@ def test_watch_timeout_exits_124_with_brief_summary(tmp_path: Path, monkeypatch,
 
 
 def test_watch_exit_code_reflects_settle_outcome(tmp_path: Path, monkeypatch, capsys):
-    """``watch`` is the wake trigger for scripts/agents (#20): it blocks until the
-    run settles and its exit code carries the outcome — 0 iff DONE."""
+    """``watch`` is the wake trigger for scripts/agents (#20): it blocks until the run settles and its exit code carries the outcome — 0 iff DONE."""
     monkeypatch.chdir(tmp_path)
     from mini.memo import MemoStore
     from mini.runs import data_root
@@ -475,8 +449,7 @@ def test_app_resolution_precedence(tmp_path: Path, monkeypatch):
 
 
 def test_run_stamps_backend_for_later_reads(tmp_path: Path, monkeypatch, capsys):
-    """A launch remembers its backend (``.mini/<name>/.app``), so ``status`` with
-    no ``--app`` reads the store the experiment actually lives on (#47)."""
+    """A launch remembers its backend (``.mini/<name>/.app``), so ``status`` with no ``--app`` reads the store the experiment actually lives on (#47)."""
     monkeypatch.chdir(tmp_path)
     exp_file = tmp_path / "stamp.py"
     exp_file.write_text(
@@ -500,8 +473,7 @@ def test_run_stamps_backend_for_later_reads(tmp_path: Path, monkeypatch, capsys)
 def test_run_captures_lineage_and_lineage_command_reports_it(tmp_path: Path, monkeypatch, capsys):
     """A run stamps provenance into meta; ``mini lineage`` reads it back.
 
-    Under ``/tmp`` there's no git repo, so the git block is absent — but the
-    identity/driver/timeline half is always captured, which is what this asserts.
+    Under ``/tmp`` there's no git repo, so the git block is absent — but the identity/driver/timeline half is always captured, which is what this asserts.
     """
     monkeypatch.chdir(tmp_path)
     exp_file = tmp_path / "prov.py"
@@ -525,8 +497,7 @@ def test_run_captures_lineage_and_lineage_command_reports_it(tmp_path: Path, mon
 
 
 def test_lineage_snapshots_declared_upstreams(tmp_path: Path, monkeypatch):
-    """An experiment that declares ``deps`` records each upstream's provenance, so a
-    downstream run can trace which A produced its inputs."""
+    """An experiment that declares ``deps`` records each upstream's provenance, so a downstream run can trace which A produced its inputs."""
     monkeypatch.chdir(tmp_path)
 
     def work(x):
@@ -550,10 +521,7 @@ def test_lineage_snapshots_declared_upstreams(tmp_path: Path, monkeypatch):
 
 
 def test_lineage_detects_upstreams_from_resolved_refs(tmp_path: Path, monkeypatch, capsys):
-    """A run that reads another experiment's ref records it as an upstream — no
-    ``deps=`` declared. The producer is stamped onto the ref at ``set_ref`` time
-    (in the upstream's worker), the consumer's worker records the resolution on
-    its task record, and the driver rolls it up into ``lineage.upstreams``."""
+    """A run that reads another experiment's ref records it as an upstream — no ``deps=`` declared. The producer is stamped onto the ref at ``set_ref`` time (in the upstream's worker), the consumer's worker records the resolution on its task record, and the driver rolls it up into ``lineage.upstreams``."""
     monkeypatch.chdir(tmp_path)
     # Workers must hit the tmp LocalStore: an ambient bucket would write the test ref
     # to the real shared store, and a publish-repo alone builds a CAS-less store.
@@ -600,8 +568,7 @@ def test_lineage_detects_upstreams_from_resolved_refs(tmp_path: Path, monkeypatc
 
 
 def test_empty_read_names_backend_and_hints_at_the_other(tmp_path: Path, monkeypatch):
-    """A read that finds nothing must say which backend it looked on and — when
-    the run lives on the other one — name the flag to get there (#47)."""
+    """A read that finds nothing must say which backend it looked on and — when the run lives on the other one — name the flag to get there (#47)."""
     monkeypatch.chdir(tmp_path)
     import mini.__main__ as cli
 
@@ -671,9 +638,7 @@ def test_retry_cli_heals_failed_task(tmp_path: Path, monkeypatch, capsys):
 
 
 def test_run_with_a_name_instead_of_a_file_hints_at_the_split(tmp_path: Path, monkeypatch):
-    """``run``/``retry`` take a *file*; the read verbs take a *name*. Typing a
-    known experiment name here must not die in a raw ``ImportError`` — it should
-    name the mistake and point at the verbs that take names (#57)."""
+    """``run``/``retry`` take a *file*; the read verbs take a *name*. Typing a known experiment name here must not die in a raw ``ImportError`` — it should name the mistake and point at the verbs that take names (#57)."""
     monkeypatch.chdir(tmp_path)  # no project marker under /tmp → store resolves under cwd
     _drive(Experiment(name="stale-probe", main=lambda ctx: ctx.map(lambda x: x, [1])), LocalApparatus("stale-probe"))
 
@@ -711,11 +676,7 @@ def _running(key: str, **fields) -> dict:
 
 
 def test_status_flags_deviation_from_expectation(tmp_path: Path, monkeypatch, capsys):
-    """Healthy is not the same as "nothing failed". A cell crawling at a fraction
-    of its siblings' throughput, one projected to hit its timeout before it
-    finishes, and one whose loss has gone to NaN all pass every liveness check —
-    a monitor that only looks for failures reports "progressing normally" while
-    the run burns (ex-2.1.5). The comparison belongs in the tool, not the reader."""
+    """Healthy is not the same as "nothing failed". A cell crawling at a fraction of its siblings' throughput, one projected to hit its timeout before it finishes, and one whose loss has gone to NaN all pass every liveness check — a monitor that only looks for failures reports "progressing normally" while the run burns (ex-2.1.5). The comparison belongs in the tool, not the reader."""
     import json
 
     monkeypatch.chdir(tmp_path)
@@ -756,10 +717,7 @@ def test_status_flags_deviation_from_expectation(tmp_path: Path, monkeypatch, ca
 
 
 def test_a_metric_meant_to_rise_is_flagged_when_it_falls(tmp_path: Path, monkeypatch, capsys):
-    """Direction comes from the job, so the flag reads the same alarm either way: a
-    sliding accuracy is as much of a problem as a climbing loss, and the CLI matches
-    on no metric names at all. An undeclared metric is measured but never flagged —
-    silence beats guessing which way a domain-specific score is supposed to go."""
+    """Direction comes from the job, so the flag reads the same alarm either way: a sliding accuracy is as much of a problem as a climbing loss, and the CLI matches on no metric names at all. An undeclared metric is measured but never flagged — silence beats guessing which way a domain-specific score is supposed to go."""
     import json
 
     monkeypatch.chdir(tmp_path)
@@ -804,11 +762,7 @@ def test_a_metric_meant_to_rise_is_flagged_when_it_falls(tmp_path: Path, monkeyp
 
 
 def test_deviation_flags_let_go_of_a_finished_task(tmp_path: Path, monkeypatch, capsys):
-    """The deviation flags describe a task *now*. A settled record keeps the numbers
-    from its final window forever, so without a state guard a cell whose last minute
-    was slow reads "under a third of the sibling median" after it finished, and a
-    loss that ticked up at the end parks a completed run in the attention list for
-    good — which would make "healthy means the scan came back clean" unreachable."""
+    """The deviation flags describe a task *now*. A settled record keeps the numbers from its final window forever, so without a state guard a cell whose last minute was slow reads "under a third of the sibling median" after it finished, and a loss that ticked up at the end parks a completed run in the attention list for good — which would make "healthy means the scan came back clean" unreachable."""
     import json
 
     monkeypatch.chdir(tmp_path)
@@ -829,9 +783,7 @@ def test_deviation_flags_let_go_of_a_finished_task(tmp_path: Path, monkeypatch, 
 
 
 def test_throughput_outlier_needs_a_fleet_to_compare_against(tmp_path: Path, monkeypatch, capsys):
-    """Two cells are not a distribution: with too few reporters there is no
-    expectation to deviate from, and flagging the slower of a pair would cry wolf
-    on every uneven sweep."""
+    """Two cells are not a distribution: with too few reporters there is no expectation to deviate from, and flagging the slower of a pair would cry wolf on every uneven sweep."""
     import json
 
     monkeypatch.chdir(tmp_path)
@@ -849,9 +801,7 @@ def test_throughput_outlier_needs_a_fleet_to_compare_against(tmp_path: Path, mon
 
 
 def test_region_defaults_from_the_project_config(tmp_path: Path, monkeypatch):
-    """Placement is usually a property of where the run's storage lives, not of one
-    experiment, so it has a project-wide default — with the explicit flag winning,
-    and a role's own ``region=`` winning over both (roles are applied on top)."""
+    """Placement is usually a property of where the run's storage lives, not of one experiment, so it has a project-wide default — with the explicit flag winning, and a role's own ``region=`` winning over both (roles are applied on top)."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "pyproject.toml").write_text('[tool.mini]\nregion = "us-east"\n')
 
@@ -871,9 +821,7 @@ def test_region_defaults_from_the_project_config(tmp_path: Path, monkeypatch):
 
 
 def test_worker_env_defaults_from_the_project_config(tmp_path: Path, monkeypatch):
-    """What a task computes under (``XLA_FLAGS``) is a property of the project, not
-    of one experiment, so it has a project-wide default on both backends — with a
-    role's own ``env=`` merging over it key by key rather than replacing it."""
+    """What a task computes under (``XLA_FLAGS``) is a property of the project, not of one experiment, so it has a project-wide default on both backends — with a role's own ``env=`` merging over it key by key rather than replacing it."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "pyproject.toml").write_text('[tool.mini]\nenv = { XLA_FLAGS = "-x", KEEP = "1" }\n')
 
@@ -900,8 +848,7 @@ def test_worker_env_defaults_from_the_project_config(tmp_path: Path, monkeypatch
 
 
 def test_a_long_sequence_is_elided_with_its_count():
-    """The reason the default view exists: a per-step metric list is one float per
-    step, and a sweep of them buries every scalar worth reading."""
+    """The reason the default view exists: a per-step metric list is one float per step, and a sweep of them buries every scalar worth reading."""
     from mini.__main__ import _abbreviated
 
     assert _abbreviated({"val_loss": [0.5, 0.4, 0.3, 0.2, 0.1]}) == "{'val_loss': [0.5, 0.4, 0.3, … +2]}"
@@ -910,8 +857,7 @@ def test_a_long_sequence_is_elided_with_its_count():
 
 
 def test_scalars_and_keys_survive_verbatim():
-    """What a reader takes from the abbreviated view has to be what the result says,
-    so only lengths are lost: no rounding, no reformatting, and every key kept."""
+    """What a reader takes from the abbreviated view has to be what the result says, so only lengths are lost: no rounding, no reformatting, and every key kept."""
     from mini.__main__ import _abbreviated
 
     stats = {"em": 0.8333333333333334, "nll": 1.204, "converged": True, "tau": None, "name": "lam0"}
@@ -929,8 +875,7 @@ def test_containers_keep_their_shape():
 
 
 def test_a_container_subclass_renders_rather_than_raising():
-    """A namedtuple is a tuple, and a result carrying one shouldn't cost the verb —
-    which is what dispatching on the exact type did."""
+    """A namedtuple is a tuple, and a result carrying one shouldn't cost the verb — which is what dispatching on the exact type did."""
     from collections import OrderedDict, namedtuple
 
     from mini.__main__ import _abbreviated
@@ -956,9 +901,7 @@ def test_an_array_shows_its_shape_rather_than_its_payload():
 
 
 def test_an_artifact_shows_the_handle_a_listing_wants():
-    """Returning bulk as an artifact is the house pattern, so this handle is the one
-    a results listing meets most; its full repr is 64-character shas and, for a tree,
-    every child blob."""
+    """Returning bulk as an artifact is the house pattern, so this handle is the one a results listing meets most; its full repr is 64-character shas and, for a tree, every child blob."""
     from mini.__main__ import _abbreviated
     from mini.store import Artifact
 
@@ -990,8 +933,7 @@ def test_an_unrenderable_value_falls_back_to_a_capped_repr():
 
 
 def test_results_elides_by_default_and_full_restores_the_repr(tmp_path: Path, monkeypatch, capsys):
-    """End to end over a real store: the default line is short enough to read, and
-    every number in it is one `--full` away from being checked."""
+    """End to end over a real store: the default line is short enough to read, and every number in it is one `--full` away from being checked."""
     monkeypatch.chdir(tmp_path)
 
     def train(x):

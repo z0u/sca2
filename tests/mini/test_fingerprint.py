@@ -1,17 +1,8 @@
 """Key semantics: identity must hold still while evidence tracks the code.
 
-The contract has two sides. *Honesty*: editing anything a task actually depends
-on — a helper (however it's referenced), a module-level constant, a method —
-must change the attempt evidence (``code_fp``), or a re-run silently serves
-stale results. *Stability*: the identity key must be identical across processes,
-across distinct-but-identical function objects, **and across code edits** — the
-key is where the task's record, logs, and history live, so an edit must re-run
-it in place, not orphan it.
+The contract has two sides. *Honesty*: editing anything a task actually depends on — a helper (however it's referenced), a module-level constant, a method — must change the attempt evidence (``code_fp``), or a re-run silently serves stale results. *Stability*: the identity key must be identical across processes, across distinct-but-identical function objects, **and across code edits** — the key is where the task's record, logs, and history live, so an edit must re-run it in place, not orphan it.
 
-Module-level dependencies are exercised with real modules written to disk (the
-fingerprint reads *source*, so the functions must have files); "editing" is
-simulated by loading a variant of the module from a sibling directory with the
-same module name, keeping the task's own source byte-identical.
+Module-level dependencies are exercised with real modules written to disk (the fingerprint reads *source*, so the functions must have files); "editing" is simulated by loading a variant of the module from a sibling directory with the same module name, keeping the task's own source byte-identical.
 """
 
 from __future__ import annotations
@@ -63,12 +54,9 @@ def load_module(tmp_path: Path):
 
 @pytest.fixture
 def deferred_modules(tmp_path: Path, monkeypatch):
-    """Write a variant's modules and make them resolvable the way the fingerprint
-    resolves a deferred import: by searching ``sys.path``, without importing.
+    """Write a variant's modules and make them resolvable the way the fingerprint resolves a deferred import: by searching ``sys.path``, without importing.
 
-    One variant is on the path at a time (same module names, different bodies), and
-    the resolver's path cache is cleared between them — within a real process a
-    module name maps to one file, so the cache is only wrong here.
+    One variant is on the path at a time (same module names, different bodies), and the resolver's path cache is cleared between them — within a real process a module name maps to one file, so the cache is only wrong here.
     """
     from mini.memo import _module_file, _module_index
 
@@ -90,8 +78,7 @@ def deferred_modules(tmp_path: Path, monkeypatch):
 
 
 def _deferred_parts(load_module, deferred_modules, task_src: str, variant: str, **modules: str) -> tuple[str, dict]:
-    """Fingerprint a task whose body imports *modules* — which are on the path but
-    deliberately never imported, as a driver process would leave them."""
+    """Fingerprint a task whose body imports *modules* — which are on the path but deliberately never imported, as a driver process would leave them."""
     deferred_modules(variant, **modules)
     return task_key_parts(load_module("tasks", task_src, variant).task, (1,))
 
@@ -106,14 +93,9 @@ def _deferred_parts(load_module, deferred_modules, task_src: str, variant: str, 
     ids=["from-import", "module import", "through another module"],
 )
 def test_deferred_imports_are_tracked(load_module, deferred_modules, task_src: str, dep: str, extra: dict[str, str]):
-    """A task that imports project code *inside its body* — the usual way to keep a
-    driver light when the import pulls jax — still depends on that code. Editing it
-    must move the evidence, whether the task imports the helper directly or reaches
-    it through a module that does, or the next wake serves a stale memo hit.
+    """A task that imports project code *inside its body* — the usual way to keep a driver light when the import pulls jax — still depends on that code. Editing it must move the evidence, whether the task imports the helper directly or reaches it through a module that does, or the next wake serves a stale memo hit.
 
-    ``explain`` should name what moved as precisely as the import allowed: the
-    helper itself for a ``from`` import, the whole module for a plain ``import``,
-    where the name reached through it can't be read off the source."""
+    ``explain`` should name what moved as precisely as the import allowed: the helper itself for a ``from`` import, the whole module for a plain ``import``, where the name reached through it can't be read off the source."""
     key_v1, p_v1 = _deferred_parts(load_module, deferred_modules, task_src, "a", helpers=HELPER_V1, **extra)
     key_v2, p_v2 = _deferred_parts(load_module, deferred_modules, task_src, "b", helpers=HELPER_V2, **extra)
     _, p_copy = _deferred_parts(load_module, deferred_modules, task_src, "c", helpers=HELPER_V1, **extra)
@@ -124,8 +106,7 @@ def test_deferred_imports_are_tracked(load_module, deferred_modules, task_src: s
 
 
 def test_deferred_library_imports_are_not_tracked(load_module, deferred_modules):
-    """Only *project* modules join the evidence: a deferred ``import json`` reaches
-    the stdlib, whose churn must not invalidate anyone's cache."""
+    """Only *project* modules join the evidence: a deferred ``import json`` reaches the stdlib, whose churn must not invalidate anyone's cache."""
     src = "def task(x):\n    import json\n\n    from helpers import helper\n\n    return json.dumps(helper(x))\n"
     _, parts = _deferred_parts(load_module, deferred_modules, src, "a", helpers=HELPER_V1)
     assert "helpers:helper" in parts["deps"]
@@ -141,11 +122,7 @@ TASK_ALIAS_BARE = "def task(x):\n    from pkg import helpers as h\n\n    return 
 def test_deferred_evidence_is_the_symbol_not_the_module(load_module, deferred_modules, task_src: str):
     """The evidence should be the *helper*, not the file it lives in.
 
-    A deferred import is deferred because the module is expensive, which tends to
-    mean it's also big — so taking it whole makes a task depend on hundreds of
-    lines it never calls, and every unrelated edit re-runs it (on ex-2.1.5, half
-    the ``sca`` package for a fn whose real references were a twentieth of that).
-    Editing a sibling function must leave the fingerprint alone."""
+    A deferred import is deferred because the module is expensive, which tends to mean it's also big — so taking it whole makes a task depend on hundreds of lines it never calls, and every unrelated edit re-runs it (on ex-2.1.5, half the ``sca`` package for a fn whose real references were a twentieth of that). Editing a sibling function must leave the fingerprint alone."""
     _, p_v1 = _deferred_parts(load_module, deferred_modules, task_src, "a", helpers=BIG_HELPERS, wrapper=WRAPPER)
     _, p_edited = _deferred_parts(
         load_module,
@@ -160,9 +137,7 @@ def test_deferred_evidence_is_the_symbol_not_the_module(load_module, deferred_mo
 
 
 def test_module_alias_narrows_to_the_attributes_reached(load_module, deferred_modules, tmp_path):
-    """``from pkg import helpers as h`` then ``h.helper()`` names one function, so
-    that's what the evidence should be — while ``h`` passed somewhere else could
-    reach anything in the module, and has to take it whole."""
+    """``from pkg import helpers as h`` then ``h.helper()`` names one function, so that's what the evidence should be — while ``h`` passed somewhere else could reach anything in the module, and has to take it whole."""
 
     def parts(task_src: str, helpers: str, variant: str) -> dict:
         d = tmp_path / variant
@@ -196,12 +171,7 @@ def _key_and_parts(load_module, task_src: str, helper_src: str, variant: str) ->
     ids=["module-attr call", "nested-code reference", "via a method"],
 )
 def test_helper_edits_move_evidence_not_identity(load_module, task_src: str):
-    """Editing a helper must change the task's evidence (so it re-runs) whether
-    it's called by bare name, as a module attribute (``helpers.helper``), from
-    inside a nested lambda / comprehension, or from a method of a class the task
-    uses — while the *key* stays put, so the re-run lands on the same record.
-    An identical copy must produce identical evidence (no path or object
-    identity in the fingerprint)."""
+    """Editing a helper must change the task's evidence (so it re-runs) whether it's called by bare name, as a module attribute (``helpers.helper``), from inside a nested lambda / comprehension, or from a method of a class the task uses — while the *key* stays put, so the re-run lands on the same record. An identical copy must produce identical evidence (no path or object identity in the fingerprint)."""
     key_v1, p_v1 = _key_and_parts(load_module, task_src, HELPER_V1, "a")
     key_v2, p_v2 = _key_and_parts(load_module, task_src, HELPER_V2, "b")
     key_copy, p_copy = _key_and_parts(load_module, task_src, HELPER_V1, "c")
@@ -211,8 +181,7 @@ def test_helper_edits_move_evidence_not_identity(load_module, task_src: str):
 
 
 def test_module_level_value_edits_invalidate(load_module):
-    """A module-level constant a task reads (``LR``) is part of its behavior:
-    editing the value must change the evidence, exactly like editing code."""
+    """A module-level constant a task reads (``LR``) is part of its behavior: editing the value must change the evidence, exactly like editing code."""
     _, p_v1 = task_key_parts(load_module("tasks", TASK_VALUE, "a").task, (1,))
     _, p_v2 = task_key_parts(load_module("tasks", TASK_VALUE.replace("0.1", "0.2"), "b").task, (1,))
     _, p_copy = task_key_parts(load_module("tasks", TASK_VALUE, "c").task, (1,))
@@ -235,10 +204,7 @@ def _make_callback(delta: int):
 
 
 def test_callable_inputs_key_by_source_not_identity():
-    """A function passed as *data* is an input, so it fingerprints into the key
-    by its source: two fresh objects of the same source coincide (a repr would
-    embed a memory address and relaunch the task every wake), while a different
-    body diverges — a new input, a new cell."""
+    """A function passed as *data* is an input, so it fingerprints into the key by its source: two fresh objects of the same source coincide (a repr would embed a memory address and relaunch the task every wake), while a different body diverges — a new input, a new cell."""
 
     def apply(f, x):
         return f(x)
@@ -263,17 +229,14 @@ def test_enum_and_path_inputs_are_stable_and_distinct():
 
 
 def test_self_referential_global_does_not_recurse(load_module):
-    """A module-level container holding the task itself (a registry pattern) must
-    not send the collector into infinite recursion."""
+    """A module-level container holding the task itself (a registry pattern) must not send the collector into infinite recursion."""
     src = "CALLBACKS = []\n\ndef task(x):\n    return len(CALLBACKS) + x\n\nCALLBACKS.append(task)\n"
     mod = load_module("tasks", src, "a")
     assert task_key_parts(mod.task, (1,))  # completes; no RecursionError
 
 
 def test_parts_split_code_from_inputs(load_module):
-    """``explain`` relies on the parts: same code + different inputs moves only
-    ``input_fp`` (a different cell); an edited helper moves only ``code_fp``
-    (and names the dep)."""
+    """``explain`` relies on the parts: same code + different inputs moves only ``input_fp`` (a different cell); an edited helper moves only ``code_fp`` (and names the dep)."""
     load_module("helpers", HELPER_V1, "a")
     tasks = load_module("tasks", TASK_ATTR, "a")
     k1, p1 = task_key_parts(tasks.task, (1,))
@@ -291,8 +254,7 @@ def test_parts_split_code_from_inputs(load_module):
 
 
 def test_version_is_evidence_not_identity():
-    """``version=`` forces a re-run *in place*: it moves the evidence while the
-    key stays put, so the bump lands as a new attempt on the same record."""
+    """``version=`` forces a re-run *in place*: it moves the evidence while the key stays put, so the bump lands as a new attempt on the same record."""
 
     def t(x):
         return x
@@ -304,8 +266,7 @@ def test_version_is_evidence_not_identity():
 
 
 def test_repr_fallback_warns_about_unstable_inputs(caplog):
-    """Inputs with no stable encoding (an object whose repr embeds its address)
-    can never cache — that's a silent money-burner, so it must warn."""
+    """Inputs with no stable encoding (an object whose repr embeds its address) can never cache — that's a silent money-burner, so it must warn."""
 
     class Opaque:
         __slots__ = ()

@@ -1,10 +1,6 @@
 """The publish-tier split (#38): routing, not transport.
 
-``HFStore`` keeps the CAS + refs in its bucket but sends ``publish`` and report
-exports to a separate, versioned dataset repo when one is configured. These tests
-inject a fake ``HfApi`` to assert *where* each verb lands and *what* URL it returns,
-without touching the network — the live round trips stay in ``test_hf_store.py``
-(bucket) and its ``MINI_PUBLISH_REPO``-gated repo cases.
+``HFStore`` keeps the CAS + refs in its bucket but sends ``publish`` and report exports to a separate, versioned dataset repo when one is configured. These tests inject a fake ``HfApi`` to assert *where* each verb lands and *what* URL it returns, without touching the network — the live round trips stay in ``test_hf_store.py`` (bucket) and its ``MINI_PUBLISH_REPO``-gated repo cases.
 """
 
 from __future__ import annotations

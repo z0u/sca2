@@ -1,20 +1,11 @@
 #!/usr/bin/env python
 """Build the static site from the project's report notebooks.
 
-The HTML lives nowhere in Git: each report is exported (``./go publish``) to a
-self-contained bundle — ``index.html`` + named-keyed ``_assets/`` — and mirrored to
-the bucket under ``exports/<key>/``. The assembly mode is an explicit choice, never
-inferred from credentials:
+The HTML lives nowhere in Git: each report is exported (``./go publish``) to a self-contained bundle — ``index.html`` + named-keyed ``_assets/`` — and mirrored to the bucket under ``exports/<key>/``. The assembly mode is an explicit choice, never inferred from credentials:
 
-``--externalize`` (CI, ``./go site``)
-    The deterministic, read-only half of publishing: read each *synced* bundle's HTML,
-    resolve author links against the repo, insert one ``<base>`` pointing at the
-    bucket, and write only ``_site/<key>/index.html`` (asset bytes stay on the CDN).
-    Requires a configured store; fails loudly without one.
+``--externalize`` (CI, ``./go site``) The deterministic, read-only half of publishing: read each *synced* bundle's HTML, resolve author links against the repo, insert one ``<base>`` pointing at the bucket, and write only ``_site/<key>/index.html`` (asset bytes stay on the CDN). Requires a configured store; fails loudly without one.
 
-``--localize`` (local preview, ``./go preview``)
-    Read the bundles from ``.mini/exports/`` and copy their ``_assets/`` beside the
-    HTML, so the site works offline. Never touches the network.
+``--localize`` (local preview, ``./go preview``) Read the bundles from ``.mini/exports/`` and copy their ``_assets/`` beside the HTML, so the site works offline. Never touches the network.
 """
 
 import argparse
@@ -72,8 +63,7 @@ def prepare_dirs():
 def _resolve_publish_store():
     """The HF publish tier for ``--externalize``, or a loud exit if unreachable.
 
-    Mode is the caller's explicit choice; this only checks the chosen mode is
-    *possible* — it never silently downgrades to localize.
+    Mode is the caller's explicit choice; this only checks the chosen mode is *possible* — it never silently downgrades to localize.
     """
     from mini.hf_store import HFStore
     from mini.store import store_for
@@ -104,9 +94,7 @@ _ANCHORED = re.compile(r"(?:[a-z][a-z0-9+.\-]*:|//|/|#)", re.IGNORECASE)
 def _strip_index(url: str) -> str:
     """Drop a trailing ``index.html`` so a report reads ``<key>/`` not ``<key>/index.html``.
 
-    GitHub Pages serves the directory form, and it's the nicer canonical/shareable URL.
-    Operates before any ``#fragment`` and leaves non-index pages (``foo.html``) untouched.
-    Used only when publishing — offline (``file://``) navigation keeps the explicit file.
+    GitHub Pages serves the directory form, and it's the nicer canonical/shareable URL. Operates before any ``#fragment`` and leaves non-index pages (``foo.html``) untouched. Used only when publishing — offline (``file://``) navigation keeps the explicit file.
     """
     return re.sub(r"(^|/)index\.html(?=$|#)", r"\1", url)
 
@@ -132,11 +120,7 @@ def _repo_slug() -> str | None:
 class LinkResolver:
     """Maps an author-written relative link to its published target.
 
-    ``render_map`` is docs-relative *source* path → site-relative *output* path for
-    every page the build emits (reports render to ``<key>/index.html``, markdown to
-    ``<name>.html``); ``source_files`` is every file under ``docs/`` (the GitHub-source
-    fallback). ``site_base``/``source_base`` are the absolute roots used when a link must
-    be made absolute (externalize mode).
+    ``render_map`` is docs-relative *source* path → site-relative *output* path for every page the build emits (reports render to ``<key>/index.html``, markdown to ``<name>.html``); ``source_files`` is every file under ``docs/`` (the GitHub-source fallback). ``site_base``/``source_base`` are the absolute roots used when a link must be made absolute (externalize mode).
     """
 
     render_map: dict[str, str]
@@ -178,10 +162,7 @@ class LinkResolver:
     def resolve(self, token: str, *, from_dir: str, out_dir: str, externalizing: bool) -> str | None:
         """The rewritten target for relative link *token* authored under ``docs/<from_dir>``.
 
-        The token is interpreted against ``from_dir`` (where it was written); a localized
-        link is made relative to ``out_dir`` (where the emitting page *renders*, which for
-        a report differs from its source dir). ``None`` means "leave it alone" — an
-        external/absolute link, or one whose target the build doesn't know how to reach.
+        The token is interpreted against ``from_dir`` (where it was written); a localized link is made relative to ``out_dir`` (where the emitting page *renders*, which for a report differs from its source dir). ``None`` means "leave it alone" — an external/absolute link, or one whose target the build doesn't know how to reach.
         """
         if not token or _ANCHORED.match(token):
             return None
@@ -227,9 +208,7 @@ def prepare_dirs_and_resolver() -> LinkResolver:
 class _Bundle:
     """One report's exported HTML as read from its source, before any assembly.
 
-    ``html`` is ``None`` when there's nothing to assemble (never published, or never
-    exported locally). ``notes`` are log lines the read wants printed — held here rather
-    than printed on the spot, so a concurrent read still logs in notebook order.
+    ``html`` is ``None`` when there's nothing to assemble (never published, or never exported locally). ``notes`` are log lines the read wants printed — held here rather than printed on the spot, so a concurrent read still logs in notebook order.
     """
 
     html: str | None
@@ -241,16 +220,9 @@ class _Bundle:
 def _read_bundle(nb: Path, *, store, pins: dict[str, str], externalizing: bool) -> _Bundle:
     """Read one report's exported ``index.html`` — off the bucket, or from ``.mini/exports/``.
 
-    Externalize reads *only* the HTML. The page's ``_assets/`` links stay relative and the
-    ``<base>`` sends them to the bundle on the CDN, so pulling the whole bundle here would
-    fetch megabytes of figures the build has no use for. It's also the one step that waits
-    on the network, which is why it's separable: the reports are independent, so the caller
-    runs these together instead of serially.
+    Externalize reads *only* the HTML. The page's ``_assets/`` links stay relative and the ``<base>`` sends them to the bundle on the CDN, so pulling the whole bundle here would fetch megabytes of figures the build has no use for. It's also the one step that waits on the network, which is why it's separable: the reports are independent, so the caller runs these together instead of serially.
 
-    A report pinned in ``docs/publish.lock`` is read *and* based at that revision, so the
-    page serves exactly what its publish uploaded — a later re-publish (e.g. from a branch
-    whose PR hasn't merged) can't swap the assets under this build. An unpinned report
-    falls back to the mutable branch head, with a warning.
+    A report pinned in ``docs/publish.lock`` is read *and* based at that revision, so the page serves exactly what its publish uploaded — a later re-publish (e.g. from a branch whose PR hasn't merged) can't swap the assets under this build. An unpinned report falls back to the mutable branch head, with a warning.
     """
     key = export_key(nb)
     if not externalizing:
@@ -277,11 +249,7 @@ def _read_bundle(nb: Path, *, store, pins: dict[str, str], externalizing: bool) 
 def build_reports(links: LinkResolver, store, externalizing: bool):
     """Assemble each report bundle into ``_site/<key>/index.html``.
 
-    Externalize: read the synced HTML from the bucket, insert one ``<base>`` at
-    ``exports/<key>/`` so its relative ``_assets/`` resolve there, and write only the
-    HTML into ``_site`` (the bytes stay on the bucket CDN). Localize: read the bundle
-    from ``.mini/exports`` and copy its ``_assets/`` beside the HTML so it works offline.
-    Author links are resolved to absolute/relative targets either way.
+    Externalize: read the synced HTML from the bucket, insert one ``<base>`` at ``exports/<key>/`` so its relative ``_assets/`` resolve there, and write only the HTML into ``_site`` (the bytes stay on the bucket CDN). Localize: read the bundle from ``.mini/exports`` and copy its ``_assets/`` beside the HTML so it works offline. Author links are resolved to absolute/relative targets either way.
     """
     print("Building reports...")
     pins = load_pins(WORKSPACE_ROOT) if externalizing else {}
@@ -324,11 +292,7 @@ def build_reports(links: LinkResolver, store, externalizing: bool):
 def _nav_urls(links: LinkResolver, *, key: str, nb_rel: str, externalizing: bool) -> tuple[str | None, str | None]:
     """The report banner's (index, source) links — same absolute/relative policy as author links.
 
-    The source is the notebook on GitHub (``source_base`` + its repo path). The index is
-    the site root: absolute (``site_base``) when externalizing — the asset ``<base>`` would
-    otherwise repoint a relative link at the bucket — and relative back up from
-    ``_site/<key>/index.html`` when localizing, so offline navigation works. Either is
-    ``None`` if its base is unavailable.
+    The source is the notebook on GitHub (``source_base`` + its repo path). The index is the site root: absolute (``site_base``) when externalizing — the asset ``<base>`` would otherwise repoint a relative link at the bucket — and relative back up from ``_site/<key>/index.html`` when localizing, so offline navigation works. Either is ``None`` if its base is unavailable.
     """
     source_url = f"{links.source_base}{nb_rel}" if links.source_base else None
     if externalizing:
@@ -388,11 +352,7 @@ def copy_md_stylesheet():
 def _rewrite_md_links(text: str, links: LinkResolver, *, from_dir: str, pretty: bool) -> str:
     """Resolve relative Markdown link targets (``](./experiment.py)``) before conversion.
 
-    Markdown pages never carry an asset ``<base>``, so they're resolved in *localize*
-    mode: a rendered target stays a relative link (clickable offline), a source file
-    becomes an absolute GitHub link, and anything else is left untouched. When publishing
-    (``pretty``), a report link drops its ``index.html`` so it reads ``<key>/``; offline
-    builds keep the explicit file so ``file://`` navigation still works.
+    Markdown pages never carry an asset ``<base>``, so they're resolved in *localize* mode: a rendered target stays a relative link (clickable offline), a source file becomes an absolute GitHub link, and anything else is left untouched. When publishing (``pretty``), a report link drops its ``index.html`` so it reads ``<key>/``; offline builds keep the explicit file so ``file://`` navigation still works.
     """
 
     def repl(m: re.Match) -> str:

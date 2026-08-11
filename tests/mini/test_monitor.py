@@ -1,8 +1,6 @@
 """Tests for the drive-to-completion watcher (``mini run --watch``).
 
-Uses a real ``LocalApparatus`` so tasks run in detached subprocesses — the same
-durable-records path the watcher polls. A quiet console keeps Rich off the test
-output. See test_orchestration.py for the single-tick ``_drive`` counterpart.
+Uses a real ``LocalApparatus`` so tasks run in detached subprocesses — the same durable-records path the watcher polls. A quiet console keeps Rich off the test output. See test_orchestration.py for the single-tick ``_drive`` counterpart.
 """
 
 from __future__ import annotations
@@ -61,9 +59,7 @@ def _times_ten(x):
 
 
 def test_watch_observes_a_run_it_did_not_launch(tmp_path: Path):
-    """Read-only ``watch``: another caller ``tick``s to launch the detached work;
-    ``watch`` only polls the durable records and returns once they settle. It takes
-    no experiment, so it structurally *can't* relaunch — the read-only invariant."""
+    """Read-only ``watch``: another caller ``tick``s to launch the detached work; ``watch`` only polls the durable records and returns once they settle. It takes no experiment, so it structurally *can't* relaunch — the read-only invariant."""
     app = LocalApparatus("watch_ro", max_workers=2, data_dir=tmp_path / "watch_ro")
     exp = Experiment(name="watch_ro", main=lambda ctx: ctx.map(_times_ten, [1, 2]))
     tick(exp, app)  # launch the single stage detached, then suspend — like a separate process
@@ -88,8 +84,7 @@ def test_raises_on_failure_without_relaunching(tmp_path: Path):
 
 
 def test_reap_dead_settles_a_killed_worker(tmp_path: Path):
-    """A worker hard-killed mid-run (no FAILED written) is detected as dead and
-    settled FAILED, so it can't masquerade as RUNNING forever."""
+    """A worker hard-killed mid-run (no FAILED written) is detected as dead and settled FAILED, so it can't masquerade as RUNNING forever."""
     app = LocalApparatus("reap", data_dir=tmp_path / "reap")
     tick(Experiment(name="reap", main=lambda ctx: ctx.map(_sleeper, [1])), app)  # launch + suspend
     store = app.memo_store()
@@ -113,8 +108,7 @@ def test_reap_dead_settles_a_killed_worker(tmp_path: Path):
 
 
 def _running_rec(key: str, **extra) -> dict:
-    """A fabricated live RUNNING record: our own (alive) pid keeps reap_dead off it,
-    and a fresh heartbeat + env mark it as truly started (not queued)."""
+    """A fabricated live RUNNING record: our own (alive) pid keeps reap_dead off it, and a fresh heartbeat + env mark it as truly started (not queued)."""
     return {
         "key": key,
         "state": "running",
@@ -133,9 +127,7 @@ def _flip(store, key: str, fields: dict, delay: float) -> threading.Thread:
 
 
 def test_watch_wakes_on_a_failure_mid_stage(tmp_path: Path):
-    """The watchdog-fired scenario: one cell settles FAILED while its siblings run
-    on. ``watch`` must return *immediately* with an attention outcome — not sit
-    until the whole stage settles (or the caller's command times out)."""
+    """The watchdog-fired scenario: one cell settles FAILED while its siblings run on. ``watch`` must return *immediately* with an attention outcome — not sit until the whole stage settles (or the caller's command times out)."""
     app = LocalApparatus("watch_wake", data_dir=tmp_path / "watch_wake")
     store = app.memo_store()
     store.records_backend.merge("t-healthy", _running_rec("t-healthy"))
@@ -149,9 +141,7 @@ def test_watch_wakes_on_a_failure_mid_stage(tmp_path: Path):
 
 
 def test_watch_ignores_terminal_tasks_from_before_the_watch(tmp_path: Path):
-    """A run deliberately advanced past a failed cell must still be watchable: only
-    failures that *happen during* the watch trigger attention, so a pre-existing
-    terminal record doesn't wake every watcher immediately."""
+    """A run deliberately advanced past a failed cell must still be watchable: only failures that *happen during* the watch trigger attention, so a pre-existing terminal record doesn't wake every watcher immediately."""
     app = LocalApparatus("watch_pre", data_dir=tmp_path / "watch_pre")
     store = app.memo_store()
     store.records_backend.merge("t-old-fail", {"key": "t-old-fail", "state": "failed", "error": "boom"})
@@ -165,9 +155,7 @@ def test_watch_ignores_terminal_tasks_from_before_the_watch(tmp_path: Path):
 
 
 def test_watch_wakes_on_a_wedged_worker(tmp_path: Path):
-    """The wedge signature — heartbeat fresh, step frozen past the threshold —
-    must wake the watcher (outcome ``attention``) instead of blocking until some
-    timeout: the worker may burn GPU forever without ever settling."""
+    """The wedge signature — heartbeat fresh, step frozen past the threshold — must wake the watcher (outcome ``attention``) instead of blocking until some timeout: the worker may burn GPU forever without ever settling."""
     from mini.runs import STALE_HEARTBEAT_S
 
     app = LocalApparatus("watch_wedge", data_dir=tmp_path / "watch_wedge")
@@ -194,8 +182,7 @@ def test_watch_timeout_returns_with_work_in_flight(tmp_path: Path):
 
 
 def test_drive_stops_on_cancelled_instead_of_spinning(tmp_path: Path):
-    """A CANCELLED task is terminal: ``drive_and_watch`` must stop (raise), not
-    busy-loop ticking a DAG that can never progress (nothing RUNNING, no FAILED)."""
+    """A CANCELLED task is terminal: ``drive_and_watch`` must stop (raise), not busy-loop ticking a DAG that can never progress (nothing RUNNING, no FAILED)."""
     app = LocalApparatus("watch_cancel", data_dir=tmp_path / "watch_cancel")
     exp = Experiment(name="watch_cancel", main=lambda ctx: ctx.map(_sleeper, [1]))
     tick(exp, app)  # launch detached
@@ -221,8 +208,7 @@ def test_drive_stops_on_cancelled_instead_of_spinning(tmp_path: Path):
 
 
 def test_watch_surfaces_a_killed_worker(tmp_path: Path):
-    """The wedge fix end-to-end: a worker killed *while watching* settles FAILED
-    via ``reap_dead``, so the drain raises instead of waiting on it forever."""
+    """The wedge fix end-to-end: a worker killed *while watching* settles FAILED via ``reap_dead``, so the drain raises instead of waiting on it forever."""
     app = LocalApparatus("watch_killed", data_dir=tmp_path / "watch_killed")
     exp = Experiment(name="watch_killed", main=lambda ctx: ctx.map(_sleeper, [1]))
 
