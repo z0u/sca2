@@ -85,9 +85,10 @@ def test_anchor_schedule_ramps_holds_and_anneals_to_a_floor():
 
 
 def test_schedule_shapes_flatten_or_straighten_the_same_keyframes():
-    keyframes = dict(warmup_epochs=10, anneal_start=90, anneal_end=100, floor=0.1)
-    flat = AnchorSpec(peak=0.1, shape="flat", **keyframes)
-    linear = AnchorSpec(peak=0.1, shape="linear", **keyframes)
+    # Spelled out rather than unpacked from a shared dict: `AnchorSpec` mixes int
+    # and float fields, and a `**dict` of keyframes widens to `int | float`.
+    flat = AnchorSpec(peak=0.1, warmup_epochs=10, anneal_start=90, anneal_end=100, floor=0.1, shape="flat")
+    linear = AnchorSpec(peak=0.1, warmup_epochs=10, anneal_start=90, anneal_end=100, floor=0.1, shape="linear")
 
     # Flat discards every keyframe: full weight from step 0, no anneal at the end.
     np.testing.assert_allclose(flat(np.array([0.0, 5.0, 50.0, 100.0])), 0.1, rtol=0, atol=1e-12)
