@@ -80,11 +80,7 @@ A worker can also *wedge*: a hung device call or deadlocked thread that holds it
 
 ## Recovery
 
-`FAILED` and `CANCELLED` are terminal by design, and a plain `run` will not relaunch them (a deterministic failure shouldn't busy-loop). Recover on purpose: `bin/mini logs <exp> <key>` to read the traceback, fix, then `bin/mini retry
-<exp>` (`--key <key>` for one). To re-run a `DONE` task, edit its fn or bump
-`version=` — a memo hit is never silently re-run. If a re-run or memo hit
-*surprises* you, `bin/mini explain <exp> <key>` shows the key's evidence and
-diffs it against its sibling record (code vs. inputs, per-dependency).
+`FAILED` and `CANCELLED` are terminal by design, and a plain `run` will not relaunch them (a deterministic failure shouldn't busy-loop). Recover on purpose: `bin/mini logs <exp> <key>` to read the traceback, fix, then `bin/mini retry <exp>` (`--key <key>` for one). To re-run a `DONE` task, edit its fn or bump `version=` — a memo hit is never silently re-run. If a re-run or memo hit *surprises* you, `bin/mini explain <exp> <key>` shows the key's evidence and diffs it against its sibling record (code vs. inputs, per-dependency).
 
 The full fix loop — the fix/prune/retry table, bounded hotfixes with `--keep-stale-done`, superseded records, and partial `map` failures — is in [recovery.md](./recovery.md); the safety rules below are the operational side of it.
 
