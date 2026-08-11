@@ -215,7 +215,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(group_weights, prior: dict):
+def _(group_weights, prior):
     # Per-run statistics of the nine-seed primary, re-derived from the arrays.
     _m10: dict = prior["m10"]
     _primary = [c for c in _m10["cells"] if c["condition"] == "either-t100"]
@@ -246,7 +246,7 @@ def _(group_weights, prior: dict):
 
 
 @app.cell(hide_code=True)
-def _(per_run: dict[str, np.ndarray]):
+def _(per_run):
     _rows = "".join(
         f"<tr><td><code>{k}</code></td>"
         f"<td class='num'>{v.mean():+.4f}</td>"
@@ -293,7 +293,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(per_run: dict[str, np.ndarray], prior: dict):
+def _(per_run, prior):
     _m10: dict = prior["m10"]
     _conds = ["op1-labels", "either-t100", "either-t500", "either-t2500", "slot-oracle"]
     _pts: dict[str, tuple[np.ndarray, np.ndarray]] = {}
@@ -393,7 +393,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(prior: dict, softmin_weights_np):
+def _(prior, softmin_weights_np):
     _m10: dict = prior["m10"]
     _labels = [c["label"] for c in _m10["cells"] if c["condition"] == "either-t100"]
     _alpha = np.mean([prior["a10"][f"{la}/alpha_lines"] for la in _labels], axis=0)  # (L1, N, T), seed mean
@@ -516,7 +516,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(prior: dict):
+def _(prior):
     _m9: dict = prior["m9"]
     _rows = []
     for _c in _m9["cells"]:
@@ -555,7 +555,7 @@ def _(prior: dict):
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### The ablation conditions
+    ### Ablation conditions
 
     There are nine conditions, three seeds each, all at the reference λ_a and τ under the either-slot labeller. `ref` re-runs the primary recipe from ex-2.1.10 through the code path of this experiment, so every comparison is between runs of identical code. `lam0` and `short-lam0` are the task-cost controls, one at each length. `flat-both` combines the two flat simplifications. We need it because an arm that changes one schedule at a time cannot show an interaction between the two; we read it only if decision rules 1 and 2 both simplify. The table reports dose and centroid for each arm, so the outcomes can tell us which of the two was doing the work.
 
@@ -634,7 +634,11 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### The decision rules
+    ### Decision rules
+
+    Two names recur from here on: **branch A** keeps the anti-subspace term's schedule shape, sampling its peak and anneal endpoint; **branch B** replaces it with one flat ratio. Rule 2 below picks between them, and the next section gives each branch's own dimensions.
+
+    <!-- REVIEW: added the branch A/B definition above the frozen rule text. Both names were already defined inside rule 2's own wording and restated in the next section, but only after their first appearance in the ablation and amendment prose further down; a reader hitting "branch A" there had to backtrack through two sections to find it. No claim changes — this states what rule 2 already decides, ahead of the frozen block that decides it. -->
 
     Rendered from the design constants (`experiment.DECISION_RULES`), so the frozen text has one home:
     """)
@@ -656,7 +660,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### The survey space
+    ### Survey space
 
     Two dimensions are always sampled, both on a log scale. λ_a spans [0.02, 1.0]: from a fifth of the rung we scored at, below which the ladder in ex-2.1.6 suggests the pull is weak, up to the weight of the ex-2.1.7 ceiling arm, where selectivity was already gone. So we believe the optimum is somewhere inside. τ spans [0.05, 0.30], on the weight-scale argument above.
     <!-- REVIEW: "half the rung" → "a fifth"; the scored rung is λ = 0.1 and the bound is 0.02. Same correction in the SPACE_COMMON docstring. -->
@@ -759,7 +763,7 @@ def _():
     mo.md(rf"""
     {len(ex.ABLATION_CONDITIONS)} ablation conditions × {ex.N_SEEDS_ABLATION} seeds = {ex.N_RUNS_ABLATION} runs, plus the amendment's {len(ex.AMENDMENT_CONDITIONS)} × {ex.N_SEEDS_ABLATION} = {ex.N_RUNS_AMENDMENT}, then at most {max(ex.N_TRIALS_BY_DIM.values())} + {ex.N_PROMOTE} × {ex.SEEDS_PROMOTE - 1} = {ex.N_RUNS_SURVEY} survey runs: about {ex.N_RUNS_ABLATION + ex.N_RUNS_AMENDMENT + ex.N_RUNS_SURVEY} training runs in the worst case.
 
-    The design budgeted roughly 25 minutes of L4 per run, inherited from ex-2.1.10. The ablation stage then billed 0.7–3.6 minutes each, because the slim eval drops the readability, geometry and leakage passes and the corpus is prepared once for the whole DAG. At the observed rate the experiment fits in under two hours of wall clock, which is what made the amendment affordable to decide on its merits rather than on cost.
+    The design budgeted roughly 25 minutes of L4 per run, inherited from ex-2.1.10. The ablation stage then billed 0.7–3.6 minutes each, because the slim eval drops the readability, geometry and leakage passes and the corpus is prepared once for the whole DAG. At the observed rate the experiment fits in under two hours of wall clock.
 
     Each stage launches with `--max-containers {ex.MAX_CONTAINERS}` and a `--budget` sized from its run count. Memoization means the promoted round re-runs only the new seeds, and `ctx.map` with `allow_partial=True` lets diverged trials land as data rather than failures.
 
@@ -791,11 +795,11 @@ def _():
     # to data the reader can see.
     ab_summary = ex.ablation_summary(ab_cells)
     ab_decision = ex.decide_amended(ab_summary)
-    return ab_arrays, ab_cells, ab_decision, ab_summary
+    return ab_cells, ab_decision, ab_summary
 
 
 @app.cell(hide_code=True)
-def _(ab_summary: dict):
+def _(ab_summary):
     _rows = "".join(
         f"<tr><td><code>{name}</code></td><td class='num'>{s['n']}</td>"
         + "".join(f"<td class='num'>{s[k]:+.4f}</td>" for k in ex.DECISION_STATS)
@@ -842,7 +846,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(ab_summary: dict, delta_table):
+def _(ab_summary, delta_table):
     mo.Html(
         figure_html(
             delta_table(ab_summary, ["flat-anchor"]),
@@ -856,7 +860,7 @@ def _(ab_summary: dict, delta_table):
 
 
 @app.cell(hide_code=True)
-def _(ab_cells: list[dict], traj_of):
+def _(ab_cells, traj_of):
     _pi = {
         c["condition"]: [
             np.asarray(r["pi"], dtype=float)[1:].mean(axis=0) for r in ab_cells if r["condition"] == c["condition"]
@@ -915,19 +919,40 @@ def _():
     mo.md(r"""
     ### Does the anti-subspace schedule beat a constant?
 
-    It comes out ahead of both constants, and at each end for a different reason.
+    It comes out ahead of both constants.
 
-    `anti-hold` holds the low ratio for all of training, which removes the early repulsion. The pull then goes where ex-2.1.8 said it would: two of three runs put more than half their deep-slice weight on `+` and trip the latch veto, and the third sits at 0.482, just under. Containment, grading, and the group contrast all come out worse, the contrast by fifty times its band.
+    <!-- REVIEW: checked what these two paragraphs are read off. Every number in
+    them is a seed-mean, end-of-training statistic from the same per-run fields
+    the delta table below reads (deep-slice `pi`, `alpha_op1`, `r2_sim`,
+    `contrast`) — there is no trajectory for these arms, and none is claimed:
+    `anti-peak`'s op1 share is 0.858/0.868/0.884 across its three runs (published
+    `pi`), matching "0.86-0.88", and its `r2_sim` is 0.61/0.66/0.69 against
+    `ref`'s 0.79/0.77/0.78, matching "0.78 to 0.65". Trimmed one sentence that
+    read as a timing claim ("the early repulsion does its job") without a
+    trajectory behind it; the rest states what the bracket comparison shows,
+    not what happens during training. Verify: the numbers above against the
+    published per-run `pi` and `r2_sim` for `anti-hold`/`anti-peak`/`ref`. -->
 
-    `anti-peak` holds the high ratio instead. The early repulsion does its job: op1 keeps 0.86–0.88 of the deep-slice weight, and the contrast holds at 0.839, which is 0.0174 under `ref`: a small drop, but nearly twice the band, so it resolves. The cost is grading, with r² falling from 0.78 to 0.65 and m_line falling with it. Repulsion that never comes down leaves the color response less graded, which is the failure the constraints exist to catch.
+    `anti-hold` holds the low ratio for all of training, which removes the early repulsion (the schedule's min-jerk anneal is slow to start, so its ratio still sits at 2.47 of an eventual 0.30 at epoch 10). The pull then goes where ex-2.1.8 said it would: two of three runs put more than half their deep-slice weight on `+` and trip the latch veto, and the third sits at 0.482, just under. Containment, grading, and the group contrast all come out worse, the contrast by fifty times its band.
 
-    So both ends of the schedule do real work. The peak keeps the pull off the syntax roles while the model is still random, and the anneal down to the hold ratio is what leaves the response graded once it has committed. Rule 2 sends the survey to branch A, the schedule family, with the hold ratio fixed and the peak and the anneal endpoint sampled.
+    `anti-peak` holds the high ratio instead: op1 keeps 0.86–0.88 of the deep-slice weight, and the contrast holds at 0.839, which is 0.0174 under `ref`: a small drop, but nearly twice the band, so it resolves. The cost is grading, with r² falling from 0.78 to 0.65 and m_line falling with it. Repulsion that never comes down leaves the color response less graded, which is the failure the constraints exist to catch.
+
+    So both ends of the schedule seem to be required: the peak keeps the pull off the syntax roles while the model is still random, and the anneal down to the hold ratio leaves the response graded once it has committed. That is one reading — both brackets change the dose along with the shape, and the amendment below adds the arm that separates the two. On what ran here, rule 2 sends the survey to branch A, the schedule family, with the hold ratio fixed and the peak and the anneal endpoint sampled.
+
+    <!-- REVIEW: the shape reading was stated here as settled while the
+    amendment section below says round 1 could not settle it (the brackets
+    confound shape with dose). Marked it as one of two live readings and added
+    the forward pointer; rule 2's firing and the branch it names are unchanged.
+    The "before its anneal" clause added in the previous pass was also made
+    precise: the anti anneal spans epochs 0–90, so nothing is delivered
+    "before" it — what protects the early window is the min-jerk shape's slow
+    start (ratio 2.47 at epoch 10, from `anti_weight`). -->
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(ab_summary: dict, delta_table):
+def _(ab_summary, delta_table):
     _dose = {
         "ref": ex.anchor_dose(lambda e: ex.anti_weight(e)),
         "anti-hold": ex.anchor_dose(lambda e: ex.ANTI_HOLD_RATIO * ex.SCORING_LAMBDA * np.ones_like(e)),
@@ -950,25 +975,36 @@ def _():
     mo.md(r"""
     ### Do the flat arms compose?
 
-    The arm ran, and it fails on all five statistics. Rule 3 never reads it: the rule fires only when rules 1 and 2 both simplify, and rule 2 did not, so nothing here changes the survey either way. The arm was insurance against an outcome that did not happen, and it cost three runs.
+    `flat-both` fails on all five statistics. Rule 3 never reads it: the rule fires only when rules 1 and 2 both simplify, and rule 2 did not, so nothing here changes the survey either way. The arm was insurance against an outcome that did not happen, and it cost three runs.
 
     <!-- REVIEW: reordered so the result comes before the rule. The section
     previously opened with "rule 3 does not read this arm", which a reader can
     take to mean the arm was never run. It ran; it is unread and it also fails.
     No claim changes. -->
 
-    It does answer a question the amendment below asks, which is why the three runs were not wasted.
+    The numbers are worth a look anyway. Two runs put their deep-slice weight on `=` and op2, and the third on `+`. So the failure is not stable across seeds — and it is not quite `anti-hold`'s failure either: that arm sent all three of its runs to `+` and kept retention within band, where this one regresses it. What survives the comparison is that the hold-level anti term fails with either anchor shape; whether the anchor's shape also steers where the pull settles is a three-seed observation with nothing riding on it.
 
+    <!-- REVIEW: corrected "this is what anti-hold does on its own, and the flat
+    anchor contributes nothing to it" against the published per-run profiles.
+    anti-hold's failure is stable — all three runs put their deep-slice weight
+    on `+` (0.54/0.63/0.48) — while flat-both's wanders (`=`/op2, `=`/op2, `+`;
+    none over the 0.5 veto) and it adds a retention regression (−0.079 against
+    a 0.010 band) that anti-hold does not have. So the flat anchor changes how
+    the failure is expressed, and the old sentence claimed otherwise. Nothing
+    decision-bearing changes: the arm is unread either way. Verify: the six
+    runs' `pi` fields, roles ordered [op1, +, op2, =]. -->
 
-    The numbers are worth a look anyway. `flat-both` fails on all five statistics, and its runs disagree about how: two put their deep-slice weight on `=` and op2, and the third on `+`. So the failure is not even stable across seeds. This is what `anti-hold` does on its own, and that is the reading to prefer, since the flat anchor contributes nothing to it. Pairing `flat-anchor` with the *scheduled* anti term is exactly the arm that passed.
-
-    Note that the recipe the survey runs is `flat-anchor`, a condition that ran here, rather than a combination no arm tested.
+    <!-- REVIEW: reworded for clarity; no claim changes. `flat-anchor` only
+    flattens the anchor term (`condition_shapes` leaves its anti-subspace shape
+    at the schedule default), so it already is flat-anchor-plus-scheduled-anti
+    — the same pairing rule 2's branch A sends the survey to. -->
+    Rule 1 (flat anchor) and rule 2 (branch A, scheduled anti) together land on a pairing that already ran: `flat-anchor` only flattened the anchor term, leaving the anti-subspace term on its schedule, so the survey's recipe is that tested condition, not a combination assembled after the fact from separate arms.
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(ab_decision: dict, ab_summary: dict, delta_table):
+def _(ab_decision, ab_summary, delta_table):
     _read = ab_decision["flat_both_read"]
     mo.Html(
         figure_html(
@@ -995,7 +1031,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(ab_summary: dict, delta_table):
+def _(ab_summary, delta_table):
     mo.Html(
         figure_html(
             delta_table(ab_summary, ["short"]),
@@ -1009,7 +1045,7 @@ def _(ab_summary: dict, delta_table):
 
 
 @app.cell(hide_code=True)
-def _(ab_cells: list[dict], traj_of):
+def _(ab_cells, traj_of):
     _keys = ("m_line", "val_loss")
     _traj = {k: {c: traj_of(ab_cells, c, k) for c in ("ref", "short")} for k in _keys}
 
@@ -1047,13 +1083,21 @@ def _():
 
     No. Straightening every ramp and anneal in both terms leaves all five statistics within band, the largest excursion being grading at −0.0248 against a band of 0.0392. Minimum-jerk stays, now on evidence rather than by inheritance from M1, and the question retires.
 
+    <!-- REVIEW: added the sentence below to answer "if linear passes, why not
+    switch to it". Rule 5 was written to keep minimum-jerk on either outcome
+    (DECISION_RULES: "Either way no survey dimension"), unlike rules 1-3, where
+    a pass deletes schedule parameters the survey would otherwise carry. There
+    is no cost saved by switching, so a pass only closes the question of
+    whether the shape is load-bearing rather than arguing for the simpler one. -->
+    Rule 5 was written to keep minimum-jerk whichever way this arm landed. Unlike the flat-arm rules, swapping the interpolation shape deletes no survey dimension, so a pass here only closes the question of whether the shape matters — it is not a case for adopting the simpler curve.
+
     A straight line and a smoothstep both cover half their window, so the anchor dose barely moves. The anti-subspace ratio interpolates over 90 epochs, and over that span the two shapes differ enough to change its dose by 6%. No statistic resolved: near the operating point the repulsion is insensitive to dose changes of that size, worth holding beside the previous section, where what the flat brackets changed was mostly something other than the dose.
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _(ab_summary: dict, delta_table):
+def _(ab_summary, delta_table):
     _sched = ex.anchor_dose(lambda e: ex.anti_weight(e))
     _lin = ex.anchor_dose(lambda e: ex.anti_weight(e, shape="linear"))
     mo.Html(
@@ -1073,15 +1117,15 @@ def _():
     mo.md(rf"""
     ### An amendment to the search plan
 
-    Everything above ran under rules frozen before any of it. This section adds four conditions and three rules, also frozen before any of *them* ran. Rules 1–5 stand exactly as they fired; the amendment extends the plan where round 1 turned out not to answer the question we had asked it.
+    Everything above ran under frozen rules. This section adds four conditions and three more rules, also frozen before any of *them* ran. Rules 1–5 stand exactly as they fired; the amendment extends the plan where round 1 turned out not to answer the question we had asked it.
 
     **What round 1 could not settle.** Rule 2 read two constants, at {ex.ANTI_HOLD_RATIO:g} and {ex.ANTI_PEAK_RATIO:g}, and both resolved worse than `ref`, which we read as the schedule earning its shape at both ends. But those two arms differ from `ref` in two ways at once: in shape, and in dose ({ex.anchor_dose(lambda e: ex.anti_weight(e, hold_ratio=ex.ANTI_HOLD_RATIO, shape="flat")) / ex.anchor_dose(lambda e: ex.anti_weight(e)):.2f}× and {ex.anchor_dose(lambda e: ex.anti_weight(e, hold_ratio=ex.ANTI_PEAK_RATIO, shape="flat")) / ex.anchor_dose(lambda e: ex.anti_weight(e)):.2f}× the reference).
 
-    So a second reading survives them: total dose has an interior optimum, and the shape is incidental. The seed means fit it too. Containment moves monotonically with dose across the three arms, and `ref` sits between the two brackets while beating both on the other three statistics.
+    So alternatively, it could be that total dose has an interior optimum, and the shape is incidental. The seed means fit it too. Containment moves monotonically with dose across the three arms, and `ref` sits between the two brackets while beating both on the other three statistics.
 
     The design anticipated this middle level and set it aside. The frozen note under `ABLATION_CONDITIONS` says the anti term "cannot be dose-matched flat (the match would sit at 1.7× the anchor peak for all of training, a different regime)".
 
-    That was the right call with no data in hand, and it follows the bracketing advice: straddling the range of the schedule asks whether *any* constant substitutes for the shape, and it needs no invariant to be chosen. What round 1 changed is that this level is now the one measurement that separates two live readings, rather than one more point in a range.
+    Perhaps that was the right call with no data in hand. But following round 1, this level is now a measurement that could separate two live readings, rather than one more point in a range.
 
     **The four conditions.** `anti-mid` holds λ_s̄/λ_a constant at {ex.ANTI_MID_RATIO:g}, the level that matches the reference dose, so it differs from `ref` in shape alone. `anti-mid-flat` pairs that constant with the flat anchor. Since `ref` and `flat-anchor` have already run, the four cells complete a 2 × 2 in (anchor shape) × (anti shape), which is what it takes to read an interaction.
 
@@ -1143,9 +1187,9 @@ def _():
     mo.md(f"""
     **The rules** (from `experiment.AMENDMENT_RULES`, frozen before the runs).
 
-    **6.** `anti-mid` against `ref`. Within band, or better → the dose is the active ingredient, the anti schedule collapses to a flat ratio, and the survey searches branch B with {ex.ANTI_MID_RATIO:g} as its reference level. Resolved worse → the shape is load-bearing, and branch A is confirmed rather than merely un-overturned.
+    **6.** `anti-mid` against `ref`. Within band, or better → the dose is the active ingredient, the anti schedule collapses to a flat ratio, and the survey searches branch B with {ex.ANTI_MID_RATIO:g} as its reference level. Resolved worse → the shape is load-bearing, and branch A is confirmed rather than merely un-overturned. This comparison holds the anchor schedule fixed at `ref`'s, so a regression here isolates the anti-subspace shape from any interaction with the anchor's shape; rule 7 tests that interaction separately, and confirming branch A does not wait on it.
 
-    **7.** `anti-mid-flat` against `flat-anchor`. Rules 1 and 6 are one-factor readings, so both simplifications are adopted together only if the pair holds. This is the interaction gate of rule 3, now at a level that can pass it. If rule 6 simplifies and this arm does not, we keep the anchor schedule and adopt the flat anti.
+    **7.** `anti-mid-flat` against `flat-anchor`. Rules 1 and 6 are one-factor readings, so both simplifications are adopted together only if the pair holds. This is the interaction gate of rule 3, now at a level that might pass it. If rule 6 simplifies and this arm does not, the two simplifications interact the way rule 3 describes: we keep the anchor schedule, since rule 1's parameters are fixed either way, and adopt the flat anti at the level rule 6 already showed works alone.
 
     **8.** `short25` within band against `ref`, task-gated against `short25-lam0` → the survey runs at {ex.EPOCHS_SHORTER} epochs. Otherwise the {ex.EPOCHS_SHORT} of rule 4 stands.
 
@@ -1197,7 +1241,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(ab_decision: dict):
+def _(ab_decision):
     _space = ex.survey_space(ab_decision)
     _rows = "".join(
         f"<tr><td><code>{d}</code></td><td class='num'>{lo:g}</td><td class='num'>{hi:g}</td><td>{scale}</td></tr>"
