@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import numbers
 import os
 import sys
 import time
@@ -835,12 +837,16 @@ def cmd_watch(args: argparse.Namespace) -> None:
 # A result routinely carries a per-step metric list — a training task's `val_loss` is
 # one float per step — so a sweep's raw reprs run to ~120 KB of floats, and the scalars
 # worth reading are buried in them (and, for an agent, the dump lands in its context).
-# The default view elides the bulk and nothing else: every mapping key and every scalar
-# prints verbatim, so what a reader takes from it is what the result says. Only lengths
-# are lost, and each elision states how much it stands for. `--full` prints the repr.
+# The default view elides the bulk: every mapping key and every scalar prints verbatim,
+# so a value shown in place of itself is the value. What is lost is length, plus the
+# interior of a long numeric sequence, which prints as rounded summary statistics rather
+# than a head of three floats. Each elision states how much it stands for, and `--full`
+# prints the repr.
 _SEQ_HEAD = 3  # elements of a sequence shown before the elision
 _STR_CAP = 80  # characters of a string shown before the elision (a sha256 still fits)
 _MAX_DEPTH = 6  # nesting deeper than this is elided rather than walked
+_STATS_MIN = 8  # an ordered numeric sequence longer than this summarizes instead
+_STATS_FMT = ".3g"  # significant figures for a summarized (and therefore rounded) number
 
 
 def _elided(parts: list[str], total: int, brackets: str) -> str:
@@ -861,10 +867,47 @@ def _capped(text: str, *, quoted: bool) -> str:
     return (repr(shown) if quoted else shown) + (f"… +{len(text) - _STR_CAP} chars" if len(text) > _STR_CAP else "")
 
 
+def _summarized(value: list | tuple) -> str | None:
+    """A long numeric sequence as where it starts, where it ends, and how it spreads — or ``None`` if it isn't one.
+
+    This is the bulk the abbreviated view exists for, and a head of three floats out of hundreds answers almost nothing about it: not where the run ended, not whether it spiked, not what the best epoch reached. First and last, any interior extreme, and the mean and spread answer those in less width.
+
+    These numbers are rounded, which nothing else here is. The rule that keeps that honest is the length floor: a summary only ever stands in for elements that were going to be dropped, never for a value the view would otherwise have printed exactly. ``--full`` has the originals.
+    """
+    if len(value) <= _STATS_MIN:
+        return None  # short enough that a head shows most of it, and a summary would be the longer line
+    if any(isinstance(v, bool) or not isinstance(v, numbers.Real) for v in value):
+        # `bool` is an `int` to Python, but a mean over elements that read as flags doesn't.
+        return None
+    integral = all(isinstance(v, numbers.Integral) for v in value)
+    fmt = ".0f" if integral else _STATS_FMT
+
+    def num(x: float) -> str:
+        return f"{x:{fmt}}"
+
+    bits = [f"{num(value[0])} → {num(value[-1])}"]
+    finite = [float(v) for v in value if math.isfinite(v)]
+    if len(finite) < len(value):
+        # A nan mid-curve is the thing you most want a results dump to tell you about.
+        bits.append(f"{len(value) - len(finite)} non-finite")
+    if finite:
+        # A metric trace usually runs one way, which puts its extremes on the ends — where they
+        # already print. So an extreme is named only when it is an interior one, and the absence
+        # of a `min` says the sequence never went below where you can see it ending.
+        ends = {float(value[0]), float(value[-1])}
+        mean = math.fsum(finite) / len(finite)
+        bits += [f"{k} {num(v)}" for k, v in (("min", min(finite)), ("max", max(finite))) if v not in ends]
+        bits.append(f"mean {mean:{_STATS_FMT}}")
+        if len(finite) > 1:
+            variance = math.fsum((x - mean) ** 2 for x in finite) / (len(finite) - 1)
+            bits.append(f"std {math.sqrt(variance):{_STATS_FMT}}")
+    return f"{len(value)} {'ints' if integral else 'floats'}: {', '.join(bits)}"
+
+
 def _abbreviated(value: Any, depth: int = 0) -> str:
     """A one-line rendering of *value* with its bulk elided — for reading, not parsing.
 
-    Containers are walked so their shape survives: a mapping keeps every key, and a sequence keeps its first few elements plus a count of the rest. Dataclasses walk as their fields, which is what keeps an :class:`~mini.store.Artifact` tree from printing every child. Scalars are never rounded or reformatted — an abbreviated number that read as exact would be worse than no number at all.
+    Containers are walked so their shape survives: a mapping keeps every key, and a sequence keeps its first few elements plus a count of the rest — or, once it is long and numeric, :func:`_summarized` statistics over the whole of it. Dataclasses walk as their fields, which is what keeps an :class:`~mini.store.Artifact` tree from printing every child. Scalars are never rounded or reformatted — an abbreviated number that read as exact would be worse than no number at all.
     """
     if depth > _MAX_DEPTH:
         return "…"
@@ -878,6 +921,9 @@ def _abbreviated(value: Any, depth: int = 0) -> str:
             # By instance, not by exact type: a namedtuple is a tuple, and a KeyError
             # here would take down the verb over a cosmetic choice of bracket.
             brackets = "[]" if isinstance(value, list) else "()" if isinstance(value, tuple) else "{}"
+            # Ordered sequences only: "first → last" needs an order to name, and a set has none.
+            if isinstance(value, list | tuple) and (stats := _summarized(value)) is not None:
+                return f"{brackets[0]}{stats}{brackets[1]}"
             head = [_abbreviated(v, depth + 1) for v in list(value)[:_SEQ_HEAD]]
             return _elided(head, len(value), brackets)
     if hasattr(value, "shape") and hasattr(value, "dtype"):  # numpy/jax array: shape, not payload
@@ -1376,7 +1422,8 @@ def main() -> None:
         "--full",
         action="store_true",
         help=f"print each result's whole repr; by default sequences past {_SEQ_HEAD} elements are "
-        "elided with a count (a per-step metric list is otherwise thousands of floats)",
+        f"elided with a count, and numeric ones past {_STATS_MIN} are summarized as first/last, any "
+        "interior min/max, and mean/std (a per-step metric list is otherwise thousands of floats)",
     )
     _add_app_flag(p)
     p.set_defaults(func=cmd_results)
