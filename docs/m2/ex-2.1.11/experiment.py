@@ -1052,6 +1052,18 @@ def r2_sim(alpha_op1: np.ndarray) -> float:
     return float(np.corrcoef(alpha_op1, SIM_TARGET)[0, 1] ** 2)
 
 
+def r2_sim_cond(alpha_op1: np.ndarray) -> float:
+    """The conditional-mean reading of grading: r² between the mean response and the mean target at each distinct redness level.
+
+    Ex-2.1.10's exploratory statistic, computed the same way (29 levels, no other binning). The survey publishes it beside the per-run r2_sim because the frozen landscape plan promised the pair — together they separate graded-on-average from graded color by color — while only the per-color reading constrains anything.
+    """
+    levels = np.round(REDNESS, 6)
+    uniq = np.unique(levels)
+    resp = np.array([alpha_op1[levels == lv].mean() for lv in uniq])
+    target = np.array([np.asarray(SIM_TARGET)[levels == lv].mean() for lv in uniq])
+    return float(np.corrcoef(resp, target)[0, 1] ** 2)
+
+
 def group_weights(r1: np.ndarray, r2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Per-line weights for the two localization groups the contrast compares.
 
@@ -1156,10 +1168,25 @@ def publish_survey(results: list[dict], trials: list[dict], decision: dict, scor
     """
     import json
 
-    from mini.store import put, set_ref
+    import numpy as np
+
+    from mini.store import get, put, set_ref
+
+    # REVIEW: the frozen landscape plan reports the conditional-mean r² beside the
+    # per-color r², but the survey cells carried scalars only, so the pair could not
+    # be rendered from the published data. This computes r2_cond per run from the
+    # same stored alpha arrays the per-color statistic was read from. Nothing
+    # sampled, ranked, or gated changes. Verify: r2_sim in the cells is untouched,
+    # and trial_feasibility never reads r2_cond.
+    def _r2_cond(r: dict) -> float:
+        path = get(r["arrays"], get_data_dir() / "publish" / f"{r['label']}.npz")
+        with np.load(path) as z:
+            return r2_sim_cond(z["alpha"][:, :, 0].mean(axis=0))
 
     survey = {
-        "cells": [{k: v for k, v in r.items() if k not in ("arrays", "traj")} for r in results],
+        "cells": [
+            {**{k: v for k, v in r.items() if k not in ("arrays", "traj")}, "r2_cond": _r2_cond(r)} for r in results
+        ],
         "trials": trials,
         "decision": decision,
         "scored": {str(t): s for t, s in scored.items()},

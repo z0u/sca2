@@ -77,7 +77,11 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    A survey to close out D2.1. The schedules and weights in the recipe were inherited piece by piece and never tuned together. So we ablate first: flat arms that bracket each schedule and their composition, plus a half-length condition. Every "no difference" lets us drop a dimension. Then a Sobol search over what is left (anchor weight, pooling temperature, repulsion dose) maps the good region and proposes the operating point the next milestone inherits.
+    A survey to close out D2.1. The schedules and weights in the recipe were inherited piece by piece and never tuned together, so we ablate first: flat arms that bracket each schedule, an arm that flattens both at once, and a half-length condition. Every "no difference" lets us drop a dimension.
+
+    Then a Sobol search over what is left (anchor weight, pooling temperature, repulsion dose) maps the good region and proposes the operating point the next milestone inherits.
+
+    Outcome: the anchor schedule and half the training could go, but the anti-subspace schedule could not. A constant that delivers the same total dose loses the grading the schedule protects, so the shape itself is doing the work. The search found a wide feasible plateau and proposes a stronger, softer point on its edge, for D2.2 to confirm.
     ///
     """)
     return
@@ -92,7 +96,7 @@ def _():
 
     **The anchor schedule can go.** `flat-anchor` stays within band on all five decision statistics, and no run latches (m_line +0.0039, band 0.0144). Rule 1: the survey runs a flat anchor weight.
 
-    **The anti-subspace schedule cannot.** Both flat brackets come out worse. `anti-hold` loses the group contrast (−0.4667, band 0.0093), grading (−0.2199, band 0.0392), and containment (+0.1275, band 0.0346), and two of its three runs latch onto `+`. `anti-peak` keeps containment and latches nothing, but loses grading (−0.1283, band 0.0392), m_line (−0.0282, band 0.0144), and a little contrast (−0.0174, band 0.0093). Rule 2: the survey searches the schedule family, branch A.
+    **The anti-subspace schedule cannot.** Both flat brackets come out worse. `anti-hold` loses the group contrast (−0.4667, band 0.0093), grading (−0.2199, band 0.0392), and containment (+0.1275, band 0.0346), and two of its three runs latch onto `+`. `anti-peak` keeps containment and latches nothing, but it loses grading (−0.1283, band 0.0392), m_line (−0.0282, band 0.0144), and a little contrast (−0.0174, band 0.0093). Rule 2: the survey searches the schedule family, branch A.
 
     <!-- REVIEW: `anti-peak` was summarized as keeping contrast; its contrast delta is −0.0174 against a band of 0.0093, so the rules read it as a resolved regression, not a tie. The branch is unaffected (m_line and grading already resolve worse). Verify: the `anti-peak` column of the delta table marks the contrast row bold with ✗. -->
 
@@ -100,7 +104,16 @@ def _():
 
     **Nothing resolves on the interpolation shape.** `linear` stays within band throughout; its largest excursion is grading, at −0.0248 against a band of 0.0392. Rule 5: keep minimum-jerk, and the question retires.
 
-    **Proposed operating point.** *Lands when the survey has run.*
+    **What matters about the anti-subspace schedule is its shape, not its dose.** `anti-mid` is a constant that matches the dose of the schedule, and it still loses grading (−0.1022, band 0.0392), m_line, and contrast. That is the pattern the shape reading of rule 6 predicted, so branch A is confirmed. The flat pairing `anti-mid-flat` fails the same way against `flat-anchor`, so flattening the anti term costs about the same with either anchor shape.
+
+    <!-- REVIEW: two wording fixes in the line above. "delivers the same dose as a constant" read as if `anti-mid` were not itself the constant; it matches the *schedule's* dose. And "there is no interaction with the anchor shape" was stronger than the 2 x 2 supports at three seeds a corner — the analysis section says the two lines move nearly in parallel, which is what this line now says. No verdict changes; rule 7 is unread either way. -->
+
+
+    **A quarter of the training is too little.** `short25` fails on m_line (−0.0268, band 0.0144), containment, and contrast. The predicted failure, in which the un-anchored control loses the task, did not happen: the task gate holds, using 0.0026 of its 0.02. Rule 8: 50 epochs stands.
+
+    **The survey maps the trade the calibration predicted.** 38 of 64 trials are feasible. m_line rises with λ_a until the task gate binds (every task failure at λ_a ≥ 0.38), and with τ until grading and contrast reach their floors. The latch veto accounts for the cold edge, with all ten vetoes at τ ≤ 0.12. The anti-subspace axes organize little.
+
+    **Proposed operating point.** `t00` sets λ_a 0.557, τ 0.265, and an anti peak of 1.376 with anneal end 0.537. It reaches m_line 0.534 ± 0.004 over five seeds, against 0.420 ± 0.005 for the reference recipe. It sits at the grading floor (r² 0.690 against 0.682), with four more trials within one band spanning λ_a 0.28–0.94. D2.2 confirms at fresh seeds before any of these numbers is quoted.
     """)
     return
 
@@ -108,8 +121,9 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    /// admonition | How to read this draft
-    This is a survey, not a hypothesis-scoring experiment. It preregisters a *search plan* and scores nothing. The plan covers the space to search, the sampling rule, the objective and its constraints, the seed budget, and the decision rules that stage the work. Once we agree on it, it is frozen (aside from immaterial edits). Results replace the `TODO` placeholders in place, and anything we think of after seeing the data goes under *Exploratory analyses*, marked as post hoc.
+    /// admonition | How to read this report
+    This is a survey, not a hypothesis-scoring experiment. It preregistered a *search plan* and scores nothing. The plan covers the space to search, the sampling rule, the objective and its constraints, the seed budget, and the decision rules that stage the work. It was frozen before the runs, and amended once mid-experiment under rules that were themselves frozen before their arms ran (the amendment section records how). Results replaced the placeholders in place, so each analysis section reads as prediction then observation, and anything conceived after seeing the data sits under *Exploratory analyses*, marked as post hoc.
+    <!-- REVIEW: retitled from "How to read this draft" and moved to past voice now that the results are in; the frozen-plan claims are unchanged, only their tense. Verify: git history shows the plan text predating the runs. -->
 
     Nothing this report finds may be quoted as a result. It proposes an operating point. The next preregistered experiment adopts that point, re-measures it at fresh seeds, and reports the survey value next to the confirmed one. The gap between the two is the winner's-curse correction: the best point in a search looks better than it really is, because part of what put it on top was luck.
     ///
@@ -768,7 +782,7 @@ def _():
     Each stage launches with `--max-containers {ex.MAX_CONTAINERS}` and a `--budget` sized from its run count. Memoization means the promoted round re-runs only the new seeds, and `ctx.map` with `allow_partial=True` lets diverged trials land as data rather than failures.
 
     <!-- Observed after the run, not a design change. -->
-    The 25-minute figure was inherited from ex-2.1.10, which carried a much heavier eval. The ablation stage's runs took 0.7 to 3.6 minutes of L4 time each, training and eval together, and all 27 settled in about 25 minutes of wall clock at eight containers.
+    The 25-minute figure was inherited from ex-2.1.10, which carried a much heavier eval. The ablation stage's runs took 0.7 to 3.6 minutes of L4 time each, training and eval together, and all 27 settled in about 25 minutes of wall clock at eight containers. The full DAG — all 127 training runs plus the prep, eval and publish steps — billed about $3.60 of compute, nearly all of it L4, in 2.8 hours of wall clock.
     """)
     return
 
@@ -795,7 +809,7 @@ def _():
     # to data the reader can see.
     ab_summary = ex.ablation_summary(ab_cells)
     ab_decision = ex.decide_amended(ab_summary)
-    return ab_cells, ab_decision, ab_summary
+    return ab_arrays, ab_cells, ab_decision, ab_summary
 
 
 @app.cell(hide_code=True)
@@ -1299,12 +1313,92 @@ def _():
     mo.md(r"""
     #### Shape or dose? (rules 6 and 7)
 
-    /// admonition | TODO
-    The `anti-mid` and `anti-mid-flat` delta tables against `ref` and `flat-anchor`, read as the round-1 tables. Plus the 2 × 2 of seed-mean m_line and r2_sim over (anchor shape) × (anti shape), which is the panel that shows an interaction if there is one.
+    Shape. `anti-mid` matches the dose of the schedule to within rounding and still comes out worse on three of the five statistics: grading falls 0.1022 against a band of 0.0392, m_line 0.0156 against 0.0144, and the group contrast 0.0135 against 0.0093. Containment and retention stay within band, containment on the better side.
 
-    Expected under the shape reading: `anti-mid` below band on m_line and r2_sim, containment intact or improved. Under the dose reading: every statistic within band, and the survey drops to three dimensions. A result contrary to both, with containment resolving worse while grading holds, would say that dose is not the axis that matters.
-    ///
+    That is what the shape reading predicted, a weakened blend of the two round-1 failures with containment intact, and not what the dose reading predicted. Rule 6 confirms branch A, so the peak and anneal endpoint of the schedule stay dimensions of the search.
+
+    Grading was the statistic to watch, and it moved the most, in the direction the frozen prediction gave a mechanism for. A constant at the matched level delivers four to six times the late repulsion of the schedule over the window where grading is learned, and the response ends less graded, as it did in both round-1 brackets.
+
+    Rule 7 is unread, because its gate needs rule 6 to simplify. The arm ran anyway, and it completes the 2 × 2. Against `flat-anchor`, `anti-mid-flat` shows the same three regressions (grading −0.1325, m_line −0.0203, contrast −0.0108). In the panel below the two anchor-shape lines move nearly in parallel, so flattening the anti term costs about the same with either anchor shape.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_summary, delta_table):
+    mo.vstack(
+        [
+            mo.Html(
+                figure_html(
+                    delta_table(ab_summary, ["anti-mid"]),
+                    caption=mo.md("""
+                    **`anti-mid` against `ref`.** Read as the round-1 tables. The arm matches the reference dose to 0.3% by construction, so what the deltas measure is the shape alone.
+                    """).text,
+                    class_="report-figure",
+                )
+            ),
+            mo.Html(
+                figure_html(
+                    delta_table(ab_summary, ["anti-mid-flat"], "flat-anchor"),
+                    caption=mo.md("""
+                    **`anti-mid-flat` against `flat-anchor`.** The frozen comparison for rule 7. Both arms hold the anchor flat, so the anti term is again the only difference.
+                    """).text,
+                    class_="report-figure",
+                )
+            ),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_cells):
+    _corner = {
+        ("min-jerk", "schedule"): "ref",
+        ("flat", "schedule"): "flat-anchor",
+        ("min-jerk", "constant"): "anti-mid",
+        ("flat", "constant"): "anti-mid-flat",
+    }
+    _runs = {
+        k: {s: [c[s] for c in ab_cells if c["condition"] == cond] for s in ("m_line", "r2_sim")}
+        for k, cond in _corner.items()
+    }
+
+    @themed(
+        name="two-by-two",
+        alt_text="""
+            Two panels, each a two-by-two interaction chart. Horizontal axis: the anti-subspace term, schedule or constant at 1.77. Two lines per panel, one per anchor shape, min-jerk and flat, with per-run dots around each seed mean. Left panel, m_line: both lines drop by about 0.02 from schedule to constant, staying nearly parallel. Right panel, grading r squared: both lines drop by about 0.10 to 0.13, again nearly parallel, with the flat-anchor line starting higher.
+        """,
+        caption=r"""
+            **The 2 × 2 of (anchor shape) × (anti term).** Seed means (large marks, joined) and per-run values (small dots) for m_line and grading $r^2$ at the four corners. An interaction would show as the two lines diverging; instead they move nearly in parallel on both panels, so the cost of flattening the anti term does not depend on the anchor's shape.
+        """,
+    )
+    def _plot():
+        colors = {"min-jerk": light_dark("#1f6fb4", "#5fa8dd"), "flat": light_dark("#b4531f", "#dd8f5f")}
+        fig, _axs = plt.subplots(1, 2, figsize=(7.2, 2.9), layout="constrained", sharex=True)
+        ax_m, ax_r = cast(tuple, _axs)
+        for ax, stat in ((ax_m, "m_line"), (ax_r, "r2_sim")):
+            for anchor in ("min-jerk", "flat"):
+                means = [float(np.mean(_runs[(anchor, anti)][stat])) for anti in ("schedule", "constant")]
+                ax.plot([0, 1], means, "o-", color=colors[anchor], ms=5, lw=1.2, label=f"{anchor} anchor")
+                for xi, anti in ((0, "schedule"), (1, "constant")):
+                    y = _runs[(anchor, anti)][stat]
+                    ax.scatter(
+                        [xi + (0.03 if anchor == "flat" else -0.03)] * len(y),
+                        y,
+                        s=10,
+                        color=colors[anchor],
+                        alpha=0.55,
+                        lw=0,
+                    )
+            ax.set_xticks([0, 1], ["schedule", f"constant {ex.ANTI_MID_RATIO:g}"])
+            ax.set_xlim(-0.35, 1.35)
+        ax_m.set_ylabel("m_line", fontsize="x-small")
+        ax_r.set_ylabel("grading r²", fontsize="x-small")
+        ax_m.legend(fontsize="x-small", frameon=False, loc="lower left")
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -1313,12 +1407,64 @@ def _():
     mo.md(r"""
     #### Can we halve the budget again? (rule 8)
 
-    /// admonition | TODO
-    The `short25` delta table against `ref`, its task cost against `short25-lam0`, and the m_line and validation-loss trajectories on a fraction-of-training axis, as in the `short` figure above.
+    No, and not for the predicted reason. The prediction named the task gate as the binding constraint, on the grounds that at 25 epochs the un-anchored control might stop saturating holdout EM. The control is fine: `short25-lam0` holds 0.9961, and the task cost of `short25` is 0.0026 against a gate of 0.02.
 
-    Expected: the task gate is the binding constraint, since 25 epochs is where the un-anchored control may stop saturating holdout EM. If the control drops, the gate is measuring convergence rather than the cost of anchoring, and the arm fails on that ground rather than on selectivity.
-    ///
+    What fails is the anchored recipe itself: m_line drops 0.0268 against a band of 0.0144, containment worsens by 0.0410 against 0.0346, and the contrast drops 0.0222 against 0.0093, with grading within band. The trap the rule named, where a shorter run scores *better* on m_line while being the less converged model, did not appear either; the shorter run scores worse outright.
+
+    The trajectories below say why the halving stopped working. On the shared fraction-of-training clock, `ref` and `short` trace the same curves. But `short25` starts far behind, and spends the rest of the run catching up: at a fifth of training its margin probe reads half of what `ref` reads at the same point, and its validation loss is a full nat higher.
+
+    Fifty epochs leaves slack after convergence, and twenty-five leaves none. Rule 8: the survey runs at the 50 epochs set by rule 4.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_summary, delta_table):
+    mo.Html(
+        figure_html(
+            delta_table(ab_summary, ["short25"]),
+            caption=mo.md("""
+            **`short25` against `ref`.** Read as the tables above; as with `short`, the task gate compares against the un-anchored control at the same length (`short25-lam0`), so convergence cost is not charged to the anchor.
+            """).text,
+            class_="report-figure",
+        )
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_cells, traj_of):
+    _keys = ("m_line", "val_loss")
+    _traj = {k: {c: traj_of(ab_cells, c, k) for c in ("ref", "short", "short25")} for k in _keys}
+
+    @themed(
+        name="short25",
+        alt_text="""
+            Two line charts sharing a horizontal axis of fraction of training. Left: per-line margin m_line for three hundred-epoch runs, three fifty-epoch runs and three twenty-five-epoch runs. The hundred- and fifty-epoch groups rise together over the first fifth of training and hold near 0.75; the twenty-five-epoch group is still near 0.35 at that fraction, climbs for most of the run, and levels off late around 0.65 to 0.69, below the others. Right: validation loss for the same runs; the two longer groups overlap, while the twenty-five-epoch curves sit well above them until nearly half of training before closing the gap.
+        """,
+        caption=r"""
+            **Twenty-five epochs against fifty and a hundred, on a shared clock.** Axes as in the `short` figure above: fraction of training horizontally, the cheap one-partner margin probe on the left, validation loss on the right. The two longer lengths trace the same curves; the quarter-length runs spend nearly half their budget still converging, and the margin they reach afterwards levels off below the others.
+        """,
+    )
+    def _plot():
+        colors = {
+            "ref": light_dark("#1f6fb4", "#5fa8dd"),
+            "short": light_dark("#2a9d8f", "#5fc9bd"),
+            "short25": light_dark("#b4531f", "#dd8f5f"),
+        }
+        labels = {"m_line": "m_line (trajectory probe)", "val_loss": "validation loss"}
+        fig, _axs = plt.subplots(1, 2, figsize=(7.2, 2.9), layout="constrained", sharex=True)
+        ax_m, ax_v = cast(tuple, _axs)
+        for ax, key in ((ax_m, "m_line"), (ax_v, "val_loss")):
+            for name, runs in _traj[key].items():
+                for i, (e, y) in enumerate(runs):
+                    ax.plot(e / e.max(), y, color=colors[name], lw=1.0, alpha=0.8, label=name if i == 0 else None)
+            ax.set_xlabel("fraction of training", fontsize="x-small")
+            ax.set_ylabel(labels[key], fontsize="x-small")
+        ax_m.legend(fontsize="x-small", frameon=False, loc="lower right")
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -1367,16 +1513,303 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(r"""
-    /// admonition | TODO
-    Four views, all built from the published per-trial table.
+    def load_survey() -> dict | None:
+        """Resolve the published survey from the store, or None if unpublished."""
+        store = project_store()
+        art = store.get_refs([ex.SURVEY_REF])[ex.SURVEY_REF]
+        if art is None:
+            return None
+        with tempfile.TemporaryDirectory() as d:
+            (p,) = store.get_many([(art, Path(d) / "survey.json")])
+            return json.loads(p.read_text())
 
-    1. The full trial table: sampled coordinates, every statistic, feasibility against each constraint, and round-2 seed means where a trial was promoted. No trial is omitted.
-    2. Marginals: m_line and each constraint statistic against each dimension, with the branch A anti axes shown in dose and centroid coordinates, and feasible trials distinguished from infeasible ones. We read off where the feasible region sits and how flat m_line is across it; a wide plateau is itself the result D2.2 wants.
-    3. The m_line against r² plane with the constraint boundary drawn, showing what the grading constraint excluded. Alongside the per-color r², we report the conditional-mean r² over redness levels. The ex-2.1.10 review found that the two together separate graded on average from graded color by color, and only the per-color reading constrains anything.
-    4. The λ_a marginal on its own. Ex-2.1.7 predicts a selectivity optimum below λ_a = 1, and where the containment and grading constraints actually bind along λ_a will inform the new operating point.
-    ///
+    _sv = load_survey()
+    mo.stop(_sv is None, mo.md("_The survey isn't published yet; the landscape cells need it._"))
+    assert _sv is not None
+    sv_scored: dict[int, dict] = {int(t): s for t, s in _sv["scored"].items()}
+    sv_trials: dict[int, dict] = {t["trial"]: t for t in _sv["trials"]}
+    sv_cells: dict[str, dict] = {c["label"]: c for c in _sv["cells"]}
+    sv_promoted: list[int] = _sv["promoted"]
+    return sv_cells, sv_promoted, sv_scored, sv_trials
+
+
+@app.cell(hide_code=True)
+def _(ab_decision, ab_summary, sv_trials):
+    # The two derived anti coordinates the frozen plan asks the marginals to use,
+    # at the survey's own length (see the centroid REVIEW note above).
+    _epochs = ab_decision["epochs"]
+
+    def _centroid_frac(tr: dict) -> float:
+        w = lambda e: ex.anti_weight(  # noqa: E731
+            e, lam=1.0, peak_ratio=tr["anti_peak_ratio"], anneal_end_frac=tr["anti_anneal_end_frac"], epochs=_epochs
+        )
+        return ex.dose_centroid(w, epochs=_epochs) / _epochs
+
+    sv_coords = {
+        t: {"dose": ex.anti_rel_dose(tr, epochs=_epochs), "centroid": _centroid_frac(tr)} for t, tr in sv_trials.items()
+    }
+    sv_control_em = ab_summary[ex.CONTROL_OF[_epochs]]["holdout_em"]
+    sv_r2_floor = ab_summary["ref"]["r2_sim"] - ex.GRADE_R2_DROP
+    return sv_control_em, sv_coords, sv_r2_floor
+
+
+@app.cell(hide_code=True)
+def _(sv_scored, sv_trials):
+    _infeasible = {t: s for t, s in sv_scored.items() if not s["feasible"]}
+    _fails = {
+        k: sum(1 for s in _infeasible.values() if not s["checks"][k])
+        for k in ("latch", "containment", "grading", "task", "contrast")
+    }
+    _veto_tau = max(sv_trials[t]["tau"] for t, s in _infeasible.items() if not s["checks"]["latch"])
+    _task_lam = min(sv_trials[t]["lam"] for t, s in _infeasible.items() if not s["checks"]["task"])
+    mo.md(f"""
+    All {len(sv_trials)} trials ran; {len(sv_scored) - len(_infeasible)} are feasible on the final reading and {len(_infeasible)} are not. No constraint is decorative: the latch veto removes {_fails["latch"]} trials, containment {_fails["containment"]}, grading {_fails["grading"]}, the task gate {_fails["task"]}, and the contrast floor {_fails["contrast"]} (a trial can fail several).
+
+    The failures organize by region rather than scattering. The latch veto owns the cold edge: every vetoed trial has τ ≤ {_veto_tau:.2f}. Grading and containment fail mostly where the pull is weak (λ_a ≲ 0.1), where the response is too control-like to show graded structure. The task gate binds only where the pull is strong: every task failure has λ_a ≥ {_task_lam:.2f}.
+
+    The feasible region is the interior left over, and it is wide on every axis. Across it the marginals repeat the calibration's trade at survey scale: m_line rises with λ_a until the task gate cuts in and rises with τ across the whole sampled range, while grading and the contrast fall along the same τ axis toward their floors.
+
+    The anti-subspace coordinates barely organize anything: the plateau's top spans most of the sampled range of both (its extent is quantified under *Proposed operating point*). That is the same insensitivity the amendment measured at the operating point, now visible across the box.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(sv_cells, sv_coords, sv_promoted, sv_scored, sv_trials):
+    def _cond_mean(t: int) -> float | None:
+        vals = [c["r2_cond"] for s in range(sv_scored[t]["n_seeds"]) if "r2_cond" in (c := sv_cells[f"t{t:02d}-s{s}"])]
+        return float(np.mean(vals)) if vals else None
+
+    def _row(_t: int) -> str:
+        _tr, _s = sv_trials[_t], sv_scored[_t]
+        _fails = ", ".join(k for k, ok in _s["checks"].items() if not ok) or "—"
+        _name = f"t{_t:02d}"
+        if _t in sv_promoted:
+            _name = f"<b>{_name}</b>"
+        _cond = _cond_mean(_t)
+        return (
+            f"<tr><td>{_name}</td>"
+            + "".join(
+                f"<td class='num'>{_tr[k]:.3f}</td>" for k in ("lam", "tau", "anti_peak_ratio", "anti_anneal_end_frac")
+            )
+            + f"<td class='num'>{sv_coords[_t]['dose']:.2f}</td><td class='num'>{sv_coords[_t]['centroid']:.2f}</td>"
+            + f"<td class='num'>{_s['n_seeds']}</td>"
+            + "".join(f"<td class='num'>{_s[k]:+.4f}</td>" for k in ("m_line", "alpha_op1", "retention", "r2_sim"))
+            + f"<td class='num'>{'—' if _cond is None else format(_cond, '+.4f')}</td>"
+            + f"<td class='num'>{_s['contrast']:+.4f}</td><td class='num'>{_s['holdout_em']:.4f}</td>"
+            + f"<td class='num'>{_s['latch_pi']:.2f}</td><td>{_fails}</td></tr>"
+        )
+
+    _rows = [_row(_t) for _t in sorted(sv_trials)]
+    _head_stats = "".join(
+        f"<th class='num'>{h}</th>"
+        for h in (
+            "m_line ↑",
+            "alpha_op1 ↓",
+            "retention ↑",
+            "r2_sim ↑",
+            "r2_cond",
+            "contrast ↑",
+            "holdout EM ↑",
+            "latch π ↓",
+        )
+    )
+    mo.Html(
+        figure_html(
+            f"""
+            <div class="report-table-scroll"><table class="report-table">
+            <thead><tr><th>trial</th><th class="num">λ_a</th><th class="num">τ</th><th class="num">peak</th>
+            <th class="num">anneal end</th><th class="num">dose</th><th class="num">centroid</th>
+            <th class="num">seeds</th>{_head_stats}<th>fails</th></tr></thead>
+            <tbody>{"".join(_rows)}</tbody>
+            </table></div>
+            """,
+            caption=mo.md("""
+            **Every trial, no omissions.** Sampled coordinates (λ_a, τ, anti peak ratio, anneal endpoint), the two derived anti coordinates (dose relative to the reference schedule at the same length, and the centroid as a fraction of training), and seed means of every statistic — over five seeds for the six promoted trials (bold), one seed otherwise. `r2_cond` is the conditional-mean grading reading, reported beside the per-color `r2_sim`; only the per-color reading constrains. The *fails* column lists the constraints a trial fails; the proposed operating point is `t00`.
+            """).text,
+            class_="report-figure",
+        )
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(sv_control_em, sv_coords, sv_r2_floor, sv_scored, sv_trials):
+    _ROWS = [
+        ("m_line", "m_line", []),
+        ("holdout_em", "holdout EM", [sv_control_em - ex.TASK_GATE, sv_control_em + ex.TASK_GATE]),
+        ("alpha_op1", "ᾱ op1", [ex.MEAN_ALIGN_GATE]),
+        ("retention", "retention", [ex.RETENTION_GATE]),
+        ("r2_sim", "grading r²", [sv_r2_floor]),
+        ("contrast", "contrast", [ex.CONTRAST_MIN]),
+        ("latch_pi", "latch π", [ex.LATCH_PI]),
+    ]
+    _COLS = [
+        ("lam", "λ_a", "log"),
+        ("tau", "τ", "log"),
+        ("dose", "anti dose (rel.)", "log"),
+        ("centroid", "anti centroid", "linear"),
+    ]
+
+    def _x(t: int, key: str) -> float:
+        return sv_trials[t][key] if key in sv_trials[t] else sv_coords[t][key]
+
+    _feas = [t for t, s in sv_scored.items() if s["feasible"]]
+    _infeas = [t for t, s in sv_scored.items() if not s["feasible"]]
+
+    @themed(
+        name="marginals",
+        alt_text="""
+            A grid of small scatter panels, seven rows by four columns. Rows are the objective and the six constraint statistics: m_line, holdout exact match, containment, retention, grading r squared, contrast, and the latch statistic pi. Columns are the four axes: anchor weight and pooling temperature on log scales, then the derived anti-subspace dose and centroid. Feasible trials are filled dots, infeasible ones open circles, the proposed trial is ringed, and dashed lines mark each constraint's gate. The strongest patterns: m_line rises left to right along both the anchor weight and temperature columns; grading and contrast fall along the temperature column; latch pi is high only at the cold end of the temperature column; holdout exact match dips below its gate line only at high anchor weight. The two anti-subspace columns show weak trends throughout.
+        """,
+        caption=r"""
+            **The marginals: every statistic against every axis.** One dot per trial (seed means; five seeds for promoted trials, one otherwise): filled = feasible, open = infeasible, ring = the proposed trial `t00`. Rows are the objective and the six constraints, with each constraint's gate dashed — a band for the task row, a ceiling for containment and latch, a floor for the rest. Columns are the two sampled scalars and the two derived anti coordinates (dose relative to the reference schedule at 50 epochs; centroid as a fraction of training). The map to read off: m_line climbs with λ_a and with τ; the τ axis spends grading and contrast as it climbs; the latch veto owns the cold-τ edge; the task gate cuts in at strong λ_a; and the anti axes organize little, which is the amendment's insensitivity result seen across the whole box.
+        """,
+    )
+    def _plot():
+        from matplotlib import ticker
+
+        c_feas = light_dark("#1f6fb4", "#5fa8dd")
+        c_infeas = light_dark("#999", "#777")
+        c_gate = light_dark("#666", "#999")
+        _ticks = {"lam": [0.02, 0.05, 0.1, 0.2, 0.5, 1.0], "tau": [0.05, 0.1, 0.2, 0.3], "dose": [0.3, 0.5, 1.0]}
+        fig, axs = plt.subplots(
+            len(_ROWS), len(_COLS), figsize=(8.4, 10.2), layout="constrained", sharex="col", sharey="row"
+        )
+        for i, (stat, sname, gates) in enumerate(_ROWS):
+            for j, (key, xname, scale) in enumerate(_COLS):
+                ax = axs[i][j]
+                ax.scatter(
+                    [_x(t, key) for t in _infeas],
+                    [sv_scored[t][stat] for t in _infeas],
+                    s=11,
+                    facecolors="none",
+                    edgecolors=c_infeas,
+                    lw=0.8,
+                )
+                ax.scatter([_x(t, key) for t in _feas], [sv_scored[t][stat] for t in _feas], s=12, color=c_feas, lw=0)
+                ax.scatter([_x(0, key)], [sv_scored[0][stat]], s=52, facecolors="none", edgecolors=c_feas, lw=1.4)
+                for g in gates:
+                    ax.axhline(g, color=c_gate, ls=(0, (4, 3)), lw=0.7)
+                if scale == "log":
+                    ax.set_xscale("log")
+                    ax.set_xticks(_ticks[key])
+                    ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+                    ax.xaxis.set_minor_formatter(ticker.NullFormatter())
+                ax.tick_params(labelsize=6)
+                if i == len(_ROWS) - 1:
+                    ax.set_xlabel(xname, fontsize="x-small")
+                if j == 0:
+                    ax.set_ylabel(sname, fontsize="x-small")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_arrays, ab_summary, sv_cells, sv_promoted, sv_r2_floor, sv_scored):
+    _has_cond = any("r2_cond" in c for c in sv_cells.values())
+    _ref_cond = float(np.mean([ex.r2_sim_cond(ab_arrays[f"ref-s{s}/alpha"][:, :, 0].mean(axis=0)) for s in range(3)]))
+
+    def _cond_mean(t: int) -> float:
+        return float(np.mean([sv_cells[f"t{t:02d}-s{s}"]["r2_cond"] for s in range(sv_scored[t]["n_seeds"])]))
+
+    _pts = {
+        t: (s["m_line"], s["r2_sim"], _cond_mean(t) if _has_cond else np.nan, s["feasible"])
+        for t, s in sv_scored.items()
+    }
+
+    @themed(
+        name="plane",
+        alt_text="""
+            Two scatter panels sharing both axes: grading r squared against m_line, left panel the per-color reading, right panel the conditional-mean reading. Feasible trials are filled dots, infeasible open, promoted trials ringed, and the reference recipe is marked with a cross near m_line 0.42, r squared 0.78. In the left panel a dashed horizontal line at 0.68 marks the grading floor; the points slope downward to the right, and the proposed trial sits at the far right, just above the line. In the right panel the same cloud sits higher, around 0.9 and above, with a much shallower slope and no floor drawn.
+        """,
+        caption=rf"""
+            **The margin–grading plane, in both readings.** Per-trial seed means: filled = feasible, open = infeasible, rings = the six promoted trials, × = the ablation stage's `ref`. **Left:** the per-color $r^2$ the grading constraint reads, with the floor (`ref` − {ex.GRADE_R2_DROP:g}) dashed; the cloud slopes down to the right — the τ walk trades grading for margin — and the constraint is what stops the objective from following it further. **Right:** the conditional-mean $r^2$ over redness levels, which stays high across the same trials. The pair separates *graded on average* from *graded color by color*: what the soft-τ end loses is per-color fidelity, not the average dose–response shape.
+        """,
+    )
+    def _plot():
+        c_feas = light_dark("#1f6fb4", "#5fa8dd")
+        c_infeas = light_dark("#999", "#777")
+        c_gate = light_dark("#666", "#999")
+        c_ref = light_dark("#7b3fa0", "#b98ce0")
+        ncols = 2 if _has_cond else 1
+        fig, _axs = plt.subplots(
+            1, ncols, figsize=(7.2 if _has_cond else 4.2, 3.0), layout="constrained", sharex=True, sharey=True
+        )
+        axs = np.atleast_1d(_axs)
+        for k, ax in enumerate(axs):
+            yi = 1 if k == 0 else 2
+            for t, (m, r, rc, feas) in _pts.items():
+                y = (m, r, rc)[yi]
+                if feas:
+                    ax.scatter([m], [y], s=14, color=c_feas, lw=0)
+                else:
+                    ax.scatter([m], [y], s=12, facecolors="none", edgecolors=c_infeas, lw=0.8)
+                if t in sv_promoted:
+                    ax.scatter([m], [y], s=56, facecolors="none", edgecolors=c_feas, lw=1.2)
+            _ref_y = ab_summary["ref"]["r2_sim"] if yi == 1 else _ref_cond
+            ax.scatter([ab_summary["ref"]["m_line"]], [_ref_y], marker="x", s=44, color=c_ref, lw=1.6)
+            ax.set_xlabel("m_line (seed mean)", fontsize="x-small")
+        axs[0].axhline(sv_r2_floor, color=c_gate, ls=(0, (4, 3)), lw=0.8)
+        axs[0].set_ylabel("grading r² (per color)", fontsize="x-small")
+        if _has_cond:
+            axs[1].set_ylabel("grading r² (conditional mean)", fontsize="x-small")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(sv_scored, sv_trials):
+    _MARKS = {
+        "task": ("^", "task"),
+        "containment": ("s", "containment"),
+        "grading": ("D", "grading"),
+        "latch": ("x", "latch"),
+        "contrast": ("v", "contrast"),
+    }
+
+    def _first_fail(s: dict) -> str:
+        return next(k for k in ("latch", "task", "grading", "containment", "contrast") if not s["checks"][k])
+
+    @themed(
+        name="lam-marginal",
+        alt_text="""
+            One scatter panel: m_line against the anchor weight lambda a on a log axis from 0.02 to 1. Feasible trials are filled dots rising from about 0.35 at the far left to about 0.53 around lambda 0.3 to 0.6, then holding flat to the right edge. Infeasible trials use open markers keyed by their first failed constraint: crosses for latch vetoes are spread across the axis, diamonds and squares for grading and containment failures cluster at the weak end, and triangles for task-gate failures appear only from about lambda 0.4 upward. The proposed trial at lambda 0.56 is ringed.
+        """,
+        caption=r"""
+            **The λ_a marginal on its own.** m_line against λ_a; filled dots are feasible trials, the ring is the proposed `t00`, and each infeasible trial is drawn with a marker naming its first failed constraint. The shape ex-2.1.7 predicted shows up as a rise to a flat top: the margin climbs for a decade of λ_a and stops gaining around 0.3–0.6, while the task gate (△) starts to bind above 0.4 — the two highest margins in the whole survey belong to trials the task gate rejected, so the task, and nothing else, caps the strong end. At the weak end grading (◇) and containment (□) fail together where the pull is too weak to organize the response.
+        """,
+    )
+    def _plot():
+        c_feas = light_dark("#1f6fb4", "#5fa8dd")
+        c_infeas = light_dark("#8a6d3b", "#c0a060")
+        fig, ax = plt.subplots(figsize=(5.6, 3.2), layout="constrained")
+        _seen = set()
+        for t, s in sv_scored.items():
+            x, m = sv_trials[t]["lam"], s["m_line"]
+            if s["feasible"]:
+                ax.scatter([x], [m], s=16, color=c_feas, lw=0, label="feasible" if "f" not in _seen else None)
+                _seen.add("f")
+            else:
+                mk, mname = _MARKS[_first_fail(s)]
+                _label = mname if mname not in _seen else None
+                if mk == "x":
+                    ax.scatter([x], [m], s=26, marker=mk, lw=1.0, color=c_infeas, label=_label)
+                else:
+                    ax.scatter([x], [m], s=26, marker=mk, lw=1.0, facecolors="none", edgecolors=c_infeas, label=_label)
+                _seen.add(mname)
+        ax.scatter([sv_trials[0]["lam"]], [sv_scored[0]["m_line"]], s=64, facecolors="none", edgecolors=c_feas, lw=1.4)
+        ax.set_xscale("log")
+        ax.set_xlabel("λ_a", fontsize="x-small")
+        ax.set_ylabel("m_line (seed mean)", fontsize="x-small")
+        ax.legend(fontsize="x-small", frameon=False, loc="lower right", ncols=2)
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -1384,10 +1817,110 @@ def _():
 def _():
     mo.md(r"""
     ## Proposed operating point
+    """)
+    return
 
-    /// admonition | TODO
-    One line: the coordinates and seed-mean statistics of the winning trial, each with its noise floor. Beside it, the values for the reference recipe and the width of the plateau it sits on. Then the handoff: which experiment confirms the point, and at how many fresh seeds, before any of these numbers is quoted.
-    ///
+
+@app.cell(hide_code=True)
+def _(ab_summary, sv_coords, sv_scored, sv_trials):
+    _t0, _s0 = sv_trials[0], sv_scored[0]
+    _ref = ab_summary["ref"]
+
+    def _pm(stat: str, s: dict) -> str:
+        return f"{s[stat]:.4f} ± {ex.NOISE_RUN[stat] / np.sqrt(s['n']):.4f}"
+
+    _stats = ["m_line", "alpha_op1", "retention", "r2_sim", "contrast", "holdout_em"]
+    _point_rows = (
+        "<tr><td>proposed (<code>t00</code>)</td>"
+        + f"<td class='num'>{_t0['lam']:.3f}</td><td class='num'>{_t0['tau']:.3f}</td>"
+        + f"<td class='num'>{_t0['anti_peak_ratio']:.3f}</td><td class='num'>{_t0['anti_anneal_end_frac']:.3f}</td>"
+        + f"<td class='num'>{sv_coords[0]['dose']:.2f}</td>"
+        + "".join(f"<td class='num'>{_pm(s, {**_s0, 'n': _s0['n_seeds']})}</td>" for s in _stats)
+        + "</tr>"
+        + "<tr><td><code>ref</code> (recipe)</td>"
+        + f"<td class='num'>{ex.SCORING_LAMBDA:g}</td><td class='num'>{ex.TAU_REF:g}</td>"
+        + f"<td class='num'>{ex.ANTI_PEAK_RATIO:g}</td><td class='num'>{ex.ANTI_ANNEAL_END_FRAC:g}</td>"
+        + "<td class='num'>1.00</td>"
+        + "".join(f"<td class='num'>{_pm(s, _ref)}</td>" for s in _stats)
+        + "</tr>"
+    )
+    mo.Html(
+        figure_html(
+            f"""
+            <div class="report-table-scroll"><table class="report-table">
+            <thead><tr><th>point</th><th class="num">λ_a</th><th class="num">τ</th><th class="num">peak</th>
+            <th class="num">anneal end</th><th class="num">dose</th>
+            <th class="num">m_line ↑</th><th class="num">alpha_op1 ↓</th><th class="num">retention ↑</th>
+            <th class="num">r2_sim ↑</th><th class="num">contrast ↑</th><th class="num">holdout EM ↑</th></tr></thead>
+            <tbody>{_point_rows}</tbody>
+            </table></div>
+            """,
+            caption=mo.md("""
+            **The proposed operating point beside the recipe it would replace.** Seed means ± the frozen per-run noise floor over √n (five seeds for the proposal, three for `ref`). The coordinate columns are the sampled values plus the relative anti dose; `ref`'s dose is 1 by definition. These numbers are proposals: D2.2 adopts the point and re-measures it at fresh seeds before any of them is quoted.
+            """).text,
+            class_="report-figure",
+        )
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(ab_summary, sv_coords, sv_r2_floor, sv_scored, sv_trials):
+    _feas = sorted((t for t, s in sv_scored.items() if s["feasible"]), key=lambda t: -sv_scored[t]["m_line"])
+    _band = ex.equiv_band("m_line", 5, 1)
+    _top = [t for t in _feas if sv_scored[t]["m_line"] >= sv_scored[0]["m_line"] - _band]
+    _rng = lambda key: (  # noqa: E731
+        min(sv_trials[t].get(key) or sv_coords[t][key] for t in _top),
+        max(sv_trials[t].get(key) or sv_coords[t][key] for t in _top),
+    )
+    _lam, _tau, _pk, _dose = _rng("lam"), _rng("tau"), _rng("anti_peak_ratio"), _rng("dose")
+    _r2_others = [sv_scored[t]["r2_sim"] for t in _top[1:]]
+    mo.md(f"""
+    The frozen rule proposes `t00`, the promoted trial with the highest seed-mean m_line that stays feasible on every constraint. Relative to the recipe it is a stronger pull with softer pooling and less repulsion: λ_a rises from {ex.SCORING_LAMBDA:g} to {sv_trials[0]["lam"]:.2f}, τ softens from {ex.TAU_REF:g} to {sv_trials[0]["tau"]:.2f}, and the anti term keeps the shape of the schedule at {sv_coords[0]["dose"]:.2f}× the reference dose.
+
+    The margin it buys is {sv_scored[0]["m_line"]:.3f}, against {ab_summary["ref"]["m_line"]:.3f} for `ref`. Containment, retention and the task gate pass with room. Grading sits {sv_scored[0]["r2_sim"] - sv_r2_floor:.3f} above its floor, a third of the per-run noise of that statistic, and it is the closest pass among the checks on the proposal.
+
+    The point sits on a plateau rather than a peak. {len(_top)} trials land within one m_line band ({_band:.3f}, five seeds against one) of the proposal, spanning λ_a {_lam[0]:.2f}–{_lam[1]:.2f}, τ {_tau[0]:.2f}–{_tau[1]:.2f}, peak ratio {_pk[0]:.1f}–{_pk[1]:.1f} and relative dose {_dose[0]:.2f}–{_dose[1]:.2f}.
+
+    The runners-up among them hold {min(_r2_others) - sv_scored[0]["r2_sim"]:.2f}–{max(_r2_others) - sv_scored[0]["r2_sim"]:.2f} more grading at nearly the same margin (the plane figure above). So what the search found is the plateau together with the constraint that bounds it, and the proposal is one end of that plateau.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(sv_cells, sv_promoted, sv_scored):
+    _rows = "".join(
+        f"<tr><td><code>t{t:02d}</code></td>"
+        f"<td class='num'>{sv_cells[f't{t:02d}-s0']['m_line']:.4f}</td>"
+        f"<td class='num'>{sv_scored[t]['m_line']:.4f}</td>"
+        f"<td class='num'>{sv_scored[t]['m_line'] - sv_cells[f't{t:02d}-s0']['m_line']:+.4f}</td>"
+        f"<td>{'✓' if sv_scored[t]['feasible'] else '✗ ' + ', '.join(k for k, ok in sv_scored[t]['checks'].items() if not ok)}</td></tr>"
+        for t in sv_promoted
+    )
+    mo.Html(
+        figure_html(
+            f"""
+            <table class="report-table">
+            <thead><tr><th>trial</th><th class="num">m_line, seed 0</th><th class="num">m_line, 5 seeds</th>
+            <th class="num">change</th><th>feasible at 5 seeds</th></tr></thead>
+            <tbody>{_rows}</tbody>
+            </table>
+            """,
+            caption=mo.md("""
+            **The promotion round is the winner's curse, measured.** The six trials promoted on their seed-0 m_line, in promotion order. Every one fell back on re-seeding, so the trials were promoted partly on merit and partly on a lucky seed, and two crossed the task gate on their five-seed means and dropped out of feasibility. The five-seed mean of the proposal already carries this correction, while the single-seed trials around it on the plateau do not. That is one more reason the numbers here are proposals for D2.2 rather than results.
+            """).text,
+            class_="report-figure",
+        )
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(sv_scored, sv_r2_floor):
+    mo.md(f"""
+    **The handoff.** D2.2 adopts this operating point and re-measures it at fresh seeds before quoting any number from this section. The survey values stand beside the confirmed ones there, and the gap between them is the remaining winner's-curse correction.
+
+    The statistic to watch at confirmation is grading. The proposal passes its floor by {sv_scored[0]["r2_sim"] - sv_r2_floor:.3f}, so a modest unlucky draw at fresh seeds would put it under. If that happens, the place to step back to is the plateau, where the runners-up hold more grading at nearly the same margin.
     """)
     return
 
@@ -1404,7 +1937,26 @@ def _():
     One run in each un-anchored control trips the veto: `lam0-s2` puts 0.55 of its deep-slice weight on `+`, and `short-lam0-s0` puts 0.52 there, both above the 0.5 threshold. The detector is reading a profile that only means something when there is a pull. With λ_a = 0, the softmin weights describe whatever alignment structure the task happens to leave behind, and there is no pull that could have latched.
     <!-- REVIEW: was "one of the three `lam0` runs". The 50-epoch control fires too (0.523), which strengthens rather than changes the reading. Verify: the per-run π table in the published metrics. --> The veto is calibrated on the anchored runs of ex-2.1.9, and the controls were never going to be judged by it, so nothing here is affected.
 
-    It does bear on the survey. λ_a runs down to 0.02, a fifth of the scored rung, and a trial that weak may look like the control rather than like a pull that committed. Such a trial would be marked infeasible for a reason other than the one the veto is named for. It would fail the contrast constraint too, so the error goes in the safe direction: we would reject a trial that was never going to be proposed. We are leaving the veto frozen and reporting the λ_a of every vetoed trial, so the two readings can be told apart in the map.
+    It does bear on the survey. λ_a runs down to 0.02, a fifth of the scored rung, and a trial that weak may look like the control rather than like a pull that committed. Such a trial would be marked infeasible for a reason other than the one the veto is named for.
+
+    It would fail the contrast constraint too, so the error goes in the safe direction: we would reject a trial that was never going to be proposed. We are leaving the veto frozen and reporting the λ_a of every vetoed trial, so the two readings can be told apart in the map.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(sv_scored, sv_trials):
+    _veto = {t: s for t, s in sv_scored.items() if not s["checks"]["latch"]}
+    _weak = {t for t in _veto if sv_trials[t]["lam"] <= 0.08}
+    _strong = sorted(set(_veto) - _weak, key=lambda t: sv_trials[t]["lam"])
+    mo.md(f"""
+    ### Where the vetoes actually landed
+
+    The vetoes from the survey sort by τ rather than by λ_a. All {len(_veto)} vetoed trials sit at τ ≤ {max(sv_trials[t]["tau"] for t in _veto):.2f}, the cold end of the box. {len(_weak)} of them are the weak-pull corner the paragraph above anticipated (λ_a ≤ {max(sv_trials[t]["lam"] for t in _weak):.2f}; one, `t29` at π = {sv_scored[29]["latch_pi"]:.2f}, also fails grading and contrast, which is the control-like signature).
+
+    The other {len(_strong)} have healthy pulls, λ_a {sv_trials[_strong[0]]["lam"]:.2f}–{sv_trials[_strong[-1]]["lam"]:.2f}. Their π values, {min(_veto[t]["latch_pi"] for t in _strong):.2f} to {max(_veto[t]["latch_pi"] for t in _strong):.2f}, fall inside what the calibration in ex-2.1.9 measured as an empty gap, with latched runs at ≥ 0.85 and healthy runs at ≤ 0.03. Cold pooling concentrates the softmin weight, so a modest alignment with a syntax role reads as a large π there.
+
+    Whether these are true latches, or the detector reading far from its calibration point, cannot be settled from this data. The error direction is safe either way, since every vetoed trial sits in the τ region whose feasible neighbors score well below the plateau. The frozen noise floors carry the same cold-regime caveat, which is one more reason for D2.2 to stay off the τ ≲ 0.1 edge unless it brings a recalibrated detector.
     """)
     return
 
@@ -1414,9 +1966,21 @@ def _():
     mo.md(r"""
     ## Discussion
 
-    /// admonition | TODO
-    Interpretation only, once the observations exist: what the ablations say about carrying the M1 schedules into this architecture, what the map says about how carefully M3 will need to tune, and what the survey format itself cost or saved. This is the first time we've used that format, so note any friction for the science skill.
-    ///
+    What transfers from M1 is the shape of the schedule. The dose is not what matters: a constant that delivers the same integrated repulsion loses the grading the schedule protects, with either anchor shape. The schedule on the anchor term, which M1 carried for training stability, resolves nothing here, and neither does the interpolation shape.
+
+    Of everything inherited from the autoencoder recipe, the one load-bearing piece of scheduling is *when the repulsion arrives*: strong while the pull is committing, reduced while grading is learned. That reading now stands on a one-variable comparison rather than on brackets that moved two things at once.
+
+    Within this testbed, the map says the recipe does not need careful tuning. The feasible region spans a decade of λ_a and most of the τ box, the top of the m_line landscape is a plateau rather than a spike, and the anti-subspace coordinates barely matter within the schedule family.
+
+    Each edge of the region belongs to a different constraint: the latch veto at cold τ, grading and contrast at soft τ, the task gate at strong λ_a, and grading and containment where the pull is too weak. So the box a future search inherits is drawn by measured boundaries rather than by guesses.
+
+    <!-- REVIEW: "For M3, the map says the method does not need careful tuning" narrowed to "within this testbed ... the recipe". The map covers one grammar, one corpus, one architecture and one labeller; M3 is small language models with real safety targets, which nothing here measures. Verify: the survey's space table and the method section, which fix everything outside the four sampled dimensions. -->
+
+    The survey format did what it was adopted for. The amendment could be added mid-experiment without spending the preregistration, because the frozen rules, their predictions, and the record-as-a-diff made the addition inspectable. Publishing every trial is what makes the plateau readable as a result.
+
+    Two frictions are worth carrying to the next survey plan. First, a scalar objective walks to its constraint boundary. The proposal sits on the grading floor with a pass margin a third of the per-run noise of that statistic, so a plan that hands off a single point should either freeze how close to a constraint a proposal may sit, or expect the confirming experiment to step back onto the plateau.
+
+    Second, ranking on single-seed values promoted two trials that the task gate rejected at five seeds. The gate width (0.02) is about twice the per-run noise of holdout EM (0.0087), so a seed-0 pass near the boundary carries little information. The curse correction absorbed both, which is what promotion is for, but a future plan could rank on constraint margins as well as on the objective.
     """)
     return
 
