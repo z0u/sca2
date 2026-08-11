@@ -1,13 +1,8 @@
 """Figure helpers for the RGB-cube domain, shared by the ex-2.1.x reports.
 
-The conventions themselves are written down in the style-fig skill; this is
-where the cube half of them is implemented, so panels stay comparable across
-reports. The hypersphere counterpart is
-:func:`sca.colorcube.plot_latent_disc`.
+The conventions themselves are written down in the style-fig skill; this is where the cube half of them is implemented, so panels stay comparable across reports. The hypersphere counterpart is :func:`sca.colorcube.plot_latent_disc`.
 
-Reports import this, experiments don't. Keep it that way: mi-ni fingerprints
-project source transitively, so an experiment that imported a plotting helper
-would re-run every time a figure got tweaked.
+Reports import this, experiments don't. Keep it that way: mi-ni fingerprints project source transitively, so an experiment that imported a plotting helper would re-run every time a figure got tweaked.
 """
 
 from __future__ import annotations
@@ -28,8 +23,7 @@ type ViewName = Literal["solid", "solid-back", "wheel"]
 class CubeView(NamedTuple):
     """One 2D view of the cube: how to project it, what its silhouette is, and which way it faces.
 
-    Any flat view of a solid has to collapse one direction, and the two views
-    differ in which one they give up. Pick by what the figure is claiming.
+    Any flat view of a solid has to collapse one direction, and the two views differ in which one they give up. Pick by what the figure is claiming.
     """
 
     basis: Float[np.ndarray, "2 3"]
@@ -103,12 +97,7 @@ def project_cube(rgb: np.ndarray, view: ViewName = "solid") -> np.ndarray:
 def grid_diameter(levels: int, view: ViewName = "solid") -> float:
     """Mark diameter, in panel units, at which a full *levels*-per-channel grid covers with no gaps.
 
-    Twice the covering radius of the projected lattice — the largest distance
-    any point in the panel can sit from the nearest mark. Neighbours overlap a
-    little, because the projection squashes the lattice unevenly (in the solid
-    view a red step is shorter on the panel than a green or blue one) and marks
-    sized to merely touch along the short direction would leave gaps along the
-    long one.
+    Twice the covering radius of the projected lattice — the largest distance any point in the panel can sit from the nearest mark. Neighbours overlap a little, because the projection squashes the lattice unevenly (in the solid view a red step is shorter on the panel than a green or blue one) and marks sized to merely touch along the short direction would leave gaps along the long one.
     """
     # One red and one green step generate the projected lattice; a blue step is a combination.
     a, b = (np.eye(3)[:2] @ CUBE_VIEWS[view].basis.T) / max(levels - 1, 1)
@@ -127,12 +116,7 @@ def grid_diameter(levels: int, view: ViewName = "solid") -> float:
 def align_to_cube(x: np.ndarray, rgb: np.ndarray) -> tuple[np.ndarray, float]:
     """Best rotation + uniform scale + shift taking *x* onto the true RGB positions.
 
-    Returns the mapped coordinates and the leftover residual as a fraction of
-    the true positions' variance. Constraining the fit to rigid motions is the
-    point: a free linear map would absorb real shape mismatch into a shear, so
-    the residual is comparable across grids, seeds, and layers. *x* may live in
-    any dimension ≥ 3 that has already been reduced to 3 (e.g. embeddings
-    projected onto a probe's read-out subspace).
+    Returns the mapped coordinates and the leftover residual as a fraction of the true positions' variance. Constraining the fit to rigid motions is the point: a free linear map would absorb real shape mismatch into a shear, so the residual is comparable across grids, seeds, and layers. *x* may live in any dimension ≥ 3 that has already been reduced to 3 (e.g. embeddings projected onto a probe's read-out subspace).
     """
     xc, yc = x - x.mean(0), rgb - rgb.mean(0)
     u, s, vt = np.linalg.svd(xc.T @ yc)
@@ -143,10 +127,7 @@ def align_to_cube(x: np.ndarray, rgb: np.ndarray) -> tuple[np.ndarray, float]:
 def draw_cube_bound(ax: Axes, view: ViewName = "solid", *, fill: bool = True) -> None:
     """The cube's silhouette and the geometry-panel conventions, without any data.
 
-    :func:`plot_rgb_cube` calls this; call it directly when a panel draws its own
-    marks — a lattice with edges between them, say, where the caller has to
-    interleave zorders itself. The silhouette goes behind everything (zorder −10)
-    and its rim in front (zorder 10), so marks in between are framed either way.
+    :func:`plot_rgb_cube` calls this; call it directly when a panel draws its own marks — a lattice with edges between them, say, where the caller has to interleave zorders itself. The silhouette goes behind everything (zorder −10) and its rim in front (zorder 10), so marks in between are framed either way.
     """
     from matplotlib.patches import Polygon
 
@@ -177,20 +158,9 @@ def plot_rgb_cube(
 ) -> None:
     """One color-cube panel, per the repo's figure conventions (see the style-fig skill).
 
-    The cube bound as a background hexagon, data-colored points, fixed domain
-    limits, no axes. Pass *truth* (the same points' true RGB) to also draw each
-    point's target as an open ring with a stub to where it actually landed, so
-    positional error reads off the panel. Titles and annotations stay with the
-    caller. See :data:`CUBE_VIEWS` for *view*; analysis panels usually want
-    ``"wheel"``.
+    The cube bound as a background hexagon, data-colored points, fixed domain limits, no axes. Pass *truth* (the same points' true RGB) to also draw each point's target as an open ring with a stub to where it actually landed, so positional error reads off the panel. Titles and annotations stay with the caller. See :data:`CUBE_VIEWS` for *view*; analysis panels usually want ``"wheel"``.
 
-    Marks are sized in points by *s*, which is what a scatter of arbitrary
-    points wants — an embedding projection shouldn't grow its dots just because
-    the vocabulary did. Pass *diameter* instead to size them in panel units,
-    where the cube spans 2 from black to white: marks then hold their size
-    relative to the cube under any figure resize, and a plot of a whole grid can
-    ask for `grid_diameter(levels)` and tile it with no trial and error. It also
-    takes one diameter per point, for a panel that reads a scalar as mark area.
+    Marks are sized in points by *s*, which is what a scatter of arbitrary points wants — an embedding projection shouldn't grow its dots just because the vocabulary did. Pass *diameter* instead to size them in panel units, where the cube spans 2 from black to white: marks then hold their size relative to the cube under any figure resize, and a plot of a whole grid can ask for `grid_diameter(levels)` and tile it with no trial and error. It also takes one diameter per point, for a panel that reads a scalar as mark area.
     """
     from matplotlib.collections import EllipseCollection
     from matplotlib.colors import to_rgba_array

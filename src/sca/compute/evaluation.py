@@ -2,17 +2,8 @@
 
 Two measurements, both against the domain's exact ground truth:
 
-- **Completion accuracy**: greedy-decode the answer after ``... = `` and
-  exact-match it. Greedy is the right decode here because the language gives
-  every prompt a single correct completion.
-- **Residual-stream probes**: closed-form ridge regression from the residual
-  stream to the ground-truth colors, fit per layer at two positions — the last
-  character of the first operand (is the operand's value represented?) and the
-  space after ``=`` (is the *result* computed before the answer is emitted?).
-  Probes are fit on one half of the probe set and scored (R²) on the other.
-  The fitted directions are returned too: comparing them across seeds is the
-  baseline for "SCA puts the concept where we choose" — without anchoring they
-  should land somewhere different every run.
+- **Completion accuracy**: greedy-decode the answer after ``... = `` and exact-match it. Greedy is the right decode here because the language gives every prompt a single correct completion.
+- **Residual-stream probes**: closed-form ridge regression from the residual stream to the ground-truth colors, fit per layer at two positions — the last character of the first operand (is the operand's value represented?) and the space after ``=`` (is the *result* computed before the answer is emitted?). Probes are fit on one half of the probe set and scored (R²) on the other. The fitted directions are returned too: comparing them across seeds is the baseline for "SCA puts the concept where we choose" — without anchoring they should land somewhere different every run.
 """
 
 from typing import Mapping, Sequence
@@ -107,14 +98,9 @@ def ridge_probe_loo(
 ) -> Float[np.ndarray, "N K"]:
     """Leave-one-out predictions: row ``i`` comes from a probe fit on every other row.
 
-    The estimator to reach for when N is small, as it is for a color vocabulary.
-    A k-fold split both trains on fewer rows and makes the answer depend on
-    which split was drawn — at N = 27 that choice moves R² by a few hundredths —
-    whereas this has no split to choose and so no seed.
+    The estimator to reach for when N is small, as it is for a color vocabulary. A k-fold split both trains on fewer rows and makes the answer depend on which split was drawn — at N = 27 that choice moves R² by a few hundredths — whereas this has no split to choose and so no seed.
 
-    Exact, and roughly the cost of one fit rather than N: each fold's centered
-    Gram matrices come from a rank-1 downdate of the full ones, since dropping
-    row ``i`` subtracts its outer product and shifts the mean by a known amount.
+    Exact, and roughly the cost of one fit rather than N: each fold's centered Gram matrices come from a rank-1 downdate of the full ones, since dropping row ``i`` subtracts its outer product and shifts the mean by a known amount.
     """
     x64, y64 = np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64)
     n, c = x64.shape
@@ -138,8 +124,7 @@ def _forced_stats(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Teacher-forced per-position surprisal and entropy over left-padded *texts*.
 
-    Returns ``(seq, nll, entropy)``: column ``j`` of the (N, T−1) stat arrays
-    describes the prediction of sequence column ``j + 1``.
+    Returns ``(seq, nll, entropy)``: column ``j`` of the (N, T−1) stat arrays describes the prediction of sequence column ``j + 1``.
     """
     model = eqx.nn.inference_mode(model)
     forward = eqx.filter_jit(model.__call__)
@@ -168,10 +153,7 @@ def candidate_logprobs(
 ) -> Float[np.ndarray, "N K"]:
     """Teacher-forced log-probability of each candidate answer after each prompt.
 
-    Scores the *complete* answer (candidate plus terminating newline), so
-    candidates of different lengths are comparable. The margin between the true
-    answer and the best competitor is the compute-vs-lookup measure from the
-    ex-2.1.1 garden-path diagnosis.
+    Scores the *complete* answer (candidate plus terminating newline), so candidates of different lengths are comparable. The margin between the true answer and the best competitor is the compute-vs-lookup measure from the ex-2.1.1 garden-path diagnosis.
     """
     texts = [p + c + "\n" for p in prompts for c in candidates]
     n_ans = np.array([len(c) + 1 for _ in prompts for c in candidates])
@@ -188,10 +170,7 @@ def answer_calibration(
 ) -> dict:
     """Mean surprisal, entropy, and s₂ = (i − h) / log |V| over answer characters.
 
-    s₂ is a graded companion to exact-match accuracy: ≈ 0 when the model knows
-    its own uncertainty, ≫ 0 when it is confidently wrong. It measures
-    calibration, not competence (a uniformly ignorant model also scores ≈ 0),
-    so read it alongside accuracy or raw surprisal.
+    s₂ is a graded companion to exact-match accuracy: ≈ 0 when the model knows its own uncertainty, ≫ 0 when it is confidently wrong. It measures calibration, not competence (a uniformly ignorant model also scores ≈ 0), so read it alongside accuracy or raw surprisal.
     """
     texts = [ex.prompt + ex.answer for ex in examples]
     n_ans = np.array([len(ex.answer) for ex in examples])
@@ -211,12 +190,7 @@ def probe_answer_schedule(
 ) -> dict:
     """Per-channel decodability of the result at each position around the answer.
 
-    Teacher-forces ``prompt + answer`` (every example must share both lengths —
-    use a single-form set, e.g. hex) and fits a ridge probe per (offset from
-    the answer start, residual depth, RGB channel). Digit ``k`` of a hex answer
-    sits at offset ``k + 1`` (offset 0 is ``#``) and is emitted *from* offset
-    ``k``, so decodability of channel ``k`` at offsets ≤ ``k`` is computation;
-    from ``k + 1`` on, the digit is in the context and decoding it is trivial.
+    Teacher-forces ``prompt + answer`` (every example must share both lengths — use a single-form set, e.g. hex) and fits a ridge probe per (offset from the answer start, residual depth, RGB channel). Digit ``k`` of a hex answer sits at offset ``k + 1`` (offset 0 is ``#``) and is emitted *from* offset ``k``, so decodability of channel ``k`` at offsets ≤ ``k`` is computation; from ``k + 1`` on, the digit is in the context and decoding it is trivial.
 
     Returns ``offsets`` and ``r2`` with shape (len(offsets), depth + 1, 3).
     """
@@ -248,11 +222,7 @@ def probe_transfer(
 ) -> dict[str, list[float]]:
     """Result-color probes fit on one prompt set, scored on others.
 
-    Fits per-layer ridge probes from the pre-answer position to the result RGB
-    on half of *fit*, then reports R² on the held-back half (key ``"fit"``, the
-    same-distribution ceiling) and on each eval set. Transfer at the same
-    position separates "the mix was never computed" from "the probe just
-    doesn't carry across prompt sets".
+    Fits per-layer ridge probes from the pre-answer position to the result RGB on half of *fit*, then reports R² on the held-back half (key ``"fit"``, the same-distribution ceiling) and on each eval set. Transfer at the same position separates "the mix was never computed" from "the probe just doesn't carry across prompt sets".
     """
     stream = eqx.filter_jit(eqx.nn.inference_mode(model).residual_stream)
 
@@ -282,8 +252,7 @@ def probe_residual_stream(
 ) -> dict:
     """Per-layer linear decodability of operand and result colors.
 
-    Returns R² lists indexed by residual-stream depth (0 = embedding, L =
-    final) and the fitted probe weights, keyed by probe name.
+    Returns R² lists indexed by residual-stream depth (0 = embedding, L = final) and the fitted probe weights, keyed by probe name.
     """
     prompts = [ex.prompt for ex in examples]
     seq = np.asarray(tokenizer.encode(prompts))  # (N, P), left-padded to a common length

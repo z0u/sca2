@@ -1,29 +1,14 @@
 """The named-only color language: a variant domain where every color is a word.
 
-The base language (`sca.data.colors`) grounds color names in hex codes: alias
-lines hand the model each name's value, and hex arithmetic teaches mixing in a
-form where the geometry is legible per digit. This module removes that
-scaffolding entirely. A vocabulary of colors is chosen from the 16-level RGB
-grid, every color is a single *opaque token* (one token per name — no
-characters, no hex), and the only sentences are mixing equations between
-vocabulary colors whose mix is itself in the vocabulary::
+The base language (`sca.data.colors`) grounds color names in hex codes: alias lines hand the model each name's value, and hex arithmetic teaches mixing in a form where the geometry is legible per digit. This module removes that scaffolding entirely. A vocabulary of colors is chosen from the 16-level RGB grid, every color is a single *opaque token* (one token per name — no characters, no hex), and the only sentences are mixing equations between vocabulary colors whose mix is itself in the vocabulary::
 
     red + blue = purple
 
-Nothing in the token stream reveals that colors live on a 3D grid; the only
-structure is the co-occurrence statistics of the mixing table. Whether a model
-can recover the geometry from that alone — tensor completion, in effect — is
-the question ex-2.1.3 asks.
+Nothing in the token stream reveals that colors live on a 3D grid; the only structure is the co-occurrence statistics of the mixing table. Whether a model can recover the geometry from that alone — tensor completion, in effect — is the question ex-2.1.3 asks.
 
-Vocabularies are level sub-grids of the full 16-level cube (`GRIDS`): the
-classic 27-color palette, plus denser grids up to the full 4096. Distinct
-closed pairs (mix on-vocabulary) split into train/holdout; pairs whose mix
-falls *off* the vocabulary ("open" pairs) can never be answered exactly and
-instead measure how *close* the model's guess lands.
+Vocabularies are level sub-grids of the full 16-level cube (`GRIDS`): the classic 27-color palette, plus denser grids up to the full 4096. Distinct closed pairs (mix on-vocabulary) split into train/holdout; pairs whose mix falls *off* the vocabulary ("open" pairs) can never be answered exactly and instead measure how *close* the model's guess lands.
 
-Synthetic names encode the value (``c05f`` = ``#05f``) purely for human
-readability in reports: each name is a single token, so the model sees an
-opaque id and must learn its meaning from usage, exactly as for ``red``.
+Synthetic names encode the value (``c05f`` = ``#05f``) purely for human readability in reports: each name is a single token, so the model sees an opaque id and must learn its meaning from usage, exactly as for ``red``.
 """
 
 import zlib
@@ -60,10 +45,7 @@ def grid_palette(levels: Iterable[int]) -> dict[str, Rgb]:
 
 
 class WordTokenizer:
-    """One token per word. Mirrors `CharTokenizer`'s conventions (sorted vocabulary,
-    the empty string as padding token 0), but vocabulary entries are whole words —
-    color names and the syntax tokens — rather than characters.
-    """
+    """One token per word. Mirrors `CharTokenizer`'s conventions (sorted vocabulary, the empty string as padding token 0), but vocabulary entries are whole words — color names and the syntax tokens — rather than characters."""
 
     def __init__(self, config: TokenizerConfig):
         self.vocabulary = sorted({""} | set(config.vocabulary))
@@ -86,8 +68,7 @@ def as_words(ex: Example) -> list[str]:
 def make_example(a: Rgb, b: Rgb, names: dict[Rgb, str], rng: np.random.Generator) -> Example:
     """Render one equation with random operand order.
 
-    The answer is empty when the mix has no name (open pairs) — such examples
-    are prompts to complete, never training lines.
+    The answer is empty when the mix has no name (open pairs) — such examples are prompts to complete, never training lines.
     """
     result = mix(a, b)
     if rng.random() < 0.5:
@@ -103,8 +84,7 @@ def pair_key(a: Rgb, b: Rgb) -> tuple[Rgb, Rgb]:
 def closed_pairs(levels: Iterable[int]) -> list[tuple[Rgb, Rgb]]:
     """All distinct unordered vocabulary pairs whose mix is on-vocabulary.
 
-    Enumeration is O(colors²) — fine up to the 216-color grid; the full grid
-    (8.4M pairs) should use `holdout_test`'s hash split instead.
+    Enumeration is O(colors²) — fine up to the 216-color grid; the full grid (8.4M pairs) should use `holdout_test`'s hash split instead.
     """
     lset = set(levels)
     colors = list(grid_palette(levels).values())
@@ -121,9 +101,7 @@ def open_pairs(levels: Iterable[int]) -> list[tuple[Rgb, Rgb]]:
 def holdout_test(levels: Iterable[int], seed: int, frac: float = 0.2) -> Callable[[Rgb, Rgb], bool]:
     """A deterministic membership test for held-out closed pairs; self-pairs always train.
 
-    Small grids enumerate the distinct closed pairs and split exactly
-    (mirroring `colors.split_named_pairs`); the full grid's 8.4M pairs get a
-    stable hash threshold instead, which converges to *frac* by volume.
+    Small grids enumerate the distinct closed pairs and split exactly (mirroring `colors.split_named_pairs`); the full grid's 8.4M pairs get a stable hash threshold instead, which converges to *frac* by volume.
     """
     levels = tuple(levels)
     if len(levels) ** 3 <= 1000:
@@ -138,9 +116,7 @@ def holdout_test(levels: Iterable[int], seed: int, frac: float = 0.2) -> Callabl
 def sample_corpus(n: int, seed: int, levels: Iterable[int], holdout_frac: float = 0.2) -> list[Example]:
     """*n* closed-pair equations drawn i.i.d. (with replacement) from the train side.
 
-    Operand pairs are uniform over ordered vocabulary pairs, filtered to those
-    whose mix is on-vocabulary and not held out — so operand order is already
-    random and self-pairs occur at their natural rate.
+    Operand pairs are uniform over ordered vocabulary pairs, filtered to those whose mix is on-vocabulary and not held out — so operand order is already random and self-pairs occur at their natural rate.
     """
     levels = tuple(levels)
     palette = grid_palette(levels)

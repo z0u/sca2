@@ -158,25 +158,14 @@ def emit_progress(step: int, total: int, message: str = ""):
 def blocking_phase(label: str, timeout_s: float) -> Iterator[None]:
     """Declare a span that legitimately makes no step progress.
 
-    The worker's progress watchdog aborts a task whose ``(step, total)`` stops
-    advancing, which is what turns a wedged worker into a fast retryable failure
-    instead of a burnt role timeout. But some spans have no steps to report and
-    are perfectly healthy: uploading a checkpoint after the last step, pulling a
-    dataset before the first, a long eval between epochs. Name one, and the
-    watchdog measures it against *timeout_s* instead of the tight step
-    threshold::
+    The worker's progress watchdog aborts a task whose ``(step, total)`` stops advancing, which is what turns a wedged worker into a fast retryable failure instead of a burnt role timeout. But some spans have no steps to report and are perfectly healthy: uploading a checkpoint after the last step, pulling a dataset before the first, a long eval between epochs. Name one, and the watchdog measures it against *timeout_s* instead of the tight step threshold::
 
         with blocking_phase("upload checkpoint", timeout_s=600):
             art = put(workdir / "model", name="model")
 
-    The budget is a bound rather than a pass: a span that hangs is still caught,
-    just at *timeout_s*. Size it for the slowest healthy case — aborting a
-    healthy task throws away everything it has done, while catching a wedge late
-    only costs idle time.
+    The budget is a bound rather than a pass: a span that hangs is still caught, just at *timeout_s*. Size it for the slowest healthy case — aborting a healthy task throws away everything it has done, while catching a wedge late only costs idle time.
 
-    ``mini.store``'s ``put``, ``get`` and ``get_many`` already declare their own,
-    sized from the payload, so a step that only moves artifacts needs nothing
-    here. Phases nest, and only ever widen the threshold.
+    ``mini.store``'s ``put``, ``get`` and ``get_many`` already declare their own, sized from the payload, so a step that only moves artifacts needs nothing here. Phases nest, and only ever widen the threshold.
 
     A no-op outside a job context, and on a worker with no watchdog armed.
     """
@@ -189,13 +178,9 @@ def emit_metrics(**scalars: float) -> None:
     """
     Report the latest scalar metrics for the current job (e.g. ``loss``, ``lr``).
 
-    Like ``emit_progress``, this is a no-op outside a job context. Metrics are
-    merged (last-writer-wins) and travel with progress updates, so a watching
-    agent or human can see a run's numbers — and step in if they go awry —
-    without waiting for it to finish.
+    Like ``emit_progress``, this is a no-op outside a job context. Metrics are merged (last-writer-wins) and travel with progress updates, so a watching agent or human can see a run's numbers — and step in if they go awry — without waiting for it to finish.
 
-    Pair it with :func:`expect_metrics` for anything whose direction isn't
-    obvious from its name, and the tools will flag a metric heading the wrong way.
+    Pair it with :func:`expect_metrics` for anything whose direction isn't obvious from its name, and the tools will flag a metric heading the wrong way.
     """
     ctx = _job_context.get()
     if ctx is None:
@@ -209,19 +194,11 @@ def expect_metrics(**directions: str) -> None:
     """
     Declare which way each metric is *supposed* to move: ``"up"`` or ``"down"``.
 
-    ``expect_metrics(loss="down", accuracy="up")``. With this, ``status`` can flag
-    a metric drifting the wrong way for several windows — a sliding accuracy reads
-    exactly as loudly as a climbing loss.
+    ``expect_metrics(loss="down", accuracy="up")``. With this, ``status`` can flag a metric drifting the wrong way for several windows — a sliding accuracy reads exactly as loudly as a climbing loss.
 
-    The declaration lives here, in the job, because this is the only place that
-    knows. A name is a poor proxy: ``loss_scale`` is a mixed-precision scale factor
-    that climbs quite happily, and a domain-specific score gives nothing away at
-    all. So the worker guesses only for a few unambiguous names (``loss``,
-    ``val_loss``, ``nll``, ``perplexity``, …) and stays quiet about the rest —
-    silence rather than a wrong guess. Declaring is how you opt a metric in.
+    The declaration lives here, in the job, because this is the only place that knows. A name is a poor proxy: ``loss_scale`` is a mixed-precision scale factor that climbs quite happily, and a domain-specific score gives nothing away at all. So the worker guesses only for a few unambiguous names (``loss``, ``val_loss``, ``nll``, ``perplexity``, …) and stays quiet about the rest — silence rather than a wrong guess. Declaring is how you opt a metric in.
 
-    A no-op outside a job context, and safe to call repeatedly (later calls win).
-    Call it before the loop; it rides along on every subsequent update.
+    A no-op outside a job context, and safe to call repeatedly (later calls win). Call it before the loop; it rides along on every subsequent update.
     """
     if bad := {k: v for k, v in directions.items() if v not in ("up", "down")}:
         raise ValueError(f"metric directions must be 'up' or 'down', got {bad}")

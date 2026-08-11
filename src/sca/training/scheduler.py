@@ -7,8 +7,7 @@ from sca.config import SchedulerConfig
 def configure_schedule(config: SchedulerConfig, peak_lr: float, epoch_length: NonNegativeInt) -> optax.Schedule:
     """Linear warmup to the peak LR, then cosine anneal down to `min_lr_factor * peak`.
 
-    The schedule is evaluated once per batch (see the training loop), so all
-    durations are expressed in steps rather than epochs.
+    The schedule is evaluated once per batch (see the training loop), so all durations are expressed in steps rather than epochs.
     """
     total_steps = config.epochs * epoch_length
     warmup_steps = int(config.warmup_epochs * epoch_length)

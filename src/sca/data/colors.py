@@ -1,40 +1,18 @@
 """The color-mixing language: M2's synthetic domain.
 
-A color is a point on a 16-level RGB grid, written either as CSS-style short
-hex (``#f80``, one digit per channel) or as one of 27 names covering the
-sub-grid with channels in {0, 8, 15} (``red`` = ``#f00``, ``purple`` =
-``#808``). Mixing is the channel-wise round-half-up mean::
+A color is a point on a 16-level RGB grid, written either as CSS-style short hex (``#f80``, one digit per channel) or as one of 27 names covering the sub-grid with channels in {0, 8, 15} (``red`` = ``#f00``, ``purple`` = ``#808``). Mixing is the channel-wise round-half-up mean::
 
     mix(a, b) = (a + b + 1) // 2        # per channel, closed on 0..15
 
-which is commutative and idempotent, so the ground truth for every equation is
-exact integer arithmetic — no perceptual judgement calls. Conveniently, the
-palette lands on familiar values: ``red + blue = purple``, ``white + black =
-gray``, ``red + lime = olive`` (averaging *darkens*; this is pigment-free
-light-averaging, not paint).
+which is commutative and idempotent, so the ground truth for every equation is exact integer arithmetic — no perceptual judgement calls. Conveniently, the palette lands on familiar values: ``red + blue = purple``, ``white + black = gray``, ``red + lime = olive`` (averaging *darkens*; this is pigment-free light-averaging, not paint).
 
 Sentences come in six forms, one per line:
 
-    named      ``red + blue = purple``   only pairs whose mix is itself named
-    hex        ``#e26 + #48a = #958``    any pair on the full grid
-    cross      ``red + #08f = #848``     a hex operand forces a hex result
-    alias      ``red = #f00``            the name → value dictionary
-    alias_rev  ``#f00 = red``            the dictionary, reversed
-    open       ``red + navy = #804``     named operands, off-palette mix ⇒ hex
+    named      ``red + blue = purple``   only pairs whose mix is itself named hex        ``#e26 + #48a = #958``    any pair on the full grid cross      ``red + #08f = #848``     a hex operand forces a hex result alias      ``red = #f00``            the name → value dictionary alias_rev  ``#f00 = red``            the dictionary, reversed open       ``red + navy = #804``     named operands, off-palette mix ⇒ hex
 
-The result's surface form is deterministic given the operand *values* (hex
-unless both operands are named and the mix lands on the palette), so greedy
-completion has a single correct answer — the exact-match accuracy in D2.1.x is
-well-defined. In the base grammar (``FORM_WEIGHTS``) the form is determined by
-the operands' surface forms alone, because named equations draw only closed
-pairs; the ``open`` form (an ex-2.1.2 intervention, off by default) makes the
-rule genuinely value-dependent — the model must compute the mix to know
-whether the answer is a name or a hex code. ``alias_rev`` (same experiment)
-supervises the hex → name direction the base grammar leaves untrained.
+The result's surface form is deterministic given the operand *values* (hex unless both operands are named and the mix lands on the palette), so greedy completion has a single correct answer — the exact-match accuracy in D2.1.x is well-defined. In the base grammar (``FORM_WEIGHTS``) the form is determined by the operands' surface forms alone, because named equations draw only closed pairs; the ``open`` form (an ex-2.1.2 intervention, off by default) makes the rule genuinely value-dependent — the model must compute the mix to know whether the answer is a name or a hex code. ``alias_rev`` (same experiment) supervises the hex → name direction the base grammar leaves untrained.
 
-``redness`` ports M1's graded concept label (the anchor's noisy supervision
-signal) to this grid, so the anchoring experiments can label sequences the same
-way the autoencoder experiments labeled samples.
+``redness`` ports M1's graded concept label (the anchor's noisy supervision signal) to this grid, so the anchoring experiments can label sequences the same way the autoencoder experiments labeled samples.
 """
 
 import json
@@ -95,9 +73,7 @@ def to_hex(c: Rgb) -> str:
 def swatch(text: str | None) -> str:
     """Inline HTML: a colour square for a palette name, followed by the name itself.
 
-    The box is tinted via the ``--sw`` custom property and styled by ``.sw`` in the
-    shared report stylesheet (``docs/report.css``), so each occurrence stays terse.
-    Non-palette text (e.g. a stray hex completion) falls back to ``<code>``.
+    The box is tinted via the ``--sw`` custom property and styled by ``.sw`` in the shared report stylesheet (``docs/report.css``), so each occurrence stays terse. Non-palette text (e.g. a stray hex completion) falls back to ``<code>``.
     """
     if text is None:
         return '<span class="sw sw-ghost" aria-hidden="true"></span>'
@@ -175,8 +151,7 @@ def closed_named_pairs() -> list[tuple[Rgb, Rgb]]:
 def split_named_pairs(seed: int, holdout_frac: float = 0.2) -> tuple[list[tuple[Rgb, Rgb]], list[tuple[Rgb, Rgb]]]:
     """Split the *distinct* closed pairs into (train, holdout); self-pairs always train.
 
-    Held-out pairs never appear as named equations in training, so completing
-    them requires composing the alias dictionary with hex arithmetic.
+    Held-out pairs never appear as named equations in training, so completing them requires composing the alias dictionary with hex arithmetic.
     """
     rng = np.random.default_rng(seed)
     pairs = closed_named_pairs()
@@ -186,9 +161,7 @@ def split_named_pairs(seed: int, holdout_frac: float = 0.2) -> tuple[list[tuple[
 
 
 def open_named_pairs() -> list[tuple[Rgb, Rgb]]:
-    """Unordered palette pairs whose mix falls *off* the palette (the complement
-    of :func:`closed_named_pairs`; self-pairs mix to themselves, so none is open).
-    """
+    """Unordered palette pairs whose mix falls *off* the palette (the complement of :func:`closed_named_pairs`; self-pairs mix to themselves, so none is open)."""
     colors = list(PALETTE.values())
     return [(a, b) for i, a in enumerate(colors) for b in colors[i:] if mix(a, b) not in NAMES]
 
@@ -196,8 +169,7 @@ def open_named_pairs() -> list[tuple[Rgb, Rgb]]:
 def split_open_pairs(seed: int, holdout_frac: float = 0.2) -> tuple[list[tuple[Rgb, Rgb]], list[tuple[Rgb, Rgb]]]:
     """Split the open pairs into (train, holdout), mirroring :func:`split_named_pairs`.
 
-    Held-out open pairs never appear in training at all, so completing them
-    (with a hex answer) requires mixing *named* operands the arithmetic way.
+    Held-out open pairs never appear in training at all, so completing them (with a hex answer) requires mixing *named* operands the arithmetic way.
     """
     rng = np.random.default_rng(seed)
     pairs = open_named_pairs()
@@ -222,11 +194,7 @@ def sample_corpus(
 ) -> list[Example]:
     """Sample the training corpus: i.i.d. examples with the given form mix.
 
-    Named equations draw only from *named_pairs* (the train side of the split);
-    hex and cross operands draw uniformly from the full grid, so pair coverage
-    is sparse (~n_examples of the grid's ~8.4M pairs) and held-out pairs test
-    composition, not recall. ``open`` equations (if weighted) draw from
-    *open_pairs* — pass the train side of :func:`split_open_pairs`.
+    Named equations draw only from *named_pairs* (the train side of the split); hex and cross operands draw uniformly from the full grid, so pair coverage is sparse (~n_examples of the grid's ~8.4M pairs) and held-out pairs test composition, not recall. ``open`` equations (if weighted) draw from *open_pairs* — pass the train side of :func:`split_open_pairs`.
     """
     rng = np.random.default_rng(seed)
     forms, probs = zip(*weights.items(), strict=True)

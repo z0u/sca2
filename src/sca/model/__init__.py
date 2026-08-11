@@ -1,7 +1,6 @@
 """The model: nGPT, the normalized transformer on the unit hypersphere.
 
-The `ngpt` module tells the architecture's story end to end; the primitives it
-builds on (and the `LanguageModel` base) live in `_shared`.
+The `ngpt` module tells the architecture's story end to end; the primitives it builds on (and the `LanguageModel` base) live in `_shared`.
 """
 
 from jaxtyping import PRNGKeyArray

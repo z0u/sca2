@@ -1,27 +1,13 @@
 """
 Worker-side progress watchdog: abort a wedged task instead of letting it burn.
 
-A wedged worker (hung device call, deadlocked thread) can sit on its GPU
-allocations while making no progress — and backend liveness probes still see a
-healthy container, so the wedge silently burns its whole role ``timeout``
-(seen in ex-2.1.4: 45 minutes at 0.3 % GPU utilization). Frozen *step*
-progress is the one honest signal: heartbeats can keep beating from a side
-thread, but a stalled training loop stops advancing ``step``.
+A wedged worker (hung device call, deadlocked thread) can sit on its GPU allocations while making no progress — and backend liveness probes still see a healthy container, so the wedge silently burns its whole role ``timeout`` (seen in ex-2.1.4: 45 minutes at 0.3 % GPU utilization). Frozen *step* progress is the one honest signal: heartbeats can keep beating from a side thread, but a stalled training loop stops advancing ``step``.
 
-The watchdog turns that silent stall into a fast, retryable failure: if the
-``(step, total)`` pair hasn't advanced within ``timeout_s``, it settles the
-task's record FAILED (with a stack dump of every thread — the closest thing a
-wedge has to a traceback) and hard-exits the process, releasing the GPU.
-``os._exit`` because a thread stuck in a native call never returns to the
-interpreter, so raising an exception at it could go unheard forever.
+The watchdog turns that silent stall into a fast, retryable failure: if the ``(step, total)`` pair hasn't advanced within ``timeout_s``, it settles the task's record FAILED (with a stack dump of every thread — the closest thing a wedge has to a traceback) and hard-exits the process, releasing the GPU. ``os._exit`` because a thread stuck in a native call never returns to the interpreter, so raising an exception at it could go unheard forever.
 
-Heartbeats and metrics-only emissions deliberately do **not** feed the
-watchdog — liveness without progress is precisely the wedge signature.
+Heartbeats and metrics-only emissions deliberately do **not** feed the watchdog — liveness without progress is precisely the wedge signature.
 
-Some spans have no steps to report and are healthy anyway: a checkpoint upload
-after the last step, a dataset pull before the first. :meth:`Watchdog.phase`
-lets the task declare those and name a budget for them, so they are measured
-against their own threshold rather than the tight step one.
+Some spans have no steps to report and are healthy anyway: a checkpoint upload after the last step, a dataset pull before the first. :meth:`Watchdog.phase` lets the task declare those and name a budget for them, so they are measured against their own threshold rather than the tight step one.
 """
 
 from __future__ import annotations
@@ -46,27 +32,13 @@ class WatchdogStall(RuntimeError):
 class Watchdog:
     """Abort the process when step progress stalls for *timeout_s* seconds.
 
-    Use as a context manager around the task call; feed it via :meth:`poke`
-    from the progress sink.
+    Use as a context manager around the task call; feed it via :meth:`poke` from the progress sink.
 
-    Until the first poke, the effective threshold is *grace_s* (defaulting to
-    *timeout_s*): one-off setup — tokenizing a dataset, compiling a model —
-    happens before the first ``emit_progress``, and without a separate grace it
-    would force the whole watchdog loose (a 10-minute prep phase would demand a
-    10-minute timeout even when training steps take seconds). After the first
-    advance the tight *timeout_s* takes over, so size it past the longest
-    legitimate gap *between* step advances only. The grace ends at the first
-    emission — a task that emits step 0 up front and then preps for minutes
-    should hold its first emission until real step cadence begins.
+    Until the first poke, the effective threshold is *grace_s* (defaulting to *timeout_s*): one-off setup — tokenizing a dataset, compiling a model — happens before the first ``emit_progress``, and without a separate grace it would force the whole watchdog loose (a 10-minute prep phase would demand a 10-minute timeout even when training steps take seconds). After the first advance the tight *timeout_s* takes over, so size it past the longest legitimate gap *between* step advances only. The grace ends at the first emission — a task that emits step 0 up front and then preps for minutes should hold its first emission until real step cadence begins.
 
-    Spans in the *middle* of a task that legitimately make no step progress get
-    :meth:`phase`, which is the same idea as the grace with a caller-named budget.
+    Spans in the *middle* of a task that legitimately make no step progress get :meth:`phase`, which is the same idea as the grace with a caller-named budget.
 
-    On stall, *on_stall* is called with a diagnosis (summary + all-thread stack
-    dump) — it should persist the failure wherever the task records state — and
-    then the process exits, no matter what *on_stall* did. Exiting on the
-    watchdog's own thread is the point: the wedged main thread can't be relied
-    on to run anything.
+    On stall, *on_stall* is called with a diagnosis (summary + all-thread stack dump) — it should persist the failure wherever the task records state — and then the process exits, no matter what *on_stall* did. Exiting on the watchdog's own thread is the point: the wedged main thread can't be relied on to run anything.
     """
 
     def __init__(
@@ -100,17 +72,9 @@ class Watchdog:
     def phase(self, label: str, timeout_s: float) -> Iterator[None]:
         """Allow *timeout_s* without step progress for a declared blocking span.
 
-        Setup gets ``grace_s``; this is the same allowance for any span the task
-        names as legitimately step-free — uploading a checkpoint, pulling a
-        dataset, a long eval between epochs. The clock resets on both entry and
-        exit, so the span gets its whole budget and the loop that follows gets
-        its whole timeout.
+        Setup gets ``grace_s``; this is the same allowance for any span the task names as legitimately step-free — uploading a checkpoint, pulling a dataset, a long eval between epochs. The clock resets on both entry and exit, so the span gets its whole budget and the loop that follows gets its whole timeout.
 
-        A budget only ever *widens* the threshold: it is a bound, not a pass. A
-        span that truly hangs is still caught, at *timeout_s* rather than at the
-        tight step timeout. Size it for the slowest healthy case — aborting a
-        healthy task throws away everything it has done, while catching a wedge
-        late only costs idle time.
+        A budget only ever *widens* the threshold: it is a bound, not a pass. A span that truly hangs is still caught, at *timeout_s* rather than at the tight step timeout. Size it for the slowest healthy case — aborting a healthy task throws away everything it has done, while catching a wedge late only costs idle time.
 
         Nests, and is safe to call from any thread.
         """
@@ -160,9 +124,7 @@ class Watchdog:
             return
 
     def _diagnosis(self, stalled_s: float) -> str:
-        """All-thread stack dump ending in the stall summary (traceback-shaped:
-        the last line is the failure, so record summaries read naturally).
-        """
+        """All-thread stack dump ending in the stall summary (traceback-shaped: the last line is the failure, so record summaries read naturally)."""
         names = {t.ident: t.name for t in threading.enumerate()}
         parts = ["Watchdog stall — stacks of all threads at abort:\n"]
         for ident, frame in sys._current_frames().items():

@@ -1,32 +1,18 @@
 """The disjoint-vocabulary color language: two surface forms, no bridge.
 
-Ex-2.1.5's domain. The corpus holds two sublanguages that are never seen
-together — color-mixing equations written with real color names, and the same
-arithmetic written as 3-digit hex codes::
+Ex-2.1.5's domain. The corpus holds two sublanguages that are never seen together — color-mixing equations written with real color names, and the same arithmetic written as 3-digit hex codes::
 
     melon + ultramarine = dusty rose
     #e26 + #48a = #958
 
-Two RGB grids are in play. Names live on the *full cube* (8-bit, 256 levels per
-channel); hex codes live on the *hex grid* (4-bit, 16 levels, one digit per
-channel). The mix is always the channel-wise round-half-up mean computed in the
-full cube; the two forms differ only in how values enter and leave it:
+Two RGB grids are in play. Names live on the *full cube* (8-bit, 256 levels per channel); hex codes live on the *hex grid* (4-bit, 16 levels, one digit per channel). The mix is always the channel-wise round-half-up mean computed in the full cube; the two forms differ only in how values enter and leave it:
 
-- Named operands already sit in the full cube; the answer snaps to the nearest
-  named color (Euclidean), distance ties broken by a coin flip seeded from the
-  mix value.
-- Hex operands are lifted by digit repetition (``#f80`` → ``#ff8800``) and the
-  answer snaps back to the hex grid.
+- Named operands already sit in the full cube; the answer snaps to the nearest named color (Euclidean), distance ties broken by a coin flip seeded from the mix value.
+- Hex operands are lifted by digit repetition (``#f80`` → ``#ff8800``) and the answer snaps back to the hex grid.
 
-The named palette comes from the xkcd color survey (all 949 names, via
-matplotlib), ordered by farthest-point selection so the first *n* form the most
-uniform palette available at that size. Hex operands come from a fixed seeded
-permutation of the 4096 grid points, so smaller subsets are prefixes of larger
-ones. The optional *cross* form (``melon + #48a = #958``) is the bridge arm's
-intervention — off by default, and the only place the two vocabularies meet.
+The named palette comes from the xkcd color survey (all 949 names, via matplotlib), ordered by farthest-point selection so the first *n* form the most uniform palette available at that size. Hex operands come from a fixed seeded permutation of the 4096 grid points, so smaller subsets are prefixes of larger ones. The optional *cross* form (``melon + #48a = #958``) is the bridge arm's intervention — off by default, and the only place the two vocabularies meet.
 
-Values in :class:`Example` are always full-cube (0..255) coordinates, whatever
-the surface form, so probe targets and distance metrics share one scale.
+Values in :class:`Example` are always full-cube (0..255) coordinates, whatever the surface form, so probe targets and distance metrics share one scale.
 """
 
 from functools import cache
@@ -61,9 +47,7 @@ BRIDGE_WEIGHTS: dict[MixedForm, float] = {"named": 0.45, "hex": 0.45, "cross": 0
 def xkcd_survey() -> dict[str, Rgb8]:
     """All 949 xkcd survey names → full-cube values, alphabetical.
 
-    Sourced from matplotlib's vendored copy of the survey results; sorting by
-    name makes the ordering independent of matplotlib's dict order. Cached —
-    treat the result as read-only.
+    Sourced from matplotlib's vendored copy of the survey results; sorting by name makes the ordering independent of matplotlib's dict order. Cached — treat the result as read-only.
     """
     from matplotlib import colors as mcolors
     from matplotlib.typing import ColorType
@@ -78,9 +62,7 @@ def xkcd_survey() -> dict[str, Rgb8]:
 def fps_order(points: np.ndarray, start: int) -> list[int]:
     """Greedy farthest-point ordering of *points*, beginning at index *start*.
 
-    Every prefix of the result is a maximally spread subset in the greedy
-    sense: each added point maximizes its distance to the points already
-    chosen. Ties resolve to the lowest index, so the order is deterministic.
+    Every prefix of the result is a maximally spread subset in the greedy sense: each added point maximizes its distance to the points already chosen. Ties resolve to the lowest index, so the order is deterministic.
     """
     d = np.linalg.norm(points - points[start], axis=1)
     order = [start]
@@ -94,10 +76,7 @@ def fps_order(points: np.ndarray, start: int) -> list[int]:
 def xkcd_palette(n: int) -> dict[str, Rgb8]:
     """The *n* most uniformly spread xkcd names (first *n* under farthest-point order).
 
-    The ordering starts from the survey color nearest black (the design study's
-    convention: at N = 140 it gives min/median nearest-neighbor distances of
-    41.9/46.5 with ``blue with a hint of purple`` the longest selected name),
-    so palettes of every size are prefixes of one fixed sequence.
+    The ordering starts from the survey color nearest black (the design study's convention: at N = 140 it gives min/median nearest-neighbor distances of 41.9/46.5 with ``blue with a hint of purple`` the longest selected name), so palettes of every size are prefixes of one fixed sequence.
     """
     survey = xkcd_survey()
     names = list(survey)
@@ -109,9 +88,7 @@ def xkcd_palette(n: int) -> dict[str, Rgb8]:
 def hex_operands(n: int, seed: int) -> list[Rgb8]:
     """A fixed random subset of the hex grid, lifted to the full cube.
 
-    The first *n* points of one seeded permutation of all 4096, so subsets of
-    different sizes nest. The subset constrains *operands* only — a hex
-    equation's answer may be any point on the hex grid.
+    The first *n* points of one seeded permutation of all 4096, so subsets of different sizes nest. The subset constrains *operands* only — a hex equation's answer may be any point on the hex grid.
     """
     rng = np.random.default_rng(seed)
     picks = rng.permutation(N_HEX**3)[:n]
@@ -127,8 +104,7 @@ def lift(c4: tuple[int, int, int]) -> Rgb8:
 def snap_hex(c8: Rgb8) -> Rgb8:
     """Nearest hex-grid point (returned in full-cube coordinates).
 
-    Rounds each channel to the nearest multiple of 17; integer inputs can never
-    tie (the midpoint 8.5 is not an integer offset).
+    Rounds each channel to the nearest multiple of 17; integer inputs can never tie (the midpoint 8.5 is not an integer offset).
     """
     r, g, b = ((2 * v + STEP) // (2 * STEP) * STEP for v in c8)
     return (r, g, b)
@@ -147,10 +123,7 @@ def to_hex3(c8: Rgb8) -> str:
 
 
 def snap_name(target: Rgb8, palette_rgb: np.ndarray) -> int:
-    """Index of the palette color nearest *target*; ties fall to a coin flip
-    seeded from the mix value, so every (palette, target) pair snaps the same
-    way in every process.
-    """
+    """Index of the palette color nearest *target*; ties fall to a coin flip seeded from the mix value, so every (palette, target) pair snaps the same way in every process."""
     d2 = ((palette_rgb.astype(np.int64) - np.array(target)) ** 2).sum(axis=1)
     ties = np.flatnonzero(d2 == d2.min())
     if len(ties) == 1:
@@ -162,8 +135,7 @@ def snap_name(target: Rgb8, palette_rgb: np.ndarray) -> int:
 def alphabet() -> list[str]:
     """Every character the language can produce, fixed a priori.
 
-    Name characters come from the *full* survey (not the selected palette), so
-    every palette size shares one token table.
+    Name characters come from the *full* survey (not the selected palette), so every palette size shares one token table.
     """
     return sorted({*"".join(xkcd_survey()), *"0123456789abcdef", *"#+= \n"})
 
@@ -171,9 +143,7 @@ def alphabet() -> list[str]:
 def make_example(form: MixedForm, a: Rgb8, b: Rgb8, names: dict[Rgb8, str], rng: np.random.Generator) -> Example:
     """Render one equation; operand order is random.
 
-    For the cross form, *a* is the named operand and *b* the (lifted) hex one.
-    ``result`` holds the exact full-cube mix, pre-snap; the answer string holds
-    the snapped, surface-form value.
+    For the cross form, *a* is the named operand and *b* the (lifted) hex one. ``result`` holds the exact full-cube mix, pre-snap; the answer string holds the snapped, surface-form value.
     """
     result = mix8(a, b)
     palette_rgb = None
@@ -217,10 +187,7 @@ def sample_corpus(
 ) -> list[Example]:
     """*n* training equations drawn i.i.d. with the given form mix.
 
-    Operands draw uniformly (with replacement) from their sublanguage's operand
-    set, skipping held-out pairs; self-pairs occur at their natural rate and
-    always train. Cross pairs (one operand per vocabulary) have no holdout —
-    the form exists to supervise alignment, not to be graded.
+    Operands draw uniformly (with replacement) from their sublanguage's operand set, skipping held-out pairs; self-pairs occur at their natural rate and always train. Cross pairs (one operand per vocabulary) have no holdout — the form exists to supervise alignment, not to be graded.
     """
     rng = np.random.default_rng(seed)
     names = {v: k for k, v in palette.items()}

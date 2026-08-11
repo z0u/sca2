@@ -1,38 +1,17 @@
 """
 Hugging Face bucket backend for the artifact :class:`~mini.store.Store`.
 
-A bucket (``hf://buckets/<namespace>/<name>``) is a Xet-backed, mutable repo with
-no git history — so concurrent writers don't conflict and immutability is ours to
-enforce by writing once per content hash. We lay the same ``cas/<sha256>`` /
-``refs/`` / ``published/`` structure over it as :class:`~mini.store.LocalStore`,
-so an :class:`~mini.store.Artifact` handle resolves identically whichever backend
-produced it.
+A bucket (``hf://buckets/<namespace>/<name>``) is a Xet-backed, mutable repo with no git history — so concurrent writers don't conflict and immutability is ours to enforce by writing once per content hash. We lay the same ``cas/<sha256>`` / ``refs/`` / ``published/`` structure over it as :class:`~mini.store.LocalStore`, so an :class:`~mini.store.Artifact` handle resolves identically whichever backend produced it.
 
 Three properties make this the durable, shareable tier:
 
-- **One bucket per project** → ``has(sha)`` is a cross-experiment hit, so a blob
-  one experiment uploads is skipped (not re-uploaded) by another, and Xet dedups
-  the chunks underneath for free.
-- **Reachable everywhere** — from a Modal worker, a local report, or a browser —
-  so it retires the per-experiment-Volume limitation for *artifacts* (the Volume
-  becomes an optional warm cache, not the source of truth).
-- **Web-serving for free** — :meth:`publish` server-side-copies a blob *by xet
-  hash* (no bytes moved) to an extensioned path, and the bucket's resolve URL
-  then serves it with a ``Content-Type`` inferred from that extension.
+- **One bucket per project** → ``has(sha)`` is a cross-experiment hit, so a blob one experiment uploads is skipped (not re-uploaded) by another, and Xet dedups the chunks underneath for free.
+- **Reachable everywhere** — from a Modal worker, a local report, or a browser — so it retires the per-experiment-Volume limitation for *artifacts* (the Volume becomes an optional warm cache, not the source of truth).
+- **Web-serving for free** — :meth:`publish` server-side-copies a blob *by xet hash* (no bytes moved) to an extensioned path, and the bucket's resolve URL then serves it with a ``Content-Type`` inferred from that extension.
 
-Blobs are warm-cached into a local :class:`~mini.store.LocalStore` so a re-read
-(or a re-``put`` of known bytes) skips the network. The bucket stays the source
-of truth; the cache is just an accelerator.
+Blobs are warm-cached into a local :class:`~mini.store.LocalStore` so a re-read (or a re-``put`` of known bytes) skips the network. The bucket stays the source of truth; the cache is just an accelerator.
 
-**The publish tier can live in a separate dataset repo.** ``put``/``get``/refs run
-hot and concurrent (many workers), which is why the CAS is a bucket — buckets have
-no git history, so parallel writers never conflict. ``publish`` and report exports
-run cold and single-writer (a driver or CI), so they can afford a git-backed
-Hugging Face *dataset repo*, which buys two things a bucket can't: a **public**
-face over a **private** CAS (buckets have no per-prefix ACL, so this is a genuine
-two-store split), and **versioned names** — a citation pins to a commit sha. Set
-``publish_repo`` (``[tool.mini] publish-repo``) to route publish/exports there;
-unset, they stay in the bucket. See ``eng/publishing.md`` and issue #38.
+**The publish tier can live in a separate dataset repo.** ``put``/``get``/refs run hot and concurrent (many workers), which is why the CAS is a bucket — buckets have no git history, so parallel writers never conflict. ``publish`` and report exports run cold and single-writer (a driver or CI), so they can afford a git-backed Hugging Face *dataset repo*, which buys two things a bucket can't: a **public** face over a **private** CAS (buckets have no per-prefix ACL, so this is a genuine two-store split), and **versioned names** — a citation pins to a commit sha. Set ``publish_repo`` (``[tool.mini] publish-repo``) to route publish/exports there; unset, they stay in the bucket. See ``eng/publishing.md`` and issue #38.
 """
 
 from __future__ import annotations
@@ -94,8 +73,7 @@ class HFStore(Store):
     def _cas(self) -> str:
         """The bucket backing the CAS/refs — or a clear error if this store is publish-only.
 
-        A store built from a publish-repo alone (no ``store-bucket``) can serve exports
-        but has nowhere to put/get blobs, so every CAS/ref path narrows through here.
+        A store built from a publish-repo alone (no ``store-bucket``) can serve exports but has nowhere to put/get blobs, so every CAS/ref path narrows through here.
         """
         if self.bucket is None:
             raise RuntimeError(
@@ -110,10 +88,7 @@ class HFStore(Store):
     def _paths_info(self, paths: list[str]) -> dict[str, Any]:
         """Path → ``BucketFile`` for the *paths* that exist, in one batched request.
 
-        A missing path is simply absent from the result; an auth/permission/network
-        failure must *not* masquerade as absent — that would silently trigger a
-        re-upload (and hide a misconfigured token), so only the two not-found
-        errors are caught and everything else propagates.
+        A missing path is simply absent from the result; an auth/permission/network failure must *not* masquerade as absent — that would silently trigger a re-upload (and hide a misconfigured token), so only the two not-found errors are caught and everything else propagates.
         """
         from huggingface_hub.errors import EntryNotFoundError, RepositoryNotFoundError
 
@@ -145,10 +120,7 @@ class HFStore(Store):
     def _pull_blobs(self, sha256s: Iterable[str]) -> None:
         """Pull every warm-cache-missing blob off the CAS bucket in **one** request.
 
-        The single place bytes come off the bucket. Batching matters as much on
-        reads as on writes: each ``download_bucket_files`` call pays the fixed
-        paths-info + metadata round trips before any bytes move, so pulling *n*
-        blobs one call at a time serializes that floor *n* times over.
+        The single place bytes come off the bucket. Batching matters as much on reads as on writes: each ``download_bucket_files`` call pays the fixed paths-info + metadata round trips before any bytes move, so pulling *n* blobs one call at a time serializes that floor *n* times over.
         """
         missing = [s for s in dict.fromkeys(sha256s) if not self._cache.has(s)]
         if not missing:
@@ -181,10 +153,7 @@ class HFStore(Store):
     def _local_blob(self, sha256: str) -> Path:
         """The blob's path in the warm cache, pulled once from the CAS bucket if absent.
 
-        :meth:`_read_blob` serves reads from it, and :meth:`publish` needs a local
-        file to hand the (separate) publish repo so Xet can chunk it — the durable
-        copy lives in the CAS, not the publish tier, so publishing pulls-then-uploads
-        rather than moving bytes server-side.
+        :meth:`_read_blob` serves reads from it, and :meth:`publish` needs a local file to hand the (separate) publish repo so Xet can chunk it — the durable copy lives in the CAS, not the publish tier, so publishing pulls-then-uploads rather than moving bytes server-side.
         """
         self._pull_blobs([sha256])
         return self._cache._blob_path(sha256)
@@ -195,8 +164,7 @@ class HFStore(Store):
     def _put_tree(self, src: Path, *, name: str) -> Artifact:
         """Hash every shard locally, then upload the missing ones in **one** commit.
 
-        Batching matters here: each bucket commit pays a ~2-3s round trip, so a
-        per-shard upload would serialize that floor across the whole tree.
+        Batching matters here: each bucket commit pays a ~2-3s round trip, so a per-shard upload would serialize that floor across the whole tree.
         """
         children: list[Artifact] = []
         add: list[tuple[str, str]] = []
@@ -260,12 +228,7 @@ class HFStore(Store):
     def _publish_to_repo(self, art: Artifact, path: str) -> str:
         """Expose a CAS blob on the public, versioned dataset repo (see :func:`publish_repo`).
 
-        No server-side by-hash copy exists across a bucket→repo boundary, so this
-        pulls the blob from the (possibly private) CAS into the warm cache and uploads
-        it. That's not a byte re-transfer: Xet chunk dedup is account-wide, so chunks
-        the CAS already stored aren't sent again — the upload is a metadata + git-commit
-        op. The commit is what gives the publish tier history: the returned ``resolve``
-        URL tracks the branch, and a citation can pin the same path to a commit sha.
+        No server-side by-hash copy exists across a bucket→repo boundary, so this pulls the blob from the (possibly private) CAS into the warm cache and uploads it. That's not a byte re-transfer: Xet chunk dedup is account-wide, so chunks the CAS already stored aren't sent again — the upload is a metadata + git-commit op. The commit is what gives the publish tier history: the returned ``resolve`` URL tracks the branch, and a citation can pin the same path to a commit sha.
         """
         if not self.has(art.sha256):
             raise FileNotFoundError(f"{art.sha256[:12]}… is not in the store — put() it before publish()")
@@ -338,11 +301,7 @@ class HFStore(Store):
     def export_base(self, key: str, *, revision: str | None = None) -> str:
         """The ``<base href>`` a published report's relative ``_assets/`` resolve against.
 
-        With *revision* (a commit sha from :meth:`sync_export`) the base is **immutable**:
-        it serves the bundle exactly as that publish left it, so a later re-publish —
-        from a branch, before its code merges — can't swap assets under HTML already
-        built against it. Without one it tracks the branch head (bucket exports have no
-        history, so there a revision is meaningless and ignored).
+        With *revision* (a commit sha from :meth:`sync_export`) the base is **immutable**: it serves the bundle exactly as that publish left it, so a later re-publish — from a branch, before its code merges — can't swap assets under HTML already built against it. Without one it tracks the branch head (bucket exports have no history, so there a revision is meaningless and ignored).
         """
         if self.publish_repo is not None:
             return f"https://huggingface.co/datasets/{self.publish_repo}/resolve/{revision or 'main'}/exports/{key}/"
@@ -351,16 +310,9 @@ class HFStore(Store):
     def sync_export(self, local_dir: Path, key: str) -> str | None:
         """Mirror a report's local export dir to ``exports/<key>/`` (delete stale).
 
-        rsync-like — a re-export overwrites in place and drops assets the report no
-        longer references — with the per-report bundle as the sync unit. On the bucket
-        that's ``sync_bucket``; on the dataset repo it's one commit whose
-        ``delete_patterns`` prunes the bundle's now-absent files.
+        rsync-like — a re-export overwrites in place and drops assets the report no longer references — with the per-report bundle as the sync unit. On the bucket that's ``sync_bucket``; on the dataset repo it's one commit whose ``delete_patterns`` prunes the bundle's now-absent files.
 
-        Returns the commit sha the bundle now lives at (repo mode) — the immutable
-        revision a build can pin its ``<base>`` to — or ``None`` on a bucket, which
-        keeps no history. An identical re-publish creates no commit (huggingface_hub
-        drops no-op operations) and returns the current head, so publishing unchanged
-        content never invalidates anything.
+        Returns the commit sha the bundle now lives at (repo mode) — the immutable revision a build can pin its ``<base>`` to — or ``None`` on a bucket, which keeps no history. An identical re-publish creates no commit (huggingface_hub drops no-op operations) and returns the current head, so publishing unchanged content never invalidates anything.
         """
         if self.publish_repo is not None:
             info = self.api.upload_folder(
@@ -378,12 +330,7 @@ class HFStore(Store):
     def read_export_html(self, key: str, *, revision: str | None = None) -> str | None:
         """The synced bundle's ``index.html`` for *key*, or ``None`` if nothing is synced.
 
-        The build reads exports back this way — read-only, no notebook execution — so a
-        report missing here just means it hasn't been ``./go publish``ed yet. Only the
-        HTML travels: the page keeps its ``_assets/`` links relative and the build points
-        one ``<base>`` (see :meth:`export_base`) at the bundle on the CDN, so the figure
-        bytes are already served from where they live. Pass the *revision* the build will
-        serve so the HTML matches the assets that revision pins; ``None`` reads the head.
+        The build reads exports back this way — read-only, no notebook execution — so a report missing here just means it hasn't been ``./go publish``ed yet. Only the HTML travels: the page keeps its ``_assets/`` links relative and the build points one ``<base>`` (see :meth:`export_base`) at the bundle on the CDN, so the figure bytes are already served from where they live. Pass the *revision* the build will serve so the HTML matches the assets that revision pins; ``None`` reads the head.
 
         Safe to call concurrently — the site build fetches its reports in one wave.
         """
@@ -393,10 +340,7 @@ class HFStore(Store):
     def _read_repo_file(self, path: str, revision: str | None) -> str | None:
         """One text file off the publish repo, or ``None`` if the repo has no such path.
 
-        The not-found error *is* the existence answer, so catching it does the work a
-        separate ``file_exists`` probe would — one round trip per file rather than two.
-        Anything else (bad revision, missing repo, rejected token) is a real
-        misconfiguration and propagates.
+        The not-found error *is* the existence answer, so catching it does the work a separate ``file_exists`` probe would — one round trip per file rather than two. Anything else (bad revision, missing repo, rejected token) is a real misconfiguration and propagates.
         """
         from huggingface_hub import hf_hub_download
         from huggingface_hub.errors import EntryNotFoundError
@@ -418,8 +362,7 @@ class HFStore(Store):
     def _read_bucket_file(self, path: str) -> str | None:
         """One text file off the bucket, or ``None`` if it isn't there.
 
-        Buckets keep no history, so there's no revision to read at — the head is all
-        there is (see :meth:`export_base`).
+        Buckets keep no history, so there's no revision to read at — the head is all there is (see :meth:`export_base`).
         """
         infos = self._paths_info([path])
         if path not in infos:
