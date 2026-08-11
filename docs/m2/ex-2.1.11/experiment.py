@@ -345,13 +345,18 @@ SPACE_COMMON: dict[str, tuple[float, float, str]] = {
     "lam": (0.02, 1.0, "log"),
     "tau": (0.05, 0.30, "log"),
 }
-"""Dimension → (low, high, scale). λ_a spans a fifth of the scoring rung to the ex-2.1.7 ceiling arm's weight, where selectivity was lost; the optimum is believed inside. τ spans the graded regime: the calibration cell shows the leading softmin weight runs 0.74 → 0.42 across it, covering the lower part of the 0.6–0.8 target band from ex-2.1.9, and the latching regime (τ ≲ 0.03) stays outside. Both are temperatures/weights, so log scale."""
+"""Dimension → (low, high, scale). λ_a spans a fifth of the scoring rung to the ex-2.1.7 ceiling arm's weight, where selectivity was lost; the optimum is believed inside. τ spans the graded regime: the calibration cell shows the leading softmin weight runs 0.78 → 0.57 across it at the embedding slice, spanning nearly all of the 0.6–0.8 target band from ex-2.1.9, and the latching regime (τ ≲ 0.03) stays outside. Both are temperatures/weights, so log scale."""
 # REVIEW: "half the scoring rung" → "a fifth" (SCORING_LAMBDA is 0.1 and the
-# bound is 0.02). And the τ range covers 0.6–0.74 of the target band, not all
-# of it: reaching 0.8 needs τ ≈ 0.04, which the lower bound holds off from to
-# keep a margin above the latching regime. Verify: the tau-range figure's own
-# alt text describes the two bands as overlapping, which is the reading kept
-# here; widen the bound only with evidence that τ ≈ 0.04 stays graded.
+# bound is 0.02). The τ figures were then corrected twice. They were first
+# narrowed to "the lower part of the band", on the reading that reaching 0.8
+# needs τ ≈ 0.04; that came from a statistic other than the one ex-2.1.9's band
+# is set on. On `pi` — the label-affinity-weighted per-colour profile maxed over
+# roles, which is also what LATCH_PI reads — the range is [0.78, 0.57] at the
+# embedding slice, and 0.8 is not reachable at any τ: the curve saturates at
+# 0.78 as τ → 0, because the profile's own spread runs out of room to sharpen.
+# The bounds are unchanged, and cover the band better than either earlier note
+# credited. Verify: the tau-range figure's embedding-slice curve passes through
+# 0.77 at τ = 0.1, reproducing ex-2.1.9's published lead_emb.
 
 SPACE_ANTI_SCHED: dict[str, tuple[float, float, str]] = {
     "anti_peak_ratio": (0.75, 4.0, "log"),

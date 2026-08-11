@@ -92,7 +92,9 @@ def _():
 
     **The anchor schedule can go.** `flat-anchor` stays within band on all five decision statistics, and no run latches (m_line +0.0039, band 0.0144). Rule 1: the survey runs a flat anchor weight.
 
-    **The anti-subspace schedule cannot.** Both flat brackets come out worse. `anti-hold` loses the group contrast (−0.4667, band 0.0093), grading (−0.2199, band 0.0392), and containment (+0.1275, band 0.0346), and two of its three runs latch onto `+`. `anti-peak` keeps containment and contrast, but loses grading (−0.1283) and m_line (−0.0282, band 0.0144). Rule 2: the survey searches the schedule family, branch A.
+    **The anti-subspace schedule cannot.** Both flat brackets come out worse. `anti-hold` loses the group contrast (−0.4667, band 0.0093), grading (−0.2199, band 0.0392), and containment (+0.1275, band 0.0346), and two of its three runs latch onto `+`. `anti-peak` keeps containment and latches nothing, but loses grading (−0.1283, band 0.0392), m_line (−0.0282, band 0.0144), and a little contrast (−0.0174, band 0.0093). Rule 2: the survey searches the schedule family, branch A.
+
+    <!-- REVIEW: `anti-peak` was summarized as keeping contrast; its contrast delta is −0.0174 against a band of 0.0093, so the rules read it as a resolved regression, not a tie. The branch is unaffected (m_line and grading already resolve worse). Verify: the `anti-peak` column of the delta table marks the contrast row bold with ✗. -->
 
     **Half the training is enough.** `short` stays within band on every statistic (m_line +0.0014), and costs 0.0013 on the task against its own control. Rule 4: every survey trial runs 50 epochs.
 
@@ -312,11 +314,10 @@ def _(per_run: dict[str, np.ndarray], prior: dict):
             Scatter chart of grading r squared against per-line margin m_line. Five clusters of small dots, one per ex-2.1.10 condition, each with a larger ringed mark at its seed mean. The reference arm, the primary and the slot oracle cluster at the upper left, near m_line 0.4 and r squared around 0.8. The two soft-tau arms sit to the lower right, near m_line 0.49 and r squared 0.65 and 0.58: margin rises as grading falls along the tau axis.
         """,
         caption=r"""
-            **The trade the constraints must hold.** Per-run grading $r^2$ against per-run m_line for ex-2.1.10's five anchored conditions (small marks; large ring = seed mean). Softening τ (0.1 → 0.5 → 2.5, left to right) buys margin and spends grading; ranking on m_line alone would pick the right-hand end. The survey caps that walk with the grading and contrast constraints instead of a second objective.
+            **The trade the constraints must hold: margin buys smear at soft τ.** Per-run grading $r^2$ against per-run m_line for ex-2.1.10's five anchored conditions (small marks; large ring = seed mean). Softening τ (0.1 → 0.5 → 2.5, left to right) buys margin and spends grading; ranking on m_line alone would pick the right-hand end. The survey caps that walk with the grading and contrast constraints instead of a second objective.
         """,
     )
     def _plot():
-        grey = light_dark("#666", "#999")
         colors = {
             "op1-labels": light_dark("#7b3fa0", "#b98ce0"),
             "either-t100": light_dark("#1f6fb4", "#5fa8dd"),
@@ -331,7 +332,6 @@ def _(per_run: dict[str, np.ndarray], prior: dict):
         ax.set_xlabel("m_line (per run)", fontsize="x-small")
         ax.set_ylabel("grading r² (per run)", fontsize="x-small")
         ax.legend(fontsize="x-small", frameon=False, loc="lower left")
-        ax.set_title("margin buys smear at soft τ", fontsize="small", color=grey)
         return fig
 
     # Margin–containment correlation across stored operating points, on two
@@ -367,8 +367,27 @@ def _():
 
     τ only matters through the weights it produces, so we set its bounds on the weight scale: the share of the pooled pull held by the leading span position, computed from the stored alignment profiles of the primary.
 
-    The bounds [0.05, 0.30] keep that leading weight between about 0.74 and about 0.42 on the trained profile, which covers the lower part of the 0.6–0.8 target band from ex-2.1.9. Reaching 0.8 would need τ of about 0.04. The lower bound sits above that, keeping a margin over the latching regime, where τ ≲ 0.03, the leading weight is ≳ 0.82, and the profile goes one-hot per run at depth. The upper bound stops short of τ = 0.5, which the trade figure above shows is already smeared.
-    <!-- REVIEW: was "contains the 0.6-0.8 target band". The stated range of the leading weight is [0.42, 0.74], so it meets the band only over 0.6-0.74; the figure's alt text already described the two as overlapping. The exclusion of the top of the band is a margin choice rather than a consequence of the latching regime, so it is now stated as one. Verify: if the survey shows τ ≈ 0.04 stays graded, the lower bound can widen. -->
+    The bounds [0.05, 0.30] carry that leading weight from 0.78 down to 0.57 at the embedding slice, and from 0.90 to 0.67 averaged over the deeper ones. So the survey range spans the target band from ex-2.1.9 — 0.6 to 0.8 — near enough end to end at the embedding slice, which is where that band was set.
+
+    Below τ ≈ 0.05 the curve is flat: it saturates at 0.78 rather than climbing to 1, because the profile the pooling is applied to has a spread that a colder temperature runs out of room to sharpen. Nothing is given up by holding the lower bound above the latching regime. The upper bound stops short of τ = 0.5, which the trade figure above shows is already smeared.
+
+    One thing this curve cannot do is predict a run trained at a different τ. It applies a hypothetical temperature to the profile of a model trained at 0.1, so it says what the pooling would weight given that model, and the latching at τ ≲ 0.03 is ex-2.1.9's observation from runs rather than anything visible here.
+    <!-- REVIEW: this paragraph and the figure below were computed on different
+    statistics, and the figure's was not the one the 0.6-0.8 band belongs to. It
+    plotted the line-weighted mean of the per-line maximum; ex-2.1.9's band is on
+    `pi`, the label-affinity-weighted per-colour profile maxed over roles, which
+    is also what the latch veto reads. Averaging over a colour's partners before
+    taking the maximum is the whole difference, and it is worth about 0.13 at
+    τ = 0.1 (0.90 against 0.77). The figure now plots `pi`, and its reference
+    value at τ = 0.1 reproduces ex-2.1.9's published lead_emb of 0.77.
+
+    Both this round's numbers and the previous round's note were derived from the
+    wrong quantity: the paragraph said [0.74, 0.42] and that reaching 0.8 needed
+    τ ≈ 0.04, and the note narrowed the claim to "the lower part of the band" on
+    that basis. On `pi` the range is [0.78, 0.57] and 0.8 is not reachable at any
+    τ. This widens the earlier note rather than reversing it — the bounds are
+    unchanged and better placed than the note credited. Verify: the reference
+    line at τ = 0.1 in the figure below should read 0.77 at the embedding slice. -->
     """)
     return
 
@@ -378,19 +397,31 @@ def _(prior: dict, softmin_weights_np):
     _m10: dict = prior["m10"]
     _labels = [c["label"] for c in _m10["cells"] if c["condition"] == "either-t100"]
     _alpha = np.mean([prior["a10"][f"{la}/alpha_lines"] for la in _labels], axis=0)  # (L1, N, T), seed mean
-    _line_p = prior["probes"]["line_p"]
-    _line_w = _line_p / _line_p.sum()
+    _w_color = prior["probes"]["weights"]
+    _n_part = _alpha.shape[1] // len(_w_color)
     _x = 1.0 - _alpha[:, :, : ex.SPAN]
     _taus = np.geomspace(0.01, 1.0, 60)
-    _lead = np.array([np.einsum("ln,n->l", softmin_weights_np(_x, t).max(axis=-1), _line_w) for t in _taus])  # (τ, L1)
+    # ex-2.1.9's `pi`: average each colour's partner lines first, then take the
+    # leading role. Averaging before the maximum is what makes this the quantity
+    # the 0.6-0.8 band was set on, rather than the per-line maximum.
+    _lead = np.array(
+        [
+            np.einsum(
+                "lct,c->lt",
+                softmin_weights_np(_x, t).reshape(_x.shape[0], len(_w_color), _n_part, ex.SPAN).mean(axis=2),
+                _w_color,
+            ).max(axis=-1)
+            for t in _taus
+        ]
+    )  # (τ, L1)
 
     @themed(
         name="tau-range",
         alt_text="""
-            Line chart of leading softmin weight against temperature tau on a log scale from 0.01 to 1. Five curves, one per residual slice, fall from near 1 at the left to about 0.3 at the right. A shaded vertical band marks the survey range 0.05 to 0.3, and a shaded horizontal band marks the target leading-weight range 0.6 to 0.8. The two bands overlap around tau 0.05 to 0.1. A dashed vertical line marks the reference tau of 0.1.
+            Line chart of leading softmin weight against temperature tau on a log scale from 0.01 to 1. Five curves, one per residual slice, are flat at about 0.77 to 0.92 on the left, then fall away from about tau 0.07 to reach 0.3 to 0.4 at the right. A shaded vertical band marks the survey range 0.05 to 0.3, and a shaded horizontal band marks the target leading-weight range 0.6 to 0.8. The embedding-slice curve runs through the target band across most of the survey range; the deeper slices sit above it until the right-hand edge. A dashed vertical line marks the reference tau of 0.1.
         """,
         caption=r"""
-            **Where the survey's τ bounds sit on the weight scale.** The label-weighted share of softmin weight held by the leading span position, per residual slice, on the primary's seed-mean alignment profile. Vertical shading: the survey range [0.05, 0.30]; horizontal shading: ex-2.1.9's 0.6–0.8 target band; dashed line: the reference τ = 0.1.
+            **Where the survey's τ bounds sit on the weight scale.** The label-affinity-weighted share of softmin weight held by the leading span role, per residual slice, on the primary's seed-mean alignment profile — ex-2.1.9's $\pi$, which is also what the latch veto reads. The lowest curve is the embedding slice, where ex-2.1.9 set its band; it passes through τ = 0.1 at 0.77, reproducing that experiment's published value. Vertical shading: the survey range [0.05, 0.30]; horizontal shading: ex-2.1.9's 0.6–0.8 target band; dashed line: the reference τ = 0.1. The flat left-hand end is the profile's own spread, which a colder temperature runs out of room to sharpen.
         """,
     )
     def _plot():
@@ -795,7 +826,9 @@ def _():
     mo.md(r"""
     ### Is the anchor schedule needed?
 
-    No. `flat-anchor` holds λ_a at 0.1 from step 0, with no ramp, no end anneal, and no floor. It matches `ref` on every decision statistic, and no run latches. The largest excursion is grading, +0.0361 against a band of 0.0392, and it falls on the better side. Rule 1 fires: the survey runs a flat anchor weight.
+    No. `flat-anchor` holds λ_a at 0.1 from step 0, with no ramp, no end anneal, and no floor. Every decision statistic lands inside its band, and no run latches. The largest excursion is grading, +0.0361 against a band of 0.0392, and it falls on the better side, so at three seeds a side this says the schedule is not doing anything we can resolve rather than that it does nothing. Rule 1 fires: the survey runs a flat anchor weight.
+
+    <!-- REVIEW: "matches `ref` on every decision statistic" → "lands inside its band", with the resolution reading spelled out. Two of the five deltas sit at 78% and 92% of their band, so "matches" read the resolution limit as evidence of equality. Verify: the delta table prints every delta beside its band. -->
 
     We had predicted the other outcome. Ex-2.1.9 found that the pooled pull commits by epoch 8, inside the 10-epoch warmup, and the `AnchorSpec` docstring says the ramp exists so that the anchor arrives with the optimizer rather than ahead of it. Applying full weight to a still-random model looked like a way to latch a syntax role. It isn't: all six runs put 0.85–0.89 of their deep-slice weight on op1, and the flat arm reaches its margin sooner and then holds it (retention 0.9975).
 
@@ -882,7 +915,7 @@ def _():
 
     `anti-hold` holds the low ratio for all of training, which removes the early repulsion. The pull then goes where ex-2.1.8 said it would: two of three runs put more than half their deep-slice weight on `+` and trip the latch veto, and the third sits at 0.482, just under. Containment, grading, and the group contrast all come out worse, the contrast by fifty times its band.
 
-    `anti-peak` holds the high ratio instead. The early repulsion does its job: op1 keeps 0.86–0.88 of the deep-slice weight, and the contrast survives at 0.839. The cost is grading, with r² falling from 0.78 to 0.65 and m_line falling with it. Repulsion that never comes down leaves the color response less graded, which is the failure the constraints exist to catch.
+    `anti-peak` holds the high ratio instead. The early repulsion does its job: op1 keeps 0.86–0.88 of the deep-slice weight, and the contrast holds at 0.839, which is 0.0174 under `ref`: a small drop, but nearly twice the band, so it resolves. The cost is grading, with r² falling from 0.78 to 0.65 and m_line falling with it. Repulsion that never comes down leaves the color response less graded, which is the failure the constraints exist to catch.
 
     So both ends of the schedule do real work. The peak keeps the pull off the syntax roles while the model is still random, and the anneal down to the hold ratio is what leaves the response graded once it has committed. Rule 2 sends the survey to branch A, the schedule family, with the hold ratio fixed and the peak and the anneal endpoint sampled.
     """)
@@ -1046,7 +1079,10 @@ def _(ab_decision: dict):
     <tbody>{_rows}</tbody>
     </table>
 
-    That is branch {ab_decision["anti_branch"]} of the frozen plan, so the trial list is the one shown under *The survey space* above: {ex.N_TRIALS} scrambled-Sobol points at seed {ex.SOBOL_SEED}, run at one seed each, with the top {ex.N_PROMOTE} feasible trials promoted to {ex.SEEDS_PROMOTE}.
+    That is branch {ab_decision["anti_branch"]} of the frozen plan, so the trial list is the one shown under *The survey space* above: {ex.N_TRIALS} scrambled-Sobol points at seed {ex.SOBOL_SEED}, run at one seed each, with the top {ex.N_PROMOTE} feasible trials promoted to {ex.SEEDS_PROMOTE}. The sampled coordinates are unchanged by rule 4, and so is the relative dose, which is normalized at the run's own length. The centroid column of that table is in epochs at 100, so at {ab_decision["epochs"]} epochs each trial's centroid is half the value shown.
+
+    <!-- REVIEW: added the centroid note. The frozen branch A table renders `dose_centroid` at its default 100 epochs, and rule 4 adopted 50, so the column's units are not the units the survey runs in. Nothing sampled or ranked changes; the marginals should be plotted at the survey's own length. -->
+
 
     Two of the ablations paid for themselves in survey cost rather than in dimensions. `short` halves every trial, and `flat-anchor` removes four parameters that would otherwise have been carried untested.
     """)
@@ -1099,7 +1135,8 @@ def _():
 
     ### The latch veto fires on an un-anchored control
 
-    One of the three `lam0` runs puts 0.55 of its deep-slice weight on `+`, above the 0.5 threshold of the veto. The detector is reading a profile that only means something when there is a pull. With λ_a = 0, the softmin weights describe whatever alignment structure the task happens to leave behind, and there is no pull that could have latched. The veto is calibrated on the anchored runs of ex-2.1.9, and the controls were never going to be judged by it, so nothing here is affected.
+    One run in each un-anchored control trips the veto: `lam0-s2` puts 0.55 of its deep-slice weight on `+`, and `short-lam0-s0` puts 0.52 there, both above the 0.5 threshold. The detector is reading a profile that only means something when there is a pull. With λ_a = 0, the softmin weights describe whatever alignment structure the task happens to leave behind, and there is no pull that could have latched.
+    <!-- REVIEW: was "one of the three `lam0` runs". The 50-epoch control fires too (0.523), which strengthens rather than changes the reading. Verify: the per-run π table in the published metrics. --> The veto is calibrated on the anchored runs of ex-2.1.9, and the controls were never going to be judged by it, so nothing here is affected.
 
     It does bear on the survey. λ_a runs down to 0.02, a fifth of the scored rung, and a trial that weak may look like the control rather than like a pull that committed. Such a trial would be marked infeasible for a reason other than the one the veto is named for. It would fail the contrast constraint too, so the error goes in the safe direction: we would reject a trial that was never going to be proposed. We are leaving the veto frozen and reporting the λ_a of every vetoed trial, so the two readings can be told apart in the map.
     """)
