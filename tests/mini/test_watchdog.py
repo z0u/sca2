@@ -21,7 +21,7 @@ from mini.local_apparatus import LocalApparatus
 from mini.memo import MemoStore
 from mini.orchestration import tick
 from mini.progress import ProgressMessage, progress_context
-from mini.runs import RunState, progress_age, stale_progress
+from mini.runs import RunState, progress_age, stale_heartbeat, stale_progress
 from mini.store import LocalStore
 
 
@@ -200,6 +200,38 @@ def test_store_transfers_declare_a_phase_sized_from_the_payload(tmp_path: Path):
     assert declared == [("put model", 128.0), ("get model", 128.0)]
 
 
+def test_a_body_of_nothing_but_transfers_never_looks_wedged(tmp_path: Path):
+    """The ex-2.1.11 shape, end to end: `publish_ablations` downloaded 27 artifacts and uploaded one, emitting no step progress for its entire run, and was badged stale three times while healthy. Nothing here calls `emit_progress` — the transfers' own spans are the only liveness the record ever gets."""
+    store = LocalStore(tmp_path / "store")
+    payload = tmp_path / "arr"
+    payload.mkdir()
+    (payload / "a.bin").write_bytes(b"x" * (1 << 20))
+
+    started = time.time() - 700.0  # 12 minutes in, well past both thresholds
+    rec: dict[str, Any] = {
+        "state": RunState.RUNNING,
+        "env": {"host": "worker.test"},
+        "started_at": started,
+        "heartbeat_at": started,
+        "watchdog_s": 120.0,
+    }
+
+    def record(**fields: Any) -> bool:
+        rec.update(fields)
+        return True
+
+    badges: list[tuple[bool, bool]] = []
+    with progress_context("r", "j", queue=None, emission_interval=0.1, on_phase=_phase_hook(None, record)):
+        for i in range(3):
+            art = store.put(payload, name=f"arr{i}")
+            badges.append((stale_heartbeat(rec), stale_progress(rec)))  # sampled in a gap
+            store.get(art, tmp_path / f"back{i}")
+            badges.append((stale_heartbeat(rec), stale_progress(rec)))
+    badges.append((stale_heartbeat(rec), stale_progress(rec)))  # after the last span closes
+
+    assert badges == [(False, False)] * len(badges)
+
+
 def test_stale_progress_pauses_for_a_declared_blocking_phase():
     # Step frozen for 300s under a 120s watchdog reads as a wedge — unless the task
     # said it was uploading, in which case it's healthy until that budget runs out.
@@ -214,6 +246,57 @@ def test_stale_progress_pauses_for_a_declared_blocking_phase():
     assert stale_progress(rec, now=1000.0) is True
     assert stale_progress(rec | {"phase_until": 1200.0}, now=1000.0) is False
     assert stale_progress(rec | {"phase_until": 900.0}, now=1000.0) is True  # budget itself blown
+
+
+def test_stale_heartbeat_pauses_for_a_declared_blocking_phase():
+    """A task whose whole body is store transfers emits no progress at all, so its heartbeat sits at ``started_at`` while it is perfectly healthy — the shape a publish step fanning in has (ex-2.1.11: 27 downloads and one upload, badged dead three times). The declared span is what separates that from a worker that really died."""
+    # Heartbeat 700s old under the 300s threshold: dead, unless a span explains it.
+    rec = {
+        "state": RunState.RUNNING,
+        "env": {"host": "x"},
+        "started_at": 300.0,
+        "heartbeat_at": 300.0,
+        "watchdog_s": 120.0,
+    }
+    assert stale_heartbeat(rec, now=1000.0) is True
+    assert stale_heartbeat(rec | {"phase_until": 1200.0}, now=1000.0) is False
+    # The span bounds the silence rather than exempting it: past its own budget, a
+    # worker that died mid-upload is flagged again.
+    assert stale_heartbeat(rec | {"phase_until": 900.0}, now=1000.0) is True
+
+
+def test_stale_progress_counts_a_recently_closed_phase_as_movement():
+    """Between two consecutive transfers the record carries no deadline at all, and the step has not moved since ``started_at`` — so the gaps, not the spans, are where a transfer-only task gets called wedged. Crossing a boundary is the movement that says otherwise."""
+    rec = {
+        "state": RunState.RUNNING,
+        "env": {"host": "x"},
+        "started_at": 300.0,
+        "heartbeat_at": 999.0,
+        "progress_at": 700.0,
+        "watchdog_s": 120.0,
+    }
+    assert stale_progress(rec, now=1000.0) is True  # step frozen, nothing to explain it
+    assert stale_progress(rec | {"phase_at": 990.0}, now=1000.0) is False  # closed a span 10s ago
+    # It buys one threshold, exactly as a step emission would — a task that closes a
+    # span and *then* wedges is still caught.
+    assert stale_progress(rec | {"phase_at": 600.0}, now=1000.0) is True
+
+
+def test_phase_transitions_stamp_liveness_for_the_gaps_between_spans():
+    """The span itself is covered by its deadline; what the stamps buy is the moments either side of it, where a task made only of transfers holds no label and no budget."""
+    stamps: list[dict[str, Any]] = []
+
+    def record(**fields: Any) -> bool:
+        stamps.append(fields)
+        return True
+
+    phase = _phase_hook(None, record)
+    before = time.time()
+    with phase("get corpus", 120.0):
+        pass
+    entry, exit_ = stamps
+    assert (entry["phase"], exit_["phase"]) == ("get corpus", None)
+    assert all(s["heartbeat_at"] >= before and s["phase_at"] >= before for s in stamps)
 
 
 def test_nested_phases_hand_the_record_back_rather_than_clearing_it(monkeypatch: pytest.MonkeyPatch):

@@ -33,6 +33,7 @@ from mini.runs import (
     STALE_HEARTBEAT_S,
     RunState,
     data_root,
+    in_declared_phase,
     is_queued,
     progress_age,
     stale_heartbeat,
@@ -291,6 +292,11 @@ def _memo_line(rec: dict, rates: dict[str, float] | None = None) -> str:
     line = f"  {glyph} {rec.get('fn', 'task'):14} {rec['key']:26} {label:9}"
     if rec.get("total"):
         line += f"  {rec.get('step', 0)}/{rec['total']}"
+    # Name the declared span, so a frozen step reads as the work rather than as a
+    # freeze. Without it the line shows 3300/3300 and nothing else for the length of
+    # a checkpoint upload, which is the shape a wedge has too.
+    if state == RunState.RUNNING and in_declared_phase(rec) and (phase := rec.get("phase")):
+        line += f"  ⋯ {phase}"
     if (rate := rec.get("steps_per_min")) is not None and state == RunState.RUNNING:
         line += f"  ~{rate:g}/min"
     if rec.get("metrics"):
@@ -769,9 +775,12 @@ def _task_json(rec: dict) -> dict[str, Any]:
         "watchdog_grace_s",
         # The declared step-free span a task is inside, if any (mini.blocking_phase).
         # Without it a frozen step and a fresh `stale_progress: false` look like a
-        # contradiction; with it, "put model" says the pause is the work.
+        # contradiction; with it, "put model" says the pause is the work. `phase_at`
+        # carries the same explanation across the gaps *between* spans, where a task
+        # made only of transfers holds no label to show.
         "phase",
         "phase_until",
+        "phase_at",
     ):
         if (v := rec.get(f)) is not None:
             out[f] = v

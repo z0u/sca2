@@ -299,14 +299,17 @@ def _phase_hook(
         """Stamp the span with the latest deadline still open, or clear at the last exit.
 
         Phases nest — task code can wrap a ``put`` that declares one of its own — while the record holds a single label, so an inner exit has to hand the record back to its parent rather than clear it. Keyed by the deadline rather than the budget: what the badge needs is when the outstanding allowance actually runs out.
+
+        Each transition also stamps the two things that make the *gaps* between spans legible, because a task whose body is a run of consecutive transfers spends those gaps carrying no deadline at all — and a poll landing in one would otherwise badge a healthy worker. ``heartbeat_at``, since reaching this line is the worker breathing: it ran task code and wrote to the control plane. And ``phase_at``, which :func:`~mini.runs.stale_progress` reads as evidence the task moved — crossing a span boundary is not step-shaped, but it is not a wedge either.
         """
         with lock:
             spans = list(open_spans.values())
+        now = time.time()
         if spans:
             deadline, label = max(spans, key=lambda s: s[0])
-            record(phase=label, phase_until=deadline)
+            record(phase=label, phase_until=deadline, phase_at=now, heartbeat_at=now)
         else:
-            record(phase=None, phase_until=None)
+            record(phase=None, phase_until=None, phase_at=now, heartbeat_at=now)
 
     @contextmanager
     def phase(label: str, timeout_s: float) -> Iterator[None]:

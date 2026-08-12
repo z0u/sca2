@@ -197,6 +197,39 @@ def test_status_badges_stale_heartbeat(tmp_path: Path, monkeypatch, capsys):
     assert "stale" not in lines["t-queued"] and "⧖" in lines["t-queued"]
 
 
+def test_status_names_a_declared_phase_instead_of_badging_it(tmp_path: Path, monkeypatch, capsys):
+    """A task whose body is store transfers emits no progress, so its heartbeat goes quiet and its step freezes while it is healthy. The declared span suppresses both badges and gets named, so the line says what the pause is instead of leaving 3300/3300 sitting there — the shape a wedge has too."""
+    monkeypatch.chdir(tmp_path)
+    from mini.memo import MemoStore
+    from mini.runs import STALE_HEARTBEAT_S, data_root
+
+    store = MemoStore(data_root() / "phaseexp")
+    now = time.time()
+    quiet = now - STALE_HEARTBEAT_S - 60
+    common = {"state": "running", "fn": "publish", "pid": os.getpid(), "env": {"host": "worker.test"}}
+    store.records_backend.merge(
+        "t-uploading",
+        {"key": "t-uploading", "heartbeat_at": quiet, "progress_at": quiet, "step": 3300, "total": 3300}
+        | {"phase": "put model", "phase_until": now + 600, "watchdog_s": 120.0}
+        | common,
+    )
+    # Same record, but its own budget has run out: the badge comes back.
+    store.records_backend.merge(
+        "t-overrun",
+        {"key": "t-overrun", "heartbeat_at": quiet, "progress_at": quiet}
+        | {"phase": "put model", "phase_until": now - 30, "watchdog_s": 120.0}
+        | common,
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="phaseexp", app="local"))
+    out = capsys.readouterr().out
+    lines = {line.split()[2]: line for line in out.splitlines() if "t-" in line}
+    assert "⋯ put model" in lines["t-uploading"] and "⚠" not in lines["t-uploading"]
+    assert "⚠ stale — worker may be dead" in lines["t-overrun"]
+
+
 def test_status_json_is_machine_readable(tmp_path: Path, monkeypatch, capsys):
     """``status --json`` emits one stable JSON object — the agent-facing signal (#20): aggregate state, per-task state, and honest liveness hints (queued / heartbeat age / stale), instead of grepping the human lines."""
     import json
