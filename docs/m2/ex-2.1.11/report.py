@@ -77,9 +77,9 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    A survey to close out D2.1. The schedules and weights in the recipe were inherited piece by piece and never tuned together, so we ablate first — flat arms bracketing each schedule, one arm flattening both, and a half-length condition, each "no difference" dropping a dimension — then run a Sobol search over what is left (anchor weight, pooling temperature, repulsion dose).
+    A survey to close out D2.1. The schedules and weights in the recipe were inherited piece by piece and never tuned together. We ablate first by replacing schedules with constants, and dropping training epochs. Then we run a Sobol search over what is left (anchor weight, pooling temperature, repulsion dose).
 
-    The anchor schedule and half the training could go; the anti-subspace schedule could not, and a constant delivering the same total dose loses the grading the schedule protects — the shape itself is doing the work. The search maps a wide feasible plateau and proposes a stronger, softer point on its edge, for D2.2 to confirm.
+    The anchor schedule and half the epochs could go. The anti-subspace schedule could not: a constant delivering the same total dose loses grading. The search maps a wide feasible plateau and proposes a stronger, softer point on its edge.
     ///
     """)
     return
