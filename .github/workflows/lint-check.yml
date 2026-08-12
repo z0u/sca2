@@ -8,6 +8,16 @@ on:
   workflow_dispatch:
     # Allows manual triggering of the workflow from the GitHub UI
 
+# A verdict is about a commit, so a new push to a PR supersedes the run in flight — it is
+# answering a question nobody is asking any more, and these checks have no side effects to
+# leave half-done. Cancelling it is worth a few runner-minutes per round of an agent's
+# fix-push-wait loop. Keying on the PR number rather than the ref is what keeps that from
+# reaching `main`: a push gets a group of its own (its sha), so every commit there still
+# runs to a completed verdict, which is what a later bisect or red-build question reads.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   check:
     name: Run all checks

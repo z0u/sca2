@@ -235,7 +235,7 @@ def test_modal_auth_error_has_actionable_message(monkeypatch):
         del args, kwargs
         raise modal.exception.AuthError("not authenticated")
         # pyrefly: ignore [unreachable]
-        yield  # pragma: no cover  # noqa: unreachable — the yield makes this an async generator
+        yield  # pragma: no cover  — the yield is what makes this an async generator
 
     monkeypatch.setattr(app, "_amap", broken_amap)
 
@@ -296,18 +296,20 @@ def test_complex_objects_as_args(apparatus):
 
 
 def test_local_apparatus_concurrent():
-    """LocalApparatus with multiple workers runs concurrently."""
+    """LocalApparatus with multiple workers runs concurrently.
+
+    Measured as overlap rather than as elapsed wall clock. A total-time bound reads the machine as much as the pool: on a loaded shared container the same three sleeps took ~1.9s against a 0.25s bound, so the test failed on a pristine tree. Every worker is a thread here, and ``sleep`` releases the GIL, so what ``max_workers=3`` actually promises is that all three spans are open at once — which is what this asserts, at any speed.
+    """
     app = LocalApparatus("test", max_workers=3)
-    start = time.monotonic()
 
     def slow(x):
-        time.sleep(0.1)
-        return x
+        started = time.monotonic()
+        time.sleep(0.2)  # margin over thread start-up, which is microseconds even under contention
+        return x, started, time.monotonic()
 
     results = list(app.map(slow, [1, 2, 3]))
-    elapsed = time.monotonic() - start
-    assert results == [1, 2, 3]
-    assert elapsed < 0.25
+    assert [x for x, _, _ in results] == [1, 2, 3]
+    assert max(s for _, s, _ in results) < min(e for _, _, e in results)  # all three spans intersect
 
 
 def test_local_apparatus_progress_emission():
