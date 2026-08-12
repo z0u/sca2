@@ -2026,7 +2026,7 @@ def _(sv_r2_floor, sv_scored: dict[int, dict]):
     mo.md(f"""
     **The handoff.** D2.2 adopts this operating point and re-measures it at fresh seeds before quoting any number from this section. The survey values stand beside the confirmed ones there, and the gap between them is the remaining winner's-curse correction.
 
-    The statistic to watch at confirmation is grading. The proposal passes its floor by {sv_scored[0]["r2_sim"] - sv_r2_floor:.3f}, so a modest unlucky draw at fresh seeds would put it under. If that happens, the place to step back to is the plateau, where the runners-up hold more grading at nearly the same margin.
+    The statistic to watch at confirmation is grading. The proposal passes its floor by {sv_scored[0]["r2_sim"] - sv_r2_floor:.3f}, so a modest unlucky draw at fresh seeds would put it under. If that happens, the place to step back to is the plateau, where the runners-up hold more grading at nearly the same margin; the exploratory section names them.
     """)
     return
 
@@ -2036,7 +2036,7 @@ def _():
     mo.md(r"""
     ## Exploratory analyses
 
-    *Post hoc: noticed after the ablation results, not part of the frozen plan.*
+    *Post hoc: noticed after seeing results, not part of the frozen plan.*
 
     ### The latch veto fires on an un-anchored control
 
@@ -2063,6 +2063,90 @@ def _(sv_scored: dict[int, dict], sv_trials: dict[int, dict]):
     The other {len(_strong)} have healthy pulls, λ_a {sv_trials[_strong[0]]["lam"]:.2f}–{sv_trials[_strong[-1]]["lam"]:.2f}. Their π values, {min(_veto[t]["latch_pi"] for t in _strong):.2f} to {max(_veto[t]["latch_pi"] for t in _strong):.2f}, fall inside what the calibration in ex-2.1.9 measured as an empty gap, with latched runs at ≥ 0.85 and healthy runs at ≤ 0.03. Cold pooling concentrates the softmin weight, so a modest alignment with a syntax role reads as a large π there.
 
     Whether these are true latches, or the detector reading far from its calibration point, cannot be settled from this data. The error direction is safe either way, since every vetoed trial sits in the τ region whose feasible neighbors score well below the plateau. The frozen noise floors carry the same cold-regime caveat, which is one more reason for D2.2 to stay off the τ ≲ 0.1 edge unless it brings a recalibrated detector.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(sv_promoted: list[int], sv_scored: dict[int, dict]):
+    _alts = sorted((t for t in sv_promoted if sv_scored[t]["feasible"]), key=lambda t: -sv_scored[t]["m_line"])
+    _band = {s: ex.equiv_band(s, 5, 5) for s in ("m_line", "r2_sim", "contrast")}
+    _spread = {s: max(sv_scored[t][s] for t in _alts) - min(sv_scored[t][s] for t in _alts) for s in _band}
+    mo.md(f"""
+    ### Naming the step-back points
+
+    The objective cannot rank the {len(_alts)} promoted trials that are still feasible on five-seed means. Their m_line values span only {_spread["m_line"]:.3f}, or {_spread["m_line"] / _band["m_line"]:.1f} resolution bands at five seeds a side.
+
+    The same trials span {_spread["r2_sim"]:.3f} of grading ({_spread["r2_sim"] / _band["r2_sim"]:.1f} bands) and {_spread["contrast"]:.3f} of contrast ({_spread["contrast"] / _band["contrast"]:.0f} bands). So the frozen argmax ordered them by differences near its own noise floor, and the places where they differ measurably are the statistics it treats as constraints.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(
+    sv_coords,
+    sv_promoted: list[int],
+    sv_r2_floor,
+    sv_scored: dict[int, dict],
+    sv_swatch,
+    sv_trials: dict[int, dict],
+):
+    _alts = sorted((t for t in sv_promoted if sv_scored[t]["feasible"]), key=lambda t: -sv_scored[t]["m_line"])
+
+    def _pm(t: int, stat: str) -> str:
+        return f"{sv_scored[t][stat]:.3f} ± {ex.NOISE_RUN[stat] / np.sqrt(sv_scored[t]['n_seeds']):.3f}"
+
+    _rows = "".join(
+        f"<tr><td>{sv_swatch(t)} <code>t{t:02d}</code></td>"
+        + f"<td class='num'>{sv_trials[t]['lam']:.3f}</td><td class='num'>{sv_trials[t]['tau']:.3f}</td>"
+        + f"<td class='num'>{sv_coords[t]['dose']:.2f}</td>"
+        + "".join(f"<td class='num'>{_pm(t, s)}</td>" for s in ("m_line", "r2_sim", "contrast"))
+        + f"<td class='num'>{sv_scored[t]['r2_sim'] - sv_r2_floor:+.3f}</td></tr>"
+        for t in _alts
+    )
+    mo.Html(
+        figure_html(
+            f"""
+            <div class="report-table-scroll"><table class="report-table">
+            <thead><tr><th>{sv_swatch(None)} trial</th><th class="num">λ_a</th><th class="num">τ</th>
+            <th class="num">dose</th><th class="num">m_line ↑</th><th class="num">r2_sim ↑</th>
+            <th class="num">contrast ↑</th><th class="num">r² − floor</th></tr></thead>
+            <tbody>{_rows}</tbody>
+            </table></div>
+            """,
+            caption=mo.md("""
+            **The plateau's confirmed members.** The promoted trials still feasible on five-seed means, ranked as the frozen rule ranks them. Coordinates as sampled (dose relative to the reference schedule at the same length); statistics are seed means ± the frozen per-run floor over √5. The last column is each trial's margin above the grading floor the feasibility check reads. A post-hoc re-cut of numbers already published above; no new runs.
+            """).text,
+            class_="report-figure",
+        )
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(
+    ab_summary,
+    sv_promoted: list[int],
+    sv_r2_floor,
+    sv_scored: dict[int, dict],
+):
+    _alts = sorted((t for t in sv_promoted if sv_scored[t]["feasible"]), key=lambda t: -sv_scored[t]["m_line"])
+    _knee = max(_alts, key=lambda t: sv_scored[t]["r2_sim"])
+    _band = {s: ex.equiv_band(s, 5, 5) for s in ("m_line", "r2_sim", "contrast")}
+    (_twin,) = [t for t in _alts[1:] if sv_scored[0]["m_line"] - sv_scored[t]["m_line"] < _band["m_line"]]
+
+    def _sig(t: int) -> float:
+        return (sv_scored[t]["r2_sim"] - sv_r2_floor) / ex.NOISE_RUN["r2_sim"]
+
+    mo.md(f"""
+    Two step-back points stand out:
+
+    - `t{_twin:02d}` sits within one band of `t00` on m_line and on grading, so the search cannot tell the two apart on either. It holds {sv_scored[_twin]["contrast"] - sv_scored[0]["contrast"]:.2f} more contrast ({(sv_scored[_twin]["contrast"] - sv_scored[0]["contrast"]) / _band["contrast"]:.0f} bands), and its grading margin is {_sig(_twin):.1f} per-run σ, against {_sig(0):.1f} for `t00`.
+    - `t{_knee:02d}` is the knee. Giving up {sv_scored[0]["m_line"] - sv_scored[_knee]["m_line"]:.3f} of m_line ({(sv_scored[0]["m_line"] - sv_scored[_knee]["m_line"]) / _band["m_line"]:.1f} bands) brings grading back to the level of the reference recipe: {sv_scored[_knee]["r2_sim"]:.3f} against {ab_summary["ref"]["r2_sim"]:.3f} for `ref`, a floor margin of {_sig(_knee):.1f} σ. It also holds {sv_scored[_knee]["contrast"] - sv_scored[0]["contrast"]:.2f} more contrast than `t00`.
+
+    The margin matters because two of the six promoted trials crossed the task gate on their five-seed means. A grading pass of {_sig(0):.1f} σ per run faces the same draw again at the fresh seeds in D2.2.
+
+    None of this reopens the frozen rule, and `t00` stands as the proposal from the survey. The recommendation goes instead to the preregistration for D2.2, which is not yet frozen: adopt `t00`, `t{_knee:02d}`, and `t{_twin:02d}` as candidate points, re-measure all three at fresh seeds, and freeze there a selection rule that weighs grading and contrast alongside the margin.
     """)
     return
 
