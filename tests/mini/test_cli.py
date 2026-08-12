@@ -856,6 +856,61 @@ def test_a_long_sequence_is_elided_with_its_count():
     assert _abbreviated([]) == "[]"
 
 
+def test_a_long_numeric_sequence_summarizes_rather_than_showing_a_head():
+    """Three floats out of hundreds say nothing about a metric trace — not where it ended, not whether it spiked. The summary answers both in about the same width."""
+    from mini.__main__ import _abbreviated
+
+    assert _abbreviated({"val_loss": [5.0, 9.0, *(4.0 for _ in range(8))]}) == (
+        "{'val_loss': [10 floats: 5 → 4, max 9, mean 4.6, std 1.58]}"  # 4 is the last, so only the spike is named
+    )
+    # Integral sequences keep integral bounds; only the mean and spread go fractional.
+    assert _abbreviated([*range(19), -1]) == "[20 ints: 0 → -1, max 18, mean 8.5, std 5.92]"
+
+
+def test_a_summary_names_an_extreme_only_where_it_is_an_interior_one():
+    """A metric trace usually runs one way, which puts its extremes on the ends, where they already print. Naming them there would be the largest repetition in the line."""
+    from mini.__main__ import _abbreviated
+
+    descending = [float(10 - i) for i in range(10)]
+    assert _abbreviated(descending) == "[10 floats: 10 → 1, mean 5.5, std 3.03]"
+    assert _abbreviated([*descending, 20.0]) == "[11 floats: 10 → 20, min 1, mean 6.82, std 5.23]"
+
+
+def test_a_sequence_short_enough_to_print_in_full_is_never_rounded():
+    """The summary is the one rounded thing in this view, so the length floor confines it to sequences already losing most of themselves to the elision."""
+    from mini.__main__ import _STATS_MIN, _abbreviated
+
+    exact = [1 / 3] * _STATS_MIN
+    assert _abbreviated(exact) == f"[{1 / 3!r}, {1 / 3!r}, {1 / 3!r}, … +{_STATS_MIN - 3}]"
+    assert "floats:" in _abbreviated([*exact, 1 / 3])  # one past the floor, and it summarizes
+
+
+def test_a_summary_counts_non_finite_values_and_leaves_them_out_of_the_stats():
+    """A nan mid-curve is the thing you most want a results dump to tell you about, and it would take min/max/mean/std with it if it reached them."""
+    from mini.__main__ import _abbreviated
+
+    assert _abbreviated([1.0, float("nan"), *(3.0 for _ in range(8))]) == (
+        "[10 floats: 1 → 3, 1 non-finite, mean 2.78, std 0.667]"
+    )
+    assert _abbreviated([float("nan")] * 10) == "[10 floats: nan → nan, 10 non-finite]"
+
+
+def test_a_sequence_only_summarizes_when_the_summary_would_mean_something():
+    """Flags are ints to Python but don't read as numbers; a mixed sequence has no stats; a set has no first or last to name."""
+    from mini.__main__ import _abbreviated
+
+    assert _abbreviated([True, False] * 5) == "[True, False, True, … +7]"
+    assert _abbreviated([1, 2, 3, "four", *range(5, 11)]) == "[1, 2, 3, … +7]"
+    assert _abbreviated(set(range(20))) == "{0, 1, 2, … +17}"
+
+
+def test_a_number_that_resists_arithmetic_costs_the_summary_not_the_verb():
+    """`math.isfinite` raises on an int too large to be a float, and the whole summary is a nicety — so it steps aside for the head view rather than taking `results` down with it."""
+    from mini.__main__ import _abbreviated
+
+    assert _abbreviated([10**400] * 10).endswith("… +7]")  # the head view, not an OverflowError
+
+
 def test_scalars_and_keys_survive_verbatim():
     """What a reader takes from the abbreviated view has to be what the result says, so only lengths are lost: no rounding, no reformatting, and every key kept."""
     from mini.__main__ import _abbreviated
@@ -946,9 +1001,9 @@ def test_results_elides_by_default_and_full_restores_the_repr(tmp_path: Path, mo
 
     cmd_results(argparse.Namespace(name="res", key=None, app="local", full=False))
     brief = capsys.readouterr().out
-    assert "'label': 'cell-1'" in brief and "… +497]" in brief
+    assert "'label': 'cell-1'" in brief and "500 floats: 0 → 49.9" in brief
     assert len(brief) < 200
 
     cmd_results(argparse.Namespace(name="res", key=None, app="local", full=True))
     full = capsys.readouterr().out
-    assert "… +497]" not in full and len(full) > 3000
+    assert "500 floats" not in full and len(full) > 3000
