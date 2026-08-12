@@ -84,6 +84,28 @@ def test_anchor_schedule_ramps_holds_and_anneals_to_a_floor():
     assert star(90) < spec(90)
 
 
+def test_schedule_shapes_flatten_or_straighten_the_same_keyframes():
+    # Spelled out rather than unpacked from a shared dict: `AnchorSpec` mixes int
+    # and float fields, and a `**dict` of keyframes widens to `int | float`.
+    flat = AnchorSpec(peak=0.1, warmup_epochs=10, anneal_start=90, anneal_end=100, floor=0.1, shape="flat")
+    linear = AnchorSpec(peak=0.1, warmup_epochs=10, anneal_start=90, anneal_end=100, floor=0.1, shape="linear")
+
+    # Flat discards every keyframe: full weight from step 0, no anneal at the end.
+    np.testing.assert_allclose(flat(np.array([0.0, 5.0, 50.0, 100.0])), 0.1, rtol=0, atol=1e-12)
+    # Linear keeps them and moves between them in a straight line.
+    np.testing.assert_allclose(linear(5), 0.05, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(linear(50), 0.1, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(linear(100), 0.01, rtol=1e-12, atol=0)
+
+    anti = dict(lam=0.1, peak_ratio=2.5, hold_ratio=0.3, anneal_end=90)
+    shared = dict(anchor_anneal_start=90, anchor_anneal_end=100, floor=0.1)
+    flat_anti = AntiSpec(shape="flat", **anti, **shared)
+    linear_anti = AntiSpec(shape="linear", **anti, **shared)
+    # Flat holds the ratio to the anchor peak and skips the anchor's end anneal.
+    np.testing.assert_allclose(flat_anti(np.array([0.0, 45.0, 100.0])), 0.03, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(linear_anti(45), 0.1 * 1.4, rtol=1e-12, atol=0)  # halfway from 2.5 to 0.3
+
+
 def test_mask_covers_the_prompt_of_labeled_lines_only(corpus):
     # Label every line whose first operand is COLORS[0], and no other.
     label_p = np.zeros(64)

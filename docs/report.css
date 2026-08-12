@@ -50,15 +50,47 @@ figure.report-figure > figcaption {
  * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See sca.data.colors.swatch. */
 .sw {
   display: inline-block;
-  width: 0.8em;
-  height: 0.8em;
+  width: round(0.8em, 1px);
+  height: round(0.8em, 1px);
   border-radius: 2px;
+  margin-inline: 0.5ch;
   border: 1px solid #8886;
   background: var(--sw);
 }
 .sw-ghost {
   --sw: transparent;
   border-color: transparent;
+}
+/* Variants that let a swatch stand for a mark in a figure: a round dot, and an open
+ * (unfilled) one, matching the filled/open scatter marks the reports draw. */
+.sw-dot {
+  border-radius: 50%;
+  width: round(0.6em, 1px);
+  height: round(0.6em, 1px);
+}
+.sw-open {
+  background: none;
+  border-color: var(--sw);
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.nb: an explicit theme on <body> wins, and the OS preference applies only
+ * where <body> states none. */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
 }
 
 /* Authored report tables. Headings left-align with their columns by default; annotate
@@ -87,10 +119,12 @@ figure.report-figure > figcaption {
 
 /* Wide tables (e.g. the per-seed completions grid) scroll horizontally inside their own
  * box rather than wrapping cell contents — which detaches a swatch from its word — or
- * forcing the whole page to scroll sideways. */
+ * forcing the whole page to scroll sideways. .report-table-scroll is not needed for
+ * tables in Markdown. */
 .report-table-scroll {
   overflow-x: auto;
 }
+.markdown table.report-table,
 .report-table-scroll .report-table {
   white-space: nowrap;
 }
@@ -104,7 +138,7 @@ figure.report-figure > figcaption {
   box-shadow: 4px 0px 0px 0px color-mix(in srgb, var(--border), transparent 0%) inset;
   transition: 0.3s;
 
-  summary {
+  > summary {
     transition: 0.3s;
     &:before {
       border-color: currentColor;
@@ -114,12 +148,15 @@ figure.report-figure > figcaption {
       visibility: hidden;
     }
   }
+  > summary + * {
+    margin-top: 0px;
+  }
 }
 .markdown details:not(:open) {
   background: transparent;
   box-shadow: 4px 0px 0px 0px transparent inset;
 
-  summary {
+  > summary {
     padding: 0;
     opacity: 0.7;
     &:after {

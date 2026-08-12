@@ -51,6 +51,25 @@ def smoothstep(tau) -> np.ndarray:
     return t**3 * (10.0 - 15.0 * t + 6.0 * t**2)
 
 
+Shape = Literal["min-jerk", "linear", "flat"]
+"""How a weight schedule moves between its keyframes.
+
+`min-jerk` is `smoothstep`, what M1's dopesheets used and what every experiment
+before ex-2.1.11 inherited. `linear` runs a straight line through the same
+keyframes, so the weight is continuous but its derivative jumps at each one.
+`flat` is not an interpolation at all: it discards the keyframes and holds one
+constant weight for the whole of training — the ablation arm that asks whether
+the schedule earns its place.
+"""
+
+
+def _interp(t, shape: Shape) -> np.ndarray:
+    """Interpolate 0 → 1 over the unit interval, clamped outside it."""
+    if shape == "linear":
+        return np.clip(np.asarray(t, dtype=float), 0.0, 1.0)
+    return smoothstep(t)
+
+
 @dataclass(frozen=True)
 class AnchorSpec:
     """Everything about the pull except which lines it applies to.
@@ -69,6 +88,9 @@ class AnchorSpec:
     flat mean over pulled positions (the ex-2.1.6..8 term). τ = ∞ is the pooled
     code path at the span mean: a per-line mean of means, which differs from the
     flat mean only on lines a crop truncates."""
+    shape: Shape = "min-jerk"
+    """Under `flat` the weight sits at `peak` throughout and the other keyframes
+    are unused, so one field ablates the ramp, the anneal and the floor together."""
 
     def __call__(self, epoch) -> np.ndarray:
         return anchor_weight(
@@ -78,6 +100,7 @@ class AnchorSpec:
             anneal_start=self.anneal_start,
             anneal_end=self.anneal_end,
             floor=self.floor,
+            shape=self.shape,
         )
 
 
@@ -89,11 +112,18 @@ def anchor_weight(
     anneal_start: float,
     anneal_end: float,
     floor: float,
+    shape: Shape = "min-jerk",
 ) -> np.ndarray:
-    """The anchor weight at (fractional) *epoch*: ramp, hold, anneal to a floor."""
+    """The anchor weight at (fractional) *epoch*: ramp, hold, anneal to a floor.
+
+    Under `shape="flat"` there is nothing to interpolate: the weight is `peak`
+    from step 0 to the end of training.
+    """
     e = np.asarray(epoch, dtype=float)
-    ramp = smoothstep(e / warmup_epochs)
-    anneal = smoothstep((e - anneal_start) / (anneal_end - anneal_start))
+    if shape == "flat":
+        return peak * np.ones_like(e)
+    ramp = _interp(e / warmup_epochs, shape)
+    anneal = _interp((e - anneal_start) / (anneal_end - anneal_start), shape)
     return peak * ramp * (1.0 - (1.0 - floor) * anneal)
 
 
@@ -111,6 +141,9 @@ class AntiSpec:
     anchor_anneal_start: float
     anchor_anneal_end: float
     floor: float = 0.1
+    shape: Shape = "min-jerk"
+    """Under `flat` the ratio sits at `hold_ratio` throughout and the term skips
+    the anchor's end anneal, so `peak_ratio` and `anneal_end` are unused."""
 
     def __call__(self, epoch) -> np.ndarray:
         return anti_subspace_weight(
@@ -122,6 +155,7 @@ class AntiSpec:
             anchor_anneal_start=self.anchor_anneal_start,
             anchor_anneal_end=self.anchor_anneal_end,
             floor=self.floor,
+            shape=self.shape,
         )
 
 
@@ -135,11 +169,18 @@ def anti_subspace_weight(
     anchor_anneal_start: float,
     anchor_anneal_end: float,
     floor: float,
+    shape: Shape = "min-jerk",
 ) -> np.ndarray:
-    """The anti-subspace weight at (fractional) *epoch*: see `AntiSpec`."""
+    """The anti-subspace weight at (fractional) *epoch*: see `AntiSpec`.
+
+    Under `shape="flat"` the weight is `lam × hold_ratio` for the whole of
+    training: a constant ratio to the anchor peak, which is the bracket arm.
+    """
     e = np.asarray(epoch, dtype=float)
-    ratio = peak_ratio + (hold_ratio - peak_ratio) * smoothstep(e / anneal_end)
-    end = 1.0 - (1.0 - floor) * smoothstep((e - anchor_anneal_start) / (anchor_anneal_end - anchor_anneal_start))
+    if shape == "flat":
+        return lam * hold_ratio * np.ones_like(e)
+    ratio = peak_ratio + (hold_ratio - peak_ratio) * _interp(e / anneal_end, shape)
+    end = 1.0 - (1.0 - floor) * _interp((e - anchor_anneal_start) / (anchor_anneal_end - anchor_anneal_start), shape)
     return lam * ratio * end
 
 
