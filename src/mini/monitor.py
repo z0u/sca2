@@ -26,7 +26,7 @@ from mini.apparatus import Apparatus
 from mini.experiment import Experiment
 from mini.memo import PollCache
 from mini.orchestration import BudgetExpired, tick
-from mini.runs import SETTLED, RunState, is_queued, progress_age, stale_heartbeat, stale_progress
+from mini.runs import SETTLED, RunState, in_declared_phase, is_queued, progress_age, stale_heartbeat, stale_progress
 
 __all__ = ["drive_and_watch", "watch"]
 
@@ -52,6 +52,8 @@ def _bar_desc(rec: dict[str, Any], queued: bool) -> str:
         desc += " — ♥ stale, worker may be dead"
     elif stale_progress(rec):  # heartbeat fresh but step frozen: the wedge signature
         desc += " — ⚠ no step progress, worker may be wedged"
+    elif in_declared_phase(rec) and (phase := rec.get("phase")):
+        desc += f" — ⋯ {phase}"  # the step is frozen because this span has no steps to report
     if rec.get("message"):
         desc += f" — {rec['message']}"
     if rec.get("metrics"):

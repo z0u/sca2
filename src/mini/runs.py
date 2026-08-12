@@ -22,6 +22,7 @@ __all__ = [
     "STALE_HEARTBEAT_S",
     "compute_env",
     "data_root",
+    "in_declared_phase",
     "is_queued",
     "progress_age",
     "spawn_taskworker",
@@ -148,15 +149,29 @@ any healthy emission gap we've seen while still catching zombies early.
 """
 
 
+def in_declared_phase(rec: dict, now: float | None = None) -> bool:
+    """Is this record inside a step-free span the task declared and still has budget for?
+
+    The record side of :func:`~mini.progress.blocking_phase`: the worker stamps ``phase`` (a label) and ``phase_until`` (the deadline of the widest span still open) on entry, and clears them at the last exit. Both liveness badges consult this, because a declared span is the one case where the quiet is the work. It reads the *deadline* rather than the label, so the span bounds the silence instead of exempting it — once a budget lapses, the badges resume, and a worker that died mid-upload is flagged as soon as its own allowance runs out.
+    """
+    until = rec.get("phase_until")
+    return bool(until) and (now if now is not None else time.time()) < until
+
+
 def stale_heartbeat(rec: dict, now: float | None = None) -> bool:
     """Is this RUNNING task's heartbeat suspiciously old — worker possibly dead?
 
     Backend-agnostic and *display-only*: badges in ``status``/``watch`` use it to keep the human/agent-visible signal honest even where a backend liveness probe has a blind spot (#20). Settling stays with ``reap_dead``/ ``enforce_budget``; a queued record's heartbeat is just its launch stamp, so queued tasks are never stale (they get the ``⧖`` treatment instead).
+
+    A task inside a declared blocking phase (:func:`in_declared_phase`) is never stale. Heartbeats ride on progress emissions, so a task whose whole body is store transfers — a publish step downloading its inputs and uploading one result — emits nothing for its entire run, and its heartbeat sits at ``started_at`` while everything is healthy. The span is what tells the two apart.
     """
     if rec.get("state") != RunState.RUNNING or is_queued(rec):
         return False
+    now = now if now is not None else time.time()
+    if in_declared_phase(rec, now):
+        return False
     hb = rec.get("heartbeat_at")
-    return bool(hb) and ((now if now is not None else time.time()) - hb) > STALE_HEARTBEAT_S
+    return bool(hb) and (now - hb) > STALE_HEARTBEAT_S
 
 
 def progress_age(rec: dict, now: float | None = None) -> float | None:
@@ -175,18 +190,22 @@ def stale_progress(rec: dict, now: float | None = None) -> bool:
 
     The companion to :func:`stale_heartbeat` for the wedge failure mode: a hung device call or deadlocked thread can leave emissions (heartbeats) flowing while ``step`` never advances, so heartbeat staleness never trips. Display-only, like the heartbeat badge. The threshold is the worker's own watchdog threshold when it stamped one (past it, the watchdog itself has evidently failed to fire — worth flagging loudly), else the generic ``STALE_HEARTBEAT_S``. Before the first emission the watchdog applies its startup grace instead of the tight timeout, so the badge matches: a worker legitimately tokenizing for ten minutes is not "possibly wedged" yet.
 
-    A task inside a declared blocking phase (:func:`~mini.progress.blocking_phase` — a checkpoint upload, a large pull) stamps ``phase_until``, and is not stale until that budget runs out. Same reasoning as the grace: the span has no steps to report and is healthy anyway.
+    A task inside a declared blocking phase (:func:`in_declared_phase` — a checkpoint upload, a large pull) is not stale until that budget runs out. Same reasoning as the grace: the span has no steps to report and is healthy anyway.
+
+    A *recently closed* span counts too, via ``phase_at``. A task whose body is a run of consecutive transfers holds no deadline in the moments between them, so without this a poll landing in a gap sees a step frozen since ``started_at`` and calls a healthy worker wedged. Crossing a span boundary is evidence the task moved — not step-shaped, but movement — so it is measured against the same threshold as a step. It buys no more blindness than a step emission would: a task that closes a span and *then* wedges still trips once the threshold passes.
     """
     age = progress_age(rec, now)
     if age is None:
         return False
     now = now if now is not None else time.time()
-    if (until := rec.get("phase_until")) and now < until:
+    if in_declared_phase(rec, now):
         return False
     if rec.get("progress_at"):
         threshold = rec.get("watchdog_s") or STALE_HEARTBEAT_S
     else:  # still in setup: no emission yet, so the (looser) grace governs
         threshold = rec.get("watchdog_grace_s") or rec.get("watchdog_s") or STALE_HEARTBEAT_S
+    if (at := rec.get("phase_at")) and (now - at) <= threshold:
+        return False
     return age > threshold
 
 
