@@ -1,13 +1,13 @@
 ---
 name: style-py
-description: Python style and typing conventions for this repo — method chaining, modern syntax, type hints that survive Marimo's bare cell signatures, and the literate programming standard for notebooks. Use when writing or reviewing any Python.
+description: Python style and typing conventions for this repo — method chaining, modern syntax, where to put type hints given that Marimo generates cell signatures, and the literate programming standard for notebooks. Use when writing or reviewing any Python.
 ---
 
 House style, in three lines: chain your calls, use the newest syntax the toolchain accepts, and keep it short.
 
 ## Shape of the code
 
-Prefer JavaScript-style method chaining, even in Python. Put the newline *before* the dot, and wrap the whole expression in parentheses when you need to:
+Prefer JavaScript-style method chaining, even in Python. Put the newline _before_ the dot, and wrap the whole expression in parentheses when you need to:
 
 ```python
 result = (
@@ -48,7 +48,7 @@ You don't need annotations everywhere. Put one wherever inference would otherwis
 
 ### Marimo cells
 
-Marimo generates each cell's signature and leaves the parameters bare, so every value arriving from another cell starts out as `Unknown`. Inference has nothing to work from at the top of the cell. Annotate the first local binding and the rest of the cell follows:
+Marimo generates cell function signatures, so a parameter is bare unless the cell that _defines_ that value annotated it. Where the parameter is bare, inference has nothing to work from at the top of the cell. Annotate the first local binding and the rest of the cell follows:
 
 ```python
 @app.cell()
@@ -56,6 +56,24 @@ def _(RUNGS, grading):
     _rungs: list[str] = [c for c in RUNGS if c != "lam0"]
     _resp: dict[str, tuple[np.ndarray, float, float]] = {c: grading(c) for c in _rungs}
 ```
+
+Annotate a _public_ name and Marimo copies that annotation onto the parameter list of every cell downstream, the next time it saves the file:
+
+```python
+@app.cell()
+def _(_sv):
+    sv_trials: dict[int, dict] = {t["trial"]: t for t in _sv["trials"]}
+    return (sv_trials,)
+
+
+@app.cell()
+def _(sv_trials: dict[int, dict]):  # Marimo propagated this annotation
+    ...
+```
+
+Leave them alone: if you add or change them, Marimo will regenerate them and cause churn in Git. Annotate the definition instead.
+
+`marimo check --fix <file>` applies the rewrite from the CLI, and is authoritative over signatures: it fills in missing annotations, corrects wrong ones, and removes any with no annotated definition behind them. It runs automatically on edit (a `PostToolUse` hook) and on commit (via lint-staged), so this mostly self-corrects.
 
 Naming:
 
