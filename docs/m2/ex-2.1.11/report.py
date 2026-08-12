@@ -2,7 +2,6 @@ import marimo
 
 __generated_with = "0.23.16"
 app = marimo.App(
-    width="medium",
     app_title="Ex 2.1.11: Ablations and a survey for the D2.1 operating point",
     css_file="../../report.css",
     auto_download=["html"],
@@ -11,6 +10,7 @@ app = marimo.App(
 with app.setup(hide_code=True):
     import json
     import tempfile
+    import zlib
     from pathlib import Path
     from typing import cast
 
@@ -229,7 +229,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(group_weights, prior):
+def _(group_weights, prior: dict):
     # Per-run statistics of the nine-seed primary, re-derived from the arrays.
     _m10: dict = prior["m10"]
     _primary = [c for c in _m10["cells"] if c["condition"] == "either-t100"]
@@ -260,7 +260,7 @@ def _(group_weights, prior):
 
 
 @app.cell(hide_code=True)
-def _(per_run):
+def _(per_run: dict[str, np.ndarray]):
     _rows = "".join(
         f"<tr><td><code>{k}</code></td>"
         f"<td class='num'>{v.mean():+.4f}</td>"
@@ -307,7 +307,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(per_run, prior):
+def _(per_run: dict[str, np.ndarray], prior: dict):
     _m10: dict = prior["m10"]
     _conds = ["op1-labels", "either-t100", "either-t500", "either-t2500", "slot-oracle"]
     _pts: dict[str, tuple[np.ndarray, np.ndarray]] = {}
@@ -328,7 +328,7 @@ def _(per_run, prior):
             Scatter chart of grading r squared against per-line margin m_line. Five clusters of small dots, one per ex-2.1.10 condition, each with a larger ringed mark at its seed mean. The reference arm, the primary and the slot oracle cluster at the upper left, near m_line 0.4 and r squared around 0.8. The two soft-tau arms sit to the lower right, near m_line 0.49 and r squared 0.65 and 0.58: margin rises as grading falls along the tau axis.
         """,
         caption=r"""
-            **The trade the constraints must hold: margin buys smear at soft τ.** Per-run grading $r^2$ against per-run m_line for ex-2.1.10's five anchored conditions (small marks; large ring = seed mean). Softening τ (0.1 → 0.5 → 2.5, left to right) buys margin and spends grading; ranking on m_line alone would pick the right-hand end. The survey caps that walk with the grading and contrast constraints instead of a second objective.
+            **The trade the constraints must hold: margin buys smear at soft τ.** Per-run grading $r^2$ against per-run m_line for ex-2.1.10's five anchored conditions ($●$ = one run, $○$ = the condition's seed mean). Softening τ (0.1 → 0.5 → 2.5, left to right) buys margin and spends grading; ranking on m_line alone would pick the right-hand end. The survey caps that walk with the grading and contrast constraints instead of a second objective.
         """,
     )
     def _plot():
@@ -407,7 +407,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(prior, softmin_weights_np):
+def _(prior: dict, softmin_weights_np):
     _m10: dict = prior["m10"]
     _labels = [c["label"] for c in _m10["cells"] if c["condition"] == "either-t100"]
     _alpha = np.mean([prior["a10"][f"{la}/alpha_lines"] for la in _labels], axis=0)  # (L1, N, T), seed mean
@@ -530,7 +530,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(prior):
+def _(prior: dict):
     _m9: dict = prior["m9"]
     _rows = []
     for _c in _m9["cells"]:
@@ -874,7 +874,7 @@ def _(ab_summary, delta_table):
 
 
 @app.cell(hide_code=True)
-def _(ab_cells, traj_of):
+def _(ab_cells: list[dict], traj_of):
     _pi = {
         c["condition"]: [
             np.asarray(r["pi"], dtype=float)[1:].mean(axis=0) for r in ab_cells if r["condition"] == c["condition"]
@@ -889,7 +889,7 @@ def _(ab_cells, traj_of):
             Two panels. Left: per-line margin m_line against epoch for three reference runs, three flat-anchor runs and three un-anchored controls; the anchored curves rise over the first twenty epochs and then hold, while the controls stay near zero. Right: the deep-slice softmin weight each run puts on the four span roles, one dot per run, with a dashed line at the latch threshold of 0.5.
         """,
         caption=r"""
-            **What the ramp buys.** **Left:** the m_line trajectory of every run, each on its own epoch axis. It sits above the endpoint value in the tables: the trajectory measures one fixed partner line per color, where the endpoint eval averages all 27. That makes it a cheaper instrument, but a consistent one within a run, which is what retention compares. **Right:** the post-attention mean softmin weight on each span role, one mark per run. The dashed line is the latch veto at $\pi = 0.5$; a run above it on `+` or `=` has committed to a syntax role. The reference and flat arms differ only over the warmup window, so a difference here says when the pull arrives rather than how much of it arrives.
+            **What the ramp buys.** **Left:** the m_line trajectory of every run, each on its own epoch axis. It sits above the endpoint value in the tables: the trajectory measures one fixed partner line per color, where the endpoint eval averages all 27. That makes it a cheaper instrument, but a consistent one within a run, which is what retention compares. **Right:** the post-attention mean softmin weight on each span role, one $●$ per run. The dashed line is the latch veto at $\pi = 0.5$; a run above it on `+` or `=` has committed to a syntax role. The reference and flat arms differ only over the warmup window, so a difference here says when the pull arrives rather than how much of it arrives.
         """,
     )
     def _plot():
@@ -1059,7 +1059,7 @@ def _(ab_summary, delta_table):
 
 
 @app.cell(hide_code=True)
-def _(ab_cells, traj_of):
+def _(ab_cells: list[dict], traj_of):
     _keys = ("m_line", "val_loss")
     _traj = {k: {c: traj_of(ab_cells, c, k) for c in ("ref", "short")} for k in _keys}
 
@@ -1352,7 +1352,7 @@ def _(ab_summary, delta_table):
 
 
 @app.cell(hide_code=True)
-def _(ab_cells):
+def _(ab_cells: list[dict]):
     _corner = {
         ("min-jerk", "schedule"): "ref",
         ("flat", "schedule"): "flat-anchor",
@@ -1370,7 +1370,7 @@ def _(ab_cells):
             Two panels, each a two-by-two interaction chart. Horizontal axis: the anti-subspace term, schedule or constant at 1.77. Two lines per panel, one per anchor shape, min-jerk and flat, with per-run dots around each seed mean. Left panel, m_line: both lines drop by about 0.02 from schedule to constant, staying nearly parallel. Right panel, grading r squared: both lines drop by about 0.10 to 0.13, again nearly parallel, with the flat-anchor line starting higher.
         """,
         caption=r"""
-            **The 2 × 2 of (anchor shape) × (anti term).** Seed means (large marks, joined) and per-run values (small dots) for m_line and grading $r^2$ at the four corners. An interaction would show as the two lines diverging; instead they move nearly in parallel on both panels, so the cost of flattening the anti term does not depend on the anchor's shape.
+            **The 2 × 2 of (anchor shape) × (anti term).** Seed means ($●$, joined) and per-run values (the smaller dots of the same color) for m_line and grading $r^2$ at the four corners. An interaction would show as the two lines diverging; instead they move nearly in parallel on both panels, so the cost of flattening the anti term does not depend on the anchor's shape.
         """,
     )
     def _plot():
@@ -1407,11 +1407,11 @@ def _():
     mo.md(r"""
     #### Can we halve the budget again? (rule 8)
 
-    No, and not for the predicted reason. The prediction named the task gate as the binding constraint, on the grounds that at 25 epochs the un-anchored control might stop saturating holdout EM. The control is fine: `short25-lam0` holds 0.9961, and the task cost of `short25` is 0.0026 against a gate of 0.02.
+    No, but not for the predicted reason. The prediction named the task gate as the binding constraint, on the grounds that at 25 epochs the un-anchored control might stop saturating holdout EM. The control is fine: `short25-lam0` holds 0.9961, and the task cost of `short25` is 0.0026 against a gate of 0.02.
 
     What fails is the anchored recipe itself: m_line drops 0.0268 against a band of 0.0144, containment worsens by 0.0410 against 0.0346, and the contrast drops 0.0222 against 0.0093, with grading within band. The trap the rule named, where a shorter run scores *better* on m_line while being the less converged model, did not appear either; the shorter run scores worse outright.
 
-    The trajectories below say why the halving stopped working. On the shared fraction-of-training clock, `ref` and `short` trace the same curves. But `short25` starts far behind, and spends the rest of the run catching up: at a fifth of training its margin probe reads half of what `ref` reads at the same point, and its validation loss is a full nat higher.
+    The trajectories below show how the halving stopped working. On the shared fraction-of-training clock, `ref` and `short` trace the same curves. But `short25` starts far behind, and spends the rest of the run catching up: at a fifth of training its margin probe reads half of what `ref` reads at the same point, and its validation loss is a full nat higher. Perhaps the shorter schedule would work with higher term weights, but that's outside the scope of this survey.
 
     Fifty epochs leaves slack after convergence, and twenty-five leaves none. Rule 8: the survey runs at the 50 epochs set by rule 4.
     """)
@@ -1433,7 +1433,7 @@ def _(ab_summary, delta_table):
 
 
 @app.cell(hide_code=True)
-def _(ab_cells, traj_of):
+def _(ab_cells: list[dict], traj_of):
     _keys = ("m_line", "val_loss")
     _traj = {k: {c: traj_of(ab_cells, c, k) for c in ("ref", "short", "short25")} for k in _keys}
 
@@ -1495,7 +1495,6 @@ def _(ab_decision):
 
     <!-- REVIEW: added the centroid note. The frozen branch A table renders `dose_centroid` at its default 100 epochs, and rule 4 adopted 50, so the column's units are not the units the survey runs in. Nothing sampled or ranked changes; the marginals should be plotted at the survey's own length. -->
 
-
     Two of the ablations paid for themselves in survey cost rather than in dimensions. `short` halves every trial, and `flat-anchor` removes four parameters that would otherwise have been carried untested.
     """)
     return
@@ -1534,7 +1533,39 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(ab_decision, ab_summary, sv_trials):
+def _(sv_scored: dict[int, dict]):
+    # Trial identity, shared by every survey figure and table below. Eight hues as light/dark
+    # pairs, assigned by a hash of the trial id so the color carries no order, and repeating
+    # past eight — a mark is identified by its color together with its position, not by color
+    # alone. Everything reads this dict, so a trial keeps one color across the whole section.
+    _HUES = [
+        ("#2a78d6", "#3987e5"),
+        ("#eb6834", "#d95926"),
+        ("#1baf7a", "#199e70"),
+        ("#eda100", "#c98500"),
+        ("#e87ba4", "#d55181"),
+        ("#008300", "#008300"),
+        ("#4a3aa7", "#9085e9"),
+        ("#e34948", "#e66767"),
+    ]
+    sv_hue = {t: _HUES[zlib.crc32(str(t).encode()) % len(_HUES)] for t in sv_scored}
+
+    def sv_swatch(t: int | None) -> str:
+        """A trial's mark as inline HTML: filled if feasible, open if not, as in the figures.
+
+        Both hexes ride along so the square tracks the figures' light/dark pair (see ``.sw-themed`` in ``docs/report.css``). Pass ``None`` for the transparent placeholder that indents a column header over its swatches.
+        """
+        if t is None:
+            return '<span class="sw sw-ghost" aria-hidden="true"></span>'
+        _light, _dark = sv_hue[t]
+        _open = "" if sv_scored[t]["feasible"] else " sw-open"
+        return f'<span class="sw sw-dot sw-themed{_open}" style="--sw-light: {_light}; --sw-dark: {_dark};" aria-hidden="true"></span>'
+
+    return sv_hue, sv_swatch
+
+
+@app.cell(hide_code=True)
+def _(ab_decision, ab_summary, sv_trials: dict[int, dict]):
     # The two derived anti coordinates the frozen plan asks the marginals to use,
     # at the survey's own length (see the centroid REVIEW note above).
     _epochs = ab_decision["epochs"]
@@ -1554,7 +1585,7 @@ def _(ab_decision, ab_summary, sv_trials):
 
 
 @app.cell(hide_code=True)
-def _(sv_scored, sv_trials):
+def _(sv_scored: dict[int, dict], sv_trials: dict[int, dict]):
     _infeasible = {t: s for t, s in sv_scored.items() if not s["feasible"]}
     _fails = {
         k: sum(1 for s in _infeasible.values() if not s["checks"][k])
@@ -1575,7 +1606,14 @@ def _(sv_scored, sv_trials):
 
 
 @app.cell(hide_code=True)
-def _(sv_cells, sv_coords, sv_promoted, sv_scored, sv_trials):
+def _(
+    sv_cells: dict[str, dict],
+    sv_coords,
+    sv_promoted: list[int],
+    sv_scored: dict[int, dict],
+    sv_swatch,
+    sv_trials: dict[int, dict],
+):
     def _cond_mean(t: int) -> float | None:
         vals = [c["r2_cond"] for s in range(sv_scored[t]["n_seeds"]) if "r2_cond" in (c := sv_cells[f"t{t:02d}-s{s}"])]
         return float(np.mean(vals)) if vals else None
@@ -1588,7 +1626,7 @@ def _(sv_cells, sv_coords, sv_promoted, sv_scored, sv_trials):
             _name = f"<b>{_name}</b>"
         _cond = _cond_mean(_t)
         return (
-            f"<tr><td>{_name}</td>"
+            f"<tr><td>{sv_swatch(_t)} {_name}</td>"
             + "".join(
                 f"<td class='num'>{_tr[k]:.3f}</td>" for k in ("lam", "tau", "anti_peak_ratio", "anti_anneal_end_frac")
             )
@@ -1614,27 +1652,37 @@ def _(sv_cells, sv_coords, sv_promoted, sv_scored, sv_trials):
             "latch π ↓",
         )
     )
-    mo.Html(
-        figure_html(
-            f"""
-            <div class="report-table-scroll"><table class="report-table">
-            <thead><tr><th>trial</th><th class="num">λ_a</th><th class="num">τ</th><th class="num">peak</th>
-            <th class="num">anneal end</th><th class="num">dose</th><th class="num">centroid</th>
-            <th class="num">seeds</th>{_head_stats}<th>fails</th></tr></thead>
-            <tbody>{"".join(_rows)}</tbody>
-            </table></div>
-            """,
-            caption=mo.md("""
-            **Every trial, no omissions.** Sampled coordinates (λ_a, τ, anti peak ratio, anneal endpoint), the two derived anti coordinates (dose relative to the reference schedule at the same length, and the centroid as a fraction of training), and seed means of every statistic — over five seeds for the six promoted trials (bold), one seed otherwise. `r2_cond` is the conditional-mean grading reading, reported beside the per-color `r2_sim`; only the per-color reading constrains. The *fails* column lists the constraints a trial fails; the proposed operating point is `t00`.
-            """).text,
-            class_="report-figure",
-        )
+    _table_fig_html = figure_html(
+        f"""
+        <div class="report-table-scroll"><table class="report-table">
+        <thead><tr><th>{sv_swatch(None)} trial</th><th class="num">λ_a</th><th class="num">τ</th><th class="num">peak</th>
+        <th class="num">anneal end</th><th class="num">dose</th><th class="num">centroid</th>
+        <th class="num">seeds</th>{_head_stats}<th>fails</th></tr></thead>
+        <tbody>{"".join(_rows)}</tbody>
+        </table></div>
+        """,
+        caption=mo.md("""
+        **Every trial, no omissions.** Each row carries the trial's mark from the figures above — its hashed color, filled if the trial is feasible and open if it is not — so a dot can be looked up here. Sampled coordinates (λ_a, τ, anti peak ratio, anneal endpoint), the two derived anti coordinates (dose relative to the reference schedule at the same length, and the centroid as a fraction of training), and seed means of every statistic — over five seeds for the six promoted trials (bold), one seed otherwise. `r2_cond` is the conditional-mean grading reading, reported beside the per-color `r2_sim`; only the per-color reading constrains. The *fails* column lists the constraints a trial fails; the proposed operating point is `t00`.
+        """).text,
+        class_="report-figure",
     )
+    mo.md(f"""
+    /// details | Table of all trial hyperparameters
+    {_table_fig_html}
+    ///
+    """)
     return
 
 
 @app.cell(hide_code=True)
-def _(sv_control_em, sv_coords, sv_r2_floor, sv_scored, sv_trials):
+def _(
+    sv_control_em,
+    sv_coords,
+    sv_hue,
+    sv_r2_floor,
+    sv_scored: dict[int, dict],
+    sv_trials: dict[int, dict],
+):
     _ROWS = [
         ("m_line", "m_line", []),
         ("holdout_em", "holdout EM", [sv_control_em - ex.TASK_GATE, sv_control_em + ex.TASK_GATE]),
@@ -1660,18 +1708,18 @@ def _(sv_control_em, sv_coords, sv_r2_floor, sv_scored, sv_trials):
     @themed(
         name="marginals",
         alt_text="""
-            A grid of small scatter panels, seven rows by four columns. Rows are the objective and the six constraint statistics: m_line, holdout exact match, containment, retention, grading r squared, contrast, and the latch statistic pi. Columns are the four axes: anchor weight and pooling temperature on log scales, then the derived anti-subspace dose and centroid. Feasible trials are filled dots, infeasible ones open circles, the proposed trial is ringed, and dashed lines mark each constraint's gate. The strongest patterns: m_line rises left to right along both the anchor weight and temperature columns; grading and contrast fall along the temperature column; latch pi is high only at the cold end of the temperature column; holdout exact match dips below its gate line only at high anchor weight. The two anti-subspace columns show weak trends throughout.
+            A grid of small scatter panels, seven rows by four columns. Rows are the objective and the six constraint statistics: m_line, holdout exact match, containment, retention, grading r squared, contrast, and the latch statistic pi. Columns are the four axes: anchor weight and pooling temperature on log scales, then the derived anti-subspace dose and centroid. Each trial keeps one color from an eight-hue palette, hashed from its trial id so the assignment carries no order, and that color repeats down every panel so the same trial can be traced row to row; feasible trials are solid dots, infeasible ones are dimmed open circles, and the proposed trial carries a large ring in its own color. Dashed lines mark each constraint's gate. The strongest patterns: m_line rises left to right along both the anchor weight and temperature columns; grading and contrast fall along the temperature column; latch pi is high only at the cold end of the temperature column; holdout exact match dips below its gate line only at high anchor weight. The two anti-subspace columns show weak trends throughout.
         """,
         caption=r"""
-            **The marginals: every statistic against every axis.** One dot per trial (seed means; five seeds for promoted trials, one otherwise): filled = feasible, open = infeasible, ring = the proposed trial `t00`. Rows are the objective and the six constraints, with each constraint's gate dashed — a band for the task row, a ceiling for containment and latch, a floor for the rest. Columns are the two sampled scalars and the two derived anti coordinates (dose relative to the reference schedule at 50 epochs; centroid as a fraction of training). The map to read off: m_line climbs with λ_a and with τ; the τ axis spends grading and contrast as it climbs; the latch veto owns the cold-τ edge; the task gate cuts in at strong λ_a; and the anti axes organize little, which is the amendment's insensitivity result seen across the whole box.
+            **The marginals: every statistic against every axis.** One dot per trial (seed means; five seeds for promoted trials, one otherwise), colored by an eight-hue categorical palette hashed from trial id (repeating past eight with no order to the repeats, so a dot's identity reads off position *and* color together): $●$ solid = feasible, $○$ open circle = infeasible, $⦿$ ring = the proposed trial `t00`. Rows are the objective and the six constraints, with each constraint's gate dashed — a band for the task row, a ceiling for containment and latch, a floor for the rest. Columns are the two sampled scalars and the two derived anti coordinates (dose relative to the reference schedule at 50 epochs; centroid as a fraction of training). The map to read off: m_line climbs with λ_a and with τ; the τ axis spends grading and contrast as it climbs; the latch veto owns the cold-τ edge; the task gate cuts in at strong λ_a; and the anti axes organize little, which is the amendment's insensitivity result seen across the whole box.
         """,
     )
     def _plot():
         from matplotlib import ticker
+        from matplotlib.colors import to_rgba
 
-        c_feas = light_dark("#1f6fb4", "#5fa8dd")
-        c_infeas = light_dark("#999", "#777")
         c_gate = light_dark("#666", "#999")
+        _trial_color = {t: light_dark(*h) for t, h in sv_hue.items()}
         _ticks = {"lam": [0.02, 0.05, 0.1, 0.2, 0.5, 1.0], "tau": [0.05, 0.1, 0.2, 0.3], "dose": [0.3, 0.5, 1.0]}
         fig, axs = plt.subplots(
             len(_ROWS), len(_COLS), figsize=(8.4, 10.2), layout="constrained", sharex="col", sharey="row"
@@ -1684,11 +1732,19 @@ def _(sv_control_em, sv_coords, sv_r2_floor, sv_scored, sv_trials):
                     [sv_scored[t][stat] for t in _infeas],
                     s=11,
                     facecolors="none",
-                    edgecolors=c_infeas,
+                    edgecolors=[to_rgba(_trial_color[t], alpha=0.45) for t in _infeas],
                     lw=0.8,
                 )
-                ax.scatter([_x(t, key) for t in _feas], [sv_scored[t][stat] for t in _feas], s=12, color=c_feas, lw=0)
-                ax.scatter([_x(0, key)], [sv_scored[0][stat]], s=52, facecolors="none", edgecolors=c_feas, lw=1.4)
+                ax.scatter(
+                    [_x(t, key) for t in _feas],
+                    [sv_scored[t][stat] for t in _feas],
+                    s=12,
+                    color=[_trial_color[t] for t in _feas],
+                    lw=0,
+                )
+                ax.scatter(
+                    [_x(0, key)], [sv_scored[0][stat]], s=52, facecolors="none", edgecolors=_trial_color[0], lw=1.4
+                )
                 for g in gates:
                     ax.axhline(g, color=c_gate, ls=(0, (4, 3)), lw=0.7)
                 if scale == "log":
@@ -1708,7 +1764,15 @@ def _(sv_control_em, sv_coords, sv_r2_floor, sv_scored, sv_trials):
 
 
 @app.cell(hide_code=True)
-def _(ab_arrays, ab_summary, sv_cells, sv_promoted, sv_r2_floor, sv_scored):
+def _(
+    ab_arrays,
+    ab_summary,
+    sv_cells: dict[str, dict],
+    sv_hue,
+    sv_promoted: list[int],
+    sv_r2_floor,
+    sv_scored: dict[int, dict],
+):
     _has_cond = any("r2_cond" in c for c in sv_cells.values())
     _ref_cond = float(np.mean([ex.r2_sim_cond(ab_arrays[f"ref-s{s}/alpha"][:, :, 0].mean(axis=0)) for s in range(3)]))
 
@@ -1723,17 +1787,18 @@ def _(ab_arrays, ab_summary, sv_cells, sv_promoted, sv_r2_floor, sv_scored):
     @themed(
         name="plane",
         alt_text="""
-            Two scatter panels sharing both axes: grading r squared against m_line, left panel the per-color reading, right panel the conditional-mean reading. Feasible trials are filled dots, infeasible open, promoted trials ringed, and the reference recipe is marked with a cross near m_line 0.42, r squared 0.78. In the left panel a dashed horizontal line at 0.68 marks the grading floor; the points slope downward to the right, and the proposed trial sits at the far right, just above the line. In the right panel the same cloud sits higher, around 0.9 and above, with a much shallower slope and no floor drawn.
+            Two scatter panels sharing both axes: grading r squared against m_line, left panel the per-color reading, right panel the conditional-mean reading. Each trial keeps the color it has in the other survey figures, hashed from its trial id. Feasible trials are filled dots, infeasible dimmed and open, promoted trials ringed, and the reference recipe is marked with a purple cross near m_line 0.42, r squared 0.78. In the left panel a dashed horizontal line at 0.68 marks the grading floor; the points slope downward to the right, and the proposed trial sits at the far right, just above the line. In the right panel the same cloud sits higher, around 0.9 and above, with a much shallower slope and no floor drawn.
         """,
         caption=rf"""
-            **The margin–grading plane, in both readings.** Per-trial seed means: filled = feasible, open = infeasible, rings = the six promoted trials, × = the ablation stage's `ref`. **Left:** the per-color $r^2$ the grading constraint reads, with the floor (`ref` − {ex.GRADE_R2_DROP:g}) dashed; the cloud slopes down to the right — the τ walk trades grading for margin — and the constraint is what stops the objective from following it further. **Right:** the conditional-mean $r^2$ over redness levels, which stays high across the same trials. The pair separates *graded on average* from *graded color by color*: what the soft-τ end loses is per-color fidelity, not the average dose–response shape.
+            **The margin–grading plane, in both readings.** Per-trial seed means, in the trial colors used throughout this section: $●$ filled = feasible, $○$ open = infeasible, $⦿$ ring = the six promoted trials, $×$ = the ablation stage's `ref`. **Left:** the per-color $r^2$ the grading constraint reads, with the floor (`ref` − {ex.GRADE_R2_DROP:g}) dashed; the cloud slopes down to the right — the τ walk trades grading for margin — and the constraint is what stops the objective from following it further. **Right:** the conditional-mean $r^2$ over redness levels, which stays high across the same trials. The pair separates *graded on average* from *graded color by color*: what the soft-τ end loses is per-color fidelity, not the average dose–response shape.
         """,
     )
     def _plot():
-        c_feas = light_dark("#1f6fb4", "#5fa8dd")
-        c_infeas = light_dark("#999", "#777")
+        from matplotlib.colors import to_rgba
+
         c_gate = light_dark("#666", "#999")
         c_ref = light_dark("#7b3fa0", "#b98ce0")
+        _trial_color = {t: light_dark(*h) for t, h in sv_hue.items()}
         ncols = 2 if _has_cond else 1
         fig, _axs = plt.subplots(
             1, ncols, figsize=(7.2 if _has_cond else 4.2, 3.0), layout="constrained", sharex=True, sharey=True
@@ -1742,13 +1807,13 @@ def _(ab_arrays, ab_summary, sv_cells, sv_promoted, sv_r2_floor, sv_scored):
         for k, ax in enumerate(axs):
             yi = 1 if k == 0 else 2
             for t, (m, r, rc, feas) in _pts.items():
-                y = (m, r, rc)[yi]
+                y, c = (m, r, rc)[yi], _trial_color[t]
                 if feas:
-                    ax.scatter([m], [y], s=14, color=c_feas, lw=0)
+                    ax.scatter([m], [y], s=14, color=c, lw=0)
                 else:
-                    ax.scatter([m], [y], s=12, facecolors="none", edgecolors=c_infeas, lw=0.8)
+                    ax.scatter([m], [y], s=12, facecolors="none", edgecolors=to_rgba(c, alpha=0.45), lw=0.8)
                 if t in sv_promoted:
-                    ax.scatter([m], [y], s=56, facecolors="none", edgecolors=c_feas, lw=1.2)
+                    ax.scatter([m], [y], s=56, facecolors="none", edgecolors=c, lw=1.2)
             _ref_y = ab_summary["ref"]["r2_sim"] if yi == 1 else _ref_cond
             ax.scatter([ab_summary["ref"]["m_line"]], [_ref_y], marker="x", s=44, color=c_ref, lw=1.6)
             ax.set_xlabel("m_line (seed mean)", fontsize="x-small")
@@ -1763,7 +1828,7 @@ def _(ab_arrays, ab_summary, sv_cells, sv_promoted, sv_r2_floor, sv_scored):
 
 
 @app.cell(hide_code=True)
-def _(sv_scored, sv_trials):
+def _(sv_hue, sv_scored: dict[int, dict], sv_trials: dict[int, dict]):
     _MARKS = {
         "task": ("^", "task"),
         "containment": ("s", "containment"),
@@ -1778,35 +1843,60 @@ def _(sv_scored, sv_trials):
     @themed(
         name="lam-marginal",
         alt_text="""
-            One scatter panel: m_line against the anchor weight lambda a on a log axis from 0.02 to 1. Feasible trials are filled dots rising from about 0.35 at the far left to about 0.53 around lambda 0.3 to 0.6, then holding flat to the right edge. Infeasible trials use open markers keyed by their first failed constraint: crosses for latch vetoes are spread across the axis, diamonds and squares for grading and containment failures cluster at the weak end, and triangles for task-gate failures appear only from about lambda 0.4 upward. The proposed trial at lambda 0.56 is ringed.
+            One scatter panel: m_line against the anchor weight lambda a on a log axis from 0.02 to 1. Each trial keeps the color it has in the other survey figures, hashed from its trial id, and the legend keys marker shape alone in gray. Feasible trials are filled dots rising from about 0.35 at the far left to about 0.53 around lambda 0.3 to 0.6, then holding flat to the right edge. Infeasible trials use open markers keyed by their first failed constraint: crosses for latch vetoes are spread across the axis, diamonds and squares for grading and containment failures cluster at the weak end, and triangles for task-gate failures appear only from about lambda 0.4 upward. The proposed trial at lambda 0.56 is ringed.
         """,
         caption=r"""
-            **The λ_a marginal on its own.** m_line against λ_a; filled dots are feasible trials, the ring is the proposed `t00`, and each infeasible trial is drawn with a marker naming its first failed constraint. The shape ex-2.1.7 predicted shows up as a rise to a flat top: the margin climbs for a decade of λ_a and stops gaining around 0.3–0.6, while the task gate (△) starts to bind above 0.4 — the two highest margins in the whole survey belong to trials the task gate rejected, so the task, and nothing else, caps the strong end. At the weak end grading (◇) and containment (□) fail together where the pull is too weak to organize the response.
+            **The λ_a marginal on its own.** m_line against λ_a, in the trial colors used throughout this section: $●$ = feasible, $⦿$ ring = the proposed `t00`, and each infeasible trial takes the shape of its first failed constraint — $△$ task, $□$ containment, $◇$ grading, $×$ latch (the legend keys the shapes, in gray). The shape ex-2.1.7 predicted shows up as a rise to a flat top: the margin climbs for a decade of λ_a and stops gaining around 0.3–0.6, while the task gate ($△$) starts to bind above 0.4 — the two highest margins in the whole survey belong to trials the task gate rejected, so the task, and nothing else, caps the strong end. At the weak end grading ($◇$) and containment ($□$) fail together where the pull is too weak to organize the response.
         """,
     )
     def _plot():
-        c_feas = light_dark("#1f6fb4", "#5fa8dd")
-        c_infeas = light_dark("#8a6d3b", "#c0a060")
+        from matplotlib.lines import Line2D
+
+        # Marker shape carries the failed constraint here, so the legend keys shape alone and
+        # draws in a neutral tone; color is the trial's identity, as in the other survey figures.
+        c_key = light_dark("#555", "#aaa")
+        _trial_color = {t: light_dark(*h) for t, h in sv_hue.items()}
         fig, ax = plt.subplots(figsize=(5.6, 3.2), layout="constrained")
         _seen = set()
         for t, s in sv_scored.items():
-            x, m = sv_trials[t]["lam"], s["m_line"]
+            x, m, c = sv_trials[t]["lam"], s["m_line"], _trial_color[t]
             if s["feasible"]:
-                ax.scatter([x], [m], s=16, color=c_feas, lw=0, label="feasible" if "f" not in _seen else None)
-                _seen.add("f")
+                ax.scatter([x], [m], s=16, color=c, lw=0)
+                _seen.add("feasible")
             else:
                 mk, mname = _MARKS[_first_fail(s)]
-                _label = mname if mname not in _seen else None
                 if mk == "x":
-                    ax.scatter([x], [m], s=26, marker=mk, lw=1.0, color=c_infeas, label=_label)
+                    ax.scatter([x], [m], s=26, marker=mk, lw=1.0, color=c)
                 else:
-                    ax.scatter([x], [m], s=26, marker=mk, lw=1.0, facecolors="none", edgecolors=c_infeas, label=_label)
+                    ax.scatter([x], [m], s=26, marker=mk, lw=1.0, facecolors="none", edgecolors=c)
                 _seen.add(mname)
-        ax.scatter([sv_trials[0]["lam"]], [sv_scored[0]["m_line"]], s=64, facecolors="none", edgecolors=c_feas, lw=1.4)
+        ax.scatter(
+            [sv_trials[0]["lam"]], [sv_scored[0]["m_line"]], s=64, facecolors="none", edgecolors=_trial_color[0], lw=1.4
+        )
+        _keys = [("o", "feasible", True)] + [(mk, name, mk == "x") for mk, name in _MARKS.values()]
+        ax.legend(
+            handles=[
+                Line2D(
+                    [],
+                    [],
+                    ls="none",
+                    marker=mk,
+                    ms=5,
+                    label=name,
+                    color=c_key,
+                    markerfacecolor=c_key if filled else "none",
+                )
+                for mk, name, filled in _keys
+                if name in _seen
+            ],
+            fontsize="x-small",
+            frameon=False,
+            loc="lower right",
+            ncols=2,
+        )
         ax.set_xscale("log")
         ax.set_xlabel("λ_a", fontsize="x-small")
         ax.set_ylabel("m_line (seed mean)", fontsize="x-small")
-        ax.legend(fontsize="x-small", frameon=False, loc="lower right", ncols=2)
         return fig
 
     mo.Html(_plot())
@@ -1822,7 +1912,12 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(ab_summary, sv_coords, sv_scored, sv_trials):
+def _(
+    ab_summary,
+    sv_coords,
+    sv_scored: dict[int, dict],
+    sv_trials: dict[int, dict],
+):
     _t0, _s0 = sv_trials[0], sv_scored[0]
     _ref = ab_summary["ref"]
 
@@ -1844,7 +1939,7 @@ def _(ab_summary, sv_coords, sv_scored, sv_trials):
         + "".join(f"<td class='num'>{_pm(s, _ref)}</td>" for s in _stats)
         + "</tr>"
     )
-    mo.Html(
+    mo.md(
         figure_html(
             f"""
             <div class="report-table-scroll"><table class="report-table">
@@ -1865,7 +1960,13 @@ def _(ab_summary, sv_coords, sv_scored, sv_trials):
 
 
 @app.cell(hide_code=True)
-def _(ab_summary, sv_coords, sv_r2_floor, sv_scored, sv_trials):
+def _(
+    ab_summary,
+    sv_coords,
+    sv_r2_floor,
+    sv_scored: dict[int, dict],
+    sv_trials: dict[int, dict],
+):
     _feas = sorted((t for t, s in sv_scored.items() if s["feasible"]), key=lambda t: -sv_scored[t]["m_line"])
     _band = ex.equiv_band("m_line", 5, 1)
     _top = [t for t in _feas if sv_scored[t]["m_line"] >= sv_scored[0]["m_line"] - _band]
@@ -1888,9 +1989,14 @@ def _(ab_summary, sv_coords, sv_r2_floor, sv_scored, sv_trials):
 
 
 @app.cell(hide_code=True)
-def _(sv_cells, sv_promoted, sv_scored):
+def _(
+    sv_cells: dict[str, dict],
+    sv_promoted: list[int],
+    sv_scored: dict[int, dict],
+    sv_swatch,
+):
     _rows = "".join(
-        f"<tr><td><code>t{t:02d}</code></td>"
+        f"<tr><td>{sv_swatch(t)} <code>t{t:02d}</code></td>"
         f"<td class='num'>{sv_cells[f't{t:02d}-s0']['m_line']:.4f}</td>"
         f"<td class='num'>{sv_scored[t]['m_line']:.4f}</td>"
         f"<td class='num'>{sv_scored[t]['m_line'] - sv_cells[f't{t:02d}-s0']['m_line']:+.4f}</td>"
@@ -1901,7 +2007,7 @@ def _(sv_cells, sv_promoted, sv_scored):
         figure_html(
             f"""
             <table class="report-table">
-            <thead><tr><th>trial</th><th class="num">m_line, seed 0</th><th class="num">m_line, 5 seeds</th>
+            <thead><tr><th>{sv_swatch(None)} trial</th><th class="num">m_line, seed 0</th><th class="num">m_line, 5 seeds</th>
             <th class="num">change</th><th>feasible at 5 seeds</th></tr></thead>
             <tbody>{_rows}</tbody>
             </table>
@@ -1916,7 +2022,7 @@ def _(sv_cells, sv_promoted, sv_scored):
 
 
 @app.cell(hide_code=True)
-def _(sv_scored, sv_r2_floor):
+def _(sv_r2_floor, sv_scored: dict[int, dict]):
     mo.md(f"""
     **The handoff.** D2.2 adopts this operating point and re-measures it at fresh seeds before quoting any number from this section. The survey values stand beside the confirmed ones there, and the gap between them is the remaining winner's-curse correction.
 
@@ -1945,7 +2051,7 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(sv_scored, sv_trials):
+def _(sv_scored: dict[int, dict], sv_trials: dict[int, dict]):
     _veto = {t: s for t, s in sv_scored.items() if not s["checks"]["latch"]}
     _weak = {t for t in _veto if sv_trials[t]["lam"] <= 0.08}
     _strong = sorted(set(_veto) - _weak, key=lambda t: sv_trials[t]["lam"])
