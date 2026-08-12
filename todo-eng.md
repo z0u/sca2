@@ -6,6 +6,22 @@ Scratch items sit under Scratch; everything below that is the prioritized index 
 
 ## Scratch
 
+- Add an easier way to open reports for editing. What works:
+
+    1. Launch Marimo in edit mode: `marimo edit --watch --headless docs/.../report.py`
+    2. Open the editor by clicking on: `URL: http://localhost:2718?access_token=...`
+    3. Click the "Toggle app view" button in the Marimo UI
+    4. Edit the source file directly in the IDE instead of Marimo
+
+    This then allows humans an AIs to edit the source, and the human can see the changes in the Marimo UI. Preprequisite config (already applied):
+
+    ```toml
+    [tool.marimo.runtime]
+    watcher_on_save = "autorun"
+    ```
+
+    The friction is mostly in steps 1 and 3. 1, because it's a long command to have to type. I never use `./go open` or `./go edit` or whatever: they're not the right verbs. They can be retired an new ones added, if that's what makes sense. 3, because you have to find the button with your mouse. Can we add a query param to the URL to automate it? Having to click on the URL in 2 is a bit annoying; it's only necessary because of `--headless` — BUT without `--headless` the URL is opened in the external browser. I want it to open inside VS Code, which it does if I Cmd-click on it.
+
 - A task whose whole body is store transfers reads as `⚠ stale — worker may be dead` (2026-08-11, ex-2.1.11). `publish_ablations` downloads 27 array artifacts and uploads one, so it emits no step progress for its entire run; `status` badged it stale at 300s+ and `watch` exited 3 (attention) three times while it was healthy. The record has the evidence to know better — `phase` was advancing through the `get`/`put` names each poll, which is exactly the blocking-phase declaration `put`/`get` already make. So the fix is probably in the staleness check: an in-flight `blocking_phase` whose label has changed since the last poll should suppress the stale-heartbeat badge (or beat the heartbeat on phase entry). As it stands the false alarm trains you to ignore a real signal, and it will recur on every publish step that fans in.
 
 - `bin/mini results` is still a bit verbose. We recently updated it to elide lists. That's good, but the numbers that are left seem to waste tokens on insignificant digits. Example: `train_one-8dc2675067d3  {'label': 'anti-hold-s1', 'val_loss': [5.189090251922607, 4.589869976043701, 3.795412063598633, … +97], …`. Not sure what to do about that, because sometimes the precision may be needed? Probably not in a `results` _command_, though. Idea: we could print first, last, and stats (min, max, mean, std), all with `:0.2g` format...?
