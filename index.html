@@ -87,7 +87,8 @@
 </li>
 <li>
 <p><a href="m2/ex-2.1.11/">2.1.11. Ablations and a survey for the D2.1 operating point</a></p>
-<p>Survey (preregistered search plan; complete). The recipe's schedules and weights were inherited piecewise and never tuned together, so flat arms bracket each schedule and a half-length condition trims the budget. The anchor schedule turns out to be replaceable by a constant and 50 epochs is enough, but the repulsion schedule earns its shape — an amendment's dose-matched constant loses the grading the schedule protects. The Sobol search over what is left maps a wide feasible plateau, each edge bounded by a different constraint, and proposes a stronger, softer operating point that D2.2 confirms at fresh seeds.</p>
+<p>A survey to close out D2.1. The schedules and weights in the recipe were inherited piece by piece and never tuned together. We ablate first by replacing schedules with constants, and dropping training epochs. Then we run a Sobol search over what is left (anchor weight, pooling temperature, repulsion dose).</p>
+<p>The anchor schedule and half the epochs could go. The anti-subspace schedule could not: a constant delivering the same total dose loses grading. The search maps a wide feasible plateau and proposes a stronger, softer point on its edge.</p>
 </li>
 </ul>
 </body>
