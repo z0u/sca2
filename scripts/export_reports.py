@@ -20,6 +20,7 @@ from mini.reports import (  # noqa: E402
     PUBLISH_LOCK,
     export_dir,
     export_key,
+    input_dir,
     is_report_notebook,
     load_pins,
     report_notebooks,
@@ -48,13 +49,27 @@ def notebooks_to_export(paths: list[str]) -> list[Path]:
     return keep
 
 
+def _touched_at(nb: Path) -> float:
+    """The mtime of the most recently edited thing *nb* is built from.
+
+    The notebook, plus everything in its input directory (:func:`~mini.reports.input_dir`) — an experiment definition, a dopesheet — since editing one of those dates the bundle exactly as editing the notebook does. Directories are stamped too, so deleting an input registers (a delete bumps the parent's mtime while touching no surviving file).
+
+    Skips ``__pycache__`` and dotfiles: importing ``experiment.py`` rewrites its bytecode, which would otherwise read as an edit and re-export the report every time something imported it. The *first* such import still registers, since creating ``__pycache__/`` stamps the directory holding it — one spurious re-export per fresh checkout, which is the price of noticing deletes at all.
+    """
+    paths = [nb]
+    if d := input_dir(nb):
+        junk = (".", "__pycache__")
+        paths += [d, *(p for p in d.rglob("*") if not any(s.startswith(junk) for s in p.relative_to(d).parts))]
+    return max(p.stat().st_mtime for p in paths if p.exists())
+
+
 def is_stale(nb: Path) -> bool:
-    """Whether *nb*'s bundle is missing or older than the notebook itself.
+    """Whether *nb*'s bundle is missing or older than anything it's built from (:func:`_touched_at`).
 
     A cheap mtime heuristic: it misses edits to imported ``src/`` modules and to the stored results a report reads, so callers offer ``--force`` (skip the check).
     """
     out = export_dir(nb) / "index.html"
-    return not out.exists() or out.stat().st_mtime < nb.stat().st_mtime
+    return not out.exists() or out.stat().st_mtime < _touched_at(nb)
 
 
 def export_one(nb: Path) -> Path:

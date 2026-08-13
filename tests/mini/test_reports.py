@@ -11,6 +11,7 @@ from mini.reports import (
     is_manually_published,
     export_key,
     externalize_html,
+    input_dir,
     insert_base,
     is_report_notebook,
     load_pins,
@@ -156,6 +157,26 @@ def test_export_key_drops_redundant_report_segment(tmp_path):
     # A top-level report.py has no directory to take, so it keeps its stem.
     (docs / "report.py").write_text(_APP)
     assert export_key(docs / "report.py") == "report"
+
+
+def test_input_dir_is_the_report_own_directory(tmp_path):
+    # A report that owns a directory reads the files beside it — experiment.py and friends.
+    (tmp_path / "pyproject.toml").write_text("")
+    docs = tmp_path / "docs"
+    (docs / "pipeline").mkdir(parents=True)
+    (docs / "pipeline" / "report.py").write_text(_APP)
+    (docs / "pipeline" / "aside.py").write_text(_APP)
+    assert input_dir(docs / "pipeline" / "report.py") == docs / "pipeline"
+    assert input_dir(docs / "pipeline" / "aside.py") == docs / "pipeline"
+
+
+def test_a_report_in_the_docs_root_has_no_input_dir(tmp_path):
+    # The docs root is shared site space (publish.lock, index.md, report.css), so no
+    # report may claim it: doing so would date every root-level report on every publish.
+    (tmp_path / "pyproject.toml").write_text("")
+    (docs := tmp_path / "docs").mkdir()
+    (docs / "overview.py").write_text(_APP)
+    assert input_dir(docs / "overview.py") is None
 
 
 def test_pins_round_trip_sorted_and_diffable(tmp_path):

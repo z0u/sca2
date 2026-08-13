@@ -31,6 +31,7 @@ __all__ = [
     "report_bundle",
     "export_key",
     "export_dir",
+    "input_dir",
     "PUBLISH_LOCK",
     "load_pins",
     "save_pins",
@@ -169,6 +170,20 @@ def export_dir(notebook_file: str | Path) -> Path:
     """
     p = Path(notebook_file).resolve()
     return _project_root(p) / ".mini" / "exports" / export_key(p)
+
+
+def input_dir(notebook_file: str | Path) -> Path | None:
+    """The directory whose files are this report's *local* inputs, or ``None`` if it has none.
+
+    The mirror of :func:`export_dir`: that names what a report writes, this names what it reads from the repo. A report that owns a directory (``docs/ex-2.1.8/report.py``) reads the files beside it — the ``experiment.py`` defining its tasks, a ``dopesheet.csv``, whatever else the author put there — so an edit to any of them dates the report's bundle exactly as an edit to the notebook does. Callers that only watch the ``.py`` see a report re-run against new results and report itself unchanged.
+
+    Scoped to the directory rather than a parsed import graph because the directory *is* the convention here (:func:`export_key` already derives a report's identity from it), and it stays right without anyone maintaining it. It's deliberately the loose end of the two: a shared module under ``src/`` is an input too, and nothing local can see that — the bundle's ``PROVENANCE_ASSET`` sidecar is where that question gets answered, at the cost of store access.
+
+    ``None`` for a report living directly in ``docs/`` (``docs/overview.py``): the docs root is shared site space — ``publish.lock``, ``index.md``, ``report.css`` — not one report's inputs, and reading it as such would date every root-level report on every publish.
+    """
+    parent = Path(notebook_file).resolve().parent
+    docs = _project_root(parent) / "docs"
+    return parent if parent != docs and docs in parent.parents else None
 
 
 # The pin manifest: export key → the publish-tier commit sha its bundle was last
