@@ -72,10 +72,45 @@ def test_the_changed_report_only(repo):
     assert changed(repo) == {"docs/ex-1/report.py"}
 
 
-def test_non_notebooks_are_not_reports(repo):
+def test_a_changed_input_beside_a_report_counts_as_changing_it(repo):
+    """The re-run case: new results land via `experiment.py` while `report.py` sits still, and the bundle then serves the previous run's figures."""
     (repo / "docs" / "ex-1" / "experiment.py").write_text("def main(ctx): pass\n")
     commit(repo, "edit the experiment definition")
+    assert changed(repo) == {"docs/ex-1/report.py"}
+
+
+def test_an_input_in_a_nested_dir_counts_too(repo):
+    (data := repo / "docs" / "ex-1" / "data").mkdir()
+    (data / "dopesheet.csv").write_text("step,lr\n0,1e-3\n")
+    commit(repo, "add a dopesheet")
+    assert changed(repo) == {"docs/ex-1/report.py"}
+
+
+def test_a_deleted_input_counts_too(repo):
+    """A delete leaves no file to inspect, so the report is found from its directory rather than the path being attributed to it."""
+    (repo / "docs" / "ex-1" / "experiment.py").unlink()
+    commit(repo, "drop the experiment definition")
+    assert changed(repo) == {"docs/ex-1/report.py"}
+
+
+def test_shared_docs_files_belong_to_no_report(repo):
+    """The docs root is site space. Reading it as one report's inputs would flag `overview.py` on every publish, since `publish.lock` lives there."""
+    (repo / "docs" / "report.css").write_text(".marimo { color: red }\n")
+    (repo / "docs" / "index.md").write_text("# Reports\n")
+    pin(repo, "ex-1", "ccc")
+    commit(repo, "restyle and repin")
     assert changed(repo) == set()
+
+
+def test_a_sibling_report_is_a_document_not_an_input(repo):
+    """Two reports in one directory: an input change dates both, but neither dates the other."""
+    (repo / "docs" / "ex-1" / "aside.py").write_text(_APP)
+    commit(repo, "a second report alongside the first")
+    assert changed(repo) == {"docs/ex-1/aside.py"}
+
+    (repo / "docs" / "ex-1" / "experiment.py").write_text("def main(ctx): pass\n")
+    commit(repo, "edit the shared experiment definition")
+    assert changed(repo) == {"docs/ex-1/aside.py", "docs/ex-1/report.py"}
 
 
 def test_a_notebook_outside_docs_is_not_a_report(repo):
@@ -124,6 +159,16 @@ def test_only_the_unpinned_report_is_flagged(repo):
     pin(repo, "ex-1", "ccc")
     commit(repo, "publish one of the two")
     assert flagged(repo) == {"docs/overview.py"}
+
+
+def test_a_re_run_experiment_is_flagged_until_republished(repo):
+    (repo / "docs" / "ex-1" / "experiment.py").write_text("def main(ctx): pass\n")
+    commit(repo, "re-run the experiment")
+    assert flagged(repo) == {"docs/ex-1/report.py"}
+
+    pin(repo, "ex-1", "ccc")
+    commit(repo, "republish against the new results")
+    assert flagged(repo) == set()
 
 
 def test_a_brand_new_report_needs_its_first_publish(repo):
