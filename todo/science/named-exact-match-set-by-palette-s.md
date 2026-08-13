@@ -1,0 +1,8 @@
+---
+status: finding
+tags: [D2.1, ex-2.1.5, metrics, representations]
+opened: 2026-07-26
+---
+# Named exact match is set by the palette's snap margin, not by how well the model represents color
+
+On an irregular palette the answer is the nearest name to the exact mix, so each prompt carries its own difficulty: the *snap margin* (runner-up distance minus winner distance) has a median of 0.033 of the unit cube at 140 names against a constant 0.2 on ex-2.1.3's `v216` sub-grid, where closed pairs land the mix on a vocabulary point. Accuracy tracks the margin prompt by prompt, and a reference guesser that reads the exact mix with isotropic error σ and then snaps (`baselines.precision_limited_acc`, one free parameter) reproduces the whole curve at σ ≈ 0.033 (≈ 8/255 per channel) on held-out prompts. The same σ predicts ≈ 0.99 on `v216` — about what ex-2.1.3 (≈ 1.0) and ex-2.1.4 (0.91) scored — so no change in color precision is needed to explain the earlier rungs' near-saturation. Consequences. (1) Compare accuracies across vocabularies only at matched margin, or through σ; raw exact match is a property of the palette as much as of the model. Standardizing this way splits `palette-250`'s drop (0.667 → 0.564) about evenly between a finer palette and a real precision cost. (2) Trained pairs break the account's shape (the model beats it at tight margins, falls short at wide ones), so errors on seen pairs are not purely a resolution limit — recall is mixed in. (3) The behavior is finer than the probe: at the pre-answer site the strict mix probe's residual is ≈ 0.058 against σ ≈ 0.033, so a probe R² is a floor on the value that is present, which matters wherever an anchor's supervision is itself a linear readout.

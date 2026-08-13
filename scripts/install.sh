@@ -33,6 +33,9 @@ done
 
 ( set -x; npm install )
 
+# Replay conflict resolutions: long-lived branches re-merge main and hit the same ones.
+( set -x; git -C "$SCRIPT_DIR/.." config rerere.enabled true )
+
 # Install versioned git hooks
 HOOKS_SRC="$SCRIPT_DIR/hooks"
 HOOKS_DST="$SCRIPT_DIR/../.git/hooks"

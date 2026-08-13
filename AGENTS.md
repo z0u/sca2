@@ -9,9 +9,7 @@ docs/  Experiments and reports (both in Python, as Marimo notebooks) — see doc
 eng/  Decision register — the *why* behind mini's storage/artifacts/publishing/gc internals. eng/README.md indexes it by question; check there before re-deriving infrastructure rationale from scratch.
 references/  Related documents, such as earlier papers and blog posts
 README.md  Details about the project including a list of deliverables, and where this milestone fits within the program of work
-todo-eng.md  Infrastructure/tooling backlog + scratch notes; readable cold — check before starting work that might already be tracked there
-todo-science.md  Experiment questions and findings backlog
-todo-style.md  Text and visual improvements
+todo/**/*.md  Three sets of backlogs, one file per item: eng (infrastructure and tooling), science (experiment questions and findings), style (text and visuals). `./go todo [...sets]` lists them, `rg` searches. Check before starting work that might already be tracked there
 ```
 
 ## Collaboration style
@@ -43,6 +41,13 @@ This project uses `uv`, `ruff`, and `ty`. Also available: `fd`, `fzf`, `rg`, `ba
 
 ```bash
 uvx --from yq tomlq '.tool.mini' pyproject.toml
+```
+
+Prose is soft-wrapped: one line per paragraph (see `style-md`), so a plain `rg` would print whole paragraphs. Use these flags:
+
+```bash
+rg -l anneal todo/science/           # which files
+rg -no '.{0,55}anneal.{0,55}' todo/  # a {0,N} window around each match
 ```
 
 Resources (compute, storage, etc.): find out what you can access with `./go auth --check`.

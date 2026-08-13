@@ -1,0 +1,11 @@
+---
+status: done
+tags: [metrics, ex-2.1.5, representations]
+---
+# Refit the probe maps holding out one target value at a time, not one equation
+
+Done in ex-2.1.5: `geometry.strict_r2` reports both estimators side by side, the report shows the strict figure with a disagreement table, and the three operand-closing spaces are landmarks. The residual question is the fold-strength asymmetry, split out as its own item below.
+
+Original note follows. `probe_maps` runs `ridge_probe_loo` over rows = equations, so a color (or a hex digit) sits in both the fit and the held-out row and the probe can memorize an identity → value table. That inflates some cells to the point of tautology and leaves others untouched, and which is which is the whole question — see the finding below for a one-cell prototype. The fix is a leave-one-group-out where the group is the target's value in the channel being scored (16 groups per hex digit, ~100–220 for named). Costs an eval-stage re-run only (checkpoints are published under `CKPT_REF`), and it is cheaper than the current fit. Two decisions to make: whether to report it beside the preregistered per-equation numbers or in place of them, and whether the cross-form ρ and principal angles (full-data fits, so unaffected mechanically) should be gated on the stricter R².
+
+Riding along in the same re-run: add the three operand-closing spaces to `LANDMARKS` (see the delimiter finding below). That makes a hex line fully measured — its operand middles are zero characters, so every position is a landmark — and leaves elision meaning one thing only, a name span too variable to align. Decided against dropping the second-to-last landmark to avoid short-name aliasing: for hex it is the green digit's own position, dropping it would break the shared-landmark cross-form comparison, and the aliasing it would fix affects 0/768 lines at the centre cell (the 140-name palette's shortest name is 4 characters) and 5/768 in `palette-250`, whose only 3-letter name is `ice`. A footnote covers it. The caption should instead say that the elided span is 0–22 characters wide depending on the line (median 6), since that averaging is the real approximation and it applies to every named panel.
