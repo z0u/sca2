@@ -9,7 +9,7 @@ docs/  Experiments and reports (both in Python, as Marimo notebooks) — see doc
 eng/  Decision register — the *why* behind mini's storage/artifacts/publishing/gc internals. eng/README.md indexes it by question; check there before re-deriving infrastructure rationale from scratch.
 references/  Related documents, such as earlier papers and blog posts
 README.md  Details about the project including a list of deliverables, and where this milestone fits within the program of work
-todo/  Three backlogs, one file per item: eng/ (infrastructure, tooling), science/ (experiment questions and findings), style/ (text and visuals). `./go todo [SET]` lists them, `rg` searches them. Readable cold — check before starting work that might already be tracked there
+todo/**/*.md  Three backlogs, one file per item: eng (infrastructure and tooling), science (experiment questions and findings), style (text and visuals). `./go todo [eng,science,style]` lists them, `rg` searches. Check before starting work that might already be tracked there
 ```
 
 ## Collaboration style
@@ -43,18 +43,12 @@ This project uses `uv`, `ruff`, and `ty`. Also available: `fd`, `fzf`, `rg`, `ba
 uvx --from yq tomlq '.tool.mini' pyproject.toml
 ```
 
-**Searching.** Prose here is soft-wrapped: one line per paragraph, in Markdown, report cells and docstrings alike (see `style-md`). A single line can run past 2,000 characters, so a plain `rg` prints whole paragraphs and costs far more context than the answer is worth. Two flags fix it, and they answer different questions:
+Prose is soft-wrapped: one line per paragraph (see `style-md`), so a plain `rg` would print whole paragraphs. Use these flags:
 
 ```bash
-rg -l anneal todo/science/                 # which files — then read the ones you want
-rg -no '.{0,55}anneal.{0,55}' todo/        # a window around each match, wherever it sits in the line
+rg -l anneal todo/science/           # which files
+rg -no '.{0,55}anneal.{0,55}' todo/  # a {0,N} window around each match
 ```
-
-Reach for `-l` first. `-o` with a `.{0,N}` window on each side is what shows the match itself: it costs a fixed span per hit rather than a paragraph, and it stays useful when a file has many.
-
-`--max-columns 200 --max-columns-preview` also bounds the output, but it prints the *head* of the line and elides the rest — so on a 2,000-character paragraph it confirms the line matched without showing where. Useful as a blanket cap, not for reading a match.
-
-Don't reach for `--pre`. A preprocessor that re-wraps long lines would have to renumber them, and any line-number prefix it added would then be part of what `rg` searches. It is also slow: a no-op `cat` preprocessor makes a repo-wide search ~25× slower, because it spawns a process per file.
 
 Resources (compute, storage, etc.): find out what you can access with `./go auth --check`.
 
