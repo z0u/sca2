@@ -9,7 +9,7 @@ docs/  Experiments and reports (both in Python, as Marimo notebooks) — see doc
 eng/  Decision register — the *why* behind mini's storage/artifacts/publishing/gc internals. eng/README.md indexes it by question; check there before re-deriving infrastructure rationale from scratch.
 references/  Related documents, such as earlier papers and blog posts
 README.md  Details about the project including a list of deliverables, and where this milestone fits within the program of work
-todo-eng.md  Infrastructure/tooling backlog + scratch notes; readable cold — check before starting work that might already be tracked there
+todo/eng/  Infrastructure/tooling backlog, one item per file; `./go todo` lists it, `rg` searches it. Readable cold — check before starting work that might already be tracked there
 todo-science.md  Experiment questions and findings backlog
 todo-style.md  Text and visual improvements
 ```

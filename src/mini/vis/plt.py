@@ -24,7 +24,7 @@ Stylesheet = Literal["base", "light", "dark", "transparent"] | Mapping[str, str]
 
 # Plain assignment aliases, not PEP 695 ``type``: as of ty 0.0.x, a ``type`` alias
 # resolves for reveal_type but drops to Unknown when inference has to push it
-# through a generic call such as ``zip(axes, ...)``. See todo-eng.md.
+# through a generic call such as ``zip(axes, ...)``. See todo/eng/ty-loses-pep695-alias.md.
 AxesRow: TypeAlias = Sequence[Axes]
 """The axes array from ``plt.subplots(1, n)``, or a flattened grid — ``cast`` to it."""
 

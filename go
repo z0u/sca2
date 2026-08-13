@@ -13,7 +13,7 @@ is_marimo_notebook() {
 show_usage() {
     # Important: heredoc indented with tab characters.
     cat <<-EOF
-		Usage: $0 {install|auth|check|open|preview|publish|site|help}
+		Usage: $0 {install|auth|check|open|preview|publish|site|todo|help}
 		New checkout? Start with: $0 install
 
 		  install:             install dependencies (uv sync) and git hooks
@@ -28,6 +28,8 @@ show_usage() {
 		  publish <nbs|--all>: export reports and sync their bundles to the publish tier
 		  site:                assemble the public site from *published* bundles into _site/
 		                       (for CI; read-only, never runs a notebook)
+		  todo    [--tag T] [--status S] [--bundle B] [--json] [--check]:
+		                       list engineering backlog items from todo/eng/
 
 		Experiments are run with \`bin/mini\`, not \`$0\` — see \`bin/mini --help\`.
 		EOF
@@ -120,6 +122,10 @@ case "${1:-help}" in
     site)
         shift
         uv run "$SCRIPT_DIR/build_site.py" --externalize "$@"
+        ;;
+    todo)
+        shift
+        uv run "$SCRIPT_DIR/todo.py" "$@"
         ;;
     e|export|r|run|s|serve|build|scrub|clean)
         case "$1" in
