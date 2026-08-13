@@ -28,8 +28,8 @@ show_usage() {
 		  publish <nbs|--all>: export reports and sync their bundles to the publish tier
 		  site:                assemble the public site from *published* bundles into _site/
 		                       (for CI; read-only, never runs a notebook)
-		  todo    [--tag T] [--status S] [--bundle B] [--json] [--check]:
-		                       list engineering backlog items from todo/eng/
+		  todo    [...sets] [--tag T] [--status S] [--bundle B] [--json] [--check]:
+		                       list backlog items from todo/[set/]
 
 		Experiments are run with \`bin/mini\`, not \`$0\` — see \`bin/mini --help\`.
 		EOF
