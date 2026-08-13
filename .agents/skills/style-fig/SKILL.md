@@ -72,7 +72,7 @@ Give every figure alt text (see the alt-text skill).
 
 ## Captions
 
-The title goes in the caption, as its opening phrase — not drawn inside the figure with `fig.suptitle`. A caption then decodes the ink: what the rows, columns, marks, and shading mean, and how to read an unusual encoding. Findings, controls, and interpretation belong in prose cells near the figure, in paragraph form — a result quoted only in a caption is easy to miss and hard to cross-reference. When an encoding needs a word of interpretation to be readable at all (say, what a step across an elided region signifies), keep one clause in the caption and put the supporting evidence in prose.
+The title goes in the caption, as its opening phrase — not drawn inside the figure with `fig.suptitle`. A caption should guide readers through what they're seeing. Findings, controls, and interpretation belong in prose cells *near* the figure, in paragraph form — a result quoted only in a caption is easy to miss and hard to cross-reference. When an encoding needs a word of interpretation to be readable at all (say, what a step across an elided region signifies), keep one clause in the caption and put the supporting evidence in prose. Explain the structure once: "Each column shows... each row shows...".
 
 Tables get a caption on the same terms — see the wrapper above.
 
