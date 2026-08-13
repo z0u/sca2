@@ -30,17 +30,20 @@ def item(root: Path, name: str = "x", **fields) -> Path:
     """An item with *fields* overriding the valid header, and `None` dropping a key."""
     head = {"status": "open", "tags": "[cli]", "opened": "2026-08-13"} | fields
     front = "\n".join(f"{k}: {v}" for k, v in head.items() if v is not None)
+    root.mkdir(parents=True, exist_ok=True)
     return write(root, name, f"---\n{front}\n---\n# {name}\n\nBody.\n")
 
 
 @pytest.fixture
 def backlog(tmp_path: Path) -> Path:
-    """Four items: two bundled, one done, one undated."""
-    item(tmp_path, "newer", tags="[cli, storage]", opened="2026-08-12", bundle="cli-devx")
-    item(tmp_path, "older", tags="[cli]", opened="2026-07-01", bundle="cli-devx")
-    item(tmp_path, "shipped", tags="[storage]", status="done", opened="2026-07-02", closed="2026-07-03")
-    item(tmp_path, "undated", tags="[vis]", opened=None)
-    (tmp_path / "README.md").write_text("# Not an item\n")
+    """Two sets: four eng items (two bundled, one done, one undated) and one science finding."""
+    eng = tmp_path / "eng"
+    item(eng, "newer", tags="[cli, storage]", opened="2026-08-12", bundle="cli-devx")
+    item(eng, "older", tags="[cli]", opened="2026-07-01", bundle="cli-devx")
+    item(eng, "shipped", tags="[storage]", status="done", opened="2026-07-02", closed="2026-07-03")
+    item(eng, "undated", tags="[vis]", opened=None)
+    item(tmp_path / "science", "learned", tags="[anchoring]", status="finding", opened="2026-07-05")
+    (eng / "README.md").write_text("# Not an item\n")
     return tmp_path
 
 
@@ -82,12 +85,11 @@ def test_structural_problems_are_rejected(tmp_path, text):
     [
         {"status": None},
         {"status": "wip"},
-        {"tags": None},
-        {"tags": "[]"},
+        {"tags": "cli"},
         {"opened": "13-08-2026"},
         {"bundle": "[a, b]"},
     ],
-    ids=["no-status", "bad-status", "no-tags", "empty-tags", "bad-date", "bundle-is-a-list"],
+    ids=["no-status", "bad-status", "tags-not-a-list", "bad-date", "bundle-is-a-list"],
 )
 def test_bad_fields_are_rejected(tmp_path, fields):
     with pytest.raises(todo.TodoError):
@@ -104,9 +106,13 @@ def test_a_duplicate_key_is_rejected(tmp_path):
         todo.parse(write(tmp_path, "x", "---\nstatus: open\nstatus: done\ntags: [cli]\n---\n# T\n"))
 
 
-def test_done_needs_a_closed_date(tmp_path):
-    with pytest.raises(todo.TodoError, match="no 'closed'"):
-        todo.parse(item(tmp_path, status="done"))
+def test_tags_are_optional(tmp_path):
+    assert todo.parse(item(tmp_path, tags=None)).tags == ()
+
+
+def test_a_closed_date_is_optional_on_done(tmp_path):
+    """Migrated items often record that something shipped without recording when."""
+    assert todo.parse(item(tmp_path, status="done")).closed is None
 
 
 def test_only_done_carries_a_closed_date(tmp_path):
@@ -131,6 +137,11 @@ def test_an_error_names_the_file(tmp_path):
 # --- loading -------------------------------------------------------------
 
 
+def test_a_finding_is_a_status(backlog):
+    items, _ = todo.load(backlog)
+    assert slugs(todo.select(items, status="finding")) == ["learned"]
+
+
 def test_load_skips_the_readme(backlog):
     items, errors = todo.load(backlog)
     assert not errors
@@ -138,19 +149,29 @@ def test_load_skips_the_readme(backlog):
 
 
 def test_one_broken_item_does_not_hide_the_rest(backlog):
-    write(backlog, "broken", "not an item at all\n")
-    write(backlog, "also-broken", "---\nstatus: nope\ntags: [x]\n---\n# T\n")
+    write(backlog / "eng", "broken", "not an item at all\n")
+    write(backlog / "eng", "also-broken", "---\nstatus: nope\ntags: [x]\n---\n# T\n")
     items, errors = todo.load(backlog)
     assert len(errors) == 2
-    assert len(items) == 4
+    assert len(items) == 5
 
 
 # --- selecting -----------------------------------------------------------
 
 
-def test_done_items_are_hidden_by_default(backlog):
+def test_settled_work_and_findings_are_hidden_by_default(backlog):
     items, _ = todo.load(backlog)
-    assert "shipped" not in slugs(todo.select(items))
+    assert {"shipped", "learned"}.isdisjoint(slugs(todo.select(items)))
+
+
+def test_a_set_narrows_the_selection(backlog):
+    items, _ = todo.load(backlog)
+    assert slugs(todo.select(items, sets=["science"], status="finding")) == ["learned"]
+    assert "learned" not in slugs(todo.select(items, sets=["eng"], status="finding"))
+
+
+def test_sets_are_the_directories_that_exist(backlog):
+    assert todo._sets(backlog) == ["eng", "science"]
 
 
 def test_status_filter_finds_them(backlog):
@@ -175,13 +196,18 @@ def test_newest_first_with_undated_last(backlog):
     assert slugs(todo.select(items)) == ["newer", "older", "undated"]
 
 
+def test_an_item_knows_its_set(backlog):
+    items, _ = todo.load(backlog)
+    assert {it.slug: it.set for it in items}["learned"] == "science"
+
+
 # --- rendering -----------------------------------------------------------
 
 
 def test_bundles_group_together_and_unbundled_comes_last(backlog):
     items, _ = todo.load(backlog)
     out = todo.render(todo.select(items))
-    assert out.index("cli-devx:") < out.index("unbundled:")
+    assert out.index("eng \u00b7 cli-devx:") < out.index("\neng:")
     assert out.index("newer.md") < out.index("undated.md")
 
 
@@ -192,6 +218,7 @@ def test_render_says_so_when_nothing_matches():
 def test_status_shows_in_the_listing(backlog):
     items, _ = todo.load(backlog)
     assert "[x] " in todo.render(todo.select(items, status="done"))
+    assert "[\u2022] " in todo.render(todo.select(items, status="finding"))
 
 
 def test_json_shape_is_serializable(backlog):

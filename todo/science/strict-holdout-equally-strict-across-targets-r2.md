@@ -1,0 +1,13 @@
+---
+status: open
+tags: [metrics, ex-2.1.5, representations]
+---
+# The strict holdout is not equally strict across targets
+
+The strict holdout is not equally strict across targets, so R² is not comparable between the operand rows and the mix row.
+
+`_value_folds` groups by the target's value in one channel. For a named operand that group is the color — every line carrying the name shares its R value — so ~93 folds remove a median 15/768 lines and the name is genuinely gone. A mix value is a midpoint, mostly unique to a line or two: ~219 folds removing a median 4/768, with both operand names still in the fit. So "named mix @ pre = 0.94" and "named op1 @ pre = 0.64" are answering different questions, and the report currently reads them side by side as if they weren't.
+
+Checked, and the headline survives: an identity-grouped fold (hold out every line where a color is an operand, score the lines where it is operand 1, so every scored line has an unseen operand) gives mix @ pre = 0.94, op1 @ pre = 0.64 — both unchanged to two places, over 139 folds × 3 seeds. Two things still to do. (1) Report the mix row under identity folds so the comparison is like for like; the per-channel grouping is the right one for hex, where the digit is the value, so this is a per-form choice. (2) Explain why mix beats its own inputs. If the probe could only compose two independent operand readouts, op1 at 0.64 with op2 seen bounds mix at ~0.82, and we see 0.94 — either the mix has its own direction by `pre`, or the probe is reading the answer the model has already chosen and looking that color up (the fold removes a color only where it is an operand). Same mechanism as the "answer positions partly read the answer" section, arriving one position earlier. A fold that also removes lines where the color is the answer would separate them.
+
+Two more fold-shaped items to ride along in the same eval re-run, so the whole set costs one pass. (a) The word-family control (identity-fold twin of the color-matched holdout) is quoted in H2 at −0.43 but computed offline, so the report asserts a number it doesn't derive — the standard the retcon sweep set. Storing a word-family-folded map alongside the two existing ones makes it a report-side figure. (b) Nothing else in ex-2.1.5 needs the eval step touched, so bundle (a), the identity-fold mix row, and the answer-inclusive fold together. Not blocking H3–H6: ρ and the principal angles come from full-data fits, and ρ's ≥ 0.5 gate can be recomputed report-side against either estimator (both give ρ = 0 at the centre cell, since every cross-form R² there is negative).

@@ -30,7 +30,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.resolve()
 TODO_DIR = ROOT / "todo"
-STATUSES = ("open", "partial", "done")
+STATUSES = ("open", "partial", "done", "finding")
+LIVE = ("open", "partial")  # what the default view shows
+MARKS = {"open": " ", "partial": "~", "done": "x", "finding": "•"}
 KEYS = ("status", "tags", "opened", "closed", "bundle")
 FENCE = "---"
 
@@ -57,6 +59,11 @@ class Item:
         return self.path.stem
 
     @property
+    def set(self) -> str:
+        """Which backlog this belongs to — the directory under `todo/`."""
+        return self.path.parent.name
+
+    @property
     def rel(self) -> str:
         """Repo-relative where it can be, and as-given otherwise — a tmp tree in tests is neither under the repo nor broken."""
         try:
@@ -68,6 +75,7 @@ class Item:
         """The item as JSON-ready data, dates as ISO strings and the body left out."""
         return {
             "slug": self.slug,
+            "set": self.set,
             "path": self.rel,
             "title": self.title,
             "status": self.status,
@@ -126,13 +134,12 @@ def parse(path: Path) -> Item:
         raise TodoError(f"{path}: no 'status' — one of {', '.join(STATUSES)}")
     if not isinstance(status, str) or status not in STATUSES:
         raise TodoError(f"{path}: status is {status!r} — expected one of {', '.join(STATUSES)}")
-    if (tags := fields.get("tags")) is None or not isinstance(tags, list) or not tags:
-        raise TodoError(f"{path}: 'tags' should be a non-empty inline list, e.g. tags: [cli, storage]")
+    tags = fields.get("tags", [])
+    if not isinstance(tags, list):
+        raise TodoError(f"{path}: 'tags' should be an inline list, e.g. tags: [cli, storage]")
 
     opened = _as_date(o, "opened", path) if (o := fields.get("opened")) else None
     closed = _as_date(c, "closed", path) if (c := fields.get("closed")) else None
-    if status == "done" and closed is None:
-        raise TodoError(f"{path}: status is 'done' but there is no 'closed' date")
     if status != "done" and closed is not None:
         raise TodoError(f"{path}: has a 'closed' date but status is {status!r}")
     if opened and closed and closed < opened:
@@ -174,47 +181,58 @@ def load(root: Path = TODO_DIR) -> tuple[list[Item], list[TodoError]]:
     return items, errors
 
 
+def _sets(root: Path = TODO_DIR) -> list[str]:
+    """The backlogs that exist — every directory under `todo/`, so adding one needs no code change."""
+    return sorted(p.name for p in root.iterdir() if p.is_dir()) if root.is_dir() else []
+
+
 def select(
     items: list[Item],
     tags: list[str] | None = None,
     status: str | None = None,
     bundle: str | None = None,
+    sets: list[str] | None = None,
 ) -> list[Item]:
     """The items matching every filter given, newest first, undated last.
 
-    Tags are conjunctive — `--tag cli --tag storage` is the intersection, which is the useful direction when narrowing a backlog. Without a status filter, done items drop out.
+    Tags are conjunctive — `--tag cli --tag storage` is the intersection, which is the useful direction when narrowing a backlog. Without a status filter, only live work shows: settled items and findings are still there, and `--status` reaches them.
     """
     wanted = set(tags or ())
     keep = [
         it
         for it in items
         if (wanted <= set(it.tags))
-        and (it.status == status if status else it.status != "done")
+        and (it.status == status if status else it.status in LIVE)
         and (it.bundle == bundle if bundle else True)
+        and (it.set in sets if sets else True)
     ]
     return sorted(keep, key=lambda it: (it.opened is None, -it.opened.toordinal() if it.opened else 0, it.slug))
 
 
 def render(items: list[Item]) -> str:
-    """The items as a grouped, aligned listing — bundles first, then everything unbundled."""
+    """The items as a grouped, aligned listing — by set, then by bundle, with unbundled last in each."""
     if not items:
         return "(nothing matches)"
-    groups: dict[str | None, list[Item]] = {}
+    groups: dict[tuple[str, str], list[Item]] = {}
     for it in items:
-        groups.setdefault(it.bundle, []).append(it)
+        groups.setdefault((it.set, it.bundle or ""), []).append(it)
     width = max(len(it.rel) for it in items)
 
     out = []
-    for bundle in sorted((b for b in groups if b), key=str) + ([None] if None in groups else []):
-        out.append(f"\n{bundle}:" if bundle else "\nunbundled:")
-        for it in groups[bundle]:
-            mark = {"open": " ", "partial": "~", "done": "x"}[it.status]
-            out.append(f"  [{mark}] {it.rel:<{width}}  {it.title}  [{' '.join(it.tags)}]")
+    for key in sorted(groups, key=lambda k: (k[0], k[1] == "", k[1])):
+        head = f"{key[0]} · {key[1]}" if key[1] else key[0]
+        out.append(f"\n{head}:")
+        for it in groups[key]:
+            tags = f"  [{' '.join(it.tags)}]" if it.tags else ""
+            out.append(f"  [{MARKS[it.status]}] {it.rel:<{width}}  {it.title}{tags}")
     return "\n".join(out).lstrip("\n")
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="List engineering backlog items.")
+    ap = argparse.ArgumentParser(description="List backlog items.")
+    ap.add_argument(
+        "sets", nargs="*", metavar="SET", help=f"which backlogs to list ({', '.join(_sets())}); default: all"
+    )
     ap.add_argument(
         "--tag",
         action="append",
@@ -228,6 +246,9 @@ def main() -> None:
     ap.add_argument("--check", action="store_true", help="validate every item's header and exit non-zero on a problem")
     args = ap.parse_args()
 
+    if unknown := [s for s in args.sets if s not in _sets()]:
+        ap.error(f"unknown backlog {unknown[0]!r} — expected one of {', '.join(_sets())}")
+
     items, errors = load()
     if args.check:
         for e in errors:
@@ -240,7 +261,7 @@ def main() -> None:
     if errors:
         print(f"warning: skipped {len(errors)} malformed item(s); run --check to see them", file=sys.stderr)
 
-    chosen = select(items, tags=args.tags, status=args.status, bundle=args.bundle)
+    chosen = select(items, tags=args.tags, status=args.status, bundle=args.bundle, sets=args.sets)
     print(json.dumps([it.as_dict() for it in chosen], indent=1) if args.json else render(chosen))
 
 
