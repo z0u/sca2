@@ -49,3 +49,7 @@ document, not a bullet, so there is room to say why.
 Settled items stay where they are rather than moving to an archive: the default view already hides them, and leaving them put keeps their inbound links and file history intact. Several are kept deliberately for their measurements.
 
 `./go check --lint` validates every header, so a malformed item fails the same gate as a lint error.
+
+## GitHub issues
+
+Issues are for capture: something noticed away from a checkout, or raised by someone without commit access. Transcribe one into a file and close it, so each item has a single home — an issue and a file describing the same work will drift, and the file is the copy that travels with the branch.
