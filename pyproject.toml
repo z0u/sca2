@@ -184,7 +184,9 @@ ignore_names = [
     "setUp",
     "tearDown",
     "_",  # marimo cell functions
-    "__generated_with"  # marimo file metadata
+    "__generated_with",  # marimo file metadata
+    "__getattr__",  # PEP 562 module hook: the interpreter calls it, no caller to find
+    "__dir__"  # ditto
 ]
 # make_whitelist = true
 min_confidence = 60
