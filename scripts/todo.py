@@ -182,7 +182,10 @@ def load(root: Path = TODO_DIR) -> tuple[list[Item], list[TodoError]]:
     """
     items, errors = [], []
     for path in sorted(root.rglob("*.md")):
-        if path.name == "README.md":
+        # A symlink is a second name for a file already scanned — `todo/CLAUDE.md` and
+        # `todo/AGENTS.md` both point at the README, so agents pick the conventions up
+        # under whichever name they look for.
+        if path.name == "README.md" or path.is_symlink():
             continue
         try:
             items.append(parse(path))

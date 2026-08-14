@@ -298,7 +298,7 @@ def test_json_shape_is_serializable(backlog):
 
 
 def test_the_committed_backlog_is_well_formed():
-    """The gate `./go check --lint` runs, asserted here too so a broken item fails the suite."""
+    """The validation behind `./go todo --check`, asserted here so a broken item fails the suite."""
     items, errors = todo.load()
     assert not errors, "\n".join(str(e) for e in errors)
     assert items, "no items found under todo/"

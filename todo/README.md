@@ -22,7 +22,7 @@ The default view shows `open` and `partial` only. Settled work and findings are 
 
 Shortlisted items carry a `!` beside their status mark and sort to the head of their group, so a plain `./go todo` shows the ranking without being asked.
 
-To search bodies rather than titles, use `rg` over the directory — a match carries its own filename and boundary, which a single long list can't give you. Paragraphs here are one line each and soft-wrapped, so print files or windows rather than whole lines (`AGENTS.md` has the reasoning):
+To search bodies rather than titles, use `rg` over the directory — a match carries its own filename and boundary, which a single long list can't give you. Paragraphs here are one line each and soft-wrapped, so print files or windows rather than whole lines (the root [`AGENTS.md`](../AGENTS.md) has the reasoning):
 
 ```bash
 rg -l anneal todo/science/           # the files, then read the ones you want
@@ -52,13 +52,13 @@ document, not a bullet, so there is room to say why.
 
 ## Priority
 
-`priority: high` is the only level, and absence is the default — a second rung would just be somewhere for indecision to live. At most six live items may carry it, and `./go check --lint` fails when a seventh appears.
+`priority: high` is the only level, and absence is the default — a second rung would just be somewhere for indecision to live. At most six live items may carry it, and `./go check --test` fails when a seventh appears.
 
 The cap is the point. Priority schemes decay when promotion is free: everything drifts upward until the top rung holds the backlog and the label stops carrying information. Here a seventh item costs a demotion, so the shortlist stays a claim about what to do next rather than a list of things that seemed important once. Settled items don't count against it, so a closed item can keep its old priority as history.
 
 Settled items stay where they are rather than moving to an archive: the default view already hides them, and leaving them put keeps their inbound links and file history intact. Several are kept deliberately for their measurements.
 
-`./go check --lint` validates every header, so a malformed item fails the same gate as a lint error.
+`./go check --test` includes a test case that validates every header, so a malformed item fails the suite; `./go todo --check` is the same validation on its own, for a quick pass after editing one.
 
 ## Notes from a routine
 
