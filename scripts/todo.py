@@ -5,7 +5,7 @@
 
 The cost of that split is the overview, which a single file gave away for free. This script buys it back — and prints it rather than writing it down, so there is no committed index to fall out of step with the files. Nothing here caches, and nothing writes.
 
-Front matter is a fixed five-key subset of YAML (scalars and inline lists), parsed here rather than with a library: `pyyaml` is only a transitive dependency, and this tool should keep running before `uv sync` does. `--check` is the gate that keeps the schema honest, and it runs as part of `./go check --lint`.
+Front matter is a fixed six-key subset of YAML (scalars and inline lists), parsed here rather than with a library: `pyyaml` is only a transitive dependency, and this tool should keep running before `uv sync` does. `--check` is the gate that keeps the schema honest, and it runs as part of `./go check --lint`.
 
     ---
     status: open          # open | partial | done
@@ -13,6 +13,7 @@ Front matter is a fixed five-key subset of YAML (scalars and inline lists), pars
     opened: 2026-08-12    # optional — some inherited items carry no date
     closed: 2026-08-12    # required when status is done
     bundle: cli-devx      # optional — groups items a single session should take together
+    priority: high        # optional — the shortlist, capped so it stays a shortlist
     ---
     # A title, as the first heading
 
@@ -33,7 +34,9 @@ TODO_DIR = ROOT / "todo"
 STATUSES = ("open", "partial", "done", "finding")
 LIVE = ("open", "partial")  # what the default view shows
 MARKS = {"open": " ", "partial": "~", "done": "x", "finding": "•"}
-KEYS = ("status", "tags", "opened", "closed", "bundle")
+PRIORITIES = ("high",)  # absence is the default, so one level is all the vocabulary needed
+BUDGET = 6  # live `priority: high` items allowed at once — see `over_budget`
+KEYS = ("status", "tags", "opened", "closed", "bundle", "priority")
 FENCE = "---"
 
 
@@ -53,6 +56,7 @@ class Item:
     opened: date | None = None
     closed: date | None = None
     bundle: str | None = None
+    priority: str | None = None
 
     @property
     def slug(self) -> str:
@@ -83,6 +87,7 @@ class Item:
             "opened": self.opened.isoformat() if self.opened else None,
             "closed": self.closed.isoformat() if self.closed else None,
             "bundle": self.bundle,
+            "priority": self.priority,
         }
 
 
@@ -153,6 +158,10 @@ def parse(path: Path) -> Item:
     if bundle is not None and not isinstance(bundle, str):
         raise TodoError(f"{path}: 'bundle' should be a single name, not a list")
 
+    priority = fields.get("priority") or None
+    if priority is not None and (not isinstance(priority, str) or priority not in PRIORITIES):
+        raise TodoError(f"{path}: priority is {priority!r} — expected one of {', '.join(PRIORITIES)}")
+
     return Item(
         path=path,
         title=first.removeprefix("# ").strip(),
@@ -162,6 +171,7 @@ def parse(path: Path) -> Item:
         opened=opened,
         closed=closed,
         bundle=bundle,
+        priority=priority,
     )
 
 
@@ -186,14 +196,38 @@ def _sets(root: Path = TODO_DIR) -> list[str]:
     return sorted(p.name for p in root.iterdir() if p.is_dir()) if root.is_dir() else []
 
 
+def shortlist(items: list[Item]) -> list[Item]:
+    """The live items marked `priority: high` — the answer to "what should we do next".
+
+    Settled items and findings are left out even if they still carry the key: an old priority on a closed item is history rather than a claim on attention, and dropping it on the way out would be one more thing to remember.
+    """
+    return [it for it in items if it.priority == "high" and it.status in LIVE]
+
+
+def over_budget(items: list[Item]) -> list[TodoError]:
+    """The shortlist against its cap, checked across the backlog rather than one file at a time.
+
+    The cap is what keeps the label worth reading. Priority schemes decay when promotion is free — everything drifts upward until the top rung holds the whole backlog and means nothing. Here a seventh item costs a demotion, which is the judgement the ranking exists to record.
+    """
+    if len(high := shortlist(items)) <= BUDGET:
+        return []
+    listing = "\n".join(f"    {it.rel}" for it in high)
+    return [
+        TodoError(
+            f"{len(high)} live items are 'priority: high', over the budget of {BUDGET} — demote one before promoting another:\n{listing}"
+        )
+    ]
+
+
 def select(
     items: list[Item],
     tags: list[str] | None = None,
     status: str | None = None,
     bundle: str | None = None,
     sets: list[str] | None = None,
+    priority: str | None = None,
 ) -> list[Item]:
-    """The items matching every filter given, newest first, undated last.
+    """The items matching every filter given, shortlisted work first, then newest first and undated last.
 
     Tags are conjunctive — `--tag cli --tag storage` is the intersection, which is the useful direction when narrowing a backlog. Without a status filter, only live work shows: settled items and findings are still there, and `--status` reaches them.
     """
@@ -205,12 +239,24 @@ def select(
         and (it.status == status if status else it.status in LIVE)
         and (it.bundle == bundle if bundle else True)
         and (it.set in sets if sets else True)
+        and (it.priority == priority if priority else True)
     ]
-    return sorted(keep, key=lambda it: (it.opened is None, -it.opened.toordinal() if it.opened else 0, it.slug))
+    return sorted(
+        keep,
+        key=lambda it: (
+            it.priority != "high",
+            it.opened is None,
+            -it.opened.toordinal() if it.opened else 0,
+            it.slug,
+        ),
+    )
 
 
 def render(items: list[Item]) -> str:
-    """The items as a grouped, aligned listing — by set, then by bundle, with unbundled last in each."""
+    """The items as a grouped, aligned listing — by set, then by bundle, with unbundled last in each.
+
+    A shortlisted item carries a `!` beside its status mark and sorts to the head of its group, so the ranking is visible in the ordinary listing without needing `--priority` to find it.
+    """
     if not items:
         return "(nothing matches)"
     groups: dict[tuple[str, str], list[Item]] = {}
@@ -224,7 +270,8 @@ def render(items: list[Item]) -> str:
         out.append(f"\n{head}:")
         for it in groups[key]:
             tags = f"  [{' '.join(it.tags)}]" if it.tags else ""
-            out.append(f"  [{MARKS[it.status]}] {it.rel:<{width}}  {it.title}{tags}")
+            flag = "!" if it.priority == "high" else " "
+            out.append(f"  [{MARKS[it.status]}]{flag} {it.rel:<{width}}  {it.title}{tags}")
     return "\n".join(out).lstrip("\n")
 
 
@@ -242,6 +289,13 @@ def main() -> None:
     )
     ap.add_argument("--status", choices=STATUSES, help="only items with this status (default: everything but done)")
     ap.add_argument("--bundle", help="only items in this bundle")
+    ap.add_argument(
+        "--priority",
+        nargs="?",
+        const="high",
+        choices=PRIORITIES,
+        help=f"only shortlisted items (at most {BUDGET} are live at a time)",
+    )
     ap.add_argument("--json", action="store_true", help="emit the selection as JSON")
     ap.add_argument("--check", action="store_true", help="validate every item's header and exit non-zero on a problem")
     args = ap.parse_args()
@@ -251,17 +305,21 @@ def main() -> None:
 
     items, errors = load()
     if args.check:
-        for e in errors:
+        problems = [*errors, *over_budget(items)]
+        for e in problems:
             print(e, file=sys.stderr)
+        ok = f"✅ {len(items)} todo items parse, {len(shortlist(items))}/{BUDGET} priority slots used"
         print(
-            f"❌ {len(errors)} malformed todo item(s)" if errors else f"✅ {len(items)} todo items parse",
-            file=sys.stderr if errors else sys.stdout,
+            f"❌ {len(problems)} problem(s) in the backlog" if problems else ok,
+            file=sys.stderr if problems else sys.stdout,
         )
-        sys.exit(1 if errors else 0)
+        sys.exit(1 if problems else 0)
     if errors:
         print(f"warning: skipped {len(errors)} malformed item(s); run --check to see them", file=sys.stderr)
 
-    chosen = select(items, tags=args.tags, status=args.status, bundle=args.bundle, sets=args.sets)
+    chosen = select(
+        items, tags=args.tags, status=args.status, bundle=args.bundle, sets=args.sets, priority=args.priority
+    )
     print(json.dumps([it.as_dict() for it in chosen], indent=1) if args.json else render(chosen))
 
 
