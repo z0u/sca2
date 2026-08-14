@@ -154,7 +154,10 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-norecursedirs = ["node_modules", ".venv", "tmp*", "scratch*"]
+# Setting this replaces pytest's default rather than extending it, and `.*` is the
+# default entry that keeps it out of dotted directories — without it, agent worktrees
+# under `.claude/worktrees/` get collected as a second copy of tests/.
+norecursedirs = [".*", "node_modules", "tmp*", "scratch*"]
 # Run in parallel by default (pytest-xdist): the suite is a mix of network-,
 # import-, and compute-bound tests that all isolate via tmp_path/monkeypatch, so
 # it scales near-linearly across cores. Override with `-n0` for a serial run
