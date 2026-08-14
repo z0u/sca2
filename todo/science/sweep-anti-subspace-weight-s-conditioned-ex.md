@@ -1,6 +1,7 @@
 ---
-status: partial
+status: done
 tags: [D2.1, anchoring, ex-2.1.7]
+closed: 2026-08-14
 ---
 # Sweep the anti-subspace weight λ_s̄, conditioned on the ex-2.1.7 read
 

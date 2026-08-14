@@ -1,6 +1,7 @@
 ---
-status: partial
+status: done
 tags: [ex-2.1.10, anchoring, schedules]
+closed: 2026-08-14
 ---
 # Survey τ finely near the ex-2.1.10 primary
 

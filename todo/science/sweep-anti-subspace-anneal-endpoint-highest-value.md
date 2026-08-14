@@ -1,6 +1,7 @@
 ---
-status: partial
+status: done
 tags: [ex-2.1.7, schedules, anchoring]
+closed: 2026-08-14
 ---
 # Sweep the anti-subspace anneal endpoint
 
