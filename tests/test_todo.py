@@ -88,8 +88,18 @@ def test_structural_problems_are_rejected(tmp_path, text):
         {"tags": "cli"},
         {"opened": "13-08-2026"},
         {"bundle": "[a, b]"},
+        {"priority": "urgent"},
+        {"priority": "[high]"},
     ],
-    ids=["no-status", "bad-status", "tags-not-a-list", "bad-date", "bundle-is-a-list"],
+    ids=[
+        "no-status",
+        "bad-status",
+        "tags-not-a-list",
+        "bad-date",
+        "bundle-is-a-list",
+        "bad-priority",
+        "priority-is-a-list",
+    ],
 )
 def test_bad_fields_are_rejected(tmp_path, fields):
     with pytest.raises(todo.TodoError):
@@ -98,7 +108,7 @@ def test_bad_fields_are_rejected(tmp_path, fields):
 
 def test_an_unknown_key_is_rejected_rather_than_ignored(tmp_path):
     with pytest.raises(todo.TodoError, match="unknown key"):
-        todo.parse(item(tmp_path, priority="high"))
+        todo.parse(item(tmp_path, owner="alex"))
 
 
 def test_a_duplicate_key_is_rejected(tmp_path):
@@ -108,6 +118,11 @@ def test_a_duplicate_key_is_rejected(tmp_path):
 
 def test_tags_are_optional(tmp_path):
     assert todo.parse(item(tmp_path, tags=None)).tags == ()
+
+
+def test_priority_is_optional_and_absence_is_the_default(tmp_path):
+    assert todo.parse(item(tmp_path, priority=None)).priority is None
+    assert todo.parse(item(tmp_path, "p", priority="high")).priority == "high"
 
 
 def test_a_closed_date_is_optional_on_done(tmp_path):
@@ -201,6 +216,45 @@ def test_an_item_knows_its_set(backlog):
     assert {it.slug: it.set for it in items}["learned"] == "science"
 
 
+# --- the shortlist -------------------------------------------------------
+
+
+def test_the_shortlist_holds_live_items_only(backlog):
+    """A settled item keeping its old priority is history, so it shouldn't answer "what next"."""
+    item(backlog / "eng", "urgent", priority="high")
+    item(backlog / "eng", "was-urgent", status="done", closed="2026-07-04", priority="high")
+    items, _ = todo.load(backlog)
+    assert slugs(todo.shortlist(items)) == ["urgent"]
+
+
+def test_the_priority_filter_finds_them(backlog):
+    item(backlog / "eng", "urgent", priority="high")
+    items, _ = todo.load(backlog)
+    assert slugs(todo.select(items, priority="high")) == ["urgent"]
+
+
+def test_shortlisted_work_outranks_recency(backlog):
+    item(backlog / "eng", "urgent", opened="2000-01-01", priority="high")
+    items, _ = todo.load(backlog)
+    assert slugs(todo.select(items))[0] == "urgent"
+
+
+def test_the_budget_holds_until_it_is_exceeded(backlog):
+    items, _ = todo.load(backlog)
+    assert todo.over_budget(items) == []
+    for n in range(todo.BUDGET + 1):
+        item(backlog / "eng", f"urgent-{n}", priority="high")
+    items, _ = todo.load(backlog)
+    assert len(todo.over_budget(items)) == 1
+
+
+def test_settled_items_do_not_spend_the_budget(backlog):
+    for n in range(todo.BUDGET + 1):
+        item(backlog / "eng", f"was-urgent-{n}", status="done", closed="2026-07-04", priority="high")
+    items, _ = todo.load(backlog)
+    assert todo.over_budget(items) == []
+
+
 # --- rendering -----------------------------------------------------------
 
 
@@ -221,6 +275,14 @@ def test_status_shows_in_the_listing(backlog):
     assert "[\u2022] " in todo.render(todo.select(items, status="finding"))
 
 
+def test_the_shortlist_is_marked_in_the_listing(backlog):
+    item(backlog / "eng", "urgent", priority="high")
+    items, _ = todo.load(backlog)
+    out = todo.render(todo.select(items))
+    assert "[ ]! " in out
+    assert "[ ]  " in out
+
+
 def test_json_shape_is_serializable(backlog):
     import json
 
@@ -228,6 +290,7 @@ def test_json_shape_is_serializable(backlog):
     data = json.loads(json.dumps([it.as_dict() for it in todo.select(items)]))
     assert data[0]["slug"] == "newer"
     assert data[0]["tags"] == ["cli", "storage"]
+    assert data[0]["priority"] is None
     assert data[-1]["opened"] is None
 
 
@@ -235,7 +298,12 @@ def test_json_shape_is_serializable(backlog):
 
 
 def test_the_committed_backlog_is_well_formed():
-    """The gate `./go check --lint` runs, asserted here too so a broken item fails the suite."""
+    """The validation behind `./go todo --check`, asserted here so a broken item fails the suite."""
     items, errors = todo.load()
     assert not errors, "\n".join(str(e) for e in errors)
     assert items, "no items found under todo/"
+
+
+def test_the_committed_backlog_stays_within_its_priority_budget():
+    items, _ = todo.load()
+    assert not (over := todo.over_budget(items)), "\n".join(str(e) for e in over)
