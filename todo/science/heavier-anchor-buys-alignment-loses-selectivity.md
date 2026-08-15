@@ -1,6 +1,7 @@
 ---
-status: partial
+status: done
 tags: [ex-2.1.7, anchoring]
+closed: 2026-08-14
 ---
 # A heavier anchor buys alignment and loses selectivity
 

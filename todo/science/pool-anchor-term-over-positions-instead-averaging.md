@@ -1,6 +1,7 @@
 ---
-status: partial
+status: done
 tags: [D2.1, anchoring, ex-2.1.6]
+closed: 2026-08-14
 ---
 # Pool the anchor term over positions instead of averaging over them
 
