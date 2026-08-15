@@ -91,6 +91,8 @@ def parse(porcelain: str, root: Path = ROOT) -> list[Worktree]:
     """Split `git worktree list --porcelain` into records, dropping the main worktree.
 
     Records are blank-line separated, one `key value` per line, with `detached` and `locked` appearing as bare flags. The main worktree is the repo itself, so it goes: it is never a candidate for removal, and listing it would only invite the question.
+
+    Records whose directory no longer exists go too. `git worktree prune` clears most of those before we look, but it leaves a locked one behind, and there is nothing useful to say about a checkout that isn't there — while judging it would mean running `git status` in a missing directory.
     """
     trees = []
     for block in porcelain.split("\n\n"):
@@ -109,7 +111,7 @@ def parse(porcelain: str, root: Path = ROOT) -> list[Worktree]:
                 root=root,
             )
         )
-    return [t for t in trees if t.path != root]
+    return [t for t in trees if t.path != root and t.path.is_dir()]
 
 
 def integration_ref(cwd: Path = ROOT) -> str | None:

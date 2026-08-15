@@ -4,6 +4,7 @@ The interesting half is `judge`, so most of this runs against a real temporary r
 """
 
 import importlib.util
+import shutil
 import subprocess
 import tomllib
 from pathlib import Path
@@ -145,6 +146,18 @@ def test_a_locked_worktree_is_left_alone(repo: Path):
     assert status.tree.locked
     assert not status.removable
     assert status.why("main") == "locked"
+
+
+def test_a_locked_worktree_whose_directory_is_gone_is_dropped(repo: Path):
+    """`git worktree prune` clears a stale entry, but not a locked one — and judging it would run `git status` in a directory that isn't there."""
+    path = add_worktree(repo, "vanished")
+    run("worktree", "lock", str(path), cwd=repo)
+    shutil.rmtree(path)
+    run("worktree", "prune", cwd=repo)  # leaves the locked entry behind
+
+    listing = run("worktree", "list", "--porcelain", cwd=repo)
+    assert "vanished" in listing  # git still knows about it...
+    assert wt.parse(listing, root=repo) == []  # ...and we have nothing to say about it
 
 
 def test_a_detached_worktree_parses_without_a_branch(repo: Path):
