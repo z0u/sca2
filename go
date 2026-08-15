@@ -13,7 +13,7 @@ is_marimo_notebook() {
 show_usage() {
     # Important: heredoc indented with tab characters.
     cat <<-EOF
-		Usage: $0 {install|auth|check|open|preview|publish|site|todo|help}
+		Usage: $0 {install|auth|check|open|preview|publish|site|todo|worktrees|help}
 		New checkout? Start with: $0 install
 
 		  install:             install dependencies (uv sync) and git hooks
@@ -30,6 +30,8 @@ show_usage() {
 		                       (for CI; read-only, never runs a notebook)
 		  todo    [...sets] [--tag T] [--status S] [--bundle B] [--priority] [--json] [--check]:
 		                       list backlog items from todo/[set/]
+		  worktrees [--prune] [--dry-run]:
+		                       list agent worktrees; --prune removes the clean, landed ones
 
 		Experiments are run with \`bin/mini\`, not \`$0\` — see \`bin/mini --help\`.
 		EOF
@@ -126,6 +128,10 @@ case "${1:-help}" in
     todo)
         shift
         uv run "$SCRIPT_DIR/todo.py" "$@"
+        ;;
+    worktrees|worktree|wt)
+        shift
+        uv run "$SCRIPT_DIR/worktrees.py" "$@"
         ;;
     e|export|r|run|s|serve|build|scrub|clean)
         case "$1" in
