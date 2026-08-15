@@ -14,3 +14,7 @@ Agents get their own git worktree under `.claude/worktrees/`, which is inside th
 `git worktree remove` is the manual answer, but something has to notice first. Candidates, roughly cheapest first: a line in `AGENTS.md` telling an agent to remove its own worktree on the way out; a warning in `./go check` when a worktree's branch is merged; or a `./go` subcommand that prunes them, which the housekeeping routine could run on its pass. The `AGENTS.md` note only fires when a session ends tidily, and a stranded worktree is evidence that one didn't — so a prune command looks like the better shape, with the routine as the thing that remembers to call it.
 
 Worth checking at the same time whether the worktrees need to be inside the repo at all. If they can sit in a sibling directory, both halves of this item stop being possible.
+
+## Notes
+
+**2026-08-15, housekeeping** — PR #100 adds `./go worktrees --prune` and audits the other tree-walking tools (ruff, ty, vulture, marimo check) for the same replaces-not-extends exclusion-list problem; also confirms worktrees can't move outside the repo (the path is the harness's, no setting for it). PR is open, not yet merged — leaving this item as `partial` until it lands, then it's closeable.
