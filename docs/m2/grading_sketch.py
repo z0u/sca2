@@ -9,7 +9,7 @@ ex-2.1.10's published arrays and writes PNGs for comparison:
 
 Not a notebook, so the site build ignores it. Run from the repo root:
 
-    uv run python docs/m2/ex-2.1.10/grading_sketch.py [--out DIR]
+    uv run python docs/m2/grading_sketch.py [--out DIR]
 """
 
 import argparse
@@ -23,8 +23,8 @@ import numpy as np
 from matplotlib.collections import LineCollection
 
 from mini.store import project_store
-from mini.vis import AxesGrid, use_style
-from sca.colorcube import redness
+from mini.vis import AxesGrid, smooth_step, use_style
+from sca.colorcube import redness, sim_to_red
 from sca.data.colors import N_LEVELS
 from sca.data.named_colors import GRIDS
 
@@ -32,6 +32,8 @@ LEVELS = np.asarray(GRIDS["v216"], dtype=float) / (N_LEVELS - 1)
 GRID_RGB = np.stack(np.meshgrid(LEVELS, LEVELS, LEVELS, indexing="ij"), axis=-1).reshape(-1, 3)
 REDNESS = redness(GRID_RGB)
 RLEVELS = np.unique(np.round(REDNESS, 6))  # 29 distinct redness values
+SIM_TARGET = sim_to_red(GRID_RGB, power=1.5)
+I_RED = int(np.argmax(REDNESS))  # pure red's row in GRID_RGB
 
 SLICE_NAMES = ["emb", "1", "2", "3", "4"]
 POS_NAMES = ["op1", "+", "op2", "=", "ans", r"\n"]
@@ -87,6 +89,8 @@ def subgrid(levels: list[float]) -> np.ndarray:
 
 
 CORNERS = subgrid([0.0, 1.0])  # the 8 cube corners
+CORNERS_NO_RED = CORNERS.copy()
+CORNERS_NO_RED[I_RED] = False  # the α_red smooth-step overlay stands in for the red corner mark
 MID27 = subgrid([0.0, 9 / 15, 1.0])  # 3x3x3 subgrid; 9/15 is the level nearest the midpoint
 
 
@@ -128,6 +132,46 @@ VARIANTS = {
 }
 
 
+def r2_sim(y: np.ndarray) -> float:
+    """Shape r² against sim¹·⁵, as the grading statistic; NaN where the response is constant."""
+    if np.std(y) < 1e-6:
+        return float("nan")
+    return float(np.corrcoef(y, SIM_TARGET)[0, 1] ** 2)
+
+
+def overlay_row_steps(fig: plt.Figure, row: list[plt.Axes], values: np.ndarray, **kwargs):
+    """A smooth-step across a row of panels: one plateau per panel, at that panel's value.
+
+    The overlay is a transparent axis spanning the row, sharing the panels' y scale, so a
+    plateau's height reads off the panels' own axis. Risers land in the gaps between panels.
+    NaN values get no plateau; an isolated finite value between NaNs draws as a flat dash.
+    """
+    boxes = [ax.get_position() for ax in row]
+    w, s = boxes[0].width, boxes[1].x0 - boxes[0].x0  # panel width and center spacing
+    y0, h = boxes[0].y0, boxes[0].height
+    ax_o = fig.add_axes((boxes[0].x0, y0, boxes[-1].x1 - boxes[0].x0, h))
+    ax_o.set_axis_off()
+    ax_o.set_xlim(-w / 2 / s, len(row) - 1 + w / 2 / s)
+    ax_o.set_ylim(*row[0].get_ylim())
+    ramp = (s - w) / s  # risers exactly span the gaps, plateaus the panels
+    # Split at NaNs: smooth_step per finite run, a plain dash for a lone finite value.
+    finite = np.isfinite(values)
+    i = 0
+    while i < len(values):
+        if not finite[i]:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(values) and finite[j + 1]:
+            j += 1
+        if j > i:
+            smooth_step(ax_o, np.arange(i, j + 1), values[i : j + 1], ramp=ramp, **kwargs)
+        else:
+            ax_o.plot([i - w / 2 / s, i + w / 2 / s], [values[i]] * 2, **kwargs)
+        i = j + 1
+    return ax_o
+
+
 # --- Figures ----------------------------------------------------------------
 
 
@@ -155,7 +199,11 @@ def fig_variants(alpha_map, ctrl: np.ndarray, out: Path):
 
 
 def fig_grid(alpha_map, ctrl: np.ndarray, out: Path, label: str, draw):
-    """The full (slice, position) grid at target size, with one candidate encoding."""
+    """The full (slice, position) grid at target size, with one candidate encoding.
+
+    Overlaid per row: a red smooth-step at each panel's α for pure red (standing in for the
+    red corner mark), and a grey dashed one at each panel's shape r² against sim¹·⁵.
+    """
     a = alpha_map("either-t100")
     fig, axes = plt.subplots(5, 6, figsize=(7.2, 6.4), sharex=True, sharey=True, layout="constrained")
     axes = cast(AxesGrid, axes)
@@ -173,6 +221,21 @@ def fig_grid(alpha_map, ctrl: np.ndarray, out: Path, label: str, draw):
     for ax in axes[-1]:
         ax.set_xlabel("redness", fontsize=7)
     fig.suptitle(f"either-t100 (primary), per (slice, position) — {label}", fontsize=10)
+    fig.legend(
+        [plt.Line2D([], [], color="#d40000", lw=1.2, alpha=0.85), plt.Line2D([], [], color="#888", lw=1.0, alpha=0.85, ls=(0, (3, 2)))],
+        ["α at pure red", "shape r² vs sim¹·⁵"],
+        loc="outside lower center", ncols=2, fontsize=8, frameon=False,
+    )  # fmt: skip
+
+    # Freeze the layout, then span each row with the two smooth-step overlays.
+    fig.canvas.draw()
+    fig.set_layout_engine("none")
+    for si in range(5):
+        row = list(axes[4 - si])
+        overlay_row_steps(fig, row, a[si, I_RED, :], color="#d40000", lw=1.2, alpha=0.85)
+        overlay_row_steps(fig, row, np.array([r2_sim(a[si, :, pi]) for pi in range(6)]),
+                          color="#888", lw=1.0, alpha=0.85, ls=(0, (3, 2)))  # fmt: skip
+
     fig.savefig(out / f"grid-{label}.png", dpi=150)
     plt.close(fig)
 
@@ -192,7 +255,8 @@ def main():
     ctrl = alpha_map("lam0")
     with use_style("base", "light"):
         fig_variants(alpha_map, ctrl, out)
-        fig_grid(alpha_map, ctrl, out, "corners", VARIANTS["sil. + 8 corners"])
+        corners = lambda ax, y: (draw_silhouette(ax, y), draw_points(ax, y, CORNERS_NO_RED))  # noqa: E731
+        fig_grid(alpha_map, ctrl, out, "corners", corners)
         fig_grid(alpha_map, ctrl, out, "edges", VARIANTS["sil. + edges"])
     print(f"wrote {out}/variants.png, grid-corners.png, grid-edges.png")
 
