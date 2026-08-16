@@ -43,3 +43,7 @@ Leave the feedback controller alone, even though the setting is harder now. Ex-2
 - Code: `docs/m1/ex-2.9.3/experiment.py`, `docs/m1/ex-2.9.4/experiment.py` (the in-scan controller and the trajectory recording both live here).
 - Deliverables context: D2.1–D2.4 in the [README](../../README.md).
 - Migrated from [sca2#10](https://github.com/z0u/sca2/issues/10), which this file replaces. The autoencoder-era name for the redirect knob was β; it is γ here, matching the rest of the backlog.
+
+## Notes
+
+**2026-08-16, housekeeping** — this closes "once D2.1's design has consumed or rejected each item", and ex-2.1.11's ablations/survey read as D2.1's closing report (see its tl;dr in `docs/index.md`). Worth a real pass checking the five-item hypothesis queue against what actually ran (1 and 2 look answered by ex-2.1.6's H4 and ex-2.1.11's ablations; 3–5 I didn't check) rather than closing on a skim. Flagging rather than doing it here, since it's a program-level judgment call, not a grep-confirmable fact.
