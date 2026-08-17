@@ -76,11 +76,43 @@ def draw_full_scatter(ax: plt.Axes, y: np.ndarray):
     ax.plot(RLEVELS, level_stat(y, np.mean), color="#222", lw=1.2, zorder=4)
 
 
+def windowed(v: np.ndarray, fn) -> np.ndarray:
+    """Apply fn over each value and its two neighboring groups; calms single-group notches."""
+    stack = np.stack([np.r_[v[:1], v[:-1]], v, np.r_[v[1:], v[-1:]]])
+    return fn(stack, axis=0)
+
+
+def envelope(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Windowed min/max of the per-redness-group extremes."""
+    return windowed(level_stat(y, np.min), np.min), windowed(level_stat(y, np.max), np.max)
+
+
 def draw_silhouette(ax: plt.Axes, y: np.ndarray, mean_line: bool = True):
-    """The scatter's envelope as a filled band: min to max at each redness level."""
-    ax.fill_between(RLEVELS, level_stat(y, np.min), level_stat(y, np.max), color="#777", alpha=0.28, lw=0, zorder=2)
+    """The scatter's envelope as a filled band: windowed min to max at each redness level."""
+    lo, hi = envelope(y)
+    ax.fill_between(RLEVELS, lo, hi, color="#777", alpha=0.28, lw=0, zorder=2)
     if mean_line:
         ax.plot(RLEVELS, level_stat(y, np.mean), color="#222", lw=1.2, zorder=4)
+
+
+def draw_voronoi(ax: plt.Axes, y: np.ndarray, alpha: float = 0.85, ylim: tuple[float, float] = (-0.3, 1.1)):
+    """The envelope filled with color: each pixel takes the color of the nearest mark.
+
+    Nearest in (redness, α) with each axis normalized to its span, so the cells match what
+    the eye would attribute the region to. Clipped to the windowed envelope band.
+    """
+    lo, hi = envelope(y)
+    x0, x1 = float(RLEVELS.min()), float(RLEVELS.max())
+    y0, y1 = ylim
+    nx, ny = 330, 240
+    xs = np.linspace(x0, x1, nx)
+    ys = np.linspace(y0, y1, ny)
+    px = np.stack([np.repeat((xs - x0) / (x1 - x0), ny), np.tile((ys - y0) / (y1 - y0), nx)], axis=-1)
+    marks = np.stack([(REDNESS - x0) / (x1 - x0), (y - y0) / (y1 - y0)], axis=-1)
+    nearest = np.argmin(((px[:, None, :] - marks[None, :, :]) ** 2).sum(-1), axis=1).reshape(nx, ny).T
+    inside = (ys[:, None] >= np.interp(xs, RLEVELS, lo)[None, :]) & (ys[:, None] <= np.interp(xs, RLEVELS, hi)[None, :])
+    rgba = np.dstack([GRID_RGB[nearest], np.where(inside, alpha, 0.0)])
+    ax.imshow(rgba, extent=(x0, x1, y0, y1), origin="lower", aspect="auto", zorder=2, interpolation="nearest")
 
 
 def subgrid(levels: list[float]) -> np.ndarray:
@@ -129,6 +161,10 @@ VARIANTS = {
     "sil. + 27 pts": lambda ax, y: (draw_silhouette(ax, y), draw_points(ax, y, MID27, s=16)),
     "cube edges": draw_edges,
     "sil. + edges": lambda ax, y: (draw_silhouette(ax, y, mean_line=False), draw_edges(ax, y, lw=1.8)),
+    "voronoi fill": lambda ax, y: (
+        draw_voronoi(ax, y),
+        ax.plot(RLEVELS, level_stat(y, np.mean), color="#222", lw=1.2, zorder=4),
+    ),
 }
 
 
@@ -198,7 +234,7 @@ def fig_variants(alpha_map, ctrl: np.ndarray, out: Path):
     plt.close(fig)
 
 
-def fig_grid(alpha_map, ctrl: np.ndarray, out: Path, label: str, draw):
+def fig_grid(alpha_map, out: Path, label: str, draw):
     """The full (slice, position) grid at target size, with one candidate encoding.
 
     Overlaid per row: a red smooth-step at each panel's α for pure red (standing in for the
@@ -211,18 +247,22 @@ def fig_grid(alpha_map, ctrl: np.ndarray, out: Path, label: str, draw):
         r = 4 - si  # embedding at the bottom, as the profile figures do
         for pi in range(6):
             ax = axes[r][pi]
-            draw_base(ax, ctrl[si, :, pi])
+            ax.axhline(0, color="#ccc", lw=0.6, zorder=0)
             draw(ax, a[si, :, pi])
-            ax.tick_params(labelsize=7)
+            ax.set_frame_on(False)
+            ax.tick_params(labelsize=7, left=False, labelleft=False, bottom=(r == 4), labelbottom=(r == 4))
             if r == 0:
                 ax.set_title(POS_NAMES[pi], fontsize=9)
         axes[r][0].set_ylabel(SLICE_NAMES[si], fontsize=8, rotation=0, ha="right", va="center")
     axes[0][0].set_ylim(-0.3, 1.1)
+    # One y scale for the whole grid, on the right of the bottom-right panel.
+    axes[-1][-1].yaxis.tick_right()
+    axes[-1][-1].tick_params(labelsize=7, right=True, labelright=True)
     for ax in axes[-1]:
         ax.set_xlabel("redness", fontsize=7)
     fig.suptitle(f"either-t100 (primary), per (slice, position) — {label}", fontsize=10)
     fig.legend(
-        [plt.Line2D([], [], color="#d40000", lw=1.2, alpha=0.85), plt.Line2D([], [], color="#888", lw=1.0, alpha=0.85, ls=(0, (3, 2)))],
+        [plt.Line2D([], [], color="#d40000", lw=0.9, alpha=0.75), plt.Line2D([], [], color="#888", lw=0.75, alpha=0.75, ls=(0, (3, 2)))],
         ["α at pure red", "shape r² vs sim¹·⁵"],
         loc="outside lower center", ncols=2, fontsize=8, frameon=False,
     )  # fmt: skip
@@ -232,9 +272,9 @@ def fig_grid(alpha_map, ctrl: np.ndarray, out: Path, label: str, draw):
     fig.set_layout_engine("none")
     for si in range(5):
         row = list(axes[4 - si])
-        overlay_row_steps(fig, row, a[si, I_RED, :], color="#d40000", lw=1.2, alpha=0.85)
+        overlay_row_steps(fig, row, a[si, I_RED, :], color="#d40000", lw=0.9, alpha=0.75)
         overlay_row_steps(fig, row, np.array([r2_sim(a[si, :, pi]) for pi in range(6)]),
-                          color="#888", lw=1.0, alpha=0.85, ls=(0, (3, 2)))  # fmt: skip
+                          color="#888", lw=0.75, alpha=0.75, ls=(0, (3, 2)))  # fmt: skip
 
     fig.savefig(out / f"grid-{label}.png", dpi=150)
     plt.close(fig)
@@ -256,8 +296,8 @@ def main():
     with use_style("base", "light"):
         fig_variants(alpha_map, ctrl, out)
         corners = lambda ax, y: (draw_silhouette(ax, y), draw_points(ax, y, CORNERS_NO_RED))  # noqa: E731
-        fig_grid(alpha_map, ctrl, out, "corners", corners)
-        fig_grid(alpha_map, ctrl, out, "edges", VARIANTS["sil. + edges"])
+        fig_grid(alpha_map, out, "corners", corners)
+        fig_grid(alpha_map, out, "edges", VARIANTS["sil. + edges"])
     print(f"wrote {out}/variants.png, grid-corners.png, grid-edges.png")
 
 
