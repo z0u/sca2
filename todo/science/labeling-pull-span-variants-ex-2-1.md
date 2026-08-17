@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [D2.1, anchoring, ex-2.1.6]
 ---
 # Labeling and pull-span variants for ex-2.1.6, queued behind the baseline read

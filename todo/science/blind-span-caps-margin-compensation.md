@@ -1,5 +1,5 @@
 ---
-status: open
+status: finding
 tags: [D2.1, anchoring, ex-2.1.7]
 ---
 # If the blind span caps the margin, M3 needs a compensation mechanism
