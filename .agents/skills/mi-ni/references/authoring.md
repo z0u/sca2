@@ -40,6 +40,7 @@ The memo key is the task's *identity* — `fn name + fingerprint(inputs)` — an
 - Keep `main` cheap and deterministic; it re-runs every wake. Derive configs there; do heavy or random work _inside_ a task.
 - Fold RNG seeds into the inputs, so the same inputs really do produce the same result. A task seeded from wall-clock can never be a cache hit.
 - Force a re-run by editing the function (its evidence goes stale) or passing `version="v2"` — either way a new attempt on the same record. Editing a project helper a task calls also invalidates it; library/framework churn does not.
+- Put a new helper wherever it belongs. Evidence is traced per definition, so a function added to an existing module is invisible to every task that doesn't call it; splitting it into a fresh module to protect the cache achieves nothing, and moving an *existing* helper re-runs its callers. The file-sized exceptions (package `__init__.py`, classes) are in [memoization.md](./memoization.md).
 
 ## Returning large outputs
 

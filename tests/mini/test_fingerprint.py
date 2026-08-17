@@ -246,6 +246,36 @@ def test_module_alias_narrows_to_the_attributes_reached(load_module, deferred_mo
     assert whole["code_fp"] != parts(TASK_ALIAS_BARE, BIG_HELPERS.replace("x * 1000", "x * 2000"), "d")["code_fp"]
 
 
+TASK_PKG_DEFERRED = "def task(x):\n    from pkg.mod import helper\n\n    return helper(x)\n"
+TASK_PKG_TOPLEVEL = "from pkg.mod import helper\n\ndef task(x):\n    return helper(x)\n"
+
+
+def test_package_init_is_evidence_for_a_deferred_import(load_module, deferred_modules, tmp_path):
+    """A package's ``__init__`` runs before the module under it does, and can change what the task computes (``sca/__init__.py`` sets ``XLA_FLAGS``) — so the deferred walk folds each parent package in whole, and editing one must re-run.
+
+    The top-level import reaches the helper as an object instead, and no package source enters the manifest. That asymmetry is characterized rather than endorsed; the shape a fix might take is in ``todo/eng/package-init-only-counts-for-deferred-imports.md``. Task bodies in this project import deferred, which is the covered path.
+    """
+
+    def parts(task_src: str, init: str, variant: str) -> dict:
+        d = tmp_path / variant
+        (d / "pkg").mkdir(parents=True, exist_ok=True)
+        (d / "pkg" / "__init__.py").write_text(init)
+        (d / "pkg" / "mod.py").write_text(HELPER_V1)
+        deferred_modules(variant)
+        for name in [n for n in sys.modules if n == "pkg" or n.startswith("pkg.")]:
+            del sys.modules[name]  # the next variant's `pkg` is a different file
+        return task_key_parts(load_module("tasks", task_src, variant).task, (1,))[1]
+
+    grown = "VERSION = 1\n\ndef unrelated():\n    return 99\n"
+    deferred = parts(TASK_PKG_DEFERRED, "VERSION = 1\n", "a")
+    assert "module:pkg" in deferred["deps"]
+    assert deferred["code_fp"] != parts(TASK_PKG_DEFERRED, grown, "b")["code_fp"]
+
+    top = parts(TASK_PKG_TOPLEVEL, "VERSION = 1\n", "c")
+    assert not [k for k in top["deps"] if k.startswith("module:")]
+    assert top["code_fp"] == parts(TASK_PKG_TOPLEVEL, grown, "d")["code_fp"]
+
+
 def _key_and_parts(load_module, task_src: str, helper_src: str, variant: str) -> tuple[str, dict]:
     load_module("helpers", helper_src, variant)
     tasks = load_module("tasks", task_src, variant)
