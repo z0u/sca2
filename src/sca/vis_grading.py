@@ -16,7 +16,9 @@ pixel), their palette color, and the interpolation weights are all fixed by cube
 geometry. :class:`GradingField` computes them once; each panel then costs one sparse
 matvec and a re-bin, ~2 ms. Draw into a whole Axes (redness on x), or pass ``span``
 to place the cloud as a self-contained mark in a slot of a wider axis — e.g. one
-slot per token position, aligned with :func:`~mini.vis.smooth_step` plateaus.
+slot per token position, aligned with :func:`~mini.vis.smooth_step` plateaus. The
+cloud is data-colored, so it draws the same in either theme with no
+:func:`~mini.vis.light_dark`, and it is cheap enough to run inside ``@themed``.
 """
 
 from functools import lru_cache
@@ -101,7 +103,15 @@ class GradingField:
 
         By default redness spans its own range on x; pass *span* to compress it into
         ``(x0, x1)`` in data coordinates instead, placing the cloud as one mark in a
-        slot of a shared axis.
+        slot of a shared axis. For a per-(slice, position) figure, prefer that row
+        layout to a grid of panels: one Axes per slice, one slot of width ``sw`` per
+        position via ``span=(p - sw/2, p + sw/2)``, with overlay series drawn by
+        :func:`~mini.vis.smooth_step` at ``ramp=1 - sw`` so plateaus span the slots
+        and risers the spaces between. Clouds and overlays then share one coordinate
+        system, with no per-panel Axes or frozen-layout overlay tricks. Label x with
+        position names; redness gets no ticks — say once in the caption that it runs
+        left to right within each slot. Reference implementation: ``fig_rows`` in
+        ``docs/m2/grading_dither.py``.
         """
         nx, ny = self.nx * self.dpr, self.ny * self.dpr
         a = self.W @ y.astype(np.float32)

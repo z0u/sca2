@@ -74,6 +74,8 @@ def swatch(text: str | None) -> str:
     """Inline HTML: a colour square for a palette name, followed by the name itself.
 
     The box is tinted via the ``--sw`` custom property and styled by ``.sw`` in the shared report stylesheet (``docs/report.css``), so each occurrence stays terse. Non-palette text (e.g. a stray hex completion) falls back to ``<code>``.
+
+    ``swatch(None)`` is a ghost: an invisible square that indents what follows by one swatch. Give one to the header of a table column whose cells are swatched, so the header text starts at the same indent as the values.
     """
     if text is None:
         return '<span class="sw sw-ghost" aria-hidden="true"></span>'
