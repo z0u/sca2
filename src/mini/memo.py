@@ -216,11 +216,11 @@ def _installed_roots() -> frozenset[str]:
 
 
 def _is_namespace_portion(name: str) -> bool:
-    """Whether *name* is a directory on ``sys.path`` with no ``__init__.py`` — a PEP 420 namespace package.
+    """Whether *name* is a directory on ``sys.path``.
 
-    Such a package has no source of its own, so ``_module_file`` finding nothing for it is its ordinary shape rather than a hole; its submodules still resolve and still join the evidence. ``_installed_roots`` covers the ones that arrived in a wheel, but a project-local namespace package has no metadata to consult, and the directory is the only thing that says so.
+    Only asked once ``_module_file`` has already come back empty, and that pairing is what makes it an answer: a directory holding no ``__init__.py`` is a PEP 420 namespace package. Such a package has no source of its own, so finding none is its ordinary shape rather than a hole — its submodules still resolve and still join the evidence. ``_installed_roots`` covers the namespace packages that arrived in a wheel; a project-local one has no metadata to consult, and the directory is the only thing that says so.
 
-    Names the portion itself, not its root, so a missing submodule of a namespace package (``nspkg.gone``) still reads as the hole it is. Uncached: only reached once per module name, and only after a path search has already failed.
+    Named on the portion itself rather than its root, so a missing submodule of a namespace package (``nspkg.gone``) still reads as the hole it is. Uncached: reached once per module name, behind a path search that already failed.
     """
     rel = Path(*name.split("."))
     return any((Path(entry) / rel).is_dir() for entry in sys.path if entry)
