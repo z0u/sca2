@@ -1310,7 +1310,7 @@ def cmd_cancel(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog=PROG, description="Run and monitor memoized mi-ni experiments.")
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")
 
     def _add_name_arg(p: argparse.ArgumentParser) -> None:
         p.add_argument("name", help="experiment NAME (as listed by: ls)")
@@ -1499,6 +1499,11 @@ def main() -> None:
     p.set_defaults(func=cmd_gc)
 
     args = parser.parse_args()
+    if not args.command:
+        # Bare invocation prints the synopsis alone (session-start hooks inject it
+        # as a one-line map of the CLI). Exit 2 is argparse's own code for a usage
+        # error — what `add_subparsers(required=True)` used to raise here.
+        parser.exit(2, parser.format_usage())
     args.func(args)
 
 

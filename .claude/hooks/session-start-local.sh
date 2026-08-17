@@ -17,6 +17,25 @@ if [[ "${CLAUDE_CODE_REMOTE:-}" == 'true' ]]; then
     exit 0
 fi
 
+cd "${CLAUDE_PROJECT_DIR:-.}"
+
+# The two CLIs, generated rather than pinned here so they can't drift. Both are
+# cheap: `./go` prints its usage in pure bash, and mini is called as the venv
+# binary rather than through `uv run`, so nothing can trigger a sync. COLUMNS
+# keeps argparse from wrapping the subcommand list; MINI_PROG makes the name it
+# prints copy-pasteable. A bare invocation of either is a usage error, so they
+# exit non-zero — `set +e` inside and `|| true` outside keep that from ending
+# the hook here.
+(
+    set +e
+    echo "## Project tooling"
+    echo
+    ./go 2>&1
+    [[ -x .venv/bin/mini ]] && COLUMNS=200 MINI_PROG=bin/mini .venv/bin/mini 2>&1
+) || true
+echo
+
+# Only the resource note below needs `free`; the tooling above lands either way.
 command -v free >/dev/null 2>&1 || exit 0
 
 mem="$(free -h | awk '/^Mem:/ {print $7" free / "$2" total"}')"

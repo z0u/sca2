@@ -51,7 +51,18 @@ log() { echo "session-start: $*" >&2; }
     echo "Experiments (report.py dirs; annotated status in docs/index.md):"
     git ls-files 'docs/**/report.py' | sed 's#/report.py##; s#^docs/#  #' | paste -sd' '
     echo "This is not an environment the human has direct access to, so if you are working on an experiment, *always* publish the report before pushing. Otherwise the human won't be able to see the rendered report and its figures, which hampers collaboration. When referring to figures in conversation you should share them with 'SendUserFile', or the 'Read' tool if you also want to see it too."
-) 2>/dev/null
+    echo
+    # The two CLIs, generated rather than pinned here so they can't drift. Both
+    # are cheap enough for the synchronous path: `./go` prints its usage in pure
+    # bash, and mini is called as the venv binary rather than through `uv run`,
+    # so nothing here can trigger the sync that step 2 below defers. That venv
+    # doesn't exist yet on a cold container, hence the guard — the first session
+    # gets one line, every later one gets both.
+    echo "Project tooling: $(./go 2>&1)"
+    if [[ -x .venv/bin/mini ]]; then
+        echo "Experiments: $(COLUMNS=200 MINI_PROG=bin/mini .venv/bin/mini 2>&1)"
+    fi
+) 2>/dev/null || true
 
 # 0. Put the project venv first on PATH so bare `python` resolves to the
 #    project's 3.14 interpreter instead of the image's system Python 3.11 (which
