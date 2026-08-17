@@ -50,8 +50,4 @@ rg -l anneal todo/science/           # which files
 rg -no '.{0,55}anneal.{0,55}' todo/  # a {0,N} window around each match
 ```
 
-Find out what you can access: `./go auth --check`
-
-Manage worktrees: `./go worktrees [--prune]`
-
 Take care to not leak secrets into the chat transcript. To see which environment variables are set (e.g. "is there an `HF_*` token?"), use `compgen -v HF_` (bash builtin).
