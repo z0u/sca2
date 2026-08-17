@@ -31,6 +31,7 @@ Coverage is biased toward over-invalidation (a spurious re-run is visible and bo
 - Files read at runtime. Pass an `Artifact` handle (keys by content), not a path the task opens.
 - Env vars and machine state. Pass them as arguments if they affect the result. The exception this project makes deliberately is `XLA_FLAGS`, which decides whether a GPU reduction is deterministic: it's set project-wide via `[tool.mini] env` and recorded on every attempt (`env.numerics_env`) rather than folded into the key, so turning determinism on didn't invalidate four published sweeps. The reasoning, and the measurements behind it, are in [eng/determinism.md](../../../../eng/determinism.md).
 - Attributes on instances (`self.x` set elsewhere, monkeypatching) and values with no stable JSON encoding — not tracked; keep task behavior in code and plain data.
+- Modules the driver process can't find. The `sys.path` search reads "no source file" the same way for a C extension and for project code that isn't installed, and the second kind then contributes nothing to the evidence — so the task looks dependency-free and caches forever. It can't be resolved from inside the walk (the source genuinely isn't there to read), so it warns instead: `no source found for 'x' on sys.path, and it is neither stdlib nor an installed package`. Seeing that on your own code means the driver's environment is missing it — check the editable install or `PYTHONPATH` — and until it's fixed, edits to that module will not re-run the task.
 
 ### `mini explain`: why did this re-run?
 

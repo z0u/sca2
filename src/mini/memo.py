@@ -18,6 +18,7 @@ import enum
 import fcntl
 import functools
 import hashlib
+import importlib.metadata
 import inspect
 import json
 import logging
@@ -201,6 +202,30 @@ def _module_file(name: str) -> Path | None:
     return None
 
 
+@functools.cache
+def _installed_roots() -> frozenset[str]:
+    """Top-level names supplied by an installed distribution.
+
+    The reason a name can legitimately resolve to no *source* file: a C extension (``ujson``), or a wheel that ships no ``.py`` at its root. Read from installed metadata rather than by importing, and only ever consulted once a path search has already failed.
+    """
+    try:
+        return frozenset(importlib.metadata.packages_distributions())
+    except Exception:  # a diagnostic must never be the thing that breaks a run
+        log.debug("couldn't enumerate installed distributions", exc_info=True)
+        return frozenset()
+
+
+def _should_have_resolved(name: str) -> bool:
+    """Whether finding no source for *name* is a hole rather than an exclusion.
+
+    ``_module_file`` returning ``None`` is the normal case for the stdlib and for extension modules, and the walk is right to skip those. It means something else when the name is project code: nothing about the module joins the evidence, so edits to it can't invalidate the cache. Told apart by the *root* package, which is what says whose code this is — a missing submodule of a project package counts, a missing submodule of ``numpy`` does not.
+    """
+    root = name.partition(".")[0]
+    if (path := _module_file(root)) is not None:
+        return _is_project_file(path)
+    return root not in sys.stdlib_module_names and root not in _installed_roots()
+
+
 def _resolve_relative(pkg: str, module: str | None, level: int) -> str | None:
     """Absolute dotted name for ``from <level dots><module> import …`` inside *pkg*."""
     if level == 0:
@@ -285,9 +310,17 @@ def _module_index(name: str) -> _ModuleIndex | None:
     """Read *name*'s top-level namespace from source.
 
     ``None`` for anything that isn't project code — the stdlib, an installed package, ``mini`` itself, or a name that resolves to no file at all.
+
+    That last case is the one worth hearing about, so it warns: a module the driver process can't see contributes nothing to the evidence, which reads as "no dependencies" and caches forever. Cached alongside the index, so each name says it once.
     """
-    path = _module_file(name)
-    if path is None or not _is_project_file(path):
+    if (path := _module_file(name)) is None:
+        if _should_have_resolved(name):
+            log.warning(
+                "no source found for %r on sys.path, and it is neither stdlib nor an installed package — nothing about it joins the evidence, so edits to it will not re-run the task. Check that the driver process can see it (an editable install, or PYTHONPATH).",
+                name,
+            )
+        return None
+    if not _is_project_file(path):
         return None
     try:
         source = path.read_text()

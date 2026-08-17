@@ -113,6 +113,49 @@ def test_deferred_library_imports_are_not_tracked(load_module, deferred_modules)
     assert not [k for k in parts["deps"] if k.startswith(("module:json", "json:"))]
 
 
+TASK_GHOST = "def task(x):\n    from ghost import helper\n\n    return helper(x)\n"
+TASK_GHOST_SUBMODULE = "def task(x):\n    from pkg.ghost import helper\n\n    return helper(x)\n"
+TASK_EXTENSION = "def task(x):\n    import math\n\n    return math.sqrt(x)\n"
+
+
+def test_unresolvable_module_warns_and_contributes_nothing(load_module, deferred_modules, caplog):
+    """A module the driver process can't find is the one case where "not project code" is a lie.
+
+    The walk skips it exactly as it skips the stdlib, so the task depends on nothing and its record caches forever — a stale result served for the life of the module. Nothing about the outcome can be fixed from here (the source genuinely isn't there to read), so the requirement is that it says so."""
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _, parts = _deferred_parts(load_module, deferred_modules, TASK_GHOST, "a", helpers=HELPER_V1)
+    assert not [k for k in parts["deps"] if "ghost" in k], "the hazard: the import joined no evidence"
+    assert [r for r in caplog.records if "'ghost'" in r.message], "…and said nothing about it"
+
+
+def test_missing_submodule_of_a_project_package_warns(load_module, deferred_modules, tmp_path, caplog):
+    """The realistic shape: ``from sca.thing import x`` after ``thing`` moved. The root package is project code and resolves fine, so only the leaf is missing — which is what makes it easy to miss."""
+    (tmp_path / "a" / "pkg").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "a" / "pkg" / "__init__.py").write_text("")
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _deferred_parts(load_module, deferred_modules, TASK_GHOST_SUBMODULE, "a")
+    assert [r for r in caplog.records if "'pkg.ghost'" in r.message]
+
+
+def test_extension_modules_resolve_silently(load_module, deferred_modules, caplog):
+    """The counterpart, and the reason the check can't just be "found no file".
+
+    ``math`` is C, so a path search finds nothing for it exactly as it finds nothing for a module that is missing — the two are indistinguishable until you ask who *claims* the name. Warning here would fire on every task that imports the stdlib, which is how a warning stops being read."""
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _deferred_parts(load_module, deferred_modules, TASK_EXTENSION, "a")
+    assert not caplog.records
+
+
+def test_installed_extension_packages_are_not_holes(monkeypatch):
+    """The same silence has to cover wheels that ship no source at their root — a C extension like ``_xxhash``, or a namespace package. Installed metadata is what says so, since the path search can't."""
+    from mini import memo
+
+    monkeypatch.setattr(memo, "_installed_roots", lambda: frozenset({"speedy"}))
+    assert not memo._should_have_resolved("speedy")
+    assert not memo._should_have_resolved("speedy.core")
+    assert memo._should_have_resolved("ghost")
+
+
 BIG_HELPERS = HELPER_V1 + "\n\ndef unrelated(x):\n    return x * 1000\n\nUNUSED = 'a' * 500\n"
 TASK_ALIAS = "def task(x):\n    from pkg import helpers as h\n\n    return h.helper(x)\n"
 TASK_ALIAS_BARE = "def task(x):\n    from pkg import helpers as h\n\n    return h.helper(x) + len(dir(h))\n"
