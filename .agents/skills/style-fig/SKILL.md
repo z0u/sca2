@@ -1,6 +1,6 @@
 ---
 name: style-fig
-description: Figure conventions for experiment reports. Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs and RGB-cube bounds as hexagons, data-colored marks, theming, captions and nested sub-figures, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, writing a figure or table caption, or building a results table, in a notebook.
+description: Figure conventions for experiment reports. Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs and RGB-cube bounds as hexagons, data-colored marks, grading clouds, theming, captions and nested sub-figures, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, writing a figure or table caption, or building a results table, in a notebook.
 ---
 
 The M1 reports and the GRaM workshop poster set the house style. Match them: a reader who has seen one SCA figure should be able to read the next one without relearning the encoding.
@@ -53,6 +53,12 @@ Two panels with nearly-but-not-quite equal limits read as a bug; the fix is to s
 In the color domain, color the marks with the colors they represent; a legend or colorbar is almost always the wrong tool. Encode comparisons in the mark itself: facecolor shows the model output (reconstruction), edgecolor (or an inset patch, for grids) shows the true input, so damage reads as a face/edge mismatch. Loss-vs-hue lines are drawn as segments colored by the color at each x (round capstyle to avoid gaps).
 
 The same rule holds in prose and HTML tables: name a palette color with an inline swatch, not words alone. `sca.data.colors.swatch(name)` emits a `<span class="sw" style="--sw:#rrggbb">` square followed by the name (and falls back to `<code>` for non-palette text, e.g. a stray hex completion).
+
+## Grading clouds
+
+A grading figure asks how a per-color response — an α read-out over the v216 grid, say — varies with redness. At one panel per (slice, position), 216 marks each is too much ink; draw the response as a dithered cloud instead: `sca.vis_grading.GradingField` (mechanics in its docstrings; `grading_field(...)` returns a cached instance). Every pixel shows one *measured* grid color and coverage becomes opacity, so density reads as translucency and no blending invents colors the data never produced. Build one field per figure and reuse it across panels. `k` sets the look and gives the same texture at any `px`/`dpr`; the `dpr=2` default anti-aliases, while `dpr=1` is the strict dither for when palette purity matters more than smoothness.
+
+Prefer the row layout to a panel grid: one Axes per slice, one slot per token position via `draw(ax, y, span=(p - sw/2, p + sw/2))`, with overlay series as `smooth_step(..., ramp=1-sw)` so plateaus span the slots and risers the gaps — clouds and overlays then share one coordinate system, with no per-panel Axes or frozen-layout overlay hacks. Label x with position names; redness gets no ticks — say once in the caption that it runs left to right within each slot. The cloud is data-colored and theme-invariant, so it needs no `light_dark`, and at ~2 ms per panel it can draw inside `@themed`. Reference implementation: `fig_rows` in `docs/m2/grading_dither.py`.
 
 ## Result tables and swatches
 
