@@ -116,6 +116,18 @@ def test_deferred_library_imports_are_not_tracked(load_module, deferred_modules)
 TASK_GHOST = "def task(x):\n    from ghost import helper\n\n    return helper(x)\n"
 TASK_GHOST_SUBMODULE = "def task(x):\n    from pkg.ghost import helper\n\n    return helper(x)\n"
 TASK_EXTENSION = "def task(x):\n    import math\n\n    return math.sqrt(x)\n"
+TASK_NAMESPACE = "def task(x):\n    from nspkg.leaf import go\n\n    return go(x)\n"
+TASK_NAMESPACE_GHOST = "def task(x):\n    from nspkg.gone import go\n\n    return go(x)\n"
+TASK_OPTIONAL_DEP = (
+    "def task(x):\n"
+    "    try:\n"
+    "        from fastmath import boost\n"
+    "    except ImportError:\n"
+    "        def boost(v):\n"
+    "            return v\n"
+    "\n"
+    "    return boost(x)\n"
+)
 
 
 def test_unresolvable_module_warns_and_contributes_nothing(load_module, deferred_modules, caplog):
@@ -144,6 +156,38 @@ def test_extension_modules_resolve_silently(load_module, deferred_modules, caplo
     with caplog.at_level("WARNING", logger="mini.memo"):
         _deferred_parts(load_module, deferred_modules, TASK_EXTENSION, "a")
     assert not caplog.records
+
+
+def test_local_namespace_package_is_not_a_hole(load_module, deferred_modules, tmp_path, caplog):
+    """A PEP 420 namespace package — a directory with no ``__init__.py`` — has no source of its own to find, so the packages walked on the way down to a submodule must not read as holes.
+
+    Installed metadata answers this for a namespace package that arrived in a wheel; a project-local one has nothing to consult but the directory. The submodule underneath it resolves normally and still has to reach the evidence, which is what makes the silence safe."""
+    (tmp_path / "a" / "nspkg").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "a" / "nspkg" / "leaf.py").write_text("def go(x):\n    return x + 1\n")
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _, parts = _deferred_parts(load_module, deferred_modules, TASK_NAMESPACE, "a")
+    assert "nspkg.leaf:go" in parts["deps"], "the submodule still has to be tracked"
+    assert not caplog.records
+
+
+def test_missing_submodule_of_a_namespace_package_warns(load_module, deferred_modules, tmp_path, caplog):
+    """The silence above is bought by naming the portion rather than its root, so a genuine hole *under* a namespace package still gets said out loud."""
+    (tmp_path / "a" / "nspkg").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "a" / "nspkg" / "leaf.py").write_text("def go(x):\n    return x + 1\n")
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _deferred_parts(load_module, deferred_modules, TASK_NAMESPACE_GHOST, "a")
+    assert [r for r in caplog.records if "'nspkg.gone'" in r.message]
+
+
+def test_deliberately_absent_imports_warn_and_say_so(load_module, deferred_modules, caplog):
+    """A known false positive, pinned rather than fixed: an optional dependency behind ``try/except ImportError`` warns whenever it is absent, which is the case the code was written to handle.
+
+    Telling it apart from a real hole needs the AST context that says "this import is guarded", and the walk reaches a task body as bytecode, where the ``try`` has become a jump — the same reason ``if TYPE_CHECKING:`` imports of uninstalled packages warn. What the message can do is admit the possibility, so a reader isn't sent looking for a broken install that was never broken. If a later change does learn to tell the two apart, this test should flip."""
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _deferred_parts(load_module, deferred_modules, TASK_OPTIONAL_DEP, "a")
+    warnings = [r for r in caplog.records if "'fastmath'" in r.message]
+    assert warnings, "the shape still warns"
+    assert "meant to be absent" in warnings[0].message, "…and the message has to allow that it is fine"
 
 
 def test_installed_extension_packages_are_not_holes(monkeypatch):
