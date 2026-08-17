@@ -5,7 +5,7 @@ ink to tile 5 slices x 6 positions. This sketch prototypes lighter encodings on
 ex-2.1.10's published arrays and writes PNGs for comparison:
 
 - variants.png: one column per encoding, on a clean and a noisy condition
-- grid-corners.png / grid-edges.png: the full (slice, position) grid, small
+- grid-corners.png / grid-cloud.png: the full (slice, position) grid, small
 
 Not a notebook, so the site build ignores it. Run from the repo root:
 
@@ -15,6 +15,7 @@ Not a notebook, so the site build ignores it. Run from the repo root:
 import argparse
 import json
 import tempfile
+from time import time
 from pathlib import Path
 from typing import cast
 
@@ -136,8 +137,10 @@ def cube_edges() -> list[np.ndarray]:
     idx = np.arange(n**3).reshape(n, n, n)
     edges = []
     for axis in range(3):
-        for a in (0, n - 1):
-            for b in (0, n - 1):
+        # for a in (0, n - 1):
+        #     for b in (0, n - 1):
+        for a in range(n):
+            for b in range(n):
                 sel: list = [a, b]
                 sel.insert(axis, slice(None))
                 edges.append(idx[tuple(sel)])
@@ -151,20 +154,232 @@ def draw_edges(ax: plt.Axes, y: np.ndarray, lw: float = 2.4):
         pts = np.column_stack([REDNESS[e], y[e]])
         segs += [pts[i : i + 2] for i in range(len(e) - 1)]
         cols += [np.clip((GRID_RGB[e[i]] + GRID_RGB[e[i + 1]]) / 2, 0, 1) for i in range(len(e) - 1)]
-    ax.add_collection(LineCollection(segs, colors=cols, lw=lw, capstyle="round", zorder=5))
+    ax.add_collection(LineCollection(segs, colors=cols, lw=lw, capstyle="round", zorder=5, alpha=0.5))
+
+
+def interp_alpha(y: np.ndarray, rgb: np.ndarray) -> np.ndarray:
+    """Trilinear interpolation of a per-color response onto arbitrary unit-cube points.
+
+    The response is only *measured* at the 216 vocabulary colors; off-grid colors have no
+    token, so these values are an interpolant, not data. Same move `draw_edges` makes along
+    each cube edge, extended into the interior.
+    """
+    n = len(LEVELS)  # LEVELS is uniform on [0, 1], so the cell index is just rgb * (n - 1)
+    grid = y.reshape(n, n, n)
+    t = np.clip(rgb, 0, 1) * (n - 1)
+    i0 = np.clip(np.floor(t).astype(int), 0, n - 2)
+    f = t - i0
+    out = np.zeros(len(rgb))
+    for corner in np.ndindex(2, 2, 2):
+        w = np.prod([f[:, c] if d else 1 - f[:, c] for c, d in enumerate(corner)], axis=0)
+        out += w * grid[tuple(i0[:, c] + d for c, d in enumerate(corner))]
+    return out
+
+
+def lattice(levels: int, chunk: int = 1_000_000):
+    """The full levels³ RGB lattice, in blocks small enough to interpolate at once."""
+    axis = np.arange(levels) / (levels - 1)
+    for start in range(0, levels**3, chunk):
+        i = np.arange(start, min(start + chunk, levels**3))
+        yield np.stack([axis[i // levels**2], axis[i // levels % levels], axis[i % levels]], axis=-1)
+
+
+def draw_cloud_pts(
+    ax: plt.Axes,
+    y: np.ndarray,
+    levels: int = 256,
+    n: int = 60_000,
+    s: float = 1.2,
+    alpha: float = 0.3,
+    mean_line: bool = True,
+    seed: int = 0,
+):
+    """A random sample of the oversampled lattice, as marks.
+
+    Mark size and opacity are set per figure: the grid's panels are a third the width of the
+    comparison figure's, so the same cloud lands in a ninth of the area.
+    """
+    rgb = np.random.default_rng(seed).integers(0, levels, (n, 3)) / (levels - 1)
+    ax.scatter(redness(rgb), interp_alpha(y, rgb), c=rgb, s=s, lw=0, alpha=alpha, zorder=3)
+    if mean_line:
+        ax.plot(RLEVELS, level_stat(y, np.mean), color="#222", lw=1.2, zorder=4)
+
+
+def draw_cloud(ax: plt.Axes, y: np.ndarray, levels: int = 256, ylim: tuple[float, float] = (-0.3, 1.1)):
+    """The whole levels³ lattice, rendered by accumulation.
+
+    Every pixel takes the mean color of the points landing in it, with opacity following how
+    many did. Too many marks to draw one by one, so we bin them; the picture is the same, it
+    just skips the overdraw.
+    """
+    nx, ny = 480, 360
+    x0, x1 = float(REDNESS.min()), float(REDNESS.max())
+    y0, y1 = ylim
+    sums, cnt = np.zeros((nx * ny, 3)), np.zeros(nx * ny)
+    for rgb in lattice(levels):
+        ix = np.rint((redness(rgb) - x0) / (x1 - x0) * (nx - 1)).astype(int)
+        iy = np.rint((interp_alpha(y, rgb) - y0) / (y1 - y0) * (ny - 1)).astype(int)
+        ok = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
+        flat = (iy[ok] * nx + ix[ok]).astype(int)
+        cnt += np.bincount(flat, minlength=nx * ny)
+        for c in range(3):
+            sums[:, c] += np.bincount(flat, weights=rgb[ok, c], minlength=nx * ny)
+    ref = np.percentile(cnt[cnt > 0], 55)  # the bulk reads as solid; the sparse fringe fades
+    rgba = np.dstack([
+        np.divide(sums, np.maximum(cnt, 1)[:, None]).reshape(ny, nx, 3),
+        np.clip(cnt / ref, 0, 1).reshape(ny, nx) ** 0.6 * 0.9,
+    ])  # fmt: skip
+    ax.imshow(rgba, extent=(x0, x1, y0, y1), origin="lower", aspect="auto", zorder=2, interpolation="nearest")
+    ax.plot(RLEVELS, level_stat(y, np.mean), color="#222", lw=1.2, zorder=4)
+
+
+def strata(k: int, seed: int = 0) -> np.ndarray:
+    """A jittered k³ stratification of the unit cube: one point per sub-cell, placed at random
+    within it.
+
+    Even coverage without the moiré a plain lattice would beat against redness, and
+    deterministic — the seed fixes the picture rather than merely the noise.
+    """
+    g = np.stack(np.meshgrid(*[np.arange(k)] * 3, indexing="ij"), axis=-1).reshape(-1, 3)
+    return (g + np.random.default_rng(seed).random(g.shape)) / k
+
+
+def draw_cloud_strat(ax: plt.Axes, y: np.ndarray, k: int = 39, s: float = 1.2, alpha: float = 0.3, seed: int = 0):
+    """The cloud, stratified rather than sampled at random. k³ marks (39³ ≈ 59k)."""
+    rgb = strata(k, seed)
+    order = np.random.default_rng(seed + 1).permutation(len(rgb))  # fixed overdraw order
+    ax.scatter(redness(rgb)[order], interp_alpha(y, rgb)[order], c=rgb[order], s=s, lw=0, alpha=alpha, zorder=3)
+
+
+def cells() -> np.ndarray:
+    """The (n-1)³ lattice cells, as index arrays into GRID_RGB: 125 cells of 8 corners."""
+    n = len(LEVELS)
+    idx = np.arange(n**3).reshape(n, n, n)
+    return np.array([
+        idx[i : i + 2, j : j + 2, k : k + 2].ravel()
+        for i in range(n - 1) for j in range(n - 1) for k in range(n - 1)
+    ])  # fmt: skip
+
+
+def draw_sweeps(ax: plt.Axes, y: np.ndarray, k: int = 64, lw: float = 0.6, alpha: float = 0.05):
+    """`draw_edges` oversampled: the r-sweep at k² intermediate (g, b), each segment exact.
+
+    Both plotted coordinates are multilinear in rgb — redness is r(1 - g/2 - b/2), and trilinear
+    interpolation is multilinear by construction — so along a line of constant (g, b) each is
+    *linear* in r. A cell-crossing is therefore a straight segment between two interpolated
+    endpoints, with no error at any point along it, and the region the cube maps to is ruled by
+    these lines. Sweeping r alone covers the cube: every color sits on exactly one such line.
+
+    Lines rasterize without holes, which is what point sampling could not manage, and the ink
+    piles up where many colors map to the same place — the density shows without averaging
+    hues together.
+    """
+    n = len(LEVELS)
+    cell = np.stack(np.meshgrid(np.arange(k), np.arange(k), indexing="ij"), axis=-1).reshape(-1, 2)
+    gb = (cell + np.random.default_rng(1).random(cell.shape)) / k  # jittered, so no lattice moiré
+    rgb = np.empty((len(gb), n, 3))
+    rgb[..., 0], rgb[..., 1:] = LEVELS[None, :], gb[:, None, :]
+    flat = rgb.reshape(-1, 3)
+    pts = np.stack([redness(flat), interp_alpha(y, flat)], axis=-1).reshape(len(gb), n, 2)
+    segs = np.concatenate([pts[:, i : i + 2] for i in range(n - 1)])
+    mids = np.concatenate([(rgb[:, i] + rgb[:, i + 1]) / 2 for i in range(n - 1)])
+    ax.add_collection(LineCollection(list(segs), colors=np.clip(mids, 0, 1), lw=lw, alpha=alpha, zorder=3))
+
+
+def draw_dither(
+    ax: plt.Axes,
+    y: np.ndarray,
+    k: int = 140,
+    px: tuple[int, int] = (480, 360),
+    ylim: tuple[float, float] = (-0.3, 1.1),
+    seed: int = 0,
+):
+    """One grid color per pixel, opaque, chosen by lot from everything that maps there.
+
+    Blending is what greys the fills out: where a red cell and a green cell overlap, an average
+    paints an olive that no color in the data produces. So each pixel instead picks a single
+    winner among the samples landing in it, uniformly at random, and takes its color at full
+    opacity. Every sample is quantized to its nearest grid color first, so the whole image is
+    painted from the 216 measured colors and nothing else. Over a small neighborhood the mix of
+    winners follows the mix of colors, which is the property mean-blending was there to provide.
+
+    Pixels the cube never reaches stay transparent, so the silhouette is the honest one: filled
+    where colors land, empty where none do.
+    """
+    nx, ny = px
+    x0, x1 = float(REDNESS.min()), float(REDNESS.max())
+    ylo, yhi = ylim
+    rgb = strata(k, seed)
+    ix = np.rint((redness(rgb) - x0) / (x1 - x0) * (nx - 1)).astype(np.int64)
+    iy = np.rint((interp_alpha(y, rgb) - ylo) / (yhi - ylo) * (ny - 1)).astype(np.int64)
+    ok = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
+    flat = iy[ok] * nx + ix[ok]
+    n = len(LEVELS)
+    palette = np.rint(rgb[ok] * (n - 1)).astype(np.int64) @ np.array([n * n, n, 1])  # nearest of the 216
+
+    # Sort by pixel, breaking ties at random, then keep the first of each run: a uniform draw
+    # among that pixel's samples, without materializing per-pixel lists.
+    key = np.random.default_rng(seed + 2).integers(0, 2**31, len(flat))
+    order = np.argsort(flat * (2**31) + key, kind="stable")
+    sflat = flat[order]
+    first = order[np.flatnonzero(np.diff(sflat, prepend=-1))]
+
+    canvas = np.zeros((nx * ny, 4))
+    canvas[flat[first], :3] = GRID_RGB[palette[first]]
+    canvas[flat[first], 3] = 1.0
+    ax.imshow(canvas.reshape(ny, nx, 4), extent=(x0, x1, ylo, yhi), origin="lower", aspect="auto",
+              zorder=2, interpolation="nearest")  # fmt: skip
+
+
+def draw_patches(ax, y: np.ndarray, m: int = 24, ylim: tuple[float, float] = (-0.3, 1.1), a0: float = 0.85):
+    """One filled patch per lattice cell, composited rather than pooled.
+
+    A cell's 8 corners are measured colors one grid step apart, so averaging *within* a cell
+    blends colors that are already neighbors. Averaging *across* cells is what turns the binned
+    version grey, so cells are composited instead: each lays down its own color over what is
+    already there, in order of increasing redness, so the red-relevant cells finish on top.
+    """
+    nx, ny = 480, 360
+    x0, x1 = float(REDNESS.min()), float(REDNESS.max())
+    ylo, yhi = ylim
+    canvas = np.zeros((nx * ny, 4))
+    u = strata(m) / (len(LEVELS) - 1)  # sample offsets within one cell, shared by all cells
+    cell = cells()
+    for c in cell[np.argsort(REDNESS[cell].mean(axis=1))]:
+        rgb = GRID_RGB[c[0]] + u
+        ix = np.rint((redness(rgb) - x0) / (x1 - x0) * (nx - 1)).astype(int)
+        iy = np.rint((interp_alpha(y, rgb) - ylo) / (yhi - ylo) * (ny - 1)).astype(int)
+        ok = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
+        flat = iy[ok] * nx + ix[ok]
+        cnt = np.bincount(flat, minlength=nx * ny)
+        hit = cnt > 0
+        src = np.stack([np.bincount(flat, weights=rgb[ok, ch], minlength=nx * ny) for ch in range(3)], axis=-1)
+        src[hit] /= cnt[hit, None]
+        a = (np.clip(cnt / np.percentile(cnt[hit], 70), 0, 1) * a0)[:, None]  # thin edges stay soft
+        canvas[:, :3] = canvas[:, :3] * (1 - a) + src * a  # the over operator, cell by cell
+        canvas[:, 3:] = canvas[:, 3:] * (1 - a) + a
+    canvas[:, :3] /= np.maximum(canvas[:, 3:], 1e-6)  # accumulated premultiplied; undo for imshow
+    ax.imshow(np.clip(canvas, 0, 1).reshape(ny, nx, 4), extent=(x0, x1, ylo, yhi), origin="lower",
+              aspect="auto", zorder=2, interpolation="nearest")  # fmt: skip
 
 
 VARIANTS = {
     "current (216 pts)": draw_full_scatter,
     "silhouette": draw_silhouette,
     "sil. + 8 corners": lambda ax, y: (draw_silhouette(ax, y), draw_points(ax, y, CORNERS)),
-    "sil. + 27 pts": lambda ax, y: (draw_silhouette(ax, y), draw_points(ax, y, MID27, s=16)),
+    # "sil. + 27 pts": lambda ax, y: (draw_silhouette(ax, y), draw_points(ax, y, MID27, s=16)),
     "cube edges": draw_edges,
-    "sil. + edges": lambda ax, y: (draw_silhouette(ax, y, mean_line=False), draw_edges(ax, y, lw=1.8)),
-    "voronoi fill": lambda ax, y: (
-        draw_voronoi(ax, y),
-        ax.plot(RLEVELS, level_stat(y, np.mean), color="#222", lw=1.2, zorder=4),
-    ),
+    "cloud (60k random)": draw_cloud_pts,
+    "cloud (39³ stratified)": draw_cloud_strat,
+    "cloud (256³, binned)": draw_cloud,
+    "sweeps (64² lines)": draw_sweeps,
+    "dither (216 palette)": draw_dither,
+    "cell patches": draw_patches,
+    # "sil. + edges": lambda ax, y: (draw_silhouette(ax, y, mean_line=False), draw_edges(ax, y, lw=1.8)),
+    # "voronoi fill": lambda ax, y: (
+    #     draw_voronoi(ax, y),
+    #     ax.plot(RLEVELS, level_stat(y, np.mean), color="#222", lw=1.2, zorder=4),
+    # ),
 }
 
 
@@ -223,7 +438,10 @@ def fig_variants(alpha_map, ctrl: np.ndarray, out: Path):
         resp = alpha_map(cond)[:, :, 0].mean(axis=0)
         for ax, (name, draw) in zip(row, VARIANTS.items(), strict=True):
             draw_base(ax, ctrl[:, :, 0].mean(axis=0))
+            start = time()
             draw(ax, resp)
+            end = time()
+            print(f"{name}: {end - start:0.2f}s")
             if cond == conds[0]:
                 ax.set_title(name, fontsize=9)
         row[0].set_ylabel(f"{cond}\nα at op1", fontsize=8)
@@ -267,8 +485,12 @@ def fig_grid(alpha_map, out: Path, label: str, draw):
         loc="outside lower center", ncols=2, fontsize=8, frameon=False,
     )  # fmt: skip
 
-    # Freeze the layout, then span each row with the two smooth-step overlays.
-    fig.canvas.draw()
+    # Freeze the layout, then span each row with the two smooth-step overlays. Run the layout
+    # engine directly rather than canvas.draw(): both settle the panel boxes identically, but
+    # a full draw also paints every mark, and this figure is repainted by savefig anyway.
+    engine = fig.get_layout_engine()
+    assert engine is not None
+    engine.execute(fig)
     fig.set_layout_engine("none")
     for si in range(5):
         row = list(axes[4 - si])
@@ -293,12 +515,24 @@ def main():
         return np.mean([alphas[f"{cond}-s{s}/alpha"] for s in range(seeds[cond])], axis=0)
 
     ctrl = alpha_map("lam0")
+    corners = lambda ax, y: (draw_silhouette(ax, y), draw_points(ax, y, CORNERS_NO_RED))  # noqa: E731
+    cloud = lambda ax, y: draw_cloud_pts(ax, y, s=0.5, alpha=0.22, mean_line=False)  # noqa: E731
+    sweeps = lambda ax, y: draw_sweeps(ax, y, lw=0.4, alpha=0.09)  # noqa: E731
+    # Panels are ~180px wide at 150dpi, so the canvas and the sample count both come down.
+    dither = lambda ax, y: draw_dither(ax, y, k=90, px=(240, 180))  # noqa: E731
+    figures = [
+        ("variants.png", lambda: fig_variants(alpha_map, ctrl, out)),
+        ("grid-corners.png", lambda: fig_grid(alpha_map, out, "corners", corners)),
+        ("grid-cloud.png", lambda: fig_grid(alpha_map, out, "cloud", cloud)),
+        ("grid-sweeps.png", lambda: fig_grid(alpha_map, out, "sweeps", sweeps)),
+        ("grid-dither.png", lambda: fig_grid(alpha_map, out, "dither", dither)),
+        # ("grid-edges.png", lambda: fig_grid(alpha_map, out, "edges", VARIANTS["sil. + edges"])),
+    ]
     with use_style("base", "light"):
-        fig_variants(alpha_map, ctrl, out)
-        corners = lambda ax, y: (draw_silhouette(ax, y), draw_points(ax, y, CORNERS_NO_RED))  # noqa: E731
-        fig_grid(alpha_map, out, "corners", corners)
-        fig_grid(alpha_map, out, "edges", VARIANTS["sil. + edges"])
-    print(f"wrote {out}/variants.png, grid-corners.png, grid-edges.png")
+        for name, draw in figures:
+            t = time()
+            draw()
+            print(f"wrote {out}/{name} ({time() - t:.1f}s)")
 
 
 if __name__ == "__main__":
