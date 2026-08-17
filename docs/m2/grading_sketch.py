@@ -494,7 +494,7 @@ def fig_grid(alpha_map, out: Path, label: str, draw):
     fig.set_layout_engine("none")
     for si in range(5):
         row = list(axes[4 - si])
-        overlay_row_steps(fig, row, a[si, I_RED, :], color="#d40000", lw=0.9, alpha=0.75)
+        overlay_row_steps(fig, row, a[si, I_RED, :], color="#d40000", lw=0.5, alpha=0.75)
         overlay_row_steps(fig, row, np.array([r2_sim(a[si, :, pi]) for pi in range(6)]),
                           color="#888", lw=0.75, alpha=0.75, ls=(0, (3, 2)))  # fmt: skip
 
