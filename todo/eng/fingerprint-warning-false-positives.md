@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [memoization]
 opened: 2026-08-17
+closed: 2026-08-17
 ---
 # Three shapes make the unresolvable-module warning fire on healthy code
 
@@ -14,3 +15,7 @@ An **optional dependency behind `try/except ImportError`** warns whenever the de
 The doc entry in `.agents/skills/mi-ni/references/memoization.md` currently reads as though any warning means a missing install, and the message points the reader at the editable install and `PYTHONPATH`. That remedy is wrong for all three, so whichever way this is settled, the message and the entry should admit that a warning can also mean "deliberately absent".
 
 Worth weighing against the reason the stdlib carve-out exists at all: a warning that fires on the ordinary case stops being read, and this one guards a failure that costs results.
+
+## Notes
+
+**2026-08-17, tech-debt session** — Settled the way the item proposed: the namespace package is fixed, the two guarded shapes are documented. `_is_namespace_portion` names the *portion* rather than its root, so `nspkg` goes quiet while `nspkg.gone` still reads as the hole it is — the narrower test than the item suggested, and it keeps the missing-submodule warning that the check exists for. The message and the `memoization.md` entry now both say a warning can mean "deliberately absent", so neither sends a reader after an install that was never broken. Three tests: the namespace silence, the hole under it, and the `try/except ImportError` shape pinned as known behaviour — that last one should flip if a later change learns to read the guard.

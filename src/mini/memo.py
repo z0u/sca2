@@ -215,11 +215,24 @@ def _installed_roots() -> frozenset[str]:
         return frozenset()
 
 
+def _is_namespace_portion(name: str) -> bool:
+    """Whether *name* is a directory on ``sys.path``.
+
+    Only asked once ``_module_file`` has already come back empty, and that pairing is what makes it an answer: a directory holding no ``__init__.py`` is a PEP 420 namespace package. Such a package has no source of its own, so finding none is its ordinary shape rather than a hole — its submodules still resolve and still join the evidence. ``_installed_roots`` covers the namespace packages that arrived in a wheel; a project-local one has no metadata to consult, and the directory is the only thing that says so.
+
+    Named on the portion itself rather than its root, so a missing submodule of a namespace package (``nspkg.gone``) still reads as the hole it is. Uncached: reached once per module name, behind a path search that already failed.
+    """
+    rel = Path(*name.split("."))
+    return any((Path(entry) / rel).is_dir() for entry in sys.path if entry)
+
+
 def _should_have_resolved(name: str) -> bool:
     """Whether finding no source for *name* is a hole rather than an exclusion.
 
     ``_module_file`` returning ``None`` is the normal case for the stdlib and for extension modules, and the walk is right to skip those. It means something else when the name is project code: nothing about the module joins the evidence, so edits to it can't invalidate the cache. Told apart by the *root* package, which is what says whose code this is — a missing submodule of a project package counts, a missing submodule of ``numpy`` does not.
     """
+    if _is_namespace_portion(name):
+        return False
     root = name.partition(".")[0]
     if (path := _module_file(root)) is not None:
         return _is_project_file(path)
@@ -316,7 +329,7 @@ def _module_index(name: str) -> _ModuleIndex | None:
     if (path := _module_file(name)) is None:
         if _should_have_resolved(name):
             log.warning(
-                "no source found for %r on sys.path, and it is neither stdlib nor an installed package — nothing about it joins the evidence, so edits to it will not re-run the task. Check that the driver process can see it (an editable install, or PYTHONPATH).",
+                "no source found for %r on sys.path, and it is neither stdlib nor an installed package — nothing about it joins the evidence, so edits to it will not re-run the task. If it is project code, check that the driver process can see it (an editable install, or PYTHONPATH). If it is meant to be absent — an optional dependency behind try/except ImportError, or an `if TYPE_CHECKING:` import — there is nothing to fix.",
                 name,
             )
         return None
