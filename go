@@ -11,9 +11,13 @@ is_marimo_notebook() {
 }
 
 show_usage() {
+    echo "usage: $SELF [-h] {install,auth,check,open,preview,publish,site,todo,worktrees} ..."
+}
+
+show_help() {
+    show_usage
     # Important: heredoc indented with tab characters.
     cat <<-EOF
-		Usage: $0 {install|auth|check|open|preview|publish|site|todo|worktrees|help}
 		New checkout? Start with: $0 install
 
 		  install:             install dependencies (uv sync) and git hooks
@@ -37,7 +41,7 @@ show_usage() {
 		EOF
 }
 
-case "${1:-help}" in
+case "${1:-}" in
     i|install)
         shift
         "$SCRIPT_DIR/install.sh" "$@"
@@ -144,11 +148,11 @@ case "${1:-help}" in
         exit 2
         ;;
     h|help|-h|--help)
-        show_usage
+        show_help
         exit 0
         ;;
     *)
         show_usage 1>&2
-        exit 1
+        exit 2
         ;;
 esac

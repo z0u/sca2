@@ -50,8 +50,8 @@ rg -l anneal todo/science/           # which files
 rg -no '.{0,55}anneal.{0,55}' todo/  # a {0,N} window around each match
 ```
 
-Resources (compute, storage, etc.): find out what you can access with `./go auth --check`.
+Find out what you can access: `./go auth --check`
 
-Agent worktrees land under `.claude/worktrees/`, inside the repo, and nothing removes one when its branch is done. `./go worktrees` lists them with a verdict each; `./go worktrees --prune` removes the ones that are clean and have landed, and reports anything it held back rather than deciding for you.
+Manage worktrees: `./go worktrees [--prune]`
 
 Take care to not leak secrets into the chat transcript. To see which environment variables are set (e.g. "is there an `HF_*` token?"), use `compgen -v HF_` (bash builtin).
