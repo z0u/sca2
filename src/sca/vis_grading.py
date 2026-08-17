@@ -110,8 +110,8 @@ class GradingField:
         and risers the spaces between. Clouds and overlays then share one coordinate
         system, with no per-panel Axes or frozen-layout overlay tricks. Label x with
         position names; redness gets no ticks — say once in the caption that it runs
-        left to right within each slot. Reference implementation: ``fig_rows`` in
-        ``docs/m2/grading_dither.py``.
+        left to right within each slot. Reference implementation: the grading-grid
+        figure in ``docs/m2/d2.1.py``.
         """
         nx, ny = self.nx * self.dpr, self.ny * self.dpr
         a = self.W @ y.astype(np.float32)
