@@ -1,25 +1,17 @@
-"""Sketch: a faster dither fill for the grading grids.
+"""Sketch: grading-cloud figures drawn with `sca.vis_grading.GradingField`.
 
-`grading_sketch.draw_dither` rebuilds the whole sample cloud for every panel — k³
-stratified samples, their redness, their palette color, trilinear weights, and a
-per-panel argsort — but of all that, only the *interpolated response* depends on
-the panel. `DitherField` hoists the rest into a one-time precomputation. Two ideas
-carry it:
+The dithered fill was prototyped here (see git history) and now lives in
+`sca.vis_grading`; this script exercises it on ex-2.1.10's published arrays.
+It writes the per-(slice, position) grid at dpr 1-3, a magnified single panel
+comparing the dpr levels, and the per-slice-row variant: one Axes per slice,
+each position a slot on x sized to match the smooth-step plateaus, so the
+overlays draw natively in the same coordinates as the clouds — no frozen-layout
+overlay axes — and the redness tick clutter goes away.
 
-- Trilinear interpolation is linear in the 216 grid values, so all k³ sample
-  responses are one sparse matvec: `W @ y`, with 8 weights per row fixed by geometry.
-- The per-pixel lottery doesn't need a sort. Pre-shuffle the samples once; then
-  "last write wins" under fancy-index assignment picks the winner at a fixed
-  position of a uniform permutation, which is itself a uniform draw.
-
-It also adds `dpr`: supersampled anti-aliasing, box-downsampled in the draw itself
-so the result is independent of figure size and savefig dpi.
-
-The script writes the grid figure at dpr 1-3 plus a magnified single panel to
-compare them. Data comes from ex-2.1.10's published arrays, cached locally after
-the first run so iteration skips the network. `--bench` adds the stage profile and
-the panel/figure timing comparison against the original implementation. Not a
-notebook, so the site build ignores it. Run from the root:
+Data is cached locally after the first run so iteration skips the network.
+`--bench` adds a stage profile of the original `grading_sketch.draw_dither` and
+a timing comparison against it, asserting both fills cover identical pixels.
+Not a notebook, so the site build ignores it. Run from the repo root:
 
     uv run python docs/m2/grading_dither.py [--out DIR] [--bench]
 """
@@ -27,14 +19,14 @@ notebook, so the site build ignores it. Run from the root:
 import argparse
 from pathlib import Path
 from time import time
-from typing import cast
+from typing import Any, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy import sparse
 
 import grading_sketch as gs
-from mini.vis import AxesRow, use_style
+from mini.vis import AxesRow, smooth_step, use_style
+from sca.vis_grading import GradingField, I_RED
 
 CACHE = Path(".mini/sketches/grading/ex-2.1.10-alpha.npz")
 
@@ -51,66 +43,70 @@ def load_cached() -> np.ndarray:
         return z["either-t100"]
 
 
-class DitherField:
-    """The y-independent parts of `draw_dither`, computed once and shared by every panel.
+OVERLAYS: list[dict[str, Any]] = [
+    dict(color="#d40000", lw=0.5, alpha=0.75),  # α at pure red
+    dict(color="#888", lw=0.75, alpha=0.75, ls=(0, (3, 2))),  # shape r² vs sim¹·⁵
+]
+OVERLAY_NAMES = ["α at pure red", "shape r² vs sim¹·⁵"]
 
-    Same picture as the original (`grading_sketch.draw_dither` documents the encoding);
-    only the winning color at each pixel is a different draw of the same lottery.
 
-    `dpr` anti-aliases by supersampling: the lottery runs on a dpr× canvas — with k
-    scaled by dpr^(2/3) so samples-per-pixel, and hence the look, stay put — and a box
-    filter brings it back to `px` before imshow ever sees it. A display pixel then
-    averages at most dpr² palette colors, all drawn from its own samples, so blending
-    stays confined below the one-pixel scale; its alpha is the fraction of subpixels
-    covered, so sparse regions of the cloud read as translucent rather than grainy.
+def stepped(ax: plt.Axes, values, sw: float, **kwargs):
+    """A smooth-step over position slots: plateaus span each slot's width *sw*, risers the
+    gaps. NaN values get no plateau; an isolated finite value between NaNs draws as a dash.
     """
+    v = np.asarray(values, float)
+    finite = np.isfinite(v)
+    i = 0
+    while i < len(v):
+        if not finite[i]:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(v) and finite[j + 1]:
+            j += 1
+        if j > i:
+            smooth_step(ax, np.arange(i, j + 1), v[i : j + 1], ramp=1 - sw, **kwargs)
+        else:
+            ax.plot([i - sw / 2, i + sw / 2], [v[i]] * 2, **kwargs)
+        i = j + 1
 
-    def __init__(
-        self,
-        k: int = 140,
-        px: tuple[int, int] = (480, 360),
-        ylim: tuple[float, float] = (-0.3, 1.1),
-        seed: int = 0,
-        dpr: int = 1,
-    ):
-        self.nx, self.ny = px
-        self.dpr = dpr
-        self.ylo, self.yhi = ylim
-        x0, x1 = float(gs.REDNESS.min()), float(gs.REDNESS.max())
-        self.extent = (x0, x1, *ylim)
-        kk = round(k * dpr ** (2 / 3))  # pixels grow as dpr², samples as k³; this holds their ratio
-        rgb = gs.strata(kk, seed)
-        # The lottery: shuffled once, so per pixel the last write is a uniform winner.
-        rgb = rgb[np.random.default_rng(seed + 2).permutation(len(rgb))]
-        n = len(gs.LEVELS)
-        pack = np.array([n * n, n, 1])
-        palette = np.rint(rgb * (n - 1)).astype(np.int64) @ pack  # nearest of the 216
-        self.rgba = np.concatenate([gs.GRID_RGB[palette], np.ones((len(rgb), 1))], axis=1).astype(np.float32)
-        self.ix = np.rint((gs.redness(rgb) - x0) / (x1 - x0) * (self.nx * dpr - 1)).astype(np.int32)
-        # Trilinear interpolation as a sparse matrix: sample i's response is (W @ y)[i].
-        t = np.clip(rgb, 0, 1) * (n - 1)
-        i0 = np.clip(np.floor(t).astype(np.int64), 0, n - 2)
-        f = t - i0
-        cols = np.empty((len(rgb), 8), np.int32)
-        data = np.empty((len(rgb), 8), np.float32)
-        for j, corner in enumerate(np.ndindex(2, 2, 2)):
-            cols[:, j] = (i0 + corner) @ pack
-            data[:, j] = np.prod([f[:, c] if d else 1 - f[:, c] for c, d in enumerate(corner)], axis=0)
-        self.W = sparse.csr_array((data.ravel(), cols.ravel(), np.arange(len(rgb) + 1) * 8), shape=(len(rgb), n**3))
 
-    def draw(self, ax: plt.Axes, y: np.ndarray):
-        nx, ny = self.nx * self.dpr, self.ny * self.dpr
-        a = self.W @ y.astype(np.float32)
-        iy = np.rint((a - self.ylo) / (self.yhi - self.ylo) * (ny - 1)).astype(np.int32)
-        ok = (iy >= 0) & (iy < ny)
-        flat = iy[ok] * nx + self.ix[ok]
-        canvas = np.zeros((ny * nx, 4), np.float32)
-        canvas[flat] = self.rgba[ok]  # duplicate pixels: last write wins
-        # Box-downsample premultiplied: winners are opaque and voids transparent black, so
-        # the block mean is (premultiplied color, coverage); dividing restores straight RGBA.
-        img = canvas.reshape(self.ny, self.dpr, self.nx, self.dpr, 4).mean(axis=(1, 3))
-        img[..., :3] /= np.maximum(img[..., 3:], 1e-6)
-        ax.imshow(img, extent=self.extent, origin="lower", aspect="auto", zorder=2, interpolation="nearest")
+def fig_rows(a: np.ndarray, out: Path, field: GradingField, sw: float = 0.72):
+    """The per-slice-row layout: one Axes per slice, positions as slots on x.
+
+    Collapsing each row of panels into a single Axes puts the clouds and the overlay
+    steps in one coordinate system, so `overlay_row_steps`' frozen-layout machinery
+    isn't needed, and each panel's redness axis goes (stated once in the caption
+    instead: redness runs left to right within a slot).
+    """
+    n_pos = a.shape[2]
+    fig, axes = plt.subplots(5, 1, figsize=(7.2, 6.4), sharex=True, sharey=True, layout="constrained")
+    axes = cast(AxesRow, axes)
+    for si in range(5):
+        ax = axes[4 - si]  # embedding at the bottom, as the profile figures do
+        ax.axhline(0, color="#ccc", lw=0.6, zorder=0)
+        for pi in range(n_pos):
+            field.draw(ax, a[si, :, pi], span=(pi - sw / 2, pi + sw / 2))
+        stepped(ax, a[si, I_RED, :], sw, **OVERLAYS[0])
+        stepped(ax, [gs.r2_sim(a[si, :, pi]) for pi in range(n_pos)], sw, **OVERLAYS[1])
+        ax.set_ylabel(gs.SLICE_NAMES[si], fontsize=8, rotation=0, ha="right", va="center")
+        ax.set_frame_on(False)
+        ax.tick_params(labelsize=7, left=False, labelleft=False, bottom=False)
+    axes[0].set_xlim(-0.5, n_pos - 0.5)
+    axes[0].set_ylim(-0.3, 1.1)
+    axes[-1].set_xticks(range(n_pos), gs.POS_NAMES)
+    axes[-1].tick_params(labelbottom=True)
+    # One y scale for the whole figure, on the right of the bottom row.
+    axes[-1].yaxis.tick_right()
+    axes[-1].tick_params(labelsize=7, right=True, labelright=True)
+    fig.suptitle("either-t100 (primary), per (slice, position) — rows", fontsize=10)
+    handles: list[dict[str, Any]] = [kw | {"lw": 1.2} for kw in OVERLAYS]  # legible at legend scale
+    fig.legend(
+        [plt.Line2D([], [], **kw) for kw in handles], OVERLAY_NAMES,
+        loc="outside lower center", ncols=2, fontsize=8, frameon=False,
+    )  # fmt: skip
+    fig.savefig(out / "grid-rows.png", dpi=150)
+    plt.close(fig)
 
 
 def fig_detail(a: np.ndarray, out: Path, k: int, px: tuple[int, int], dprs: tuple[int, ...]):
@@ -120,7 +116,7 @@ def fig_detail(a: np.ndarray, out: Path, k: int, px: tuple[int, int], dprs: tupl
     y = a[4, :, 0]  # slice 4 at op1: a dense shoulder and a sparse tail in one panel
     fig, axes = plt.subplots(1, len(dprs), figsize=(2.6 * len(dprs), 2.4), sharey=True, layout="constrained")
     for ax, dpr in zip(cast(AxesRow, axes), dprs, strict=True):
-        DitherField(k=k, px=px, dpr=dpr).draw(ax, y)
+        GradingField(k=k, px=px, dpr=dpr).draw(ax, y)
         ax.set_title(f"dpr={dpr}", fontsize=9)
         ax.set_xlim(0, 1)
         ax.set_ylim(-0.3, 1.1)
@@ -160,7 +156,7 @@ def profile_baseline(y: np.ndarray, k: int, px: tuple[int, int]):
 
 
 def bench(a: np.ndarray, out: Path, k: int, px: tuple[int, int]):
-    """Stage profile, per-panel timing, and the full grid, original vs DitherField at dpr=1
+    """Stage profile, per-panel timing, and the full grid, original vs GradingField at dpr=1
     (where the two run the same lottery on the same samples, so coverage must agree).
     """
     panels = [a[si, :, pi] for si in range(a.shape[0]) for pi in range(a.shape[2])]
@@ -170,8 +166,8 @@ def bench(a: np.ndarray, out: Path, k: int, px: tuple[int, int]):
     profile_baseline(panels[0], k, px)
 
     t = time()
-    field = DitherField(k=k, px=px)
-    print(f"DitherField precompute: {time() - t:.2f}s (once per figure)")
+    field = GradingField(k=k, px=px, dpr=1)
+    print(f"GradingField precompute: {time() - t:.2f}s (once per figure)")
 
     fig, ax = plt.subplots()
     times: dict[str, float] = {"base": 0.0, "fast": 0.0}
@@ -214,11 +210,15 @@ def main():
     with use_style("base", "light"):
         for dpr in dprs:
             t = time()
-            field = DitherField(k=k, px=px, dpr=dpr)
+            field = GradingField(k=k, px=px, dpr=dpr)
             gs.fig_grid(alpha_map, out, f"dither-dpr{dpr}", field.draw)
             print(f"wrote {out}/grid-dither-dpr{dpr}.png ({time() - t:.1f}s)")
         fig_detail(a, out, k, px, dprs)
         print(f"wrote {out}/dither-detail.png")
+        t = time()
+        # Slots render at ~0.78 x 1.0 in at 150 dpi; k scales to the smaller canvas by itself.
+        fig_rows(a, out, GradingField(k=k, px=(120, 150)))
+        print(f"wrote {out}/grid-rows.png ({time() - t:.1f}s)")
 
 
 if __name__ == "__main__":
