@@ -54,6 +54,26 @@ PRE_OP2 = (0, 1)
 #: Probe targets, and the position of the token whose color each names.
 TARGETS = {"op1": 0, "op2": 2, "ans": 4}
 
+#: H1's frozen gate: "the seed-mean strict R² of the op2-target probe stays
+#: below 0.12 in every condition and every channel" at the pre-op2 sites —
+#: the ceiling plus margin for estimation noise.
+H1_GATE = 0.12
+
+#: H2's frozen gate: at each selected site, "the primary's seed-mean
+#: per-channel R² comes within 0.10 of the control's (one-sided)".
+H2_GATE = 0.10
+
+#: H2's partial band: "exactly one channel of one target misses … by no more
+#: than 0.2".
+H2_PARTIAL = 0.2
+
+#: H2 scores only targets whose selection map reaches this R².
+H2_MIN_CONTROL = 0.5
+
+#: The control seed whose map picks each target's comparison site; the score
+#: uses the remaining control seeds, so selection noise stays off the gate.
+H2_SELECT_SEED = 0
+
 
 @dataclass(frozen=True)
 class Condition:
