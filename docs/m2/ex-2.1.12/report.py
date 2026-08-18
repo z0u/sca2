@@ -138,10 +138,10 @@ def _(r2):
     @themed(
         name="probe-channel-maps",
         alt_text="""
-            A four-by-three grid of stacked step-line panels: rows are the recipe conditions, columns the op1, op2, and ans probe targets, and within each block five slice panels run upward from the embedding across the six token positions. Every op2 column lies on the floor before the op2 position, identically in all four rows; in the bare-anchor row the upper slices stay near the floor after that position too, and they recover over the next two rows.
+            A four-by-three grid of stacked step-line panels: rows are the recipe conditions, columns the op1, op2, and ans probe targets, and within each block five slice panels run upward from the embedding across the six token positions. Every op2 column lies on the floor before the op2 position, identically in all four rows; in the bare-anchor row the upper slices stay near the floor after that position too, and they recover over the next two rows. A small label at each row's right edge gives its seed count: 3 for the first three rows, 9 for the pooled row.
         """,
         caption=r"""
-            **Per-channel strict probe R², per condition and target.** Rows are the four conditions of the D2.1 progression; columns the probe targets. Within a block, slices run upward from the embedding, the x axis crosses the six token positions, and each RGB channel draws as its own step-line, with the grey area their mean and hairlines the seed envelope. Seed counts differ by row (3 for the first three conditions, 9 for the pooled one), so the channel lines agree more closely there: which channel a seed decodes best is idiosyncratic, and the larger sample averages it out. Negative scores clip to the floor: a probe that does worse than predicting the mean has failed, and how much worse is not a finer grade of failure — the H1 prose carries the raw values. One scale, 0 to 1, serves every panel.
+            **Per-channel strict probe R², per condition and target.** Rows are the four conditions of the D2.1 progression; columns the probe targets. Within a block, slices run upward from the embedding, the x axis crosses the six token positions, and each RGB channel draws as its own step-line, with the grey area their mean and hairlines the seed envelope. The count at each row's right edge is its number of seeds; where it is larger the channel lines agree more closely, because which channel a seed decodes best is idiosyncratic and the bigger sample averages it out. Negative scores clip to the floor: a probe that does worse than predicting the mean has failed, and how much worse is not a finer grade of failure — the H1 prose carries the raw values. One scale, 0 to 1, serves every panel.
         """,
     )
     def _plot() -> plt.Figure:
@@ -167,6 +167,8 @@ def _(r2):
                     if j == 0:
                         ax.set_ylabel(SLICE_NAMES[d], fontsize=6, rotation=0, ha="right", va="center")
                 axes[0].set_title(f"{cond.title} · {t}", fontsize=8)
+                if j == n_c - 1:
+                    axes[0].set_title(f"{cond.seeds} seeds", loc="right", fontsize=6, color=light_dark("#666", "#aaa"))
                 axes[-1].set_xticks(range(len(POS_NAMES)), POS_NAMES if i == n_r - 1 else [""] * len(POS_NAMES), fontsize=7)  # fmt: skip
                 label_scale(axes, show=(i, j) == (n_r - 1, n_c - 1))
         return fig
