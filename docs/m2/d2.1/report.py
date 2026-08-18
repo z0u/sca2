@@ -24,7 +24,7 @@ with app.setup(hide_code=True):
     from mini.store import project_store
     from mini.vis import AxesRow, figure_html, light_dark, smooth_step, smooth_step_area, themed
     from sca.colorcube import sim_to_red
-    from sca.vis_grading import GRID_RGB, I_RED, REDNESS, grading_field
+    from sca.vis_grading import GRID_RGB, I_RED, REDNESS, GradingCloud, grading_field
 
     use_publisher(report_bundle(__file__))
 
@@ -155,7 +155,8 @@ def _(
 ):
     _ys = {c.key: alphas[c.key]["op1"][:, :, 0].mean(axis=0) for c in ex.CONDITIONS}
     _envs = {c.key: alpha_stacks[c.key]["op1"][:, :, :, 0].reshape(-1, len(GRID_RGB)) for c in ex.CONDITIONS}
-    _field = grading_field(k=40, px=(400, 400), ylim=(-0.4, 1.05))
+    # Wide enough for the envelope's full range, since the clouds draw unclipped.
+    _ylim = (-0.4, 1.05)
 
     @themed(
         name="grading-progression",
@@ -172,15 +173,19 @@ def _(
         )
         axes = cast(AxesRow, axes)
         for ax, cond in zip(axes, ex.CONDITIONS, strict=True):
-            _env = _field.draw(ax, _envs[cond.key], color=light_dark("#999", "#888"))
-            _env.set_alpha(0.4)
-            _env.set_clip_on(False)
-            _img = _field.draw(ax, _ys[cond.key], zorder=3)
-            _img.set_clip_on(False)
+            GradingCloud(
+                ax, _envs[cond.key], _ylim, k=20, color=light_dark("#0003", "#fff2"), clip_on=False, zorder=-1, dpr=1
+            )
+            GradingCloud(ax, _ys[cond.key], _ylim, k=35, dpr=2, clip_on=False)
             ax.set_title(cond.title, fontsize=9)
             ax.set_xlabel("redness of op1", fontsize=8)
             ax.tick_params(labelsize=7)
             ax.set_aspect("equal")
+            ax.spines["bottom"].set_visible(True)
+            # ax.spines["bottom"].set_zorder(3)
+            ax.spines["bottom"].set_color("#0008")
+            ax.spines["bottom"].set_linewidth(0.5)
+            # ax.set_axis_off()
         axes[0].set_xticks([0, 0.5, 1])
         axes[0].set_yticks([0, 0.5, 1])
         axes[0].set_ylim(0, 1)

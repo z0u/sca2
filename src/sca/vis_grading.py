@@ -11,21 +11,25 @@ it — a dither, so no averaging invents colors the data never produced — and,
 `dpr` > 1, a supersampled box filter turns subpixel coverage into opacity, so sparse
 regions of the cloud read as translucent rather than grainy.
 
-Almost none of that depends on the response: the samples, their redness (the x
-pixel), their palette color, and the interpolation weights are all fixed by cube
-geometry. :class:`GradingField` computes them once; each panel then costs one sparse
-matvec and a re-bin, ~2 ms. Draw into a whole Axes (redness on x), or pass ``span``
-to place the cloud as a self-contained mark in a slot of a wider axis — e.g. one
-slot per token position, aligned with :func:`~mini.vis.smooth_step` plateaus. The
-cloud is data-colored, so it draws the same in either theme with no
-:func:`~mini.vis.light_dark`, and it is cheap enough to run inside ``@themed``.
+Draw with :class:`GradingCloud`, an artist that rasters itself at the axes' device
+size at draw time, so the dither maps 1:1 onto output pixels at any figure size and
+export dpi. :class:`GradingField` is the fixed-size form it grew from — rastered at
+a size chosen up front and rescaled by imshow, which aliases wherever the axes
+actually lands — kept for the slot-layout grid figure until that migrates. Both
+share one geometry: almost nothing depends on the response — the samples, their
+redness (the x pixel), their palette color, and the interpolation weights are all
+fixed by cube geometry and cached per sample-lattice size — so each panel costs one
+sparse matvec and a re-bin, a few ms. The cloud is data-colored, so it draws the
+same in either theme with no :func:`~mini.vis.light_dark`, and it is cheap enough
+to run inside ``@themed``.
 """
 
 from functools import lru_cache
+from typing import NamedTuple
 
 import numpy as np
 from matplotlib.axes import Axes
-from matplotlib.colors import to_rgb
+from matplotlib.colors import to_rgba
 from matplotlib.image import AxesImage
 from scipy import sparse
 
@@ -39,6 +43,7 @@ REDNESS = redness(GRID_RGB)
 I_RED = int(np.argmax(REDNESS))  # pure red's row in GRID_RGB
 
 REF_PX = (240, 180)  # the canvas size k is calibrated against, ~a grid panel at 150 dpi
+XSPAN = (float(REDNESS.min()), float(REDNESS.max()))
 
 
 def strata(k: int, seed: int = 0) -> np.ndarray:
@@ -52,17 +57,187 @@ def strata(k: int, seed: int = 0) -> np.ndarray:
     return (g + np.random.default_rng(seed).random(g.shape)) / k
 
 
-class GradingField:
-    """The response-independent parts of the grading cloud, computed once per figure.
+def _lattice_k(k: int, px: tuple[int, int], dpr: int) -> int:
+    """The stratification size that holds samples-per-pixel at the look `k` names.
 
-    `k` sets the look — how much of the cloud reads as solid versus translucent — and
-    is calibrated at :data:`REF_PX`: the sample count scales with `px` and `dpr` to
-    hold samples-per-pixel, so the same k gives the same texture at any size. `dpr`
-    supersamples: the per-pixel lottery runs on a dpr× canvas and a box filter brings
-    it back to `px` before imshow ever sees it, so the result is independent of figure
-    size and savefig dpi. A display pixel then averages at most dpr² palette colors,
-    all drawn from its own samples — blending stays confined below the one-pixel
-    scale — and its alpha is the fraction of subpixels covered.
+    Pixels grow as px·dpr², samples as (lattice k)³; the cube root holds their
+    ratio, so the same k gives the same texture at any raster size. It also
+    quantizes coarsely, so nearby raster sizes land on the same lattice and share
+    a cached :func:`_geometry`.
+    """
+    return round(k * (px[0] * px[1] / (REF_PX[0] * REF_PX[1])) ** (1 / 3) * dpr ** (2 / 3))
+
+
+class _Geometry(NamedTuple):
+    """The response-independent parts of the cloud — everything cube geometry fixes."""
+
+    u: np.ndarray
+    """Each sample's coordinate along the loft (see :class:`GradingCloud`)."""
+    rgba: np.ndarray
+    """Each sample's palette color: nearest of the 216, opaque."""
+    xs: np.ndarray
+    """Each sample's redness — its x position, awaiting a pixel scale."""
+    W: sparse.csr_array
+    """Trilinear interpolation: sample i's response is ``(W @ y)[i]``."""
+
+
+@lru_cache(maxsize=4)
+def _geometry(kk: int, seed: int) -> _Geometry:
+    """The sample set for one lattice size, shared by every cloud that lands on it.
+
+    An entry is tens of MB at panel sizes (`W` dominates), hence the small cache;
+    like-sized panels and both themes of a `@themed` render all hit one entry.
+    """
+    rgb = strata(kk, seed)
+    # The lottery: shuffled once, so per pixel the last write is a uniform winner.
+    rgb = rgb[np.random.default_rng(seed + 2).permutation(len(rgb))]
+    # Fixed like the rest of the geometry so panels dither identically across conditions.
+    u = np.random.default_rng(seed + 1).random(len(rgb)).astype(np.float32)
+    n = len(LEVELS)
+    pack = np.array([n * n, n, 1])
+    palette = np.rint(rgb * (n - 1)).astype(np.int64) @ pack  # nearest of the 216
+    rgba = np.concatenate([GRID_RGB[palette], np.ones((len(rgb), 1))], axis=1).astype(np.float32)
+    # Trilinear interpolation as a sparse matrix.
+    t = np.clip(rgb, 0, 1) * (n - 1)
+    i0 = np.clip(np.floor(t).astype(np.int64), 0, n - 2)
+    f = t - i0
+    cols = np.empty((len(rgb), 8), np.int32)
+    data = np.empty((len(rgb), 8), np.float32)
+    for j, corner in enumerate(np.ndindex(2, 2, 2)):
+        cols[:, j] = (i0 + corner) @ pack
+        data[:, j] = np.prod([f[:, c] if d else 1 - f[:, c] for c, d in enumerate(corner)], axis=0)
+    W = sparse.csr_array((data.ravel(), cols.ravel(), np.arange(len(rgb) + 1) * 8), shape=(len(rgb), n**3))
+    return _Geometry(u, rgba, redness(rgb), W)
+
+
+def _raster(
+    geom: _Geometry,
+    y: np.ndarray,
+    ylim: tuple[float, float],
+    px: tuple[int, int],
+    dpr: int,
+    lerp: bool = False,
+    color: str | tuple[float, float, float] | None = None,
+) -> np.ndarray:
+    """One response's RGBA raster at `px`, ready for imshow with ``origin="lower"``."""
+    nx, ny = px[0] * dpr, px[1] * dpr
+    if y.ndim == 1:
+        a = geom.W @ y.astype(np.float32)
+    else:
+        rows = np.arange(len(geom.u))
+        aa = geom.W @ y.astype(np.float32).T  # (sample, layer)
+        if lerp:
+            t = geom.u * (len(y) - 1)
+            s0 = np.minimum(t.astype(np.int64), len(y) - 2)
+            f = t - s0
+            a = aa[rows, s0] * (1 - f) + aa[rows, s0 + 1] * f
+        else:
+            a = aa[rows, np.minimum((geom.u * len(y)).astype(np.int64), len(y) - 1)]
+    x0, x1 = XSPAN
+    ix = np.rint((geom.xs - x0) / (x1 - x0) * (nx - 1)).astype(np.int32)
+    ylo, yhi = ylim
+    iy = np.rint((a - ylo) / (yhi - ylo) * (ny - 1)).astype(np.int32)
+    ok = (iy >= 0) & (iy < ny)
+    flat = iy[ok] * nx + ix[ok]
+    canvas = np.zeros((ny * nx, 4), np.float32)
+    canvas[flat] = geom.rgba[ok]  # duplicate pixels: last write wins
+    # Box-downsample premultiplied: winners are opaque and voids transparent black, so
+    # the block mean is (premultiplied color, coverage); dividing restores straight RGBA.
+    img = canvas.reshape(px[1], dpr, px[0], dpr, 4).mean(axis=(1, 3))
+    img[..., :3] /= np.maximum(img[..., 3:], 1e-6)
+    if color is not None:
+        *rgb, a = to_rgba(color)
+        img[..., :3] = rgb
+        img[..., 3] *= a
+    return img
+
+
+class GradingCloud(AxesImage):
+    """A grading cloud that rasters itself at the axes' device size, at draw time.
+
+    A raster sized up front gets nearest-neighbor-rescaled to wherever the axes
+    actually lands — figure size, layout, and savefig dpi all move it — and any
+    non-integer ratio duplicates some dither rows and drops others: moiré. By draw
+    time the transforms are final, so this artist measures its extent in device
+    pixels, re-rasters at that size when it changed, and hands a 1:1 image to the
+    normal ``AxesImage`` path, where nearest-neighbor resampling is the identity.
+    Exports come out clean at any dpi, since matplotlib applies the export dpi
+    before drawing.
+
+    `k` sets the look — how much of the cloud reads as solid versus translucent —
+    and is size-invariant: the sample count follows the device size to hold
+    samples-per-pixel (:func:`_lattice_k`), with the geometry cached per lattice
+    size, so like-sized panels share it and a redraw costs one sparse matvec and a
+    re-bin. `dpr` supersamples: the per-pixel lottery runs on a dpr× canvas and a
+    box filter brings it back down, so a display pixel averages at most dpr²
+    palette colors — blending stays confined below the one-pixel scale — and its
+    alpha is the fraction of subpixels covered.
+
+    *y* is the response per grid color, or a stack of them, shape ``(S, n³)`` —
+    one per residual slice, or per seed. The cube is then lofted over the stack:
+    each sample belongs to one layer (its share of the fixed loft coordinate `u`),
+    takes its response from that layer alone, and the per-pixel lottery weighs the
+    layers fairly, so the cloud shows the union of the layers' responses rather
+    than the response of their mean. With `lerp` the stack is treated as a
+    continuum instead, each sample blending its two nearest layers — smoother, but
+    the blends are responses no layer produced.
+
+    *color* flattens the palette to one hue, multiplying its own alpha into the
+    coverage: for a lofted envelope drawn as a muted band behind a full-color
+    summary cloud, where fading the palette instead would misstate the sample
+    colors. *span* compresses redness into ``(x0, x1)`` in data coordinates,
+    placing the cloud as one mark in a slot of a shared axis;
+    :meth:`GradingField.draw` holds the slot-layout recipe. Remaining kwargs are
+    Artist properties — ``alpha``, ``clip_on``, ``zorder`` (default 2).
+    """
+
+    def __init__(
+        self,
+        ax: Axes,
+        y: np.ndarray,
+        ylim: tuple[float, float] = (-0.3, 1.1),
+        *,
+        k: int = 30,
+        seed: int = 0,
+        dpr: int = 2,
+        span: tuple[float, float] | None = None,
+        color: str | tuple[float, float, float] | None = None,
+        lerp: bool = False,
+        **kwargs,
+    ):
+        super().__init__(ax, origin="lower", interpolation="nearest")
+        self._y = np.asarray(y)
+        self._ylim = ylim
+        self._k, self._seed, self._dpr = k, seed, dpr
+        self._color, self._lerp = color, lerp
+        self._px: tuple[int, int] | None = None
+        self.set_extent((*(span if span is not None else XSPAN), *ylim))
+        self.set_data(np.zeros((1, 1, 4), np.float32))
+        kwargs.setdefault("zorder", 2)
+        self.set(**kwargs)
+        ax.add_image(self)
+
+    def draw(self, renderer) -> None:
+        ax = self.axes
+        assert ax is not None
+        x0, x1, y0, y1 = self.get_extent()
+        (px0, py0), (px1, py1) = ax.transData.transform([(x0, y0), (x1, y1)])
+        px = max(2, round(abs(px1 - px0))), max(2, round(abs(py1 - py0)))
+        if px != self._px:
+            geom = _geometry(_lattice_k(self._k, px, self._dpr), self._seed)
+            self.set_data(_raster(geom, self._y, self._ylim, px, self._dpr, self._lerp, self._color))
+            self._px = px
+        super().draw(renderer)
+
+
+class GradingField:
+    """The fixed-raster grading cloud: geometry sized up front, drawn via imshow.
+
+    Prefer :class:`GradingCloud`, which sizes itself and cannot alias; this form
+    rescales its raster to the axes and remains only for the slot-layout grid
+    figure until that migrates. `k`, `dpr`, and the stacked-`y` and `color`
+    semantics are as documented there, with `px` standing in for the device size
+    the artist would measure.
     """
 
     def __init__(
@@ -73,34 +248,10 @@ class GradingField:
         seed: int = 0,
         dpr: int = 2,
     ):
-        self.nx, self.ny = px
+        self.px = px
         self.dpr = dpr
-        self.ylo, self.yhi = ylim
-        self.xspan = float(REDNESS.min()), float(REDNESS.max())
-        # Pixels grow as px·dpr², samples as k³; this holds their ratio, and the look.
-        kk = round(k * (self.nx * self.ny / (REF_PX[0] * REF_PX[1])) ** (1 / 3) * dpr ** (2 / 3))
-        rgb = strata(kk, seed)
-        # The lottery: shuffled once, so per pixel the last write is a uniform winner.
-        rgb = rgb[np.random.default_rng(seed + 2).permutation(len(rgb))]
-        # Each sample's coordinate along the loft (see draw), fixed like the rest of
-        # the geometry so stratified panels dither identically across conditions.
-        self.u = np.random.default_rng(seed + 1).random(len(rgb)).astype(np.float32)
-        n = len(LEVELS)
-        pack = np.array([n * n, n, 1])
-        palette = np.rint(rgb * (n - 1)).astype(np.int64) @ pack  # nearest of the 216
-        self.rgba = np.concatenate([GRID_RGB[palette], np.ones((len(rgb), 1))], axis=1).astype(np.float32)
-        x0, x1 = self.xspan
-        self.ix = np.rint((redness(rgb) - x0) / (x1 - x0) * (self.nx * dpr - 1)).astype(np.int32)
-        # Trilinear interpolation as a sparse matrix: sample i's response is (W @ y)[i].
-        t = np.clip(rgb, 0, 1) * (n - 1)
-        i0 = np.clip(np.floor(t).astype(np.int64), 0, n - 2)
-        f = t - i0
-        cols = np.empty((len(rgb), 8), np.int32)
-        data = np.empty((len(rgb), 8), np.float32)
-        for j, corner in enumerate(np.ndindex(2, 2, 2)):
-            cols[:, j] = (i0 + corner) @ pack
-            data[:, j] = np.prod([f[:, c] if d else 1 - f[:, c] for c, d in enumerate(corner)], axis=0)
-        self.W = sparse.csr_array((data.ravel(), cols.ravel(), np.arange(len(rgb) + 1) * 8), shape=(len(rgb), n**3))
+        self.ylim = ylim
+        self.geom = _geometry(_lattice_k(k, px, dpr), seed)
 
     def draw(
         self,
@@ -111,20 +262,8 @@ class GradingField:
         lerp: bool = False,
         color: str | tuple[float, float, float] | None = None,
     ) -> AxesImage:
-        """The cloud for one response vector *y* (per grid color), on the Axes' y scale.
-
-        *y* may instead stack several response vectors, shape ``(S, n³)`` — one per
-        residual slice, or per seed. The cube is then lofted over the stack: each
-        sample belongs to one layer (its share of the fixed loft coordinate ``u``),
-        takes its response from that layer alone, and the per-pixel lottery weighs
-        the layers fairly, so the cloud shows the union of the layers' responses
-        rather than the response of their mean. With ``lerp`` the stack is treated
-        as a continuum instead, each sample blending its two nearest layers —
-        smoother, but the blends are responses no layer produced.
-
-        *color* flattens the palette to one hue, keeping coverage as alpha: for a
-        lofted envelope drawn as a muted band behind a full-color summary cloud,
-        where fading the palette instead would misstate the sample colors.
+        """The cloud for one response *y* — a vector per grid color, or a stack of them
+        (see :class:`GradingCloud` for the loft, `lerp`, and `color` semantics).
 
         By default redness spans its own range on x; pass *span* to compress it into
         ``(x0, x1)`` in data coordinates instead, placing the cloud as one mark in a
@@ -138,31 +277,8 @@ class GradingField:
         left to right within each slot. Reference implementation: the grading-grid
         figure in ``docs/m2/d2.1/report.py``.
         """
-        nx, ny = self.nx * self.dpr, self.ny * self.dpr
-        if y.ndim == 1:
-            a = self.W @ y.astype(np.float32)
-        else:
-            rows = np.arange(len(self.u))
-            aa = self.W @ y.astype(np.float32).T  # (sample, layer)
-            if lerp:
-                t = self.u * (len(y) - 1)
-                s0 = np.minimum(t.astype(np.int64), len(y) - 2)
-                f = t - s0
-                a = aa[rows, s0] * (1 - f) + aa[rows, s0 + 1] * f
-            else:
-                a = aa[rows, np.minimum((self.u * len(y)).astype(np.int64), len(y) - 1)]
-        iy = np.rint((a - self.ylo) / (self.yhi - self.ylo) * (ny - 1)).astype(np.int32)
-        ok = (iy >= 0) & (iy < ny)
-        flat = iy[ok] * nx + self.ix[ok]
-        canvas = np.zeros((ny * nx, 4), np.float32)
-        canvas[flat] = self.rgba[ok]  # duplicate pixels: last write wins
-        # Box-downsample premultiplied: winners are opaque and voids transparent black, so
-        # the block mean is (premultiplied color, coverage); dividing restores straight RGBA.
-        img = canvas.reshape(self.ny, self.dpr, self.nx, self.dpr, 4).mean(axis=(1, 3))
-        img[..., :3] /= np.maximum(img[..., 3:], 1e-6)
-        if color is not None:
-            img[..., :3] = to_rgb(color)
-        extent = (*(span if span is not None else self.xspan), self.ylo, self.yhi)
+        img = _raster(self.geom, y, self.ylim, self.px, self.dpr, lerp, color)
+        extent = (*(span if span is not None else XSPAN), *self.ylim)
         return ax.imshow(img, extent=extent, origin="lower", aspect="auto", zorder=zorder, interpolation="nearest")
 
 
