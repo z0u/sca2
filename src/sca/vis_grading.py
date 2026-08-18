@@ -25,6 +25,7 @@ from functools import lru_cache
 
 import numpy as np
 from matplotlib.axes import Axes
+from matplotlib.colors import to_rgb
 from matplotlib.image import AxesImage
 from scipy import sparse
 
@@ -81,6 +82,9 @@ class GradingField:
         rgb = strata(kk, seed)
         # The lottery: shuffled once, so per pixel the last write is a uniform winner.
         rgb = rgb[np.random.default_rng(seed + 2).permutation(len(rgb))]
+        # Each sample's coordinate along the loft (see draw), fixed like the rest of
+        # the geometry so stratified panels dither identically across conditions.
+        self.u = np.random.default_rng(seed + 1).random(len(rgb)).astype(np.float32)
         n = len(LEVELS)
         pack = np.array([n * n, n, 1])
         palette = np.rint(rgb * (n - 1)).astype(np.int64) @ pack  # nearest of the 216
@@ -98,8 +102,29 @@ class GradingField:
             data[:, j] = np.prod([f[:, c] if d else 1 - f[:, c] for c, d in enumerate(corner)], axis=0)
         self.W = sparse.csr_array((data.ravel(), cols.ravel(), np.arange(len(rgb) + 1) * 8), shape=(len(rgb), n**3))
 
-    def draw(self, ax: Axes, y: np.ndarray, span: tuple[float, float] | None = None, zorder: float = 2) -> AxesImage:
+    def draw(
+        self,
+        ax: Axes,
+        y: np.ndarray,
+        span: tuple[float, float] | None = None,
+        zorder: float = 2,
+        lerp: bool = False,
+        color: str | tuple[float, float, float] | None = None,
+    ) -> AxesImage:
         """The cloud for one response vector *y* (per grid color), on the Axes' y scale.
+
+        *y* may instead stack several response vectors, shape ``(S, n³)`` — one per
+        residual slice, or per seed. The cube is then lofted over the stack: each
+        sample belongs to one layer (its share of the fixed loft coordinate ``u``),
+        takes its response from that layer alone, and the per-pixel lottery weighs
+        the layers fairly, so the cloud shows the union of the layers' responses
+        rather than the response of their mean. With ``lerp`` the stack is treated
+        as a continuum instead, each sample blending its two nearest layers —
+        smoother, but the blends are responses no layer produced.
+
+        *color* flattens the palette to one hue, keeping coverage as alpha: for a
+        lofted envelope drawn as a muted band behind a full-color summary cloud,
+        where fading the palette instead would misstate the sample colors.
 
         By default redness spans its own range on x; pass *span* to compress it into
         ``(x0, x1)`` in data coordinates instead, placing the cloud as one mark in a
@@ -114,7 +139,18 @@ class GradingField:
         figure in ``docs/m2/d2.1/report.py``.
         """
         nx, ny = self.nx * self.dpr, self.ny * self.dpr
-        a = self.W @ y.astype(np.float32)
+        if y.ndim == 1:
+            a = self.W @ y.astype(np.float32)
+        else:
+            rows = np.arange(len(self.u))
+            aa = self.W @ y.astype(np.float32).T  # (sample, layer)
+            if lerp:
+                t = self.u * (len(y) - 1)
+                s0 = np.minimum(t.astype(np.int64), len(y) - 2)
+                f = t - s0
+                a = aa[rows, s0] * (1 - f) + aa[rows, s0 + 1] * f
+            else:
+                a = aa[rows, np.minimum((self.u * len(y)).astype(np.int64), len(y) - 1)]
         iy = np.rint((a - self.ylo) / (self.yhi - self.ylo) * (ny - 1)).astype(np.int32)
         ok = (iy >= 0) & (iy < ny)
         flat = iy[ok] * nx + self.ix[ok]
@@ -124,6 +160,8 @@ class GradingField:
         # the block mean is (premultiplied color, coverage); dividing restores straight RGBA.
         img = canvas.reshape(self.ny, self.dpr, self.nx, self.dpr, 4).mean(axis=(1, 3))
         img[..., :3] /= np.maximum(img[..., 3:], 1e-6)
+        if color is not None:
+            img[..., :3] = to_rgb(color)
         extent = (*(span if span is not None else self.xspan), self.ylo, self.yhi)
         return ax.imshow(img, extent=extent, origin="lower", aspect="auto", zorder=zorder, interpolation="nearest")
 

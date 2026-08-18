@@ -37,15 +37,17 @@ with app.setup(hide_code=True):
 
 
 @app.function(hide_code=True)
-def load_margins() -> tuple[dict[str, dict[str, np.ndarray]], np.ndarray] | None:
-    """Seed-mean α per condition and keying, plus the probe set's operand index.
+def load_margins() -> tuple[dict[str, dict[str, np.ndarray]], dict[str, dict[str, np.ndarray]], np.ndarray] | None:
+    """α per condition and keying, plus the probe set's operand index.
 
-    `experiment.py` publishes both operand margins of every condition, per run;
-    this averages over seeds. `out[key]["op1"]` is (slice, color, position) α
-    against the first operand's color and `["op2"]` the same measurement keyed
-    by the second, so a figure picks its color axis by choosing between them.
-    The pair index rides along: it says which color sits at each operand slot
-    on each probe line, which is what the partner-composition note reads.
+    `experiment.py` publishes both operand margins of every condition, per run.
+    `out[key]["op1"]` is seed-mean (slice, color, position) α against the first
+    operand's color and `["op2"]` the same measurement keyed by the second, so a
+    figure picks its color axis by choosing between them. `stacks` is the same
+    measurement with the seed axis kept, (seed, slice, color, position) — the
+    progression figure's spread envelope dithers over it. The pair index rides
+    along: it says which color sits at each operand slot on each probe line,
+    which is what the partner-composition note reads.
     """
     store = project_store()
     art = store.get_refs([ex.ARRAYS_REF])[ex.ARRAYS_REF]
@@ -54,11 +56,12 @@ def load_margins() -> tuple[dict[str, dict[str, np.ndarray]], np.ndarray] | None
     with tempfile.TemporaryDirectory() as d:
         (path,) = store.get_many([(art, Path(d) / "margins.npz")])
         with np.load(path) as z:
-            out = {
-                c.key: {k: np.mean([z[f"{c.key}/s{i}/{k}"] for i in range(c.seeds)], axis=0) for k in KEYINGS}
+            stacks = {
+                c.key: {k: np.stack([z[f"{c.key}/s{i}/{k}"] for i in range(c.seeds)]) for k in KEYINGS}
                 for c in ex.CONDITIONS
             }
-            return out, z["probe/pairs"]
+            out = {key: {k: v.mean(axis=0) for k, v in d.items()} for key, d in stacks.items()}
+            return out, stacks, z["probe/pairs"]
 
 
 @app.function(hide_code=True)
@@ -128,8 +131,9 @@ def _():
     mo.stop(_loaded is None, mo.md("_Results are not published yet; the figures render once they are._"))
     assert _loaded is not None
     alphas: dict[str, dict[str, np.ndarray]] = _loaded[0]
-    probe_pairs: np.ndarray = _loaded[1]
-    return alphas, probe_pairs
+    alpha_stacks: dict[str, dict[str, np.ndarray]] = _loaded[1]
+    probe_pairs: np.ndarray = _loaded[2]
+    return alpha_stacks, alphas, probe_pairs
 
 
 @app.cell(hide_code=True)
@@ -137,7 +141,7 @@ def _():
     mo.md(r"""
     ## The recipe, one piece at a time
 
-    Each panel below adds one piece of the anchoring recipe. The quantity plotted is the α response at the op1 token, drawn against the redness of the first operand.[^alpha] Each chart is a *grading cloud*: the response is measured at the 216 vocabulary colors, interpolated across the whole RGB cube, and drawn as a dither of the colors themselves, so the vertical spread at each redness is the range of responses among equally red colors.
+    Each panel below adds one piece of the anchoring recipe. The quantity plotted is the α response at the op1 token, drawn against the redness of the first operand.[^alpha] Each chart is a *grading cloud*: the response is measured at the 216 vocabulary colors, interpolated across the whole RGB cube, and drawn as a dither of the colors themselves, so the vertical spread at each redness is the range of responses among equally red colors. The grey band behind each cloud drops the averaging: it redraws the response separately for every residual slice and every seed, flattened to grey so it reads as an envelope rather than data.
 
     [^alpha]: α is the cosine between the residual stream (the running vector that each layer reads from and writes back to) and the anchor axis, the direction we train the concept toward. Here it is averaged over the five residual slices, the five points in the network where we read that vector.
     """)
@@ -145,17 +149,21 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(alphas: dict[str, dict[str, np.ndarray]]):
+def _(
+    alpha_stacks: dict[str, dict[str, np.ndarray]],
+    alphas: dict[str, dict[str, np.ndarray]],
+):
     _ys = {c.key: alphas[c.key]["op1"][:, :, 0].mean(axis=0) for c in ex.CONDITIONS}
-    _field = grading_field(k=40, px=(400, 330), ylim=(-0.2, 1))
+    _envs = {c.key: alpha_stacks[c.key]["op1"][:, :, :, 0].reshape(-1, len(GRID_RGB)) for c in ex.CONDITIONS}
+    _field = grading_field(k=40, px=(400, 400), ylim=(-0.4, 1.05))
 
     @themed(
         name="grading-progression",
         alt_text="""
-            Four grading clouds against redness. The un-anchored cloud is flat near zero; adding the anchor lifts every color to at least 0.4; the anti-subspace term restores a graded ramp from near zero; pooled labels leave the same clean rise to about 0.9 at pure red.
+            Four grading clouds against redness, each over a grey per-slice, per-seed envelope. The un-anchored cloud is flat near zero; adding the anchor lifts every color to at least 0.4, with the envelope fanning wide across slices; the anti-subspace term restores a graded ramp from near zero; pooled labels leave the same clean rise to about 0.9 at pure red, the envelope hugging the ramp.
         """,
         caption=r"""
-            **The anchoring recipe, one piece at a time.** Each panel is a grading cloud of the α response at op1 (mean over the five residual slices) against the redness of the first operand, drawn over the whole RGB cube. Left to right: the un-anchored control and the bare anchor at λ = 0.1 (ex-2.1.6); the anchor plus the anti-subspace term at its tuned operating point, with labels still keyed to op1 (ex-2.1.8, `end90-hold30`); and the full recipe, where sequence-level labels name *either* operand and mellowmax pooling finds the red token on its own (the primary condition of ex-2.1.10, `either-t100`).
+            **The anchoring recipe, one piece at a time.** Each panel is a grading cloud of the α response at op1 (mean over the five residual slices) against the redness of the first operand, drawn over the whole RGB cube; the grey envelope behind it redraws the response separately for every residual slice and seed, so the cloud reads against the spread it summarizes. Left to right: the un-anchored control and the bare anchor at λ = 0.1 (ex-2.1.6); the anchor plus the anti-subspace term at its tuned operating point, with labels still keyed to op1 (ex-2.1.8, `end90-hold30`); and the full recipe, where sequence-level labels name *either* operand and mellowmax pooling finds the red token on its own (the primary condition of ex-2.1.10, `either-t100`).
         """,
     )
     def _plot() -> plt.Figure:
@@ -164,7 +172,10 @@ def _(alphas: dict[str, dict[str, np.ndarray]]):
         )
         axes = cast(AxesRow, axes)
         for ax, cond in zip(axes, ex.CONDITIONS, strict=True):
-            _img = _field.draw(ax, _ys[cond.key])
+            _env = _field.draw(ax, _envs[cond.key], color=light_dark("#999", "#888"))
+            _env.set_alpha(0.4)
+            _env.set_clip_on(False)
+            _img = _field.draw(ax, _ys[cond.key], zorder=3)
             _img.set_clip_on(False)
             ax.set_title(cond.title, fontsize=9)
             ax.set_xlabel("redness of op1", fontsize=8)
