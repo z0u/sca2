@@ -86,6 +86,6 @@ These experiments were preparation for the main work: exercising the infrastruct
 
     The anchor schedule and half the epochs could go. The anti-subspace schedule could not: a constant delivering the same total dose loses grading. The search maps a wide feasible plateau and proposes a stronger, softer point on its edge.
 
-- [D2.1 figures for the anchoring post](./m2/d2.1.py)
+- [D2.1 figures for the anchoring post](./m2/d2.1/report.py)
 
     Grading-cloud figures for the LessWrong post on D2.1, drawn from the published results above: the anchoring recipe one piece at a time, and the primary condition per (slice, position).

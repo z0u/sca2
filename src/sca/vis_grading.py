@@ -111,7 +111,7 @@ class GradingField:
         system, with no per-panel Axes or frozen-layout overlay tricks. Label x with
         position names; redness gets no ticks — say once in the caption that it runs
         left to right within each slot. Reference implementation: the grading-grid
-        figure in ``docs/m2/d2.1.py``.
+        figure in ``docs/m2/d2.1/report.py``.
         """
         nx, ny = self.nx * self.dpr, self.ny * self.dpr
         a = self.W @ y.astype(np.float32)

@@ -11,7 +11,7 @@ It is not specific to the primary — `op1-labels` reads 0.59 at the embedding a
 
 Questions worth answering: (a) is the step the affinity shape echoed, or a latch-like binarization the grading floor should worry about; (b) does the anti-subspace term set the flat part, or is it just absence of pull; (c) should the grading statistic be scored per slice — a slice whose response is a step passes the slice-mean r² today by hiding behind graded neighbours, which matters for the D2.2 confirm and any claim quoting r² as "the response is graded".
 
-Numbers above are from the published `alpha` arrays (seed-mean, r² against sim¹·⁵ per slice at op1), computed with `docs/m2/grading_sketch.py`'s data path (sketch since removed; `docs/m2/d2.1.py` carries the same loading and statistic); the per-(slice, position) chart that surfaced this is in PR #99.
+Numbers above are from the published `alpha` arrays (seed-mean, r² against sim¹·⁵ per slice at op1), computed with `docs/m2/grading_sketch.py`'s data path (sketch since removed; `docs/m2/d2.1/report.py` carries the same loading and statistic); the per-(slice, position) chart that surfaced this is in PR #99.
 
 ## Notes
 
