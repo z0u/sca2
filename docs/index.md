@@ -86,6 +86,10 @@ These experiments were preparation for the main work: exercising the infrastruct
 
     The anchor schedule and half the epochs could go. The anti-subspace schedule could not: a constant delivering the same total dose loses grading. The search maps a wide feasible plateau and proposes a stronger, softer point on its edge.
 
+- [2.1.12. Fitted channel probes over the anchored checkpoints](./m2/ex-2.1.12/report.py)
+
+    Ridge probes for each operand's RGB at every (slice, position) site of the D2.1 conditions, from their published checkpoints. Before op2 the probes find nothing in any condition, anchored or not, so the off-key tilt in the grading figures belongs to the probe set. No decodability cost of anchoring resolves, and the maps show the bare anchor giving up late-slice decodability that the rest of the recipe restores.
+
 - [D2.1 figures for the anchoring post](./m2/d2.1/report.py)
 
     Grading-cloud figures for the LessWrong post on D2.1, drawn from the published results above: the anchoring recipe one piece at a time, and the primary condition per (slice, position).
