@@ -14,7 +14,8 @@ key      = {fn name}-hash(fn's module-qualified name + fingerprint(inputs))
 evidence = fingerprint(source(fn)
                        + source(project fns/classes fn calls, transitively)
                        + source(what fn imports in its own body)
-                       + source(the __init__.py of each package on the way there)) + version
+                       + source(the __init__.py of each package on the way there)
+                       + source(the import-time statements of each module reached)) + version
 ```
 
 `joblib.Memory` and friends stop at the first line of that — why this is `mini`'s own code rather than a library's is recorded in [eng/decisions.md](../../../../eng/decisions.md).
@@ -31,7 +32,7 @@ The unit of evidence is the definition a task reaches, so the rest of the module
 
 Three places where a whole file is the unit, so adding to them does re-run what's downstream:
 
-- **A package `__init__.py`**, for every deferred import beneath it. `from sca.compute.geometry import probe_maps` folds in `sca/__init__.py` and `sca/compute/__init__.py` whole, because they execute on the way down and can change what the task computes (ours sets `XLA_FLAGS`). Worth keeping thin. A top-level import doesn't fold them in — task bodies here import deferred, so this is the usual path.
+- **A package `__init__.py`**, for every import beneath it. `from sca.compute.geometry import probe_maps` folds in `sca/__init__.py` and `sca/compute/__init__.py` whole, because they execute on the way down and can change what the task computes (ours sets `XLA_FLAGS`). Worth keeping thin. Where the import is written makes no difference: a deferred import reads the chain off the dotted name, a module-scope one reads it off the helper's `__module__`, and both also fold in the defining module's own import-time statements.
 - **A class**, methods the task never calls included: a class is fingerprinted as one block of source.
 - **A module reached without a readable name** — plain `import x` in a task body, a star-import, an alias used bare rather than dotted into. Deliberate, per the deferred-imports bullet above.
 

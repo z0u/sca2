@@ -120,6 +120,9 @@ def _collect_class(cls: type, seen: dict[str, str]) -> None:
             member = member.__func__
         if isinstance(member, types.FunctionType):
             _collect_sources(member, seen)
+    # Usually redundant — a method would carry the same chain — but a class with no
+    # methods of its own (a dataclass of fields, an enum) reaches this and nothing else.
+    _collect_deferred(_import_time_chain(cls), seen)
 
 
 def _value_json(obj: Any) -> str | None:
@@ -365,6 +368,21 @@ def _package_chain(module: str) -> list[_Ref]:
     return [(".".join(parts[: i + 1]), None) for i in range(len(parts))]
 
 
+def _import_time_chain(obj: Any) -> list[_Ref]:
+    """The same import-time evidence for a live object that a deferred import gets from its name.
+
+    The reference walk reaches a helper as an *object*, so the modules that ran to produce it leave no trace: a task importing ``probe_maps`` at module scope records the function and what it references, and no package source enters. ``sca/__init__.py`` could then change its ``XLA_FLAGS`` line — which changes what the task computes — without re-running anything. The deferred walk gets the chain for free, because it resolves a dotted name; here it's read off ``__module__`` instead, and folds the same two things: the parent packages whole, and the defining module's own import-time statements.
+
+    Skipped when the module resolves to no file, which for a live object is ordinary rather than a hole: ``__main__``, a notebook cell module, something built by ``exec``. The deferred walk's missing-source warning is about a name that was *written down* and should have resolved; there's no such name here, so there's nothing to report.
+    """
+    module = getattr(obj, "__module__", None)
+    # ``__module__`` is a str by convention, and assignable to anything at all — which
+    # would reach the path search as a crash. A fingerprint must not be what breaks a run.
+    if not isinstance(module, str) or not module or _module_file(module) is None:
+        return []
+    return [*_package_chain(module), (module, _PRELUDE)]
+
+
 def _imports_within(node: ast.AST, idx: _ModuleIndex) -> list[_Ref]:
     """Every project reference the ``import`` statements inside *node* name.
 
@@ -563,7 +581,7 @@ def _collect_sources(fn: Callable, seen: dict[str, str]) -> None:
             # editing code. Skipped when it has no stable encoding (see _value_json).
             if (js := _value_json(obj)) is not None:
                 seen[f"{qualname}::{name}"] = js
-    _collect_deferred(_bytecode_imports(fn), seen)
+    _collect_deferred(_bytecode_imports(fn) + _import_time_chain(fn), seen)
 
 
 @functools.lru_cache(maxsize=256)
