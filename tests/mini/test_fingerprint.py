@@ -250,30 +250,55 @@ TASK_PKG_DEFERRED = "def task(x):\n    from pkg.mod import helper\n\n    return 
 TASK_PKG_TOPLEVEL = "from pkg.mod import helper\n\ndef task(x):\n    return helper(x)\n"
 
 
-def test_package_init_is_evidence_for_a_deferred_import(load_module, deferred_modules, tmp_path):
-    """A package's ``__init__`` runs before the module under it does, and can change what the task computes (``sca/__init__.py`` sets ``XLA_FLAGS``) — so the deferred walk folds each parent package in whole, and editing one must re-run.
+@pytest.fixture
+def pkg_parts(load_module, deferred_modules, tmp_path):
+    """Fingerprint a task that reaches ``pkg.mod:helper``, against a given ``pkg/__init__.py``."""
 
-    The top-level import reaches the helper as an object instead, and no package source enters the manifest. That asymmetry is characterized rather than endorsed; the shape a fix might take is in ``todo/eng/package-init-only-counts-for-deferred-imports.md``. Task bodies in this project import deferred, which is the covered path.
-    """
-
-    def parts(task_src: str, init: str, variant: str) -> dict:
+    def _parts(task_src: str, init: str, variant: str, mod: str = HELPER_V1) -> tuple[str, dict]:
         d = tmp_path / variant
         (d / "pkg").mkdir(parents=True, exist_ok=True)
         (d / "pkg" / "__init__.py").write_text(init)
-        (d / "pkg" / "mod.py").write_text(HELPER_V1)
+        (d / "pkg" / "mod.py").write_text(mod)
         deferred_modules(variant)
         for name in [n for n in sys.modules if n == "pkg" or n.startswith("pkg.")]:
             del sys.modules[name]  # the next variant's `pkg` is a different file
-        return task_key_parts(load_module("tasks", task_src, variant).task, (1,))[1]
+        return task_key_parts(load_module("tasks", task_src, variant).task, (1,))
 
+    return _parts
+
+
+@pytest.mark.parametrize(
+    "task_src", [TASK_PKG_DEFERRED, TASK_PKG_TOPLEVEL], ids=["deferred import", "module-scope import"]
+)
+def test_package_init_is_evidence_however_the_helper_is_reached(pkg_parts, task_src: str):
+    """A package's ``__init__`` runs before the module under it does, and can change what the task computes (``sca/__init__.py`` sets ``XLA_FLAGS``), so it belongs in the evidence and editing it must re-run.
+
+    Which is easy for the deferred walk, resolving a dotted name it can read the chain off. The module-scope import reaches the helper as an *object*, and the chain has to come from its ``__module__`` instead — otherwise the same edit to the same file invalidates one task and not the other, purely by where the import was written.
+    """
     grown = "VERSION = 1\n\ndef unrelated():\n    return 99\n"
-    deferred = parts(TASK_PKG_DEFERRED, "VERSION = 1\n", "a")
-    assert "module:pkg" in deferred["deps"]
-    assert deferred["code_fp"] != parts(TASK_PKG_DEFERRED, grown, "b")["code_fp"]
+    key_v1, p_v1 = pkg_parts(task_src, "VERSION = 1\n", "a")
+    key_v2, p_v2 = pkg_parts(task_src, grown, "b")
+    _, p_copy = pkg_parts(task_src, "VERSION = 1\n", "c")
+    assert "module:pkg" in p_v1["deps"], "the parent package left no trace — edits to it can't re-run the task"
+    assert p_v1["code_fp"] != p_v2["code_fp"], "package-init edit invisible — stale results would be served"
+    assert key_v1 == key_v2, "the edit re-keyed the task — record/logs/history would be orphaned"
+    assert p_copy["code_fp"] == p_v1["code_fp"], "identical source must fingerprint identically"
 
-    top = parts(TASK_PKG_TOPLEVEL, "VERSION = 1\n", "c")
-    assert not [k for k in top["deps"] if k.startswith("module:")]
-    assert top["code_fp"] == parts(TASK_PKG_TOPLEVEL, grown, "d")["code_fp"]
+
+# Import-time behavior in the *defining* module rather than a package above it: the
+# helper's own source is untouched by an edit to the line beside it.
+MOD_PRELUDE = "import os\n\nos.environ.setdefault('PKG_MODE', '{mode}')\n\n" + HELPER_V1
+
+
+@pytest.mark.parametrize(
+    "task_src", [TASK_PKG_DEFERRED, TASK_PKG_TOPLEVEL], ids=["deferred import", "module-scope import"]
+)
+def test_a_modules_import_time_statements_are_evidence(pkg_parts, task_src: str):
+    """The other half of what runs before a helper does: statements at the top of its *own* module. Editing one leaves the helper's source byte-identical, so only the module's prelude entry can carry it — and the task's behavior really does change, since that's where an ``os.environ.setdefault`` lands."""
+    _, p_v1 = pkg_parts(task_src, "", "a", mod=MOD_PRELUDE.format(mode="fast"))
+    _, p_v2 = pkg_parts(task_src, "", "b", mod=MOD_PRELUDE.format(mode="slow"))
+    assert "pkg.mod:<module>" in p_v1["deps"], "the module's import-time statements left no trace"
+    assert p_v1["code_fp"] != p_v2["code_fp"], "import-time edit invisible — stale results would be served"
 
 
 def _key_and_parts(load_module, task_src: str, helper_src: str, variant: str) -> tuple[str, dict]:
