@@ -188,7 +188,7 @@ class GradingCloud(AxesImage):
     colors. *span* compresses redness into ``(x0, x1)`` in data coordinates,
     placing the cloud as one mark in a slot of a shared axis;
     :meth:`GradingField.draw` holds the slot-layout recipe. Remaining kwargs are
-    Artist properties — ``alpha``, ``clip_on``, ``zorder`` (default 2).
+    Artist properties — ``alpha``, ``clip_on``, ``zorder``, etc.
     """
 
     def __init__(
@@ -213,7 +213,6 @@ class GradingCloud(AxesImage):
         self._px: tuple[int, int] | None = None
         self.set_extent((*(span if span is not None else XSPAN), *ylim))
         self.set_data(np.zeros((1, 1, 4), np.float32))
-        kwargs.setdefault("zorder", 2)
         self.set(**kwargs)
         ax.add_image(self)
 
