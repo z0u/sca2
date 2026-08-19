@@ -1040,3 +1040,34 @@ def test_results_elides_by_default_and_full_restores_the_repr(tmp_path: Path, mo
     cmd_results(argparse.Namespace(name="res", key=None, app="local", full=True))
     full = capsys.readouterr().out
     assert "500 floats" not in full and len(full) > 3000
+
+
+def test_status_flags_results_computed_under_older_numerics(tmp_path: Path, monkeypatch, capsys):
+    """A finished result carries the library versions it was computed under, so a read-only view can say — without importing anything or re-running the DAG — that the current environment might not reproduce it."""
+    monkeypatch.chdir(tmp_path)
+    import json
+
+    from mini.memo import MemoStore
+    from mini.runs import data_root, installed_numerics
+
+    now_jax = installed_numerics()["jax"]
+    store = MemoStore(data_root() / "driftexp")
+    common = {"state": "done", "fn": "train"}
+    store.records_backend.merge(
+        "train-old", {"key": "train-old", "env": {"numerics_packages": {"jax": "0.0.1-old"}}, **common}
+    )
+    store.records_backend.merge(
+        "train-now", {"key": "train-now", "env": {"numerics_packages": {"jax": now_jax}}, **common}
+    )
+
+    from mini.__main__ import cmd_status
+
+    cmd_status(argparse.Namespace(name="driftexp", app="local"))
+    assert f"⚠ 1 result(s) computed under different numerics: jax 0.0.1-old → {now_jax}" in capsys.readouterr().out
+
+    # Same shape in both payloads: a monitor polling --brief is the reader most likely
+    # to be the only one watching while a sweep straddles an upgrade.
+    expected = {"tasks": 1, "packages": {"jax": {"recorded": "0.0.1-old", "current": now_jax}}}
+    for brief in (False, True):
+        cmd_status(argparse.Namespace(name="driftexp", app="local", json=True, brief=brief))
+        assert json.loads(capsys.readouterr().out)["numerics_drift"] == expected

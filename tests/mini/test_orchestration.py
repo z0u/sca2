@@ -5,6 +5,7 @@ Task functions are *local* so cloudpickle serializes them by value; the orchestr
 
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -15,8 +16,9 @@ from mini.apparatus import Apparatus
 from mini.experiment import Experiment
 from mini.local_apparatus import LocalApparatus
 from mini.memo import LocalRecordStore, MemoStore, task_key
+from mini import orchestration
 from mini.orchestration import TaskFailed, retry, tick
-from mini.runs import RunState
+from mini.runs import RunState, installed_numerics
 
 
 def _setup(name: str, main, tmp_path: Path) -> tuple[Experiment, LocalApparatus]:
@@ -585,3 +587,29 @@ def test_input_fingerprint_stable_across_processes():
         for seed in ("0", "1", "2")
     }
     assert len(outs) == 1, f"fingerprint varied across hash seeds: {outs}"
+
+
+def test_memo_hit_computed_under_older_numerics_is_reported(tmp_path: Path, caplog):
+    """A library upgrade changes what a task computes while leaving key and evidence untouched, so the memo serves the old number silently. The tick says so instead — once, and without re-running anything: whether to re-run is a `version=` decision the caller makes."""
+
+    def train(lr):
+        return lr * 2
+
+    exp, app = _setup("drift", lambda ctx: ctx.map(train, [0.1]), tmp_path)
+    assert _drive(exp, app) == [0.2]
+
+    # Age the finished record's numerics: same key, same code, an older jax.
+    store = app.memo_store()
+    (rec,) = store.records()
+    env = {**rec["env"], "numerics_packages": {**rec["env"]["numerics_packages"], "jax": "0.0.1-old"}}
+    store.update(rec["key"], env=env)
+
+    orchestration._warned_numerics.clear()  # process-level "said it once" guard
+    with caplog.at_level(logging.WARNING, logger="mini.orchestration"):
+        assert _drive(exp, app) == [0.2]  # the result is still served — detection, not a re-run
+    assert f"jax 0.0.1-old → {installed_numerics()['jax']}" in caplog.text
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="mini.orchestration"):
+        _drive(exp, app)
+    assert caplog.text == ""  # a watching driver ticks every few seconds; the answer doesn't change

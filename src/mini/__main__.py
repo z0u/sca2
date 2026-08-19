@@ -35,6 +35,7 @@ from mini.runs import (
     data_root,
     in_declared_phase,
     is_queued,
+    numerics_drift,
     progress_age,
     stale_heartbeat,
     stale_progress,
@@ -235,6 +236,37 @@ def _dag_note(store: MemoStore, state: RunState) -> str:
     if store.budget_expired():  # the compounding trap: work left, and nothing will launch
         return "DAG suspended, and the budget has expired — re-run with --budget to advance"
     return "DAG suspended at the last tick — re-run to advance"
+
+
+def _numerics_moved(records: list[dict]) -> tuple[int, dict[str, tuple[str, str]]]:
+    """How many DONE results were computed under numerics packages that have since moved, and what moved.
+
+    Read-only and self-contained: each record carries the versions its worker ran under (:func:`mini.runs.compute_env`), so a view can answer this from the store alone — no import, no tick, no fingerprinting. Same comparison the driver makes on a memo hit; here it stays visible after the run, which is when someone is usually asking where a number came from.
+    """
+    moved: dict[str, tuple[str, str]] = {}
+    drifted = 0
+    for rec in records:
+        if _rec_state(rec) == RunState.DONE and (drift := numerics_drift(rec.get("env"))):
+            drifted += 1
+            moved.update(drift)
+    return drifted, moved
+
+
+def _numerics_note(records: list[dict]) -> str:
+    """One line naming the numerics packages that moved under a run's results (or empty)."""
+    drifted, moved = _numerics_moved(records)
+    if not moved:
+        return ""
+    bits = ", ".join(f"{name} {was} → {now}" for name, (was, now) in sorted(moved.items()))
+    return f"⚠ {drifted} result(s) computed under different numerics: {bits}"
+
+
+def _numerics_drift_json(records: list[dict]) -> dict[str, Any] | None:
+    """The JSON twin of :func:`_numerics_note` — same shape in the full and ``--brief`` payloads, or ``None`` when nothing moved."""
+    drifted, moved = _numerics_moved(records)
+    if not moved:
+        return None
+    return {"tasks": drifted, "packages": {n: {"recorded": w, "current": c} for n, (w, c) in sorted(moved.items())}}
 
 
 def _aggregate_state(states: list[RunState]) -> RunState:
@@ -496,6 +528,8 @@ def cmd_status(args: argparse.Namespace) -> None:
         if suffix:
             header += f"  ·  {suffix}"
     print(header)
+    if note := _numerics_note(current):  # a line of its own: it qualifies every DONE result below
+        print(f"  {note}")
     if brief:
         print(f"  {_fmt_counts(current)}")
         groups = _attention_groups(current)
@@ -716,6 +750,8 @@ def _brief_json(
         out["budget"] = budget
     if stale:
         out["superseded"] = len(stale)
+    if drift := _numerics_drift_json(current):  # a monitor reading only this payload would otherwise never hear it
+        out["numerics_drift"] = drift
     return out
 
 
@@ -744,6 +780,8 @@ def _status_json(
         out["budget"] = budget
     if kept := meta.get("kept_stale"):
         out["kept_stale"] = sorted(kept)
+    if drift := _numerics_drift_json(current):
+        out["numerics_drift"] = drift
     return out
 
 

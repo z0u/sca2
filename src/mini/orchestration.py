@@ -8,14 +8,17 @@ An experiment is a plain function ``main(ctx)`` that expresses the DAG in ordina
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, overload
 
 from mini.memo import MemoStore, task_key_parts
-from mini.runs import SETTLED, RunState
+from mini.runs import SETTLED, RunState, numerics_drift
 
 if TYPE_CHECKING:
     from mini.apparatus import Apparatus
     from mini.experiment import Experiment
+
+log = logging.getLogger(__name__)
 
 __all__ = ["MemoError", "Pending", "TaskFailed", "BudgetExpired", "MISSING", "Ctx", "tick", "retry"]
 
@@ -120,6 +123,12 @@ class Ctx:
         # DONE results served despite stale evidence (keep_stale) — persisted so
         # read-only views can badge them (they can't fingerprint code themselves).
         self.stale_kept: list[str] = []
+        # DONE results computed under numerics packages that have since moved:
+        # the keys served, and what moved (``{package: (recorded, current)}``).
+        # Not persisted — unlike stale evidence, a read-only view can work this
+        # out for itself from the record's ``env`` (see ``mini status``).
+        self.numerics_drifted: list[str] = []
+        self.numerics_moved: dict[str, tuple[str, str]] = {}
 
     def _route(self, on: Apparatus | None, role: str | None) -> Apparatus:
         """Resolve which apparatus a step runs on: ``role`` label, ``on=``, or default."""
@@ -159,6 +168,12 @@ class Ctx:
                 to_launch = (key, gen, fn, args, getattr(app, "_before_hooks", []))
                 self.launched.append(key)
             state = RunState.RUNNING
+        elif state == RunState.DONE and (moved := numerics_drift(rec.get("env"))):
+            # A hit whose result predates a library upgrade: same key, same code,
+            # a number the current environment may not reproduce. Noted here rather
+            # than acted on — re-running is the caller's call, via ``version=``.
+            self.numerics_drifted.append(key)
+            self.numerics_moved.update(moved)
         return key, state, to_launch
 
     def _task_failed(self, key: str, state: RunState) -> TaskFailed:
@@ -285,7 +300,35 @@ def tick(experiment: Experiment, apparatus: Apparatus, keep_stale: bool = False)
             kept_stale=list(dict.fromkeys(ctx.stale_kept)),
             complete=complete,
         )
+        _warn_numerics_drift(ctx)
     return True, result
+
+
+# Drift signatures already reported in this process. A watching driver ticks every
+# few seconds and the answer is the same each time, so this is worth saying once
+# and worth not repeating — `mini status` keeps it readable after the fact.
+_warned_numerics: set[tuple[tuple[str, str, str], ...]] = set()
+
+
+def _warn_numerics_drift(ctx: Ctx) -> None:
+    """Say once that this wake served results computed under since-upgraded numerics packages.
+
+    A memo hit is a claim that the stored result is what the current code would produce, and a library upgrade breaks that claim without touching either the key or the evidence (``eng/determinism.md``). Nothing here re-runs anything: the levers are a deliberate ``version=`` bump on the affected tasks, or publishing the numbers with the straddle stated.
+    """
+    if not ctx.numerics_moved:
+        return
+    signature = tuple(sorted((name, was, now) for name, (was, now) in ctx.numerics_moved.items()))
+    if signature in _warned_numerics:
+        return
+    _warned_numerics.add(signature)
+    moved = ", ".join(f"{name} {was} → {now}" for name, was, now in signature)
+    log.warning(
+        "%d memo hit(s) were computed under different numerics: %s. Same key, same code, "
+        "a result the current environment may not reproduce — bump version= on the affected "
+        "tasks to re-run, or say so where the numbers are published.",
+        len(ctx.numerics_drifted),
+        moved,
+    )
 
 
 def retry(store: MemoStore, key: str | None = None) -> list[str]:
