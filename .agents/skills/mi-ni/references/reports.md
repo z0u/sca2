@@ -40,7 +40,9 @@ pub = use_publisher(report_bundle(__file__))   # assets → this report's bundle
 url = pub.asset_url(points_json, name="points.json")   # -> '_assets/points.json'
 ```
 
-Each asset is written to `_assets/<name>`, keyed by its readable name, so the URL is stable across re-exports and a re-render overwrites in place (nothing accumulates on the bucket), and a browser "Save as" suggests that name (it takes the URL's last segment; the bucket sets no `Content-Disposition`). Two *different* blobs under one name in a report raises (give each a distinct `name=`). With no publisher, figures inline as self-contained `data:` URIs, so a no-frills export still works.
+Each asset is written to `_assets/<name>`, keyed by its readable name, so the URL is stable across re-exports and a re-render overwrites in place (nothing accumulates on the bucket), and a browser "Save as" suggests that name (it takes the URL's last segment; the bucket sets no `Content-Disposition`). Two *different* blobs under one name in an export raises (give each a distinct `name=`).
+
+`report_bundle` picks the destination from the context, because the two documents resolve relative URLs against different roots. Exporting, that's the bundle's `_assets/` beside `index.html`. Interactively, it's `public/.mini/<notebook stem>/` next to the notebook — marimo's dev server serves a notebook's `public/` and nothing else. Two things differ there: the same-name guard is off (re-running a figure cell after an edit is a replacement, not a collision), and the URL carries a `?v=<content hash>` so the browser shows the re-render instead of the copy it cached under that stable filename. Both are gitignored. Externalizing interactively too is what lets a figure-heavy report render at all: inlined, a page of `data:` URIs runs past the output size marimo will display. With no publisher at all, figures still inline, so a no-frills export works.
 
 ### Consume
 

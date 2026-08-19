@@ -1,7 +1,7 @@
 """
 Notebook utilities for rendering themed matplotlib figures as HTML.
 
-A report's figures are heavy (a themed plot is *two* PNGs, light and dark). Inlined as ``data:`` URIs they bloat the exported HTML — the bytes Git LFS used to carry. A :class:`~mini.reports.Publisher` instead writes each blob out as a file beside the report (keyed by its readable name) and references it by a **relative** URL, so the report HTML stays light. Set one up once per report and every ``@themed`` figure externalizes with no per-figure ceremony::
+A report's figures are heavy (a themed plot is *two* PNGs, light and dark). Inlined as ``data:`` URIs they bloat the exported HTML — the bytes Git LFS used to carry — and a page of them exceeds the output size marimo will display, so a heavy report won't render interactively either. A :class:`~mini.reports.Publisher` instead writes each blob out as a file (keyed by its readable name) and references it by a **relative** URL, so the HTML stays light. Set one up once per report and every ``@themed`` figure externalizes with no per-figure ceremony::
 
     # in the report's setup cell
     from mini.vis import themed
@@ -13,7 +13,7 @@ A report's figures are heavy (a themed plot is *two* PNGs, light and dark). Inli
     def _plot(): ...
     mo.Html(_plot())
 
-The relative reference is the point: the *same* HTML works both ways. Opened locally it resolves to the co-located ``_assets/`` files (offline, and the figures are real PNG files); published, ``scripts/build_site.py`` uploads those files to the HF bucket and inserts a single ``<base href>`` so the very same relative URLs resolve there. A report with no publisher inlines as self-contained ``data:`` URIs, as before. The publisher and the bundle protocol live in :mod:`mini.reports`.
+The relative reference is the point: the *same* HTML works every way it's read. Opened locally it resolves to the co-located ``_assets/`` files (offline, and the figures are real PNG files); published, ``scripts/build_site.py`` uploads those files to the HF bucket and inserts a single ``<base href>`` so the very same relative URLs resolve there. Interactively, :func:`~mini.reports.report_bundle` points the publisher at the notebook's ``public/.mini/`` instead, the one place marimo's dev server serves files from. A figure with no publisher at all inlines as a self-contained ``data:`` URI. The publisher and the bundle protocol live in :mod:`mini.reports`.
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ def themed(
 
         themed(plot_lr_finder, alt_text='LR finder')(lr_history, lr_config)
 
-    By default the figure is inlined as a ``data:`` URI. To externalize it (keeping the report HTML light), set a default :class:`~mini.reports.Publisher` with :func:`~mini.reports.use_publisher`, or pass ``publish=`` one here. *name* is the externalized figure's readable basename (it ends up in the asset filename and the download name); it defaults to the plot function's name.
+    By default the figure is inlined as a ``data:`` URI. To externalize it (keeping the report HTML light enough to render and to ship), set a default :class:`~mini.reports.Publisher` with :func:`~mini.reports.use_publisher`, or pass ``publish=`` one here. *name* is the externalized figure's readable basename (it ends up in the asset filename and the download name); it defaults to the plot function's name.
 
     *caption* is **Markdown** rendered into a ``<figcaption>`` inside the ``<figure>``, so the caption travels with the image instead of riding along in a sibling ``mo.vstack``. Write it as a triple-quoted string — ``mo.md`` dedents, so leading indentation is stripped for you.
 

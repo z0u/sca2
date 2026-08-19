@@ -155,6 +155,15 @@ def test_distinct_blobs_same_name_in_one_report_raise(tmp_path: Path):
     with pytest.raises(ValueError, match="distinct"):
         pub.asset_url(b"different", name="fig.png")  # two different figures, one name
 
+    # An interactive publisher replaces instead: that's a re-render, not a collision.
+    loose = Publisher(tmp_path, strict=False, versioned=True)
+    was = loose.asset_url(b"first", name="fig2.png")
+    now = loose.asset_url(b"different", name="fig2.png")
+    assert (tmp_path / "fig2.png").read_bytes() == b"different"
+    # Same name, new URL — else a browser keeps showing the figure it already cached.
+    assert now.startswith("_assets/fig2.png?v=") and now != was
+    assert loose.asset_url(b"different", name="fig2.png") == now  # unchanged bytes, same URL
+
 
 def test_use_publisher_default_is_picked_up(tmp_path: Path):
     use_publisher(Publisher(tmp_path / "_assets"))
@@ -186,8 +195,8 @@ def test_report_bundle_targets_export_dir(tmp_path: Path, monkeypatch):
     assert pub.link == "_assets"
 
 
-def test_report_bundle_is_none_off_export(tmp_path: Path, monkeypatch):
-    """Under `marimo edit` (no EXPORTING_ENV) there's no bundle, so figures inline."""
+def test_report_bundle_targets_public_dir_off_export(tmp_path: Path, monkeypatch):
+    """Under `marimo edit` (no EXPORTING_ENV) assets go where marimo's dev server serves them."""
     from mini.reports import EXPORTING_ENV
 
     monkeypatch.delenv(EXPORTING_ENV, raising=False)
@@ -195,7 +204,27 @@ def test_report_bundle_is_none_off_export(tmp_path: Path, monkeypatch):
     nb = tmp_path / "docs" / "gpt-sweep" / "report.py"
     nb.parent.mkdir(parents=True)
     nb.write_text("")
-    assert report_bundle(nb) is None
+    pub = report_bundle(nb)
+    assert pub.asset_dir == nb.parent / "public" / ".mini" / "report"
+    assert pub.link == "public/.mini/report"
+    assert not pub.strict  # re-running a figure cell rewrites the same name
+    assert pub.versioned  # ...and the browser has to notice it changed
+
+
+def test_report_bundle_off_export_writes_a_servable_url(tmp_path: Path, monkeypatch):
+    """The figure URL is relative and public/-prefixed — how marimo serves notebook files."""
+    from mini.reports import EXPORTING_ENV
+
+    monkeypatch.delenv(EXPORTING_ENV, raising=False)
+    (tmp_path / "pyproject.toml").write_text("")
+    nb = tmp_path / "docs" / "gpt-sweep" / "report.py"
+    nb.parent.mkdir(parents=True)
+    nb.write_text("")
+    use_publisher(report_bundle(nb))
+    result = themed(_dummy_plot)(1, 2)
+    assert re.search(r'src="public/\.mini/report/dummy_plot-light\.png\?v=[0-9a-f]{8}"', result)
+    png = nb.parent / "public" / ".mini" / "report" / "dummy_plot-light.png"
+    assert png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
 
 def test_export_key_top_level_notebook(tmp_path: Path):

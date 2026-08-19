@@ -81,9 +81,9 @@ def export_one(nb: Path) -> Path:
     sidecar = out.parent / "_assets" / PROVENANCE_ASSET
     sidecar.unlink(missing_ok=True)
     print(f"  export {nb.relative_to(ROOT)} -> {out.relative_to(ROOT)}")
-    # Mark the render as an export so the report's setup cell activates its bundle
-    # publisher (externalize figures to _assets/); under interactive `marimo edit` the
-    # var is absent and figures inline instead — see mini.reports.exporting.
+    # Mark the render as an export so the report's setup cell points its publisher at
+    # the bundle (_assets/, beside this HTML); under interactive `marimo edit` the var is
+    # absent and figures go to the notebook's public/ instead — see mini.reports.exporting.
     env = {**os.environ, EXPORTING_ENV: "1"}
     subprocess.run(["marimo", "export", "html", "-f", str(nb), "-o", str(out)], check=True, cwd=ROOT, env=env)
     clean_html(out)  # scrub terminal control seqs + redact modal URLs from the published HTML
