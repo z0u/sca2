@@ -3,7 +3,7 @@ Report bundles: produce a report's assets as relative URLs, then repoint them.
 
 A report is a **bundle** — one Marimo HTML document plus its heavy assets (figures, data blobs). The two halves of the bundle protocol both live here:
 
-**Produce.** A :class:`Publisher` writes each asset out as a file beside the exported HTML and hands back a *relative* URL like ``_assets/<name>.png``. (Interactively there's no exported HTML to sit beside, so :func:`report_bundle` aims the same publisher at the notebook's ``public/.mini/`` — see :func:`public_dir`.) The path is the asset's readable name (so a browser saving it suggests a sensible filename — the URL's last segment, since the bucket sets no ``Content-Disposition``), and the name *is* the key, so a re-render overwrites in place and the URL stays stable. ``themed`` figures externalize through a publisher when one is set; :meth:`Publisher.asset_url` is the general verb for any blob.
+**Produce.** A :class:`Publisher` writes each asset out as a file beside the exported HTML and hands back a *relative* URL like ``_assets/<name>.png``. (Interactively there's no exported HTML to sit beside, so :func:`report_bundle` aims the same publisher at the notebook's ``public/.mini/`` and hands back the URL marimo's kernel serves that file from — see :func:`public_dir`.) The path is the asset's readable name (so a browser saving it suggests a sensible filename — the URL's last segment, since the bucket sets no ``Content-Disposition``), and the name *is* the key, so a re-render overwrites in place and the URL stays stable. ``themed`` figures externalize through a publisher when one is set; :meth:`Publisher.asset_url` is the general verb for any blob.
 
 **Publish.** That same HTML is consumed two ways:
 
@@ -107,6 +107,15 @@ class Publisher:
     # bundle already gets a fresh URL per revision (the ``<base href>`` carries the
     # commit sha), and a query string there would only churn the HTML.
     versioned: bool = False
+    # Whether to hand back the URL marimo's *kernel* serves the file from, rather than a
+    # path under ``link``. Interactive only, and a workaround: marimo's ``public/`` route
+    # resolves a URL against whichever notebook a service worker names in a header, and
+    # that worker holds one notebook per browser — so with two reports open, only the
+    # first one's figures resolve (todo/eng/marimo-public-serving-is-per-browser.md). A
+    # virtual file is looked up by name in the kernel's own registry, with no notebook in
+    # the path, so every open report resolves. Falls back to the ``link`` path when
+    # there's no kernel to ask.
+    virtualize: bool = False
     # name -> sha of what we wrote under it this export, so a second *different*
     # blob under the same name is caught rather than silently clobbering.
     _written: dict[str, str] = field(default_factory=dict, compare=False, repr=False)
@@ -126,8 +135,10 @@ class Publisher:
         tmp.write_text(json.dumps({"refs": self._refs}, sort_keys=True, indent=1))
         tmp.replace(dest)
 
-    def asset_url(self, data: bytes | Path, *, name: str) -> str:
-        """Write *data* (bytes or a file) as ``<name>`` and return its relative URL.
+    def asset_url(self, data: bytes | Path, *, name: str, serve: bool = True) -> str:
+        """Write *data* (bytes or a file) as ``<name>`` and return its URL.
+
+        Pass ``serve=False`` for a blob written only so that tooling can read it off disk (see :func:`externalize_html`); the URL is still returned, but under ``virtualize`` it skips registering a copy with the kernel that nothing would fetch.
 
         The asset is keyed by its readable *name* (carry the extension — it sets the served media type), so the URL is stable and a re-render overwrites in place. Under ``strict`` (the default, and what an export uses) two *different* blobs written under the same name is an authoring bug — give each figure a distinct ``name=`` — so it raises rather than clobber. Under ``versioned`` the URL carries a ``?v=`` stamp of the content, so a re-render is visible through a browser cache.
         """
@@ -147,7 +158,31 @@ class Publisher:
         tmp = dest.with_name(f"{leaf}.tmp")
         tmp.write_bytes(blob)
         tmp.replace(dest)  # atomic + overwrite-in-place: a re-render replaces, never piles up
+        if serve and self.virtualize and (served := _virtual_url(dest)) is not None:
+            return served  # a fresh name per render already, so no ?v= stamp to add
         return f"{self.link}/{leaf}?v={sha[:8]}" if self.versioned else f"{self.link}/{leaf}"
+
+
+# The ``<img src='…'>`` marimo hands back from ``mo.image``: its HTML builder emits
+# single quotes, but match either rather than pin the workaround to that detail.
+_IMG_SRC = re.compile(r"""<img[^>]*\ssrc=(["'])(.*?)\1""", re.IGNORECASE | re.DOTALL)
+
+
+def _virtual_url(path: Path) -> str | None:
+    """The URL marimo's kernel serves *path* from (``./@file/<len>-<name>``), or ``None`` if it won't.
+
+    ``mo.image`` is the public door to marimo's virtual files: hand it a path, and it reads the bytes, registers them with the running kernel, and returns an ``<img>`` pointing at the ``/@file/`` route — which resolves out of that registry alone, so it is indifferent to which notebook the browser thinks it is asking on behalf of. We want the URL rather than the tag, so we lift it back out.
+
+    Discarding the returned ``Html`` is safe. Marimo refcounts a virtual file by scanning each ``Html``'s own text for registered filenames, so the reference is held by whichever ``Html`` finally carries the URL — the caller's wrapper, not ours. The one requirement is that the URL reach an ``Html`` (or ``mo.md``) in the same cell run; a bare string crossing a cell-lifecycle boundary would let the kernel sweep the blob at refcount zero.
+
+    Returns ``None`` off the kernel, where ``mo.image`` would fall back to a ``data:`` URI — tens of MB of base64 across a report, which is the output size the publisher exists to avoid. The ``data:`` check is belt and braces behind :func:`marimo.running_in_notebook`, which also spares us base64-encoding a result we would discard.
+    """
+    import marimo as mo
+
+    if not mo.running_in_notebook():
+        return None
+    m = _IMG_SRC.search(mo.image(src=path).text)
+    return None if m is None or m.group(2).startswith("data:") else m.group(2)
 
 
 def _project_root(start: Path) -> Path:
@@ -297,7 +332,9 @@ PUBLIC_LINK = "public/.mini"
 def public_dir(notebook_file: str | Path) -> Path:
     """The dir an *interactive* render writes its assets to: ``<notebook dir>/public/.mini/<stem>/``.
 
-    The counterpart to :func:`export_dir` for a live ``marimo edit`` session. Marimo serves a notebook's ``public/`` over its dev server (as ``public/<path>``, resolved relative to the notebook page), so a relative URL under it works there exactly as ``_assets/`` does beside an exported ``index.html`` — and nothing outside ``public/`` is reachable at all. The per-notebook ``<stem>`` subdir keeps two notebooks sharing a directory from writing over each other.
+    The counterpart to :func:`export_dir` for a live ``marimo edit`` session. Marimo serves a notebook's ``public/`` over its dev server (as ``public/<path>``), so a relative URL under it works there much as ``_assets/`` does beside an exported ``index.html`` — and nothing outside ``public/`` is reachable at all. The per-notebook ``<stem>`` subdir keeps two notebooks sharing a directory from writing over each other.
+
+    One caveat, and it's why a render's URL no longer points here: the dev server resolves ``public/<path>`` against whichever notebook a service worker names in an ``X-Notebook-Id`` header, rather than against the page the request came from. That worker is one per browser origin and latches onto the first notebook that loads, so with two reports open only the first one's figures resolve. :class:`Publisher` still writes the files here — readable names on disk, and the bytes marimo reads — and serves them through the kernel instead (its ``virtualize`` flag, and :func:`_virtual_url`). See ``todo/eng/marimo-public-serving-is-per-browser.md``.
 
     Scratch, not a bundle: it's regenerated on every render and gitignored, so deleting it costs a re-run and nothing more.
     """
@@ -315,7 +352,7 @@ def report_bundle(notebook_file: str | Path, *, link: str = "_assets") -> Publis
     Both contexts externalize; they differ only in where the files land and what the relative URL is, because the two documents resolve URLs against different roots:
 
     - **exporting** (:func:`exporting`) — the bundle's ``_assets/`` under :func:`export_dir`, so ``_assets/<name>`` resolves next to the exported ``index.html`` (and, once published, against the ``<base href>`` pointing at the bucket).
-    - **interactive** ``marimo edit`` — :func:`public_dir`, so ``public/.mini/<stem>/<name>`` resolves against marimo's dev server. Writes here are non-strict, and the URLs are ``versioned``: re-running a figure cell after an edit is a fresh blob under the same name, which should replace it *and* be what the browser then shows.
+    - **interactive** ``marimo edit`` — :func:`public_dir`, so the file lands at ``public/.mini/<stem>/<name>``, and the URL is the kernel-served ``@file/`` one (``virtualize``, which sidesteps the per-browser ``public/`` routing :func:`public_dir` describes). Writes here are non-strict, and the fallback URL is ``versioned``: re-running a figure cell after an edit is a fresh blob under the same name, which should replace it *and* be what the browser then shows.
 
     Externalizing in both keeps a heavy report renderable interactively. Inlined as ``data:`` URIs, a page of figures is tens of MB of base64 in the cell outputs, which marimo refuses to display past its output size limit. *link* names the export's asset subdir; the interactive prefix is fixed by what marimo serves.
     """
@@ -324,7 +361,7 @@ def report_bundle(notebook_file: str | Path, *, link: str = "_assets") -> Publis
         # The notebook page is what a relative URL resolves against, so the URL *is* the
         # asset dir's path relative to the notebook — read off it, never spelled twice.
         url = assets.relative_to(Path(notebook_file).resolve().parent).as_posix()
-        return Publisher(asset_dir=assets, link=url, strict=False, versioned=True)
+        return Publisher(asset_dir=assets, link=url, strict=False, versioned=True, virtualize=True)
     return Publisher(asset_dir=export_dir(notebook_file) / link, link=link)
 
 
@@ -354,7 +391,7 @@ def externalize_html(fragment: str, *, name: str, publish: Publisher | None = No
     publish = publish if publish is not None else current_publisher()
     if publish is not None:
         leaf = name if PurePosixPath(name).suffix else f"{name}.html"
-        publish.asset_url(fragment.encode(), name=leaf)
+        publish.asset_url(fragment.encode(), name=leaf, serve=False)
     return fragment
 
 
