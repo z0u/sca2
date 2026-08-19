@@ -79,7 +79,7 @@ def grading_grid(a: np.ndarray, figsize: tuple[float, float] = (7, 4.5)) -> plt.
     n_slices = a.shape[0]
     n_pos = a.shape[2]
     red_c = light_dark("#d40000", "#f44")
-    grey_c = light_dark("#0003", "#fff1")
+    grey_c = light_dark("#00000014", "#fff1")
     fig, ax = plt.subplots(figsize=figsize)
     for si in range(n_slices):
         shift = Affine2D().translate(0, si) + ax.transData  # embedding at the bottom, as the profile figures do
@@ -88,7 +88,8 @@ def grading_grid(a: np.ndarray, figsize: tuple[float, float] = (7, 4.5)) -> plt.
         smooth_step_area(ax, xs, reds, ramp=1 - sw, color=grey_c, transform=shift)
         for pi in range(n_pos):
             GradingCloud(ax, a[si, :, pi], span=(pi - sw / 2, pi + sw / 2), transform=shift, clip_on=False)
-        smooth_step(ax, xs, reds, ramp=1 - sw, color=red_c, lw=1, alpha=1, transform=shift, clip_on=False)
+        smooth_step(ax, xs, reds, ramp=1 - sw, color=red_c, lw=1, alpha=1, transform=shift, clip_on=False, zorder=2)
+        ax.axhline(si, color=light_dark("#aaaa", "#333a"), lw=0.5)
     ax.set_xlim(-0.5, n_pos - 0.5)
     ax.set_ylim(0, n_slices)
     ax.set_xticks(range(n_pos), POS_NAMES)
