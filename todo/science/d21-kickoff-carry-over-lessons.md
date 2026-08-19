@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [D2.1, anchoring, schedules, superposition]
 opened: 2026-07-11
 ---
@@ -46,4 +46,4 @@ Leave the feedback controller alone, even though the setting is harder now. Ex-2
 
 ## Notes
 
-**2026-08-16, housekeeping** — this closes "once D2.1's design has consumed or rejected each item", and ex-2.1.11's ablations/survey read as D2.1's closing report (see its tl;dr in `docs/index.md`). Worth a real pass checking the five-item hypothesis queue against what actually ran (1 and 2 look answered by ex-2.1.6's H4 and ex-2.1.11's ablations; 3–5 I didn't check) rather than closing on a skim. Flagging rather than doing it here, since it's a program-level judgment call, not a grep-confirmable fact.
+**2026-08-19, housekeeping** — the pass the 08-16 note asked for, against the five-item hypothesis queue. Consumed: **1** (ex-2.1.6 records per-step probe trajectories, and its H4 failure is a slide rather than ex-2.9.3's late collapse, so the mechanism did not reappear) and **2** (ex-2.1.8 swept `anneal_end` × `hold_ratio` — anneal-to-floor is the hold ratio — and ex-2.1.11 ablated the schedules against constants). Not consumed: **3**, the fallback-control analog — "fallback" appears nowhere in the m2 reports, and ex-2.1.6 says outright that it leaves the *anti-anchor* term out; **4**, stream-vs-init attribution, which no D2.1 report runs, though it may be moot given there were no catastrophic anchoring failures to attribute; **5**, the anchor-layer sweep — the anchor pulls all five layers equally throughout D2.1, and a layer sweep is now inside D2.2's own scope per the README. So status is `partial`, and what is left is 3–5 as D2.2 design input rather than D2.1 leftovers.
