@@ -11,27 +11,29 @@ app = marimo.App(
 with app.setup(hide_code=True):
     import tempfile
     from pathlib import Path
-    from typing import NamedTuple
+    from typing import NamedTuple, cast
 
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
-    from matplotlib.layout_engine import ConstrainedLayoutEngine
+    from matplotlib.transforms import Affine2D
 
     # Marimo puts the notebook directory on sys.path, so the conditions and the
     # ref come from the definition module beside this one.
     import experiment as ex
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
-    from mini.vis import figure_html, light_dark, themed
+    from mini.vis import AxesRow, figure_html, light_dark, themed
     from sca.colorcube import sim_to_red
     from sca.vis_grading import GRID_RGB
-    from sca.vis_probes import draw_traces, label_scale
+    from sca.vis_probes import draw_traces
 
     use_publisher(report_bundle(__file__))
 
     SLICE_NAMES = ["emb", "1", "2", "3", "4"]
     POS_NAMES = ["op1", "+", "op2", "=", "ans", r"\n"]
+    TARGET_TITLES = {"op1": "The color of op1", "op2": "The color of op2", "ans": "The color of the answer"}
+    """Panel titles, one per probe target: which token's color that panel's probes decode."""
 
 
 @app.function(hide_code=True)
@@ -45,6 +47,61 @@ def load_npz(ref: str) -> dict[str, np.ndarray] | None:
         (path,) = store.get_many([(art, Path(d) / "arrays.npz")])
         with np.load(path) as z:
             return {k: z[k] for k in z.files}
+
+
+@app.function(hide_code=True)
+def draw_probe_grid(
+    ax: plt.Axes, stack: np.ndarray, *, own: int | None = None, row_names: bool = True, scale: bool = True
+) -> None:
+    """One row per residual slice, the six token positions across, drawn into *ax*.
+
+    *stack* is one condition's (seed, slice, position, channel) strict R² for one target. Each row draws the seed mean as a step-line per RGB channel over the grey area of their mean, with the seed envelope as hairlines — see :func:`~sca.vis_probes.draw_traces`, which the landmark maps of ex-2.1.5 use the same way.
+
+    The rows share one Axes, each offset by a translate transform, so a row spans y ∈ [si, si+1] and keeps a fixed 0–1 scale: a site that decodes nothing looks like it decodes nothing, here and in every other panel. Each row's zero line is also the rule between it and the row below, so the rules mark the boundaries and no separators are needed. That is the layout of the grading grids on [the figures page](../d2.1/report.py), and the two figures cover the same sites, so a reader who has read one can read the other.
+
+    Negative scores clip to the floor first. A probe that does worse than predicting the mean has failed, and how much worse is not a finer grade of failure; the rows also draw unclipped, so a value left below zero would run down into the row beneath.
+
+    *own* is the position of the token whose color the panel decodes; its x label draws in bold, since what a site holds *before* that token is the question H1 asks. *row_names* draws the slice names on the left and *scale* the 0–1 scale on the right; a panel in a row of them wants each only on its own side of the figure (see :func:`probe_grids`).
+    """
+    sw = 0.7  # smooth-step plateau width, as the grading grids use
+    _, n_slices, n_pos, _ = stack.shape
+    stack = np.clip(stack, 0, 1)
+    for si in range(n_slices):
+        shift = Affine2D().translate(0, si) + ax.transData  # embedding at the bottom, as the profile figures do
+        draw_traces(ax, stack.mean(0)[si], spread=stack[:, si], ramp=1 - sw, transform=shift, clip_on=False)
+        ax.axhline(si, color=light_dark("#aaaa", "#333a"), lw=0.5)
+    ax.set_xlim(-0.5, n_pos - 0.5)
+    ax.set_ylim(0, n_slices)
+    ax.set_xticks(range(n_pos), POS_NAMES)
+    ax.set_yticks(np.arange(n_slices) + 0.5, SLICE_NAMES if row_names else [""] * n_slices)
+    ax.tick_params(axis="x", labelsize=6, bottom=False)
+    ax.tick_params(axis="y", labelsize=7, left=False)
+    if own is not None:
+        # Weight, not color: the three channel hues are data here, and a red tick label would
+        # read as the R channel rather than as a slot.
+        ax.get_xticklabels()[own].set(fontweight="bold")
+    if scale:
+        # One y scale for the whole figure, against the bottom row, whose offset is zero.
+        sec = ax.secondary_yaxis("right")
+        sec.set_yticks(np.arange(n_slices + 1), ["0", "1"] + [""] * (n_slices - 1))
+        sec.tick_params(labelsize=6, direction="out")
+        sec.set_ylabel("R², 0–1 per row", fontsize=7)
+
+
+@app.function(hide_code=True)
+def probe_grids(
+    panels: dict[str, tuple[np.ndarray, int | None]], figsize: tuple[float, float] = (8.6, 2.7)
+) -> plt.Figure:
+    """A row of probe grids sharing one set of rows and one R² scale, titled by *panels*' keys; each value pairs the R² array with the position of the token whose color it decodes (see :func:`draw_probe_grid`).
+
+    The panels measure the same quantity on the same scale and the reader compares across them, so they belong in one figure — one image per condition, which is also how the recipe reads: each condition is a picture, and the progression is the four of them in order. The row names sit on the left of the first panel and the scale on the right of the last, since both are shared.
+    """
+    fig, axes = plt.subplots(1, len(panels), figsize=figsize, squeeze=False)
+    row = cast(AxesRow, axes[0])
+    for i, (ax, (title, (stack, own))) in enumerate(zip(row, panels.items(), strict=True)):
+        draw_probe_grid(ax, stack, own=own, row_names=i == 0, scale=i == len(row) - 1)
+        ax.set_title(title, fontsize=8, pad=6)
+    return fig
 
 
 @app.cell(hide_code=True)
@@ -135,55 +192,48 @@ def _():
 
 
 @app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ## The maps
+
+    One figure per condition carries every reading the sections below score: its three panels are the probe targets, and within a panel the slices stack upward from the embedding, as the α grids on the figures page do.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _(r2):
-    @themed(
-        name="probe-channel-maps",
-        alt_text="""
-            A four-by-three grid of stacked step-line panels: rows are the recipe conditions, columns the op1, op2, and ans probe targets, and within each block five slice panels run upward from the embedding across the six token positions. Every op2 column lies on the floor before the op2 position, identically in all four rows; in the bare-anchor row the upper slices stay near the floor after that position too, and they recover over the next two rows. A small label at each row's right edge gives its seed count: 3 for the first three rows, 9 for the pooled row.
+    # Takeaway first: what each figure shows, not an inventory of what is drawn.
+    _ALT = {
+        "ex-2.1.6/lam0": """
+            Each panel decodes its own token and nothing that precedes it: op1 and op2 read about 0.7 at their own slot in every slice, and the answer's color climbs at the equals slot, with a small step at op2 in the upper slices. In the op2 panel the two slots before op2 lie flat on the floor.
         """,
-        caption=r"""
-            **Per-channel strict probe R², per condition and target.** Rows are the four conditions of the D2.1 progression; columns the probe targets. Within a block, slices run upward from the embedding, the x axis crosses the six token positions, and each RGB channel draws as its own step-line, with the grey area their mean and hairlines the seed envelope. The count at each row's right edge is its number of seeds; where it is larger the channel lines agree more closely, because which channel a seed decodes best is idiosyncratic and the bigger sample averages it out. Negative scores clip to the floor: a probe that does worse than predicting the mean has failed, and how much worse is not a finer grade of failure — the H1 prose carries the raw values. One scale, 0 to 1, serves every panel.
+        "ex-2.1.6/lam0.1": """
+            The same shape, except that the op2 panel fades going up the stack: its own slot reads about 0.84 at the embedding and almost nothing by the last slice. The two slots before op2 lie flat on the floor there, as in every condition.
         """,
-    )
-    def _plot() -> plt.Figure:
-        n_r, n_c = len(ex.CONDITIONS), len(ex.TARGETS)
-        fig = plt.figure(figsize=(9.7, 8.4), layout="constrained")
-        sfigs = fig.subfigures(n_r, n_c, squeeze=False)
-        for i, cond in enumerate(ex.CONDITIONS):
-            for j, t in enumerate(ex.TARGETS):
-                sfig = sfigs[i, j]
-                engine = sfig.get_layout_engine()
-                if isinstance(engine, ConstrainedLayoutEngine):
-                    engine.set(hspace=0, h_pad=0.01, wspace=0)
-                stack = np.clip(r2[cond.key, t], 0, 1)
-                axes = sfig.subplots(len(SLICE_NAMES), 1, sharex=True, sharey=True, squeeze=False)[:, 0]
-                for row, ax in enumerate(axes):
-                    d = len(SLICE_NAMES) - 1 - row
-                    draw_traces(ax, stack.mean(0)[d], spread=stack[:, d])
-                    ax.set(ylim=(-0.2, 1.2), xlim=(-0.5, len(POS_NAMES) - 0.5), yticks=[0, 1], yticklabels=[])
-                    ax.tick_params(axis="y", left=True, right=True, direction="in")
-                    ax.tick_params(axis="x", length=0)
-                    ax.spines[:].set_visible(False)
-                    ax.grid(which="major", c="#888", alpha=0.2)
-                    if j == 0:
-                        ax.set_ylabel(SLICE_NAMES[d], fontsize=6, rotation=0, ha="right", va="center")
-                axes[0].set_title(f"{cond.title} · {t}", fontsize=8)
-                if j == n_c - 1:
-                    axes[0].set_title(f"{cond.seeds} seeds", loc="right", fontsize=6, color=light_dark("#666", "#aaa"))
-                axes[-1].set_xticks(range(len(POS_NAMES)), POS_NAMES if i == n_r - 1 else [""] * len(POS_NAMES), fontsize=7)  # fmt: skip
-                label_scale(axes, show=(i, j) == (n_r - 1, n_c - 1))
-        return fig
+        "ex-2.1.8/end90-hold30": """
+            About half of that late-slice fade is repaired: op2's own slot holds 0.75 at the embedding and 0.32 at the last slice, where the bare anchor gave up nearly all of it. The two slots before op2 lie flat on the floor.
+        """,
+        "ex-2.1.10/either-t100": """
+            No fade left: op2's own slot holds 0.6 to 0.8 through every slice, as it does un-anchored, and the nine-seed hairlines sit close to the lines. The two slots before op2 lie flat on the floor.
+        """,
+    }
 
-    mo.vstack(
-        [
-            mo.md(r"""
-        ## The maps
+    def _maps(cond: ex.Condition) -> str:
+        @themed(
+            name=f"probe-channel-maps-{cond.exp}-{cond.name}",
+            alt_text=_ALT[cond.key],
+            caption=rf"""
+                **{cond.title}** ({cond.exp}, `{cond.name}`, {cond.seeds} seeds). Per-channel strict probe R² at every site: one row per residual slice, with the embedding at the bottom, and the six token positions across. Each RGB channel draws as its own step-line over the grey area of their mean, and the hairlines are the seed envelope; where the seeds disagree the hairlines part from the silhouette. The three panels decode three targets, and the bold slot on the x axis is the token whose color that panel reads. Negative scores clip to the floor — a probe that does worse than predicting the mean has failed, and the H1 prose carries the raw values. Each row spans the same 0–1 scale, ticked once at the bottom right.
+            """,
+        )
+        def _plot() -> plt.Figure:
+            return probe_grids({TARGET_TITLES[t]: (r2[cond.key, t], p) for t, p in ex.TARGETS.items()})
 
-        One figure carries every reading the sections below score: rows are the conditions, columns the targets, and within each block the slices stack upward from the embedding, as the α grids on the figures page do.
-        """),
-            mo.Html(_plot()),
-        ]
-    )
+        return _plot()
+
+    for c in mo.status.progress_bar(ex.CONDITIONS, title="Rendering charts", remove_on_exit=True, show_eta=True):
+        mo.output.append(mo.md(f"### {c.title}\n\n{_maps(c)}"))
     return
 
 
@@ -395,7 +445,7 @@ def _(arrays: dict[str, np.ndarray], r2):
 
         **E3 — no drag signature in the readout of the model itself.** In every condition, the control included, the on-key prediction errors at the emb slice correlate with the partner-mean of the affinity at |r| ≤ {max(v[0] for v in _e3.values()):.2f}. They correlate with the affinity itself only weakly, and to almost the same degree in each condition ({min(v[1] for v in _e3.values()):+.2f} to {max(v[1] for v in _e3.values()):+.2f} for the R channel). So the drag-versus-direct ordering that shows up along the anchor axis does not reappear in RGB decodability: whatever the op1-keyed labels dragged onto the axis, they did not measurably bend the color geometry of the embeddings.
 
-        **E4 — the bare anchor gives up late-slice decodability, and the recipe restores it** (post hoc). Channel-mean op2 decodability at its own position, last slice: control {np.mean(_e4[ex.CONTROL]):.2f}, bare anchor {np.mean(_e4["ex-2.1.6/lam0.1"]):.2f} (seeds {_fmt(sorted(_e4["ex-2.1.6/lam0.1"]))}), anti-subspace {np.mean(_e4["ex-2.1.8/end90-hold30"]):.2f}, primary {np.mean(_e4[ex.PRIMARY]):.2f}. The indiscriminate lift of the bare anchor crowds linear color readout out of the top of the stack. The anti-subspace term restores about half of it, and the full recipe matches the control. The op2 column of the maps shows the whole shape.
+        **E4 — the bare anchor gives up late-slice decodability, and the recipe restores it** (post hoc). Channel-mean op2 decodability at its own position, last slice: control {np.mean(_e4[ex.CONTROL]):.2f}, bare anchor {np.mean(_e4["ex-2.1.6/lam0.1"]):.2f} (seeds {_fmt(sorted(_e4["ex-2.1.6/lam0.1"]))}), anti-subspace {np.mean(_e4["ex-2.1.8/end90-hold30"]):.2f}, primary {np.mean(_e4[ex.PRIMARY]):.2f}. The indiscriminate lift of the bare anchor crowds linear color readout out of the top of the stack. The anti-subspace term restores about half of it, and the full recipe matches the control. The op2 panel of each condition's map shows the whole shape.
         """),
         ]
     )
