@@ -28,7 +28,7 @@ Color the marks with the colors they represent; a legend or colorbar is almost a
 
 ## Grading clouds
 
-A grading figure shows how a response measured per grid color varies with redness. A mean line or envelope hides too much of the structure, and drawing grid vertices is too visually heavy. Use `sca.vis_grading.grading_field(...)` to draw a dithered cloud instead. You can use it to draw single charts, or align it with `smooth_step` overlays.
+A grading figure shows how a response measured per grid color varies with redness. A mean line or envelope hides too much of the structure, and drawing grid vertices is too visually heavy. Use `sca.vis_grading.GradingCloud` to draw a dithered cloud instead. You can use it to draw single charts, or align it with `smooth_step` overlays.
 
 ## Result tables
 

@@ -13,10 +13,7 @@ regions of the cloud read as translucent rather than grainy.
 
 Draw with :class:`GradingCloud`, an artist that rasters itself at the axes' device
 size at draw time, so the dither maps 1:1 onto output pixels at any figure size and
-export dpi. :class:`GradingField` is the fixed-size form it grew from — rastered at
-a size chosen up front and rescaled by imshow, which aliases wherever the axes
-actually lands — kept for the slot-layout grid figure until that migrates. Both
-share one geometry: almost nothing depends on the response — the samples, their
+export dpi. Almost nothing depends on the response — the samples, their
 redness (the x pixel), their palette color, and the interpolation weights are all
 fixed by cube geometry and cached per sample-lattice size — so each panel costs one
 sparse matvec and a re-bin, a few ms. The cloud is data-colored, so it draws the
@@ -185,10 +182,27 @@ class GradingCloud(AxesImage):
     *color* flattens the palette to one hue, multiplying its own alpha into the
     coverage: for a lofted envelope drawn as a muted band behind a full-color
     summary cloud, where fading the palette instead would misstate the sample
-    colors. *span* compresses redness into ``(x0, x1)`` in data coordinates,
-    placing the cloud as one mark in a slot of a shared axis;
-    :meth:`GradingField.draw` holds the slot-layout recipe. Remaining kwargs are
-    Artist properties — ``alpha``, ``clip_on``, ``zorder``, etc.
+    colors. Remaining kwargs are Artist properties — ``alpha``, ``clip_on``,
+    ``zorder``. The zorder defaults to 1.5, between matplotlib's own defaults for
+    patches (1) and lines (2), so a cloud draws over the fill it sits on and under
+    any overlay; the image default of 0 would put it under both.
+
+    *span* compresses redness into ``(x0, x1)`` in data coordinates, placing the
+    cloud as one mark in a slot of a shared axis. For a per-(slice, position)
+    figure, prefer that row layout to a grid of panels: one slot of width ``sw``
+    per position via ``span=(p - sw/2, p + sw/2)``, with overlay series drawn by
+    :func:`~mini.vis.smooth_step` at ``ramp=1 - sw`` so plateaus span the slots and
+    risers the spaces between. Clouds and overlays then share one coordinate
+    system, with no per-panel Axes or frozen-layout overlay tricks. Stack the rows
+    in that same Axes by handing each row's artists a
+    ``Affine2D().translate(0, row) + ax.transData`` — clouds included, since the
+    extent goes through the artist's transform — rather than one Axes per row. A
+    cloud overhangs the row it belongs to, and within one Axes that tail draws over
+    the row beneath instead of being covered by its background; each row's zero
+    line doubles as the rule beneath it. Label x with position names; redness gets
+    no ticks — say once in the caption that it runs left to right within each slot.
+    Reference implementation: the grading-grid figure in
+    ``docs/m2/d2.1/report.py``.
     """
 
     def __init__(
@@ -213,6 +227,7 @@ class GradingCloud(AxesImage):
         self._px: tuple[int, int] | None = None
         self.set_extent((*(span if span is not None else XSPAN), *ylim))
         self.set_data(np.zeros((1, 1, 4), np.float32))
+        kwargs.setdefault("zorder", 1.5)
         self.set(**kwargs)
         ax.add_image(self)
 
@@ -227,75 +242,3 @@ class GradingCloud(AxesImage):
             self.set_data(_raster(geom, self._y, self._ylim, px, self._dpr, self._lerp, self._color))
             self._px = px
         super().draw(renderer)
-
-
-class GradingField:
-    """The fixed-raster grading cloud: geometry sized up front, drawn via imshow.
-
-    Prefer :class:`GradingCloud`, which sizes itself and cannot alias; this form
-    rescales its raster to the axes and remains only for the slot-layout grid
-    figure until that migrates. `k`, `dpr`, and the stacked-`y` and `color`
-    semantics are as documented there, with `px` standing in for the device size
-    the artist would measure.
-    """
-
-    def __init__(
-        self,
-        k: int = 30,
-        px: tuple[int, int] = REF_PX,
-        ylim: tuple[float, float] = (-0.3, 1.1),
-        seed: int = 0,
-        dpr: int = 2,
-    ):
-        self.px = px
-        self.dpr = dpr
-        self.ylim = ylim
-        self.geom = _geometry(_lattice_k(k, px, dpr), seed)
-
-    def draw(
-        self,
-        ax: Axes,
-        y: np.ndarray,
-        span: tuple[float, float] | None = None,
-        zorder: float = 2,
-        lerp: bool = False,
-        color: str | tuple[float, float, float] | None = None,
-    ) -> AxesImage:
-        """The cloud for one response *y* — a vector per grid color, or a stack of them
-        (see :class:`GradingCloud` for the loft, `lerp`, and `color` semantics).
-
-        By default redness spans its own range on x; pass *span* to compress it into
-        ``(x0, x1)`` in data coordinates instead, placing the cloud as one mark in a
-        slot of a shared axis. For a per-(slice, position) figure, prefer that row
-        layout to a grid of panels: one slot of width ``sw`` per position via
-        ``span=(p - sw/2, p + sw/2)``, with overlay series drawn by
-        :func:`~mini.vis.smooth_step` at ``ramp=1 - sw`` so plateaus span the slots
-        and risers the spaces between. Clouds and overlays then share one coordinate
-        system, with no per-panel Axes or frozen-layout overlay tricks. Stack the
-        rows in that same Axes by handing each row's artists a
-        ``Affine2D().translate(0, row) + ax.transData`` — clouds included, since the
-        extent goes through the artist's transform — rather than one Axes per row.
-        A cloud overhangs the row it belongs to, and within one Axes that tail draws
-        over the row beneath instead of being covered by its background; each row's
-        zero line doubles as the rule beneath it. Label x with position names;
-        redness gets no ticks — say once in the caption that it runs left to right
-        within each slot. Reference implementation: the grading-grid figure in
-        ``docs/m2/d2.1/report.py``.
-        """
-        img = _raster(self.geom, y, self.ylim, self.px, self.dpr, lerp, color)
-        extent = (*(span if span is not None else XSPAN), *self.ylim)
-        return ax.imshow(img, extent=extent, origin="lower", aspect="auto", zorder=zorder, interpolation="nearest")
-
-
-@lru_cache
-def grading_field(
-    k: int = 30,
-    px: tuple[int, int] = REF_PX,
-    ylim: tuple[float, float] = (-0.3, 1.1),
-    seed: int = 0,
-    dpr: int = 2,
-) -> GradingField:
-    """A shared :class:`GradingField` per parameter set. The precompute is only ~20 ms,
-    but caching makes repeated notebook cells and re-renders free.
-    """
-    return GradingField(k, px, ylim, seed, dpr)
