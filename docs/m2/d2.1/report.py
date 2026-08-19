@@ -66,10 +66,14 @@ def r2_sim(y: np.ndarray) -> float:
 
 
 @app.function(hide_code=True)
-def draw_grading_grid(ax: plt.Axes, a: np.ndarray, *, row_names: bool = True, scale: bool = True) -> None:
+def draw_grading_grid(
+    ax: plt.Axes, a: np.ndarray, *, keyed: int | None = None, row_names: bool = True, scale: bool = True
+) -> None:
     """One row per residual slice, one grading-cloud slot per token position, drawn into *ax*.
 
     *a* is (slice, color, position) α, keyed by whichever operand's color the caller wants on the color axis; the overlay is that keying's pure-red row. Every figure below shares this, so the two views of a condition differ only in the array they are handed — and so do the four conditions.
+
+    *keyed* is the slot the panel is keyed by; its x label draws in the overlay red, so the ink itself says which slot the red line answers to. The off-key clouds stay at full strength — they are data the prose reads (the shared-span pull, the partner-composition tilt), and fading them would presuppose the finding.
 
     The rows share one Axes, each offset by a translate transform, so a row spans y ∈ [si, si+1] and its slots keep a fixed 0–1 scale: a slot that holds nothing looks like it holds nothing, here and in the panel below. Stacking them this way costs nothing in code and buys the overhang — a cloud's extent runs past the row it belongs to, and within one Axes those tails draw over the row beneath rather than being covered by its background. Each row's zero line is also the rule between it and the row below, so the overlay marks the boundaries and no separators are needed.
 
@@ -94,16 +98,21 @@ def draw_grading_grid(ax: plt.Axes, a: np.ndarray, *, row_names: bool = True, sc
     ax.set_yticks(np.arange(n_slices) + 0.5, SLICE_NAMES if row_names else [""] * n_slices)
     ax.tick_params(axis="x", labelsize=6, bottom=False)
     ax.tick_params(axis="y", labelsize=7, left=False)
+    if keyed is not None:
+        ax.get_xticklabels()[keyed].set(color=red_c, fontweight="bold")
     if scale:
         # One y scale for the whole figure, against the bottom row, whose offset is zero.
         sec = ax.secondary_yaxis("right")
         sec.set_yticks(np.arange(n_slices + 1), ["0", "1"] + [""] * (n_slices - 1))
         sec.tick_params(labelsize=6, direction="out")
+        sec.set_ylabel("α, 0–1 per row", fontsize=7)
 
 
 @app.function(hide_code=True)
-def grading_grids(panels: dict[str, np.ndarray], figsize: tuple[float, float] = (7.4, 3.3)) -> plt.Figure:
-    """A row of grading grids sharing one set of rows and one α scale, titled by *panels*' keys.
+def grading_grids(
+    panels: dict[str, tuple[np.ndarray, int | None]], figsize: tuple[float, float] = (7.4, 3.3)
+) -> plt.Figure:
+    """A row of grading grids sharing one set of rows and one α scale, titled by *panels*' keys; each value pairs the α array with its keyed slot (see :func:`draw_grading_grid`).
 
     The panels measure the same quantity on the same scale and the reader compares across them, so they belong in one figure — which is also what the post wants to upload, one image per condition. The row names sit on the left of the first panel and the α scale on the right of the last, since both are shared; a lone panel gets each on its own side.
 
@@ -111,8 +120,8 @@ def grading_grids(panels: dict[str, np.ndarray], figsize: tuple[float, float] = 
     """
     fig, axes = plt.subplots(1, len(panels), figsize=figsize, squeeze=False)
     row = cast(AxesRow, axes[0])
-    for i, (ax, (title, a)) in enumerate(zip(row, panels.items(), strict=True)):
-        draw_grading_grid(ax, a, row_names=i == 0, scale=i == len(row) - 1)
+    for i, (ax, (title, (a, keyed))) in enumerate(zip(row, panels.items(), strict=True)):
+        draw_grading_grid(ax, a, keyed=keyed, row_names=i == 0, scale=i == len(row) - 1)
         ax.set_title(title, fontsize=8, pad=6)  # pad clears the top row's unclipped cloud
     return fig
 
@@ -145,7 +154,7 @@ def _():
 
     Each panel below adds one piece of the anchoring recipe. The quantity plotted is the α response at the op1 token, drawn against the redness of the first operand.[^alpha] Each chart is a *grading cloud*: the response is measured at the 216 vocabulary colors, interpolated across the whole RGB cube, and drawn as a dither of the colors themselves, so the vertical spread at each redness is the range of responses among equally red colors. The grey band behind each cloud drops the averaging: it redraws the response separately for every residual slice and every seed, flattened to grey so it reads as an envelope rather than data.
 
-    [^alpha]: α is the cosine between the residual stream (the running vector that each layer reads from and writes back to) and the anchor axis, the direction we train the concept toward. Here it is averaged over the five residual slices, the five points in the network where we read that vector.
+    [^alpha]: α is the cosine between the residual stream (the running vector that each layer reads from and writes back to) and the anchor axis, the direction we train the concept toward. The model keeps every residual state unit-norm (it is an nGPT variant), which is why the axis label can write that cosine as a plain dot product. Here it is averaged over the five residual slices, the five points in the network where we read that vector.
     """)
     return
 
@@ -186,7 +195,7 @@ def _(
         axes[0].set_xticks([0, 0.5, 1])
         axes[0].set_yticks([0, 0.5, 1])
         axes[0].set_ylim(0, 1)
-        axes[0].set_ylabel("α at op1, slice mean", fontsize=8)
+        axes[0].set_ylabel("α at op1\nact · (1, 0, …)", fontsize=8)
         return fig
 
     mo.Html(_plot())
@@ -250,11 +259,13 @@ def _(alphas: dict[str, dict[str, np.ndarray]]):
             name=f"grading-grid-{cond.exp}-{cond.name}",
             alt_text=_ALT[cond.key],
             caption=rf"""
-                **{cond.title}** ({cond.exp}, `{cond.name}`). One row per residual slice, with the embedding at the bottom; each slot holds the grading cloud of the α response at that token position. The two panels key the same measurement by a different operand — its redness runs left to right within every slot — and in red, α on the probe lines whose keyed operand is pure red. One y scale, 0 to 1, serves both.
+                **{cond.title}** ({cond.exp}, `{cond.name}`). One row per residual slice, with the embedding at the bottom; each slot holds the grading cloud of the α response at that token position. The two panels key the same measurement by a different operand — its redness runs left to right within every slot — and in red, α on the probe lines whose keyed operand is pure red; the red slot name on the x axis marks that operand. Each row spans the same 0–1 α scale, ticked once at the bottom right.
             """,
         )
         def _plot() -> plt.Figure:
-            return grading_grids({f"Keyed by the {op} operand": alphas[cond.key][k] for k, op in KEYINGS.items()})
+            return grading_grids(
+                {f"Keyed by the {op} operand": (alphas[cond.key][k], POS_NAMES.index(k)) for k, op in KEYINGS.items()}
+            )
 
         return _plot()
 
