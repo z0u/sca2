@@ -419,7 +419,9 @@ def test_virtual_url_lifts_the_src_from_marimos_own_img_tag():
     from mini.reports import _IMG_SRC
 
     tag = h.img(src="./@file/49361-164816-TeHGmd7R.png", alt="a plot", style="max-width: 100%")
-    assert _IMG_SRC.search(tag).group(2) == "./@file/49361-164816-TeHGmd7R.png"
+    m = _IMG_SRC.search(tag)
+    assert m is not None, tag
+    assert m.group(2) == "./@file/49361-164816-TeHGmd7R.png"
 
 
 def test_virtual_url_declines_off_the_kernel(tmp_path):

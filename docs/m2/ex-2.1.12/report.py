@@ -11,6 +11,7 @@ app = marimo.App(
 with app.setup(hide_code=True):
     import tempfile
     from pathlib import Path
+    from typing import NamedTuple
 
     import marimo as mo
     import matplotlib.pyplot as plt
@@ -218,7 +219,19 @@ def _(r2):
     _inter = ex.CONDITIONS[1:3]
     _CH = "RGB"
 
-    _rows = []
+    class _Row(NamedTuple):
+        """One target's deciding comparison: per-channel readings at the site the control picked."""
+
+        t: str
+        site: str
+        sel: float
+        ctrl: np.ndarray
+        prim: np.ndarray
+        gap: np.ndarray
+        band: float
+        inter: dict[str, np.ndarray]
+
+    _rows: list[_Row] = []
     for _t in ex.TARGETS:
         _m = r2[_ctrl.key, _t]
         _sel = _m[ex.H2_SELECT_SEED].mean(-1)
@@ -226,12 +239,12 @@ def _(r2):
         _c = _m[np.arange(len(_m)) != ex.H2_SELECT_SEED][:, _si, _pi, :]
         _p = r2[_prim.key, _t][:, _si, _pi, :]
         _band = 2 * float(np.sqrt((_c.var(0, ddof=1).mean() + _p.var(0, ddof=1).mean()) / 2))
-        _rows.append({
-            "t": _t, "site": f"slice {_si}, {POS_NAMES[_pi]}", "sel": float(_sel[_si, _pi]),
-            "ctrl": _c.mean(0), "prim": _p.mean(0), "gap": _c.mean(0) - _p.mean(0), "band": _band,
-            "inter": {c.title: r2[c.key, _t].mean(0)[_si, _pi] for c in _inter},
-        })  # fmt: skip
-    assert all(r["sel"] >= ex.H2_MIN_CONTROL for r in _rows), "an unscored target needs its row marked"
+        _rows.append(_Row(
+            t=_t, site=f"slice {_si}, {POS_NAMES[_pi]}", sel=float(_sel[_si, _pi]),
+            ctrl=_c.mean(0), prim=_p.mean(0), gap=_c.mean(0) - _p.mean(0), band=_band,
+            inter={c.title: r2[c.key, _t].mean(0)[_si, _pi] for c in _inter},
+        ))  # fmt: skip
+    assert all(r.sel >= ex.H2_MIN_CONTROL for r in _rows), "an unscored target needs its row marked"
 
     def _num(v: float, bold: bool = False) -> str:
         s = f"{v:+.2f}"
@@ -246,15 +259,15 @@ def _(r2):
         )
         body = ""
         for r in _rows:
-            n = 2 + len(r["inter"])
+            n = 2 + len(r.inter)
             body += (
-                f'<tr><td rowspan="{n}">{r["t"]}</td><td rowspan="{n}">{r["site"]}</td>'
+                f'<tr><td rowspan="{n}">{r.t}</td><td rowspan="{n}">{r.site}</td>'
                 + "<td>un-anchored (seeds 1–2)</td>"
-                + "".join(f'<td class="num">{_num(v)}</td>' for v in r["ctrl"])
+                + "".join(f'<td class="num">{_num(v)}</td>' for v in r.ctrl)
                 + '<td class="num"></td>' * 3
                 + '<td class="num"></td></tr>'
             )
-            for title, vals in r["inter"].items():
+            for title, vals in r.inter.items():
                 body += (
                     f"<tr><td>{title}</td>"
                     + "".join(f'<td class="num">{_num(v)}</td>' for v in vals)
@@ -263,15 +276,15 @@ def _(r2):
                 )
             body += (
                 f"<tr><td>{_prim.title} (primary)</td>"
-                + "".join(f'<td class="num">{_num(v)}</td>' for v in r["prim"])
-                + "".join(f'<td class="num">{_num(g, bold=g <= ex.H2_GATE)}</td>' for g in r["gap"])
-                + f'<td class="num">{r["band"]:.2f}</td></tr>'
+                + "".join(f'<td class="num">{_num(v)}</td>' for v in r.prim)
+                + "".join(f'<td class="num">{_num(g, bold=g <= ex.H2_GATE)}</td>' for g in r.gap)
+                + f'<td class="num">{r.band:.2f}</td></tr>'
             )
         return f'<div class="report-table-scroll"><table class="report-table">{head}{body}</table></div>'
 
-    _misses = [(r["t"], ch, float(g), r["band"]) for r in _rows for ch, g in zip(_CH, r["gap"], strict=True) if g > ex.H2_GATE]  # fmt: skip
+    _misses = [(r.t, ch, float(g), r.band) for r in _rows for ch, g in zip(_CH, r.gap, strict=True) if g > ex.H2_GATE]  # fmt: skip
     assert all(g < band for _, _, g, band in _misses), "a resolved miss would change the verdict"
-    _gb_excess = max(float(-r["gap"][k]) for r in _rows for k in (1, 2))
+    _gb_excess = max(float(-r.gap[k]) for r in _rows for k in (1, 2))
     _ctrl_spread = sorted(float(v) for v in r2[_ctrl.key, "op1"][:, 1, 0, :].mean(-1))
     _prim_spread = sorted(float(v) for v in r2[_prim.key, "op1"][:, 1, 0, :].mean(-1))
 
