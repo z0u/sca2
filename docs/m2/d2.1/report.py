@@ -16,15 +16,15 @@ with app.setup(hide_code=True):
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
+    from matplotlib.transforms import Affine2D
 
-    # Marimo puts the notebook directory on sys.path, so the condition list and the
-    # ref come from the prep module beside this one rather than a copy of them here.
+    # Marimo puts the notebook directory on sys.path, so the condition list and the ref come from the prep module beside this one rather than a copy of them here.
     import experiment as ex
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import AxesRow, figure_html, light_dark, smooth_step, smooth_step_area, themed
     from sca.colorcube import sim_to_red
-    from sca.vis_grading import GRID_RGB, I_RED, REDNESS, GradingCloud, grading_field
+    from sca.vis_grading import GRID_RGB, I_RED, REDNESS, GradingCloud
 
     use_publisher(report_bundle(__file__))
 
@@ -40,14 +40,7 @@ with app.setup(hide_code=True):
 def load_margins() -> tuple[dict[str, dict[str, np.ndarray]], dict[str, dict[str, np.ndarray]], np.ndarray] | None:
     """α per condition and keying, plus the probe set's operand index.
 
-    `experiment.py` publishes both operand margins of every condition, per run.
-    `out[key]["op1"]` is seed-mean (slice, color, position) α against the first
-    operand's color and `["op2"]` the same measurement keyed by the second, so a
-    figure picks its color axis by choosing between them. `stacks` is the same
-    measurement with the seed axis kept, (seed, slice, color, position) — the
-    progression figure's spread envelope dithers over it. The pair index rides
-    along: it says which color sits at each operand slot on each probe line,
-    which is what the partner-composition note reads.
+    `experiment.py` publishes both operand margins of every condition, per run. `out[key]["op1"]` is seed-mean (slice, color, position) α against the first operand's color and `["op2"]` the same measurement keyed by the second, so a figure picks its color axis by choosing between them. `stacks` is the same measurement with the seed axis kept, (seed, slice, color, position) — the progression figure's spread envelope dithers over it. The pair index rides along: it says which color sits at each operand slot on each probe line, which is what the partner-composition note reads.
     """
     store = project_store()
     art = store.get_refs([ex.ARRAYS_REF])[ex.ARRAYS_REF]
@@ -73,45 +66,39 @@ def r2_sim(y: np.ndarray) -> float:
 
 
 @app.function(hide_code=True)
-def grading_grid(a: np.ndarray, figsize: tuple[float, float] = (7, 5)) -> plt.Figure:
+def grading_grid(a: np.ndarray, figsize: tuple[float, float] = (7, 4.5)) -> plt.Figure:
     """One row per residual slice, one grading-cloud slot per token position.
 
-    *a* is (slice, color, position) α, keyed by whichever operand's color the
-    caller wants on the color axis; the overlay is that keying's pure-red row.
-    Every figure below shares this, so the two views of a condition differ only
-    in the array they are handed — and so do the four conditions.
+    *a* is (slice, color, position) α, keyed by whichever operand's color the caller wants on the color axis; the overlay is that keying's pure-red row. Every figure below shares this, so the two views of a condition differ only in the array they are handed — and so do the four conditions.
 
-    Sized so one keying fills the content column, which stacks a condition's pair
-    rather than setting them side by side, and leaves each slot enough width for
-    its dither to read. The y scale is fixed at 0–1 rather than fitted, so a slot
-    that holds nothing looks like it holds nothing, here and in the panel below.
+    The rows share one Axes, each offset by a translate transform, so a row spans y ∈ [si, si+1] and its slots keep a fixed 0–1 scale: a slot that holds nothing looks like it holds nothing, here and in the panel below. Stacking them this way costs nothing in code and buys the overhang — a cloud's extent runs past the row it belongs to, and within one Axes those tails draw over the row beneath rather than being covered by its background. Each row's zero line is also the rule between it and the row below, so the overlay marks the boundaries and no separators are needed.
+
+    Sized so one keying fills the content column, which stacks a condition's pair rather than setting them side by side, and leaves each slot enough width for its dither to read.
     """
     sw = 0.72
+    n_slices = a.shape[0]
     n_pos = a.shape[2]
-    field = grading_field(k=50, px=(240, 300))
     red_c = light_dark("#d40000", "#f44")
-    grey_c = light_dark("#888", "#999")
-    fig, axes = plt.subplots(5, 1, figsize=figsize, sharex=True, sharey=True)
-    axes = cast(AxesRow, axes)
-    for si in range(5):
-        ax = axes[4 - si]  # embedding at the bottom, as the profile figures do
+    grey_c = light_dark("#0003", "#fff1")
+    fig, ax = plt.subplots(figsize=figsize)
+    for si in range(n_slices):
+        shift = Affine2D().translate(0, si) + ax.transData  # embedding at the bottom, as the profile figures do
         reds = a[si, I_RED, :]
         xs = np.arange(len(reds))
-        smooth_step_area(ax, xs, reds, ramp=1 - sw, color=grey_c, alpha=0.1)
+        smooth_step_area(ax, xs, reds, ramp=1 - sw, color=grey_c, transform=shift)
         for pi in range(n_pos):
-            img = field.draw(ax, a[si, :, pi], span=(pi - sw / 2, pi + sw / 2))
-            img.set_clip_on(False)
-        smooth_step(ax, xs, reds, ramp=1 - sw, color=red_c, lw=1, alpha=1)
-        ax.set_ylabel(SLICE_NAMES[si], fontsize=7, rotation=0, ha="right", va="center", labelpad=2)
-        ax.tick_params(labelsize=6, left=False, labelleft=False, bottom=False)
-    axes[0].set_xlim(-0.5, n_pos - 0.5)
-    axes[0].set_ylim(0, 1)
-    axes[-1].set_xticks(range(n_pos), POS_NAMES)
-    axes[-1].set_yticks([0, 0.5, 1])
-    axes[-1].tick_params(labelbottom=True)
-    # One y scale for the whole figure, on the right of the bottom row.
-    axes[-1].yaxis.tick_right()
-    axes[-1].tick_params(labelsize=6, right=True, labelright=True)
+            GradingCloud(ax, a[si, :, pi], span=(pi - sw / 2, pi + sw / 2), transform=shift, clip_on=False)
+        smooth_step(ax, xs, reds, ramp=1 - sw, color=red_c, lw=1, alpha=1, transform=shift, clip_on=False)
+    ax.set_xlim(-0.5, n_pos - 0.5)
+    ax.set_ylim(0, n_slices)
+    ax.set_xticks(range(n_pos), POS_NAMES)
+    ax.set_yticks(np.arange(n_slices) + 0.5, SLICE_NAMES)
+    ax.tick_params(axis="x", labelsize=6, bottom=False)
+    ax.tick_params(axis="y", labelsize=7, left=False)
+    # One y scale for the whole figure, against the bottom row, whose offset is zero.
+    scale = ax.secondary_yaxis("right")
+    scale.set_yticks(np.arange(n_slices + 1), ["0", "1"] + [""] * (n_slices - 1))
+    scale.tick_params(labelsize=6, direction="out")
     return fig
 
 
@@ -181,8 +168,6 @@ def _(
             ax.set_xlabel("redness of op1", fontsize=8)
             ax.tick_params(labelsize=7)
             ax.set_aspect("equal")
-            ax.spines["bottom"].set_visible(True)
-            ax.spines["bottom"].set_linewidth(0.5)
         axes[0].set_xticks([0, 0.5, 1])
         axes[0].set_yticks([0, 0.5, 1])
         axes[0].set_ylim(0, 1)
@@ -238,28 +223,22 @@ def _(alphas: dict[str, dict[str, np.ndarray]]):
             Keyed by the second operand the picture is the same — flat at zero in every slot and every slice.
         """,
         ("ex-2.1.6/lam0.1", "op1"): """
-            The bare anchor lifts the whole sequence: every slot sits high, with only a mild tilt, so almost
-            nothing is graded by redness.
+            The bare anchor lifts the whole sequence: every slot sits high, with only a mild tilt, so almost nothing is graded by redness.
         """,
         ("ex-2.1.6/lam0.1", "op2"): """
-            Keyed by the second operand, the same indiscriminate lift, with the op2 slot the only one whose
-            cloud climbs steeply with redness.
+            Keyed by the second operand, the same indiscriminate lift, with the op2 slot the only one whose cloud climbs steeply with redness.
         """,
         ("ex-2.1.8/end90-hold30", "op1"): """
-            Grading returns, but it fills the whole anchored span — op1, plus, op2 and equals all carry tall
-            red-rising clouds, while the answer and newline slots stay low.
+            Grading returns, but it fills the whole anchored span — op1, plus, op2 and equals all carry tall red-rising clouds, while the answer and newline slots stay low.
         """,
         ("ex-2.1.8/end90-hold30", "op2"): """
-            Keyed by the second operand the tallest cloud sits at op2, with equals close behind and op1 much
-            lower: the pull is shared across the span either way round.
+            Keyed by the second operand the tallest cloud sits at op2, with equals close behind and op1 much lower: the pull is shared across the span either way round.
         """,
         ("ex-2.1.10/either-t100", "op1"): """
-            The pull has narrowed to one token: a sigmoid cloud rises to about 0.97 at the op1 slot in every
-            slice, and every other slot stays low.
+            The pull has narrowed to one token: a sigmoid cloud rises to about 0.97 at the op1 slot in every slice, and every other slot stays low.
         """,
         ("ex-2.1.10/either-t100", "op2"): """
-            The mirror image — the cloud has moved to the op2 slot and climbs just as high there, while the
-            op1 slot sits low.
+            The mirror image — the cloud has moved to the op2 slot and climbs just as high there, while the op1 slot sits low.
         """,
     }
 
@@ -276,15 +255,13 @@ def _(alphas: dict[str, dict[str, np.ndarray]]):
 
     def _pair(cond: ex.Condition) -> str:
         _caption = mo.md(rf"""
-            **{cond.title}** ({cond.exp}, `{cond.name}`). One row per residual slice, with the embedding at the
-            bottom; each slot holds the grading cloud of the α response at that token position. The two views key
-            the same measurement by a different operand — its redness runs left to right within every slot — and
-            in red, α on the probe lines whose keyed operand is pure red. One y scale, 0 to 1, serves both.
+            **{cond.title}** ({cond.exp}, `{cond.name}`). One row per residual slice, with the embedding at the bottom; each slot holds the grading cloud of the α response at that token position. The two views key the same measurement by a different operand — its redness runs left to right within every slot — and in red, α on the probe lines whose keyed operand is pure red. One y scale, 0 to 1, serves both.
         """).text
         _body = "".join(_grid(cond, k) for k in KEYINGS)
         return figure_html(_body, caption=_caption, aria_label=f"{cond.title}: α per slice and position, keyed by each operand in turn")  # fmt: skip
 
-    mo.vstack([mo.md(f"### {c.title}\n\n{_pair(c)}") for c in ex.CONDITIONS])
+    for c in mo.status.progress_bar(ex.CONDITIONS, title="Rendering charts", remove_on_exit=True, show_eta=True):
+        mo.output.append(mo.md(f"### {c.title}\n\n{_pair(c)}"))
     return
 
 

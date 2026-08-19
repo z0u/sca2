@@ -268,14 +268,20 @@ class GradingField:
         By default redness spans its own range on x; pass *span* to compress it into
         ``(x0, x1)`` in data coordinates instead, placing the cloud as one mark in a
         slot of a shared axis. For a per-(slice, position) figure, prefer that row
-        layout to a grid of panels: one Axes per slice, one slot of width ``sw`` per
-        position via ``span=(p - sw/2, p + sw/2)``, with overlay series drawn by
+        layout to a grid of panels: one slot of width ``sw`` per position via
+        ``span=(p - sw/2, p + sw/2)``, with overlay series drawn by
         :func:`~mini.vis.smooth_step` at ``ramp=1 - sw`` so plateaus span the slots
         and risers the spaces between. Clouds and overlays then share one coordinate
-        system, with no per-panel Axes or frozen-layout overlay tricks. Label x with
-        position names; redness gets no ticks — say once in the caption that it runs
-        left to right within each slot. Reference implementation: the grading-grid
-        figure in ``docs/m2/d2.1/report.py``.
+        system, with no per-panel Axes or frozen-layout overlay tricks. Stack the
+        rows in that same Axes by handing each row's artists a
+        ``Affine2D().translate(0, row) + ax.transData`` — clouds included, since the
+        extent goes through the artist's transform — rather than one Axes per row.
+        A cloud overhangs the row it belongs to, and within one Axes that tail draws
+        over the row beneath instead of being covered by its background; each row's
+        zero line doubles as the rule beneath it. Label x with position names;
+        redness gets no ticks — say once in the caption that it runs left to right
+        within each slot. Reference implementation: the grading-grid figure in
+        ``docs/m2/d2.1/report.py``.
         """
         img = _raster(self.geom, y, self.ylim, self.px, self.dpr, lerp, color)
         extent = (*(span if span is not None else XSPAN), *self.ylim)
