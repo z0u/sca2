@@ -6,9 +6,17 @@ description: >-
   user wants a report reviewed or sanity-checked, or wants to know whether it is
   ready to run, to freeze, or to publish.
 argument-hint: <path to report.py>
-context: fork
 model: sonnet
 ---
+
+<!--
+Runs inline, not `context: fork`. A fork loses the `Agent` tool, and the
+runbook's whole shape is "spawn a fresh reviewer subagent per round" —
+without `Agent` that falls back to a remote CCR session per reviewer, which
+costs a side-branch round-trip for staged edits and races the reviewer
+against the branch push. The router doesn't review, so it doesn't need a
+fresh context of its own; only the reviewer does, and `Agent` gives it one.
+-->
 
 Let's iteratively improve this report.
 
