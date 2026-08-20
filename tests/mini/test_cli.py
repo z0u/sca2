@@ -1053,8 +1053,13 @@ def test_status_flags_results_computed_under_older_numerics(tmp_path: Path, monk
     now_jax = installed_numerics()["jax"]
     store = MemoStore(data_root() / "driftexp")
     common = {"state": "done", "fn": "train"}
+    # Two aged baselines of the same package: a sweep computed half under one jax
+    # and half under another must report both, not whichever record read last.
     store.records_backend.merge(
-        "train-old", {"key": "train-old", "env": {"numerics_packages": {"jax": "0.0.1-old"}}, **common}
+        "train-old", {"key": "train-old", "env": {"numerics_packages": {"jax": "0.0.1"}}, **common}
+    )
+    store.records_backend.merge(
+        "train-older", {"key": "train-older", "env": {"numerics_packages": {"jax": "0.0.2"}}, **common}
     )
     store.records_backend.merge(
         "train-now", {"key": "train-now", "env": {"numerics_packages": {"jax": now_jax}}, **common}
@@ -1063,11 +1068,11 @@ def test_status_flags_results_computed_under_older_numerics(tmp_path: Path, monk
     from mini.__main__ import cmd_status
 
     cmd_status(argparse.Namespace(name="driftexp", app="local"))
-    assert f"⚠ 1 result(s) computed under different numerics: jax 0.0.1-old → {now_jax}" in capsys.readouterr().out
+    assert f"⚠ 2 result(s) computed under different numerics: jax 0.0.1/0.0.2 → {now_jax}" in capsys.readouterr().out
 
     # Same shape in both payloads: a monitor polling --brief is the reader most likely
     # to be the only one watching while a sweep straddles an upgrade.
-    expected = {"tasks": 1, "packages": {"jax": {"recorded": "0.0.1-old", "current": now_jax}}}
+    expected = {"tasks": 2, "packages": {"jax": {"recorded": ["0.0.1", "0.0.2"], "current": now_jax}}}
     for brief in (False, True):
         cmd_status(argparse.Namespace(name="driftexp", app="local", json=True, brief=brief))
         assert json.loads(capsys.readouterr().out)["numerics_drift"] == expected

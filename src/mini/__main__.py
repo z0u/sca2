@@ -33,8 +33,10 @@ from mini.runs import (
     STALE_HEARTBEAT_S,
     RunState,
     data_root,
+    describe_numerics_drift,
     in_declared_phase,
     is_queued,
+    merged_numerics_drift,
     numerics_drift,
     progress_age,
     stale_heartbeat,
@@ -238,18 +240,15 @@ def _dag_note(store: MemoStore, state: RunState) -> str:
     return "DAG suspended at the last tick — re-run to advance"
 
 
-def _numerics_moved(records: list[dict]) -> tuple[int, dict[str, tuple[str, str]]]:
+def _numerics_moved(records: list[dict]) -> tuple[int, dict[str, tuple[tuple[str, ...], str]]]:
     """How many DONE results were computed under numerics packages that have since moved, and what moved.
 
-    Read-only and self-contained: each record carries the versions its worker ran under (:func:`mini.runs.compute_env`), so a view can answer this from the store alone — no import, no tick, no fingerprinting. Same comparison the driver makes on a memo hit; here it stays visible after the run, which is when someone is usually asking where a number came from.
+    Read-only and self-contained: each record carries the versions its worker ran under (:func:`mini.runs.compute_env`), so a view can answer this from the store alone — no import, no tick, no fingerprinting. Same comparison the driver makes on a memo hit; here it stays visible after the run, which is when someone is usually asking where a number came from. A package's recorded side is every version seen across the records — a sweep can straddle an upgrade — merged by :func:`mini.runs.merged_numerics_drift`.
     """
-    moved: dict[str, tuple[str, str]] = {}
-    drifted = 0
-    for rec in records:
-        if _rec_state(rec) == RunState.DONE and (drift := numerics_drift(rec.get("env"))):
-            drifted += 1
-            moved.update(drift)
-    return drifted, moved
+    drifts = [
+        drift for rec in records if _rec_state(rec) == RunState.DONE and (drift := numerics_drift(rec.get("env")))
+    ]
+    return len(drifts), merged_numerics_drift(drifts)
 
 
 def _numerics_note(records: list[dict]) -> str:
@@ -257,16 +256,18 @@ def _numerics_note(records: list[dict]) -> str:
     drifted, moved = _numerics_moved(records)
     if not moved:
         return ""
-    bits = ", ".join(f"{name} {was} → {now}" for name, (was, now) in sorted(moved.items()))
-    return f"⚠ {drifted} result(s) computed under different numerics: {bits}"
+    return f"⚠ {drifted} result(s) computed under different numerics: {describe_numerics_drift(moved)}"
 
 
 def _numerics_drift_json(records: list[dict]) -> dict[str, Any] | None:
-    """The JSON twin of :func:`_numerics_note` — same shape in the full and ``--brief`` payloads, or ``None`` when nothing moved."""
+    """The JSON twin of :func:`_numerics_note` — same shape in the full and ``--brief`` payloads, or ``None`` when nothing moved. ``recorded`` is a list: a run that straddles an upgrade has several baselines, and a monitor should see all of them."""
     drifted, moved = _numerics_moved(records)
     if not moved:
         return None
-    return {"tasks": drifted, "packages": {n: {"recorded": w, "current": c} for n, (w, c) in sorted(moved.items())}}
+    return {
+        "tasks": drifted,
+        "packages": {n: {"recorded": list(w), "current": c} for n, (w, c) in sorted(moved.items())},
+    }
 
 
 def _aggregate_state(states: list[RunState]) -> RunState:

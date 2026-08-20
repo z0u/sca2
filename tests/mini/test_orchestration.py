@@ -613,3 +613,37 @@ def test_memo_hit_computed_under_older_numerics_is_reported(tmp_path: Path, capl
     with caplog.at_level(logging.WARNING, logger="mini.orchestration"):
         _drive(exp, app)
     assert caplog.text == ""  # a watching driver ticks every few seconds; the answer doesn't change
+
+
+def test_numerics_warning_grows_with_the_hits_it_covers(tmp_path: Path, caplog):
+    """A tick can suspend partway through the DAG, having counted only some of the drifted hits — the warning fires in ``finally``, partial tick or not. A later, fuller wake that serves more drifted hits under the same signature must not be silenced by the first, smaller report."""
+
+    def train(lr):
+        return lr * 2
+
+    exp, app = _setup("drift-count", lambda ctx: ctx.map(train, [0.1, 0.2]), tmp_path)
+    assert _drive(exp, app) == [0.2, 0.4]
+
+    def age(rec):
+        env = {**rec["env"], "numerics_packages": {**rec["env"]["numerics_packages"], "jax": "0.0.1"}}
+        store.update(rec["key"], env=env)
+
+    store = app.memo_store()
+    first, second = store.records()
+    orchestration._warned_numerics.clear()
+
+    age(first)  # stands in for a suspended tick that only reached one of the hits
+    with caplog.at_level(logging.WARNING, logger="mini.orchestration"):
+        _drive(exp, app)
+    assert "1 memo hit(s)" in caplog.text
+
+    caplog.clear()
+    age(second)  # same signature, one more hit under it — the count must catch up
+    with caplog.at_level(logging.WARNING, logger="mini.orchestration"):
+        _drive(exp, app)
+    assert "2 memo hit(s)" in caplog.text
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="mini.orchestration"):
+        _drive(exp, app)
+    assert caplog.text == ""  # the full count has been said; repeats stay quiet

@@ -11,10 +11,11 @@ import importlib.metadata
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -25,9 +26,11 @@ __all__ = [
     "STALE_HEARTBEAT_S",
     "compute_env",
     "data_root",
+    "describe_numerics_drift",
     "in_declared_phase",
     "installed_numerics",
     "is_queued",
+    "merged_numerics_drift",
     "numerics_drift",
     "progress_age",
     "spawn_taskworker",
@@ -140,6 +143,30 @@ def numerics_drift(
     recorded = (env or {}).get("numerics_packages") or {}
     now = installed_numerics() if current is None else current
     return {name: (was, now[name]) for name, was in recorded.items() if name in now and now[name] != was}
+
+
+def _version_sort_key(v: str) -> tuple[tuple[int, int | str], ...]:
+    """Numeric-aware sort key for version strings, without a parser dependency: ``0.9.0`` sorts before ``0.10.1``, and non-numeric fragments compare as text."""
+    return tuple((0, int(p)) if p.isdigit() else (1, p) for p in re.split(r"(\d+)", v))
+
+
+def merged_numerics_drift(drifts: Iterable[Mapping[str, tuple[str, str]]]) -> dict[str, tuple[tuple[str, ...], str]]:
+    """Fold per-record drifts into one map: ``{package: (recorded versions, current)}``.
+
+    A run can straddle *several* upgrades — half a sweep computed under jax 0.9.0, half under 0.10.1 — so a package's recorded side is a tuple of every version seen, sorted, rather than whichever record happened to be read last. The current side is single-valued: it's this process's installed version.
+    """
+    recorded: dict[str, set[str]] = {}
+    current: dict[str, str] = {}
+    for drift in drifts:
+        for name, (was, now) in drift.items():
+            recorded.setdefault(name, set()).add(was)
+            current[name] = now
+    return {name: (tuple(sorted(vs, key=_version_sort_key)), current[name]) for name, vs in recorded.items()}
+
+
+def describe_numerics_drift(moved: Mapping[str, tuple[tuple[str, ...], str]]) -> str:
+    """One clause per package: ``jax 0.9.0/0.10.1 → 0.11.0, numpy 2.2.3 → 2.3.0``."""
+    return ", ".join(f"{name} {'/'.join(was)} → {now}" for name, (was, now) in sorted(moved.items()))
 
 
 def compute_env() -> dict[str, Any]:

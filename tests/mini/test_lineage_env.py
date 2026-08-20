@@ -128,3 +128,14 @@ def test_numerics_drift_names_what_moved():
 def test_numerics_drift_stays_quiet_without_both_halves(env, current):
     """Absence of evidence isn't evidence of a change: a package missing from either side says nothing about whether the result would reproduce."""
     assert runs.numerics_drift(env, current) == {}
+
+
+def test_merged_numerics_drift_keeps_every_baseline():
+    """A sweep can straddle an upgrade, so two records drifting from *different* versions of the same package both appear — numerically sorted, so `0.9.0` reads before `0.10.1`."""
+    drifts = [
+        {"jax": ("0.10.1", "0.11.0")},
+        {"jax": ("0.9.0", "0.11.0"), "numpy": ("2.2.3", "2.3.0")},
+    ]
+    merged = runs.merged_numerics_drift(drifts)
+    assert merged == {"jax": (("0.9.0", "0.10.1"), "0.11.0"), "numpy": (("2.2.3",), "2.3.0")}
+    assert runs.describe_numerics_drift(merged) == "jax 0.9.0/0.10.1 → 0.11.0, numpy 2.2.3 → 2.3.0"
