@@ -71,9 +71,9 @@ def _bound_names(target: ast.expr) -> list[tuple[ast.Name, bool]]:
 
 
 def findings_in(path: Path) -> list[Finding]:
-    """Every public cell variable in *path* that a bare assignment defines.
+    """Every public cell variable in *path* that an unannotated assignment defines, bare or unpacked.
 
-    A leading underscore marks a name cell-local — Marimo neither exports it nor propagates anything about it — so those are none of this check's business.
+    A leading underscore marks a name cell-local — Marimo neither exports it nor propagates anything about it — so those are none of this check's business. An `AnnAssign` is the annotated form, and simply isn't an `ast.Assign`, so it drops out of the match below rather than needing a test of its own.
     """
     try:
         tree = ast.parse(path.read_text("utf-8", errors="ignore"), filename=str(path))
