@@ -1,0 +1,12 @@
+---
+status: open
+tags: [ci]
+opened: 2026-08-21
+---
+# Nothing tells us when a pinned Action goes stale
+
+`astral-sh/setup-uv` is now pinned to a full version (`@v10.0.1`) in all three workflows, because upstream stopped publishing floating major tags at v8 — a mutable `@v8` is a supply chain the pin can't see, so naming the release is their recommendation. That trade lands the freshness problem on us: the pin will sit at v10.0.1 until someone edits three files, and nothing in the repo will mention it. The previous item took two years of deprecation warnings to get noticed, and that was with a *warning* being printed on every run; an exact pin is quieter than that.
+
+The obvious answer is a `.github/dependabot.yml` with the `github-actions` ecosystem on a monthly interval, which opens a PR per stale pin and understands full-version and SHA pins alike. That is a process change rather than a code one — it means a bot opening PRs on this repo and every one of them spending a CI round — so it wants a human decision rather than a quiet commit. Worth weighing against the alternative of grouping the updates (`groups:` in the config keeps it to one PR per interval), or of doing nothing and re-checking by hand whenever CI is being touched anyway.
+
+Scope is small either way: four pinned Actions across three workflows. `actions/checkout`, `rossjrw/pr-preview-action` and `JamesIves/github-pages-deploy-action` all still publish floating majors, so today only setup-uv actually needs the reminder — but that is a property of those three upstreams, not a guarantee, and the same immutable-release argument is spreading.

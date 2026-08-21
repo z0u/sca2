@@ -23,12 +23,17 @@ jobs:
     name: Run all checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the publish check diffs against the base branch's merge base
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        # Pinned to a full version rather than a floating major, because from v8 on
+        # astral-sh stopped publishing `@v8`-style tags — a mutable major is a supply
+        # chain the pin can't see, so upstream's contract is now "name the release".
+        # The cost is that this one doesn't drift forward on its own; bumping it is a
+        # manual edit here and in pr-preview.yml / publish-docs.yml.
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies
         id: install
