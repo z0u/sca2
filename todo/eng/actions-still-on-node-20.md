@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [ci]
 opened: 2026-08-19
+closed: 2026-08-21
 ---
 # Two pinned Actions still target Node 20
 
@@ -10,3 +11,7 @@ Every workflow run now ends with a warning: "Node.js 20 is deprecated. The follo
 Both pins appear three times each, once per workflow (`lint-check.yml`, `pr-preview.yml`, `publish-docs.yml`), so this is six lines and a green run to confirm. `rossjrw/pr-preview-action@v1` and `JamesIves/github-pages-deploy-action@v4` are not named in the warning.
 
 Noticed while reading a CI log for something else, from a session whose GitHub scope was this repo only — so the major versions to move to weren't checked against the upstream release pages. Do that first rather than assuming the next integer, and prefer landing it in a PR that already touches CI, since the confirmation is one full run either way.
+
+## Notes
+
+**2026-08-21, tech debt** — Checked both upstreams by reading `action.yml` at each tag rather than the release prose. `actions/checkout` moved to `node24` at v5 and still publishes floating majors, so it goes to `@v7` (latest; v6 moved persisted credentials into a file under `$RUNNER_TEMP` and v7 blocks fork checkout under `pull_request_target`/`workflow_run` — we use neither trigger, and both deploy actions authenticate with their own token input rather than the checkout's credentials). `astral-sh/setup-uv` moved to `node24` at v7, and at v8 stopped publishing major/minor tags altogether, so `@v6` becomes the full version `@v10.0.1`. We pass it no inputs, so the v9/v10 cache-default changes don't reach us. The exact pin creates a manual-bump obligation, which is now [its own item](./pin-refresh-policy.md).

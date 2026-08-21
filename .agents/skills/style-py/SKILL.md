@@ -75,6 +75,8 @@ Leave them alone: if you add or change them, Marimo will regenerate them and cau
 
 `marimo check --fix <file>` applies the rewrite from the CLI, and is authoritative over signatures: it fills in missing annotations, corrects wrong ones, and removes any with no annotated definition behind them. It runs automatically on edit (a `PostToolUse` hook) and on commit (via lint-staged), so this mostly self-corrects.
 
+`./go annotations [path...]` names the public cell variables that are still bare, so you can see a notebook's share before you start: `./go annotations docs/m2/ex-2.1.8`. It's advisory — a worklist, not a gate — and it reports names bound by unpacking (`a, b = ...`) separately, since Python has no syntax to annotate those and the fix is to split the statement instead.
+
 Naming:
 
 - Symbols that are cell-local must start with `_`, or Marimo will complain.
