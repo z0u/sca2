@@ -15,6 +15,7 @@ Ruff can't express this rule today: `PYI052` (unannotated-assignment) is stubs-o
 import argparse
 import ast
 import sys
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,7 +43,7 @@ class Finding:
         return f"{where.as_posix()}:{self.line}: {self.name}{' (unpacked)' if self.unpacked else ''}"
 
 
-def cell_functions(tree: ast.Module):
+def cell_functions(tree: ast.Module) -> Iterator[ast.FunctionDef | ast.AsyncFunctionDef]:
     """The cell bodies of a Marimo notebook: module-level functions carrying `@app.cell`.
 
     Module-level rather than :func:`ast.walk`, because that's where Marimo writes them — a nested lookalike would be ordinary code.
