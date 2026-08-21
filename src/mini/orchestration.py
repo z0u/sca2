@@ -8,14 +8,17 @@ An experiment is a plain function ``main(ctx)`` that expresses the DAG in ordina
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, overload
 
 from mini.memo import MemoStore, task_key_parts
-from mini.runs import SETTLED, RunState
+from mini.runs import SETTLED, RunState, describe_numerics_drift, merged_numerics_drift, numerics_drift
 
 if TYPE_CHECKING:
     from mini.apparatus import Apparatus
     from mini.experiment import Experiment
+
+log = logging.getLogger(__name__)
 
 __all__ = ["MemoError", "Pending", "TaskFailed", "BudgetExpired", "MISSING", "Ctx", "tick", "retry"]
 
@@ -120,6 +123,14 @@ class Ctx:
         # DONE results served despite stale evidence (keep_stale) — persisted so
         # read-only views can badge them (they can't fingerprint code themselves).
         self.stale_kept: list[str] = []
+        # DONE results computed under numerics packages that have since moved:
+        # the keys served, and each hit's own drift map (``{package: (recorded,
+        # current)}``) — kept per hit, since a sweep can straddle an upgrade and
+        # carry two different recorded versions of the same package.
+        # Not persisted — unlike stale evidence, a read-only view can work this
+        # out for itself from the record's ``env`` (see ``mini status``).
+        self.numerics_drifted: list[str] = []
+        self.numerics_moved: list[dict[str, tuple[str, str]]] = []
 
     def _route(self, on: Apparatus | None, role: str | None) -> Apparatus:
         """Resolve which apparatus a step runs on: ``role`` label, ``on=``, or default."""
@@ -159,6 +170,12 @@ class Ctx:
                 to_launch = (key, gen, fn, args, getattr(app, "_before_hooks", []))
                 self.launched.append(key)
             state = RunState.RUNNING
+        elif state == RunState.DONE and (moved := numerics_drift(rec.get("env"))):
+            # A hit whose result predates a library upgrade: same key, same code,
+            # a number the current environment may not reproduce. Noted here rather
+            # than acted on — re-running is the caller's call, via ``version=``.
+            self.numerics_drifted.append(key)
+            self.numerics_moved.append(moved)
         return key, state, to_launch
 
     def _task_failed(self, key: str, state: RunState) -> TaskFailed:
@@ -285,7 +302,40 @@ def tick(experiment: Experiment, apparatus: Apparatus, keep_stale: bool = False)
             kept_stale=list(dict.fromkeys(ctx.stale_kept)),
             complete=complete,
         )
+        _warn_numerics_drift(ctx)
     return True, result
+
+
+# Drift signatures already reported in this process, with the largest hit count
+# each was reported at. A watching driver ticks every few seconds and the answer
+# is the same each time, so a repeat is worth suppressing — but a suspended tick
+# only walks the DAG up to its suspension point, so a later, fuller wake can serve
+# *more* drifted hits under the same signature. The high-water count lets that
+# wake speak again with the larger number instead of being silenced by the first,
+# partial one. `mini status` keeps the answer readable after the fact.
+_warned_numerics: dict[tuple[tuple[str, tuple[str, ...], str], ...], int] = {}
+
+
+def _warn_numerics_drift(ctx: Ctx) -> None:
+    """Say that this wake served results computed under since-upgraded numerics packages — once per answer, not per tick.
+
+    A memo hit is a claim that the stored result is what the current code would produce, and a library upgrade breaks that claim without touching either the key or the evidence (``eng/determinism.md``). Nothing here re-runs anything: the levers are a deliberate ``version=`` bump on the affected tasks, or publishing the numbers with the straddle stated.
+    """
+    if not ctx.numerics_moved:
+        return
+    moved = merged_numerics_drift(ctx.numerics_moved)
+    signature = tuple(sorted((name, was, now) for name, (was, now) in moved.items()))
+    drifted = len(dict.fromkeys(ctx.numerics_drifted))
+    if drifted <= _warned_numerics.get(signature, 0):
+        return
+    _warned_numerics[signature] = drifted
+    log.warning(
+        "%d memo hit(s) were computed under different numerics: %s. Same key, same code, "
+        "a result the current environment may not reproduce — bump version= on the affected "
+        "tasks to re-run, or say so where the numbers are published.",
+        drifted,
+        describe_numerics_drift(moved),
+    )
 
 
 def retry(store: MemoStore, key: str | None = None) -> list[str]:

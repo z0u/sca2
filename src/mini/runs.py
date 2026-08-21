@@ -6,12 +6,16 @@ The control plane is small, hot, last-writer-wins JSON (per-task state, metrics,
 
 from __future__ import annotations
 
+import functools
+import importlib.metadata
 import json
 import os
 import platform
+import re
 import subprocess
 import sys
 import time
+from collections.abc import Iterable, Mapping
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -22,8 +26,12 @@ __all__ = [
     "STALE_HEARTBEAT_S",
     "compute_env",
     "data_root",
+    "describe_numerics_drift",
     "in_declared_phase",
+    "installed_numerics",
     "is_queued",
+    "merged_numerics_drift",
+    "numerics_drift",
     "progress_age",
     "spawn_taskworker",
     "stale_heartbeat",
@@ -93,11 +101,78 @@ _MODAL_ENV_KEYS = {
 # asked for, so a setting that failed to arrive shows up as absent.
 _NUMERICS_ENV_KEYS = ("XLA_FLAGS",)
 
+# Packages whose *version* changes what a task computes. They are invisible to the
+# memo — `mini.memo._is_project_file` excludes site-packages, so no library source
+# reaches a fingerprint, and no version string reaches a key — yet a jax upgrade
+# measurably moves a training result (jax 0.10.1 → 0.11.0 shifted a fixed nGPT
+# run's final loss by ~1 part in 4×10⁶; `eng/determinism.md`). Recorded so a number
+# can be traced back to the library that produced it, and so a memo hit computed
+# under a since-upgraded library can be *noticed* (`numerics_drift`). Read in the
+# worker, like the flags above, so what's recorded is what actually ran.
+#
+# Kept to the ones a measurement has implicated. Adding a name here only affects
+# records written afterwards: an older record simply doesn't carry it, and reads
+# as quiet rather than as drifted.
+_NUMERICS_PACKAGES = ("jax", "jaxlib", "numpy")
+
+
+@functools.cache
+def installed_numerics() -> dict[str, str]:
+    """Installed versions of the numerics packages (``_NUMERICS_PACKAGES``), by name.
+
+    Cached: a process's own installed set can't change under it, and this is read once per memo hit on the driver's hot path. Packages that aren't installed are simply absent — the driver of an experiment that never touches jax says nothing about jax.
+    """
+    versions = {}
+    for name in _NUMERICS_PACKAGES:
+        try:
+            versions[name] = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            continue
+    return versions
+
+
+def numerics_drift(
+    env: Mapping[str, Any] | None, current: Mapping[str, str] | None = None
+) -> dict[str, tuple[str, str]]:
+    """Numerics packages that have moved since *env* was recorded: ``{name: (recorded, current)}``.
+
+    Detection only, and deliberately not evidence: folding versions into the memo key would invalidate every record in the project on an upgrade, to reproduce numbers we already have (`eng/determinism.md`). What this answers instead is the question a memo hit can't ask for itself — "was this result computed under the libraries I have now?" — so a run that straddles an upgrade can be said out loud rather than found later.
+
+    *current* defaults to this process's own installed set, which on Modal is the driver's rather than the container's; the image is frozen from the same lock, so they agree unless something has been pinned apart deliberately. A package missing from either side is skipped: a record written before the version was captured, or a driver without the package installed, is an absence of evidence rather than evidence of a change.
+    """
+    recorded = (env or {}).get("numerics_packages") or {}
+    now = installed_numerics() if current is None else current
+    return {name: (was, now[name]) for name, was in recorded.items() if name in now and now[name] != was}
+
+
+def _version_sort_key(v: str) -> tuple[tuple[int, int | str], ...]:
+    """Numeric-aware sort key for version strings, without a parser dependency: ``0.9.0`` sorts before ``0.10.1``, and non-numeric fragments compare as text."""
+    return tuple((0, int(p)) if p.isdigit() else (1, p) for p in re.split(r"(\d+)", v))
+
+
+def merged_numerics_drift(drifts: Iterable[Mapping[str, tuple[str, str]]]) -> dict[str, tuple[tuple[str, ...], str]]:
+    """Fold per-record drifts into one map: ``{package: (recorded versions, current)}``.
+
+    A run can straddle *several* upgrades — half a sweep computed under jax 0.9.0, half under 0.10.1 — so a package's recorded side is a tuple of every version seen, sorted, rather than whichever record happened to be read last. The current side is single-valued: it's this process's installed version.
+    """
+    recorded: dict[str, set[str]] = {}
+    current: dict[str, str] = {}
+    for drift in drifts:
+        for name, (was, now) in drift.items():
+            recorded.setdefault(name, set()).add(was)
+            current[name] = now
+    return {name: (tuple(sorted(vs, key=_version_sort_key)), current[name]) for name, vs in recorded.items()}
+
+
+def describe_numerics_drift(moved: Mapping[str, tuple[tuple[str, ...], str]]) -> str:
+    """One clause per package: ``jax 0.9.0/0.10.1 → 0.11.0, numpy 2.2.3 → 2.3.0``."""
+    return ", ".join(f"{name} {'/'.join(was)} → {now}" for name, (was, now) in sorted(moved.items()))
+
 
 def compute_env() -> dict[str, Any]:
     """A snapshot of *what a task actually ran on*, recorded by the worker.
 
-    Captured inside the worker process (local subprocess or Modal container), so it reflects the real execution environment rather than the requested backend — useful when a sweep fans out across heterogeneous Modal containers. Kept small (it rides the hot control-plane record): host, OS/arch, Python, CPU/RAM, the GPU model + count if any, the numerics env (``_NUMERICS_ENV_KEYS``), and — on Modal — the container/region/cloud ids (never any token or secret; see ``_MODAL_ENV_KEYS``).
+    Captured inside the worker process (local subprocess or Modal container), so it reflects the real execution environment rather than the requested backend — useful when a sweep fans out across heterogeneous Modal containers. Kept small (it rides the hot control-plane record): host, OS/arch, Python, CPU/RAM, the GPU model + count if any, the numerics env (``_NUMERICS_ENV_KEYS``) and numerics package versions (``_NUMERICS_PACKAGES``), and — on Modal — the container/region/cloud ids (never any token or secret; see ``_MODAL_ENV_KEYS``).
     """
     env: dict[str, Any] = {
         "host": platform.node(),
@@ -117,6 +192,8 @@ def compute_env() -> dict[str, Any]:
             env[dst] = val
     if numerics := {k: v for k in _NUMERICS_ENV_KEYS if (v := os.environ.get(k))}:
         env["numerics_env"] = numerics
+    if packages := installed_numerics():
+        env["numerics_packages"] = dict(packages)
     return env
 
 
