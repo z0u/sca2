@@ -110,18 +110,18 @@ def main() -> None:
     targets = [p for arg in paths for p in (python_files(arg) if arg.is_dir() else [arg])]
     found = sorted(f for path in targets for f in findings_in(path))
 
-    for finding in found:
-        print(finding)
-
-    bare = [f for f in found if not f.unpacked]
     if not found:
         print("✅ Every public cell variable is annotated")
         return
 
-    unpacked = len(found) - len(bare)
-    print(
+    for finding in found:  # stdout is the worklist, so it stays pipeable
+        print(finding)
+
+    bare = sum(1 for f in found if not f.unpacked)
+    unpacked = len(found) - bare
+    print(  # the tally is commentary, so it goes to stderr and out of the pipe
         f"\n{len(found)} public cell variable(s) reach downstream cells untyped"
-        f" — {len(bare)} to annotate at the definition"
+        f" — {bare} to annotate at the definition"
         f"{f', {unpacked} bound by unpacking (split the statement, or accept it)' if unpacked else ''}.",
         file=sys.stderr,
     )
