@@ -102,3 +102,12 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         continue-on-error: true
         run: ./go deadcode
+
+      - name: Cell variable annotations
+        # Also advisory, and for now the stronger reason: the backlog it found on
+        # arrival is ~90 sites across 16 notebooks, and each fix has to be published
+        # with its report. It prints the worklist so a session touching a notebook
+        # can see its own share; it becomes a gate once that list is short.
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        continue-on-error: true
+        run: ./go annotations

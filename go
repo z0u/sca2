@@ -24,7 +24,8 @@ show_help() {
 		  auth    [--check]:   set up credentials; --check just probes
 		  check   [--lint] [--format] [--typecheck] [--test] [--fix]:
 		                       run checks in parallel (default: all without --fix)
-		                       individual commands: format | lint | types | tests | dead
+		                       individual commands: format | lint | types | tests
+		                       advisory, and outside check: dead | annotations
 		  open    <file>:      open a Marimo notebook in Marimo, or anything else in \$EDITOR
 		  preview [...nbs] [--no-serve] [--force] [--port N]:
 		                       export stale reports, assemble the site with local assets
@@ -61,6 +62,13 @@ case "${1:-}" in
     dead|deadcode)
         shift
         "$SCRIPT_DIR/deadcode.sh" "$@"
+        ;;
+    ann|annotations)
+        # Advisory, like `dead`: a worklist of public cell variables that reach
+        # downstream cells untyped. Deliberately outside `check` while the backlog
+        # is longer than a branch should carry.
+        shift
+        uv run "$SCRIPT_DIR/unannotated_cell_vars.py" "$@"
         ;;
     type|types|typecheck)
         shift
