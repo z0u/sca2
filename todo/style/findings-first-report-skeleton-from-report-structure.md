@@ -1,6 +1,7 @@
 ---
 status: open
 opened: 2026-08-10
+priority: high
 ---
 # Findings-first report skeleton, from the `report-structure` pass at the ex-2.1.10 publish gate
 
@@ -13,3 +14,11 @@ The pass found the residual duplication in an otherwise clean report is generate
 **What breaks, and mitigations:** forward references from results into Measurements definitions — the glossary must define every term the verdicts use (it already did in ex-2.1.10); Calibration cells read oddly in past position — reword their frame ("before anything ran…"), not their content; the reader loses the four predictions read consecutively — the Findings block carries that in verdict form, and the how-to-read note's commit hash carries the "this was frozen" role the monolithic block served visually. Estimated effect on an ex-2.1.10-shaped report: ~6,000 → ~4,500 words, first evidence ~700 words after the title instead of ~2,800.
 
 **How to adopt:** bake into the *next* experiment's prereg skeleton and update the science skill's report-skeleton guidance (and the prereg-reviewer's expectations) to match, so the structure is frozen in that shape from the start — never by reordering a frozen report after results. Retrofitting published reports is optional and low priority.
+
+## Notes
+
+**2026-08-21, housekeeping** — the adoption window this names has already passed once, so re-pointing it and promoting it. "The *next* experiment's prereg skeleton" was written at ex-2.1.10's publish gate, and the next prereg was ex-2.1.11 (#84, 08-11), which took none of it: that report runs Observations → Method → Search plan → Ablations → … → Discussion, so findings do sit early, but that is the survey shape the `science` skill already specified rather than this proposal landing. The skill's skeleton paragraph still puts method and hypotheses ahead of the analysis sections, and is unchanged since 08-04.
+
+One of the three authoring rules is already in the skill, though, so it doesn't need re-deriving: "keep rationales, caveats, and worked reasoning at the point of use rather than in the method" landed with ex-2.1.8. What's left to write in is the prediction-at-the-top-of-its-own-section rule, the Discussion-may-reference-but-not-requote rule, and the deferral of Method/Calibration/Measurements to the end.
+
+Now aimed at D2.2's first prereg. Promoted on the same reasoning as the survey-format lessons: while the skeleton is being drafted this costs a paragraph, and afterwards it costs a restructure that the freeze rule forbids anyway. Shortlist was 4/6.
