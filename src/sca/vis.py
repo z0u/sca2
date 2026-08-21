@@ -127,7 +127,7 @@ def align_to_cube(x: np.ndarray, rgb: np.ndarray) -> tuple[np.ndarray, float]:
 def draw_cube_bound(ax: Axes, view: ViewName = "solid", *, fill: bool = True) -> None:
     """The cube's silhouette and the geometry-panel conventions, without any data.
 
-    :func:`plot_rgb_cube` calls this; call it directly when a panel draws its own marks — a lattice with edges between them, say, where the caller has to interleave zorders itself. The silhouette goes behind everything (zorder −10) and its rim in front (zorder 10), so marks in between are framed either way.
+    :func:`plot_rgb_cube` calls this; call it directly when a panel draws its own marks — a lattice with edges between them, say, where the caller has to interleave zorders itself. The silhouette goes behind everything (zorder −10) and its rim in front (zorder 10), so marks in between are framed either way. Draw your marks with ``clip_on=False``: the limits describe the domain rather than the ink, so a mark centered on the silhouette overhangs it by half its width, and clipping would flatten that overhang. Spilling into a neighboring panel is the lesser problem.
     """
     from matplotlib.patches import Polygon
 
