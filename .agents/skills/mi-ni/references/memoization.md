@@ -5,7 +5,7 @@ Every `ctx.run`/`ctx.map` call resolves to a durable record that answers two sep
 - Identity, which task is this? The *key*: the fn's qualified name plus a fingerprint of its inputs. Stable across code edits, so a task's record, logs, and results keep one address for the task's whole life.
 - Validity, is the cached result current? The *evidence* stamped on each attempt: a fingerprint of the code the task actually depends on, plus `version=`. Stale evidence re-runs the task in place: a new attempt on the same record, with the old attempt kept in the record's history.
 
-Understanding both is how you keep the "fix a bug, re-run" loop fast and correct. The mechanics of the loop (the fix/prune/retry table, partial failures, reading results) are in [recovery.md](./recovery.md).
+Understanding both is how you keep the "fix a bug, re-run" loop fast and correct. The habits that follow from it — narrow inputs, a cheap `main`, folded RNG seeds, where to put a new helper — are in [authoring.md](./authoring.md#write-cache-friendly-experiments); the mechanics of the loop (the fix/prune/retry table, partial failures, reading results) are in [recovery.md](./recovery.md).
 
 ## How the key and evidence are computed
 
@@ -57,20 +57,3 @@ Each attempt stamps its evidence on the record — code hash, input hash, and a 
 Use it whenever a memo hit or re-run surprises you.
 
 Why isn't the result keyed on inputs *alone*, with no code tracking? Because after you fix a bug, pure input-keying would return the _stale, buggy_ result — the opposite of what the loop needs. Tracking code as validity evidence re-runs exactly the code that changed, while keeping the task's address (record, logs, history) stable through the fix.
-
-### Maximize cache hits: pass narrow inputs
-
-The single most effective habit. A task keyed on the entire experiment config re-runs whenever any unrelated field changes:
-
-```python
-ctx.map(train, whole_configs)      # re-runs on ANY config change
-ctx.map(train, lrs, vocab_sizes)   # re-runs only when lr / vocab_size change
-```
-
-(`ctx.map` zips its iterables Executor-style — `train(lr, vocab_size)` per pair, mismatched lengths raise. A single iterable passes each element as one argument, tuples included.)
-
-Keep `main` cheap and deterministic (it re-runs every wake), and fold RNG seeds into a task's inputs so the same inputs really do produce the same result.
-
-## Recovering, fixing, retrying
-
-Once you understand identity and evidence, the operational loop — fixing a bug and re-running in bounded time, pruning superseded records, recovering terminal failures, handling partial `map` failures, and reading results without re-running — is in [recovery.md](./recovery.md).
