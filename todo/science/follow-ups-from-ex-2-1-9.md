@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [ex-2.1.9, anchoring, schedules, ex-2.1.7, labels, m3]
 opened: 2026-08-06
 ---
@@ -26,3 +26,11 @@ Pool over positions *within* a layer, leaving the layer mean alone: one change a
 Calibrate the τ grid from ex-2.1.7's stored per-position alignment profile before running — pick τ so the leading position takes ~0.6–0.8 of the weight at each layer. Report-side, free, and it keeps τ out of guess territory.
 
 Original note follows. Ex-2.1.7's largest single effect is narrowing the pull from four prompt positions to op1 alone (+0.22 margin, and it is what stops the trajectory sliding). But that remedy is only available because this synthetic language has a known position carrying the concept, which is exactly what a labeled span of real text does not give you — so the finding is about what sequence-level labeling costs, not a design M3 can keep. Candidates: pool the pull over the span (pull the mean state rather than each state, so a color-independent shift no longer satisfies it); weight positions by an attention-derived estimate of where the concept sits; or pull only the position whose state is already most alignable, an EM-flavored scheme. The margin-by-position profile is the encouraging part — under the op1 pull the margin concentrates at op1 (0.63) with `+`/op2 near 0.08, so the model does distinguish these positions when the pull lets it.
+
+## Notes
+
+**2026-08-23, housekeeping** — A pass over this against ex-2.1.10 and ex-2.1.11, which both ran after it was opened. Status is now `partial`, because the document has two halves and one of them is spent.
+
+Everything from **The term** downwards — the mellowmax choice, the scoring statistic, the deciding figure, the τ-grid calibration, and the original note — was design input *for* ex-2.1.9, and all of it is built. `pooled_anchor_term` in `src/sca/anchoring.py` is the log-mean-exp form this argued for, and `test_pooled_term_at_tau_inf_is_the_mean_of_per_line_means` pins the τ → ∞ limit as the item asked. Ex-2.1.9 scores `m_span` — the control-subtracted layer-mean of the max-over-span margin — and reports `m_op1` beside it for continuity; ex-2.1.10 generalizes that to `m_line`. And ex-2.1.9 renders the softmin weights per position per slice against the un-anchored control's own profile, calibrating the τ grid from ex-2.1.8's alignment maps before running anything. Leaving those sections in place, since they record why each choice was made, but nothing there is work.
+
+The live part is the bullet list at the top, and one of its six is consumed: **latch rates need more seeds** — ex-2.1.10 carries `N_SEEDS_PRIMARY = 9` at its primary rung against ex-2.1.9's three. Two of the remaining five now have a named blocker rather than simply being unbuilt: the **soft → sharp τ schedule** and **adaptive τ** both need τ to move during training, and `make_anchored_train_step` fixes τ per build on purpose — "a condition's pooling does not move over training" — so either one begins by reopening that decision. **Position dropout** has no implementation on the anchoring path at all; `dropout` appears nowhere in `src/sca` or the m2 experiment modules. **Per-role drift in the trajectory** and **early lock-in vs late-forming concepts** still want the re-run the bullets describe, and neither 2.1.10 nor 2.1.11 records per-role ᾱ(ℓ, t).
