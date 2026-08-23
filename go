@@ -26,7 +26,10 @@ show_help() {
 		                       run checks in parallel (default: all without --fix)
 		                       individual commands: format | lint | types | tests
 		                       advisory, and outside check: dead | annotations
-		  open    <file>:      open a Marimo notebook in Marimo, or anything else in \$EDITOR
+		  open    <file> [--browser]:
+		                       open a Marimo notebook for live editing — watches the file so
+		                       the IDE stays the editor, and prints a URL that lands in the
+		                       app view; anything else opens in \$EDITOR
 		  preview [...nbs] [--no-serve] [--force] [--port N]:
 		                       export stale reports, assemble the site with local assets
 		                       (never touches the network), and serve it
@@ -89,11 +92,17 @@ case "${1:-}" in
     o|edit|open)
         shift
         if [[ $# -eq 0 ]]; then
-            echo "open what? pass a Marimo notebook (opens in marimo edit)," 1>&2
+            echo "open what? pass a Marimo notebook (opens in marimo edit --watch)," 1>&2
             echo "or any other file (opens in \$VISUAL/\$EDITOR)." 1>&2
             exit 2
-        elif is_marimo_notebook "${1:-}"; then
-            ( set -x; uv run marimo edit "$@" )
+        fi
+        # Any position, so `--browser` and marimo's own flags can precede the file.
+        notebook=
+        for arg in "$@"; do
+            if is_marimo_notebook "$arg"; then notebook="$arg"; break; fi
+        done
+        if [[ -n "$notebook" ]]; then
+            ( set -x; uv run "$SCRIPT_DIR/edit_notebook.py" "$@" )
         else
             editor="${VISUAL:-${EDITOR:-code}}"
             if ! command -v "$editor" > /dev/null; then
