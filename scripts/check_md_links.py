@@ -32,6 +32,15 @@ ROOT = Path(__file__).parent.parent.resolve()
 # reaches them.
 UNOWNED = ("references/", "src/subline/")
 
+# `docs/` is the one tree that gets rendered to the published site, and `build_site.py` leaves
+# a root-absolute target alone (`_ANCHORED` matches the leading `/`). The site is served from
+# a subpath — `z0u.github.io/sca2/` — so such a link resolves against the domain root and
+# 404s there while resolving perfectly on disk and on GitHub. Exactly the quiet kind, so it
+# is reported rather than trusted.
+PUBLISHED_ABSOLUTE = "root-absolute under docs/, which is published to a subpath — use a relative target"
+
+MISSING_FILE = "no such file"
+
 # A fence is three-or-more backticks or tildes; the closer must be at least as long and of
 # the same kind, so a ````-fenced block can quote a ``` one (the docs do this).
 FENCE = re.compile(r"^(?P<indent> {0,3})(?P<fence>`{3,}|~{3,})(?P<info>.*)$")
@@ -168,16 +177,22 @@ def findings_in(path: Path, cache: dict[Path, set[str]]) -> list[Finding]:
     body = strip_code(HTML_COMMENT.sub("", text))
     found: list[Finding] = []
 
+    published = path.resolve().is_relative_to(ROOT / "docs")
+
     for line, raw in _targets(body):
         target = unquote(raw.strip().removeprefix("<").removesuffix(">"))
         if not target or EXTERNAL.match(target):
+            continue
+
+        if target.startswith("/") and published:
+            found.append(Finding(path, line, target, PUBLISHED_ABSOLUTE))
             continue
 
         path_part, _, fragment = target.partition("#")
         dest = path.resolve() if not path_part else _resolve(path_part, path).resolve()
 
         if not dest.exists():
-            found.append(Finding(path, line, target, "no such file"))
+            found.append(Finding(path, line, target, MISSING_FILE))
             continue
         if not fragment or dest.suffix != ".md":
             continue  # a fragment on a non-Markdown target is a line ref or a viewer's business
@@ -245,10 +260,14 @@ def main() -> None:
     for finding in found:  # stdout is the worklist, so it stays pipeable
         print(finding)
 
-    dead = sum(1 for f in found if f.reason == "no such file")
+    counts = {
+        "missing file": sum(1 for f in found if f.reason == MISSING_FILE),
+        "unresolved #anchor": sum(1 for f in found if f.reason.startswith("no heading")),
+        "root-absolute under docs/": sum(1 for f in found if f.reason == PUBLISHED_ABSOLUTE),
+    }
     print(  # the tally is commentary, so it goes to stderr and out of the pipe
-        f"\n{len(found)} broken link(s) across {len(targets)} files"
-        f" — {dead} missing file(s), {len(found) - dead} unresolved #anchor(s).",
+        f"\n{len(found)} problem(s) across {len(targets)} files — "
+        + ", ".join(f"{n} {label}" for label, n in counts.items() if n),
         file=sys.stderr,
     )
     sys.exit(1)

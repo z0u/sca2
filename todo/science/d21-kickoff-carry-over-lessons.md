@@ -41,7 +41,7 @@ Leave the feedback controller alone, even though the setting is harder now. Ex-2
 
 - Reports: [ex-2.9.3](https://z0u.github.io/sca2/ex-2.9.3/) (failure timing, init × stream attribution, schedule sweep), [ex-2.9.4](https://z0u.github.io/sca2/ex-2.9.4/) (closed-loop weights; a clean negative).
 - Code: `docs/m1/ex-2.9.3/experiment.py`, `docs/m1/ex-2.9.4/experiment.py` (the in-scan controller and the trajectory recording both live here).
-- Deliverables context: D2.1–D2.4 in the [README](../../README.md).
+- Deliverables context: D2.1–D2.4 in the [README](/README.md).
 - Migrated from [sca2#10](https://github.com/z0u/sca2/issues/10), which this file replaces. The autoencoder-era name for the redirect knob was β; it is γ here, matching the rest of the backlog.
 
 ## Notes

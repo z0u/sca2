@@ -160,6 +160,30 @@ def test_a_root_absolute_path_resolves_from_the_repo_root(tmp_path: Path):
     assert reasons(page) == ["no such file"]
 
 
+def test_a_root_absolute_link_under_docs_is_reported():
+    """`docs/` is the one tree rendered to the published site, which is served from a subpath.
+
+    `build_site.py` leaves a root-absolute target alone, so it resolves on disk and on GitHub while 404ing on the site — the quiet kind, and invisible to a checker that only asks whether the file exists.
+    """
+    scratch = ROOT / "docs" / "zz-test-absolute.md"
+    scratch.write_text("[eng](/eng/gc.md)\n")
+    try:
+        (finding,) = check.findings_in(scratch, {})
+        assert finding.reason == check.PUBLISHED_ABSOLUTE
+    finally:
+        scratch.unlink()
+
+
+def test_a_root_absolute_link_outside_docs_is_fine():
+    """Everywhere else these are read on GitHub and in an editor, where `/` means the repo root."""
+    scratch = ROOT / "eng" / "zz-test-absolute.md"
+    scratch.write_text("[agents](/AGENTS.md)\n")
+    try:
+        assert check.findings_in(scratch, {}) == []
+    finally:
+        scratch.unlink()
+
+
 def test_a_title_is_not_part_of_the_target(tmp_path: Path):
     doc(tmp_path, "# T\n", "target.md")
     page = doc(tmp_path, '[x](./target.md "A title")')

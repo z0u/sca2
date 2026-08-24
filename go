@@ -22,13 +22,12 @@ show_help() {
 
 		  install:             install dependencies (uv sync) and git hooks
 		  auth    [--check]:   set up credentials; --check just probes
-		  check   [--lint] [--format] [--typecheck] [--test] [--fix]:
+		  check   [--lint] [--format] [--typecheck] [--test] [--links] [--fix]:
 		                       run checks in parallel (default: all without --fix)
-		                       individual commands: format | lint | types | tests
-		                       also outside check: links (a gate)
+		                       individual commands: format | lint | types | tests | links
 		                       advisory, and outside check: dead | annotations
 		  links   [...paths]:  relative doc links and #anchors that no longer resolve
-		                       (default: every tracked .md we author)
+		                       (default: every .md we author)
 		  open    <file> [--browser]:
 		                       open a Marimo notebook for live editing — watches the file so
 		                       the IDE stays the editor, and prints a URL that lands in the
@@ -69,10 +68,7 @@ case "${1:-}" in
         shift
         "$SCRIPT_DIR/deadcode.sh" "$@"
         ;;
-    links|md-links)
-        # A gate rather than advisory, unlike `dead` and `annotations`: those two report a
-        # backlog longer than a branch should carry, while this one arrived at zero, so
-        # keeping it there costs nothing and is the only way the *next* rename gets caught.
+    link|links)
         shift
         uv run "$SCRIPT_DIR/check_md_links.py" "$@"
         ;;
@@ -96,7 +92,7 @@ case "${1:-}" in
             shift
             "$SCRIPT_DIR/check.sh" "$@"
         else
-            "$SCRIPT_DIR/check.sh" --lint --format --typecheck --test
+            "$SCRIPT_DIR/check.sh" --lint --format --typecheck --test --links
         fi
         ;;
     o|edit|open)

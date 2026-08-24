@@ -13,9 +13,11 @@ Wrapping: keep each paragraph on one line — very wide — and let the editor s
 
 ## Links
 
-Relative links between docs are checked: `./go links` reports any whose file is missing, and any `#anchor` that no longer matches a heading. It gates CI, so run it after renaming a heading or moving a file — a moved file gives a dead link, but a renamed heading is the quiet one, since the link still opens the file at the top and the reader lands somewhere plausible.
+A target starting with `/` resolves from the **repository** root, not the filesystem or domain root — GitHub rewrites it to the current ref, and VS Code resolves it against the workspace root. Prefer that form whenever a link leaves its own directory: `/eng/determinism.md` says where it lands, where `../../../../eng/determinism.md` only says how far to climb. Keep `./sibling.md` for a file alongside, and `../` where the relationship is the point — a `references/` doc pointing at the `SKILL.md` that owns it, or one backlog set pointing at another.
 
-To show a link *as an example* rather than follow it, put it in a code span: `` `[experiment](./experiment.py)` `` is read as text, and a bare one would be resolved against whichever directory the doc sits in.
+Two exceptions. Under `docs/`, stay relative: those files are also rendered to the published site, which is served from a subpath, and `build_site.py` leaves a root-absolute target alone — so it would resolve on disk and 404 on the site. And in an issue or PR comment, write the full URL, since nothing rewrites a path there.
+
+`./go links` reports a target whose file is missing, an `#anchor` that no longer matches a heading, and a root-absolute link under `docs/`. It's part of `./go check` and gates CI, so run it after renaming a heading or moving a file — the moved file gives a dead link, but the renamed heading is the quiet one, since the link still opens the file at the top and the reader lands somewhere plausible.
 
 ## GitHub
 
