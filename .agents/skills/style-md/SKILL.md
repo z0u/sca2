@@ -11,6 +11,12 @@ Wrapping: keep each paragraph on one line — very wide — and let the editor s
 > (a) Foo,
 > (b) Bar.
 
+## Links
+
+Relative links between docs are checked: `./go links` reports any whose file is missing, and any `#anchor` that no longer matches a heading. It gates CI, so run it after renaming a heading or moving a file — a moved file gives a dead link, but a renamed heading is the quiet one, since the link still opens the file at the top and the reader lands somewhere plausible.
+
+To show a link *as an example* rather than follow it, put it in a code span: `` `[experiment](./experiment.py)` `` is read as text, and a bare one would be resolved against whichever directory the doc sits in.
+
 ## GitHub
 
 In pull requests and issues, single newlines are retained — whereas in `.md` files they are collapsed. So don't hard-wrap paragraphs in issues and PRs.

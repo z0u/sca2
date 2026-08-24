@@ -25,7 +25,10 @@ show_help() {
 		  check   [--lint] [--format] [--typecheck] [--test] [--fix]:
 		                       run checks in parallel (default: all without --fix)
 		                       individual commands: format | lint | types | tests
+		                       also outside check: links (a gate)
 		                       advisory, and outside check: dead | annotations
+		  links   [...paths]:  relative doc links and #anchors that no longer resolve
+		                       (default: every tracked .md we author)
 		  open    <file> [--browser]:
 		                       open a Marimo notebook for live editing — watches the file so
 		                       the IDE stays the editor, and prints a URL that lands in the
@@ -65,6 +68,13 @@ case "${1:-}" in
     dead|deadcode)
         shift
         "$SCRIPT_DIR/deadcode.sh" "$@"
+        ;;
+    links|md-links)
+        # A gate rather than advisory, unlike `dead` and `annotations`: those two report a
+        # backlog longer than a branch should carry, while this one arrived at zero, so
+        # keeping it there costs nothing and is the only way the *next* rename gets caught.
+        shift
+        uv run "$SCRIPT_DIR/check_md_links.py" "$@"
         ;;
     ann|annotations)
         # Advisory, like `dead`: a worklist of public cell variables that reach
