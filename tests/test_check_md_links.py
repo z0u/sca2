@@ -12,6 +12,8 @@ assert _SPEC and _SPEC.loader
 check = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(check)
 
+ROOT = Path(__file__).resolve().parent.parent
+
 
 def doc(tmp_path: Path, body: str, name: str = "doc.md") -> Path:
     """A Markdown file holding *body*, with any parent directories made."""
@@ -229,12 +231,32 @@ def test_a_link_in_an_html_comment_is_left_alone(tmp_path: Path):
     assert check.findings_in(page, {}) == []
 
 
-# --- the repo itself ------------------------------------------------------------------------
+# --- the file set ---------------------------------------------------------------------------
+
+
+def test_an_uncommitted_doc_is_still_checked(tmp_path: Path):
+    """The trap this avoids: writing a doc, running the check, and being told it's clean.
+
+    Uses a real path in the repo rather than *tmp_path*, since the file set is whatever git reports — and an untracked file is exactly the case at issue.
+    """
+    scratch = ROOT / "eng" / "zz-test-uncommitted.md"
+    scratch.write_text("[gone](./no-such-file.md)\n")
+    try:
+        assert scratch in check.repo_markdown([Path("eng")])
+    finally:
+        scratch.unlink()
+
+
+def test_an_ignored_tree_is_left_out():
+    """`.gitignore` does the excluding, so `.venv/` and friends need no rule of their own."""
+    listed = {check.display(p) for p in check.repo_markdown([])}
+
+    assert not [p for p in listed if p.startswith((".venv/", "_site/", ".mini/", ".claude/worktrees/"))]
 
 
 def test_the_repos_own_docs_resolve():
     """The check is a gate, so this is the assertion CI is really making."""
     cache: dict[Path, set[str]] = {}
-    found = [f for path in check.tracked_markdown([]) for f in check.findings_in(path, cache)]
+    found = [f for path in check.repo_markdown([]) for f in check.findings_in(path, cache)]
 
     assert [str(f) for f in found] == []

@@ -9,7 +9,7 @@ Two strips before any matching, both load-bearing. Fenced code blocks hold illus
 
 Anchors are matched against GitHub's slugs, since that is where these docs are read: lowercase, drop anything that isn't a letter, digit, space, hyphen or underscore, then spaces to hyphens, with `-1`/`-2` suffixes for repeats. So "Provenance & cost" is `#provenance--cost` — the removed `&` leaves the two spaces that become two hyphens. Explicit `id=`/`name=` attributes on inline HTML count as anchors too, which is how a hand-written target survives a heading rewrite.
 
-The file set is `git ls-files '*.md'`, which is both the right scope and the cheapest one: an untracked doc is a scratch file, and vendored trees, `_site/`, and agent worktrees drop out without a rule of their own. `.claude/skills` is a tracked *symlink* to `.agents/skills`, so git lists the real files once and the walk can't double-report through it.
+The file set comes from `git ls-files`, including untracked-but-not-ignored files — a doc written this session is the likeliest place for a link to be wrong, so listing only what git already knows about would hand it a clean bill of health. `.gitignore` does the excluding, so `.venv/`, `_site/`, `.mini/` and `.claude/worktrees/` drop out without a rule of their own, and `.claude/skills` is a tracked *symlink* to `.agents/skills`, so git lists the real files once and the walk can't double-report through it.
 """
 
 import argparse
@@ -191,14 +191,27 @@ def findings_in(path: Path, cache: dict[Path, set[str]]) -> list[Finding]:
     return sorted(found)
 
 
-def tracked_markdown(paths: Iterable[Path]) -> list[Path]:
-    """The tracked `.md` files under *paths* — git decides, so ignores and worktrees need no rule.
+def repo_markdown(paths: Iterable[Path]) -> list[Path]:
+    """The `.md` files under *paths* that belong to this repo — git decides what that means.
+
+    `--others --exclude-standard` puts *untracked* files in alongside tracked ones, which is what makes the check useful before a commit: a doc written this session is the likeliest place for a link to be wrong, and listing only what git already knows about would answer it with a clean bill of health. `.gitignore` still does the excluding, so `.venv/`, `_site/`, `.mini/` and `.claude/worktrees/` drop out without a rule of their own.
 
     :data:`UNOWNED` is filtered out only for the default (whole-repo) scope: naming a path is a deliberate act, and answering it with silence would be worse than the noise.
     """
     args = [str(p) for p in paths]
     listed = subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files", "-z", "--", *(args or ["."])],
+        [
+            "git",
+            "-C",
+            str(ROOT),
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            *(args or ["."]),
+        ],
         capture_output=True,
         text=True,
         check=True,
@@ -216,8 +229,12 @@ def main() -> None:
 
     if missing := [p for p in args.paths if not p.exists()]:
         sys.exit(f"no such path: {', '.join(p.as_posix() for p in missing)}")
+    # git resolves a pathspec against the repo, so one from outside it is an error there rather
+    # than an empty result — caught here so it reads as a usage mistake, not a crash.
+    if outside := [p for p in args.paths if not p.resolve().is_relative_to(ROOT)]:
+        sys.exit(f"outside the repo: {', '.join(p.as_posix() for p in outside)}")
 
-    targets = tracked_markdown(args.paths)
+    targets = repo_markdown(args.paths)
     cache: dict[Path, set[str]] = {}
     found = sorted(f for path in targets for f in findings_in(path, cache))
 
