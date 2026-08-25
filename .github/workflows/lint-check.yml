@@ -97,6 +97,15 @@ jobs:
           echo "::error::Reports changed without a publish — see the job summary."
           exit 1
 
+      - name: Doc links
+        # A gate, unlike the two advisory steps below: the tree was clean when this arrived,
+        # so holding it there costs nothing. The failure it exists for is the quiet one — a
+        # renamed heading leaves the link opening the file at the top, so a session following
+        # it reads the wrong section and nothing looks wrong. Relative targets only; an
+        # external URL needs the network and goes stale for reasons outside this repo.
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: ./go links
+
       - name: Dead code detection
         # Advisory: it reports, and a finding never fails the build.
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
