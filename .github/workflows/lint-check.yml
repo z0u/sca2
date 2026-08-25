@@ -37,6 +37,12 @@ jobs:
 
       - name: Install dependencies
         id: install
+        # install.sh reads $CI and holds the lockfiles fixed here, so a pyproject.toml
+        # or package.json edit pushed without its re-lock stops the build instead of
+        # being quietly resolved away — see the comment there. Every check below is
+        # gated on this step, which is the right shape for this failure: a lockfile
+        # its manifest outgrew is an environment fault, the exception already carved
+        # out below, and uv and npm each name the command that fixes it.
         run: ./go install
 
       # Every check below carries the same condition, so one round reports everything

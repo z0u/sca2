@@ -20,7 +20,9 @@ show_help() {
     cat <<-EOF
 		New checkout? Start with: $0 install
 
-		  install:             install dependencies (uv sync) and git hooks
+		  install [--locked]:  install dependencies (uv sync) and git hooks
+		                       --locked fails on a lockfile its manifest has outgrown,
+		                       rather than re-resolving it (the default under \$CI)
 		  auth    [--check]:   set up credentials; --check just probes
 		  check   [--lint] [--format] [--typecheck] [--test] [--links] [--fix]:
 		                       run checks in parallel (default: all without --fix)
