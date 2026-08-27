@@ -39,7 +39,7 @@ The library is vendored from [z0u/subline](https://github.com/z0u/subline) and i
 - **Values are fractions of the band**: 0 sits on the token baseline, 1 at the top. Scale each series into that range — `nll / log |V|` reads as "fraction of a uniform guess" — and clip it there, because a negative value is dropped silently while the band renders up to 2.
 - **`NaN` breaks the path**, which is how a gap is drawn. Position 0 has no prediction, so prepend one and the series lines up with the text.
 - Series take `--col-series-1` through `-5` in order, and only those five are defined. Give each a `dasharray` as well as a color: on a 20px band they cross constantly.
-- The SVG carries **its own light/dark theme**, independent of `@themed`. Pass `css="svg { --bg-color: light-dark(#fff, #181c1a); }"` to match the notebook — the library default is a neutral grey that reads as a box on our background. Coincident series stay legible because the series paths carry `mix-blend-mode` (multiply on light, screen on dark), which is the one thing matplotlib has no answer for.
+- The SVG carries **its own light/dark theme**, independent of `@themed`. Its light background already matches ours; its dark one is `#2a2a2a`, a lighter grey that reads as a box on the notebook. So pass `css="svg { --bg-color: light-dark(#fff, #181c1a); }"`, which is what ex-2.1.1 and ex-2.1.2 both do. Coincident series stay legible because the series paths carry `mix-blend-mode` (multiply on light, screen on dark) — the one thing matplotlib has no answer for.
 
 Wrap the result with `figure_html` and externalize the group on the same terms as any other figure.
 
