@@ -14,3 +14,9 @@ Two things to try, in order of bluntness:
 - Beyond that it's the engine itself, and the options are fewer panels per figure or a fixed layout for the grid-shaped figures that don't need solving. Both change margins, so eyeball across a few reports rather than swapping blind.
 
 Reproduce with: `python -m cProfile -o p.prof` around a `MINI_EXPORTING=1` `runpy` of the notebook, or monkeypatch `DefaultExecutor.execute_cell` for per-cell times. Beware absolute timings across container restarts — the box this was measured on drifted ~25% between sessions, so A/B interleaved.
+
+## Notes
+
+**2026-08-17, grading sketch** — a third instance of the draw-twice pattern, and a fix worth knowing. `docs/m2/grading_sketch.py:fig_grid` called `fig.canvas.draw()` to settle the panel boxes before adding overlay axes, then saved: two full paints. Replacing it with `fig.get_layout_engine().execute(fig)` settles the same boxes (panel positions bit-identical, `max|Δ| = 0`) at 0.47s against 3.49s, and took the figure from 7.1s to 3.7s. Any place that freezes a constrained layout mid-build can use it.
+
+That measurement also bounds the layout claim above: on a 30-panel figure carrying 1.8M scatter marks, `layout=None` saved nothing (savefig 3.39s vs 3.19s constrained) — the cost was marker rasterization, and it tracked mark count (60k/panel → 3.0s, 1k/panel → 0.25s). So the per-panel `get_tightbbox` cost dominates only while the panels are cheap to paint; for mark-heavy figures, paint count is the thing to cut.

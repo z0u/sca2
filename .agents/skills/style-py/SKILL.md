@@ -51,7 +51,7 @@ You don't need annotations everywhere. Put one wherever inference would otherwis
 Marimo generates cell function signatures, so a parameter is bare unless the cell that _defines_ that value annotated it. Where the parameter is bare, inference has nothing to work from at the top of the cell. Annotate the first local binding and the rest of the cell follows:
 
 ```python
-@app.cell()
+@app.cell(hide_code=True)
 def _(RUNGS, grading):
     _rungs: list[str] = [c for c in RUNGS if c != "lam0"]
     _resp: dict[str, tuple[np.ndarray, float, float]] = {c: grading(c) for c in _rungs}
@@ -60,13 +60,13 @@ def _(RUNGS, grading):
 Annotate a _public_ name and Marimo copies that annotation onto the parameter list of every cell downstream, the next time it saves the file:
 
 ```python
-@app.cell()
+@app.cell(hide_code=True)
 def _(_sv):
     sv_trials: dict[int, dict] = {t["trial"]: t for t in _sv["trials"]}
     return (sv_trials,)
 
 
-@app.cell()
+@app.cell(hide_code=True)
 def _(sv_trials: dict[int, dict]):  # Marimo propagated this annotation
     ...
 ```
@@ -83,11 +83,34 @@ Naming:
 - Symbols within nested functions should usually not start with `_`.
 
 ```python
-@app.cell()
+@app.cell(hide_code=True)
 def _():
     def _foo(x: int) -> int:
         y = x + 1
         return y
+```
+
+Utilities and setup:
+
+- In general, put imports and constants in a setup cell.
+- Put utility functions in their own reusable cells. Don't put them in the setup cell, or editing a function would invalidate every cell in the notebook.
+
+```python
+with app.setup(hide_code=True):
+    # This is the "setup" cell
+    from mini.reports import report_bundle, use_publisher
+
+    use_publisher(report_bundle(__file__))
+
+    SLICE_NAMES = ["emb", "1", "2", "3", "4"]
+    """A docstring for a constant."""
+
+
+@app.function(hide_code=True)
+def load_margins() -> tuple[dict[str, dict[str, np.ndarray]], np.ndarray] | None:
+    # This is a "reusable function" cell
+    ...
+    return data
 ```
 
 ### Matplotlib axes

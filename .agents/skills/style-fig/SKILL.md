@@ -1,117 +1,53 @@
 ---
 name: style-fig
-description: Figure conventions for experiment reports. Fixed domain limits and hidden axes for latent-space plots, hypersphere bounds as background discs and RGB-cube bounds as hexagons, data-colored marks, theming, captions and nested sub-figures, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, writing a figure or table caption, or building a results table, in a notebook.
+description: Figure conventions for experiment reports. Configuration for latent-space plots, how to draw hyperspheres and RGB-cubes, data-colored marks, smooth-step token sequence charts, grading clouds, theming, captions and nested sub-figures, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, writing a figure or table caption, or building a results table, in a notebook.
 ---
 
-The M1 reports and the GRaM workshop poster set the house style. Match them: a reader who has seen one SCA figure should be able to read the next one without relearning the encoding.
+The M1 reports and the GRaM workshop poster set the house style. Match them: a reader who has seen one SCA figure should be able to read the next one without relearning the encoding. The recurring panel types are packaged as helpers whose docstrings hold the mechanics; this file says which to use when.
 
-## Geometry panels vs. charts
+## Geometry panels
 
-Decide which kind of panel you are drawing.
+A geometry panel shows a space (latent scatter, embedding projection, color cube). The space is the message, so draw the domain rather than chart furniture: limits fixed from the domain (never autoscaled, since panels must be comparable across conditions and a collapsed dimension should _look_ collapsed), axes hidden, and the bound drawn instead. The helpers package all of this: `sca.colorcube.plot_latent_disc` for spherical latents; `sca.vis.plot_rgb_cube` for cubes, with `CUBE_VIEWS` explaining the choice of view, `truth=` + `align_to_cube` for recovered cubes, and `s=`/`diameter=` for mark sizing; `sca.vis.draw_cube_bound` when a panel draws its own marks.
 
-A geometry panel shows a space (latent scatter, embedding projection). The space is the message, so draw the domain rather than the chart furniture:
+Hand-drawn panels follow the same conventions: equal aspect, marks and rim annotations with `clip_on=False` (see `draw_cube_bound`), and 3D projections orthographic and top-down (`ax.view_init(elev=90, azim=-90)`, `ax.set_proj_type('ortho')`, view margin 0) so the panel is a 2D slice.
 
-- Fix the limits from the domain, not the data. Latent plots of a unit hypersphere use (-1, 1) with a margin of about ±0.1, i.e. `ax.set_xlim(-1.1, 1.1)`. Never let autoscale infer limits from data bounds: panels must be comparable across conditions, and a collapsed dimension should *look* collapsed.
-- Hide the axes entirely (`ax.set_axis_off()`). Represent the hypersphere bound instead: a background disc behind the data (`light_dark('#eee', '#111')`; `#8888` if a theme-neutral value is needed), plus a semi-transparent stroke drawn *over* the data (`#0005`, lw 1) so the bound stays legible where points cover it. For 2D latent panels this whole recipe is packaged as `sca.colorcube.plot_latent_disc(ax, z, colors)` — use it instead of re-inlining the disc/scatter/rim block.
-- The RGB cube gets the same treatment with a hexagon in place of the disc: `sca.vis.plot_rgb_cube(ax, rgb, colors)`, at the same (-1.1, 1.1) limits. Any flat view of a solid collapses one direction, so there are two, and they differ in which one they give up. The default `view='solid'` stands the cube on its black corner — white up, black down, red toward the reader — so lightness runs up the panel and the silhouette reads as the familiar color solid. Use it whenever colors are the data: a grid, a dataset, a palette. It deliberately looks unlike the hypersphere disc, so readers don't take one for the other. `view='wheel'` looks down the grey diagonal instead, putting the six chromatic corners on a regular hexagon with red up and collapsing lightness. Prefer it for analysis panels — a probe projection, a recovered cube — where hiding a hue axis would occlude the errors the panel exists to show. A panel that draws its own marks — a lattice with edges between vertices, where the caller has to interleave zorders — calls `sca.vis.draw_cube_bound(ax, view)` for the silhouette and the panel conventions, then draws on top. The silhouette sits at zorder −10 and its rim at +10, so hand-placed marks are framed wherever they land.
-- Size marks in points (`s=`) for a scatter of arbitrary points, so an embedding projection doesn't grow its dots when the vocabulary does. Size them in panel units (`diameter=`) when the marks stand for grid cells: they then hold their size relative to the cube through any resize, and `sca.vis.grid_diameter(levels, view)` gives the value at which a full grid tiles with no gaps. Marks sized this way carry no edge, since at tiling density the edges become a mesh over the solid.
-- Data marks and rim annotations draw with `clip_on=False`, as the disc panels' rim markers do. The limits describe the domain, not the ink: a mark centered on the silhouette overhangs it by half its width, and cropping that turns a circle into a flat-sided blob. Overhang into a neighboring panel is the lesser problem.
-- Pass `truth=` (the same points' true RGB) to draw each target as an open ring with a stub to where the point actually landed, which is how positional error should read on a cube panel. `sca.vis.align_to_cube` supplies the coordinates for a recovered cube: it Procrustes-fits a rotation, uniform scale and shift onto the true positions and returns the leftover residual. Keep that fit rigid — a free linear map absorbs shape mismatch into a shear, and then the residual stops being comparable across grids, seeds and layers.
-- Equal aspect. For 3D projections: orthographic, viewed top-down, so the panel reads as a 2D slice — `ax.view_init(elev=90, azim=-90)`, `ax.set_proj_type('ortho')`, and set the view margin to 0.
-- Since the axes are hidden, name the panel (`ax.set_title('ablated')`) and annotate meaningful directions: the anchor as a coordinate label like `(1, 0, 0, 0)` with a small marker at the rim, intervention directions as cones or dashed lines.
+## Charts
 
-A chart (loss curve, score sweep, schedule) keeps its axes. Use the stylesheet defaults from `mini.vis` and prefer meaningful ticks: a hue axis gets named ticks (Red, Green, Blue), not 0–1.
+A chart (loss curve, score sweep, schedule) keeps its axes. Use the stylesheet defaults from `mini.vis` and prefer meaningful ticks: a hue axis gets named ticks (Red, Green, Blue) instead of 0–1.
 
-A range band (e.g. `fill_between` showing a min/max or confidence spread) must sit behind every summary line, not just the line it belongs to — draw all bands first, then all lines, or give the bands a lower `zorder` explicitly. A band drawn after a neighboring condition's line covers that line and drowns it out.
-
-For an *ordinal* series (depth, size), encode order as ordered shades of one colormap rather than categorical hues — but pick the stops with `light_dark`: a colormap's dark end vanishes on a dark background (e.g. viridis `[0.75, 0.45, 0.1]` in light mode, `[0.8, 0.5, 0.25]` in dark). Judge the dark variant properly: exported figures have transparent backgrounds, so composite `_assets/<name>-dark.png` over `#111` first — a viewer's default matte hides both real problems and false alarms.
-
-A 2D geometry panel in full:
-
-```python
-from matplotlib.patches import Circle
-from mini.vis import light_dark
-
-def draw_latent_panel(ax, z, facecolors, edgecolors=None):
-    ax.add_patch(Circle((0, 0), 1, facecolor=light_dark("#eee", "#111"), zorder=-10))
-    ax.scatter(z[:, 0], z[:, 1], c=facecolors, s=22, edgecolors=edgecolors, lw=0.5)
-    ax.add_patch(Circle((0, 0), 1, facecolor="none", edgecolor="#0005", lw=1, zorder=10))
-    ax.set_aspect("equal")
-    ax.set_xlim(-1.1, 1.1)
-    ax.set_ylim(-1.1, 1.1)
-    ax.set_axis_off()
-```
-
-## Sharing an axis across panels
-
-Decide `sharex`/`sharey` from the *units*, not from the ranges the run happened to produce. Panels measuring the same quantity share; panels measuring different quantities get their own scale, however close the numbers land. A level and a contrast built from the same measurement (mean alignment and the alignment margin, say) count as the same units — sharing lets the reader compare their sizes by eye, which is usually the point of putting them side by side.
-
-Two panels with nearly-but-not-quite equal limits read as a bug; the fix is to share, or to make the scales visibly different, whichever the units call for.
+- Draw range bands (`fill_between`) before any summary line, or give the bands a lower `zorder`.
+- Encode an _ordinal_ series (depth, size) as ordered shades of one colormap rather than categorical hues, with stops picked via `light_dark` — a colormap's dark end vanishes on a dark background.
+- For per-token series, draw plateaus joined by S-curve risers with `mini.vis.smooth_step` and its band/area/marks companions (`smooth_step_marks` puts the weight on the plateaus, for a handful of discrete sites). The docstrings cover `ramp`, `breaks`, and `elide`; `sca.vis_probes` is the reference implementation.
+- For all other ordinal series, use a regular line chart.
+- We never use heat maps for sequences.
+- Decide `sharex`/`sharey` from the units: panels measuring the same quantity share; panels measuring different quantities get their own scale, however close the numbers. Two panels with nearly-but-not-quite equal limits look like a bug.
 
 ## Color is data
 
-In the color domain, color the marks with the colors they represent; a legend or colorbar is almost always the wrong tool. Encode comparisons in the mark itself: facecolor shows the model output (reconstruction), edgecolor (or an inset patch, for grids) shows the true input, so damage reads as a face/edge mismatch. Loss-vs-hue lines are drawn as segments colored by the color at each x (round capstyle to avoid gaps).
+Color the marks with the colors they represent; a legend or colorbar is almost always the wrong tool. Encode comparisons in the mark itself: facecolor shows the model output, edgecolor (or an inset patch, for grids) shows the true input, so damage shows as a face/edge mismatch. Loss-vs-hue lines draw as segments colored by the color at each x (round capstyle to avoid gaps). The same rule holds in prose and HTML tables: name a palette color with an inline swatch, `sca.data.colors.swatch`.
 
-The same rule holds in prose and HTML tables: name a palette color with an inline swatch, not words alone. `sca.data.colors.swatch(name)` emits a `<span class="sw" style="--sw:#rrggbb">` square followed by the name (and falls back to `<code>` for non-palette text, e.g. a stray hex completion).
+## Grading clouds
 
-## Result tables and swatches
+A grading figure shows how a response measured per grid color varies with redness. A mean line or envelope hides too much of the structure, and drawing grid vertices is too visually heavy. Use `sca.vis_grading.GradingCloud` to draw a dithered cloud instead. You can use it to draw single charts, or align it with `smooth_step` overlays.
 
-Authored HTML tables (built by hand and wrapped in `mo.Html`, not marimo's `mo.ui.table`) use the shared classes in `docs/report.css` rather than inline `style=` — central edits then restyle every report at once:
+## Result tables
 
-- `class="report-table"` on the `<table>`. Numeric columns right-align with tabular figures when *both* the `<th>` and its `<td>`s carry `class="num"`; headers are left-aligned otherwise.
-- Wrap a wide grid (e.g. the per-seed completions table) in `<div class="report-table-scroll">` so it scrolls inside its own box instead of wrapping cells. This allows reports to be viewed on small screens, so you'll usually want to use this for tabular data.
-- When a column's cells hold `swatch(...)` squares, give its header a ghost swatch — `swatch(None)`, a transparent `.sw-ghost` placeholder — so the header text starts at the same indent as the swatched values below it.
-- Caption the table the same way you would a figure (see below), by wrapping it in `figure_html(..., caption=..., class_="report-figure")`.
-- In a scored results table, make it visible at a glance what counts as good: mark each scored column's desired direction in its header (↑ or ↓, matching the report's glossary), and bold the values that pass their gate.
+Authored HTML tables (built by hand and wrapped in `mo.md`) use the shared classes in `docs/report.css` rather than inline `style=`, so central edits restyle every report at once: `report-table` on the `<table>`, `num` on numeric `<th>`s and their `<td>`s, a `report-table-scroll` wrapper for wide data, and a caption via `figure_html(..., class_="report-figure")` on the same terms as a figure. In a scored table, make it visible at a glance what counts as good: mark each column's desired direction (↑ or ↓, matching the report's glossary) in its header, and bold the values that pass their gate.
 
-## Theming and annotation
+## Theming
 
-Every figure goes through `@themed` (see `mini.vis`); inside the plot function pick theme-dependent values with `light_dark(light, dark)`. Overlay lines that must survive a busy background use `gapcolor` — e.g. black dashes with a light gap color in light mode, white with dark in dark mode — rather than a heavier stroke.
+Every figure goes through `@themed` (see `mini.vis`), which renders the plot function once per theme — its docstring explains why data gets computed outside it. Inside, pick theme-dependent values with `light_dark(light, dark)`. That includes colormaps: a light-only map's pale end disappears on dark, so pick the map itself per theme — `light_dark("RdBu_r", "berlin")` for diverging (`berlin` ships with matplotlib ≥3.11), or a `LinearSegmentedColormap.from_list` running near-background → theme accent for sequential.
+
+Judge dark variants by compositing `_assets/<name>-dark.png` over `#111`: dark exports are transparent, and your Read tool's default matte hides both real problems and false alarms.
+
+## Captions and sub-figures
+
+The title goes in the caption, as its opening phrase — never in `fig.suptitle` (`ax.set_title` still names a panel _within_ a figure). A caption guides decoding ("Each column shows…") and may keep one clause of interpretation where an encoding needs it; findings and their evidence belong in prose cells near the figure. Tables get a caption on the same terms, via `figure_html`.
+
+Panels share one matplotlib figure only when they share axes, a colorbar, or a scale the reader compares across. Otherwise render each as its own `@themed` figure with a short caption, and wrap the group in `figure_html(body, caption=..., aria_label=...)`, whose outer caption holds the shared decoding — each panel then keeps its own size and the row reflows on a narrow viewport. `report.css` styles the nesting; the docstring explains `aria_label`.
 
 Give every figure alt text (see the alt-text skill).
 
-## Captions
-
-The title goes in the caption, as its opening phrase — not drawn inside the figure with `fig.suptitle`. A caption should guide readers through what they're seeing. Findings, controls, and interpretation belong in prose cells *near* the figure, in paragraph form — a result quoted only in a caption is easy to miss and hard to cross-reference. When an encoding needs a word of interpretation to be readable at all (say, what a step across an elided region signifies), keep one clause in the caption and put the supporting evidence in prose. Explain the structure once: "Each column shows... each row shows...".
-
-Tables get a caption on the same terms — see the wrapper above.
-
-`ax.set_title` is still how you name a panel *within* one figure — see the hidden-axes note above. What moves to the caption is the figure-level title.
-
-## Sub-figures
-
-Panels only need to live in one matplotlib figure when they share axes, a colorbar, or a scale the reader is meant to compare across. Otherwise prefer separate nested figures: render each panel as its own `themed` figure with a short caption naming just that panel, then wrap the group in `figure_html(body, caption=..., aria_label=...)`, whose outer `<figcaption>` carries the shared decoding. Each panel then keeps its own size and the row reflows to a stack on a narrow viewport, rather than every panel shrinking together. `report.css` styles `figure:has(> figure)` for exactly this; use `aria_label` rather than `role="img"` on the outer figure, or the sub-captions stop being navigable.
-
-Sequential/heatmap palettes must be theme-adaptive too: `@themed` renders a light and a dark variant, so pick the colormap itself with `light_dark(...)` rather than hard-coding a light-only map like `"Blues"`, whose pale low end disappears on a dark background. Build one with `LinearSegmentedColormap.from_list` running from a near-background low to a theme accent high, e.g. `LinearSegmentedColormap.from_list("leak", light_dark(["#eef3f7", "#1a5f8a"], ["#20242a", "#6ab0d4"]))`. Diverging maps swap the same way but a named pair usually suffices: `RdBu_r` reads well in light mode but its white midpoint and pale ends wash out on a dark background, so pair it with a dark-centered perceptually-uniform map — `cmap=light_dark("RdBu_r", "berlin")` (`berlin` ships with matplotlib ≥3.11). Cell text over such a matrix flips on *both* axes: theme and cell saturation, e.g. `color=light_dark("#fff", "#000") if saturated else light_dark("#000", "#fff")`.
-
-Marks drawn over a variable or heatmap background (text ×, scatter dots) need a contrasting halo so they read on any cell, whatever color sits underneath: `path_effects=[pe.withStroke(linewidth=2, foreground=light_dark("#ffffff", "#000000"))]` (`import matplotlib.patheffects as pe`), or the draw-twice halo technique the color-matrix figure uses.
-
-## What a figure costs to render
-
-`@themed` calls the plot function twice, once per theme, so everything inside it is paid twice, including work that has nothing to do with color. Only the drawing differs between the two passes. Compute the data in the cell, outside the decorated function, and let the plot function receive it and draw:
-
-```python
-_null = {w: random_angle_null(w) for w in _widths}  # once, in the cell
-
-@themed(name="angles", ...)
-def _plot():
-    ...  # draws _null; no fitting, sampling or bootstrapping in here
-```
-
-This matters most for anything sampled or fitted — a null distribution, a bootstrap, a bisection. A 5-second resample inside a plot function is a 10-second one.
-
-Reach for vectorized NumPy over Python comprehensions in that computation. A list comprehension calling a NumPy function per item pays interpreter and dispatch overhead on every element, and `np.linalg`'s decompositions (`qr`, `svd`, `solve`, `inv`) all accept leading batch dimensions, so a stack is one LAPACK call instead of *n*. The batch form is the same arithmetic — it gives bit-identical results, so it's safe to apply to a published figure:
-
-```python
-# 2000 QR/SVD pairs, one call each, ~4x faster than the comprehension
-pairs = rng.normal(size=(n, 2, width, 3))
-angles = gm.principal_angles(pairs[:, 0], pairs[:, 1])
-```
-
-Likewise for nearest-neighbor work: `argmin` over distances doesn't need the distances themselves. Expanding the squared distance to `|v|^2 - 2 v.x` turns a materialized (N, V, K) difference into one (N, V) matmul — see `sca.baselines.precision_limited_acc`.
-
-Comprehensions are fine for assembling a handful of panels or labels; the rule is about per-element numerics.
-
 ## Prior art
 
-M1's figure code lives in [ex-preppy `src/ex_color/vis/`](https://github.com/z0u/ex-preppy/tree/main/src/ex_color/vis). [references/ex-preppy-vis.md](references/ex-preppy-vis.md) reviews it module by module: which helpers are worth porting when the M2 experiments need them, and which parts (the notebook wrapper, the cone solver) to leave.
+M1's figure code lives in [ex-preppy `src/ex_color/vis/`](https://github.com/z0u/ex-preppy/tree/main/src/ex_color/vis); [references/ex-preppy-vis.md](references/ex-preppy-vis.md) reviews it module by module.

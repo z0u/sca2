@@ -7,6 +7,7 @@ Each report (a ``docs/**/*.py`` declaring ``marimo.App(``) exports to its own bu
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -76,14 +77,16 @@ def export_one(nb: Path) -> Path:
     """Export *nb* to ``.mini/exports/<key>/index.html`` (assets land beside it). Returns the dir."""
     out = export_dir(nb) / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)
-    # The render rewrites the provenance sidecar as it resolves refs; clear the last
-    # export's first so a report that stopped reading a ref can't inherit stale claims.
-    sidecar = out.parent / "_assets" / PROVENANCE_ASSET
-    sidecar.unlink(missing_ok=True)
+    # The render rewrites every asset it still produces, and the sync mirrors whatever is
+    # here; clear the last export's first so a figure the report no longer draws (or a
+    # ref it stopped reading, via the provenance sidecar) can't ride along as an orphan.
+    assets = out.parent / "_assets"
+    shutil.rmtree(assets, ignore_errors=True)
+    sidecar = assets / PROVENANCE_ASSET
     print(f"  export {nb.relative_to(ROOT)} -> {out.relative_to(ROOT)}")
-    # Mark the render as an export so the report's setup cell activates its bundle
-    # publisher (externalize figures to _assets/); under interactive `marimo edit` the
-    # var is absent and figures inline instead — see mini.reports.exporting.
+    # Mark the render as an export so the report's setup cell points its publisher at
+    # the bundle (_assets/, beside this HTML); under interactive `marimo edit` the var is
+    # absent and figures go to the notebook's public/ instead — see mini.reports.exporting.
     env = {**os.environ, EXPORTING_ENV: "1"}
     subprocess.run(["marimo", "export", "html", "-f", str(nb), "-o", str(out)], check=True, cwd=ROOT, env=env)
     clean_html(out)  # scrub terminal control seqs + redact modal URLs from the published HTML

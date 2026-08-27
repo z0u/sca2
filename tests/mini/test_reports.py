@@ -373,3 +373,73 @@ def test_externalize_html_uses_default_publisher(tmp_path):
 def test_externalize_html_without_publisher_is_passthrough():
     use_publisher(None)
     assert externalize_html("<p>hi</p>", name="chunk") == "<p>hi</p>"
+
+
+def test_virtualize_falls_back_to_the_file_url_off_the_kernel(tmp_path):
+    # No marimo kernel under pytest, so there is nothing to register the bytes with and
+    # nothing to serve them: the publisher must degrade to the file it just wrote rather
+    # than to the data: URI mo.image would hand back.
+    pub = Publisher(asset_dir=tmp_path / "a", link="public/.mini/r", versioned=True, virtualize=True)
+    url = pub.asset_url(b"png-bytes", name="fig.png")
+    assert url.startswith("public/.mini/r/fig.png?v=")
+    assert (tmp_path / "a" / "fig.png").read_bytes() == b"png-bytes"
+
+
+def test_virtualize_prefers_the_kernel_url_and_still_writes_the_file(tmp_path, monkeypatch):
+    monkeypatch.setattr("mini.reports._virtual_url", lambda p: f"./@file/9-{p.name}")
+    pub = Publisher(asset_dir=tmp_path / "a", link="public/.mini/r", versioned=True, virtualize=True)
+    url = pub.asset_url(b"png-bytes", name="fig.png")
+    # The kernel mints a fresh name per render, so the ?v= cache-buster has nothing to do.
+    assert url == "./@file/9-fig.png"
+    # The readable copy stays on disk — it is what marimo reads, and what a person browsing
+    # the directory finds.
+    assert (tmp_path / "a" / "fig.png").read_bytes() == b"png-bytes"
+
+
+def test_serve_false_skips_the_kernel(tmp_path, monkeypatch):
+    # An export sidecar is written for tooling to read off disk; nothing fetches it, so it
+    # should not occupy a slot in the kernel's registry.
+    monkeypatch.setattr("mini.reports._virtual_url", lambda p: f"./@file/9-{p.name}")
+    pub = Publisher(asset_dir=tmp_path / "a", link="_assets", virtualize=True)
+    assert pub.asset_url(b"<svg/>", name="frag.svg", serve=False) == "_assets/frag.svg"
+
+
+def test_externalize_html_keeps_its_sidecar_off_the_kernel(tmp_path, monkeypatch):
+    monkeypatch.setattr("mini.reports._virtual_url", lambda p: pytest.fail("sidecar was virtualized"))
+    pub = Publisher(asset_dir=tmp_path / "a", virtualize=True)
+    assert externalize_html("<svg/>", name="frag.svg", publish=pub) == "<svg/>"
+    assert (tmp_path / "a" / "frag.svg").read_text() == "<svg/>"
+
+
+def test_virtual_url_lifts_the_src_from_marimos_own_img_tag():
+    # Pin the parse to marimo's HTML builder rather than to a hand-written sample, so a
+    # change in how it quotes attributes shows up here.
+    from marimo._output.builder import h
+
+    from mini.reports import _IMG_SRC
+
+    tag = h.img(src="./@file/49361-164816-TeHGmd7R.png", alt="a plot", style="max-width: 100%")
+    m = _IMG_SRC.search(tag)
+    assert m is not None, tag
+    assert m.group(2) == "./@file/49361-164816-TeHGmd7R.png"
+
+
+def test_virtual_url_declines_off_the_kernel(tmp_path):
+    from mini.reports import _virtual_url
+
+    png = tmp_path / "fig.png"
+    png.write_bytes(b"not really a png")
+    # mo.image would return a data: URI here; the publisher must read that as "no kernel".
+    assert _virtual_url(png) is None
+
+
+def test_report_bundle_virtualizes_only_interactively(tmp_path, monkeypatch):
+    from mini.reports import EXPORTING_ENV, report_bundle
+
+    nb = tmp_path / "docs" / "m9" / "report.py"
+    nb.parent.mkdir(parents=True)
+    nb.write_text("import marimo\n")
+    monkeypatch.delenv(EXPORTING_ENV, raising=False)
+    assert report_bundle(nb).virtualize is True
+    monkeypatch.setenv(EXPORTING_ENV, "1")
+    assert report_bundle(nb).virtualize is False
