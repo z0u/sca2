@@ -9,24 +9,32 @@ import argparse
 import os
 import textwrap
 import time
+from collections import OrderedDict, namedtuple
 from pathlib import Path
 
+import numpy as np
 import pytest
+from rich.console import Console
 
+from mini.__main__ import _STATS_MIN, _STR_CAP, _abbreviated
 from mini.experiment import Experiment
 from mini.local_apparatus import LocalApparatus
+from mini.monitor import drive_and_watch
 from mini.orchestration import tick
 from mini.runs import RunState
+from mini.store import Artifact
 
 
-def _drive(exp: Experiment, app: LocalApparatus, timeout: float = 30.0) -> None:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        done, _ = tick(exp, app)
-        if done:
-            return
-        time.sleep(0.1)
-    raise AssertionError("orchestration did not complete")
+def _drive(exp: Experiment, app: LocalApparatus) -> None:
+    """Drive to completion the way ``mini run --watch`` does, with the display muted and the human-paced poll wound right down."""
+    drive_and_watch(exp, app, poll=0.005, console=Console(quiet=True))
+
+
+def _drive_to_failure(exp: Experiment, app: LocalApparatus) -> ExceptionGroup:
+    """Drive until the strict map surfaces its failures; return the group."""
+    with pytest.raises(ExceptionGroup) as exc:
+        _drive(exp, app)
+    return exc.value
 
 
 def test_data_root_anchors_at_project_root(tmp_path: Path, monkeypatch):
@@ -79,15 +87,7 @@ def test_status_and_ls_report_done_despite_superseded_failure(tmp_path: Path, mo
         return Experiment(name="super", main=lambda ctx: ctx.map(fn, [1]))
 
     app = LocalApparatus("super")  # default data_dir → .mini/super
-    deadline = time.monotonic() + 30
-    while time.monotonic() < deadline:  # drive the buggy version to its failure
-        try:
-            tick(sweep(bad), app)
-        except ExceptionGroup:
-            break
-        time.sleep(0.1)
-    else:
-        raise AssertionError("map never surfaced the failure")
+    _drive_to_failure(sweep(bad), app)
     _drive(sweep(good), LocalApparatus("super"))  # the "hotfix": new source, new keys
 
     from mini.__main__ import cmd_ls, cmd_status
@@ -122,15 +122,7 @@ def test_explain_walks_the_attempt_timeline_after_a_hotfix(tmp_path: Path, monke
         return Experiment(name="explain", main=lambda ctx: ctx.map(fn, [1]))
 
     app = LocalApparatus("explain")
-    deadline = time.monotonic() + 30
-    while time.monotonic() < deadline:
-        try:
-            tick(sweep(make(fixed=False)), app)
-        except ExceptionGroup:
-            break
-        time.sleep(0.1)
-    else:
-        raise AssertionError("map never surfaced the failure")
+    _drive_to_failure(sweep(make(fixed=False)), app)
     _drive(sweep(make(fixed=True)), LocalApparatus("explain"))
 
     store = app.memo_store()
@@ -147,54 +139,33 @@ def test_explain_walks_the_attempt_timeline_after_a_hotfix(tmp_path: Path, monke
     assert "changed" in out  # …and the dependency that moved to heal it
 
 
-def test_status_shows_queued_distinct_from_running(tmp_path: Path, monkeypatch, capsys):
-    """A RUNNING record with no ``env`` is launched-but-unstarted (the worker writes ``env`` as its first action): ``status`` must read it as *queued*, not silently lump it in with tasks actually running on a worker."""
+def test_status_distinguishes_running_queued_and_stale(tmp_path: Path, monkeypatch, capsys):
+    """A RUNNING record with no ``env`` is launched-but-unstarted (the worker writes ``env`` as its first action): ``status`` must read it as *queued*, not silently lump it in with tasks actually running on a worker.
+
+    A task that *is* on a worker but whose heartbeat has gone quiet for minutes gets an advisory badge — the honest signal when a backend liveness probe has a blind spot (#20). Queued tasks never badge, however old their stamp: it is the launch time, not liveness."""
     monkeypatch.chdir(tmp_path)
     from mini.memo import MemoStore
-    from mini.runs import data_root
+    from mini.runs import STALE_HEARTBEAT_S, data_root
 
     store = MemoStore(data_root() / "queuedexp")
     now = time.time()
-    pid = os.getpid()  # a live pid, so reap_dead doesn't settle the records
-    common = {"state": "running", "fn": "train", "pid": pid, "heartbeat_at": now}
-    store.records_backend.merge("train-queued", {"key": "train-queued", **common})
-    store.records_backend.merge("train-live", {"key": "train-live", "env": {"host": "worker.test"}, **common})
+    quiet = now - STALE_HEARTBEAT_S - 60
+    common = {"state": "running", "fn": "train", "pid": os.getpid()}  # a live pid, so reap_dead leaves them be
+    env = {"env": {"host": "worker.test"}}
+    store.records_backend.merge("t-live", {"key": "t-live", "heartbeat_at": now, **env, **common})
+    store.records_backend.merge("t-stale", {"key": "t-stale", "heartbeat_at": quiet, **env, **common})
+    store.records_backend.merge("t-queued", {"key": "t-queued", "heartbeat_at": quiet, **common})
 
     from mini.__main__ import cmd_status
 
     cmd_status(argparse.Namespace(name="queuedexp", app="local"))
     out = capsys.readouterr().out
-    lines = {line.split()[2]: line for line in out.splitlines() if "train-" in line}
-    assert "◌" in lines["train-queued"] and "queued" in lines["train-queued"]
-    assert "♥" not in lines["train-queued"]  # its heartbeat is just the launch stamp, not liveness
-    assert "▸" in lines["train-live"] and "running" in lines["train-live"] and "♥" in lines["train-live"]
-
-
-def test_status_badges_stale_heartbeat(tmp_path: Path, monkeypatch, capsys):
-    """A RUNNING task whose heartbeat has gone quiet for minutes gets an advisory badge — the honest signal when a backend liveness probe has a blind spot (#20). Queued tasks never badge: their heartbeat is just the launch stamp."""
-    monkeypatch.chdir(tmp_path)
-    from mini.memo import MemoStore
-    from mini.runs import STALE_HEARTBEAT_S, data_root
-
-    store = MemoStore(data_root() / "staleexp")
-    now = time.time()
-    pid = os.getpid()  # a live pid, so reap_dead doesn't settle the records
-    env = {"env": {"host": "worker.test"}}
-    common = {"state": "running", "fn": "train", "pid": pid}
-    store.records_backend.merge("t-fresh", {"key": "t-fresh", "heartbeat_at": now, **env, **common})
-    store.records_backend.merge(
-        "t-stale", {"key": "t-stale", "heartbeat_at": now - STALE_HEARTBEAT_S - 60, **env, **common}
-    )
-    store.records_backend.merge("t-queued", {"key": "t-queued", "heartbeat_at": now - STALE_HEARTBEAT_S - 60, **common})
-
-    from mini.__main__ import cmd_status
-
-    cmd_status(argparse.Namespace(name="staleexp", app="local"))
-    out = capsys.readouterr().out
     lines = {line.split()[2]: line for line in out.splitlines() if "t-" in line}
+    assert "▸" in lines["t-live"] and "running" in lines["t-live"] and "♥" in lines["t-live"]
+    assert "stale" not in lines["t-live"]
     assert "⚠ stale — worker may be dead" in lines["t-stale"]
-    assert "stale" not in lines["t-fresh"]
-    assert "stale" not in lines["t-queued"] and "⧖" in lines["t-queued"]
+    assert "◌" in lines["t-queued"] and "queued" in lines["t-queued"] and "⧖" in lines["t-queued"]
+    assert "♥" not in lines["t-queued"] and "stale" not in lines["t-queued"]
 
 
 def test_status_names_a_declared_phase_instead_of_badging_it(tmp_path: Path, monkeypatch, capsys):
@@ -503,32 +474,6 @@ def test_run_stamps_backend_for_later_reads(tmp_path: Path, monkeypatch, capsys)
     assert "done" in capsys.readouterr().out
 
 
-def test_run_captures_lineage_and_lineage_command_reports_it(tmp_path: Path, monkeypatch, capsys):
-    """A run stamps provenance into meta; ``mini lineage`` reads it back.
-
-    Under ``/tmp`` there's no git repo, so the git block is absent — but the identity/driver/timeline half is always captured, which is what this asserts.
-    """
-    monkeypatch.chdir(tmp_path)
-    exp_file = tmp_path / "prov.py"
-    exp_file.write_text(
-        textwrap.dedent("""
-        from mini import Experiment
-        def work(x):
-            return x
-        experiment = Experiment(name='provexp', main=lambda ctx: ctx.map(work, [1, 2]))
-        """)
-    )
-    from mini.__main__ import cmd_lineage, cmd_run
-
-    cmd_run(argparse.Namespace(path=str(exp_file), watch=True, poll=0.05, app=None, workers=1))
-    capsys.readouterr()
-
-    cmd_lineage(argparse.Namespace(name="provexp", app="local", diff=False))
-    out = capsys.readouterr().out
-    assert "provexp — lineage" in out
-    assert "when" in out and "driver" in out  # timeline + spawning environment always present
-
-
 def test_lineage_snapshots_declared_upstreams(tmp_path: Path, monkeypatch):
     """An experiment that declares ``deps`` records each upstream's provenance, so a downstream run can trace which A produced its inputs."""
     monkeypatch.chdir(tmp_path)
@@ -554,7 +499,9 @@ def test_lineage_snapshots_declared_upstreams(tmp_path: Path, monkeypatch):
 
 
 def test_lineage_detects_upstreams_from_resolved_refs(tmp_path: Path, monkeypatch, capsys):
-    """A run that reads another experiment's ref records it as an upstream — no ``deps=`` declared. The producer is stamped onto the ref at ``set_ref`` time (in the upstream's worker), the consumer's worker records the resolution on its task record, and the driver rolls it up into ``lineage.upstreams``."""
+    """A run that reads another experiment's ref records it as an upstream — no ``deps=`` declared. The producer is stamped onto the ref at ``set_ref`` time (in the upstream's worker), the consumer's worker records the resolution on its task record, and the driver rolls it up into ``lineage.upstreams``.
+
+    ``mini lineage`` then reads the whole stamp back. Under ``/tmp`` there's no git repo, so the git block is absent — but the timeline/driver half is always captured."""
     monkeypatch.chdir(tmp_path)
     # Workers must hit the tmp LocalStore: an ambient bucket would write the test ref
     # to the real shared store, and a publish-repo alone builds a CAS-less store.
@@ -590,14 +537,20 @@ def test_lineage_detects_upstreams_from_resolved_refs(tmp_path: Path, monkeypatc
     store = LocalApparatus("train").memo_store()
     (rec,) = store.records()
     assert rec["upstream_refs"] == [{"ref": "shared/thing", "experiment": "prep"}]  # worker-side evidence
-    upstreams = store.meta()["lineage"]["upstreams"]  # driver rollup (stamped at end of the watch)
+    lineage = store.meta()["lineage"]
+    upstreams = lineage["upstreams"]  # driver rollup (stamped at end of the watch)
     assert [u["experiment"] for u in upstreams] == ["prep"]
     assert upstreams[0]["refs"] == ["shared/thing"]
     assert "run_at" in upstreams[0]  # snapshotted from prep's own stored lineage
 
     cmd_lineage(argparse.Namespace(name="train", app="local", diff=False))
     out = capsys.readouterr().out
+    assert "train — lineage" in out
     assert "⇐ prep" in out and "via shared/thing" in out
+    # The timeline and the spawning environment, as actually stamped — not just their labels.
+    assert f"first {lineage['first_captured_at']} · last {lineage['captured_at']}" in out
+    driver = lineage["driver"]
+    assert f"{driver['host']} · {driver['platform']} · py{driver['python']}" in out
 
 
 def test_empty_read_names_backend_and_hints_at_the_other(tmp_path: Path, monkeypatch):
@@ -880,144 +833,117 @@ def test_worker_env_defaults_from_the_project_config(tmp_path: Path, monkeypatch
 # ---------------------------------------------------------------------------
 
 
-def test_a_long_sequence_is_elided_with_its_count():
-    """The reason the default view exists: a per-step metric list is one float per step, and a sweep of them buries every scalar worth reading."""
-    from mini.__main__ import _abbreviated
-
-    assert _abbreviated({"val_loss": [0.5, 0.4, 0.3, 0.2, 0.1]}) == "{'val_loss': [0.5, 0.4, 0.3, … +2]}"
-    assert _abbreviated([1, 2, 3]) == "[1, 2, 3]"  # nothing dropped, nothing said
-    assert _abbreviated([]) == "[]"
+_DESCENDING = [float(10 - i) for i in range(10)]
+_AT_FLOOR = [1 / 3] * _STATS_MIN
+_HUGE = 10**400  # `math.isfinite` raises on an int too large to be a float
+_HUGE_REPR = f"{str(_HUGE)[:_STR_CAP]}… +{len(str(_HUGE)) - _STR_CAP} chars"
 
 
-def test_a_long_numeric_sequence_summarizes_rather_than_showing_a_head():
-    """Three floats out of hundreds say nothing about a metric trace — not where it ended, not whether it spiked. The summary answers both in about the same width."""
-    from mini.__main__ import _abbreviated
-
-    assert _abbreviated({"val_loss": [5.0, 9.0, *(4.0 for _ in range(8))]}) == (
-        "{'val_loss': [10 floats: 5 → 4, max 9, mean 4.6, std 1.58]}"  # 4 is the last, so only the spike is named
-    )
-    # Integral sequences keep integral bounds; only the mean and spread go fractional.
-    assert _abbreviated([*range(19), -1]) == "[20 ints: 0 → -1, max 18, mean 8.5, std 5.92]"
-
-
-def test_a_summary_names_an_extreme_only_where_it_is_an_interior_one():
-    """A metric trace usually runs one way, which puts its extremes on the ends, where they already print. Naming them there would be the largest repetition in the line."""
-    from mini.__main__ import _abbreviated
-
-    descending = [float(10 - i) for i in range(10)]
-    assert _abbreviated(descending) == "[10 floats: 10 → 1, mean 5.5, std 3.03]"
-    assert _abbreviated([*descending, 20.0]) == "[11 floats: 10 → 20, min 1, mean 6.82, std 5.23]"
-
-
-def test_a_sequence_short_enough_to_print_in_full_is_never_rounded():
-    """The summary is the one rounded thing in this view, so the length floor confines it to sequences already losing most of themselves to the elision."""
-    from mini.__main__ import _STATS_MIN, _abbreviated
-
-    exact = [1 / 3] * _STATS_MIN
-    assert _abbreviated(exact) == f"[{1 / 3!r}, {1 / 3!r}, {1 / 3!r}, … +{_STATS_MIN - 3}]"
-    assert "floats:" in _abbreviated([*exact, 1 / 3])  # one past the floor, and it summarizes
-
-
-def test_a_summary_counts_non_finite_values_and_leaves_them_out_of_the_stats():
-    """A nan mid-curve is the thing you most want a results dump to tell you about, and it would take min/max/mean/std with it if it reached them."""
-    from mini.__main__ import _abbreviated
-
-    assert _abbreviated([1.0, float("nan"), *(3.0 for _ in range(8))]) == (
-        "[10 floats: 1 → 3, 1 non-finite, mean 2.78, std 0.667]"
-    )
-    assert _abbreviated([float("nan")] * 10) == "[10 floats: nan → nan, 10 non-finite]"
-
-
-def test_a_sequence_only_summarizes_when_the_summary_would_mean_something():
-    """Flags are ints to Python but don't read as numbers; a mixed sequence has no stats; a set has no first or last to name."""
-    from mini.__main__ import _abbreviated
-
-    assert _abbreviated([True, False] * 5) == "[True, False, True, … +7]"
-    assert _abbreviated([1, 2, 3, "four", *range(5, 11)]) == "[1, 2, 3, … +7]"
-    assert _abbreviated(set(range(20))) == "{0, 1, 2, … +17}"
-
-
-def test_a_number_that_resists_arithmetic_costs_the_summary_not_the_verb():
-    """`math.isfinite` raises on an int too large to be a float, and the whole summary is a nicety — so it steps aside for the head view rather than taking `results` down with it."""
-    from mini.__main__ import _abbreviated
-
-    assert _abbreviated([10**400] * 10).endswith("… +7]")  # the head view, not an OverflowError
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        # The reason the default view exists: a per-step metric list is one float per
+        # step, and a sweep of them buries every scalar worth reading.
+        pytest.param({"val_loss": [0.5, 0.4, 0.3, 0.2, 0.1]}, "{'val_loss': [0.5, 0.4, 0.3, … +2]}", id="elided"),
+        pytest.param([1, 2, 3], "[1, 2, 3]", id="short"),  # nothing dropped, nothing said
+        pytest.param([], "[]", id="empty"),
+        # Three floats out of hundreds say nothing about a metric trace — not where it
+        # ended, not whether it spiked. The summary answers both in about the same width.
+        pytest.param(
+            {"val_loss": [5.0, 9.0, *(4.0 for _ in range(8))]},
+            "{'val_loss': [10 floats: 5 → 4, max 9, mean 4.6, std 1.58]}",  # 4 is the last, so only the spike is named
+            id="summarized",
+        ),
+        # Integral sequences keep integral bounds; only the mean and spread go fractional.
+        pytest.param([*range(19), -1], "[20 ints: 0 → -1, max 18, mean 8.5, std 5.92]", id="ints"),
+        # A trace usually runs one way, which puts its extremes on the ends, where they
+        # already print. Naming them there would be the largest repetition in the line.
+        pytest.param(_DESCENDING, "[10 floats: 10 → 1, mean 5.5, std 3.03]", id="extremes-on-the-ends"),
+        pytest.param([*_DESCENDING, 20.0], "[11 floats: 10 → 20, min 1, mean 6.82, std 5.23]", id="interior-extreme"),
+        # The summary is the one rounded thing in this view, so the length floor confines
+        # it to sequences already losing most of themselves to the elision.
+        pytest.param(_AT_FLOOR, f"[{1 / 3!r}, {1 / 3!r}, {1 / 3!r}, … +{_STATS_MIN - 3}]", id="at-the-floor"),
+        pytest.param([*_AT_FLOOR, 1 / 3], "[9 floats: 0.333 → 0.333, mean 0.333, std 0]", id="one-past-the-floor"),
+        # A nan mid-curve is the thing you most want a results dump to tell you about,
+        # and it would take min/max/mean/std with it if it reached them.
+        pytest.param(
+            [1.0, float("nan"), *(3.0 for _ in range(8))],
+            "[10 floats: 1 → 3, 1 non-finite, mean 2.78, std 0.667]",
+            id="non-finite",
+        ),
+        pytest.param([float("nan")] * 10, "[10 floats: nan → nan, 10 non-finite]", id="all-non-finite"),
+        # Flags are ints to Python but don't read as numbers; a mixed sequence has no
+        # stats; a set has no first or last to name.
+        pytest.param([True, False] * 5, "[True, False, True, … +7]", id="bools"),
+        pytest.param([1, 2, 3, "four", *range(5, 11)], "[1, 2, 3, … +7]", id="mixed"),
+        pytest.param(set(range(20)), "{0, 1, 2, … +17}", id="set"),
+        # The whole summary is a nicety, so it steps aside for the head view rather than
+        # taking `results` down with it when the arithmetic raises.
+        pytest.param([_HUGE] * 10, f"[{_HUGE_REPR}, {_HUGE_REPR}, {_HUGE_REPR}, … +7]", id="overflow"),
+    ],
+)
+def test_a_long_sequence_is_elided_or_summarized(value, expected):
+    assert _abbreviated(value) == expected
 
 
-def test_scalars_and_keys_survive_verbatim():
-    """What a reader takes from the abbreviated view has to be what the result says, so only lengths are lost: no rounding, no reformatting, and every key kept."""
-    from mini.__main__ import _abbreviated
-
-    stats = {"em": 0.8333333333333334, "nll": 1.204, "converged": True, "tau": None, "name": "lam0"}
-    assert _abbreviated(stats) == (
-        "{'em': 0.8333333333333334, 'nll': 1.204, 'converged': True, 'tau': None, 'name': 'lam0'}"
-    )
+_DEEP = _level = {}
+for _ in range(10):
+    _level["a"] = _level = {}
 
 
-def test_containers_keep_their_shape():
-    from mini.__main__ import _abbreviated
-
-    assert _abbreviated((1, 2)) == "(1, 2)"
-    assert _abbreviated({"a": {"b": [1, 2, 3, 4]}}) == "{'a': {'b': [1, 2, 3, … +1]}}"
-    assert _abbreviated(frozenset({1})) == "{1}"
-
-
-def test_a_container_subclass_renders_rather_than_raising():
-    """A namedtuple is a tuple, and a result carrying one shouldn't cost the verb — which is what dispatching on the exact type did."""
-    from collections import OrderedDict, namedtuple
-
-    from mini.__main__ import _abbreviated
-
-    assert _abbreviated(namedtuple("P", "a b")(1, 2)) == "(1, 2)"
-    assert _abbreviated(OrderedDict(a=1)) == "{'a': 1}"
-
-
-def test_a_long_string_says_how_much_it_dropped():
-    from mini.__main__ import _abbreviated
-    from mini.__main__ import _STR_CAP as cap
-
-    assert _abbreviated("x" * cap) == repr("x" * cap)
-    assert _abbreviated("x" * (cap + 5)) == f"{'x' * cap!r}… +5 chars"
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        # What a reader takes from the abbreviated view has to be what the result says,
+        # so only lengths are lost: no rounding, no reformatting, and every key kept.
+        pytest.param(
+            {"em": 0.8333333333333334, "nll": 1.204, "converged": True, "tau": None, "name": "lam0"},
+            "{'em': 0.8333333333333334, 'nll': 1.204, 'converged': True, 'tau': None, 'name': 'lam0'}",
+            id="scalars-verbatim",
+        ),
+        pytest.param((1, 2), "(1, 2)", id="tuple"),
+        pytest.param({"a": {"b": [1, 2, 3, 4]}}, "{'a': {'b': [1, 2, 3, … +1]}}", id="nested"),
+        pytest.param(frozenset({1}), "{1}", id="frozenset"),
+        # A namedtuple is a tuple, and a result carrying one shouldn't cost the verb —
+        # which is what dispatching on the exact type did.
+        pytest.param(namedtuple("P", "a b")(1, 2), "(1, 2)", id="namedtuple"),
+        pytest.param(OrderedDict(a=1), "{'a': 1}", id="ordereddict"),
+        pytest.param(_DEEP, "{'a': " * 7 + "…" + "}" * 7, id="depth-capped"),
+    ],
+)
+def test_a_container_keeps_its_shape(value, expected):
+    assert _abbreviated(value) == expected
 
 
-def test_an_array_shows_its_shape_rather_than_its_payload():
-    import numpy as np
-
-    from mini.__main__ import _abbreviated
-
-    assert _abbreviated(np.zeros((3300, 4), dtype=np.float32)) == "float32[3300, 4]"
+_BLOB = Artifact(sha256="ab" * 32, size=9021, name="evals.json")
 
 
-def test_an_artifact_shows_the_handle_a_listing_wants():
-    """Returning bulk as an artifact is the house pattern, so this handle is the one a results listing meets most; its full repr is 64-character shas and, for a tree, every child blob."""
-    from mini.__main__ import _abbreviated
-    from mini.store import Artifact
-
-    blob = Artifact(sha256="ab" * 32, size=9021, name="evals.json")
-    assert _abbreviated(blob) == "Artifact('evals.json', 9021 bytes, sha256=abababababab…)"
-
-    tree = Artifact(sha256="cd" * 32, size=48213, name="ckpt", kind="tree", children=(blob, blob, blob))
-    assert _abbreviated(tree) == "Artifact('ckpt', 48213 bytes, 3 files, sha256=cdcdcdcdcdcd…)"
+class _Sprawling:
+    def __repr__(self):
+        return "S(" + "y" * 300 + ")"  # 303 characters, and no quotes added on the way out
 
 
-def test_nesting_is_walked_only_so_far():
-    from mini.__main__ import _abbreviated
-
-    deep = value = {}
-    for _ in range(10):
-        value["a"] = value = {}
-    assert _abbreviated(deep).endswith("…" + "}" * 7)
-
-
-def test_an_unrenderable_value_falls_back_to_a_capped_repr():
-    from mini.__main__ import _abbreviated
-    from mini.__main__ import _STR_CAP as cap
-
-    class Sprawling:
-        def __repr__(self):
-            return "S(" + "y" * 300 + ")"  # 303 characters, and no quotes added on the way out
-
-    assert _abbreviated(Sprawling()) == f"{'S(' + 'y' * (cap - 2)}… +{303 - cap} chars"
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        pytest.param("x" * _STR_CAP, repr("x" * _STR_CAP), id="string-at-cap"),
+        pytest.param("x" * (_STR_CAP + 5), f"{'x' * _STR_CAP!r}… +5 chars", id="string-over-cap"),
+        pytest.param(np.zeros((3300, 4), dtype=np.float32), "float32[3300, 4]", id="ndarray"),
+        # Returning bulk as an artifact is the house pattern, so this handle is the one a
+        # results listing meets most; its full repr is 64-character shas and, for a tree,
+        # every child blob.
+        pytest.param(_BLOB, "Artifact('evals.json', 9021 bytes, sha256=abababababab…)", id="artifact-blob"),
+        pytest.param(
+            Artifact(sha256="cd" * 32, size=48213, name="ckpt", kind="tree", children=(_BLOB, _BLOB, _BLOB)),
+            "Artifact('ckpt', 48213 bytes, 3 files, sha256=cdcdcdcdcdcd…)",
+            id="artifact-tree",
+        ),
+        pytest.param(_Sprawling(), f"{'S(' + 'y' * (_STR_CAP - 2)}… +{303 - _STR_CAP} chars", id="repr-fallback"),
+    ],
+)
+def test_an_opaque_value_shows_a_handle_rather_than_its_payload(value, expected):
+    """Anything that isn't a container gets rendered by what a listing can use — a shape, a sha, a capped repr — never its bulk."""
+    assert _abbreviated(value) == expected
 
 
 def test_results_elides_by_default_and_full_restores_the_repr(tmp_path: Path, monkeypatch, capsys):

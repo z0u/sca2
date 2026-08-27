@@ -167,27 +167,28 @@ def test_a_window_is_judged_by_its_mean_not_its_last_sample(tmp_path: Path, monk
     assert rec["metrics_wrong_way"] == {}, "a flat loss must not read as a rising one"
 
 
-def test_a_metric_going_the_wrong_way_accumulates_windows(tmp_path: Path, monkeypatch):
-    """Steadily climbing where it should fall, window over window — the count is what ``status`` thresholds on, so one bad window stays quiet and a trend doesn't.
+@pytest.mark.parametrize(
+    ("metric", "goal", "wrong_way"),
+    [
+        pytest.param("loss", "down", {"loss": 3}, id="climb-against-the-goal"),
+        pytest.param("accuracy", "up", {}, id="climb-with-the-goal"),
+    ],
+)
+def test_a_metric_going_the_wrong_way_accumulates_windows(tmp_path: Path, monkeypatch, metric, goal, wrong_way):
+    """Steadily climbing where it should fall, window over window — the count is what ``status`` thresholds on, so one bad window stays quiet and a trend doesn't. The identical series declared the other way is a metric doing its job, so only the declaration separates the two.
 
     Five samples a minute apart close four windows, and the first close only *sets* the anchor there's nothing yet to compare against — so the count is three. Worth knowing when reading a young run: the flag needs one window more than its threshold before it can fire."""
     rec = _windows(
-        MemoStore(tmp_path / "wrong"),
+        MemoStore(tmp_path / metric),
         "k",
         monkeypatch,
         [(1000.0 + 60 * i, 1.0 + i) for i in range(5)],
-        loss="down",
+        metric=metric,
+        **{metric: goal},
     )
-    assert rec["metrics_wrong_way"] == {"loss": 3}
-    assert rec["metric_goals"] == {"loss": "down"}
-
-
-def test_the_same_climb_is_fine_when_the_job_says_it_should_climb(tmp_path: Path, monkeypatch):
-    """The identical series, declared the other way, is a metric doing its job."""
-    series = [(1000.0 + 60 * i, 1.0 + i) for i in range(5)]
-    rec = _windows(MemoStore(tmp_path / "up"), "k", monkeypatch, series, metric="accuracy", accuracy="up")
-    assert rec["metrics_wrong_way"] == {}
-    assert rec["metrics_delta"] == {"accuracy": 1.0}, "movement is still reported either way"
+    assert rec["metrics_wrong_way"] == wrong_way
+    assert rec["metric_goals"] == {metric: goal}
+    assert rec["metrics_delta"] == {metric: 1.0}, "movement is still reported either way"
 
 
 def test_an_undeclared_metric_is_measured_but_not_judged(tmp_path: Path, monkeypatch):

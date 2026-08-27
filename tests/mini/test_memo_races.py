@@ -8,6 +8,8 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import pytest
+
 from mini._taskworker import execute_task
 from mini.local_apparatus import LocalApparatus
 from mini.memo import LocalRecordStore, MemoStore, task_key_parts
@@ -94,49 +96,57 @@ def test_cancel_releases_the_generation(tmp_path: Path):
     assert store.record(key)["state"] == RunState.CANCELLED
 
 
-def test_stale_worker_cannot_move_a_ref(tmp_path: Path):
-    """A worker superseded mid-run that tries ``set_ref`` fails loudly with ``StaleWriteError`` — the name never moves, and the successor's write is the one that resolves (issue #46: refs were the last unfenced write path)."""
+def _write_ref(payload: bytes) -> None:
     from mini.store import put, set_ref
 
-    store = MemoStore(tmp_path / "refs")
+    set_ref("best", put(payload, name="model.bin"))
+
+
+def _read_ref(artifacts: LocalStore, tmp_path: Path) -> bytes | None:
+    art = artifacts.get_ref("best")
+    return artifacts.get(art, tmp_path / "out.bin").read_bytes() if art is not None else None
+
+
+def _write_published(payload: bytes) -> None:
+    from mini.store import publish, put
+
+    publish(put(payload, name="fig.png"), "reports/fig.png")
+
+
+def _read_published(artifacts: LocalStore, tmp_path: Path) -> bytes | None:
+    path = tmp_path / "store" / "published" / "reports" / "fig.png"
+    return path.read_bytes() if path.exists() else None
+
+
+@pytest.mark.parametrize(
+    ("write", "read_back"),
+    [
+        pytest.param(_write_ref, _read_ref, id="set_ref"),
+        pytest.param(_write_published, _read_published, id="publish"),
+    ],
+)
+def test_a_stale_worker_cannot_move_a_name(tmp_path: Path, write, read_back):
+    """A worker superseded mid-run that tries to move a name fails loudly with ``StaleWriteError`` — the name never moves, and the successor's write is the one that resolves (issue #46: ``set_ref`` and ``publish`` were the last unfenced write paths, and both go through the same fence)."""
+    store = MemoStore(tmp_path / "names")
     artifacts = LocalStore(tmp_path / "store")
     taken: dict[str, str] = {}
 
     def sneaky(x):
         _, taken["gen"] = _claim(store, sneaky)  # superseded mid-run
-        set_ref("best", put(b"stale", name="model.bin"))
+        write(b"stale")
 
     key, old = _claim(store, sneaky)
     execute_task(store, key, sneaky, (1,), [], artifacts=artifacts, gen=old)
-    assert artifacts.get_ref("best") is None  # the name never moved
+    assert read_back(artifacts, tmp_path) is None  # the name never moved
     assert store.record(key)["state"] == RunState.RUNNING  # FAILED fenced out too
     assert "StaleWriteError" in store.error_path(key, old).read_text()
 
     def fresh(x):
-        set_ref("best", put(b"fresh", name="model.bin"))
+        write(b"fresh")
         return "ok"
 
     execute_task(store, key, fresh, (1,), [], artifacts=artifacts, gen=taken["gen"])
-    art = artifacts.get_ref("best")
-    assert art is not None
-    assert artifacts.get(art, tmp_path / "out.bin").read_bytes() == b"fresh"
-
-
-def test_stale_worker_cannot_publish(tmp_path: Path):
-    """``publish`` is fenced like ``set_ref``: a superseded attempt cannot last-writer-win a published path."""
-    from mini.store import publish, put
-
-    store = MemoStore(tmp_path / "pub")
-    artifacts = LocalStore(tmp_path / "store")
-
-    def sneaky(x):
-        _claim(store, sneaky)  # superseded mid-run
-        publish(put(b"stale", name="fig.png"), "reports/fig.png")
-
-    key, old = _claim(store, sneaky)
-    execute_task(store, key, sneaky, (1,), [], artifacts=artifacts, gen=old)
-    assert not (tmp_path / "store" / "published" / "reports" / "fig.png").exists()
-    assert "StaleWriteError" in store.error_path(key, old).read_text()
+    assert read_back(artifacts, tmp_path) == b"fresh"
 
 
 def test_current_worker_name_writes_land(tmp_path: Path):

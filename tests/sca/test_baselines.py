@@ -63,12 +63,6 @@ def test_operand_shell_null_matches_hand_count():
     assert bl.operand_shell_null(shell, RGB27, [pair]) == pytest.approx(0.5)
 
 
-def test_k_nearest_stats_k1_is_the_floor():
-    d = bl.distances(RGB27, [(8, 8, 8), (0, 0, 0), (4, 4, 4)])
-    assert bl.k_nearest_stats(d, 1)["dist"] == pytest.approx(d.min(axis=1).mean())
-    assert bl.k_nearest_stats(d, 1)["nearest"] == 1.0
-
-
 def test_k_nearest_stats_degrades_with_k():
     # Off-lattice targets with no tied nearest name (a channel at 4 ties 0 against 8).
     d = bl.distances(RGB27, [(3, 5, 9), (12, 2, 6)])
@@ -78,7 +72,8 @@ def test_k_nearest_stats_degrades_with_k():
 
 
 def test_k_nearest_stats_keeps_ties_at_the_floor():
-    """A target equidistant from several names has more than one 'nearest'."""
+    """At k = 1 every target's own nearest name is in the shortlist, and a target equidistant from several names keeps that rate at 1 even at k = 2."""
+    assert bl.k_nearest_stats(bl.distances(RGB27, [(8, 8, 8), (0, 0, 0), (4, 4, 4)]), 1)["nearest"] == 1.0
     d = bl.distances(RGB27, [(4, 4, 4)])
     assert bl.k_nearest_stats(d, 2)["nearest"] == 1.0
 

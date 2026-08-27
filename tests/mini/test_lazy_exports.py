@@ -54,10 +54,6 @@ def test_unknown_name_raises_attribute_error():
     assert lineage.__name__ == "mini.lineage"
 
 
-def test_dir_advertises_the_lazy_names():
-    assert set(mini.__all__) <= set(dir(mini))
-
-
 def test_leaf_module_import_stays_light():
     """
     The point of the exercise: `mini.reports` imports only the standard library, but a

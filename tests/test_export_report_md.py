@@ -1,17 +1,11 @@
 """Fence handling and the dropped-cell guard in the report exporter."""
 
-import importlib.util
-from pathlib import Path
-
 import pytest
 from marimo_md_export.models import Cell
 
-_SPEC = importlib.util.spec_from_file_location(
-    "export_report_md", Path(__file__).resolve().parent.parent / "scripts" / "export_report_md.py"
-)
-assert _SPEC and _SPEC.loader
-export_report_md = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(export_report_md)
+from tests.conftest import load_script
+
+export_report_md = load_script("export_report_md")
 
 convert_admonitions = export_report_md.convert_admonitions
 fenced_spans = export_report_md.fenced_spans
@@ -66,12 +60,8 @@ def _cell(source: str) -> Cell:
     return Cell(source=source, source_hash=_md5(source.strip()), block_text=source)
 
 
-def test_check_passes_when_sources_match():
-    cell = _cell("x = 1\n")
-    check_sources_agree([cell], {cell.source_hash})
-
-
 def test_check_raises_on_a_rewritten_fence():
     cell = _cell("x = 1\n")
+    check_sources_agree([cell], {cell.source_hash})  # the control: an untouched source agrees
     with pytest.raises(RuntimeError, match="no notebook cell has"):
         check_sources_agree([cell], {"some-other-hash"})

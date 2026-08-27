@@ -1,14 +1,12 @@
 """Tests for the backlog index — header validation, and the query that replaces a committed list."""
 
-import importlib.util
 from pathlib import Path
 
 import pytest
 
-_SPEC = importlib.util.spec_from_file_location("todo", Path(__file__).resolve().parent.parent / "scripts" / "todo.py")
-assert _SPEC and _SPEC.loader
-todo = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(todo)
+from tests.conftest import load_script
+
+todo = load_script("todo")
 
 VALID = """---
 status: open
@@ -55,15 +53,11 @@ def slugs(items) -> list[str]:
 
 
 def test_a_valid_item_parses(tmp_path):
-    it = todo.parse(write(tmp_path, "x", VALID))
-    assert (it.title, it.status, it.tags) == ("A title", "open", ("cli", "storage"))
+    """The title comes off the heading, the slug off the filename — so the two can disagree."""
+    it = todo.parse(write(tmp_path, "some-slug", VALID))
+    assert (it.title, it.slug, it.status, it.tags) == ("A title", "some-slug", "open", ("cli", "storage"))
     assert it.body == "The body."
     assert it.opened.isoformat() == "2026-08-13"
-
-
-def test_the_title_comes_off_the_heading_not_the_filename(tmp_path):
-    assert todo.parse(write(tmp_path, "some-slug", VALID)).title == "A title"
-    assert todo.parse(write(tmp_path, "some-slug", VALID)).slug == "some-slug"
 
 
 @pytest.mark.parametrize(
@@ -116,12 +110,9 @@ def test_a_duplicate_key_is_rejected(tmp_path):
         todo.parse(write(tmp_path, "x", "---\nstatus: open\nstatus: done\ntags: [cli]\n---\n# T\n"))
 
 
-def test_tags_are_optional(tmp_path):
-    assert todo.parse(item(tmp_path, tags=None)).tags == ()
-
-
-def test_priority_is_optional_and_absence_is_the_default(tmp_path):
-    assert todo.parse(item(tmp_path, priority=None)).priority is None
+def test_optional_fields_fall_back_to_their_defaults(tmp_path):
+    it = todo.parse(item(tmp_path, tags=None, opened=None, priority=None))
+    assert (it.tags, it.opened, it.priority) == ((), None, None)
     assert todo.parse(item(tmp_path, "p", priority="high")).priority == "high"
 
 
@@ -140,21 +131,12 @@ def test_closing_before_opening_is_rejected(tmp_path):
         todo.parse(item(tmp_path, status="done", opened="2026-08-13", closed="2026-08-01"))
 
 
-def test_opened_is_optional(tmp_path):
-    assert todo.parse(item(tmp_path, opened=None)).opened is None
-
-
 def test_an_error_names_the_file(tmp_path):
     with pytest.raises(todo.TodoError, match="broken.md"):
         todo.parse(item(tmp_path, "broken", status="nonsense"))
 
 
 # --- loading -------------------------------------------------------------
-
-
-def test_a_finding_is_a_status(backlog):
-    items, _ = todo.load(backlog)
-    assert slugs(todo.select(items, status="finding")) == ["learned"]
 
 
 def test_load_skips_the_readme(backlog):
@@ -174,46 +156,38 @@ def test_one_broken_item_does_not_hide_the_rest(backlog):
 # --- selecting -----------------------------------------------------------
 
 
-def test_settled_work_and_findings_are_hidden_by_default(backlog):
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ({}, ["newer", "older", "undated"]),
+        ({"status": "done"}, ["shipped"]),
+        ({"status": "finding"}, ["learned"]),
+        ({"tags": ["cli"]}, ["newer", "older"]),
+        ({"tags": ["cli", "storage"]}, ["newer"]),
+        ({"tags": ["cli", "vis"]}, []),
+        ({"bundle": "cli-devx"}, ["newer", "older"]),
+        ({"sets": ["science"], "status": "finding"}, ["learned"]),
+        ({"sets": ["eng"], "status": "finding"}, []),
+    ],
+    ids=[
+        "default-hides-settled-work-and-findings",  # newest first, undated last
+        "status",
+        "a-finding-is-a-status",
+        "one-tag",
+        "tags-are-conjunctive",
+        "conjunction-with-no-members",
+        "bundle",
+        "a-set-narrows-the-selection",
+        "the-set-wins-over-the-status",
+    ],
+)
+def test_select_filters_and_orders(backlog, query, expected):
     items, _ = todo.load(backlog)
-    assert {"shipped", "learned"}.isdisjoint(slugs(todo.select(items)))
-
-
-def test_a_set_narrows_the_selection(backlog):
-    items, _ = todo.load(backlog)
-    assert slugs(todo.select(items, sets=["science"], status="finding")) == ["learned"]
-    assert "learned" not in slugs(todo.select(items, sets=["eng"], status="finding"))
+    assert slugs(todo.select(items, **query)) == expected
 
 
 def test_sets_are_the_directories_that_exist(backlog):
     assert todo._sets(backlog) == ["eng", "science"]
-
-
-def test_status_filter_finds_them(backlog):
-    items, _ = todo.load(backlog)
-    assert slugs(todo.select(items, status="done")) == ["shipped"]
-
-
-def test_tags_are_conjunctive(backlog):
-    items, _ = todo.load(backlog)
-    assert slugs(todo.select(items, tags=["cli"])) == ["newer", "older"]
-    assert slugs(todo.select(items, tags=["cli", "storage"])) == ["newer"]
-    assert todo.select(items, tags=["cli", "vis"]) == []
-
-
-def test_bundle_filter(backlog):
-    items, _ = todo.load(backlog)
-    assert slugs(todo.select(items, bundle="cli-devx")) == ["newer", "older"]
-
-
-def test_newest_first_with_undated_last(backlog):
-    items, _ = todo.load(backlog)
-    assert slugs(todo.select(items)) == ["newer", "older", "undated"]
-
-
-def test_an_item_knows_its_set(backlog):
-    items, _ = todo.load(backlog)
-    assert {it.slug: it.set for it in items}["learned"] == "science"
 
 
 # --- the shortlist -------------------------------------------------------
@@ -225,11 +199,6 @@ def test_the_shortlist_holds_live_items_only(backlog):
     item(backlog / "eng", "was-urgent", status="done", closed="2026-07-04", priority="high")
     items, _ = todo.load(backlog)
     assert slugs(todo.shortlist(items)) == ["urgent"]
-
-
-def test_the_priority_filter_finds_them(backlog):
-    item(backlog / "eng", "urgent", priority="high")
-    items, _ = todo.load(backlog)
     assert slugs(todo.select(items, priority="high")) == ["urgent"]
 
 
@@ -243,16 +212,13 @@ def test_the_budget_holds_until_it_is_exceeded(backlog):
     items, _ = todo.load(backlog)
     assert todo.over_budget(items) == []
     for n in range(todo.BUDGET + 1):
+        item(backlog / "eng", f"was-urgent-{n}", status="done", closed="2026-07-04", priority="high")
+    items, _ = todo.load(backlog)
+    assert todo.over_budget(items) == [], "settled items keeping an old priority don't spend the budget"
+    for n in range(todo.BUDGET + 1):
         item(backlog / "eng", f"urgent-{n}", priority="high")
     items, _ = todo.load(backlog)
     assert len(todo.over_budget(items)) == 1
-
-
-def test_settled_items_do_not_spend_the_budget(backlog):
-    for n in range(todo.BUDGET + 1):
-        item(backlog / "eng", f"was-urgent-{n}", status="done", closed="2026-07-04", priority="high")
-    items, _ = todo.load(backlog)
-    assert todo.over_budget(items) == []
 
 
 # --- rendering -----------------------------------------------------------

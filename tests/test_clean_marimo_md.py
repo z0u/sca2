@@ -1,15 +1,10 @@
 """Paragraph reflow and HTML-island conversion in the marimo-export cleaner."""
 
-import importlib.util
 import re
-from pathlib import Path
 
-_SPEC = importlib.util.spec_from_file_location(
-    "clean_marimo_md", Path(__file__).resolve().parent.parent / "scripts" / "clean_marimo_md.py"
-)
-assert _SPEC and _SPEC.loader
-clean_marimo_md = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(clean_marimo_md)
+from tests.conftest import load_script
+
+clean_marimo_md = load_script("clean_marimo_md")
 
 reflow = clean_marimo_md.reflow
 to_md = clean_marimo_md.to_md
@@ -60,6 +55,9 @@ def test_details_and_admonition_agree():
 
 
 def test_reflow_preserves_content():
+    """Every paragraph is joined and no word is lost, with the blocks between them left where they were."""
     src = "some prose\nwrapped oddly\n\n- a list\n\n| t | b |\n\ntrailing\ntext\n"
+    out = reflow(src)
     squash = lambda t: re.sub(r"\s+", " ", t).strip()  # noqa: E731
-    assert squash(reflow(src)) == squash(src)
+    assert squash(out) == squash(src)
+    assert out.splitlines() == ["some prose wrapped oddly", "", "- a list", "", "| t | b |", "", "trailing text"]

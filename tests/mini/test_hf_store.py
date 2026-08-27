@@ -1,35 +1,38 @@
 """Integration test for the Hugging Face bucket store — network-gated.
 
-Talks to a real bucket, so it's skipped unless ``MINI_STORE_BUCKET`` and ``HF_TOKEN`` are set. It writes only under a unique ``cas/`` blob and a per-run ``refs/_test/<uuid>`` / ``published/_test/<uuid>`` prefix, and deletes everything it created in teardown, so it never collides with real artifacts.
+Talks to a real bucket at ~2-3s per commit, so it is deselected by default (the ``hf`` marker) and, when selected, skipped unless a bucket is configured (``MINI_STORE_BUCKET``, else ``[tool.mini] store-bucket``) *and* the ambient Hugging Face token (``HF_TOKEN``, else the ``hf auth login`` cache) can write to it — a read-only token skips the module rather than failing every write. It writes only under a unique ``cas/`` blob and a per-run ``refs/_test/<uuid>`` / ``published/_test/<uuid>`` prefix, and deletes everything it created in teardown, so it never collides with real artifacts.
 
 Run it with::
 
-    MINI_STORE_BUCKET=<ns>/<bucket> HF_TOKEN=... uv run pytest tests/mini/test_hf_store.py
+    ./go auth   # or set HF_TOKEN
+    uv run pytest -m hf
 """
 
 from __future__ import annotations
 
-import os
 import re
 import secrets
 from pathlib import Path
 
 import pytest
 
-from mini.store import _cas_key
+from mini.store import _cas_key, _hf_token, publish_repo, store_bucket
 
-BUCKET = os.environ.get("MINI_STORE_BUCKET")
-PUBLISH_REPO = os.environ.get("MINI_PUBLISH_REPO")
+BUCKET = store_bucket()
+PUBLISH_REPO = publish_repo()
+TOKEN = _hf_token()
 
-pytestmark = pytest.mark.skipif(
-    not (BUCKET and os.environ.get("HF_TOKEN")),
-    reason="set MINI_STORE_BUCKET + HF_TOKEN to run the HF bucket integration test",
-)
+pytestmark = [
+    pytest.mark.hf,
+    pytest.mark.skipif(
+        not (BUCKET and TOKEN),
+        reason="no HF bucket/token configured — run ./go auth to exercise the HF bucket integration test",
+    ),
+]
 
 # The publish-tier cases also need a (public) dataset repo — see the split in #38.
 repo_publish = pytest.mark.skipif(
-    not (BUCKET and PUBLISH_REPO and os.environ.get("HF_TOKEN")),
-    reason="also set MINI_PUBLISH_REPO to run the publish-repo integration test",
+    not PUBLISH_REPO, reason="no MINI_PUBLISH_REPO / publish-repo configured for the publish-repo integration test"
 )
 
 # Once a project has adopted the #38 split (MINI_PUBLISH_REPO set), the CAS bucket is
@@ -42,22 +45,45 @@ bucket_publish = pytest.mark.skipif(
 )
 
 
-@pytest.fixture
-def hf(tmp_path: Path):
-    """An HFStore against the real bucket, with a unique prefix and full cleanup."""
-    from huggingface_hub import HfApi
+@pytest.fixture(scope="module")
+def api():
+    """One authenticated client, after a write probe: a token that *exists* isn't one that can write.
 
+    Claude Code web sessions carry a read-only token on purpose, and with an existence-only gate every write case there fails on a 403 that has nothing to do with the branch. The probe costs one round trip (a tiny ref written and deleted) and turns that into a skip that names the cause.
+    """
+    from huggingface_hub import HfApi
+    from huggingface_hub.errors import HfHubHTTPError
+
+    assert BUCKET is not None  # narrowed by pytestmark skip
+    api = HfApi(token=TOKEN)
+    probe = f"refs/_test/probe-{secrets.token_hex(4)}.json"
+    try:
+        api.batch_bucket_files(BUCKET, add=[(b"{}", probe)])
+    except HfHubHTTPError as e:
+        status = e.response.status_code if e.response is not None else None
+        if status in (401, 403):
+            pytest.skip(
+                f"the HF token can't write to {BUCKET} (HTTP {status}); the bucket integration test needs a write token"
+            )
+        raise
+    api.batch_bucket_files(BUCKET, delete=[probe])
+    return api
+
+
+@pytest.fixture
+def hf(api, tmp_path: Path):
+    """An HFStore against the real bucket, with a unique prefix and full cleanup."""
     from mini.hf_store import HFStore
     from mini.store import LocalStore
 
     assert BUCKET is not None  # narrowed by pytestmark skip
     tag = secrets.token_hex(4)
-    store = HFStore(BUCKET, cache=LocalStore(tmp_path / "cache"))
+    store = HFStore(BUCKET, cache=LocalStore(tmp_path / "cache"), token=TOKEN)
     created: list[str] = []
     yield store, tag, created
     # Teardown: remove every path this test created.
     if created:
-        HfApi(token=os.environ["HF_TOKEN"]).batch_bucket_files(BUCKET, delete=sorted(set(created)))
+        api.batch_bucket_files(BUCKET, delete=sorted(set(created)))
 
 
 def test_put_get_round_trips_over_the_bucket(hf):
@@ -157,23 +183,20 @@ def test_export_round_trips_over_the_bucket(hf, tmp_path: Path):
 
 
 @pytest.fixture
-def hf_repo(tmp_path: Path):
+def hf_repo(api, tmp_path: Path):
     """An HFStore whose CAS is the bucket but whose publish tier is a dataset repo.
 
     Cleans up both sides: the ``cas/`` blobs it wrote to the bucket and the ``published/`` / ``exports/`` files it committed to the repo.
     """
-    from huggingface_hub import HfApi
-
     from mini.hf_store import HFStore
     from mini.store import LocalStore
 
     assert BUCKET is not None and PUBLISH_REPO is not None  # narrowed by the repo_publish skip
     tag = secrets.token_hex(4)
-    store = HFStore(BUCKET, cache=LocalStore(tmp_path / "cache"), publish_repo=PUBLISH_REPO)
+    store = HFStore(BUCKET, cache=LocalStore(tmp_path / "cache"), publish_repo=PUBLISH_REPO, token=TOKEN)
     cas_created: list[str] = []
     repo_paths: list[str] = []
     yield store, tag, cas_created, repo_paths
-    api = HfApi(token=os.environ["HF_TOKEN"])
     if cas_created:
         api.batch_bucket_files(BUCKET, delete=sorted(set(cas_created)))
     for p in sorted(set(repo_paths)):

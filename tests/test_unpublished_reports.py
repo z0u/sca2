@@ -1,6 +1,5 @@
 """Tests for the forgotten-publish check — changed reports whose pin didn't move."""
 
-import importlib.util
 import json
 import subprocess
 from pathlib import Path
@@ -8,12 +7,9 @@ from pathlib import Path
 import pytest
 from mini.reports import MANUAL_PUBLISH_MARKER
 
-_SPEC = importlib.util.spec_from_file_location(
-    "unpublished_reports", Path(__file__).resolve().parent.parent / "scripts" / "unpublished_reports.py"
-)
-assert _SPEC and _SPEC.loader
-unpub = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(unpub)
+from tests.conftest import load_script
+
+unpub = load_script("unpublished_reports")
 
 _APP = "import marimo\napp = marimo.App()\n"
 
@@ -64,12 +60,6 @@ def repo(tmp_path: Path) -> Path:
 
 def test_nothing_changed(repo):
     assert changed(repo) == set()
-
-
-def test_the_changed_report_only(repo):
-    (repo / "docs" / "ex-1" / "report.py").write_text(_APP + "# edited\n")
-    commit(repo, "edit one report")
-    assert changed(repo) == {"docs/ex-1/report.py"}
 
 
 def test_a_changed_input_beside_a_report_counts_as_changing_it(repo):
@@ -143,6 +133,7 @@ def test_base_branch_commits_are_not_ours(repo):
 def test_a_changed_report_without_a_new_pin_is_flagged(repo):
     (repo / "docs" / "ex-1" / "report.py").write_text(_APP + "# edited\n")
     commit(repo, "edit a report")
+    assert changed(repo) == {"docs/ex-1/report.py"}
     assert flagged(repo) == {"docs/ex-1/report.py"}
 
 

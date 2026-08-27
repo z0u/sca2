@@ -14,6 +14,7 @@ from typing import Any, Iterator
 
 import pytest
 
+from mini import _watchdog
 from mini._taskworker import _MemoSink, _phase_hook
 from mini._watchdog import Watchdog
 from mini.experiment import Experiment
@@ -30,27 +31,56 @@ from mini.store import LocalStore
 # ---------------------------------------------------------------------------
 
 
-def test_watchdog_fires_only_when_progress_stalls():
+class _FakeClock:
+    """Stands in for the ``time`` module inside :mod:`mini._watchdog`."""
+
+    def __init__(self, start: float = 1000.0):
+        self.t = start
+
+    def monotonic(self) -> float:
+        return self.t
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> _FakeClock:
+    """Fake the watchdog's *judgement* of elapsed time, not its polling.
+
+    ``_run`` still waits on its Event at the real poll interval, so the thread behaves exactly as in production; only ``time.monotonic`` is ours. That way a test crosses a threshold by moving the clock instead of by sleeping through it, and costs a poll or two rather than the whole timeout.
+    """
+    fake = _FakeClock()
+    monkeypatch.setattr(_watchdog, "time", fake)
+    return fake
+
+
+def _settle(exits: list[int], timeout_s: float = 5.0) -> None:
+    """Wait (in real seconds) for the watchdog thread's next poll to land."""
+    deadline = time.monotonic() + timeout_s
+    while not exits and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+
+def test_watchdog_fires_only_when_progress_stalls(clock: _FakeClock):
     stalls: list[str] = []
     exits: list[int] = []
     wd = Watchdog(0.4, stalls.append, _exit=exits.append)
     with wd:
-        for step in range(8):  # steady progress: each poke resets the clock
-            wd.poke(step, 8)
-            time.sleep(0.1)
+        for step in range(3):  # steady progress: each poke resets the clock
+            wd.poke(step, 3)
+            clock.t += 0.3  # a gap under the timeout, so no poll ever sees a stall
+            time.sleep(0.1)  # …and polls do happen: the interval here is 0.1s
         assert stalls == []
     assert exits == []
 
 
-def test_watchdog_aborts_on_frozen_step():
+def test_watchdog_aborts_on_frozen_step(clock: _FakeClock):
     stalls: list[str] = []
     exits: list[int] = []
     wd = Watchdog(0.3, stalls.append, _exit=exits.append)
     with wd:
-        deadline = time.monotonic() + 5.0
-        while not exits and time.monotonic() < deadline:
-            wd.poke(7, 100)  # emissions keep coming, but the step never advances
-            time.sleep(0.05)
+        wd.poke(7, 100)
+        wd.poke(7, 100)  # emissions keep coming, but the step never advances
+        clock.t += 1.0
+        _settle(exits)
     assert exits == [70]
     (diagnosis,) = stalls
     assert "at step 7/100" in diagnosis
@@ -58,50 +88,50 @@ def test_watchdog_aborts_on_frozen_step():
     assert "--- thread" in diagnosis  # the stack dump is the wedge's "traceback"
 
 
-def test_grace_covers_setup_then_tight_timeout_applies():
+def test_grace_covers_setup_then_tight_timeout_applies(clock: _FakeClock):
     stalls: list[str] = []
     exits: list[int] = []
     wd = Watchdog(0.2, stalls.append, grace_s=5.0, _exit=exits.append)
     with wd:
-        time.sleep(0.6)  # "tokenizing": way past the 0.2s timeout, inside the grace
+        clock.t += 0.6  # "tokenizing": way past the 0.2s timeout, inside the grace
+        time.sleep(0.1)  # a couple of polls, none of which finds anything wrong
         assert exits == []
         wd.poke(1, 10)  # first emission ends the grace; the tight timeout takes over
-        deadline = time.monotonic() + 5.0
-        while not exits and time.monotonic() < deadline:
-            time.sleep(0.05)
+        clock.t += 0.5
+        _settle(exits)
     assert exits == [70]
     assert "watchdog 0.2s" in stalls[0]  # the tight threshold, not the 5s grace
 
 
-def test_phase_covers_a_step_free_span_then_the_tight_timeout_returns():
+def test_phase_covers_a_step_free_span_then_the_tight_timeout_returns(clock: _FakeClock):
     stalls: list[str] = []
     exits: list[int] = []
     wd = Watchdog(0.2, stalls.append, _exit=exits.append)
     with wd:
         wd.poke(1, 10)  # training under way; the tight 0.2s timeout is in force
         with wd.phase("upload checkpoint", 5.0):
-            time.sleep(0.6)  # the upload: no steps, way past the tight timeout
+            clock.t += 0.6  # the upload: no steps, way past the tight timeout
+            time.sleep(0.1)
             assert exits == []
-        deadline = time.monotonic() + 5.0  # phase over, so the tight timeout is back
-        while not exits and time.monotonic() < deadline:
-            time.sleep(0.05)
+        clock.t += 0.5  # phase over, so the tight timeout is back
+        _settle(exits)
     assert exits == [70]
     assert "watchdog 0.2s" in stalls[0]
 
 
-def test_phase_bounds_the_span_rather_than_exempting_it():
+def test_phase_bounds_the_span_rather_than_exempting_it(clock: _FakeClock):
     stalls: list[str] = []
     exits: list[int] = []
     wd = Watchdog(0.2, stalls.append, _exit=exits.append)
     with wd:
         wd.poke(1, 10)
-        started = time.monotonic()
         with wd.phase("upload checkpoint", 1.0):
-            deadline = started + 5.0
-            while not exits and time.monotonic() < deadline:
-                time.sleep(0.05)  # an upload that hangs is still caught, at its own budget
+            clock.t += 0.5  # past the tight timeout the loop was held to…
+            time.sleep(0.1)
+            assert exits == []  # …and the span's own budget is what applies instead
+            clock.t += 0.7  # an upload that hangs is still caught, at that budget
+            _settle(exits)
     assert exits == [70]
-    assert time.monotonic() - started >= 1.0  # not at the tight 0.2s the loop was held to
     (diagnosis,) = stalls
     assert "blocking phase 'upload checkpoint' 1s" in diagnosis
     assert "at step 1/10" in diagnosis  # where the task was when the span began
@@ -119,14 +149,13 @@ def test_phase_only_ever_widens_the_threshold():
     assert wd._threshold() == 10.0
 
 
-def test_stall_during_grace_names_the_grace():
+def test_stall_during_grace_names_the_grace(clock: _FakeClock):
     stalls: list[str] = []
     exits: list[int] = []
     wd = Watchdog(5.0, stalls.append, grace_s=0.2, _exit=exits.append)
     with wd:
-        deadline = time.monotonic() + 5.0
-        while not exits and time.monotonic() < deadline:
-            time.sleep(0.05)  # never emits: the grace, not the timeout, is what expires
+        clock.t += 0.5  # never emits: the grace, not the timeout, is what expires
+        _settle(exits)
     assert exits == [70]
     (diagnosis,) = stalls
     assert "startup grace 0.2s" in diagnosis
@@ -232,37 +261,45 @@ def test_a_body_of_nothing_but_transfers_never_looks_wedged(tmp_path: Path):
     assert badges == [(False, False)] * len(badges)
 
 
-def test_stale_progress_pauses_for_a_declared_blocking_phase():
-    # Step frozen for 300s under a 120s watchdog reads as a wedge — unless the task
-    # said it was uploading, in which case it's healthy until that budget runs out.
-    rec = {
-        "state": RunState.RUNNING,
-        "env": {"host": "x"},
-        "started_at": 400.0,
-        "heartbeat_at": 999.0,
-        "progress_at": 700.0,
-        "watchdog_s": 120.0,
-    }
-    assert stale_progress(rec, now=1000.0) is True
-    assert stale_progress(rec | {"phase_until": 1200.0}, now=1000.0) is False
-    assert stale_progress(rec | {"phase_until": 900.0}, now=1000.0) is True  # budget itself blown
-
-
-def test_stale_heartbeat_pauses_for_a_declared_blocking_phase():
-    """A task whose whole body is store transfers emits no progress at all, so its heartbeat sits at ``started_at`` while it is perfectly healthy — the shape a publish step fanning in has (ex-2.1.11: 27 downloads and one upload, badged dead three times). The declared span is what separates that from a worker that really died."""
-    # Heartbeat 700s old under the 300s threshold: dead, unless a span explains it.
-    rec = {
-        "state": RunState.RUNNING,
-        "env": {"host": "x"},
-        "started_at": 300.0,
-        "heartbeat_at": 300.0,
-        "watchdog_s": 120.0,
-    }
-    assert stale_heartbeat(rec, now=1000.0) is True
-    assert stale_heartbeat(rec | {"phase_until": 1200.0}, now=1000.0) is False
+@pytest.mark.parametrize(
+    ("badge", "rec"),
+    [
+        # Step frozen for 300s under a 120s watchdog reads as a wedge — unless the
+        # task said it was uploading, in which case it's healthy until that budget
+        # runs out.
+        pytest.param(
+            stale_progress,
+            {
+                "state": RunState.RUNNING,
+                "env": {"host": "x"},
+                "started_at": 400.0,
+                "heartbeat_at": 999.0,
+                "progress_at": 700.0,
+                "watchdog_s": 120.0,
+            },
+            id="stale_progress",
+        ),
+        # Heartbeat 700s old under the 300s threshold: dead, unless a span explains it.
+        pytest.param(
+            stale_heartbeat,
+            {
+                "state": RunState.RUNNING,
+                "env": {"host": "x"},
+                "started_at": 300.0,
+                "heartbeat_at": 300.0,
+                "watchdog_s": 120.0,
+            },
+            id="stale_heartbeat",
+        ),
+    ],
+)
+def test_a_declared_blocking_phase_pauses_both_wedge_badges(badge, rec):
+    """A task whose whole body is store transfers emits no progress at all, so its heartbeat sits at ``started_at`` while it is perfectly healthy — the shape a publish step fanning in has (ex-2.1.11: 27 downloads and one upload, badged dead three times). The declared span is what separates that from a worker that really died, and it has to reach both badges or one still says wedged."""
+    assert badge(rec, now=1000.0) is True
+    assert badge(rec | {"phase_until": 1200.0}, now=1000.0) is False
     # The span bounds the silence rather than exempting it: past its own budget, a
     # worker that died mid-upload is flagged again.
-    assert stale_heartbeat(rec | {"phase_until": 900.0}, now=1000.0) is True
+    assert badge(rec | {"phase_until": 900.0}, now=1000.0) is True
 
 
 def test_stale_progress_counts_a_recently_closed_phase_as_movement():
@@ -282,38 +319,26 @@ def test_stale_progress_counts_a_recently_closed_phase_as_movement():
     assert stale_progress(rec | {"phase_at": 600.0}, now=1000.0) is True
 
 
-def test_phase_transitions_stamp_liveness_for_the_gaps_between_spans():
-    """The span itself is covered by its deadline; what the stamps buy is the moments either side of it, where a task made only of transfers holds no label and no budget."""
+def test_phase_transitions_stamp_liveness_and_hand_nested_spans_back(monkeypatch: pytest.MonkeyPatch):
+    """The span itself is covered by its deadline; what the stamps buy is the moments either side of it, where a task made only of transfers holds no label and no budget.
+
+    And task code wrapping a `put` — which declares one of its own — leaves two spans open. The record holds one label, so the inner exit has to restore the outer's, not clear it: otherwise the badge calls the rest of the outer span a wedge.
+    """
+    monkeypatch.setattr(time, "time", lambda: 1000.0)
     stamps: list[dict[str, Any]] = []
 
-    def record(**fields: Any) -> bool:
+    def record(**fields: Any) -> bool:  # matches execute_task's own record()
         stamps.append(fields)
         return True
 
     phase = _phase_hook(None, record)
-    before = time.time()
-    with phase("get corpus", 120.0):
-        pass
-    entry, exit_ = stamps
-    assert (entry["phase"], exit_["phase"]) == ("get corpus", None)
-    assert all(s["heartbeat_at"] >= before and s["phase_at"] >= before for s in stamps)
-
-
-def test_nested_phases_hand_the_record_back_rather_than_clearing_it(monkeypatch: pytest.MonkeyPatch):
-    """Task code wrapping a `put` — which declares one of its own — leaves two spans open. The record holds one label, so the inner exit has to restore the outer's, not clear it: otherwise the badge calls the rest of the outer span a wedge."""
-    monkeypatch.setattr(time, "time", lambda: 1000.0)
-    stamps: list[tuple[str | None, float | None]] = []
-
-    def record(**fields: Any) -> bool:  # matches execute_task's own record()
-        stamps.append((fields.get("phase"), fields.get("phase_until")))
-        return True
-
-    phase = _phase_hook(None, record)
     with phase("archive epoch", 600.0):
+        assert (stamps[-1]["phase"], stamps[-1]["phase_until"]) == ("archive epoch", 1600.0)
         with phase("put model", 120.0):
             pass
-        assert stamps[-1] == ("archive epoch", 1600.0)  # back to the outer span, still open
-    assert stamps[-1] == (None, None)  # only the last exit clears it
+        assert (stamps[-1]["phase"], stamps[-1]["phase_until"]) == ("archive epoch", 1600.0)  # back to the outer span
+    assert (stamps[-1]["phase"], stamps[-1]["phase_until"]) == (None, None)  # only the last exit clears it
+    assert all(s["heartbeat_at"] == 1000.0 and s["phase_at"] == 1000.0 for s in stamps)  # every transition
 
 
 def test_status_json_surfaces_the_declared_phase():
@@ -370,7 +395,7 @@ def test_wedged_worker_settles_failed_with_stack_dump(tmp_path: Path):
         return ctx.map(wedge_or_work, [0.0, 60.0])
 
     exp = Experiment(name="wedge", main=main)
-    app = LocalApparatus("wedge", max_workers=2, data_dir=tmp_path / "wedge").w(watchdog=1)
+    app = LocalApparatus("wedge", max_workers=2, data_dir=tmp_path / "wedge").w(watchdog=0.5)
     store = app.memo_store()
     done, _ = tick(exp, app)
     assert not done  # both cells launched, in flight
@@ -387,7 +412,7 @@ def test_wedged_worker_settles_failed_with_stack_dump(tmp_path: Path):
     wedged = by_state[RunState.FAILED]
     assert wedged["exc_type"] == "mini._watchdog.WatchdogStall"
     assert "no step progress" in wedged["error"]
-    assert wedged["watchdog_s"] == 1
+    assert wedged["watchdog_s"] == 0.5
     diagnosis = store.error(wedged["key"])
     assert "wedge_or_work" in diagnosis  # the stack dump names the wedged frame
     # The healthy sibling finished normally under the same watchdog.
@@ -398,7 +423,7 @@ def test_grace_lets_slow_setup_finish_under_a_tight_watchdog(tmp_path: Path):
     def slow_setup(x: int):
         from mini import emit_progress
 
-        time.sleep(3.0)  # "tokenizing": longer than the watchdog, inside the grace
+        time.sleep(0.5)  # "tokenizing": longer than the watchdog, inside the grace
         for step in range(1, 4):
             emit_progress(step, 3)
         return x
@@ -407,7 +432,7 @@ def test_grace_lets_slow_setup_finish_under_a_tight_watchdog(tmp_path: Path):
         return ctx.run(slow_setup, 1)
 
     exp = Experiment(name="grace", main=main)
-    app = LocalApparatus("grace", data_dir=tmp_path / "grace").w(watchdog=1, watchdog_grace=30)
+    app = LocalApparatus("grace", data_dir=tmp_path / "grace").w(watchdog=0.25, watchdog_grace=30)
     store = app.memo_store()
     done, _ = tick(exp, app)
     assert not done
@@ -418,8 +443,8 @@ def test_grace_lets_slow_setup_finish_under_a_tight_watchdog(tmp_path: Path):
         if rec.get("state") in (RunState.DONE, RunState.FAILED):
             break
         time.sleep(0.2)
-    assert rec["state"] == RunState.DONE  # the 1s watchdog didn't kill the 3s setup
-    assert (rec["watchdog_s"], rec["watchdog_grace_s"]) == (1, 30)
+    assert rec["state"] == RunState.DONE  # the 0.25s watchdog didn't kill the 0.5s setup
+    assert (rec["watchdog_s"], rec["watchdog_grace_s"]) == (0.25, 30)
 
 
 def test_blocking_phase_lets_a_post_loop_upload_finish(tmp_path: Path):
@@ -431,14 +456,14 @@ def test_blocking_phase_lets_a_post_loop_upload_finish(tmp_path: Path):
         for step in range(1, 4):
             emit_progress(step, 3)
         with blocking_phase("upload checkpoint", timeout_s=30.0):
-            time.sleep(3.0)  # the push: no steps, and well past the 1s watchdog
+            time.sleep(0.5)  # the push: no steps, and well past the 0.25s watchdog
         return x
 
     def main(ctx):
         return ctx.run(train_then_upload, 1)
 
     exp = Experiment(name="upload", main=main)
-    app = LocalApparatus("upload", data_dir=tmp_path / "upload").w(watchdog=1)
+    app = LocalApparatus("upload", data_dir=tmp_path / "upload").w(watchdog=0.25)
     store = app.memo_store()
     done, _ = tick(exp, app)
     assert not done

@@ -130,53 +130,55 @@ TASK_OPTIONAL_DEP = (
 )
 
 
-def test_unresolvable_module_warns_and_contributes_nothing(load_module, deferred_modules, caplog):
-    """A module the driver process can't find is the one case where "not project code" is a lie.
+def _no_layout(root: Path) -> None:
+    """Nothing on disk but the task itself."""
 
-    The walk skips it exactly as it skips the stdlib, so the task depends on nothing and its record caches forever — a stale result served for the life of the module. Nothing about the outcome can be fixed from here (the source genuinely isn't there to read), so the requirement is that it says so."""
+
+def _project_package(root: Path) -> None:
+    (root / "pkg").mkdir(parents=True, exist_ok=True)
+    (root / "pkg" / "__init__.py").write_text("")
+
+
+def _namespace_package(root: Path) -> None:
+    """PEP 420: a directory with no ``__init__.py``, with a real submodule under it."""
+    (root / "nspkg").mkdir(parents=True, exist_ok=True)
+    (root / "nspkg" / "leaf.py").write_text("def go(x):\n    return x + 1\n")
+
+
+@pytest.mark.parametrize(
+    "task_src,layout,warns,dep",
+    [
+        (TASK_GHOST, _no_layout, "'ghost'", None),
+        (TASK_GHOST_SUBMODULE, _project_package, "'pkg.ghost'", None),
+        (TASK_EXTENSION, _no_layout, None, None),
+        (TASK_NAMESPACE, _namespace_package, None, "nspkg.leaf:go"),
+        (TASK_NAMESPACE_GHOST, _namespace_package, "'nspkg.gone'", None),
+    ],
+    ids=[
+        "unresolvable module",
+        "missing submodule of a project package",
+        "extension module",
+        "local namespace package",
+        "missing submodule of a namespace package",
+    ],
+)
+def test_only_genuine_holes_warn(load_module, deferred_modules, tmp_path, caplog, task_src, layout, warns, dep):
+    """A module the walk can't find is the one case where "not project code" is a lie: it is skipped exactly as the stdlib is, so the task depends on nothing and its record caches forever — a stale result served for the life of the module. The source genuinely isn't there to read, so all that's left is to say so.
+
+    Which makes the silent cases the hard part, because a path search finds nothing for them either. ``math`` is C; a PEP 420 namespace package is a bare directory; a wheel may ship no source at its root. Warning on those would fire on every task that imports the stdlib, which is how a warning stops being read — so the question is who *claims* the name, not whether a file turned up. The silence is bought by naming the portion rather than its root, so a genuine hole *under* a namespace package is still said out loud, and the submodule below one still reaches the evidence.
+
+    The realistic hole is ``from sca.thing import x`` after ``thing`` moved: the root package is project code and resolves fine, so only the leaf is missing — which is what makes it easy to miss.
+    """
+    layout(tmp_path / "a")
     with caplog.at_level("WARNING", logger="mini.memo"):
-        _, parts = _deferred_parts(load_module, deferred_modules, TASK_GHOST, "a", helpers=HELPER_V1)
-    assert not [k for k in parts["deps"] if "ghost" in k], "the hazard: the import joined no evidence"
-    assert [r for r in caplog.records if "'ghost'" in r.message], "…and said nothing about it"
-
-
-def test_missing_submodule_of_a_project_package_warns(load_module, deferred_modules, tmp_path, caplog):
-    """The realistic shape: ``from sca.thing import x`` after ``thing`` moved. The root package is project code and resolves fine, so only the leaf is missing — which is what makes it easy to miss."""
-    (tmp_path / "a" / "pkg").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "a" / "pkg" / "__init__.py").write_text("")
-    with caplog.at_level("WARNING", logger="mini.memo"):
-        _deferred_parts(load_module, deferred_modules, TASK_GHOST_SUBMODULE, "a")
-    assert [r for r in caplog.records if "'pkg.ghost'" in r.message]
-
-
-def test_extension_modules_resolve_silently(load_module, deferred_modules, caplog):
-    """The counterpart, and the reason the check can't just be "found no file".
-
-    ``math`` is C, so a path search finds nothing for it exactly as it finds nothing for a module that is missing — the two are indistinguishable until you ask who *claims* the name. Warning here would fire on every task that imports the stdlib, which is how a warning stops being read."""
-    with caplog.at_level("WARNING", logger="mini.memo"):
-        _deferred_parts(load_module, deferred_modules, TASK_EXTENSION, "a")
-    assert not caplog.records
-
-
-def test_local_namespace_package_is_not_a_hole(load_module, deferred_modules, tmp_path, caplog):
-    """A PEP 420 namespace package — a directory with no ``__init__.py`` — has no source of its own to find, so the packages walked on the way down to a submodule must not read as holes.
-
-    Installed metadata answers this for a namespace package that arrived in a wheel; a project-local one has nothing to consult but the directory. The submodule underneath it resolves normally and still has to reach the evidence, which is what makes the silence safe."""
-    (tmp_path / "a" / "nspkg").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "a" / "nspkg" / "leaf.py").write_text("def go(x):\n    return x + 1\n")
-    with caplog.at_level("WARNING", logger="mini.memo"):
-        _, parts = _deferred_parts(load_module, deferred_modules, TASK_NAMESPACE, "a")
-    assert "nspkg.leaf:go" in parts["deps"], "the submodule still has to be tracked"
-    assert not caplog.records
-
-
-def test_missing_submodule_of_a_namespace_package_warns(load_module, deferred_modules, tmp_path, caplog):
-    """The silence above is bought by naming the portion rather than its root, so a genuine hole *under* a namespace package still gets said out loud."""
-    (tmp_path / "a" / "nspkg").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "a" / "nspkg" / "leaf.py").write_text("def go(x):\n    return x + 1\n")
-    with caplog.at_level("WARNING", logger="mini.memo"):
-        _deferred_parts(load_module, deferred_modules, TASK_NAMESPACE_GHOST, "a")
-    assert [r for r in caplog.records if "'nspkg.gone'" in r.message]
+        _, parts = _deferred_parts(load_module, deferred_modules, task_src, "a")
+    if warns:
+        assert [r for r in caplog.records if warns in r.message], "the hole said nothing about itself"
+        assert not [k for k in parts["deps"] if warns.strip("'") in k], "the hazard: the import joined no evidence"
+    else:
+        assert not caplog.records
+    if dep:
+        assert dep in parts["deps"], "the submodule still has to be tracked"
 
 
 def test_deliberately_absent_imports_warn_and_say_so(load_module, deferred_modules, caplog):

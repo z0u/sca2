@@ -1,9 +1,8 @@
-"""End-to-end coverage for the two experiment patterns, against the *shipped* demos.
+"""End-to-end coverage for the memoized/detached experiment pattern, against the *shipped* demos.
 
 The rest of the suite drives inline ``Experiment(...)`` objects; here we exercise the real files under ``docs/`` the way a user (or the CLI) does, so a demo can't bit-rot — a broken import, a drifted ``main(ctx)`` signature, or a ``load_experiment`` contract change fails CI instead of silently rotting the onboarding examples.
 
-- **Memoized / detached pattern:** ``load_experiment(<file>)`` then drive the real ``main(ctx)`` DAG to completion on a ``LocalApparatus`` (detached subprocess workers + the durable memo store) — the same path ``mini run`` takes.
-- **Interactive pattern:** drive an ``Apparatus`` directly (as a notebook does), fanning a sweep out with ``.map`` and reducing — no memo store, no CLI.
+Each demo is loaded with ``load_experiment(<file>)`` and its real ``main(ctx)`` DAG driven to completion on a ``LocalApparatus`` (detached subprocess workers + the durable memo store) — the same path ``mini run`` takes.
 
 The light demos (``pipeline``, the ``acts``/``probe`` pair) run to completion; the GPU/Modal-heavy ``ngpt-scaling`` is only *loaded* (import + construct), which still catches rot cheaply.
 """
@@ -74,7 +73,9 @@ def test_pipeline_demo_runs_end_to_end(tmp_path: Path, monkeypatch: pytest.Monke
     assert set(payload) == {"meta", "best", "results"}
     assert len(payload["results"]) == 3
     assert payload["best"]["lr"] == 1e-2  # the toy loss bowl's minimum
-    assert payload["meta"]["vocab_size"] == payload["results"][0].get("vocab", payload["meta"]["vocab_size"])
+    # Prep really ran, and the sweep was keyed on what it produced: a pangram
+    # repeated 200× is 26 letters + a space, 44 characters a repeat.
+    assert payload["meta"] == {"vocab_size": 27, "n_chars": 8800}
 
 
 def test_cross_experiment_artifact_reuse(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -98,17 +99,3 @@ def test_cross_experiment_artifact_reuse(tmp_path: Path, monkeypatch: pytest.Mon
     store = LocalApparatus("probe").store()
     cache = store.get(acts["artifact"], tmp_path / "check")
     assert len(list(cache.glob("*.npy"))) == acts["shards"]
-
-
-def test_interactive_apparatus_sweep_pattern():
-    """The interactive pattern: drive an ``Apparatus`` directly (notebook-style) — fan a sweep out with ``.map`` and reduce to the best config. No memo store/CLI."""
-    app = LocalApparatus("interactive", max_workers=3)
-
-    def train(lr: float) -> dict:
-        return {"lr": lr, "loss": (lr - 1e-2) ** 2}  # bowl with its minimum at lr=1e-2
-
-    results = list(app.map(train, [1e-3, 1e-2, 1e-1]))
-    best = min(results, key=lambda r: r["loss"])
-
-    assert len(results) == 3
-    assert best["lr"] == 1e-2

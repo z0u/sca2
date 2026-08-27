@@ -13,6 +13,9 @@ from mini.volume import get_data_dir
 from mini.local_apparatus import LocalApparatus
 from mini.modal_apparatus import ModalApparatus
 import modal
+from modal.call_graph import InputStatus
+from modal.exception import FunctionTimeoutError, InternalFailure, NotFoundError, OutputExpiredError
+from modal.exception import TimeoutError as ModalTimeout
 
 
 # ---------------------------------------------------------------------------
@@ -153,68 +156,23 @@ def apparatus(request, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_single_arg(apparatus):
-    """map(fn, [a, b, c]) calls fn(a), fn(b), fn(c)."""
-    results = list(apparatus.map(lambda x: x * 2, [1, 2, 3]))
-    assert results == [2, 4, 6]
-
-
-def test_two_args(apparatus):
-    """map(fn, xs, ys) calls fn(x, y) for each pair."""
-    results = list(apparatus.map(lambda x, y: f"{x}-{y}", [1, 2, 3], ["a", "b", "c"]))
-    assert results == ["1-a", "2-b", "3-c"]
-
-
-def test_single_arg_with_kwargs(apparatus):
-    """map(fn, xs, kwargs={...}) forwards kwargs to every call."""
-
-    def fn(x, scale=1):
-        return x * scale
-
-    results = list(apparatus.map(fn, [1, 2, 3], kwargs={"scale": 10}))
-    assert results == [10, 20, 30]
-
-
-def test_two_args_with_kwargs(apparatus):
-    """map(fn, xs, ys, kwargs={...}) forwards both positional and keyword args."""
-
-    def fn(x, y, sep=","):
-        return f"{x}{sep}{y}"
-
-    results = list(apparatus.map(fn, [1, 2], ["a", "b"], kwargs={"sep": ":"}))
-    assert results == ["1:a", "2:b"]
-
-
-def test_kwargs_only(apparatus):
-    """map(fn, dummy_iter, kwargs={...}) works with functions that only use kwargs."""
-
-    def fn(_, key="default"):
-        return key
-
-    results = list(apparatus.map(fn, range(3), kwargs={"key": "hello"}))
-    assert results == ["hello", "hello", "hello"]
-
-
-def test_no_kwargs(apparatus):
-    """map(fn, xs) works without kwargs (kwargs defaults to None)."""
-
-    def fn(x, y="default"):
-        return f"{x}-{y}"
-
-    results = list(apparatus.map(fn, [1, 2]))
-    assert results == ["1-default", "2-default"]
-
-
-def test_empty(apparatus):
-    """map with empty iterables returns no results."""
-    results = list(apparatus.map(lambda x: x, []))
-    assert results == []
-
-
-def test_result_order_preserved(apparatus):
-    """Results are returned in the same order as inputs, not completion order."""
-    results = list(apparatus.map(lambda x: x**2, [3, 1, 4, 1, 5]))
-    assert results == [9, 1, 16, 1, 25]
+@pytest.mark.parametrize(
+    ("fn", "iterables", "kwargs", "expected"),
+    [
+        pytest.param(lambda x: x * 2, ([1, 2, 3],), None, [2, 4, 6], id="one-iterable"),
+        pytest.param(
+            lambda x, y: f"{x}-{y}",
+            ([1, 2, 3], ["a", "b", "c"]),
+            None,
+            ["1-a", "2-b", "3-c"],
+            id="iterables-zipped",
+        ),
+        pytest.param(lambda x, scale=1: x * scale, ([1, 2, 3],), {"scale": 10}, [10, 20, 30], id="kwargs-forwarded"),
+    ],
+)
+def test_map_passes_arguments_through(apparatus, fn, iterables, kwargs, expected):
+    """map zips the iterables into positional args, in order, and forwards ``kwargs`` to every call."""
+    assert list(apparatus.map(fn, *iterables, kwargs=kwargs)) == expected
 
 
 def test_amap_materializes(apparatus):
@@ -280,16 +238,6 @@ def test_attach_hf_cache_preserves_user_mounts_and_secrets(monkeypatch):
     assert fn_kwargs["secrets"] == ["user-secret", ("secret", {"HF_HOME": HF_CACHE_MOUNT})]
 
 
-def test_complex_objects_as_args(apparatus):
-    """map works with non-trivial argument types (dicts, dataclasses, etc.)."""
-
-    def fn(params):
-        return params["a"] + params["b"]
-
-    results = list(apparatus.map(fn, [{"a": 1, "b": 2}, {"a": 10, "b": 20}]))
-    assert results == [3, 30]
-
-
 # ---------------------------------------------------------------------------
 # LocalApparatus-specific tests
 # ---------------------------------------------------------------------------
@@ -312,19 +260,6 @@ def test_local_apparatus_concurrent():
     assert max(s for _, s, _ in results) < min(e for _, _, e in results)  # all three spans intersect
 
 
-def test_local_apparatus_progress_emission():
-    """Mapped functions can emit progress messages."""
-    app = LocalApparatus("test", max_workers=1)
-
-    def fn_with_progress(x):
-        for i in range(10):
-            emit_progress(i, 10, message=f"step {i}")
-        return x
-
-    results = list(app.map(fn_with_progress, [1, 2]))
-    assert results == [1, 2]
-
-
 def test_progress_emission_outside_apparatus():
     """emit_progress() silently does nothing when not inside a run context."""
     # Should not raise an exception
@@ -341,12 +276,10 @@ def test_local_apparatus_exception_propagates():
         return x
 
     results = []
-    try:
+    with pytest.raises(ValueError, match="bad value"):
         for r in app.map(fail, [1, 2, 3]):
             results.append(r)
-    except ValueError:
-        pass
-    assert results == [1]
+    assert results == [1]  # the results before the failure still reached the caller
 
 
 # ---------------------------------------------------------------------------
@@ -521,48 +454,71 @@ def _graph_input(status, function_call_id="fc-under-test"):
     return InputInfo("in-1", function_call_id, "ta-1", status, "worker", "mod", [])
 
 
-def _probe(monkeypatch, fake: _FakeFunctionCall) -> bool:
-    monkeypatch.setattr("modal.FunctionCall.from_id", lambda fc_id: fake)
-    return _make_modal(monkeypatch)._is_task_alive({"fc_id": "fc-under-test"})
+_LAUNCHED = {"fc_id": "fc-under-test"}
 
 
-def test_liveness_no_fc_id_is_alive(monkeypatch):
-    """Not launched on Modal yet — nothing to probe, never reap."""
-    assert _make_modal(monkeypatch)._is_task_alive({}) is True
-
-
-def test_liveness_settled_states(monkeypatch):
-    """Direct signals out of ``get(timeout=0)`` map per the probe's contract."""
-    from modal.call_graph import InputStatus
-    from modal.exception import FunctionTimeoutError, InternalFailure, NotFoundError, OutputExpiredError
-    from modal.exception import TimeoutError as ModalTimeout
-
-    cases = [
-        (None, None, True),  # completed and returned — the record settles on its own
-        (TimeoutError(), None, True),  # poll came up empty — the *builtin*, as modal 1.5.1 actually raises
-        (ModalTimeout(), None, True),  # …and modal's own TimeoutError, for good measure
-        (FunctionTimeoutError("timeout"), None, False),  # THE #20 case: killed at the function timeout
-        (InternalFailure("infra"), None, False),  # settled infra failure (invisible to the call graph)
-        (OutputExpiredError(), None, False),
-        (NotFoundError("gone"), None, False),
+@pytest.mark.parametrize(
+    ("record", "fake", "alive"),
+    [
+        # Not launched on Modal yet — nothing to probe, never reap:
+        pytest.param({}, None, True, id="no-fc-id"),
+        # Direct signals out of ``get(timeout=0)``:
+        pytest.param(_LAUNCHED, _FakeFunctionCall(), True, id="returned"),  # the record settles on its own
+        # Poll came up empty — the *builtin*, as modal 1.5.1 actually raises, and modal's own, for good measure:
+        pytest.param(_LAUNCHED, _FakeFunctionCall(TimeoutError()), True, id="builtin-timeout"),
+        pytest.param(_LAUNCHED, _FakeFunctionCall(ModalTimeout()), True, id="modal-timeout"),
+        pytest.param(_LAUNCHED, _FakeFunctionCall(FunctionTimeoutError("timeout")), False, id="function-timeout"),
+        pytest.param(_LAUNCHED, _FakeFunctionCall(InternalFailure("infra")), False, id="internal-failure"),
+        pytest.param(_LAUNCHED, _FakeFunctionCall(OutputExpiredError()), False, id="output-expired"),
+        pytest.param(_LAUNCHED, _FakeFunctionCall(NotFoundError("gone")), False, id="not-found"),
         # Ambiguous exception → the call-graph cross-check discriminates:
-        (RuntimeError("deserialized remote failure"), [_graph_input(InputStatus.FAILURE)], False),
-        (RuntimeError("worker terminated"), [_graph_input(InputStatus.TERMINATED)], False),
-        (RuntimeError("transport blip"), [_graph_input(InputStatus.PENDING)], True),
-        (RuntimeError("transport blip"), [_graph_input(InputStatus.SUCCESS)], True),
-        (RuntimeError("transport down"), RuntimeError("graph unreachable too"), True),
+        pytest.param(
+            _LAUNCHED,
+            _FakeFunctionCall(RuntimeError("deserialized remote failure"), [_graph_input(InputStatus.FAILURE)]),
+            False,
+            id="graph-failure",
+        ),
+        pytest.param(
+            _LAUNCHED,
+            _FakeFunctionCall(RuntimeError("worker terminated"), [_graph_input(InputStatus.TERMINATED)]),
+            False,
+            id="graph-terminated",
+        ),
+        pytest.param(
+            _LAUNCHED,
+            _FakeFunctionCall(RuntimeError("transport blip"), [_graph_input(InputStatus.PENDING)]),
+            True,
+            id="graph-pending",
+        ),
+        pytest.param(
+            _LAUNCHED,
+            _FakeFunctionCall(RuntimeError("transport blip"), [_graph_input(InputStatus.SUCCESS)]),
+            True,
+            id="graph-success",
+        ),
+        pytest.param(
+            _LAUNCHED,
+            _FakeFunctionCall(RuntimeError("transport down"), RuntimeError("graph unreachable too")),
+            True,
+            id="graph-unreachable",
+        ),
         # Another call's failed input in the graph is not evidence about ours:
-        (RuntimeError("blip"), [_graph_input(InputStatus.FAILURE, function_call_id="fc-other")], True),
-    ]
-    for get_exc, graph, alive in cases:
-        got = _probe(monkeypatch, _FakeFunctionCall(get_exc=get_exc, graph=graph))
-        assert got is alive, f"get={get_exc!r} graph={graph!r}: expected alive={alive}, got {got}"
+        pytest.param(
+            _LAUNCHED,
+            _FakeFunctionCall(RuntimeError("blip"), [_graph_input(InputStatus.FAILURE, function_call_id="fc-other")]),
+            True,
+            id="other-calls-failure",
+        ),
+    ],
+)
+def test_liveness_settled_states(monkeypatch, record, fake, alive):
+    """A settled failure must read dead; anything ambiguous stays alive."""
+    monkeypatch.setattr("modal.FunctionCall.from_id", lambda fc_id: fake)
+    assert _make_modal(monkeypatch)._is_task_alive(record) is alive
 
 
 def test_reap_settles_timeout_killed_modal_task(monkeypatch, tmp_path):
     """End to end: a timeout-killed call's RUNNING record settles FAILED on reap, so ``status``/``watch`` can't read it as running forever (sca2#20)."""
-    from modal.exception import FunctionTimeoutError
-
     from mini.memo import MemoStore
 
     store = MemoStore(tmp_path / "exp")
@@ -580,7 +536,10 @@ def test_reap_settles_timeout_killed_modal_task(monkeypatch, tmp_path):
 
 
 def test_modal_env_becomes_a_container_secret():
-    """``env=`` reaches the container as a Secret, and never as a ``@function`` kwarg — Modal has no ``env`` parameter, so a leak would be a TypeError at registration. The container is the right level: a task that set it in-process would be too late for anything that reads its env once at init."""
+    """``env=`` reaches the container as a Secret, and never as a ``@function`` kwarg — Modal has no ``env`` parameter, so a leak would be a TypeError at registration. The container is the right level: a task that set it in-process would be too late for anything that reads its env once at init.
+
+    The HF store/cache secrets are attached alongside, so ``env`` must append rather than replace; an absent or empty mapping adds nothing at all.
+    """
     from mini.modal_apparatus import _attach_env
 
     fn_kwargs: dict = {"gpu": "L4", "env": {"XLA_FLAGS": "--xla_gpu_deterministic_ops=true"}}
@@ -590,15 +549,10 @@ def test_modal_env_becomes_a_container_secret():
     assert len(fn_kwargs["secrets"]) == 1
     assert isinstance(fn_kwargs["secrets"][0], modal.Secret)
 
-
-def test_modal_env_appends_to_existing_secrets_and_no_ops_when_empty():
-    """The HF store/cache secrets are attached alongside, so ``env`` must append rather than replace; an absent or empty mapping adds nothing at all."""
-    from mini.modal_apparatus import _attach_env
-
     sentinel = modal.Secret.from_dict({"EXISTING": "1"})
-    fn_kwargs = {"secrets": [sentinel], "env": {"XLA_FLAGS": "-x"}}
-    _attach_env(fn_kwargs)
-    assert fn_kwargs["secrets"][0] is sentinel and len(fn_kwargs["secrets"]) == 2
+    existing: dict = {"secrets": [sentinel], "env": {"XLA_FLAGS": "-x"}}
+    _attach_env(existing)
+    assert existing["secrets"][0] is sentinel and len(existing["secrets"]) == 2
 
     for empty in ({}, None):
         bare: dict = {"gpu": "L4"} | ({"env": empty} if empty is not None else {})

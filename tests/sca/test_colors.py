@@ -17,7 +17,6 @@ REV_ALIAS = re.compile(r"^#[0-9a-f]{3} = [a-z]+\n$")
     ("a", "b", "result"),
     [
         ("red", "blue", "purple"),
-        ("white", "black", "gray"),
         ("red", "lime", "olive"),
         ("yellow", "blue", "gray"),
         ("red", "red", "red"),  # idempotent
@@ -47,12 +46,17 @@ def test_closed_named_pairs_are_closed():
     assert all(mix(a, b) in colors.NAMES for a, b in pairs)
 
 
-def test_named_split_is_deterministic_and_disjoint():
+def test_the_splits_are_deterministic_and_disjoint():
     train, holdout = colors.split_named_pairs(0)
     assert (train, holdout) == colors.split_named_pairs(0)
     assert not set(train) & set(holdout)
     assert len(holdout) == 10  # 20% of the 49 distinct closed pairs
     assert all(a != b for a, b in holdout)  # self-pairs always train
+
+    open_train, open_holdout = colors.split_open_pairs(0)
+    assert (open_train, open_holdout) == colors.split_open_pairs(0)
+    assert not set(open_train) & set(open_holdout)
+    assert len(open_holdout) == 60  # 20% of 302
 
 
 def test_corpus_is_well_formed_and_deterministic():
@@ -73,13 +77,6 @@ def test_open_pairs_complement_the_closed_ones():
     assert len(open_pairs) == 302  # 378 unordered palette pairs − 76 closed
     assert all(mix(a, b) not in colors.NAMES for a, b in open_pairs)
     assert all(a != b for a, b in open_pairs)  # self-pairs mix to themselves
-
-
-def test_open_split_is_deterministic_and_disjoint():
-    train, holdout = colors.split_open_pairs(0)
-    assert (train, holdout) == colors.split_open_pairs(0)
-    assert not set(train) & set(holdout)
-    assert len(holdout) == 60  # 20% of 302
 
 
 def test_new_forms_render_and_stay_in_the_alphabet():

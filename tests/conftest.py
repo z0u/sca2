@@ -1,6 +1,28 @@
 # conftest.py — shared pytest fixtures and plugins
 
+import importlib.util
+import os
+import sys
+from pathlib import Path
+from types import ModuleType
+
 import pytest
+
+# JAX's persistent compilation cache, so a jitted train step compiles once per checkout rather than once per test process: the training tests build the same few HLO modules every run, and each XLA compile costs ~1.5s. Env vars rather than `jax.config`, so nothing imports JAX before a test asks for it (and so xdist workers share the setting). The default minimum compile time would skip exactly these small modules.
+os.environ.setdefault("JAX_COMPILATION_CACHE_DIR", os.path.expanduser("~/.cache/sca2/jax"))
+os.environ.setdefault("JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS", "0")
+
+_SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
+
+
+def load_script(name: str) -> ModuleType:
+    """Import `scripts/<name>.py` as a module. The scripts aren't a package, so tests load them by path, and the module is registered under its own name so `@dataclass` and `typing.get_type_hints` can resolve it."""
+    spec = importlib.util.spec_from_file_location(name, _SCRIPTS / f"{name}.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 @pytest.fixture(autouse=True)

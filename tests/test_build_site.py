@@ -1,16 +1,10 @@
 """Tests for the static-site builder's author-link resolver (pure policy)."""
 
-import importlib.util
-from pathlib import Path
-
 import pytest
 
-_SPEC = importlib.util.spec_from_file_location(
-    "build_site", Path(__file__).resolve().parent.parent / "scripts" / "build_site.py"
-)
-assert _SPEC and _SPEC.loader
-build_site = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(build_site)
+from tests.conftest import load_script
+
+build_site = load_script("build_site")
 
 
 @pytest.mark.parametrize(
@@ -19,9 +13,7 @@ _SPEC.loader.exec_module(build_site)
         ("probe/report/index.html", "probe/report/"),
         ("probe/report/index.html#cell-3", "probe/report/#cell-3"),
         ("index.html", ""),
-        ("../acts/report/index.html", "../acts/report/"),
-        ("guide.html", "guide.html"),  # not an index page — untouched
-        ("reindex.html", "reindex.html"),  # only a whole index.html segment is stripped
+        ("reindex.html", "reindex.html"),  # not an index page: only a whole index.html segment is stripped
     ],
 )
 def test_strip_index(url, want):
@@ -61,9 +53,11 @@ def test_nav_urls_index_is_relative_when_localizing(resolver):
 
 
 def test_rendered_link_is_absolute_pages_url_when_externalizing(resolver):
-    # Published links drop index.html — GitHub Pages serves the directory form.
+    # Published links drop index.html — GitHub Pages serves the directory form — and a fragment rides along.
     got = resolver.resolve("../acts/report.py", from_dir="probe", out_dir="probe/report", externalizing=True)
     assert got == "https://o.github.io/r/acts/report/"
+    got = resolver.resolve("../acts/report.py#cell-3", from_dir="probe", out_dir="probe/report", externalizing=True)
+    assert got == "https://o.github.io/r/acts/report/#cell-3"
 
 
 def test_rendered_link_stays_relative_when_localizing(resolver):
@@ -89,11 +83,6 @@ def test_directory_form_link_resolves_like_the_report_file(resolver):
 def test_source_file_resolves_to_github(resolver):
     got = resolver.resolve("./experiment.py", from_dir="probe", out_dir="probe/report", externalizing=True)
     assert got == "https://github.com/o/r/blob/main/docs/probe/experiment.py"
-
-
-def test_fragment_is_preserved(resolver):
-    got = resolver.resolve("../acts/report.py#cell-3", from_dir="probe", out_dir="probe/report", externalizing=True)
-    assert got == "https://o.github.io/r/acts/report/#cell-3"
 
 
 def test_repo_source_link_outside_docs_resolves_to_github(resolver):

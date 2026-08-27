@@ -15,11 +15,6 @@ from mini import runs
 from mini.modal_apparatus import _aggregate_cost, _worker_fn_name
 
 
-def test_compute_env_has_core_fields():
-    env = runs.compute_env()
-    assert {"host", "platform", "python", "cpu_count"} <= env.keys()
-
-
 def test_compute_env_records_modal_container_ids_but_never_secrets(monkeypatch):
     monkeypatch.setenv("MODAL_TASK_ID", "ta-123")
     monkeypatch.setenv("MODAL_REGION", "us-west-2")
@@ -30,6 +25,7 @@ def test_compute_env_records_modal_container_ids_but_never_secrets(monkeypatch):
     monkeypatch.setenv("MODAL_TASK_SECRET", "shhh")
     monkeypatch.setenv("MODAL_TOKEN_SECRET", "also-secret")
     env = runs.compute_env()
+    assert {"host", "platform", "python", "cpu_count"} <= env.keys()
     assert env["modal_task_id"] == "ta-123"
     assert env["region"] == "us-west-2"
     assert env["cloud"] == "CLOUD_PROVIDER_AWS"
@@ -40,7 +36,7 @@ def test_compute_env_records_modal_container_ids_but_never_secrets(monkeypatch):
     assert "also-secret" not in blob
 
 
-def test_worker_fn_name_is_readable_and_disambiguated():
+def test_worker_fn_name_is_readable_stable_and_disambiguated():
     def train(x):
         return x
 
@@ -48,8 +44,6 @@ def test_worker_fn_name_is_readable_and_disambiguated():
     assert name.startswith("train-")
     assert _worker_fn_name(train) == name  # stable across calls
 
-
-def test_worker_fn_name_distinguishes_same_named_functions():
     def make(tag):
         def run(x):  # both have __name__ == "run" but distinct qualnames
             return x
@@ -88,10 +82,8 @@ def test_aggregate_cost_sums_only_wanted_apps_with_breakdown():
     assert out["by_resource"] == {"L4": Decimal("0.90"), "CPU": Decimal("0.60")}
     assert out["intervals"] == 2
 
-
-def test_aggregate_cost_empty_when_no_match():
-    out = _aggregate_cost([_Item("ap-x", Decimal("1"), {})], {"ap-y"})
-    assert out == {"total": Decimal(0), "by_resource": {}, "intervals": 0}
+    nothing = _aggregate_cost([_Item("ap-x", Decimal("1"), {})], {"ap-y"})
+    assert nothing == {"total": Decimal(0), "by_resource": {}, "intervals": 0}
 
 
 def test_compute_env_records_the_numerics_env(monkeypatch):

@@ -53,21 +53,14 @@ def test_themed_value_is_used():
     assert "#000" in seen
 
 
-def test_alt_text():
-    result = themed(_dummy_plot, alt_text="My plot")(1, 2)
-    assert 'alt="My plot"' in result
-
-
 def test_alt_text_whitespace_collapses():
+    assert 'alt="My plot"' in themed(_dummy_plot, alt_text="My plot")(1, 2)
     result = themed(_dummy_plot, alt_text="A plot\n    with   newlines")(1, 2)
     assert 'alt="A plot with newlines"' in result
 
 
-def test_no_figcaption_without_caption():
-    assert "<figcaption>" not in themed(_dummy_plot)(1, 2)
-
-
 def test_caption_renders_markdown_into_figcaption():
+    assert "<figcaption>" not in themed(_dummy_plot)(1, 2)  # no caption, no element
     result = themed(_dummy_plot, caption="*Emphasised* caption")(1, 2)
     assert "<figcaption>" in result
     assert "<em>Emphasised</em>" in result  # Markdown was rendered, not passed verbatim
@@ -128,20 +121,15 @@ def test_name_overrides_the_asset_leaf(tmp_path: Path):
     assert result.count('data-asset-name="loss-curve"') == 2
 
 
-def test_distinct_light_dark_files(tmp_path: Path):
-    pub = Publisher(tmp_path / "_assets")
-    result = themed(_dummy_plot)(1, 2)  # inline (no publisher) → control
-    assert "data:image" in result
-    out = themed(_dummy_plot, publish=pub)(1, 2)
-    srcs = set(re.findall(r'src="([^"]+)"', out))
-    assert len(srcs) == 2  # distinct -light/-dark names → two files
-
-
 def test_stable_url_overwrites_in_place(tmp_path: Path):
-    # A re-export is a fresh Publisher over the same dir; the same name overwrites.
+    # Named for a readable download; the name is the stable key (no content hash),
+    # and the bytes land under it on disk.
     u1 = Publisher(tmp_path).asset_url(b"first", name="pts.json")
+    assert u1 == "_assets/pts.json"
+    assert (tmp_path / "pts.json").read_bytes() == b"first"
+    # A re-export is a fresh Publisher over the same dir; the same name overwrites.
     u2 = Publisher(tmp_path).asset_url(b"second", name="pts.json")
-    assert u1 == u2 == "_assets/pts.json"  # stable URL, no content hash
+    assert u1 == u2
     assert len(list(tmp_path.rglob("*.json"))) == 1  # one file, overwritten
     assert (tmp_path / "pts.json").read_bytes() == b"second"
 
@@ -169,14 +157,6 @@ def test_use_publisher_default_is_picked_up(tmp_path: Path):
     use_publisher(Publisher(tmp_path / "_assets"))
     result = themed(_dummy_plot)(1, 2)  # no per-figure publish=
     assert re.search(r'src="_assets/dummy_plot-light\.png"', result)
-
-
-def test_asset_url_writes_file_and_returns_relative_url(tmp_path: Path):
-    pub = Publisher(tmp_path / "_assets")
-    url = pub.asset_url(b'{"hello": "world"}', name="points.json")
-    # Named for a readable download; the name is the stable key (no content hash).
-    assert url == "_assets/points.json"
-    assert (tmp_path / url).read_bytes() == b'{"hello": "world"}'
 
 
 def test_report_bundle_targets_export_dir(tmp_path: Path, monkeypatch):
@@ -225,16 +205,6 @@ def test_report_bundle_off_export_writes_a_servable_url(tmp_path: Path, monkeypa
     assert re.search(r'src="public/\.mini/report/dummy_plot-light\.png\?v=[0-9a-f]{8}"', result)
     png = nb.parent / "public" / ".mini" / "report" / "dummy_plot-light.png"
     assert png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
-
-
-def test_export_key_top_level_notebook(tmp_path: Path):
-    from mini.reports import export_key
-
-    (tmp_path / "pyproject.toml").write_text("")
-    nb = tmp_path / "docs" / "gpt.py"
-    nb.parent.mkdir(parents=True)
-    nb.write_text("")
-    assert export_key(nb) == "gpt"  # top-level report → bare stem, served at /gpt/
 
 
 def test_img_pins_physical_size_from_dpi():

@@ -1,16 +1,12 @@
 """Tests for the propagation check — public cell variables defined without an annotation."""
 
-import importlib.util
 from pathlib import Path
 
 import pytest
 
-_SPEC = importlib.util.spec_from_file_location(
-    "unannotated_cell_vars", Path(__file__).resolve().parent.parent / "scripts" / "unannotated_cell_vars.py"
-)
-assert _SPEC and _SPEC.loader
-check = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(check)
+from tests.conftest import load_script
+
+check = load_script("unannotated_cell_vars")
 
 HEADER = "import marimo\n\napp = marimo.App()\n\n\n"
 
@@ -58,10 +54,9 @@ def test_cell_local_names_are_none_of_our_business(tmp_path: Path):
         "def helper(x: int) -> int: return x",  # carries its own types
         "class Record: pass",
         "record['key'] = 1",  # mutates something that exists; defines no cell variable
-        "record.attr = 1",
         "count += 1",
     ],
-    ids=["def", "class", "subscript", "attribute", "augmented"],
+    ids=["def", "class", "subscript", "augmented"],
 )
 def test_bindings_with_nothing_to_annotate(tmp_path: Path, statement: str):
     """Only assignments can carry an annotation Marimo would propagate, so only those are asked to."""

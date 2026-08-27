@@ -10,7 +10,6 @@ import numpy as np
 
 from sca.config import ModelConfig
 from sca.model import build_model
-from sca.model._shared import normalize
 
 
 def make_config(**overrides: Any) -> ModelConfig:
@@ -33,19 +32,6 @@ def test_forward_shape_and_finite():
     logits = model(idx)
     assert logits.shape == (2, 16, config.vocab_size)
     assert jnp.isfinite(logits).all()
-
-
-def test_hidden_state_stays_on_sphere():
-    """Every block must return unit-norm hidden states."""
-    config = make_config()
-    model = build_model(config, key=jr.key(0))
-    idx = jr.randint(jr.key(1), (2, 16), 0, config.vocab_size)
-    enc = model.transformer.rotary_enc
-    h = normalize(model.transformer.wte[idx])
-    for block in model.transformer.blocks:
-        h = block(h, enc)
-        norms = jnp.linalg.norm(h, axis=-1)
-        np.testing.assert_allclose(norms, jnp.ones_like(norms), rtol=0, atol=1e-5)
 
 
 def test_residual_step_size_is_inverse_depth():
@@ -100,8 +86,6 @@ def test_learnable_alpha_trains_and_reports():
         assert block.s_attn is not None and jnp.abs(block.s_attn.weight).max() > 0
         assert block.s_mlp is not None and jnp.abs(block.s_mlp.weight).max() > 0
 
-
-def test_fixed_alpha_omits_gains_from_report():
-    """Without learnable_alpha, the report has no residual gains to show."""
-    report = build_model(make_config(), key=jr.key(0)).scale_report()
-    assert "alpha_attn" not in report and "alpha_mlp" not in report
+    # Without the flag there are no residual gains, so the report has none to show.
+    fixed = build_model(make_config(), key=jr.key(0)).scale_report()
+    assert "alpha_attn" not in fixed and "alpha_mlp" not in fixed

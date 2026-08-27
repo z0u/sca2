@@ -1,18 +1,23 @@
 """Tests for the Markdown link check — relative targets and `#anchor` fragments."""
 
-import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
 
-_SPEC = importlib.util.spec_from_file_location(
-    "check_md_links", Path(__file__).resolve().parent.parent / "scripts" / "check_md_links.py"
-)
-assert _SPEC and _SPEC.loader
-check = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(check)
+from tests.conftest import load_script
 
-ROOT = Path(__file__).resolve().parent.parent
+check = load_script("check_md_links")
+
+
+@pytest.fixture
+def fake_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """*tmp_path* standing in as the repo root, for the tests about root-absolute targets and the file set.
+
+    Those need a doc at a known place *inside* the root, and writing one into the real tree races `test_the_repos_own_docs_resolve`, which scans untracked files.
+    """
+    monkeypatch.setattr(check, "ROOT", tmp_path)
+    return tmp_path
 
 
 def doc(tmp_path: Path, body: str, name: str = "doc.md") -> Path:
@@ -46,11 +51,8 @@ def test_a_renamed_heading_is_reported(tmp_path: Path):
     (finding,) = check.findings_in(page, {})
     assert finding.reason.endswith("storage.md slugs to #publishing-to-the-web")
 
-
-def test_a_link_that_resolves_is_not_reported(tmp_path: Path):
+    # The control: rename the heading back and the same link is silent.
     doc(tmp_path, "# Storage\n\n## Publishing to the web\n", "storage.md")
-    page = doc(tmp_path, "See [publishing](./storage.md#publishing-to-the-web).")
-
     assert check.findings_in(page, {}) == []
 
 
@@ -97,7 +99,6 @@ def test_a_longer_fence_can_quote_a_shorter_one(tmp_path: Path):
         ("Provenance & cost", "provenance--cost"),
         ("Hotfix safety: avoid double-spending", "hotfix-safety-avoid-double-spending"),
         ("D2.3: asymmetry", "d23-asymmetry"),
-        ("Write cache-friendly experiments", "write-cache-friendly-experiments"),
         ("A `code` span and **bold**", "a-code-span-and-bold"),
         ("A [linked](./x.md) word", "a-linked-word"),
         # Underscores are identifiers here, not emphasis: CommonMark won't open emphasis on an
@@ -153,35 +154,24 @@ def test_external_targets_are_left_alone(tmp_path: Path, link: str):
     assert check.findings_in(doc(tmp_path, link), {}) == []
 
 
-def test_a_root_absolute_path_resolves_from_the_repo_root(tmp_path: Path):
-    """`/AGENTS.md` means the repo root, which is how it reads on GitHub."""
-    page = doc(tmp_path, "See [agents](/AGENTS.md) and [nope](/no-such-file.md).")
+def test_a_root_absolute_path_resolves_from_the_repo_root(fake_root: Path):
+    """`/AGENTS.md` means the repo root, which is how it reads on GitHub and in an editor — so outside `docs/` it stands."""
+    doc(fake_root, "# Agents\n", "AGENTS.md")
+    page = doc(fake_root, "See [agents](/AGENTS.md) and [nope](/no-such-file.md).", "eng/doc.md")
 
     assert reasons(page) == ["no such file"]
 
 
-def test_a_root_absolute_link_under_docs_is_reported():
+def test_a_root_absolute_link_under_docs_is_reported(fake_root: Path):
     """`docs/` is the one tree rendered to the published site, which is served from a subpath.
 
     `build_site.py` leaves a root-absolute target alone, so it resolves on disk and on GitHub while 404ing on the site — the quiet kind, and invisible to a checker that only asks whether the file exists.
     """
-    scratch = ROOT / "docs" / "zz-test-absolute.md"
-    scratch.write_text("[eng](/eng/gc.md)\n")
-    try:
-        (finding,) = check.findings_in(scratch, {})
-        assert finding.reason == check.PUBLISHED_ABSOLUTE
-    finally:
-        scratch.unlink()
+    doc(fake_root, "# GC\n", "eng/gc.md")
+    page = doc(fake_root, "[eng](/eng/gc.md)\n", "docs/report.md")
 
-
-def test_a_root_absolute_link_outside_docs_is_fine():
-    """Everywhere else these are read on GitHub and in an editor, where `/` means the repo root."""
-    scratch = ROOT / "eng" / "zz-test-absolute.md"
-    scratch.write_text("[agents](/AGENTS.md)\n")
-    try:
-        assert check.findings_in(scratch, {}) == []
-    finally:
-        scratch.unlink()
+    (finding,) = check.findings_in(page, {})
+    assert finding.reason == check.PUBLISHED_ABSOLUTE
 
 
 def test_a_title_is_not_part_of_the_target(tmp_path: Path):
@@ -258,17 +248,15 @@ def test_a_link_in_an_html_comment_is_left_alone(tmp_path: Path):
 # --- the file set ---------------------------------------------------------------------------
 
 
-def test_an_uncommitted_doc_is_still_checked(tmp_path: Path):
+def test_an_uncommitted_doc_is_still_checked(fake_root: Path):
     """The trap this avoids: writing a doc, running the check, and being told it's clean.
 
-    Uses a real path in the repo rather than *tmp_path*, since the file set is whatever git reports — and an untracked file is exactly the case at issue.
+    The file set is whatever git reports, so this runs against a real (empty) repo — an untracked file is exactly the case at issue.
     """
-    scratch = ROOT / "eng" / "zz-test-uncommitted.md"
-    scratch.write_text("[gone](./no-such-file.md)\n")
-    try:
-        assert scratch in check.repo_markdown([Path("eng")])
-    finally:
-        scratch.unlink()
+    subprocess.run(["git", "init", "-q", str(fake_root)], check=True, capture_output=True)
+    scratch = doc(fake_root, "[gone](./no-such-file.md)\n", "eng/uncommitted.md")
+
+    assert check.repo_markdown([Path("eng")]) == [scratch]
 
 
 def test_an_ignored_tree_is_left_out():

@@ -3,7 +3,6 @@
 The interesting half is `judge`, so most of this runs against a real temporary repo with real worktrees rather than mocking git out. The decisions being checked are about git's actual behaviour (what a squash merge leaves behind, what `status --porcelain` counts), and a mock would only encode this file's guess at those.
 """
 
-import importlib.util
 import shutil
 import subprocess
 import tomllib
@@ -11,12 +10,9 @@ from pathlib import Path
 
 import pytest
 
-_SPEC = importlib.util.spec_from_file_location(
-    "worktrees", Path(__file__).resolve().parent.parent / "scripts" / "worktrees.py"
-)
-assert _SPEC and _SPEC.loader
-wt = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(wt)
+from tests.conftest import load_script
+
+wt = load_script("worktrees")
 
 
 def run(*args: str, cwd: Path) -> str:

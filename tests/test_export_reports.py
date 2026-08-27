@@ -1,17 +1,13 @@
 """Tests for the preview-path staleness heuristic — which bundles `--stale-only` re-exports."""
 
-import importlib.util
 import os
 from pathlib import Path
 
 import pytest
 
-_SPEC = importlib.util.spec_from_file_location(
-    "export_reports", Path(__file__).resolve().parent.parent / "scripts" / "export_reports.py"
-)
-assert _SPEC and _SPEC.loader
-export_reports = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(export_reports)
+from tests.conftest import load_script
+
+export_reports = load_script("export_reports")
 
 _APP = "import marimo\napp = marimo.App()\n"
 

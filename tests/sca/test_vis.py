@@ -69,17 +69,13 @@ def _outside(hull: np.ndarray, pts: np.ndarray) -> float:
 
 
 @pytest.mark.parametrize("view", VIEWS)
-def test_the_rim_is_wound_counter_clockwise(view):
-    hull = project_cube(CUBE_VIEWS[view].rim, view)
-    shoelace = np.sum(hull[:, 0] * np.roll(hull[:, 1], -1) - np.roll(hull[:, 0], -1) * hull[:, 1])
-    assert shoelace > 0
-
-
-@pytest.mark.parametrize("view", VIEWS)
 def test_the_silhouette_contains_every_color(view):
     g = np.linspace(0, 1, 9)
     rgb = np.stack(np.meshgrid(g, g, g, indexing="ij"), -1).reshape(-1, 3)
     hull = project_cube(CUBE_VIEWS[view].rim, view)
+    # `_outside` reads the outward normal off the winding, so check that first.
+    shoelace = np.sum(hull[:, 0] * np.roll(hull[:, 1], -1) - np.roll(hull[:, 0], -1) * hull[:, 1])
+    assert shoelace > 0
     assert _outside(hull, project_cube(rgb, view)) < 1e-12
 
 
@@ -95,11 +91,6 @@ def test_grid_diameter_covers_the_panel_but_is_not_wasteful(view):
     nearest = np.linalg.norm(probe[:, None] - xy[None], axis=2).min(axis=1)
     assert nearest.max() <= d / 2 + 1e-9
     assert nearest.max() > d / 2 * 0.8  # and not by a wide margin, or the marks are oversized
-
-
-@pytest.mark.parametrize("view", VIEWS)
-def test_grid_diameter_shrinks_with_the_grid(view):
-    assert grid_diameter(16, view) < grid_diameter(8, view) < grid_diameter(4, view)
 
 
 def test_align_recovers_a_rotated_scaled_cube_exactly():

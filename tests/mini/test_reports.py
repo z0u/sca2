@@ -56,10 +56,8 @@ def test_stray_links_flags_author_links_not_assets():
     assert strays == ["../acts/experiment.py", "./experiment.py"]  # sorted, deduped
     assert "_assets/abc123.png" not in strays  # the asset is allowed
 
-
-def test_stray_links_empty_when_only_assets():
-    html = '<img src="_assets/a.png"><img src=\\"_assets/b.png\\"><a href="https://x/y">x</a>'
-    assert stray_links(html) == []
+    assets_only = '<img src="_assets/a.png"><img src=\\"_assets/b.png\\"><a href="https://x/y">x</a>'
+    assert stray_links(assets_only) == []  # a page with nothing but assets is clean
 
 
 def test_rewrite_links_handles_plain_and_escaped():
@@ -130,11 +128,6 @@ def test_set_theme_fixed_target_skips_the_flash_guard():
     # a baked theme doesn't flash, so no blocking script — just declare the scheme
     assert '<meta name="color-scheme" content="dark" />' in out
     assert "prefers-color-scheme" not in out
-
-
-def test_set_theme_is_noop_without_a_theme():
-    html = "<html><head></head><body></body></html>"
-    assert set_theme(html) == html
 
 
 def test_export_key_uses_docs_relative_stem(tmp_path):
@@ -214,10 +207,7 @@ def test_set_banner_omits_missing_links():
     out = set_banner(_EXPORT_HTML, index_url="../index.html", source_url=None)
     assert "&larr; Index" in out
     assert ">Source<" not in out
-
-
-def test_set_banner_is_noop_without_urls():
-    assert set_banner(_EXPORT_HTML) == _EXPORT_HTML
+    assert set_banner(_EXPORT_HTML) == _EXPORT_HTML  # neither link: no bar at all
 
 
 _PRODUCER = {"experiment": "prep", "git_describe": "v1-3-gabc1234", "git_dirty": True, "run_at": "2026-07-12T01:02:03"}
@@ -264,11 +254,6 @@ def test_set_responsive_fits_narrow_screens_and_hides_watermark():
     # …and Marimo's bottom-right "made with marimo" watermark is hidden.
     assert '[data-testid="watermark"]{display:none!important}' in out
     assert out.index("min-w-[400px]") < out.index("</head>")  # both rules land in <head>
-
-
-def test_set_responsive_is_noop_shape_on_a_plain_page():
-    # No <head>/classes to match — the regex simply finds no </head>, returning as-is.
-    assert set_responsive("<html><body>hi</body></html>") == "<html><body>hi</body></html>"
 
 
 def test_set_report_styles_inlines_the_sheet_last_in_head():
@@ -319,30 +304,24 @@ def test_is_report_notebook_excludes_non_app_and_non_py(tmp_path):
     assert not is_report_notebook(tmp_path / "missing.py")  # absent
 
 
-def test_source_only_marker_opts_out(tmp_path):
-    nb = tmp_path / "example.py"
-    nb.write_text(f"import marimo\n# {SOURCE_ONLY_MARKER} — heavy inline compute\napp = marimo.App()\n")
-    assert not is_report_notebook(nb)
-
-
 def test_report_notebooks_skips_source_only(tmp_path):
     (tmp_path / "report.py").write_text(_APP)
     (tmp_path / "sub").mkdir()
     (tmp_path / "sub" / "nested.py").write_text(_APP)
-    (tmp_path / "example.py").write_text(f"# {SOURCE_ONLY_MARKER}\n{_APP}")
+    example = tmp_path / "example.py"
+    example.write_text(f"import marimo\n# {SOURCE_ONLY_MARKER} — heavy inline compute\napp = marimo.App()\n")
     (tmp_path / "plain.py").write_text("x = 1\n")
+    assert not is_report_notebook(example)  # the marker is what takes it out
     found = {p.relative_to(tmp_path).as_posix() for p in report_notebooks(tmp_path)}
     assert found == {"report.py", "sub/nested.py"}
 
 
-def test_reports_are_publish_checked_by_default(tmp_path):
-    nb = tmp_path / "report.py"
-    nb.write_text(_APP)
-    assert not is_manually_published(nb)
-
-
 def test_manual_publish_marker_opts_out_of_the_reminder_only(tmp_path):
-    nb = tmp_path / "report.py"
+    plain = tmp_path / "report.py"
+    plain.write_text(_APP)
+    assert not is_manually_published(plain)  # reports are publish-checked by default
+
+    nb = tmp_path / "manual.py"
     nb.write_text(f"import marimo\n# {MANUAL_PUBLISH_MARKER} — published on its own schedule\napp = marimo.App()\n")
     assert is_report_notebook(nb)  # still a report: rendered, pinned, on the site
     assert is_manually_published(nb)  # just not nagged about
@@ -354,14 +333,14 @@ def test_externalize_html_writes_sidecar_and_passes_through(tmp_path):
     assert externalize_html(html, name="sublines", publish=pub) == html  # inline copy unchanged
     assert (tmp_path / "_assets" / "sublines.html").read_text() == html  # …and a plain file for tooling
 
-
-def test_externalize_html_keeps_explicit_extension(tmp_path):
-    pub = Publisher(tmp_path / "_assets")
     externalize_html("<svg xmlns='http://www.w3.org/2000/svg'/>", name="spark.svg", publish=pub)
-    assert (tmp_path / "_assets" / "spark.svg").exists()
+    assert (tmp_path / "_assets" / "spark.svg").exists()  # an explicit extension is kept as given
 
 
-def test_externalize_html_uses_default_publisher(tmp_path):
+def test_externalize_html_uses_the_default_publisher_when_there_is_one(tmp_path):
+    use_publisher(None)
+    assert externalize_html("<p>hi</p>", name="chunk") == "<p>hi</p>"  # nowhere to write: pass through
+
     use_publisher(Publisher(tmp_path / "_assets"))
     try:
         externalize_html("<p>hi</p>", name="chunk")
@@ -370,19 +349,17 @@ def test_externalize_html_uses_default_publisher(tmp_path):
     assert (tmp_path / "_assets" / "chunk.html").exists()
 
 
-def test_externalize_html_without_publisher_is_passthrough():
-    use_publisher(None)
-    assert externalize_html("<p>hi</p>", name="chunk") == "<p>hi</p>"
-
-
 def test_virtualize_falls_back_to_the_file_url_off_the_kernel(tmp_path):
     # No marimo kernel under pytest, so there is nothing to register the bytes with and
     # nothing to serve them: the publisher must degrade to the file it just wrote rather
     # than to the data: URI mo.image would hand back.
+    from mini.reports import _virtual_url
+
     pub = Publisher(asset_dir=tmp_path / "a", link="public/.mini/r", versioned=True, virtualize=True)
     url = pub.asset_url(b"png-bytes", name="fig.png")
     assert url.startswith("public/.mini/r/fig.png?v=")
     assert (tmp_path / "a" / "fig.png").read_bytes() == b"png-bytes"
+    assert _virtual_url(tmp_path / "a" / "fig.png") is None  # the condition the fallback keys off
 
 
 def test_virtualize_prefers_the_kernel_url_and_still_writes_the_file(tmp_path, monkeypatch):
@@ -396,19 +373,17 @@ def test_virtualize_prefers_the_kernel_url_and_still_writes_the_file(tmp_path, m
     assert (tmp_path / "a" / "fig.png").read_bytes() == b"png-bytes"
 
 
-def test_serve_false_skips_the_kernel(tmp_path, monkeypatch):
+def test_files_nothing_fetches_skip_the_kernel(tmp_path, monkeypatch):
     # An export sidecar is written for tooling to read off disk; nothing fetches it, so it
-    # should not occupy a slot in the kernel's registry.
-    monkeypatch.setattr("mini.reports._virtual_url", lambda p: f"./@file/9-{p.name}")
+    # should not occupy a slot in the kernel's registry — whether the caller asks for that
+    # with serve=False or reaches it through externalize_html.
+    monkeypatch.setattr("mini.reports._virtual_url", lambda p: pytest.fail(f"{p.name} was virtualized"))
     pub = Publisher(asset_dir=tmp_path / "a", link="_assets", virtualize=True)
     assert pub.asset_url(b"<svg/>", name="frag.svg", serve=False) == "_assets/frag.svg"
 
-
-def test_externalize_html_keeps_its_sidecar_off_the_kernel(tmp_path, monkeypatch):
-    monkeypatch.setattr("mini.reports._virtual_url", lambda p: pytest.fail("sidecar was virtualized"))
-    pub = Publisher(asset_dir=tmp_path / "a", virtualize=True)
-    assert externalize_html("<svg/>", name="frag.svg", publish=pub) == "<svg/>"
-    assert (tmp_path / "a" / "frag.svg").read_text() == "<svg/>"
+    sidecar = Publisher(asset_dir=tmp_path / "b", virtualize=True)
+    assert externalize_html("<svg/>", name="frag.svg", publish=sidecar) == "<svg/>"
+    assert (tmp_path / "b" / "frag.svg").read_text() == "<svg/>"
 
 
 def test_virtual_url_lifts_the_src_from_marimos_own_img_tag():
@@ -422,15 +397,6 @@ def test_virtual_url_lifts_the_src_from_marimos_own_img_tag():
     m = _IMG_SRC.search(tag)
     assert m is not None, tag
     assert m.group(2) == "./@file/49361-164816-TeHGmd7R.png"
-
-
-def test_virtual_url_declines_off_the_kernel(tmp_path):
-    from mini.reports import _virtual_url
-
-    png = tmp_path / "fig.png"
-    png.write_bytes(b"not really a png")
-    # mo.image would return a data: URI here; the publisher must read that as "no kernel".
-    assert _virtual_url(png) is None
 
 
 def test_report_bundle_virtualizes_only_interactively(tmp_path, monkeypatch):

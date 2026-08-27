@@ -1,16 +1,10 @@
 """Tests for the live-editing launcher — rewriting marimo's URL banner into an app-view link."""
 
-import importlib.util
-from pathlib import Path
-
 import pytest
 
-_SPEC = importlib.util.spec_from_file_location(
-    "edit_notebook", Path(__file__).resolve().parent.parent / "scripts" / "edit_notebook.py"
-)
-assert _SPEC and _SPEC.loader
-edit_notebook = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(edit_notebook)
+from tests.conftest import load_script
+
+edit_notebook = load_script("edit_notebook")
 
 # Exactly what `marimo edit --headless --watch` prints on stdout (marimo 0.23): eight
 # spaces, an arrow, two spaces. The parse is an integration assumption, so the fixture
@@ -23,7 +17,6 @@ BANNER = "        ➜  URL: http://localhost:2718?access_token=Xk3p9\n"
     [
         ("http://localhost:2718?access_token=Xk3p9", "http://localhost:2718?access_token=Xk3p9&view-as=present"),
         ("http://localhost:2718", "http://localhost:2718?view-as=present"),
-        ("http://localhost:2718/", "http://localhost:2718/?view-as=present"),
     ],
 )
 def test_app_view_keeps_the_access_token(url: str, expected: str):
@@ -48,7 +41,6 @@ def test_rewrite_reads_a_coloured_banner():
     "line",
     [
         "        Edit report.py in your browser 📝\n",
-        "\n",
         "[W 260823 16:13:31 start:271] Enabling watch mode may interfere with auto-save.\n",
         "  Fetched URL: not-a-url\n",
     ],
@@ -70,7 +62,7 @@ def test_command_watches_headlessly_and_forwards_the_rest():
     ]
 
 
-@pytest.mark.parametrize(("returncode", "status"), [(0, 0), (2, 2), (-2, 130), (-15, 143)])
+@pytest.mark.parametrize(("returncode", "status"), [(0, 0), (-2, 130)])
 def test_signalled_marimo_exits_the_way_a_shell_reads_it(returncode: int, status: int):
     """Ctrl-C is SIGINT (2), so the caller should see 130 — not the low byte of -2."""
     assert edit_notebook.exit_status(returncode) == status

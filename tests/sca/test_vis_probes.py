@@ -1,4 +1,7 @@
-"""The landmark axis is a figure convention shared across reports, so pin what it promises."""
+"""The landmark axis is a figure convention shared across reports, so pin what it promises.
+
+These assertions read matplotlib's artist internals (patches, tick labels, edge colors) — the only handle a rendered figure offers — so a matplotlib upgrade can break them without the figures changing.
+"""
 
 import matplotlib
 

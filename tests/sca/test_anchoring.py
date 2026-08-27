@@ -139,8 +139,7 @@ def test_mask_is_empty_without_labels_and_full_with_them(corpus):
 
 def test_padded_positions_are_never_pulled(corpus):
     mc, dc = model_config(), data_config(1.0)
-    _, _, mask = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(2), np.ones(64)))
-    x, _, _ = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(2), np.ones(64)))
+    x, _, mask = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(2), np.ones(64)))
     assert mask[x == 0].sum() == 0
 
 
@@ -390,8 +389,10 @@ def training_config(seed: int = 0) -> TrainingConfig:
     return TrainingConfig(
         model=model_config(),
         tokenizer=TokenizerConfig(vocabulary=[str(i) for i in range(15)]),
-        data=data_config(),
-        optimizer=OptimizerConfig(weight_decay=0, learning_rate=1e-2, betas=(0.9, 0.95)),
+        # Small crops and a lively LR: the assertions below are about direction, and
+        # this is the cheapest run that still separates the conditions.
+        data=DataConfig(batch_size=8, oversample=8, train_split=0.9, padding_chance=0.1),
+        optimizer=OptimizerConfig(weight_decay=0, learning_rate=3e-2, betas=(0.9, 0.95)),
         scheduler=SchedulerConfig(epochs=15, warmup_epochs=2, min_lr_factor=0.01),
         seed=seed,
     )
@@ -469,21 +470,17 @@ def test_pooled_training_runs_and_records_the_weight_profile(data_dir, tmp_path)
     assert float(np.abs(trajs[0.05]["pi"][-1] - 0.25).max()) > 0.05  # a finite τ concentrates
 
 
-def test_the_anchor_is_the_only_difference_between_conditions(data_dir, tmp_path):
-    """λ=0 trains on the same crops as λ>0, so accuracy differences have one cause."""
-    label_p = np.full(16, 0.5)
-    tokens, weights = probe_set()
-    losses = []
-    for peak in (0.0, 0.0):
-        _, metrics, _ = train_anchored(
-            training_config(),
-            data_dir,
-            anchor=AnchorSpec(peak=peak, warmup_epochs=2, anneal_start=13, anneal_end=15),
-            label_p=label_p,
-            probe_tokens=tokens,
-            probe_weights=weights,
-            checkpoint_dir=tmp_path / f"ckpt{peak}",
-            traj_stride=100,
-        )
-        losses.append([m.train_loss for m in metrics])
-    assert losses[0] == losses[1]
+def test_the_labeller_draws_the_same_crops_whatever_it_labels(corpus):
+    """λ=0 trains on the same crops as λ>0, so accuracy differences have one cause.
+
+    The anchor weight never reaches the sampler, and the label draws are consumed whatever *p* says — so the crop stream is a function of the seed alone and only the mask moves.
+    """
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    mc, dc = model_config(), data_config()
+    unlabeled = list(sample_anchored_batches(corpus, dc, mc, 3, np.random.default_rng(4), np.zeros(64)))
+    labeled = list(sample_anchored_batches(corpus, dc, mc, 3, np.random.default_rng(4), label_p))
+    for (x0, y0, m0), (x1, y1, m1) in zip(unlabeled, labeled, strict=True):
+        np.testing.assert_array_equal(x0, x1)
+        np.testing.assert_array_equal(y0, y1)
+        assert m0.sum() == 0 and m1.sum() > 0  # only the mask moved

@@ -43,6 +43,7 @@ dev = [
     "markdownify>=1.2.3",
     "pandas-stubs",
     "pytest-asyncio>=0.25.3",
+    "pytest-timeout>=2.3",
     "pytest-xdist>=3.6",
     "pytest>=8.3.5",
     "ruff>=0.9.7",  # linter and formatter
@@ -158,11 +159,15 @@ asyncio_default_fixture_loop_scope = "function"
 # default entry that keeps it out of dotted directories — without it, agent worktrees
 # under `.claude/worktrees/` get collected as a second copy of tests/.
 norecursedirs = [".*", "node_modules", "tmp*", "scratch*"]
-# Run in parallel by default (pytest-xdist): the suite is a mix of network-,
-# import-, and compute-bound tests that all isolate via tmp_path/monkeypatch, so
-# it scales near-linearly across cores. Override with `-n0` for a serial run
-# (e.g. when using --pdb).
-addopts = ["-n", "auto"]
+# Parallel by default (pytest-xdist) as a convenience, not a need: the suite runs
+# in ~30s serially and ~15s across cores. Serial (`-n0`) is the baseline every test
+# must pass under, and the one to use with --pdb.
+markers = ["hf: talks to the real Hugging Face bucket (slow, network); deselected by default — opt in with `-m hf`"]
+# The orchestration tests drive real worker subprocesses through the shipped
+# `drive_and_watch`, which waits like production does — a wedged task would hang the
+# suite rather than fail it. The cap is well above the slowest test (a few seconds).
+timeout = 60
+addopts = ["-n", "auto", "-m", "not hf"]
 
 [tool.vulture]
 exclude = [

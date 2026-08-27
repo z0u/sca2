@@ -118,10 +118,6 @@ def test_export_routes_to_dataset_when_repo_set(tmp_path: Path):
     assert len(folders) == 1
     assert folders[0]["path_in_repo"] == "exports/k"
     assert folders[0]["delete_patterns"] == "*"  # rsync-like: prune assets the report dropped
-
-
-def test_export_base_pins_to_a_revision(tmp_path: Path):
-    store = _store(tmp_path, publish_repo="ns/pub")
     assert store.export_base("k", revision=FAKE_OID) == (
         f"https://huggingface.co/datasets/ns/pub/resolve/{FAKE_OID}/exports/k/"
     )
@@ -165,8 +161,12 @@ def test_read_export_html_is_none_when_nothing_is_published(tmp_path: Path, monk
     assert store._api.calls == []  # no separate existence probe against the repo
 
 
-def test_read_export_html_from_the_bucket(tmp_path: Path):
+def test_export_serves_from_the_bucket_without_a_repo(tmp_path: Path):
     store = _store(tmp_path)  # no publish repo: exports live in the bucket
+    assert store.export_base("k") == "https://huggingface.co/buckets/ns/bkt/resolve/exports/k/"
+    # Buckets keep no history — a revision is meaningless there and ignored.
+    assert store.export_base("k", revision=FAKE_OID) == "https://huggingface.co/buckets/ns/bkt/resolve/exports/k/"
+
     store._api.contents["exports/k/index.html"] = b"<html>bucketed</html>"
     assert store.read_export_html("k") == "<html>bucketed</html>"
     pulled = [c for c in store._api.calls if c[0] == "download_bucket_files"]
@@ -174,10 +174,3 @@ def test_read_export_html_from_the_bucket(tmp_path: Path):
 
     store._api.present = False  # nothing synced under the key
     assert store.read_export_html("k") is None
-
-
-def test_export_base_uses_bucket_without_repo(tmp_path: Path):
-    store = _store(tmp_path)
-    assert store.export_base("k") == "https://huggingface.co/buckets/ns/bkt/resolve/exports/k/"
-    # Buckets keep no history — a revision is meaningless there and ignored.
-    assert store.export_base("k", revision=FAKE_OID) == "https://huggingface.co/buckets/ns/bkt/resolve/exports/k/"

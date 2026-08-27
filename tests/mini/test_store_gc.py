@@ -22,7 +22,6 @@ from types import SimpleNamespace
 import cloudpickle
 import pytest
 
-from mini.experiment import Experiment
 from mini.gc import (
     ModalGcIO,
     StoreGcError,
@@ -34,23 +33,8 @@ from mini.gc import (
 )
 from mini.local_apparatus import LocalApparatus
 from mini.memo import MemoStore
-from mini.orchestration import tick
 from mini.runs import data_root
 from mini.store import Artifact, LocalStore, _cas_key, artifact_shas, store_for
-
-
-def _sweep(name: str, fn, xs: list) -> Experiment:
-    return Experiment(name=name, main=lambda ctx: ctx.map(fn, xs))
-
-
-def _drive(exp: Experiment, app: LocalApparatus, timeout: float = 30.0) -> None:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        done, _ = tick(exp, app)
-        if done:
-            return
-        time.sleep(0.1)
-    raise AssertionError("orchestration did not complete")
 
 
 def _put_step():
@@ -84,6 +68,7 @@ def test_artifact_shas_walks_nested_containers():
     a, b, c = _file("a" * 64), _file("b" * 64), _file("c" * 64)
     obj = {"x": [a, (b,)], "y": {"deep": c}}  # dict, list, tuple, nested dict
     assert artifact_shas(obj) == {"a" * 64, "b" * 64, "c" * 64}
+    assert artifact_shas({"metrics": [1, 2, 3], "name": "run", "ok": True}) == set()  # nothing to find
 
 
 def test_artifact_shas_reaches_dataclass_fields():
@@ -104,10 +89,6 @@ def test_artifact_shas_collects_tree_children_not_manifest():
     assert "t" * 64 not in shas
 
 
-def test_artifact_shas_empty_for_plain_values():
-    assert artifact_shas({"metrics": [1, 2, 3], "name": "run", "ok": True}) == set()
-
-
 def test_artifact_shas_prunes_at_callables():
     """The walk stops at code/module boundaries: an Artifact reachable only through a function's closure is invisible (crossing it would drag in unrelated module state)."""
     hidden = _file("e" * 64)
@@ -123,12 +104,10 @@ def test_artifact_shas_prunes_at_callables():
 # ---------------------------------------------------------------------------
 
 
-def test_sidecar_indexes_result_blobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_sidecar_indexes_result_blobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, local_store, sweep, drive):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)
-    monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
     app = LocalApparatus("sidecar")
-    _drive(_sweep("sidecar", _put_step(), [1]), app)
+    drive(sweep("sidecar", _put_step(), [1]), app)
 
     store = app.memo_store()
     [rec] = store.records()
@@ -140,13 +119,13 @@ def test_sidecar_indexes_result_blobs(tmp_path: Path, monkeypatch: pytest.Monkey
     assert store.result_artifacts(key) == [art.sha256]
 
 
-def test_stale_sidecar_swept_as_attempt_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_stale_sidecar_swept_as_attempt_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, local_store, sweep, drive
+):
     """A sidecar under a replaced generation is unreachable, so the memo sweep collects it."""
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)
-    monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
     app = LocalApparatus("stale-side")
-    _drive(_sweep("stale-side", _put_step(), [1]), app)
+    drive(sweep("stale-side", _put_step(), [1]), app)
     store = app.memo_store()
     [rec] = store.records()
     (store.result_dir(rec["key"]) / "result-deadbeef.artifacts.json").write_text('["oldsha"]')
@@ -226,12 +205,12 @@ def test_roots_note_expired_modal_plane():
 # ---------------------------------------------------------------------------
 
 
-def test_sweep_keeps_referenced_and_ref_pinned_collects_orphan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_sweep_keeps_referenced_and_ref_pinned_collects_orphan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, local_store, sweep, drive
+):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)
-    monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
     app = LocalApparatus("cas")
-    _drive(_sweep("cas", _put_step(), [1]), app)
+    drive(sweep("cas", _put_step(), [1]), app)
     store = store_for(data_root() / "store")
 
     step_art = app.memo_store().result(app.memo_store().records()[0]["key"])
@@ -249,10 +228,8 @@ def test_sweep_keeps_referenced_and_ref_pinned_collects_orphan(tmp_path: Path, m
     assert store.has(step_art.sha256) and store.has(pinned.sha256)
 
 
-def test_grace_window_keeps_young_blobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_grace_window_keeps_young_blobs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, local_store):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)
-    monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
     store = store_for(data_root() / "store")
     fresh = store.put(b"just written", name="fresh.bin")
 
@@ -266,14 +243,14 @@ def test_grace_window_keeps_young_blobs(tmp_path: Path, monkeypatch: pytest.Monk
     assert _shas(plan) == {fresh.sha256}
 
 
-def test_superseded_record_pins_its_blob_until_memo_gc(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_superseded_record_pins_its_blob_until_memo_gc(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, local_store, sweep, drive
+):
     """A superseded record is still a mark root; its blob is collectible only once ``mini gc <name>`` removes the record."""
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)
-    monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
     app = LocalApparatus("pin")
-    _drive(_sweep("pin", _put_step(), [1, 2]), app)
-    _drive(_sweep("pin", _put_step(), [1]), app)  # input 2 removed → its record superseded
+    drive(sweep("pin", _put_step(), [1, 2]), app)
+    drive(sweep("pin", _put_step(), [1]), app)  # input 2 removed → its record superseded
     store = store_for(data_root() / "store")
     memo = app.memo_store()
 
@@ -383,7 +360,7 @@ class _FakeVolume:
         self.removed.append((path, recursive))
 
 
-def test_modal_gc_io_reads_memo_tree(tmp_path: Path):
+def test_modal_gc_io_reads_memo_tree():
     vol = _FakeVolume(
         [
             _Entry("_memo/task-aaaa", is_file=False),  # dir entry, not a file
@@ -423,6 +400,7 @@ def test_modal_gc_plan_and_apply_over_fakes(tmp_path: Path):
     assert ("_memo/ghost-cccc", True) in vol.removed
     assert "old-bbbb" not in d  # the Dict record went too
     assert "task-aaaa" in d  # the current record is untouched
+    memo.records_backend.delete("old-bbbb")  # absent key is a no-op, not an error
 
 
 # ---------------------------------------------------------------------------
@@ -435,14 +413,14 @@ def _store_ns(**kw) -> argparse.Namespace:
     return argparse.Namespace(**{**base, **kw})
 
 
-def test_cmd_gc_store_dry_run_then_apply(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys):
+def test_cmd_gc_store_dry_run_then_apply(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys, local_store, sweep, drive
+):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("MINI_STORE_BUCKET", raising=False)
-    monkeypatch.delenv("MINI_PUBLISH_REPO", raising=False)
     from mini.__main__ import cmd_gc
 
     app = LocalApparatus("clistore")
-    _drive(_sweep("clistore", _put_step(), [1]), app)  # a referenced blob (kept)
+    drive(sweep("clistore", _put_step(), [1]), app)  # a referenced blob (kept)
     store = store_for(data_root() / "store")
     orphan = store.put(b"orphan for cli", name="o.bin")
 

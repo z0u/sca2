@@ -4,6 +4,7 @@ from typing import Any
 
 import jax.random as jr
 import numpy as np
+import pytest
 
 from sca.config import ModelConfig, TokenizerConfig
 from sca.data import colors
@@ -36,21 +37,22 @@ def examples(n: int) -> list[colors.Example]:
     return [ex for ex in colors.sample_corpus(n, 0, train) if ex.rhs is not None]
 
 
-def test_greedy_completions_are_deterministic_and_bounded():
+def test_greedy_completions_are_deterministic_and_scored_as_they_decode():
+    """`completion_accuracy` is that same decode, exact-matched — so score and failure list agree."""
     model, tokenizer = make_model(), make_tokenizer()
-    prompts = [ex.prompt for ex in examples(8)]
+    exs = examples(8)
+    prompts = [ex.prompt for ex in exs]
     got = greedy_completions(model, tokenizer, prompts, max_new_tokens=6)
     assert got == greedy_completions(model, tokenizer, prompts, max_new_tokens=6)
     assert len(got) == len(prompts)
     assert all(len(g) <= 6 and "\n" not in g for g in got)
 
-
-def test_completion_accuracy_shape():
-    model, tokenizer = make_model(), make_tokenizer()
-    result = completion_accuracy(model, tokenizer, examples(8), max_new_tokens=6)
+    result = completion_accuracy(model, tokenizer, exs, max_new_tokens=6)
     assert set(result) == {"accuracy", "n", "failures"}
-    assert 0.0 <= result["accuracy"] <= 1.0  # untrained: almost surely 0
-    assert result["n"] == len(examples(8))
+    assert result["n"] == len(exs)
+    misses = [(ex.prompt, ex.answer, g) for ex, g in zip(exs, got, strict=True) if g != ex.answer]
+    assert result["accuracy"] == pytest.approx(1 - len(misses) / len(exs))
+    assert result["failures"] == misses[:8]  # the misses themselves, capped for inspection
 
 
 def test_ridge_probe_recovers_a_planted_linear_map():
@@ -102,13 +104,15 @@ def test_candidate_logprobs_shape_and_consistency():
     lp2 = candidate_logprobs(model, tokenizer, prompts + ["white + navy = "], candidates)
     np.testing.assert_allclose(lp, lp2[:2], rtol=0, atol=1e-4)
 
-
-def test_answer_calibration_reports_finite_scalars():
-    model, tokenizer = make_model(), make_tokenizer()
+    # The scalar summary of the same forced pass. An untrained nGPT scores each token
+    # by the cosine to a random embedding, so the 64-way head is all but uniform:
+    # entropy sits just under log|V|, and a uniformly ignorant model is calibrated.
     stats = answer_calibration(model, tokenizer, examples(16))
     assert set(stats) == {"nll", "entropy", "s2"}
     assert all(np.isfinite(v) for v in stats.values())
-    assert stats["nll"] > 0 and stats["entropy"] > 0
+    assert stats["nll"] > 0
+    assert stats["entropy"] == pytest.approx(np.log(64), rel=0.02)
+    assert stats["s2"] == pytest.approx(0.0, abs=0.1)
 
 
 def test_probe_answer_schedule_goes_trivial_once_digits_land_in_context():
