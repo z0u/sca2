@@ -37,8 +37,9 @@ jobs:
 
       - name: Install Dependencies (for docs build)
         # The build imports mini.store / mini.hf_store, so it needs the project
-        # (not just the pages group's markdown).
-        run: uv sync --group pages
+        # (not just the pages group's markdown). --locked because this doesn't go
+        # through install.sh, which turns it on under $CI — see pr-preview.yml.
+        run: uv sync --locked --group pages
 
       - name: Build Site
         # Read-only, deterministic half of publishing: build_site pulls each synced

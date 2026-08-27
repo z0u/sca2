@@ -39,7 +39,10 @@ jobs:
 
       - name: Install Dependencies (for docs build)
         if: github.event.action != 'closed'
-        run: uv sync --group pages
+        # --locked because this doesn't go through install.sh, which turns it on
+        # under $CI: a bare `uv sync` would rewrite uv.lock to match a pyproject.toml
+        # that outgrew it, and build the preview against a resolution nobody reviewed.
+        run: uv sync --locked --group pages
 
       - name: Build Site
         if: github.event.action != 'closed'
