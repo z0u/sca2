@@ -57,9 +57,11 @@ Use these terms consistently across all reports.
 
 - s₂ (surprise-surprise)
 
-  Mean surprisal minus mean predictive entropy over the scored characters, in units of $\log |V|$: how much more surprised the model was than it expected to be. `sca.compute.evaluation.answer_calibration` returns it alongside both parts. What it buys over bare surprisal is that it nets out the surprise the model itself anticipated, so a genuinely unpredictable position — an operand — doesn't count against a model that knew it was unpredictable.
+  A **per-token** statistic: a token's surprisal minus the entropy of the distribution that predicted it, over $\log |V|$ — how much more surprised the model was than it expected to be. Pooling is a separate choice made afterwards, and the statistic is linear in both parts, so the order doesn't matter (`sca.compute.evaluation.answer_calibration` means over the answer characters). What it buys over bare surprisal is that it nets out the surprise the model itself anticipated, so a genuinely unpredictable position doesn't count against a model that knew it was unpredictable.
 
-  Read the sign. Around 0 is calibrated; positive is confidently wrong (a 0.99-confident miss over a 256-character vocabulary reads ≈ +1.8); negative is a hedge the outcome didn't need. It scores calibration rather than competence — a uniformly ignorant model reads exactly 0 — so quote it beside accuracy or raw surprisal, never alone.
+  It is zero in expectation under the model's _own_ distribution, which is what makes it a calibration statistic and not an accuracy one — a uniform model reads exactly 0 at every token, since its surprisal and its entropy are both $\log |V|$ whatever comes next. So s₂ alone says nothing about whether the model is any good; pair it with accuracy or surprisal unless competence is already established elsewhere.
+
+  Read the sign, and expect an asymmetric scale. Positive is confidently wrong and unbounded (surprisal has no ceiling); negative is a hedge the outcome didn't need, and is bounded by $-h/\log|V|$, so it stays shallow while the model is mostly confident. Measured over ex-2.1.1's captured rows: 80% of positions are negative but the median is −0.001, only 2% fall below −0.15, and the floor is −0.28 against a maximum of +6.2. Those deep-negative positions are overwhelmingly the first character of a word, where the model is unsure _which_ word but the character is shared across its candidates (`black + ` → `b`).
 
   It is not a KL divergence, despite the shape. It is $H(p,q) - H(q)$, where a divergence from the data would be $H(p,q) - H(p)$; against a near-deterministic truth the two disagree in sign, so don't describe it as a distance from the data.
 
