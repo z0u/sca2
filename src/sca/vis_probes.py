@@ -16,7 +16,7 @@ from matplotlib.figure import Figure, SubFigure
 from matplotlib.layout_engine import ConstrainedLayoutEngine
 from matplotlib.transforms import Transform
 
-from mini.vis import light_dark, mix, page_color, smooth_step, smooth_step_area
+from mini.vis import light_dark, mix, page_color, smooth_step, smooth_step_area, smooth_step_marks
 from sca.data.mixed_vocab import GAP_RISERS, LANDMARKS, OPERATORS, SPAN_RISERS
 
 FORMS = ("named", "hex")
@@ -96,6 +96,7 @@ def draw_traces(
     fill_alpha: float | None = None,
     edge_alpha: float = 0.55,
     spread: np.ndarray | None = None,
+    faint_risers: bool = False,
     transform: Transform | None = None,
     clip_on: bool = True,
 ) -> None:
@@ -109,6 +110,8 @@ def draw_traces(
 
     That hierarchy is the point of drawing the spread as lines rather than as more shading. Three stacked tones (under the minimum, the summary, the maximum) put only a few points of opacity between neighbouring levels, which is below what a 0.45in panel can show; and the more obvious arrangement — a min–max ribbon over a summary fill — makes their *overlap* the darkest part of the panel, so a reader sees a dark stripe floating between two lighter ones with nothing in the data to match it.
 
+    *faint_risers* moves the weight onto the plateaus, since that is where the measurements were taken and the risers only carry the eye between them. Every line that states a level — the summary and the envelope — breaks at each riser, and the channels draw as :func:`~mini.vis.smooth_step_marks`, so a row reads as a run of level marks with a hint of the path between them rather than as a curve that happens to be flat in places. The area still runs its risers solid, which is what keeps the shape of the panel: a filled silhouette says "between these levels" without claiming a measurement, where a line through the same points would. Use it where the x axis is a handful of discrete sites; over the landmark axis, where a riser can span unprobed text, that stretch is part of what the reader has to judge and the risers keep their weight.
+
     *transform* places the panel somewhere other than the Axes' own data area. Pass an offset (``Affine2D().translate(0, i) + ax.transData``) to stack several panels in one Axes, each on its own 0–1 row, and turn *clip_on* off so a trace that runs along a row's boundary keeps its full stroke instead of half of it.
 
     *fill_alpha* defaults per theme. A pale fill lightens a white page but has to lighten a near-black one by more to travel the same visual distance, so the dark figure needs a stronger value to read as the same shade of quiet.
@@ -121,6 +124,10 @@ def draw_traces(
     # Matplotlib reads an explicit transform=None as "already set", which would cost the
     # artist its default of ax.transData, so an absent transform has to be absent.
     place: dict[str, Any] = {"clip_on": clip_on} | ({} if transform is None else {"transform": transform})
+
+    # The level-stating lines break at every riser; the channels get theirs back, faint.
+    marks = breaks | set(x) if faint_risers else breaks
+    step = smooth_step_marks if faint_risers else smooth_step
 
     def shade(summary: np.ndarray, replicates: np.ndarray | None, color: str) -> None:
         # Opaque, not translucent: these three lines coincide wherever the replicates agree,
@@ -140,7 +147,7 @@ def draw_traces(
             ink = mix(over, color, weight)
             smooth_step(
                 ax, x, y,
-                ramp=ramp, breaks=breaks, elide=elide, fade=mix(over, ink, fade),
+                ramp=ramp, breaks=marks, elide=elide, fade=mix(over, ink, fade),
                 color=ink, lw=0.5, **place,
             )  # fmt: skip
 
@@ -157,7 +164,7 @@ def draw_traces(
     for c in range(values.shape[1]):
         if fill == "channel":
             shade(values[:, c], None if spread is None else spread[:, :, c], colors[c])
-        smooth_step(
+        step(
             ax, x, values[:, c],
             ramp=ramp, breaks=breaks, elide=elide, fade=fade, color=colors[c], lw=lws[c], **place,
         )  # fmt: skip

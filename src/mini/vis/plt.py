@@ -167,3 +167,26 @@ def smooth_step(
     patch = PathPatch(_step_path(x, y, hs, brk | eli), **style)
     ax.add_patch(patch)
     return patch
+
+
+def smooth_step_marks(
+    ax: "Axes",
+    x: "ArrayLike",
+    y: "ArrayLike",
+    *,
+    breaks: "Iterable[int] | None" = None,
+    riser_weight: float = 0.5,
+    riser_alpha: float = 0.5,
+    **kwargs,
+) -> PathPatch:
+    """A :func:`smooth_step` whose weight sits on the plateaus, with the risers drawn faint.
+
+    Two strokes: the full path at *riser_weight* times the line width and *riser_alpha* times its opacity, and over it the same line at full weight broken at every riser. A row then reads as a run of level marks with a hint of the path between them, rather than as a curve that happens to be flat in places. Use it where the x axis is a handful of discrete sites and the measurements are the plateaus; where a riser can span unprobed ground the reader has to judge, keep :func:`smooth_step`'s solid risers (or *elide* those stretches).
+
+    *breaks* and the other keywords pass through to both strokes. Returns the marks' patch.
+    """
+    x = np.asarray(x, float)
+    lw = kwargs.pop("lw", kwargs.pop("linewidth", 1.0))
+    alpha = kwargs.pop("alpha", None) or 1.0
+    smooth_step(ax, x, y, breaks=breaks, lw=lw * riser_weight, alpha=alpha * riser_alpha, **kwargs)
+    return smooth_step(ax, x, y, breaks=set(breaks or ()) | set(range(len(x) - 1)), lw=lw, alpha=alpha, **kwargs)

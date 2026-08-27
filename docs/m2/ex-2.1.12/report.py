@@ -68,7 +68,9 @@ def draw_probe_grid(
     stack = np.clip(stack, 0, 1)
     for si in range(n_slices):
         shift = Affine2D().translate(0, si) + ax.transData  # embedding at the bottom, as the profile figures do
-        draw_traces(ax, stack.mean(0)[si], spread=stack[:, si], ramp=1 - sw, transform=shift, clip_on=False)
+        draw_traces(
+            ax, stack.mean(0)[si], spread=stack[:, si], ramp=1 - sw, faint_risers=True, transform=shift, clip_on=False
+        )
         ax.axhline(si, color=light_dark("#aaaa", "#333a"), lw=0.5)
     ax.set_xlim(-0.5, n_pos - 0.5)
     ax.set_ylim(0, n_slices)
@@ -215,7 +217,7 @@ def _(r2):
             About half of that late-slice fade is repaired: op2's own slot holds 0.75 at the embedding and 0.32 at the last slice, where the bare anchor gave up nearly all of it. The two slots before op2 lie flat on the floor.
         """,
         "ex-2.1.10/either-t100": """
-            No fade left: op2's own slot holds 0.6 to 0.8 through every slice, as it does un-anchored, and the nine-seed hairlines sit close to the lines. The two slots before op2 lie flat on the floor.
+            No fade left: op2's own slot holds 0.6 to 0.8 through every slice, as it does un-anchored, and the nine-seed envelope marks sit close to the channel marks. The two slots before op2 lie flat on the floor.
         """,
     }
 
@@ -224,7 +226,7 @@ def _(r2):
             name=f"probe-channel-maps-{cond.exp}-{cond.name}",
             alt_text=_ALT[cond.key],
             caption=rf"""
-                **{cond.title}** ({cond.exp}, `{cond.name}`, {cond.seeds} seeds). Per-channel strict probe R² at every site: one row per residual slice, with the embedding at the bottom, and the six token positions across. Each RGB channel draws as its own step-line over the grey area of their mean, and the hairlines are the seed envelope; where the seeds disagree the hairlines part from the silhouette. The three panels decode three targets, and the bold slot on the x axis is the token whose color that panel reads. Negative scores clip to the floor — a probe that does worse than predicting the mean has failed, and the H1 prose carries the raw values. Each row spans the same 0–1 scale, ticked once at the bottom right.
+                **{cond.title}** ({cond.exp}, `{cond.name}`, {cond.seeds} seeds). Per-channel strict probe R² at every site: one row per residual slice, with the embedding at the bottom, and the six token positions across. Each RGB channel draws as a mark per site over the grey area of their mean, with faint risers between them, since the sites are where the measurements are; the grey marks are the seed envelope, so where the seeds disagree they stand off the silhouette. The three panels decode three targets, and the bold slot on the x axis is the token whose color that panel reads. Negative scores clip to the floor — a probe that does worse than predicting the mean has failed, and the H1 prose carries the raw values. Each row spans the same 0–1 scale, ticked once at the bottom right.
             """,
         )
         def _plot() -> plt.Figure:

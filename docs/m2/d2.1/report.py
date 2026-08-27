@@ -22,7 +22,7 @@ with app.setup(hide_code=True):
     import experiment as ex
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
-    from mini.vis import AxesRow, light_dark, smooth_step, smooth_step_area, themed
+    from mini.vis import AxesRow, light_dark, smooth_step_area, smooth_step_marks, themed
     from sca.colorcube import sim_to_red
     from sca.vis_grading import GRID_RGB, I_RED, REDNESS, GradingCloud
 
@@ -79,7 +79,7 @@ def draw_grading_grid(
 
     *row_names* draws the slice names on the left and *scale* the 0–1 α scale on the right; a panel in a row of them wants each only on its own side of the figure, since the rows and the scale are the same for all of them (see :func:`grading_grids`).
     """
-    sw = 0.72  # smooth-step plateau width
+    sw = 0.7  # smooth-step plateau width
     n_slices, _, n_pos = a.shape
     red_c = light_dark("#d40000", "#f44")
     grey_c = light_dark("#eee", "#111")
@@ -90,7 +90,7 @@ def draw_grading_grid(
         smooth_step_area(ax, xs, reds, ramp=1 - sw, color=grey_c, transform=shift, zorder=0)
         for pi in range(n_pos):
             GradingCloud(ax, a[si, :, pi], span=(pi - sw / 2, pi + sw / 2), transform=shift, clip_on=False)
-        smooth_step(ax, xs, reds, ramp=1 - sw, color=red_c, lw=1, alpha=1, transform=shift, clip_on=False, zorder=1)
+        smooth_step_marks(ax, xs, reds, ramp=1 - sw, color=red_c, lw=1.3, transform=shift, clip_on=False)
         ax.axhline(si, color=light_dark("#aaaa", "#333a"), lw=0.5)
     ax.set_xlim(-0.5, n_pos - 0.5)
     ax.set_ylim(0, n_slices)
@@ -110,7 +110,7 @@ def draw_grading_grid(
 
 @app.function(hide_code=True)
 def grading_grids(
-    panels: dict[str, tuple[np.ndarray, int | None]], figsize: tuple[float, float] = (7.4, 3.3)
+    panels: dict[str, tuple[np.ndarray, int | None]], figsize: tuple[float, float] = (7.4, 2.2)
 ) -> plt.Figure:
     """A row of grading grids sharing one set of rows and one α scale, titled by *panels*' keys; each value pairs the α array with its keyed slot (see :func:`draw_grading_grid`).
 
