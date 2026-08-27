@@ -1,6 +1,6 @@
 ---
 name: style-fig
-description: Figure conventions for experiment reports. Configuration for latent-space plots, how to draw hyperspheres and RGB-cubes, data-colored marks, smooth-step token sequence charts, grading clouds, theming, captions and nested sub-figures, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, writing a figure or table caption, or building a results table, in a notebook.
+description: Figure conventions for experiment reports. Configuration for latent-space plots, how to draw hyperspheres and RGB-cubes, data-colored marks, smooth-step token sequence charts, grading clouds, sublines (per-character series drawn under the text), theming, captions and nested sub-figures, plus HTML result-table and color-swatch conventions. Use when drawing or revising any figure, writing a figure or table caption, or building a results table, in a notebook.
 ---
 
 The M1 reports and the GRaM workshop poster set the house style. Match them: a reader who has seen one SCA figure should be able to read the next one without relearning the encoding. The recurring panel types are packaged as helpers whose docstrings hold the mechanics; this file says which to use when.
@@ -19,7 +19,7 @@ A chart (loss curve, score sweep, schedule) keeps its axes. Use the stylesheet d
 - Encode an _ordinal_ series (depth, size) as ordered shades of one colormap rather than categorical hues, with stops picked via `light_dark` — a colormap's dark end vanishes on a dark background.
 - For per-token series, draw plateaus joined by S-curve risers with `mini.vis.smooth_step` and its band/area/marks companions (`smooth_step_marks` puts the weight on the plateaus, for a handful of discrete sites). The docstrings cover `ramp`, `breaks`, and `elide`; `sca.vis_probes` is the reference implementation.
 - For all other ordinal series, use a regular line chart.
-- We never use heat maps for sequences.
+- We never use heat maps for sequences. Where the series runs over the characters of one specific string, use a subline (below) rather than either.
 - Decide `sharex`/`sharey` from the units: panels measuring the same quantity share; panels measuring different quantities get their own scale, however close the numbers. Two panels with nearly-but-not-quite equal limits look like a bug.
 
 ## Color is data
@@ -29,6 +29,19 @@ Color the marks with the colors they represent; a legend or colorbar is almost a
 ## Grading clouds
 
 A grading figure shows how a response measured per grid color varies with redness. A mean line or envelope hides too much of the structure, and drawing grid vertices is too visually heavy. Use `sca.vis_grading.GradingCloud` to draw a dithered cloud instead. You can use it to draw single charts, or align it with `smooth_step` overlays.
+
+## Sublines
+
+A subline is the text itself with one sparkline per series running underneath, each knot aligned to a character: `subline.subline.Subline(chars_per_line=…, css=…).plot(text, series)`, returning an SVG string. Reach for it when the reader needs to see _which_ character a value lands on — per-character surprisal and predictive entropy over a single prompt is the standing case (ex-2.1.1, ex-2.1.2). A matplotlib chart of the same series gives up the alignment with the glyphs, and a heatmap gives up the rate of change.
+
+The library is vendored from [z0u/subline](https://github.com/z0u/subline) and its docstrings are thin, so the mechanics live here:
+
+- **Values are fractions of the band**: 0 sits on the token baseline, 1 at the top. Scale each series into that range — `nll / log |V|` reads as "fraction of a uniform guess" — and clip it there, because a negative value is dropped silently while the band renders up to 2.
+- **`NaN` breaks the path**, which is how a gap is drawn. Position 0 has no prediction, so prepend one and the series lines up with the text.
+- Series take `--col-series-1` through `-5` in order, and only those five are defined. Give each a `dasharray` as well as a color: on a 20px band they cross constantly.
+- The SVG carries **its own light/dark theme**, independent of `@themed`. Pass `css="svg { --bg-color: light-dark(#fff, #181c1a); }"` to match the notebook — the library default is a neutral grey that reads as a box on our background. Coincident series stay legible because the series paths carry `mix-blend-mode` (multiply on light, screen on dark), which is the one thing matplotlib has no answer for.
+
+Wrap the result with `figure_html` and externalize the group on the same terms as any other figure.
 
 ## Result tables
 

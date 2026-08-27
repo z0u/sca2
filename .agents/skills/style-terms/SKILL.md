@@ -55,5 +55,13 @@ Use these terms consistently across all reports.
 
   Two statistics that earlier reports both wrote as R². Write $R^2$ for a probe's held-out coefficient of determination (can be negative; measures a fitted readout), and $r^2$ for a squared Pearson correlation (bounded to [0, 1]; measures proportionality, e.g. the grading track). Say which one in prose on first use.
 
+- s₂ (surprise-surprise)
+
+  Mean surprisal minus mean predictive entropy over the scored characters, in units of $\log |V|$: how much more surprised the model was than it expected to be. `sca.compute.evaluation.answer_calibration` returns it alongside both parts. What it buys over bare surprisal is that it nets out the surprise the model itself anticipated, so a genuinely unpredictable position — an operand — doesn't count against a model that knew it was unpredictable.
+
+  Read the sign. Around 0 is calibrated; positive is confidently wrong (a 0.99-confident miss over a 256-character vocabulary reads ≈ +1.8); negative is a hedge the outcome didn't need. It scores calibration rather than competence — a uniformly ignorant model reads exactly 0 — so quote it beside accuracy or raw surprisal, never alone.
+
+  It is not a KL divergence, despite the shape. It is $H(p,q) - H(q)$, where a divergence from the data would be $H(p,q) - H(p)$; against a near-deterministic truth the two disagree in sign, so don't describe it as a distance from the data.
+
 
 [^not-cell]: In classical DoE a condition is called a cell, but we can't call it that because other senses of "cell" appear in reports and cannot be renamed away: cells of a table or heatmap ("each cell is the seed mean"), and Marimo notebook cells ("the analysis cells below"). Reports also legitimately use it for spatial grids (color-grid cells, Voronoi cells). So in prose, "cell" never means a condition or a run. In _code_, the stored key `metrics["cells"]` can keep its legacy name to avoid invalidating memo keys.
