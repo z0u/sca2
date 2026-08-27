@@ -1,8 +1,8 @@
 ---
-status: open
+status: done
 tags: [D2.1, ex-2.1.12, publishing, figures]
 opened: 2026-08-24
-priority: high
+closed: 2026-08-27
 ---
 # Land ex-2.1.12 and the D2.1 figure report, or decide not to
 
@@ -26,3 +26,5 @@ Deciding not to land it is a fine answer, but then the ex-2.1.12 finding and the
 On landing it. The merge base is 2026-08-15, so the branch is nine days behind, and `main` has touched `.agents/skills/style-fig/SKILL.md` and `style-py` in that window while the branch rewrites both — expect conflicts there rather than in the reports. CI's "Run all checks" reads failure on the 08-19 head, but the log doesn't explain it on its own: 746 tests passed, the publish check exited clean, and the only error is `./go deadcode` flagging three of ex-2.1.12's preregistration constants (`OFFKEY_CEILING`, `POSITIONS`, `H2_PARTIAL`) — a step marked `continue-on-error` on both the branch and `main`, so it shouldn't be deciding the job. Cheapest first move is to merge `main` in and re-run; a `# noqa` on those three constants clears the finding either way.
 
 Promoted to the shortlist because the decodability result feeds the D2.2 side-effects framing, and because holding a published experiment off `main` is what makes the number collision possible.
+
+**2026-08-27, landing** — Merged `main` into the branch (no conflicts; the skill-file rewrites had already reconciled), republished both reports, and rewrote the PR description to match the branch. The deadcode step's three ex-2.1.12 constants are no longer flagged; the findings that remain are all in files the PR doesn't touch. Closed by #99.
