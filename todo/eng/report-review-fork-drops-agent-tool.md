@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [agents, skills]
 opened: 2026-08-10
+closed: 2026-08-20
 ---
 # The `report-review` skill's `context: fork` frontmatter drops the Agent tool
 

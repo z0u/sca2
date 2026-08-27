@@ -6,7 +6,6 @@ description: >-
   user wants a report reviewed or sanity-checked, or wants to know whether it is
   ready to run, to freeze, or to publish.
 argument-hint: <path to report.py>
-context: fork
 model: sonnet
 ---
 

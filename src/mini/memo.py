@@ -18,6 +18,7 @@ import enum
 import fcntl
 import functools
 import hashlib
+import importlib.metadata
 import inspect
 import json
 import logging
@@ -119,6 +120,9 @@ def _collect_class(cls: type, seen: dict[str, str]) -> None:
             member = member.__func__
         if isinstance(member, types.FunctionType):
             _collect_sources(member, seen)
+    # Usually redundant — a method would carry the same chain — but a class with no
+    # methods of its own (a dataclass of fields, an enum) reaches this and nothing else.
+    _collect_deferred(_import_time_chain(cls), seen)
 
 
 def _value_json(obj: Any) -> str | None:
@@ -199,6 +203,43 @@ def _module_file(name: str) -> Path | None:
             if cand.is_file():
                 return cand
     return None
+
+
+@functools.cache
+def _installed_roots() -> frozenset[str]:
+    """Top-level names supplied by an installed distribution.
+
+    The reason a name can legitimately resolve to no *source* file: a C extension (``ujson``), or a wheel that ships no ``.py`` at its root. Read from installed metadata rather than by importing, and only ever consulted once a path search has already failed.
+    """
+    try:
+        return frozenset(importlib.metadata.packages_distributions())
+    except Exception:  # a diagnostic must never be the thing that breaks a run
+        log.debug("couldn't enumerate installed distributions", exc_info=True)
+        return frozenset()
+
+
+def _is_namespace_portion(name: str) -> bool:
+    """Whether *name* is a directory on ``sys.path``.
+
+    Only asked once ``_module_file`` has already come back empty, and that pairing is what makes it an answer: a directory holding no ``__init__.py`` is a PEP 420 namespace package. Such a package has no source of its own, so finding none is its ordinary shape rather than a hole — its submodules still resolve and still join the evidence. ``_installed_roots`` covers the namespace packages that arrived in a wheel; a project-local one has no metadata to consult, and the directory is the only thing that says so.
+
+    Named on the portion itself rather than its root, so a missing submodule of a namespace package (``nspkg.gone``) still reads as the hole it is. Uncached: reached once per module name, behind a path search that already failed.
+    """
+    rel = Path(*name.split("."))
+    return any((Path(entry) / rel).is_dir() for entry in sys.path if entry)
+
+
+def _should_have_resolved(name: str) -> bool:
+    """Whether finding no source for *name* is a hole rather than an exclusion.
+
+    ``_module_file`` returning ``None`` is the normal case for the stdlib and for extension modules, and the walk is right to skip those. It means something else when the name is project code: nothing about the module joins the evidence, so edits to it can't invalidate the cache. Told apart by the *root* package, which is what says whose code this is — a missing submodule of a project package counts, a missing submodule of ``numpy`` does not.
+    """
+    if _is_namespace_portion(name):
+        return False
+    root = name.partition(".")[0]
+    if (path := _module_file(root)) is not None:
+        return _is_project_file(path)
+    return root not in sys.stdlib_module_names and root not in _installed_roots()
 
 
 def _resolve_relative(pkg: str, module: str | None, level: int) -> str | None:
@@ -285,9 +326,17 @@ def _module_index(name: str) -> _ModuleIndex | None:
     """Read *name*'s top-level namespace from source.
 
     ``None`` for anything that isn't project code — the stdlib, an installed package, ``mini`` itself, or a name that resolves to no file at all.
+
+    That last case is the one worth hearing about, so it warns: a module the driver process can't see contributes nothing to the evidence, which reads as "no dependencies" and caches forever. Cached alongside the index, so each name says it once.
     """
-    path = _module_file(name)
-    if path is None or not _is_project_file(path):
+    if (path := _module_file(name)) is None:
+        if _should_have_resolved(name):
+            log.warning(
+                "no source found for %r on sys.path, and it is neither stdlib nor an installed package — nothing about it joins the evidence, so edits to it will not re-run the task. If it is project code, check that the driver process can see it (an editable install, or PYTHONPATH). If it is meant to be absent — an optional dependency behind try/except ImportError, or an `if TYPE_CHECKING:` import — there is nothing to fix.",
+                name,
+            )
+        return None
+    if not _is_project_file(path):
         return None
     try:
         source = path.read_text()
@@ -317,6 +366,21 @@ def _package_chain(module: str) -> list[_Ref]:
     """
     parts = module.split(".")[:-1]
     return [(".".join(parts[: i + 1]), None) for i in range(len(parts))]
+
+
+def _import_time_chain(obj: Any) -> list[_Ref]:
+    """The same import-time evidence for a live object that a deferred import gets from its name.
+
+    The reference walk reaches a helper as an *object*, so the modules that ran to produce it leave no trace: a task importing ``probe_maps`` at module scope records the function and what it references, and no package source enters. ``sca/__init__.py`` could then change its ``XLA_FLAGS`` line — which changes what the task computes — without re-running anything. The deferred walk gets the chain for free, because it resolves a dotted name; here it's read off ``__module__`` instead, and folds the same two things: the parent packages whole, and the defining module's own import-time statements.
+
+    Skipped when the module resolves to no file, which for a live object is ordinary rather than a hole: ``__main__``, a notebook cell module, something built by ``exec``. The deferred walk's missing-source warning is about a name that was *written down* and should have resolved; there's no such name here, so there's nothing to report.
+    """
+    module = getattr(obj, "__module__", None)
+    # ``__module__`` is a str by convention, and assignable to anything at all — which
+    # would reach the path search as a crash. A fingerprint must not be what breaks a run.
+    if not isinstance(module, str) or not module or _module_file(module) is None:
+        return []
+    return [*_package_chain(module), (module, _PRELUDE)]
 
 
 def _imports_within(node: ast.AST, idx: _ModuleIndex) -> list[_Ref]:
@@ -517,7 +581,7 @@ def _collect_sources(fn: Callable, seen: dict[str, str]) -> None:
             # editing code. Skipped when it has no stable encoding (see _value_json).
             if (js := _value_json(obj)) is not None:
                 seen[f"{qualname}::{name}"] = js
-    _collect_deferred(_bytecode_imports(fn), seen)
+    _collect_deferred(_bytecode_imports(fn) + _import_time_chain(fn), seen)
 
 
 @functools.lru_cache(maxsize=256)

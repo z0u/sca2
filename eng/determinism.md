@@ -63,6 +63,15 @@ The memo cannot see this. `_is_project_file` excludes site-packages, so no libra
 
 The same reasoning as above still applies — this is provenance, not identity, and `compute_env` is where it belongs. But unlike `XLA_FLAGS`, a version bump arrives with an ordinary dependency upgrade rather than a deliberate flag change, so it wants a deliberate gate. When a numerics-relevant package moves, either accept that records straddle two regimes and say so where the numbers are published, or bump `version=` on the affected tasks to force a clean re-run.
 
+## The gate: detection, not invalidation
+
+`compute_env` records the version of each package in `mini.runs._NUMERICS_PACKAGES` (`jax`, `jaxlib`, `numpy`) on every attempt, as `env.numerics_packages`. That is what makes the straddle *visible*: `numerics_drift` compares a record's versions against the ones installed now, and two readers act on it.
+
+- A **tick** notes every memo hit whose result predates an upgrade, and logs one warning naming what moved (`jax 0.10.1 → 0.11.0`) and how many hits it covers. Said once per answer, per process — a watching driver ticks every few seconds and the answer doesn't change — but a later wake that reaches more drifted hits (a suspended tick only walks the DAG to its suspension point) speaks again with the larger count. A run that straddles an upgrade can carry several recorded versions of one package; the warning names them all (`jax 0.9.0/0.10.1 → 0.11.0`).
+- **`mini status`** re-derives the same comparison from the records alone (`⚠ N result(s) computed under different numerics: …`, and a `numerics_drift` object under `--json`). No import, no tick, no fingerprinting, so it still answers weeks later, which is when someone is usually asking where a number came from.
+
+Nothing re-runs on its own, which is the point: the levers stay `version=` and an honest note beside the published numbers. Two things this does not see. A package outside the list moves silently — the list is what a measurement has implicated, and adding a name only affects records written afterwards. And the comparison is against the *driver's* installed set, not the container's; the Modal image is frozen from the same lock, so they agree unless something has been pinned apart deliberately. Records written before this shipped carry no versions and read as quiet rather than as drifted: no evidence, rather than evidence of no change.
+
 ## The alternative we didn't take: tolerating small differences
 
 The tempting move is to leave the GPU alone and teach the DAG that 4.147422 and 4.147430 are the same number. It doesn't work, for a reason worth writing down: near-equality isn't an equivalence relation. `a ≈ b` and `b ≈ c` doesn't give `a ≈ c`, so there's no way to bucket values into hashable classes. Concretely:

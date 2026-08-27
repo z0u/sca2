@@ -113,6 +113,93 @@ def test_deferred_library_imports_are_not_tracked(load_module, deferred_modules)
     assert not [k for k in parts["deps"] if k.startswith(("module:json", "json:"))]
 
 
+TASK_GHOST = "def task(x):\n    from ghost import helper\n\n    return helper(x)\n"
+TASK_GHOST_SUBMODULE = "def task(x):\n    from pkg.ghost import helper\n\n    return helper(x)\n"
+TASK_EXTENSION = "def task(x):\n    import math\n\n    return math.sqrt(x)\n"
+TASK_NAMESPACE = "def task(x):\n    from nspkg.leaf import go\n\n    return go(x)\n"
+TASK_NAMESPACE_GHOST = "def task(x):\n    from nspkg.gone import go\n\n    return go(x)\n"
+TASK_OPTIONAL_DEP = (
+    "def task(x):\n"
+    "    try:\n"
+    "        from fastmath import boost\n"
+    "    except ImportError:\n"
+    "        def boost(v):\n"
+    "            return v\n"
+    "\n"
+    "    return boost(x)\n"
+)
+
+
+def test_unresolvable_module_warns_and_contributes_nothing(load_module, deferred_modules, caplog):
+    """A module the driver process can't find is the one case where "not project code" is a lie.
+
+    The walk skips it exactly as it skips the stdlib, so the task depends on nothing and its record caches forever — a stale result served for the life of the module. Nothing about the outcome can be fixed from here (the source genuinely isn't there to read), so the requirement is that it says so."""
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _, parts = _deferred_parts(load_module, deferred_modules, TASK_GHOST, "a", helpers=HELPER_V1)
+    assert not [k for k in parts["deps"] if "ghost" in k], "the hazard: the import joined no evidence"
+    assert [r for r in caplog.records if "'ghost'" in r.message], "…and said nothing about it"
+
+
+def test_missing_submodule_of_a_project_package_warns(load_module, deferred_modules, tmp_path, caplog):
+    """The realistic shape: ``from sca.thing import x`` after ``thing`` moved. The root package is project code and resolves fine, so only the leaf is missing — which is what makes it easy to miss."""
+    (tmp_path / "a" / "pkg").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "a" / "pkg" / "__init__.py").write_text("")
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _deferred_parts(load_module, deferred_modules, TASK_GHOST_SUBMODULE, "a")
+    assert [r for r in caplog.records if "'pkg.ghost'" in r.message]
+
+
+def test_extension_modules_resolve_silently(load_module, deferred_modules, caplog):
+    """The counterpart, and the reason the check can't just be "found no file".
+
+    ``math`` is C, so a path search finds nothing for it exactly as it finds nothing for a module that is missing — the two are indistinguishable until you ask who *claims* the name. Warning here would fire on every task that imports the stdlib, which is how a warning stops being read."""
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _deferred_parts(load_module, deferred_modules, TASK_EXTENSION, "a")
+    assert not caplog.records
+
+
+def test_local_namespace_package_is_not_a_hole(load_module, deferred_modules, tmp_path, caplog):
+    """A PEP 420 namespace package — a directory with no ``__init__.py`` — has no source of its own to find, so the packages walked on the way down to a submodule must not read as holes.
+
+    Installed metadata answers this for a namespace package that arrived in a wheel; a project-local one has nothing to consult but the directory. The submodule underneath it resolves normally and still has to reach the evidence, which is what makes the silence safe."""
+    (tmp_path / "a" / "nspkg").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "a" / "nspkg" / "leaf.py").write_text("def go(x):\n    return x + 1\n")
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _, parts = _deferred_parts(load_module, deferred_modules, TASK_NAMESPACE, "a")
+    assert "nspkg.leaf:go" in parts["deps"], "the submodule still has to be tracked"
+    assert not caplog.records
+
+
+def test_missing_submodule_of_a_namespace_package_warns(load_module, deferred_modules, tmp_path, caplog):
+    """The silence above is bought by naming the portion rather than its root, so a genuine hole *under* a namespace package still gets said out loud."""
+    (tmp_path / "a" / "nspkg").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "a" / "nspkg" / "leaf.py").write_text("def go(x):\n    return x + 1\n")
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _deferred_parts(load_module, deferred_modules, TASK_NAMESPACE_GHOST, "a")
+    assert [r for r in caplog.records if "'nspkg.gone'" in r.message]
+
+
+def test_deliberately_absent_imports_warn_and_say_so(load_module, deferred_modules, caplog):
+    """A known false positive, pinned rather than fixed: an optional dependency behind ``try/except ImportError`` warns whenever it is absent, which is the case the code was written to handle.
+
+    Telling it apart from a real hole needs the AST context that says "this import is guarded", and the walk reaches a task body as bytecode, where the ``try`` has become a jump — the same reason ``if TYPE_CHECKING:`` imports of uninstalled packages warn. What the message can do is admit the possibility, so a reader isn't sent looking for a broken install that was never broken. If a later change does learn to tell the two apart, this test should flip."""
+    with caplog.at_level("WARNING", logger="mini.memo"):
+        _deferred_parts(load_module, deferred_modules, TASK_OPTIONAL_DEP, "a")
+    warnings = [r for r in caplog.records if "'fastmath'" in r.message]
+    assert warnings, "the shape still warns"
+    assert "meant to be absent" in warnings[0].message, "…and the message has to allow that it is fine"
+
+
+def test_installed_extension_packages_are_not_holes(monkeypatch):
+    """The same silence has to cover wheels that ship no source at their root — a C extension like ``_xxhash``, or a namespace package. Installed metadata is what says so, since the path search can't."""
+    from mini import memo
+
+    monkeypatch.setattr(memo, "_installed_roots", lambda: frozenset({"speedy"}))
+    assert not memo._should_have_resolved("speedy")
+    assert not memo._should_have_resolved("speedy.core")
+    assert memo._should_have_resolved("ghost")
+
+
 BIG_HELPERS = HELPER_V1 + "\n\ndef unrelated(x):\n    return x * 1000\n\nUNUSED = 'a' * 500\n"
 TASK_ALIAS = "def task(x):\n    from pkg import helpers as h\n\n    return h.helper(x)\n"
 TASK_ALIAS_BARE = "def task(x):\n    from pkg import helpers as h\n\n    return h.helper(x) + len(dir(h))\n"
@@ -157,6 +244,61 @@ def test_module_alias_narrows_to_the_attributes_reached(load_module, deferred_mo
     whole = parts(TASK_ALIAS_BARE, BIG_HELPERS, "c")
     assert "module:pkg.helpers" in whole["deps"]
     assert whole["code_fp"] != parts(TASK_ALIAS_BARE, BIG_HELPERS.replace("x * 1000", "x * 2000"), "d")["code_fp"]
+
+
+TASK_PKG_DEFERRED = "def task(x):\n    from pkg.mod import helper\n\n    return helper(x)\n"
+TASK_PKG_TOPLEVEL = "from pkg.mod import helper\n\ndef task(x):\n    return helper(x)\n"
+
+
+@pytest.fixture
+def pkg_parts(load_module, deferred_modules, tmp_path):
+    """Fingerprint a task that reaches ``pkg.mod:helper``, against a given ``pkg/__init__.py``."""
+
+    def _parts(task_src: str, init: str, variant: str, mod: str = HELPER_V1) -> tuple[str, dict]:
+        d = tmp_path / variant
+        (d / "pkg").mkdir(parents=True, exist_ok=True)
+        (d / "pkg" / "__init__.py").write_text(init)
+        (d / "pkg" / "mod.py").write_text(mod)
+        deferred_modules(variant)
+        for name in [n for n in sys.modules if n == "pkg" or n.startswith("pkg.")]:
+            del sys.modules[name]  # the next variant's `pkg` is a different file
+        return task_key_parts(load_module("tasks", task_src, variant).task, (1,))
+
+    return _parts
+
+
+@pytest.mark.parametrize(
+    "task_src", [TASK_PKG_DEFERRED, TASK_PKG_TOPLEVEL], ids=["deferred import", "module-scope import"]
+)
+def test_package_init_is_evidence_however_the_helper_is_reached(pkg_parts, task_src: str):
+    """A package's ``__init__`` runs before the module under it does, and can change what the task computes (``sca/__init__.py`` sets ``XLA_FLAGS``), so it belongs in the evidence and editing it must re-run.
+
+    Which is easy for the deferred walk, resolving a dotted name it can read the chain off. The module-scope import reaches the helper as an *object*, and the chain has to come from its ``__module__`` instead — otherwise the same edit to the same file invalidates one task and not the other, purely by where the import was written.
+    """
+    grown = "VERSION = 1\n\ndef unrelated():\n    return 99\n"
+    key_v1, p_v1 = pkg_parts(task_src, "VERSION = 1\n", "a")
+    key_v2, p_v2 = pkg_parts(task_src, grown, "b")
+    _, p_copy = pkg_parts(task_src, "VERSION = 1\n", "c")
+    assert "module:pkg" in p_v1["deps"], "the parent package left no trace — edits to it can't re-run the task"
+    assert p_v1["code_fp"] != p_v2["code_fp"], "package-init edit invisible — stale results would be served"
+    assert key_v1 == key_v2, "the edit re-keyed the task — record/logs/history would be orphaned"
+    assert p_copy["code_fp"] == p_v1["code_fp"], "identical source must fingerprint identically"
+
+
+# Import-time behavior in the *defining* module rather than a package above it: the
+# helper's own source is untouched by an edit to the line beside it.
+MOD_PRELUDE = "import os\n\nos.environ.setdefault('PKG_MODE', '{mode}')\n\n" + HELPER_V1
+
+
+@pytest.mark.parametrize(
+    "task_src", [TASK_PKG_DEFERRED, TASK_PKG_TOPLEVEL], ids=["deferred import", "module-scope import"]
+)
+def test_a_modules_import_time_statements_are_evidence(pkg_parts, task_src: str):
+    """The other half of what runs before a helper does: statements at the top of its *own* module. Editing one leaves the helper's source byte-identical, so only the module's prelude entry can carry it — and the task's behavior really does change, since that's where an ``os.environ.setdefault`` lands."""
+    _, p_v1 = pkg_parts(task_src, "", "a", mod=MOD_PRELUDE.format(mode="fast"))
+    _, p_v2 = pkg_parts(task_src, "", "b", mod=MOD_PRELUDE.format(mode="slow"))
+    assert "pkg.mod:<module>" in p_v1["deps"], "the module's import-time statements left no trace"
+    assert p_v1["code_fp"] != p_v2["code_fp"], "import-time edit invisible — stale results would be served"
 
 
 def _key_and_parts(load_module, task_src: str, helper_src: str, variant: str) -> tuple[str, dict]:

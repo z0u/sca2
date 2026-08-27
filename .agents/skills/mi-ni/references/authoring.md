@@ -13,6 +13,8 @@ def main(ctx: Ctx) -> dict:
 experiment = Experiment(name="my-exp", main=main)
 ```
 
+`ctx.map` zips its iterables Executor-style — `train(lr, vocab)` per pair, and mismatched lengths raise — which is why a constant is repeated to length above. A single iterable passes each element as one argument, tuples included.
+
 The module exposes a top-level `experiment = Experiment(...)`. It carries no compute: the apparatus is injected when it runs, so the same file runs locally or on Modal without edits.
 
 ## Where experiments live
@@ -36,10 +38,11 @@ CI globs `docs/**/experiment.py` (`tests/mini/test_experiments_e2e.py`): every d
 
 The memo key is the task's *identity* — `fn name + fingerprint(inputs)` — and each attempt carries *evidence* (`fingerprint(source of fn + the project fns it calls)`) that decides whether its cached result is still current; stale evidence re-runs the task in place, under the same key (full semantics in [memoization.md](./memoization.md)). To keep the "fix a bug, re-run" loop fast and correct:
 
-- Pass each task the narrow subset of config it actually uses. `train(lr, vocab_size)` re-runs only when `lr` or `vocab_size` change; `train(whole_config)` re-runs whenever _any_ unrelated field changes.
+- Pass each task the narrow subset of config it actually uses — the habit that pays best. `train(lr, vocab_size)` re-runs only when `lr` or `vocab_size` change; `train(whole_config)` re-runs whenever _any_ unrelated field changes.
 - Keep `main` cheap and deterministic; it re-runs every wake. Derive configs there; do heavy or random work _inside_ a task.
 - Fold RNG seeds into the inputs, so the same inputs really do produce the same result. A task seeded from wall-clock can never be a cache hit.
 - Force a re-run by editing the function (its evidence goes stale) or passing `version="v2"` — either way a new attempt on the same record. Editing a project helper a task calls also invalidates it; library/framework churn does not.
+- Put a new helper wherever it belongs. Evidence is traced per definition, so a function added to an existing module is invisible to every task that doesn't call it; splitting it into a fresh module to protect the cache achieves nothing, and moving an *existing* helper re-runs its callers. The file-sized exceptions (package `__init__.py`, classes) are in [memoization.md](./memoization.md).
 
 ## Returning large outputs
 
@@ -70,4 +73,4 @@ The experiment's `roles=` table binds each label to hardware kwargs, e.g. `roles
 
 Spans *inside* the loop that legitimately report no steps get the same allowance on demand, via `mini.blocking_phase(label, timeout_s=…)`. `put`, `get` and `get_many` already declare their own, sized from the payload, so a step that checkpoints after its last training step needs nothing — reach for it only when your own code blocks for longer than the step cadence (a long eval, a download you drive yourself). The budget bounds the span rather than exempting it: a span that hangs is still caught, at `timeout_s`.
 
-A role can also set `env=` — environment for the worker, in place *before* the process starts (a Modal container Secret; locally, the task subprocess's env). Reach for it when a library reads its env once at init and a task setting it on itself would be too late: a Modal container is reused across a map's tasks, so whichever task ran first fixes the setting for the rest. `[tool.mini] env` in `pyproject.toml` gives every experiment a baseline (this project uses it for `XLA_FLAGS`, so GPU results reproduce — see [eng/determinism.md](../../../../eng/determinism.md)); a role's `env=` merges over it key by key. It is *not* a credential channel — the values land on the task record; pass tokens through Modal's `secrets=`.
+A role can also set `env=` — environment for the worker, in place *before* the process starts (a Modal container Secret; locally, the task subprocess's env). Reach for it when a library reads its env once at init and a task setting it on itself would be too late: a Modal container is reused across a map's tasks, so whichever task ran first fixes the setting for the rest. `[tool.mini] env` in `pyproject.toml` gives every experiment a baseline (this project uses it for `XLA_FLAGS`, so GPU results reproduce — see [eng/determinism.md](/eng/determinism.md)); a role's `env=` merges over it key by key. It is *not* a credential channel — the values land on the task record; pass tokens through Modal's `secrets=`.

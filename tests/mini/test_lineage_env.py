@@ -5,8 +5,11 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 from dataclasses import dataclass
 from decimal import Decimal
+
+import pytest
 
 from mini import runs
 from mini.modal_apparatus import _aggregate_cost, _worker_fn_name
@@ -98,3 +101,41 @@ def test_compute_env_records_the_numerics_env(monkeypatch):
 
     monkeypatch.setenv("XLA_FLAGS", "--xla_gpu_deterministic_ops=true")
     assert runs.compute_env()["numerics_env"] == {"XLA_FLAGS": "--xla_gpu_deterministic_ops=true"}
+
+
+def test_compute_env_records_the_numerics_package_versions():
+    """A library version moves a number without moving the memo key — no library source reaches a fingerprint — so the versions a task ran under are recorded alongside the flags."""
+    versions = runs.compute_env()["numerics_packages"]
+    assert versions.keys() <= set(runs._NUMERICS_PACKAGES)
+    assert versions["numpy"] == importlib.metadata.version("numpy")
+
+
+def test_numerics_drift_names_what_moved():
+    recorded = {"numerics_packages": {"jax": "0.10.1", "numpy": "2.2.3"}}
+    now = {"jax": "0.11.0", "numpy": "2.2.3"}
+    assert runs.numerics_drift(recorded, now) == {"jax": ("0.10.1", "0.11.0")}
+
+
+@pytest.mark.parametrize(
+    "env,current",
+    [
+        ({}, {"jax": "0.11.0"}),  # a record from before the versions were captured
+        ({"numerics_packages": {"jax": "0.10.1"}}, {}),  # a driver without jax installed
+        ({"numerics_packages": {"jax": "0.10.1"}}, {"numpy": "2.2.3"}),  # nothing in common
+        (None, {"jax": "0.11.0"}),  # a record with no env at all (never started)
+    ],
+)
+def test_numerics_drift_stays_quiet_without_both_halves(env, current):
+    """Absence of evidence isn't evidence of a change: a package missing from either side says nothing about whether the result would reproduce."""
+    assert runs.numerics_drift(env, current) == {}
+
+
+def test_merged_numerics_drift_keeps_every_baseline():
+    """A sweep can straddle an upgrade, so two records drifting from *different* versions of the same package both appear — numerically sorted, so `0.9.0` reads before `0.10.1`."""
+    drifts = [
+        {"jax": ("0.10.1", "0.11.0")},
+        {"jax": ("0.9.0", "0.11.0"), "numpy": ("2.2.3", "2.3.0")},
+    ]
+    merged = runs.merged_numerics_drift(drifts)
+    assert merged == {"jax": (("0.9.0", "0.10.1"), "0.11.0"), "numpy": (("2.2.3",), "2.3.0")}
+    assert runs.describe_numerics_drift(merged) == "jax 0.9.0/0.10.1 → 0.11.0, numpy 2.2.3 → 2.3.0"

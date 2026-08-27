@@ -48,7 +48,7 @@ dev = [
     "ruff>=0.9.7",  # linter and formatter
     "scipy-stubs>=1.15.2.2",
     "segno>=1.6.1",  # QR code generation
-    "ty>=0.0.19",  # type checker
+    "ty>=0.0.73",  # type checker; 0.0.73 is the first to keep a PEP 695 alias through a widening generic call
     "vulture>=2.14",  # dead code detection
     "watchdog>=6.0.0",  # Marimo hot-reload
 ]

@@ -1,15 +1,6 @@
 # Reports
 
-A report is a Marimo notebook (`docs/**/*.py`) that reads an experiment's durable results and renders them for the web. Fixing what the report will claim *before* the experiment runs is the preregistration discipline, a methodological concern that lives in the science skill; this file covers the other half, publishing the report as a self-contained bundle once results land.
-
-### Simplification pass
-
-Whenever you write prose, unless the changes are _very_ minor, the text should be reviewed before handing back to the human. In one turn:
-
-1. Write
-2. Stage changes (unless you have another way to see what the agent changes)
-3. Hand it to the `prose-simplifier` agent on the same turn
-4. Review the agent's changes; check for correctness
+A report is a Marimo notebook (`docs/**/*.py`) that reads an experiment's durable results and renders them for the web. Two parts of making one live in the science skill rather than here: fixing what the report will claim *before* the experiment runs (the preregistration discipline), and the passes any report prose goes through once written. This file covers the rest — publishing the report as a self-contained bundle once results land.
 
 ## Report bundles
 

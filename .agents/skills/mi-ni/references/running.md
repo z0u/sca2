@@ -6,7 +6,7 @@ The store lives at the project root (`.mini/`, found by walking up for `pyprojec
 
 ## The one invariant: tick vs. read
 
-`run`, `retry`, and `cancel` _tick_ the DAG. They re-run `main` and launch (or stop) work, so they have side effects and cost money. `ls`, `status`, `watch`, `results`, and `logs` only read the durable store, and are safe to call any time.
+`run`, `retry`, and `cancel` _tick_ the DAG. They re-run `main` and launch (or stop) work, so they have side effects and cost money. `ls`, `status`, `watch`, `results`, `logs`, and `explain` only read the durable store, and are safe to call any time.
 
 So poll with `status`, never by re-running. `--app modal` inspects a run on the Modal control plane. Don't pass `--watch` in a capped or agent session, since `run --watch` blocks to completion; one plain `run` launches the next stage and returns at once. To follow a run with a live bar *without* driving it, use the read-only `mini watch <name>`, which renders a run another process launched (a detached or Modal run) and never `tick`s.
 
@@ -60,6 +60,8 @@ So the default is not to pin; reach for it when you have a reason. If you suspec
 
 A run stamps lineage into its meta on every wake, enough to reproduce or forensically trace it: the git state (sha, branch, tags, sanitized remote, and the working-tree diff when the tree is dirty), who or what drove it (the AI agent(s) plus a non-PII operator handle — the repo owner from the remote, since the git `user.name` is a bot in agent and CI contexts and a real name is PII), the spawning environment, and the timeline. `bin/mini lineage <exp>` prints the summary (`--diff` dumps the recorded diff), including a rollup of what the tasks ran on. Upstream experiments are captured automatically: a step that `get_ref`s another experiment's ref records that producer, and the driver snapshots each producer's provenance into `lineage.upstreams` (shown as `⇐ <producer> … via <ref>`). Declare `Experiment(deps=[...])` only to force an upstream the run doesn't read via a ref (e.g. served from a memo hit, or handed over via the volume).
 
+Every attempt also records the numerics packages it ran under (`jax`, `jaxlib`, `numpy`). A library upgrade moves a number without moving the memo key, so a finished record can keep serving a result the current environment wouldn't reproduce. A tick warns once when it serves such hits, and `status` says the same from the records alone: `⚠ N result(s) computed under different numerics: jax 0.10.1 → 0.11.0`. Nothing re-runs on its own — the levers are `version=` on the affected tasks, or saying so where the numbers are published (`eng/determinism.md`).
+
 On Modal, each run's app-instance ids are recorded for cost attribution. `bin/mini cost <exp>` reconciles the run's spend from the billing API with a per-resource breakdown (CPU / Memory / each GPU type). It's a post-run query: Modal bills at daily resolution and lags the run, so a just-finished run reports nothing yet — check back later.
 
 ## Reading a task that isn't progressing
@@ -80,9 +82,7 @@ A worker can also *wedge*: a hung device call or deadlocked thread that holds it
 
 ## Recovery
 
-`FAILED` and `CANCELLED` are terminal by design, and a plain `run` will not relaunch them (a deterministic failure shouldn't busy-loop). Recover on purpose: `bin/mini logs <exp> <key>` to read the traceback, fix, then `bin/mini retry <exp>` (`--key <key>` for one). To re-run a `DONE` task, edit its fn or bump `version=` — a memo hit is never silently re-run. If a re-run or memo hit *surprises* you, `bin/mini explain <exp> <key>` shows the key's evidence and diffs it against its sibling record (code vs. inputs, per-dependency).
-
-The full fix loop — the fix/prune/retry table, bounded hotfixes with `--keep-stale-done`, superseded records, and partial `map` failures — is in [recovery.md](./recovery.md); the safety rules below are the operational side of it.
+The fix loop — why `FAILED` and `CANCELLED` are terminal, the fix/prune/retry table, bounded hotfixes with `--keep-stale-done`, superseded records, and partial `map` failures — is in [recovery.md](./recovery.md). What follows here is its operational side: what an edit costs while workers are still live, and one Modal-specific way a fix can look like it was ignored.
 
 ### Hotfix safety (avoid double-spending)
 

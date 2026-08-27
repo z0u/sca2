@@ -11,17 +11,29 @@ is_marimo_notebook() {
 }
 
 show_usage() {
+    echo "usage: $SELF [-h] {install,auth,check,open,preview,publish,site,todo,worktrees} ..."
+}
+
+show_help() {
+    show_usage
     # Important: heredoc indented with tab characters.
     cat <<-EOF
-		Usage: $0 {install|auth|check|open|preview|publish|site|todo|help}
 		New checkout? Start with: $0 install
 
-		  install:             install dependencies (uv sync) and git hooks
+		  install [--locked]:  install dependencies (uv sync) and git hooks
+		                       --locked fails on a lockfile its manifest has outgrown,
+		                       rather than re-resolving it (the default under \$CI)
 		  auth    [--check]:   set up credentials; --check just probes
-		  check   [--lint] [--format] [--typecheck] [--test] [--fix]:
+		  check   [--lint] [--format] [--typecheck] [--test] [--links] [--fix]:
 		                       run checks in parallel (default: all without --fix)
-		                       individual commands: format | lint | types | tests | dead
-		  open    <file>:      open a Marimo notebook in Marimo, or anything else in \$EDITOR
+		                       individual commands: format | lint | types | tests | links
+		                       advisory, and outside check: dead | annotations
+		  links   [...paths]:  relative doc links and #anchors that no longer resolve
+		                       (default: every .md we author)
+		  open    <file> [--browser]:
+		                       open a Marimo notebook for live editing — watches the file so
+		                       the IDE stays the editor, and prints a URL that lands in the
+		                       app view; anything else opens in \$EDITOR
 		  preview [...nbs] [--no-serve] [--force] [--port N]:
 		                       export stale reports, assemble the site with local assets
 		                       (never touches the network), and serve it
@@ -30,12 +42,14 @@ show_usage() {
 		                       (for CI; read-only, never runs a notebook)
 		  todo    [...sets] [--tag T] [--status S] [--bundle B] [--priority] [--json] [--check]:
 		                       list backlog items from todo/[set/]
+		  worktrees [--prune] [--dry-run]:
+		                       list agent worktrees; --prune removes the clean, landed ones
 
 		Experiments are run with \`bin/mini\`, not \`$0\` — see \`bin/mini --help\`.
 		EOF
 }
 
-case "${1:-help}" in
+case "${1:-}" in
     i|install)
         shift
         "$SCRIPT_DIR/install.sh" "$@"
@@ -56,6 +70,17 @@ case "${1:-help}" in
         shift
         "$SCRIPT_DIR/deadcode.sh" "$@"
         ;;
+    link|links)
+        shift
+        uv run "$SCRIPT_DIR/check_md_links.py" "$@"
+        ;;
+    ann|annotations)
+        # Advisory, like `dead`: a worklist of public cell variables that reach
+        # downstream cells untyped. Deliberately outside `check` while the backlog
+        # is longer than a branch should carry.
+        shift
+        uv run "$SCRIPT_DIR/unannotated_cell_vars.py" "$@"
+        ;;
     type|types|typecheck)
         shift
         "$SCRIPT_DIR/typecheck.sh" "$@"
@@ -69,17 +94,23 @@ case "${1:-help}" in
             shift
             "$SCRIPT_DIR/check.sh" "$@"
         else
-            "$SCRIPT_DIR/check.sh" --lint --format --typecheck --test
+            "$SCRIPT_DIR/check.sh" --lint --format --typecheck --test --links
         fi
         ;;
     o|edit|open)
         shift
         if [[ $# -eq 0 ]]; then
-            echo "open what? pass a Marimo notebook (opens in marimo edit)," 1>&2
+            echo "open what? pass a Marimo notebook (opens in marimo edit --watch)," 1>&2
             echo "or any other file (opens in \$VISUAL/\$EDITOR)." 1>&2
             exit 2
-        elif is_marimo_notebook "${1:-}"; then
-            ( set -x; uv run marimo edit "$@" )
+        fi
+        # Any position, so `--browser` and marimo's own flags can precede the file.
+        notebook=
+        for arg in "$@"; do
+            if is_marimo_notebook "$arg"; then notebook="$arg"; break; fi
+        done
+        if [[ -n "$notebook" ]]; then
+            ( set -x; uv run "$SCRIPT_DIR/edit_notebook.py" "$@" )
         else
             editor="${VISUAL:-${EDITOR:-code}}"
             if ! command -v "$editor" > /dev/null; then
@@ -127,6 +158,10 @@ case "${1:-help}" in
         shift
         uv run "$SCRIPT_DIR/todo.py" "$@"
         ;;
+    worktrees|worktree|wt)
+        shift
+        uv run "$SCRIPT_DIR/worktrees.py" "$@"
+        ;;
     e|export|r|run|s|serve|build|scrub|clean)
         case "$1" in
             e|export)     echo "'export' is gone — '$0 preview --no-serve' exports stale reports to .mini/exports/" ;;
@@ -138,11 +173,11 @@ case "${1:-help}" in
         exit 2
         ;;
     h|help|-h|--help)
-        show_usage
+        show_help
         exit 0
         ;;
     *)
         show_usage 1>&2
-        exit 1
+        exit 2
         ;;
 esac

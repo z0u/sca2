@@ -53,7 +53,7 @@ local = get(art, get_data_dir() / "acts-in")
 
 See `docs/acts` (producer) and `docs/probe` (consumer) for a runnable pair.
 
-Refs carry _provenance_ automatically. A `set_ref` inside a step stamps the writer's identity into the payload (experiment, task key, git sha/describe/dirty, run time), and a `get_ref` inside a step records the resolution on the task's record. Two things fall out with no code in the experiment. A run that reads another experiment's ref gets that experiment recorded as an upstream in its lineage (`mini lineage <name>` shows `⇐ <producer> … via <ref>`), so `Experiment(deps=[...])` is only needed to *force* an upstream that isn't read via a ref during the run (e.g. consumed through a memo hit from an earlier wake, or via the volume). And a report that resolves refs gets a provenance footer citing the producing runs ([reports.md](./reports.md)).
+Refs carry _provenance_ automatically. A `set_ref` inside a step stamps the writer's identity into the payload (experiment, task key, git sha/describe/dirty, run time), and a `get_ref` inside a step records the resolution on the task's record. Two things fall out with no code in the experiment: the reading run records that producer as an upstream in its lineage ([running.md](./running.md#provenance--cost)), and a report that resolves refs gets a provenance footer citing the producing runs ([reports.md](./reports.md)).
 
 Refs written *outside* a task worker (a notebook using the interactive `Apparatus`, a driver-side `set_ref` in `main`) are unstamped — consumers still resolve them fine, they just can't be attributed.
 
@@ -102,7 +102,7 @@ store-bucket = "your-namespace/your-bucket"        # private CAS + refs
 publish-repo = "your-namespace/your-publish-repo"   # public, versioned dataset repo
 ```
 
-With `publish-repo` set, `publish`/report-exports route to that dataset repo (a citation can pin to `…/resolve/<commit-sha>/…`); `put`/`get`/refs stay in the bucket. It costs no extra storage — Xet dedups chunks account-wide — so publishing is a commit, not a byte re-transfer. See [`eng/publishing.md`](../../../../eng/publishing.md) and issue #38 for the design.
+With `publish-repo` set, `publish`/report-exports route to that dataset repo (a citation can pin to `…/resolve/<commit-sha>/…`); `put`/`get`/refs stay in the bucket. It costs no extra storage — Xet dedups chunks account-wide — so publishing is a commit, not a byte re-transfer. See [`eng/publishing.md`](/eng/publishing.md) and issue #38 for the design.
 
 Reports don't call `publish` directly; they go through a report bundle (`use_publisher` + `asset_url`, and the publish/build split): [reports.md](./reports.md).
 

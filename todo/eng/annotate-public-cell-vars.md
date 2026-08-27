@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [notebooks, tooling, typing]
 opened: 2026-08-12
 ---
@@ -16,3 +16,13 @@ Now that Marimo propagates a definition's annotation onto the parameters of ever
 *Records* are where jaxtyping has nothing to say. `dict[int, dict]` wants a `TypedDict` for the metrics/trial/cell records every report indexes by string key. The repo has none today, and since those shapes are shared across experiments they'd belong in `src/` rather than being redeclared per notebook.
 
 A weaker mechanical backstop, if we want one: flag unparameterized `dict`/`list`/`np.ndarray`, and select `ANN401` for a literal `Any`.
+
+## Notes
+
+**2026-08-21, tech debt** — The mechanizable half is built: `scripts/unannotated_cell_vars.py`, `./go annotations`, and an advisory CI step beside the dead-code one. The `ast` route was the right guess — it needed no new toolchain, and the parse turned out to be its own predicate for "is this a notebook", so no marker matching and no `docs/` pathspec caveat. It takes paths, so `./go annotations docs/m2/ex-2.1.8` prints one report's share.
+
+The backlog it found on arrival: **91 bare public assignments** to annotate, plus **42 names bound by unpacking** across 21 statements, over 16 notebooks. Heaviest are ex-2.1.8 (20), ex-2.1.6 (11), ex-2.1.7 (11), ex-2.1.1 (10). Advisory rather than a gate because of that size, and because each fix has to be published with its report — which is also why this session stopped at the checker: a read-only `HF_TOKEN` can edit a notebook but can't republish it, and CI's publish check would fail the branch.
+
+Two things worth knowing before the annotating pass. First, **16 of the 91 are not in their cell's `return` tuple at all**, so nothing downstream reads them and an annotation propagates nowhere: `scores`, `n_seeds`, `s_bz`, `s_fr`, `rp_bz`, `rp_fr`, `corpus`, `log_v`, `sub_width`, `sub_css`, `cells`, `MARK`, `STAR`, `E`, `LR`, `depth_spread`. Those want a leading underscore rather than a type — a naming fix, not this one. Second, the return tuple is a *better* filter than the underscore convention for finding the annotations that actually pay, and the check could take it as an option later; it's left out for now because it depends on Marimo having re-saved the file (the edit hook keeps it current, but that's an assumption the checker would rather not carry).
+
+The gate is the natural next step once the list is short: move it into `./go lint`, and add it to `.claude/hooks/marimo-format.sh` so a new one is caught where it's written.
