@@ -7,7 +7,9 @@ Only *relative* targets are checked. An `http(s)://` or `mailto:` link needs the
 
 Two strips before any matching, both load-bearing. Fenced code blocks hold illustrative fragments that contain bracket-paren pairs — `todo/eng/ty-loses-pep695-alias.md`'s repro has `(x: Sequence[T])`, which reads as a link target otherwise. Inline code spans hold links quoted *as examples*: `.agents/skills/mi-ni/references/reports.md` deliberately shows ``[experiment](./experiment.py)`` as the shape a report author writes, and without the strip it is reported against whichever directory the doc happens to sit in.
 
-Anchors are matched against GitHub's slugs, since that is where these docs are read: lowercase, drop anything that isn't a letter, digit, space, hyphen or underscore, then spaces to hyphens, with `-1`/`-2` suffixes for repeats. So "Provenance & cost" is `#provenance--cost` — the removed `&` leaves the two spaces that become two hyphens. Explicit `id=`/`name=` attributes on inline HTML count as anchors too, which is how a hand-written target survives a heading rewrite.
+Anchors are matched against GitHub's slugs, since that is where these docs are read — `mini.reports.github_slug`, the same function `build_site.py` hands to Python-Markdown so a published page carries the ids GitHub would give it. So "Provenance & cost" is `#provenance--cost`: the removed `&` leaves the two spaces that become two hyphens. Explicit `id=`/`name=` attributes on inline HTML count as anchors too, which is how a hand-written target survives a heading rewrite.
+
+Repeats are where the two renderers part company, GitHub numbering them `-1` and `toc` `_1`. Under `docs/`, which is rendered both ways, a duplicate heading is therefore reported rather than resolved to one dialect or the other; elsewhere GitHub's numbering is the only one in play and stands.
 
 The file set comes from `git ls-files`, including untracked-but-not-ignored files — a doc written this session is the likeliest place for a link to be wrong, so listing only what git already knows about would hand it a clean bill of health. `.gitignore` does the excluding, so `.venv/`, `_site/`, `.mini/` and `.claude/worktrees/` drop out without a rule of their own, and `.claude/skills` is a tracked *symlink* to `.agents/skills`, so git lists the real files once and the walk can't double-report through it.
 """
@@ -16,11 +18,12 @@ import argparse
 import re
 import subprocess
 import sys
-import unicodedata
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote
+
+from mini.reports import github_slug
 
 ROOT = Path(__file__).parent.parent.resolve()
 
@@ -33,6 +36,17 @@ ROOT = Path(__file__).parent.parent.resolve()
 UNOWNED = ("references/", "src/subline/")
 
 MISSING_FILE = "no such file"
+
+# Two headings that slug alike are fine on GitHub, which numbers the repeats `-1`, `-2`.
+# `docs/` is the one tree also rendered to the published site, and Python-Markdown's `toc`
+# numbers them `_1`, `_2` — so the second heading's anchor differs between the two places a
+# reader might follow it, and only one of them can be what a checked `#fragment` matched.
+# Rather than teach the fragment check which dialect a target speaks, we keep `docs/` free of
+# the ambiguity. A heading carrying its own `id=` is already unambiguous and doesn't count.
+DUPLICATE_HEADING = (
+    "duplicate heading under docs/, which GitHub and the site number differently"
+    ' — reword it, or give it its own <span id="..."></span>'
+)
 
 # A fence is three-or-more backticks or tildes; the closer must be at least as long and of
 # the same kind, so a ````-fenced block can quote a ``` one (the docs do this).
@@ -59,21 +73,9 @@ HEADING = re.compile(r"^(?P<indent> {0,3})(?P<hashes>#{1,6})\s+(?P<text>.*?)\s*#
 HTML_ANCHOR = re.compile(r"""<[^>]*\b(?:id|name)\s*=\s*["'](?P<anchor>[^"']+)["'][^>]*>""")
 
 HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-HTML_TAG = re.compile(r"<[^>]+>")
 
 # Anything with a scheme (`https:`, `mailto:`) or protocol-relative (`//host`) leaves the repo.
 EXTERNAL = re.compile(r"^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|//)")
-
-# Markdown link and emphasis syntax inside heading text, which GitHub renders away before slugging.
-HEADING_LINK = re.compile(r"\[(?P<text>[^\]]*)\]\([^)]*\)")
-
-# `*` only, never `_`. CommonMark doesn't open emphasis on an intra-word underscore, so the
-# underscores in this repo's headings are all identifiers — `test_local_apparatus_concurrent`,
-# `__init__.py` — and reading a pair of them as emphasis would eat the characters between,
-# slugging that first one `testlocalapparatus_concurrent` and never matching a real link.
-HEADING_EMPHASIS = re.compile(r"\*{1,3}(?P<text>[^*]+?)\*{1,3}")
-
-SLUG_STRIP = re.compile(r"[^\w\- ]", re.UNICODE)
 
 
 def display(path: Path) -> str:
@@ -120,17 +122,6 @@ def strip_code(text: str) -> str:
     return CODE_SPAN.sub(lambda m: "\n" * m.group(0).count("\n"), "\n".join(out))
 
 
-def slugify(heading: str) -> str:
-    """A heading's GitHub anchor: strip markup, lowercase, drop punctuation, spaces to hyphens."""
-    text = HTML_TAG.sub("", heading)
-    text = HEADING_LINK.sub(lambda m: m["text"], text)
-    text = HEADING_EMPHASIS.sub(lambda m: m["text"], text)
-    text = text.replace("`", "")
-    # NFC first, so a combining accent and its precomposed form slug alike.
-    text = unicodedata.normalize("NFC", text).lower()
-    return SLUG_STRIP.sub("", text).replace(" ", "-")
-
-
 def anchors_in(text: str) -> set[str]:
     """Every fragment *text* offers: one slug per heading, plus explicit HTML `id`/`name`.
 
@@ -140,7 +131,7 @@ def anchors_in(text: str) -> set[str]:
     found: set[str] = set()
     seen: dict[str, int] = {}
     for m in HEADING.finditer(body):
-        if not (slug := slugify(m["text"])):
+        if not (slug := github_slug(m["text"])):
             continue  # a heading of pure punctuation gets no anchor from GitHub either
         count = seen.get(slug, 0)
         found.add(slug if count == 0 else f"{slug}-{count}")
@@ -164,11 +155,30 @@ def _resolve(target: str, source: Path) -> Path:
     return ROOT / target.lstrip("/") if target.startswith("/") else (source.parent / target)
 
 
+def _duplicate_headings(path: Path, body: str) -> list[Finding]:
+    """Headings in a code-stripped *body* that slug the same as an earlier one, minus those carrying an explicit `id=`.
+
+    Reported for `docs/` only — see :data:`DUPLICATE_HEADING`. The first of a run stands; each one after it is a finding, so the fix is local to the heading that arrived second.
+    """
+    found: list[Finding] = []
+    seen: set[str] = set()
+    for m in HEADING.finditer(body):
+        if not (slug := github_slug(m["text"])):
+            continue
+        if slug in seen and not HTML_ANCHOR.search(m["text"]):
+            found.append(Finding(path, body[: m.start()].count("\n") + 1, m["text"].strip(), DUPLICATE_HEADING))
+        seen.add(slug)
+    return found
+
+
 def findings_in(path: Path, cache: dict[Path, set[str]]) -> list[Finding]:
     """Every relative link in *path* whose file is missing or whose fragment names no heading."""
     text = path.read_text("utf-8", errors="ignore")
     body = strip_code(HTML_COMMENT.sub("", text))
     found: list[Finding] = []
+
+    if path.resolve().is_relative_to(ROOT / "docs"):
+        found += _duplicate_headings(path, body)
 
     for line, raw in _targets(body):
         target = unquote(raw.strip().removeprefix("<").removesuffix(">"))
@@ -241,7 +251,7 @@ def main() -> None:
     found = sorted(f for path in targets for f in findings_in(path, cache))
 
     if not found:
-        print(f"✅ Every relative link and #anchor resolves ({len(targets)} files)")
+        print(f"✅ Every relative link and #anchor resolves, and docs/ headings are unambiguous ({len(targets)} files)")
         return
 
     for finding in found:  # stdout is the worklist, so it stays pipeable
@@ -250,6 +260,7 @@ def main() -> None:
     counts = {
         "missing file": sum(1 for f in found if f.reason == MISSING_FILE),
         "unresolved #anchor": sum(1 for f in found if f.reason.startswith("no heading")),
+        "duplicate heading under docs/": sum(1 for f in found if f.reason == DUPLICATE_HEADING),
     }
     print(  # the tally is commentary, so it goes to stderr and out of the pipe
         f"\n{len(found)} problem(s) across {len(targets)} files — "

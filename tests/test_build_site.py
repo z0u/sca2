@@ -2,6 +2,8 @@
 
 import pytest
 
+from mini.reports import github_slug
+
 from tests.conftest import load_script
 
 build_site = load_script("build_site")
@@ -18,6 +20,35 @@ build_site = load_script("build_site")
 )
 def test_strip_index(url, want):
     assert build_site._strip_index(url) == want
+
+
+@pytest.mark.parametrize(
+    "heading",
+    [
+        "Provenance & cost",  # the `&` goes, its two spaces both become hyphens
+        "D2.1: anchoring in a transformer",
+        "Hotfix safety: avoid double-spending",
+        "`test_local_apparatus_concurrent` failed on a pristine tree",
+        "Keeps_underscores",
+    ],
+)
+def test_rendered_heading_ids_are_github_slugs(heading):
+    """A `#fragment` is checked against GitHub's slugs, so the published page has to use them too.
+
+    Python-Markdown's own slugify collapses a run of separators — it would render "Provenance & cost" as `provenance-cost` where GitHub and the check both say `provenance--cost`, and the link would resolve everywhere except the site it was written for.
+    """
+    html = build_site.render_markdown(f"## {heading}\n")
+
+    assert f'id="{github_slug(heading)}"' in html
+
+
+def test_a_heading_inside_a_details_block_is_given_an_id():
+    """The index collapses its older sections, and a fragment into one has to land."""
+    html = build_site.render_markdown(
+        '<details markdown="1"><summary><h3>Iteration 0 (prep)</h3></summary>\n\nbody\n\n</details>\n'
+    )
+
+    assert 'id="iteration-0-prep"' in html
 
 
 @pytest.fixture

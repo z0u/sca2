@@ -24,6 +24,7 @@ from mini.reports import (
     PUBLISH_LOCK,
     export_dir,
     export_key,
+    github_slug,
     insert_base,
     load_pins,
     report_notebooks,
@@ -377,6 +378,18 @@ def _rewrite_md_links(text: str, links: LinkResolver, *, from_dir: str, pretty: 
     return re.sub(r"\]\(([^)\s]+)\)", repl, text)
 
 
+def render_markdown(text: str) -> str:
+    """A Markdown page's HTML body, with a GitHub-compatible ``id`` on every heading.
+
+    ``toc`` is what puts the ids there — without it a heading renders bare, so a ``#fragment`` into a page works on GitHub and scrolls nowhere here, which no link check can see from the source alone. Its own slugify collapses a run of separators, so it has to be handed :func:`github_slug` instead or the site would speak a third dialect: ``check_md_links`` validates a fragment against GitHub's slugs, and a link that resolves there has to resolve here.
+    """
+    return md_lib.markdown(
+        text,
+        extensions=["extra", "md_in_html", "toc"],
+        extension_configs={"toc": {"slugify": lambda value, separator: github_slug(value)}},
+    )
+
+
 def convert_markdown(links: LinkResolver, externalizing: bool):
     """Convert all .md files in docs/ (except README.md) to .html in _site/."""
     print("Converting Markdown...")
@@ -390,7 +403,7 @@ def convert_markdown(links: LinkResolver, externalizing: bool):
         from_dir = md_file.parent.relative_to(DOCS_DIR).as_posix()
         from_dir = "" if from_dir == "." else from_dir
         text = _rewrite_md_links(md_file.read_text("utf-8"), links, from_dir=from_dir, pretty=externalizing)
-        body = md_lib.markdown(text, extensions=["extra", "md_in_html"])
+        body = render_markdown(text)
         title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
         title = title_match.group(1).strip() if title_match else md_file.stem
         root = site_root(dest)
