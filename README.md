@@ -10,6 +10,8 @@ Sparse Concept Anchoring (SCA) adds a light geometric regularizer to the trainin
 
 This is part of a milestone program.
 
+![Milestone map: M1 (autoencoders) complete, M2 (transformers) in progress, M3 (language models) and M4 (LLM fine-tunes) planned. Within M2, D2.1 (anchor a concept) is complete, D2.2 (operations and steering) in progress, D2.3 (asymmetric verification) planned, and D2.4 (publication) already under way.](/docs/public/milestones.svg)
+
 - M1 anchored concepts in autoencoders. Done: [published in GRaM @ ICLR 2026](https://arxiv.org/abs/2512.12469). [M1 blog post](/references/d1.3-intervening-sca.md); [source](https://github.com/z0u/ex-preppy))
 - **M2 tests whether it transfers to transformers (this project)**
 - M3 and M4: Small language models and LLM fine-tunes with real safety targets, sycophancy the lead candidate.
