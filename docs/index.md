@@ -93,3 +93,9 @@ These experiments were preparation for the main work: exercising the infrastruct
 - [D2.1 figures for the anchoring post](./m2/d2.1/report.py)
 
     Grading-cloud figures for the LessWrong post on D2.1, drawn from the published results above: the anchoring recipe one piece at a time, and the primary condition per (slice, position).
+
+### D2.2: anchoring an operation
+
+- [D2.2 design](./m2/d2.2/design.md)
+
+    The plan: the claims D2.2 exists to make, the experiments in order with the engineering that precedes them, the risk each retires, and what is out of scope.
