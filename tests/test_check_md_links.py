@@ -162,16 +162,15 @@ def test_a_root_absolute_path_resolves_from_the_repo_root(fake_root: Path):
     assert reasons(page) == ["no such file"]
 
 
-def test_a_root_absolute_link_under_docs_is_reported(fake_root: Path):
-    """`docs/` is the one tree rendered to the published site, which is served from a subpath.
+def test_a_root_absolute_link_under_docs_stands(fake_root: Path):
+    """`docs/` is rendered to a site served from a subpath, which once made this form 404 there.
 
-    `build_site.py` leaves a root-absolute target alone, so it resolves on disk and on GitHub while 404ing on the site — the quiet kind, and invisible to a checker that only asks whether the file exists.
+    `build_site.py` now reads a root-absolute target against the repo root and rewrites it, so the house style holds inside `docs/` as well and only the file has to exist.
     """
     doc(fake_root, "# GC\n", "eng/gc.md")
-    page = doc(fake_root, "[eng](/eng/gc.md)\n", "docs/report.md")
+    page = doc(fake_root, "[eng](/eng/gc.md) and [nope](/eng/no-such-file.md)\n", "docs/report.md")
 
-    (finding,) = check.findings_in(page, {})
-    assert finding.reason == check.PUBLISHED_ABSOLUTE
+    assert reasons(page) == ["no such file"]
 
 
 def test_a_title_is_not_part_of_the_target(tmp_path: Path):

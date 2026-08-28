@@ -86,9 +86,15 @@ def _resolve_publish_store():
 # resolver turns each such link into an absolute target — the rendered page for things
 # the build renders, the GitHub source otherwise — so it survives the base. In localize
 # mode (no base) rendered links stay relative so offline navigation still works.
+#
+# A root-absolute target (``/eng/gc.md``) is the house style for a cross-tree link
+# (see ``todo/eng/markdown-link-check.md``): GitHub and VS Code both read it against
+# the repo root, so the resolver does too, rebasing it onto ``docs/`` to take the same
+# paths below as a relative one. ``_ANCHORED`` therefore matches only what is already
+# absolute or in-page, the same set ``mini.reports`` leaves alone.
 # ---------------------------------------------------------------------------
 
-_ANCHORED = re.compile(r"(?:[a-z][a-z0-9+.\-]*:|//|/|#)", re.IGNORECASE)
+_ANCHORED = re.compile(r"(?:[a-z][a-z0-9+.\-]*:|//|#)", re.IGNORECASE)
 
 
 def _strip_index(url: str) -> str:
@@ -160,15 +166,21 @@ class LinkResolver:
         return cls(render_map, source_files, site_base, source_base, repo_root=WORKSPACE_ROOT)
 
     def resolve(self, token: str, *, from_dir: str, out_dir: str, externalizing: bool) -> str | None:
-        """The rewritten target for relative link *token* authored under ``docs/<from_dir>``.
+        """The rewritten target for author-written link *token* under ``docs/<from_dir>``.
 
-        The token is interpreted against ``from_dir`` (where it was written); a localized link is made relative to ``out_dir`` (where the emitting page *renders*, which for a report differs from its source dir). ``None`` means "leave it alone" — an external/absolute link, or one whose target the build doesn't know how to reach.
+        A relative token is interpreted against ``from_dir`` (where it was written) and a root-absolute one against the repo root; a localized link is made relative to ``out_dir`` (where the emitting page *renders*, which for a report differs from its source dir). ``None`` means "leave it alone" — an external or in-page link, or one whose target the build doesn't know how to reach.
         """
         if not token or _ANCHORED.match(token):
             return None
         path_part, _, frag = token.partition("#")
         frag = f"#{frag}" if frag else ""
-        norm = os.path.normpath(PurePosixPath(from_dir, path_part).as_posix())
+        if path_part.startswith("/"):
+            # Root-absolute: repo-root-relative, so rebase onto docs/ and let the
+            # branches below decide. One under docs/ renders like any other page;
+            # one outside it takes the escape branch and points at the source.
+            norm = os.path.relpath(os.path.normpath(path_part.lstrip("/")), "docs")
+        else:
+            norm = os.path.normpath(PurePosixPath(from_dir, path_part).as_posix())
         if norm.startswith(".."):
             # Escaped docs/, but often still inside the repo — a report linking to its
             # source modules (``../src/experiment``, ``../../src/.../README.md``). Point

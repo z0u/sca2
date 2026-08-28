@@ -126,11 +126,34 @@ def test_missing_repo_source_target_is_unresolved(tmp_path):
     )
 
 
-def test_external_and_anchored_links_are_left_alone(resolver):
+def test_external_and_in_page_links_are_left_alone(resolver):
     kw = dict(from_dir="probe", out_dir="probe/report", externalizing=True)
     assert resolver.resolve("https://example.com", **kw) is None
+    assert resolver.resolve("//cdn.example.com/x.js", **kw) is None
     assert resolver.resolve("#section", **kw) is None
-    assert resolver.resolve("/absolute", **kw) is None
+
+
+def test_root_absolute_link_reads_against_the_repo_root(resolver):
+    # The house style for a cross-tree link. One outside docs/ points at the GitHub
+    # source; one under docs/ renders like the relative form of the same target.
+    kw = dict(from_dir="probe", out_dir="probe/report", externalizing=True)
+    assert resolver.resolve("/src/experiment", **kw) == "https://github.com/o/r/blob/main/src/experiment"
+    assert resolver.resolve("/eng/gc.md#gate", **kw) == "https://github.com/o/r/blob/main/eng/gc.md#gate"
+    assert resolver.resolve("/docs/acts/report.py", **kw) == "https://o.github.io/r/acts/report/"
+    assert (
+        resolver.resolve("/docs/probe/experiment.py", **kw)
+        == "https://github.com/o/r/blob/main/docs/probe/experiment.py"
+    )
+
+
+def test_root_absolute_link_localizes_like_a_relative_one(resolver):
+    got = resolver.resolve("/docs/acts/report.py", from_dir="probe", out_dir="probe/report", externalizing=False)
+
+    assert got == resolver.resolve("../acts/report.py", from_dir="probe", out_dir="probe/report", externalizing=False)
+
+
+def test_root_absolute_link_escaping_the_repo_root_is_unresolved(resolver):
+    assert resolver.resolve("/../etc/passwd", from_dir="probe", out_dir="probe/report", externalizing=True) is None
 
 
 def test_unknown_target_is_unresolved(resolver):
