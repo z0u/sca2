@@ -55,5 +55,15 @@ Use these terms consistently across all reports.
 
   Two statistics that earlier reports both wrote as R². Write $R^2$ for a probe's held-out coefficient of determination (can be negative; measures a fitted readout), and $r^2$ for a squared Pearson correlation (bounded to [0, 1]; measures proportionality, e.g. the grading track). Say which one in prose on first use.
 
+- s₂ (surprise-surprise)
+
+  A **per-token** statistic: a token's surprisal minus the entropy of the distribution that predicted it, over $\log |V|$ — how much more surprised the model was than it expected to be. Pooling is a separate choice made afterwards, and the statistic is linear in both parts, so the order doesn't matter (`sca.compute.evaluation.answer_calibration` means over the answer characters). What it buys over bare surprisal is that it nets out the surprise the model itself anticipated, so a genuinely unpredictable position doesn't count against a model that knew it was unpredictable.
+
+  It is zero in expectation under the model's _own_ distribution, which is what makes it a calibration statistic and not an accuracy one — a uniform model reads exactly 0 at every token, since its surprisal and its entropy are both $\log |V|$ whatever comes next. So s₂ alone says nothing about whether the model is any good; pair it with accuracy or surprisal unless competence is already established elsewhere.
+
+  Read the sign, and expect an asymmetric scale. Positive is confidently wrong and unbounded (surprisal has no ceiling); negative is a hedge the outcome didn't need, and is bounded by $-h/\log|V|$, so it stays shallow while the model is mostly confident. Measured over ex-2.1.1's captured rows: 80% of positions are negative but the median is −0.001, only 2% fall below −0.15, and the floor is −0.28 against a maximum of +6.2. Those deep-negative positions are overwhelmingly the first character of a word, where the model is unsure _which_ word but the character is shared across its candidates (`black + ` → `b`).
+
+  It is not a KL divergence, despite the shape. It is $H(p,q) - H(q)$, where a divergence from the data would be $H(p,q) - H(p)$; against a near-deterministic truth the two disagree in sign, so don't describe it as a distance from the data.
+
 
 [^not-cell]: In classical DoE a condition is called a cell, but we can't call it that because other senses of "cell" appear in reports and cannot be renamed away: cells of a table or heatmap ("each cell is the seed mean"), and Marimo notebook cells ("the analysis cells below"). Reports also legitimately use it for spatial grids (color-grid cells, Voronoi cells). So in prose, "cell" never means a condition or a run. In _code_, the stored key `metrics["cells"]` can keep its legacy name to avoid invalidating memo keys.
