@@ -24,6 +24,7 @@ from mini.reports import (
     PUBLISH_LOCK,
     export_dir,
     export_key,
+    github_slug,
     insert_base,
     load_pins,
     report_notebooks,
@@ -47,6 +48,24 @@ REPORT_CSS = DOCS_DIR / "report.css"
 # The relative dir, beside each report's index.html, holding its externalized assets
 # (figures, data blobs) written by mini.reports.Publisher.
 ASSET_LINK = "_assets"
+
+# Mermaid for Markdown pages, pinned to the version Marimo's frontend depends on, so a
+# diagram in a .md renders like one `mo.mermaid` draws in a report. Re-check on a marimo
+# bump, alongside the font pins in scripts/md.css:
+#   curl -s https://cdn.jsdelivr.net/npm/@marimo-team/frontend@<version>/package.json
+MERMAID_VERSION = "11.12.3"
+MERMAID_URL = f"https://cdn.jsdelivr.net/npm/mermaid@{MERMAID_VERSION}/dist/mermaid.esm.min.mjs"
+
+# Loaded only by a page that holds a diagram, since the bundle is a few MB. Mermaid picks
+# up the reader's colour scheme the way md.css does; a scheme changed after load lands on
+# the next reload.
+MERMAID_SCRIPT = f"""<script type="module">
+import mermaid from "{MERMAID_URL}";
+const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+mermaid.initialize({{ startOnLoad: false, theme: dark ? "dark" : "default" }});
+await mermaid.run();
+</script>
+"""
 
 # Source suffixes that the build renders into a report page (so an author link to one
 # resolves to the rendered result, not the dead source file).
@@ -86,9 +105,15 @@ def _resolve_publish_store():
 # resolver turns each such link into an absolute target — the rendered page for things
 # the build renders, the GitHub source otherwise — so it survives the base. In localize
 # mode (no base) rendered links stay relative so offline navigation still works.
+#
+# A root-absolute target (``/eng/gc.md``) is the house style for a cross-tree link
+# (see ``todo/eng/markdown-link-check.md``): GitHub and VS Code both read it against
+# the repo root, so the resolver does too, rebasing it onto ``docs/`` to take the same
+# paths below as a relative one. ``_ANCHORED`` therefore matches only what is already
+# absolute or in-page, the same set ``mini.reports`` leaves alone.
 # ---------------------------------------------------------------------------
 
-_ANCHORED = re.compile(r"(?:[a-z][a-z0-9+.\-]*:|//|/|#)", re.IGNORECASE)
+_ANCHORED = re.compile(r"(?:[a-z][a-z0-9+.\-]*:|//|#)", re.IGNORECASE)
 
 
 def _strip_index(url: str) -> str:
@@ -160,15 +185,21 @@ class LinkResolver:
         return cls(render_map, source_files, site_base, source_base, repo_root=WORKSPACE_ROOT)
 
     def resolve(self, token: str, *, from_dir: str, out_dir: str, externalizing: bool) -> str | None:
-        """The rewritten target for relative link *token* authored under ``docs/<from_dir>``.
+        """The rewritten target for author-written link *token* under ``docs/<from_dir>``.
 
-        The token is interpreted against ``from_dir`` (where it was written); a localized link is made relative to ``out_dir`` (where the emitting page *renders*, which for a report differs from its source dir). ``None`` means "leave it alone" — an external/absolute link, or one whose target the build doesn't know how to reach.
+        A relative token is interpreted against ``from_dir`` (where it was written) and a root-absolute one against the repo root; a localized link is made relative to ``out_dir`` (where the emitting page *renders*, which for a report differs from its source dir). ``None`` means "leave it alone" — an external or in-page link, or one whose target the build doesn't know how to reach.
         """
         if not token or _ANCHORED.match(token):
             return None
         path_part, _, frag = token.partition("#")
         frag = f"#{frag}" if frag else ""
-        norm = os.path.normpath(PurePosixPath(from_dir, path_part).as_posix())
+        if path_part.startswith("/"):
+            # Root-absolute: repo-root-relative, so rebase onto docs/ and let the
+            # branches below decide. One under docs/ renders like any other page;
+            # one outside it takes the escape branch and points at the source.
+            norm = os.path.relpath(os.path.normpath(path_part.lstrip("/")), "docs")
+        else:
+            norm = os.path.normpath(PurePosixPath(from_dir, path_part).as_posix())
         if norm.startswith(".."):
             # Escaped docs/, but often still inside the repo — a report linking to its
             # source modules (``../src/experiment``, ``../../src/.../README.md``). Point
@@ -365,6 +396,30 @@ def _rewrite_md_links(text: str, links: LinkResolver, *, from_dir: str, pretty: 
     return re.sub(r"\]\(([^)\s]+)\)", repl, text)
 
 
+def render_markdown(text: str) -> str:
+    """A Markdown page's HTML body, with a GitHub-compatible ``id`` on every heading.
+
+    ``toc`` is what puts the ids there — without it a heading renders bare, so a ``#fragment`` into a page works on GitHub and scrolls nowhere here, which no link check can see from the source alone. Its own slugify collapses a run of separators, so it has to be handed :func:`github_slug` instead or the site would speak a third dialect: ``check_md_links`` validates a fragment against GitHub's slugs, and a link that resolves there has to resolve here.
+    """
+    return md_lib.markdown(
+        text,
+        extensions=["extra", "md_in_html", "toc"],
+        extension_configs={"toc": {"slugify": lambda value, separator: github_slug(value)}},
+    )
+
+
+_MERMAID_FENCE = re.compile(r'<pre><code class="language-mermaid">(.*?)</code></pre>', re.DOTALL)
+
+
+def promote_mermaid(html: str) -> tuple[str, bool]:
+    """Rewrite a ```mermaid fence into the ``<pre class="mermaid">`` the library renders into, and say whether the page has one.
+
+    Python-Markdown renders any fence as a nested ``<pre><code>``, which mermaid walks straight past; the flag then keeps its script off every page that holds no diagram. The escaping the fence applied (``&quot;`` for a node label, ``&amp;`` for a fan-out edge) is left in place — the parser reads the element's text, which the browser has already decoded.
+    """
+    html, count = _MERMAID_FENCE.subn(r'<pre class="mermaid">\1</pre>', html)
+    return html, bool(count)
+
+
 def convert_markdown(links: LinkResolver, externalizing: bool):
     """Convert all .md files in docs/ (except README.md) to .html in _site/."""
     print("Converting Markdown...")
@@ -378,7 +433,7 @@ def convert_markdown(links: LinkResolver, externalizing: bool):
         from_dir = md_file.parent.relative_to(DOCS_DIR).as_posix()
         from_dir = "" if from_dir == "." else from_dir
         text = _rewrite_md_links(md_file.read_text("utf-8"), links, from_dir=from_dir, pretty=externalizing)
-        body = md_lib.markdown(text, extensions=["extra", "md_in_html"])
+        body, has_mermaid = promote_mermaid(render_markdown(text))
         title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
         title = title_match.group(1).strip() if title_match else md_file.stem
         root = site_root(dest)
@@ -389,8 +444,7 @@ def convert_markdown(links: LinkResolver, externalizing: bool):
             '<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f"<title>{title}</title>\n"
-            f'<link rel="stylesheet" href="{root}md.css">\n'
-            "</head>\n"
+            f'<link rel="stylesheet" href="{root}md.css">\n' + (MERMAID_SCRIPT if has_mermaid else "") + "</head>\n"
             "<body>\n" + body + "\n</body>\n</html>\n"
         )
         dest.write_text(html, "utf-8")

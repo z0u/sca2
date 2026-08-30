@@ -115,8 +115,8 @@ def test_a_longer_fence_can_quote_a_shorter_one(tmp_path: Path):
         ),
     ],
 )
-def test_slugify_matches_github(heading: str, slug: str):
-    assert check.slugify(heading) == slug
+def test_github_slug_matches_github(heading: str, slug: str):
+    assert check.github_slug(heading) == slug
 
 
 def test_repeated_headings_take_numbered_suffixes(tmp_path: Path):
@@ -162,16 +162,45 @@ def test_a_root_absolute_path_resolves_from_the_repo_root(fake_root: Path):
     assert reasons(page) == ["no such file"]
 
 
-def test_a_root_absolute_link_under_docs_is_reported(fake_root: Path):
-    """`docs/` is the one tree rendered to the published site, which is served from a subpath.
-
-    `build_site.py` leaves a root-absolute target alone, so it resolves on disk and on GitHub while 404ing on the site — the quiet kind, and invisible to a checker that only asks whether the file exists.
-    """
-    doc(fake_root, "# GC\n", "eng/gc.md")
-    page = doc(fake_root, "[eng](/eng/gc.md)\n", "docs/report.md")
+def test_a_duplicate_heading_under_docs_is_reported(fake_root: Path):
+    """`docs/` renders to the site as well as GitHub, and the two number a repeat differently (`-1` vs `_1`), so the second heading's anchor depends on where it is read."""
+    page = doc(fake_root, "## Provenance & cost\n\n## Provenance & cost\n", "docs/report.md")
 
     (finding,) = check.findings_in(page, {})
-    assert finding.reason == check.PUBLISHED_ABSOLUTE
+    assert finding.reason == check.DUPLICATE_HEADING
+    assert finding.line == 3  # the one that arrived second, so the fix is local to it
+
+
+def test_a_duplicate_heading_outside_docs_stands(fake_root: Path):
+    """Only GitHub renders it, and its `-1` is what the fragment check already models."""
+    page = doc(fake_root, "## Notes\n\n## Notes\n", "eng/doc.md")
+
+    assert reasons(page) == []
+
+
+def test_a_duplicate_heading_with_its_own_id_stands(fake_root: Path):
+    """The remedy the message names has to clear the finding, or it sends the author in a circle."""
+    page = doc(fake_root, '## Notes\n\n## Notes<span id="later-notes"></span>\n', "docs/report.md")
+
+    assert reasons(page) == []
+
+
+def test_a_duplicate_heading_in_a_code_fence_stands(fake_root: Path):
+    """Headings quoted as examples aren't headings — the same strip the link scan relies on."""
+    page = doc(fake_root, "## Notes\n\n```md\n## Notes\n```\n", "docs/report.md")
+
+    assert reasons(page) == []
+
+
+def test_a_root_absolute_link_under_docs_stands(fake_root: Path):
+    """`docs/` is rendered to a site served from a subpath, which once made this form 404 there.
+
+    `build_site.py` now reads a root-absolute target against the repo root and rewrites it, so the house style holds inside `docs/` as well and only the file has to exist.
+    """
+    doc(fake_root, "# GC\n", "eng/gc.md")
+    page = doc(fake_root, "[eng](/eng/gc.md) and [nope](/eng/no-such-file.md)\n", "docs/report.md")
+
+    assert reasons(page) == ["no such file"]
 
 
 def test_a_title_is_not_part_of_the_target(tmp_path: Path):

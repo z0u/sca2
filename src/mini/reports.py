@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -51,6 +52,7 @@ __all__ = [
     "relative_urls",
     "stray_links",
     "rewrite_links",
+    "github_slug",
     "insert_base",
     "set_theme",
     "set_responsive",
@@ -422,6 +424,38 @@ def stray_links(html: str, *, link: str = "_assets") -> list[str]:
     """
     prefix = f"{link}/"
     return sorted({u for u in relative_urls(html) if not u.startswith(prefix)})
+
+
+#: Markup a heading carries that GitHub renders away before slugging: inline HTML, and
+#: a link's target (its text stays).
+_SLUG_HTML_TAG = re.compile(r"<[^>]+>")
+_SLUG_LINK = re.compile(r"\[(?P<text>[^\]]*)\]\([^)]*\)")
+
+#: Emphasis markers. `*` only, never `_`: CommonMark doesn't open emphasis on an intra-word
+#: underscore, so the underscores in this repo's headings are all identifiers —
+#: `test_local_apparatus_concurrent`, `__init__.py` — and reading a pair of them as emphasis
+#: would eat the characters between, slugging the first `testlocalapparatus_concurrent` and
+#: never matching a real link.
+_SLUG_EMPHASIS = re.compile(r"\*{1,3}(?P<text>[^*]+?)\*{1,3}")
+
+#: What survives: letters, digits, spaces, hyphens, underscores. Spaces then become hyphens.
+_SLUG_STRIP = re.compile(r"[^\w\- ]", re.UNICODE)
+
+
+def github_slug(heading: str) -> str:
+    """A heading's GitHub anchor: strip markup, lowercase, drop punctuation, spaces to hyphens.
+
+    The one definition of a heading anchor for this repo, shared by ``scripts/check_md_links.py`` (which validates a ``#fragment`` against it) and ``scripts/build_site.py`` (which hands it to Python-Markdown's ``toc`` so the published page carries the same id GitHub would give it). Python-Markdown's own slugify collapses a run of separators, so "Provenance & cost" would be ``provenance-cost`` there and ``provenance--cost`` here — the removed ``&`` leaves two spaces, and GitHub turns both into hyphens. A link that resolves in one place has to resolve in the other, so neither may drift.
+
+    Repeats are the one case the two still number differently (``-1`` on GitHub, ``_1`` in ``toc``); ``check_md_links`` reports a duplicate heading under ``docs/`` rather than letting it render.
+    """
+    text = _SLUG_HTML_TAG.sub("", heading)
+    text = _SLUG_LINK.sub(lambda m: m["text"], text)
+    text = _SLUG_EMPHASIS.sub(lambda m: m["text"], text)
+    text = text.replace("`", "")
+    # NFC first, so a combining accent and its precomposed form slug alike.
+    text = unicodedata.normalize("NFC", text).lower()
+    return _SLUG_STRIP.sub("", text).replace(" ", "-")
 
 
 def rewrite_links(html: str, mapping: dict[str, str]) -> str:

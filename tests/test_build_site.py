@@ -2,6 +2,8 @@
 
 import pytest
 
+from mini.reports import github_slug
+
 from tests.conftest import load_script
 
 build_site = load_script("build_site")
@@ -18,6 +20,52 @@ build_site = load_script("build_site")
 )
 def test_strip_index(url, want):
     assert build_site._strip_index(url) == want
+
+
+@pytest.mark.parametrize(
+    "heading",
+    [
+        "Provenance & cost",  # the `&` goes, its two spaces both become hyphens
+        "D2.1: anchoring in a transformer",
+        "Hotfix safety: avoid double-spending",
+        "`test_local_apparatus_concurrent` failed on a pristine tree",
+        "Keeps_underscores",
+    ],
+)
+def test_rendered_heading_ids_are_github_slugs(heading):
+    """A `#fragment` is checked against GitHub's slugs, so the published page has to use them too.
+
+    Python-Markdown's own slugify collapses a run of separators — it would render "Provenance & cost" as `provenance-cost` where GitHub and the check both say `provenance--cost`, and the link would resolve everywhere except the site it was written for.
+    """
+    html = build_site.render_markdown(f"## {heading}\n")
+
+    assert f'id="{github_slug(heading)}"' in html
+
+
+def test_a_heading_inside_a_details_block_is_given_an_id():
+    """The index collapses its older sections, and a fragment into one has to land."""
+    html = build_site.render_markdown(
+        '<details markdown="1"><summary><h3>Iteration 0 (prep)</h3></summary>\n\nbody\n\n</details>\n'
+    )
+
+    assert 'id="iteration-0-prep"' in html
+
+
+def test_a_mermaid_fence_becomes_the_element_the_library_renders_into():
+    """Python-Markdown nests every fence in a `<code>`, which mermaid walks straight past."""
+    html, has_mermaid = build_site.promote_mermaid(
+        build_site.render_markdown('```mermaid\nflowchart LR\na(["suppress red"]) & b --> c\n```\n')
+    )
+
+    assert has_mermaid
+    assert html == '<pre class="mermaid">flowchart LR\na([&quot;suppress red&quot;]) &amp; b --&gt; c\n</pre>'
+
+
+def test_an_ordinary_fence_is_left_as_code():
+    html, has_mermaid = build_site.promote_mermaid(build_site.render_markdown("```python\nx = 1\n```\n"))
+
+    assert not has_mermaid
+    assert 'class="mermaid"' not in html
 
 
 @pytest.fixture
@@ -126,11 +174,34 @@ def test_missing_repo_source_target_is_unresolved(tmp_path):
     )
 
 
-def test_external_and_anchored_links_are_left_alone(resolver):
+def test_external_and_in_page_links_are_left_alone(resolver):
     kw = dict(from_dir="probe", out_dir="probe/report", externalizing=True)
     assert resolver.resolve("https://example.com", **kw) is None
+    assert resolver.resolve("//cdn.example.com/x.js", **kw) is None
     assert resolver.resolve("#section", **kw) is None
-    assert resolver.resolve("/absolute", **kw) is None
+
+
+def test_root_absolute_link_reads_against_the_repo_root(resolver):
+    # The house style for a cross-tree link. One outside docs/ points at the GitHub
+    # source; one under docs/ renders like the relative form of the same target.
+    kw = dict(from_dir="probe", out_dir="probe/report", externalizing=True)
+    assert resolver.resolve("/src/experiment", **kw) == "https://github.com/o/r/blob/main/src/experiment"
+    assert resolver.resolve("/eng/gc.md#gate", **kw) == "https://github.com/o/r/blob/main/eng/gc.md#gate"
+    assert resolver.resolve("/docs/acts/report.py", **kw) == "https://o.github.io/r/acts/report/"
+    assert (
+        resolver.resolve("/docs/probe/experiment.py", **kw)
+        == "https://github.com/o/r/blob/main/docs/probe/experiment.py"
+    )
+
+
+def test_root_absolute_link_localizes_like_a_relative_one(resolver):
+    got = resolver.resolve("/docs/acts/report.py", from_dir="probe", out_dir="probe/report", externalizing=False)
+
+    assert got == resolver.resolve("../acts/report.py", from_dir="probe", out_dir="probe/report", externalizing=False)
+
+
+def test_root_absolute_link_escaping_the_repo_root_is_unresolved(resolver):
+    assert resolver.resolve("/../etc/passwd", from_dir="probe", out_dir="probe/report", externalizing=True) is None
 
 
 def test_unknown_target_is_unresolved(resolver):

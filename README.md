@@ -10,16 +10,31 @@ Sparse Concept Anchoring (SCA) adds a light geometric regularizer to the trainin
 
 This is part of a milestone program.
 
-- M1 anchored concepts in autoencoders (done, [published](https://arxiv.org/abs/2512.12469); [blog post](https://www.lesswrong.com/posts/sGskzx7LgsDkMLvcv/intervening-on-sparse-anchored-concepts); [source](https://github.com/z0u/ex-preppy))
-- M2 tests whether it transfers to transformers (this project)
-- M3 and M4 carry it to small language models and LLM fine-tunes with real safety targets, sycophancy the lead candidate.
+![Milestone map: M1 (autoencoders) complete, M2 (transformers) in progress, M3 (language models) and M4 (LLM fine-tunes) planned. Within M2, D2.1 (anchor a concept) is complete, D2.2 (operations and steering) in progress, D2.3 (asymmetric verification) planned, and D2.4 (publication) already under way.](/docs/public/milestones.svg)
 
-M2 works in a synthetic color-mixing domain with unambiguous ground truth (`red + blue = purple`), in a small transformer:
+- M1 anchored concepts in autoencoders. Done: [published in GRaM @ ICLR 2026](https://arxiv.org/abs/2512.12469). [M1 blog post](/references/d1.3-intervening-sca.md); [source](https://github.com/z0u/ex-preppy))
+- **M2 tests whether it transfers to transformers (this project)**
+- M3 and M4: Small language models and LLM fine-tunes with real safety targets, sycophancy the lead candidate.
 
-- D2.1: Does SCA work in a transformer at all? Anchor a concept such as _red_ across the residual stream in the color-mixing task; probe each layer for the anchored concept, and confirm that completion accuracy (predicting the correct result color) matches an un-anchored baseline.
-- D2.2: Anchor an abstract _operation_ (e.g. _addition_, rather than a concrete attribute like _redness_); sweep over layers; confirm task performance is intact and that suppression scales as it did in the autoencoders.
-- D2.3: Add a verification task (`red + blue = purple TRUE/FALSE`) and test whether suppression can degrade _completion_ while preserving _verification_: the experimental analog for letting a model recognize a behavior without being able to produce it.
-- D2.4: Consolidation/outreach/publication.
+### M2
+
+M2 works in a synthetic color-mixing domain with unambiguous ground truth (`red + blue = purple`), in a small transformer:
+
+- D2.1: Does SCA work in a transformer at all? [Reports](/docs/index.md#d21-anchoring-in-a-transformer)
+
+  Anchor a concept such as _red_ across the residual stream in the color-mixing task; probe each layer for the anchored concept, and confirm that completion accuracy (predicting the correct result color) matches an un-anchored baseline.
+
+  Done. see [D2.1 blog post](/references/d2.1-anchored-transformer.md).
+
+- D2.2: Abstract concepts and steering
+
+  Anchor an abstract _operation_ (e.g. _addition_, rather than a concrete attribute like _redness_); sweep over layers; confirm task performance is intact and that suppression scales as it did in the autoencoders.
+
+- D2.3: Engineering asymmetry
+
+  Add a verification task (`red + blue = purple TRUE/FALSE`) and test whether suppression can degrade _completion_ while preserving _verification_: the experimental analog for letting a model recognize a behavior without being able to produce it.
+
+- D2.4: Consolidation/outreach/publication
 
 Why the synthetic domain first, rather than language models straight away? A toy domain keeps a negative result interpretable. In an LLM, a null result at this stage could mean the method failed, or it could mean any of the other things that can go wrong in language-model training. The color domain removes those confounds, so M2 tests the method itself.
 

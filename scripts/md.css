@@ -1,42 +1,42 @@
 /*
  * Webfonts matching the Marimo notebook reports (PT Sans / Lora / Fira Mono),
  * loaded from the same jsDelivr-hosted bundle Marimo ships.
- * Filenames are content-hashed and pinned to marimo 0.23.9 — re-check/bump
+ * Filenames are content-hashed and pinned to marimo 0.23.16 — re-check/bump
  * these URLs whenever the marimo dependency is upgraded.
  */
 @font-face {
   font-family: "PT Sans";
-  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.9/dist/assets/PTSans-Regular-Bam3NpBI.woff2") format("woff2");
+  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.16/dist/assets/PTSans-Regular-Bam3NpBI.woff2") format("woff2");
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
   font-family: "PT Sans";
-  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.9/dist/assets/PTSans-Bold-C_DwAp7Z.woff2") format("woff2");
+  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.16/dist/assets/PTSans-Bold-C_DwAp7Z.woff2") format("woff2");
   font-weight: 700;
   font-display: swap;
 }
 @font-face {
   font-family: "Lora";
-  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.9/dist/assets/Lora-VariableFont_wght-CZceb_kH.woff2") format("woff2");
+  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.16/dist/assets/Lora-VariableFont_wght-CZceb_kH.woff2") format("woff2");
   font-weight: 400 700;
   font-display: swap;
 }
 @font-face {
   font-family: "Fira Mono";
-  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.9/dist/assets/FiraMono-Regular-CEsLFVD9.woff2") format("woff2");
+  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.16/dist/assets/FiraMono-Regular-CEsLFVD9.woff2") format("woff2");
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
   font-family: "Fira Mono";
-  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.9/dist/assets/FiraMono-Medium-D5MAsWEG.woff2") format("woff2");
+  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.16/dist/assets/FiraMono-Medium-D5MAsWEG.woff2") format("woff2");
   font-weight: 500;
   font-display: swap;
 }
 @font-face {
   font-family: "Fira Mono";
-  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.9/dist/assets/FiraMono-Bold-C6PDArdf.woff2") format("woff2");
+  src: url("https://cdn.jsdelivr.net/npm/@marimo-team/frontend@0.23.16/dist/assets/FiraMono-Bold-C6PDArdf.woff2") format("woff2");
   font-weight: 700;
   font-display: swap;
 }
@@ -199,4 +199,19 @@ ul:has(>li>p),
       display: block;
     }
   }
+}
+
+/* A ```mermaid fence, promoted by the build to the <pre class="mermaid"> the library
+ * renders into (see scripts/build_site.py). It holds a diagram rather than code, so it
+ * drops the code-block frame; until the script has run it shows the diagram source. */
+pre.mermaid {
+  background: none;
+  border-left: none;
+  padding: 0;
+  text-align: center;
+}
+
+pre.mermaid svg {
+  max-width: 100%;
+  height: auto;
 }
