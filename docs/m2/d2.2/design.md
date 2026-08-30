@@ -1,4 +1,4 @@
-# D2.2 design: anchoring an operation, and the first interventions
+# D2.2 design: anchoring an operation, and the first interventions (DRAFT)
 
 A plan for the second deliverable of M2, laid out several ways: the claims we want to be able to make, the experiments in order, the engineering that has to come first, the risks each experiment retires, and what is out of scope.
 
