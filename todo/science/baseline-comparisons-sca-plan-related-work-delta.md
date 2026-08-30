@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [methodology, D2.2, D2.4, baselines]
 priority: high
 ---
@@ -10,3 +10,7 @@ A 2026-08-13 four-angle literature sweep (gradient-routing lineage, training-tim
 ## Notes
 
 **2026-08-17, housekeeping** — promoted alongside the operation-variable item, since both are D2.2 prerequisites rather than D2.2 itself. The binding piece is the method-agnostic eval contract: every baseline has to produce (model, subspace, intervention operator) for a shared scorer, and that shape is far cheaper to fix before D2.2's own experiment code is written than to retrofit around it afterwards. The literature half is already banked in `references/related-work-delta-2026.md`, so what's left here is the plan, not another sweep. Shortlist was 1/6.
+
+**2026-08-30, housekeeping** — `partial`, because the [D2.2 design](/docs/m2/d2.2/design.md) has taken the sequencing sketch nearly whole and it does not need deriving again. Placed there: the post-hoc tier (probe, diff-in-means, LEACE on the un-anchored control) runs inside *suppress red* as calibration for what follows; SGTM is its own preregistered experiment; RMU and SAE rows are deferred to D2.3; and the eval contract sits in the deps, with the operator library named (axis projection, the M1 lobe, weight ablation). The contract is the piece that is still work rather than plan, and it is still the cheapest thing to fix before any D2.2 experiment code exists — which is why the priority stays.
+
+Two pieces of this item did *not* reach the design, and I could not tell from the document whether that was a decision or an omission, so they are what is left to settle. The **2025 auditing standards** (relearning rebound, activation-perturbation, minor-direction recoverability) appear nowhere in the plan, and they are eval-contract shaped — adopting them later means re-scoring every arm rather than adding a row. The **filtered-corpus row** is likewise unplaced; it is the one baseline that needs a training run of its own, so it wants a home in the sequence before the grammar work starts, or an explicit deferral to D2.3 beside the RMU row.
