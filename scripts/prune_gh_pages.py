@@ -13,6 +13,10 @@ Two decisions worth knowing about:
 
 `single-commit: true` on `JamesIves/github-pages-deploy-action` was the off-the-shelf alternative. It force-pushes too, so it needed the lease anyway, and it wipes the history entirely rather than keeping a window — no recent deploy left to diff against, and every preview standing on the branch rewritten on every build rather than every few weeks.
 
+Nothing here checks anything out or reads the working tree — it fetches, writes commit objects, and pushes — so it doesn't care what state the deploy step left the runner in, or which branch is checked out.
+
+Expect a `pages build and deployment` run to fire right after a prune, since GitHub watches the branch and the sha moved. It rebuilds the same tree, so it publishes the same site; it's noise in the Actions list rather than a second deploy.
+
 Two consequences to be aware of. A rewrite orphans any local `gh-pages` checkout (`git fetch` then `git reset --hard origin/gh-pages` re-syncs one; nobody is expected to have one). And a re-rooted history means old deploy commits stop resolving, so nothing may cite one as a permalink — see `todo/eng/site-permalinks-for-tags.md`, which wants tag-pinned site snapshots and would need a durable home of its own regardless.
 
 Runs from `.github/workflows/publish-docs.yml` after the production deploy. To see what it would do without touching anything:
