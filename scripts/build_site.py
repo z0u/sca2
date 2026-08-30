@@ -49,6 +49,24 @@ REPORT_CSS = DOCS_DIR / "report.css"
 # (figures, data blobs) written by mini.reports.Publisher.
 ASSET_LINK = "_assets"
 
+# Mermaid for Markdown pages, pinned to the version Marimo's frontend depends on, so a
+# diagram in a .md renders like one `mo.mermaid` draws in a report. Re-check on a marimo
+# bump, alongside the font pins in scripts/md.css:
+#   curl -s https://cdn.jsdelivr.net/npm/@marimo-team/frontend@<version>/package.json
+MERMAID_VERSION = "11.12.3"
+MERMAID_URL = f"https://cdn.jsdelivr.net/npm/mermaid@{MERMAID_VERSION}/dist/mermaid.esm.min.mjs"
+
+# Loaded only by a page that holds a diagram, since the bundle is a few MB. Mermaid picks
+# up the reader's colour scheme the way md.css does; a scheme changed after load lands on
+# the next reload.
+MERMAID_SCRIPT = f"""<script type="module">
+import mermaid from "{MERMAID_URL}";
+const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+mermaid.initialize({{ startOnLoad: false, theme: dark ? "dark" : "default" }});
+await mermaid.run();
+</script>
+"""
+
 # Source suffixes that the build renders into a report page (so an author link to one
 # resolves to the rendered result, not the dead source file).
 _RENDERED_SUFFIXES = (".py", ".ipynb", ".md")
@@ -390,6 +408,18 @@ def render_markdown(text: str) -> str:
     )
 
 
+_MERMAID_FENCE = re.compile(r'<pre><code class="language-mermaid">(.*?)</code></pre>', re.DOTALL)
+
+
+def promote_mermaid(html: str) -> tuple[str, bool]:
+    """Rewrite a ```mermaid fence into the ``<pre class="mermaid">`` the library renders into, and say whether the page has one.
+
+    Python-Markdown renders any fence as a nested ``<pre><code>``, which mermaid walks straight past; the flag then keeps its script off every page that holds no diagram. The escaping the fence applied (``&quot;`` for a node label, ``&amp;`` for a fan-out edge) is left in place — the parser reads the element's text, which the browser has already decoded.
+    """
+    html, count = _MERMAID_FENCE.subn(r'<pre class="mermaid">\1</pre>', html)
+    return html, bool(count)
+
+
 def convert_markdown(links: LinkResolver, externalizing: bool):
     """Convert all .md files in docs/ (except README.md) to .html in _site/."""
     print("Converting Markdown...")
@@ -403,7 +433,7 @@ def convert_markdown(links: LinkResolver, externalizing: bool):
         from_dir = md_file.parent.relative_to(DOCS_DIR).as_posix()
         from_dir = "" if from_dir == "." else from_dir
         text = _rewrite_md_links(md_file.read_text("utf-8"), links, from_dir=from_dir, pretty=externalizing)
-        body = render_markdown(text)
+        body, has_mermaid = promote_mermaid(render_markdown(text))
         title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
         title = title_match.group(1).strip() if title_match else md_file.stem
         root = site_root(dest)
@@ -414,8 +444,7 @@ def convert_markdown(links: LinkResolver, externalizing: bool):
             '<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f"<title>{title}</title>\n"
-            f'<link rel="stylesheet" href="{root}md.css">\n'
-            "</head>\n"
+            f'<link rel="stylesheet" href="{root}md.css">\n' + (MERMAID_SCRIPT if has_mermaid else "") + "</head>\n"
             "<body>\n" + body + "\n</body>\n</html>\n"
         )
         dest.write_text(html, "utf-8")

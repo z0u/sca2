@@ -51,6 +51,23 @@ def test_a_heading_inside_a_details_block_is_given_an_id():
     assert 'id="iteration-0-prep"' in html
 
 
+def test_a_mermaid_fence_becomes_the_element_the_library_renders_into():
+    """Python-Markdown nests every fence in a `<code>`, which mermaid walks straight past."""
+    html, has_mermaid = build_site.promote_mermaid(
+        build_site.render_markdown('```mermaid\nflowchart LR\na(["suppress red"]) & b --> c\n```\n')
+    )
+
+    assert has_mermaid
+    assert html == '<pre class="mermaid">flowchart LR\na([&quot;suppress red&quot;]) &amp; b --&gt; c\n</pre>'
+
+
+def test_an_ordinary_fence_is_left_as_code():
+    html, has_mermaid = build_site.promote_mermaid(build_site.render_markdown("```python\nx = 1\n```\n"))
+
+    assert not has_mermaid
+    assert 'class="mermaid"' not in html
+
+
 @pytest.fixture
 def resolver() -> "build_site.LinkResolver":
     # Reports render to <key>/index.html (per-report dirs); markdown to <name>.html.
