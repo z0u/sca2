@@ -324,12 +324,7 @@ def test_helper_edits_move_evidence_not_identity(load_module, task_src: str):
     assert (key_copy, p_copy["code_fp"]) == (key_v1, p_v1["code_fp"]), "identical source must fingerprint identically"
 
 
-DOCUMENTED = (
-    '"""Colour helpers."""\n\n\n'
-    "def helper(x):\n"
-    '    """Add one to *x*."""\n'
-    "    return x + 1  # the increment\n"
-)
+DOCUMENTED = '"""Colour helpers."""\n\n\ndef helper(x):\n    """Add one to *x*."""\n    return x + 1  # the increment\n'
 
 
 @pytest.mark.parametrize(
