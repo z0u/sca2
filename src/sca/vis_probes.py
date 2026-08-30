@@ -239,7 +239,7 @@ def draw_depth_stack(
 
     A four-dimensional *stack* is read as ``(replicate, depth, landmark, channel)`` — the per-seed maps rather than their average. The panels then plot the mean over replicates and shade their spread, so nothing upstream has to decide which of the two to keep.
 
-    Depth 0 (the embedding) goes at the bottom and the last layer at the top, matching the heatmaps, so height on the page means depth in the network in both figures.
+    Depth 0 (the embedding, labelled ``emb``) goes at the bottom and the last block's output at the top, matching the heatmaps, so height on the page means depth in the network in both figures.
 
     The panels are pushed flush against each other: a stack is one picture of how a probe fares through the network, and a gap between rows would break it into five pictures. Blocks stay apart because each is its own sub-figure.
     """
@@ -266,7 +266,7 @@ def draw_depth_stack(
         )
         style_trace_panel(ax)
         if depth_labels:
-            ax.set_ylabel(f"{depth}", fontsize=8)
+            ax.set_ylabel("emb" if depth == 0 else f"{depth}", fontsize=8)
     if title:
         axes[0].set_title(title, fontsize=9)
     label_landmarks(axes[-1], sparse=sparse_ticks, labels=tick_labels)
@@ -364,7 +364,7 @@ def draw_transfer_stack(
             )
         style_trace_panel(ax)
         if depth_labels:
-            ax.set_ylabel(f"{depth}", fontsize=8)
+            ax.set_ylabel("emb" if depth == 0 else f"{depth}", fontsize=8)
     if title:
         axes[0].set_title(title, fontsize=9)
     label_landmarks(axes[-1], sparse=sparse_ticks, labels=tick_labels)

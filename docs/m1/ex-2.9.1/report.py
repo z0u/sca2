@@ -55,9 +55,9 @@ def _():
 
     This is a port of [ex-preppy](https://github.com/z0u/ex-preppy) experiment 2.9.1 (M1, autoencoders), run as an end-to-end test of the infrastructure in this repo before the M2 transformer experiments. It re-answers the M1 question: if Sparse Concept Anchoring pins *red* to one latent axis during training, does zeroing that axis delete red, and only red?
 
-    The model is a small autoencoder: it compresses each RGB color down to a 5-dimensional vector (the bottleneck) and reconstructs the color from that vector alone. Training adds four regularizers[^regularizer] on the bottleneck, which is unit-normalized so every latent vector lands on the surface of a hypersphere: anchor pulls red-labeled samples toward one fixed axis (e₀), anti-anchor pushes everything away from the opposite point (−e₀), separate spreads samples within a batch apart from each other, and anti-subspace pushes everything away from axis 0 in general. The red label itself is sparse and noisy: even a pure red sample only gets labeled "red" with probability 0.08 per draw.
+    The model is a small autoencoder: it compresses each RGB color down to a 5-dimensional vector (the bottleneck) and reconstructs the color from that vector alone. Training adds four regularizers[^regularizer] on the bottleneck, which is unit-normalized so every latent vector lands on the surface of a hypersphere: anchor pulls red-labeled samples toward one fixed axis (e₁), anti-anchor pushes everything away from the opposite point (−e₁), separate spreads samples within a batch apart from each other, and anti-subspace pushes everything away from that first axis in general. The red label itself is sparse and noisy: even a pure red sample only gets labeled "red" with probability 0.08 per draw.
 
-    After training, we ablate (zero out) axis 0 and reconstruct every color, then score the run by how tightly the post-ablation reconstruction error of each color tracks its HSV similarity to red. The score is R², which runs from 0 (no relationship) to 1 (a perfect linear fit): a value near 1 means the deletion was clean, with error scaling with redness and colors unlike red left untouched.
+    After training, we ablate (zero out) the first axis and reconstruct every color, then score the run by how tightly the post-ablation reconstruction error of each color tracks its HSV similarity to red. The score is R², which runs from 0 (no relationship) to 1 (a perfect linear fit): a value near 1 means the deletion was clean, with error scaling with redness and colors unlike red left untouched.
 
     This is a report: it reads results the experiment already produced. The experiment itself is [`experiment.py`](./experiment.py), a `main(ctx)` DAG driven from the CLI — 16 seeded runs fanned out on Modal CPU containers:
 
@@ -175,7 +175,7 @@ def _():
     mo.md(r"""
     ## Was the deletion clean?
 
-    For the best run, we ablate latent axis 0 and reconstruct the full 8×8×8 RGB grid. If the anchored concept was fully contained in that axis, the damage should be proportional to the similarity of each color to red, and colors unlike red should be untouched.
+    For the best run, we ablate the first latent axis and reconstruct the full 8×8×8 RGB grid. If the anchored concept was fully contained in that axis, the damage should be proportional to the similarity of each color to red, and colors unlike red should be untouched.
     """)
     return
 
@@ -218,7 +218,7 @@ def _():
     mo.md(r"""
     ## The latent geometry
 
-    The same result shows up in the bottleneck geometry. Before ablation, position along axis 0 tracks similarity to red: pure red sits at 1, blues, greens, and grays sit near 0 (pushed off the axis by the anti-subspace term), and warm colors fall in between. Ablation zeroes axis 0, which collapses that one direction but leaves the arrangement of the other dimensions intact. That's why the effect on reconstruction is proportional to redness.
+    The same result shows up in the bottleneck geometry. Before ablation, position along the first axis tracks similarity to red: pure red sits at 1, blues, greens, and grays sit near 0 (pushed off the axis by the anti-subspace term), and warm colors fall in between. Ablation zeroes that axis, which collapses that one direction but leaves the arrangement of the other dimensions intact. That's why the effect on reconstruction is proportional to redness.
     """)
     return
 

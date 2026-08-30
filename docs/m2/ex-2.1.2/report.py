@@ -518,7 +518,7 @@ def _(sched_offsets, sched_r2):
                 ax.plot(offs[pre], sched_r2[pre, d, k], "o-", color=c, lw=1.8, ms=3, label=f"channel {'RGB'[k]}")
                 ax.plot(offs[emit <= offs], sched_r2[emit <= offs, d, k], "o:", color=c, lw=1, ms=2, alpha=0.6)
             ax.axvline(-0.5, color="#888", lw=0.8, ls="--", alpha=0.6)
-            ax.set(title=f"depth {d}", xlabel="offset from '#'", ylim=(-0.05, 1.05))
+            ax.set(title="emb" if d == 0 else f"depth {d}", xlabel="offset from '#'", ylim=(-0.05, 1.05))
             ax.grid(alpha=0.3)
         axes[0].set_ylabel("probe R² (held-out half)")
         axes[0].legend(fontsize=7)

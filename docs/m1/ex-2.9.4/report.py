@@ -150,9 +150,9 @@ def _(cond, steps, traj):
                 ax.axvspan(750, 1500, color=light_dark("#1a5f8a", "#6ab0d4"), alpha=0.07, lw=0)
                 ax.grid(alpha=0.3)
                 ax.legend(loc="center left", fontsize=8)
-            axes[row, 0].set_ylabel(f"{label}\nz₀(pure red)")
-        axes[0, 1].set_ylabel("leak (mean |z₀|, non-red)")
-        axes[1, 1].set_ylabel("leak (mean |z₀|, non-red)")
+            axes[row, 0].set_ylabel(f"{label}\nz₁(pure red)")
+        axes[0, 1].set_ylabel("leak (mean |z₁|, non-red)")
+        axes[1, 1].set_ylabel("leak (mean |z₁|, non-red)")
         axes[0, 0].set_ylim(-1.05, 1.05)
         axes[0, 1].set_ylim(0, 0.9)
         for ax in axes[1]:
@@ -177,7 +177,7 @@ def _(cond, traj):
     _c27 = next(r for r in _cn if r["seed"] == 27)
     _drop = int(np.flatnonzero(traj(_r27, "z0_red") < 0.7)[-1]) * TRAJ_STRIDE
     mo.md(f"""
-    The weight trajectory separates the two outcomes. In the rescues, λ engages while the anchor is forming, then releases once the constraint is met. On seed 27 (the worst under the static schedule, still below z₀ = 0.7 at step {_drop}), the controlled run holds z₀ near 1 through the plateau, with λ decaying to {_c27["lam_anchor_end"]:.2f}. In the failures the labeled anchor EMA never reaches its target, so λ climbs to the {LAM_CAP} cap and stays there: {_sat_bad} of {len(_bad)} catastrophic runs had mean λ > 0.13, versus {_sat_ok} of {_n_ok} clean ones.
+    The weight trajectory separates the two outcomes. In the rescues, λ engages while the anchor is forming, then releases once the constraint is met. On seed 27 (the worst under the static schedule, still below z₁ = 0.7 at step {_drop}), the controlled run holds z₁ near 1 through the plateau, with λ decaying to {_c27["lam_anchor_end"]:.2f}. In the failures the labeled anchor EMA never reaches its target, so λ climbs to the {LAM_CAP} cap and stays there: {_sat_bad} of {len(_bad)} catastrophic runs had mean λ > 0.13, versus {_sat_ok} of {_n_ok} clean ones.
 
     This is a problem with the sensor. The anchor term is measured on noisy labels, and a pinkish color placed off the axis on purpose looks the same, to that measurement, as a red that has drifted off it. On most seeds the average settles below target anyway; on some it can't, and overcorrects. One run lost its anchor even with its weight pinned at maximum.
     """)

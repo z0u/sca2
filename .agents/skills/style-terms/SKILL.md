@@ -37,6 +37,18 @@ Use these terms consistently across all reports.
 
   One clause of a hypothesis gate. Calling these "conditions" would collide with the design sense above and produces sentences like "every condition a condition misses".
 
+## Indexing
+
+Prose counts from 1; code counts from 0. So the anchored direction is *the first axis* in a report and `ANCHOR_AXIS = 0` in the source. Prose here means reports and design docs; a source file is code all the way through, docstrings and comments included, so one module keeps one convention and the crossing is stated once where it happens (`sca.anchoring.ANCHOR_AXIS`). This follows the SCA1 paper, which anchors *red* to "the first dimension" and writes the hue subspace as "dimensions 1 and 2".
+
+Prefer the ordinal to the number wherever the number carries no other work: "the first basis vector" over "basis vector 1", "the first position" over "position 0". Reach for a number when the text is picking one out of several that are all in play ("dimensions 1--2"), or when it has to line up with a figure axis.
+
+On a figure axis the slices are labelled `emb`, `1`, `2`, … rather than `0`, `1`, `2`, …, so the reader sees straight away that the first one is not a block output. Say `slice` or `depth` on the axis and let the ticks carry the rest; an axis label does not need to explain that 0 is the embedding once the tick says `emb`.
+
+The slice index $\ell$ is not an exception to this, though it starts at 0. It counts *blocks applied*, so $\ell = 0$ is the token embedding — the state before any block has run — and $\ell = 1 \ldots L$ are the block outputs. The things being counted are the blocks, and those start at 1. This is also the standard residual-stream notation in transformer work.
+
+Roles are named, not numbered (op1, `+`, op2, `=`, answer, newline), and op1 is the *first* operand, so nothing there needs converting. Seeds keep their literal values (`seed 0` is the integer handed to the RNG, not a position in a list), and stored keys keep whatever they were stamped with.
+
 ## Model and measurement terms
 
 - slice

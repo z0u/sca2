@@ -28,7 +28,10 @@ from sca.model import LanguageModel
 from sca.training.loop import cross_entropy
 
 ANCHOR_AXIS = 0
-"""The anchor direction is e₀, the first basis vector of the residual stream.
+"""The first basis vector of the residual stream — e₀ here and $e_1$ in the reports.
+
+Prose counts from 1 and arrays from 0 (see the `style-terms` skill), so the axis
+a report calls *the first* is index 0 in this module and every `e₀` below.
 
 The residual operations of nGPT (LERP toward normalized sub-module output,
 scalar gains) are rotation-equivariant, so a basis vector is a convenience for
