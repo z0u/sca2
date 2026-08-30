@@ -76,3 +76,12 @@ jobs:
           clean: true
           clean-exclude: pr-preview/
           force: false
+
+      - name: Prune gh-pages history
+        # gh-pages is build output: every deploy here and every PR-preview deploy
+        # and teardown appends a commit, and nothing removes one. The site serves
+        # only the tip, so once the branch passes a threshold this re-roots it onto
+        # its newest commits — same trees, shorter ancestry. It force-pushes under
+        # a lease, so a preview deploy that lands mid-prune wins and this yields
+        # until the next main build. See the script for the rest of the reasoning.
+        run: uv run scripts/prune_gh_pages.py
