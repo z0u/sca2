@@ -1,5 +1,6 @@
 """The deploy-branch pruner: does it keep the site byte-identical while cutting the history behind it, and does it yield when a preview deploy beats it to the push?"""
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import pytest
 from tests.conftest import load_script
 
 prune_gh_pages = load_script("prune_gh_pages")
+WORKFLOW = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "publish-docs.yml"
 
 
 def git(*args: str, cwd: Path) -> str:
@@ -136,6 +138,14 @@ def test_works_without_a_configured_git_identity(clone: Path, remote: Path, tmp_
     monkeypatch.delenv("EMAIL", raising=False)
     assert prune_gh_pages.prune(clone, "origin", "gh-pages", keep=3, prune_above=5) == 0
     assert len(shas(remote)) == 3
+
+
+def test_the_workflow_and_the_defaults_agree():
+    """The workflow passes both thresholds explicitly, so its step says what will happen without anyone opening the script. That leaves two copies of the numbers, and the point of the second one is that a dry run on a laptop predicts what CI does — so they have to match."""
+    step = WORKFLOW.read_text()
+    assert "scripts/prune_gh_pages.py" in step, "the workflow no longer runs the pruner"
+    assert re.search(rf"--keep {prune_gh_pages.KEEP}\b", step)
+    assert re.search(rf"--prune-above {prune_gh_pages.PRUNE_ABOVE}\b", step)
 
 
 def test_keep_above_the_threshold_is_refused(monkeypatch, capsys):

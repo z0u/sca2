@@ -79,9 +79,15 @@ jobs:
 
       - name: Prune gh-pages history
         # gh-pages is build output: every deploy here and every PR-preview deploy
-        # and teardown appends a commit, and nothing removes one. The site serves
-        # only the tip, so once the branch passes a threshold this re-roots it onto
-        # its newest commits — same trees, shorter ancestry. It force-pushes under
-        # a lease, so a preview deploy that lands mid-prune wins and this yields
-        # until the next main build. See the script for the rest of the reasoning.
-        run: uv run scripts/prune_gh_pages.py
+        # and teardown appends a commit, and nothing removes one — 340 of them in
+        # the branch's first six weeks, which swamps a `tig --all`. The site serves
+        # only the tip, so once the branch is deeper than 10 commits this re-roots
+        # it onto the newest 3 — same trees, shorter ancestry. Keeping 3 rather
+        # than 1 leaves a recent deploy to diff against; the threshold means a
+        # build arriving on an already-short branch rewrites nothing.
+        #
+        # It force-pushes under a lease, so a preview deploy that lands mid-prune
+        # keeps the branch and this yields until the next main build. That lease is
+        # why we don't use the deploy action's own `single-commit: true`, which
+        # force-pushes unguarded on every build. See the script for the rest.
+        run: uv run scripts/prune_gh_pages.py --keep 3 --prune-above 10

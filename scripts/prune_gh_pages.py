@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 """Keep the deploy branch's history bounded.
 
-`gh-pages` is build output, not source: every production deploy and every PR-preview deploy and teardown appends a commit, and nothing ever removes one. Measured 2026-08-30, 340 commits since the branch opened six weeks earlier — 296 of them preview churn (`Deploy preview for PR N` / `Remove preview for PR N`), which is where the growth actually comes from, since a preview turns over far more often than `main` does. The site only ever serves the tip, and every deploy is reproducible from `main` plus the pins in `docs/publish.lock`, so the history behind the tip earns nothing and costs a bigger clone for everyone who checks the branch out.
+`gh-pages` is build output, not source: every production deploy and every PR-preview deploy and teardown appends a commit, and nothing ever removes one. Measured 2026-08-30, 340 commits since the branch opened six weeks earlier — 296 of them preview churn (`Deploy preview for PR N` / `Remove preview for PR N`), which is where the growth actually comes from, since a preview turns over far more often than `main` does. The site only ever serves the tip, and every deploy is reproducible from `main` plus the pins in `docs/publish.lock`, so the history behind the tip earns nothing.
 
-This re-roots the branch: the newest `--keep` commits are replayed onto a fresh root with their trees, messages, and author/committer identities intact, and everything older is dropped. Trees are copied verbatim, so **the deployed site is byte-identical before and after** — this changes ancestry, never content. The commits are replayed in order rather than squashed into one, so `git log gh-pages` still shows the recent deploys and you can still diff two of them.
+What it costs is legibility: 340 deploy commits swamp the first screen of `tig --all` and anything else that reads every ref, which is why the window is a handful of commits rather than a week's worth. Clone size is the smaller half of the argument.
 
-Two decisions worth knowing about:
+This re-roots the branch: the newest `--keep` commits are replayed onto a fresh root with their trees, messages, and author/committer identities intact, and everything older is dropped. Trees are copied verbatim, so **the deployed site is byte-identical before and after** — this changes ancestry, never content. A few commits are kept rather than one, so a recent deploy is still there to diff against; the cost of the extra two over a squash is two lines in a log.
 
-- **Hysteresis, not a fixed ceiling.** Re-rooting rewrites every kept commit's sha, so pruning on every build would force-push a fresh set of commit objects each time for no gain. Instead the branch is left alone until it passes `--prune-above`, then cut back to `--keep`. At the observed ~6 commits/day that's a rewrite every few weeks, and the branch stays somewhere between one and four weeks deep.
+**The push holds a lease, and yields.** This is the part to preserve if the rest is ever rewritten. Merging a PR fires the preview teardown (`pull_request: closed`) and the production deploy (`push: main`) at the same moment, and both write this branch: in the history above they land 2 and 6 seconds apart. Production deploys survive that with `force: false`, which rebases onto the teardown instead of dropping it. A prune has to force-push, so it can't inherit that — instead it pushes with `--force-with-lease` against the tip it fetched, and if anything landed in between the push is rejected, this exits quietly, and the next `main` build prunes. Losing the race costs nothing, because the outcome is "not yet".
 
-- **The push holds a lease, and yields.** Production deploys run with `force: false` precisely so they rebase onto a concurrent preview deploy instead of dropping it, and previews share this branch under `pr-preview/`. A prune has to force-push, so it can't inherit that protection — instead it pushes with `--force-with-lease` against the tip it fetched. If a preview deploy lands in between, the push is rejected, this exits quietly, and the next `main` build prunes instead. The window is seconds and the outcome of losing the race is "not yet", so the race needs no cleverer handling than that.
+That is also why `single-commit: true` on `JamesIves/github-pages-deploy-action`, the off-the-shelf alternative, isn't used. It force-pushes with no lease on *every* production deploy, so each merge is a coin flip against that teardown — and when the deploy wins, the teardown is lost and that PR's preview is resurrected on the site for good, since the teardown workflow has already run and won't fire again.
 
-`single-commit: true` on `JamesIves/github-pages-deploy-action` was the off-the-shelf alternative. It force-pushes too, so it needed the lease anyway, and it wipes the history entirely rather than keeping a window — no recent deploy left to diff against, and every preview standing on the branch rewritten on every build rather than every few weeks.
+**Hysteresis, so a prune is a force-push rather than a habit.** The branch is left alone until it passes `--prune-above`, then cut back to `--keep`, so a `main` build arriving on an already-short branch rewrites nothing. With a window this small most `main` builds will prune, and that's fine: re-rooting writes `--keep` tiny commit objects, and the lease makes the frequency a matter of noise rather than of safety.
 
 Nothing here checks anything out or reads the working tree — it fetches, writes commit objects, and pushes — so it doesn't care what state the deploy step left the runner in, or which branch is checked out.
 
@@ -19,7 +19,7 @@ Expect a `pages build and deployment` run to fire right after a prune, since Git
 
 Two consequences to be aware of. A rewrite orphans any local `gh-pages` checkout (`git fetch` then `git reset --hard origin/gh-pages` re-syncs one; nobody is expected to have one). And a re-rooted history means old deploy commits stop resolving, so nothing may cite one as a permalink — see `todo/eng/site-permalinks-for-tags.md`, which wants tag-pinned site snapshots and would need a durable home of its own regardless.
 
-Runs from `.github/workflows/publish-docs.yml` after the production deploy. To see what it would do without touching anything:
+Runs from `.github/workflows/publish-docs.yml` after the production deploy, which passes both thresholds on the command line so the workflow says what it will do without anyone opening this file. The defaults below match it, and a test holds them to that. To see what it would do without touching anything:
 
     uv run scripts/prune_gh_pages.py --dry-run
 """
@@ -32,11 +32,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.resolve()
 
-KEEP = 40
-"""Commits left on the branch after a prune — about a week of deploys."""
+KEEP = 3
+"""Commits left on the branch after a prune. Enough to diff the last deploy against the one before it, few enough that the branch stops dominating a `tig --all`."""
 
-PRUNE_ABOVE = 120
-"""Prune only once the branch is deeper than this, so a rewrite costs a force-push every few weeks rather than every build."""
+PRUNE_ABOVE = 10
+"""Prune only once the branch is deeper than this, so a `main` build arriving on an already-short branch rewrites nothing."""
 
 
 def git(*args: str, cwd: Path, env: dict[str, str] | None = None) -> str:
