@@ -145,13 +145,14 @@ def _repo_slug() -> str | None:
 class LinkResolver:
     """Maps an author-written relative link to its published target.
 
-    ``render_map`` is docs-relative *source* path → site-relative *output* path for every page the build emits (reports render to ``<key>/index.html``, markdown to ``<name>.html``); ``source_files`` is every file under ``docs/`` (the GitHub-source fallback). ``site_base``/``source_base`` are the absolute roots used when a link must be made absolute (externalize mode).
+    ``render_map`` is docs-relative *source* path → site-relative *output* path for every page the build emits (reports render to ``<key>/index.html``, markdown to ``<name>.html``); ``site_assets`` is what :func:`site_asset_files` copies verbatim into ``_site/`` at the same relative path; ``source_files`` is every file under ``docs/`` (the GitHub-source fallback). ``site_base``/``source_base`` are the absolute roots used when a link must be made absolute (externalize mode).
     """
 
     render_map: dict[str, str]
     source_files: frozenset[str]
     site_base: str | None
     source_base: str | None
+    site_assets: frozenset[str] = frozenset()
     repo_root: Path | None = None  # used to confirm a link escaping docs/ exists in the repo
 
     @classmethod
@@ -174,6 +175,7 @@ class LinkResolver:
             render_map[export_key(nb)] = out
 
         source_files = frozenset(p.relative_to(DOCS_DIR).as_posix() for p in DOCS_DIR.rglob("*") if p.is_file())
+        site_assets = frozenset(p.relative_to(DOCS_DIR).as_posix() for p in site_asset_files())
 
         slug = _repo_slug()
         site_base = os.environ.get("MINI_SITE_URL")
@@ -182,7 +184,17 @@ class LinkResolver:
             owner, repo = slug.split("/", 1)
             site_base = site_base or f"https://{owner}.github.io/{repo}/"
             source_base = source_base or f"https://github.com/{slug}/blob/main/"
-        return cls(render_map, source_files, site_base, source_base, repo_root=WORKSPACE_ROOT)
+        return cls(render_map, source_files, site_base, source_base, site_assets, repo_root=WORKSPACE_ROOT)
+
+    def _in_site(self, out: str, *, out_dir: str, externalizing: bool, frag: str) -> str | None:
+        """How a page rendering into ``out_dir`` should link *out*, a site-relative path.
+
+        Externalizing, the page carries an asset ``<base>`` that would repoint a relative URL at the bucket, so it has to be spelled out from ``site_base`` (and a report reads ``<key>/``, not ``<key>/index.html``). Localizing, it stays relative — resolved from where the page *renders*, which for a report differs from its source dir — so offline navigation works.
+        """
+        if externalizing:
+            return None if self.site_base is None else f"{self.site_base}{_strip_index(out)}{frag}"
+        rel = os.path.relpath(out, out_dir or ".")
+        return f"{PurePosixPath(rel).as_posix()}{frag}"
 
     def resolve(self, token: str, *, from_dir: str, out_dir: str, externalizing: bool) -> str | None:
         """The rewritten target for author-written link *token* under ``docs/<from_dir>``.
@@ -216,12 +228,13 @@ class LinkResolver:
             return f"{self.source_base}{repo_rel}{frag}"
 
         if norm in self.render_map:
-            out = self.render_map[norm]
-            if externalizing:
-                return None if self.site_base is None else f"{self.site_base}{_strip_index(out)}{frag}"
-            # localize: keep it relative, resolved from where this page renders (out_dir)
-            rel = os.path.relpath(out, out_dir or ".")
-            return f"{PurePosixPath(rel).as_posix()}{frag}"
+            return self._in_site(self.render_map[norm], out_dir=out_dir, externalizing=externalizing, frag=frag)
+        if norm in self.site_assets:
+            # A file the build copies verbatim into _site/ — an image, a data blob. The
+            # site serves it at the same relative path, so point there. The GitHub
+            # fallback below would hand back a ``blob/`` URL, which is an HTML page
+            # rather than the bytes: fine to click, but an ``<img>`` renders nothing.
+            return self._in_site(norm, out_dir=out_dir, externalizing=externalizing, frag=frag)
         if norm in self.source_files:
             return None if self.source_base is None else f"{self.source_base}docs/{norm}{frag}"
         return None
@@ -345,19 +358,32 @@ def _resolve_html_links(html: str, links: LinkResolver, *, from_dir: str, out_di
     return rewrite_links(html, mapping) if mapping else html
 
 
-def copy_assets():
-    """Copy non-notebook, non-markdown files from docs/ to _site/."""
-    print("Copying assets...")
-    skip_dirs = {"__marimo__", "__pycache__"}
-    skip_suffixes = {".py", ".md", ".ipynb", ".pyc", ".pyo"}
+_ASSET_SKIP_DIRS = {"__marimo__", "__pycache__"}
+_ASSET_SKIP_SUFFIXES = {".py", ".md", ".ipynb", ".pyc", ".pyo"}
+
+
+def site_asset_files() -> list[Path]:
+    """Files under ``docs/`` the build copies verbatim into ``_site/``, at the same relative path.
+
+    One definition, read twice: :func:`copy_assets` copies them, and :class:`LinkResolver` needs the same set to know that a link to one is served by the site. Were the two to drift, an author link would resolve somewhere the copy never put the file.
+    """
+    out = []
     for item in sorted(DOCS_DIR.rglob("*")):
         if not item.is_file() or item == WORKSPACE_ROOT / PUBLISH_LOCK:  # the pin manifest is build input, not content
             continue
         parts = item.relative_to(DOCS_DIR).parts
-        if any(p in skip_dirs or p.startswith(".") for p in parts):
+        if any(p in _ASSET_SKIP_DIRS or p.startswith(".") for p in parts):
             continue
-        if item.suffix in skip_suffixes:
+        if item.suffix in _ASSET_SKIP_SUFFIXES:
             continue
+        out.append(item)
+    return out
+
+
+def copy_assets():
+    """Copy non-notebook, non-markdown files from docs/ to _site/."""
+    print("Copying assets...")
+    for item in site_asset_files():
         rel = item.relative_to(DOCS_DIR)
         dest = SITE_DIR / rel
         dest.parent.mkdir(parents=True, exist_ok=True)

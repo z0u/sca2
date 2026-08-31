@@ -78,9 +78,10 @@ def resolver() -> "build_site.LinkResolver":
             "acts/report": "acts/report/index.html",  # directory form: one report links another by its canonical URL
             "guide.md": "guide.html",
         },
-        source_files=frozenset({"probe/experiment.py", "acts/experiment.py", "probe/report.py"}),
+        source_files=frozenset({"probe/experiment.py", "acts/experiment.py", "probe/report.py", "public/map.svg"}),
         site_base="https://o.github.io/r/",
         source_base="https://github.com/o/r/blob/main/",
+        site_assets=frozenset({"public/map.svg"}),
     )
 
 
@@ -126,6 +127,40 @@ def test_directory_form_link_resolves_like_the_report_file(resolver):
         resolver.resolve("../acts/report/", from_dir="probe", out_dir="probe/report", externalizing=False)
         == "../../acts/report/index.html"
     )
+
+
+def test_copied_asset_is_served_by_the_site_not_github(resolver):
+    # An image copied into _site/ must point at the copy. A GitHub ``blob/`` URL is an
+    # HTML page, so an <img> aimed at one renders nothing.
+    assert resolver.resolve("./public/map.svg", from_dir="", out_dir="", externalizing=False) == "public/map.svg"
+    assert (
+        resolver.resolve("../public/map.svg", from_dir="probe", out_dir="probe/report", externalizing=False)
+        == "../../public/map.svg"
+    )
+
+
+def test_copied_asset_is_absolute_when_externalizing(resolver):
+    # Under an asset <base> a relative link would resolve against the bucket, so the
+    # site root has to be spelled out.
+    assert (
+        resolver.resolve("../public/map.svg", from_dir="probe", out_dir="probe/report", externalizing=True)
+        == "https://o.github.io/r/public/map.svg"
+    )
+
+
+def test_copy_assets_and_the_resolver_agree_on_what_lands_in_the_site(tmp_path, monkeypatch):
+    # The two read one definition; this is the guard that they keep doing so.
+    docs = tmp_path / "docs"
+    (docs / "public").mkdir(parents=True)
+    (docs / "public" / "map.svg").write_text("<svg/>")
+    (docs / "index.md").write_text("# hi")
+    (docs / "probe").mkdir()
+    (docs / "probe" / "experiment.py").write_text("x = 1")
+    (docs / "__marimo__").mkdir()
+    (docs / "__marimo__" / "cache.json").write_text("{}")
+    monkeypatch.setattr(build_site, "WORKSPACE_ROOT", tmp_path)
+    monkeypatch.setattr(build_site, "DOCS_DIR", docs)
+    assert [p.relative_to(docs).as_posix() for p in build_site.site_asset_files()] == ["public/map.svg"]
 
 
 def test_source_file_resolves_to_github(resolver):
