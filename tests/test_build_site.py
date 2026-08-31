@@ -85,6 +85,54 @@ def resolver() -> "build_site.LinkResolver":
     )
 
 
+@pytest.fixture
+def strips() -> dict[str, "build_site.FigureStrip"]:
+    from mini.reports import ReportFigure
+
+    return {
+        "probe/report": build_site.FigureStrip(
+            "probe/report",
+            "https://hf.co/d/r/resolve/abc123/exports/probe/report/",
+            (
+                ReportFigure(
+                    "grading", light="_assets/grading-light.png", dark="_assets/grading-dark.png", alt="Bands"
+                ),
+                ReportFigure("extra", light="_assets/extra.png"),
+            ),
+        )
+    }
+
+
+def test_figures_marker_survives_markdown_and_expands_to_pinned_cdn_thumbnails(resolver, strips):
+    """The marker rides inside a list item as a comment; expansion happens on the rendered HTML, after Python-Markdown (which would read a raw <div> indented in a list as code)."""
+    body = build_site.render_markdown(
+        "- [probe](./probe/report.py)\n\n    Lede.\n\n    <!-- mini:figures ./probe/report.py -->\n"
+    )
+    assert "mini:figures" in body  # the comment came through rendering intact
+
+    out = build_site.expand_figure_strips(body, strips, resolver, from_dir="", externalizing=True)
+    assert "mini:figures" not in out
+    assert '<img src="https://hf.co/d/r/resolve/abc123/exports/probe/report/_assets/grading-light.png"' in out
+    assert 'srcset="https://hf.co/d/r/resolve/abc123/exports/probe/report/_assets/grading-dark.png"' in out
+    assert 'alt="Bands"' in out and 'loading="lazy"' in out
+    assert "<picture>" not in out.split("extra.png")[0].rsplit("<a ", 1)[-1]  # the unthemed figure is a bare <img>
+
+
+def test_figures_marker_localizes_to_the_copied_assets(resolver, strips):
+    out = build_site.expand_figure_strips(
+        "<!-- mini:figures ./probe/report.py -->", strips, resolver, from_dir="", externalizing=False
+    )
+    assert '<img src="probe/report/_assets/grading-light.png"' in out  # beside _site/probe/report/index.html
+
+
+def test_figures_marker_for_an_unbuilt_report_renders_nothing(resolver, strips, capsys):
+    out = build_site.expand_figure_strips(
+        "<!-- mini:figures ./acts/report.py --><p>after</p>", strips, resolver, from_dir="", externalizing=True
+    )
+    assert out == "<p>after</p>"
+    assert "names no built report" in capsys.readouterr().out
+
+
 def test_nav_urls_absolute_when_externalizing(resolver):
     # With an asset <base>, the index link must be absolute (the site root); source is
     # always the notebook on GitHub.

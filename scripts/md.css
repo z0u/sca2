@@ -201,6 +201,32 @@ ul:has(>li>p),
   }
 }
 
+/* A report's thumbnail strip (a `mini:figures` marker, expanded by scripts/build_site.py):
+ * full-size figures scaled down to a fixed-height row that scrolls sideways when it
+ * overflows. The height cap is what keeps a page of them cheap to scan; `max-width: none`
+ * lifts the global img rule, which would otherwise squash each figure to fit the flex row. */
+.fig-strip {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  margin-block: 0.75em;
+}
+
+.fig-strip img {
+  display: block;
+  height: 4.5rem;
+  width: auto;
+  max-width: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* A tag row under an index entry: quieter than body text, so it reads as metadata. */
+.tags {
+  color: var(--fg-muted);
+  font-size: 0.875em;
+}
+
 /* A ```mermaid fence, promoted by the build to the <pre class="mermaid"> the library
  * renders into (see scripts/build_site.py). It holds a diagram rather than code, so it
  * drops the code-block frame; until the script has run it shows the diagram source. */
