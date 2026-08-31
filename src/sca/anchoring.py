@@ -28,10 +28,7 @@ from sca.model import LanguageModel
 from sca.training.loop import cross_entropy
 
 ANCHOR_AXIS = 0
-"""The first basis vector of the residual stream — e₀ here and $e_1$ in the reports.
-
-Prose counts from 1 and arrays from 0 (see the `style-terms` skill), so the axis
-a report calls *the first* is index 0 in this module and every `e₀` below.
+"""The anchor direction is e₁, the first basis vector of the residual stream.
 
 The residual operations of nGPT (LERP toward normalized sub-module output,
 scalar gains) are rotation-equivariant, so a basis vector is a convenience for
@@ -200,7 +197,7 @@ class LabelSpec:
 
 
 def anchor_term(states: Float[Array, "L1 B T C"], mask: Float[Array, "B T"]) -> Float[Array, ""]:
-    """Mean of (1 − cos(h, e₀)) over pulled positions and residual-stream slices.
+    """Mean of (1 − cos(h, e₁)) over pulled positions and residual-stream slices.
 
     States are unit-norm, so the cosine against a basis vector is just that component. The denominator is the mask's own weight with M1's ε, so a batch holding no labels contributes zero rather than 0/0 — which at this label density is one batch in eight.
     """
@@ -252,7 +249,7 @@ def pooled_anchor_term(
 
 
 def anti_subspace_term(states: Float[Array, "L1 B T C"], live: Float[Array, "B T"]) -> Float[Array, ""]:
-    """Mean of cos²(h, e₀) over every residual-stream slice and every live position.
+    """Mean of cos²(h, e₁) over every residual-stream slice and every live position.
 
     M1's anti-subspace penalty with the reserved coordinate axis replaced by our anchor direction: it asks that the cloud as a whole not sit on the axis, without asking any particular point to leave it. *live* selects the non-pad positions — the ones the model is actually shown — and every line counts, labeled or not, which is what makes the term indiscriminate.
     """
@@ -374,7 +371,7 @@ def alignment(
     tokens: Int[np.ndarray, "N T"],
     batch_size: int = 1024,
 ) -> Float[np.ndarray, "L1 N T"]:
-    """cos(h, e₀) at every residual-stream slice and position, for each line of *tokens*.
+    """cos(h, e₁) at every residual-stream slice and position, for each line of *tokens*.
 
     nGPT is dropout-free, so there is no inference mode to switch into: the training-time and measurement-time forward passes are the same function.
     """

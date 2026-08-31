@@ -39,7 +39,7 @@ Use these terms consistently across all reports.
 
 ## Indexing
 
-Math and prose counts from 1; code counts from 0. So the anchored direction is *the first axis* in a report and `ANCHOR_AXIS = 0` in the source and docstrings. Slight preference for "the first basis vector" over "basis vector 1", etc.
+Math and prose counts from 1; code counts from 0. So the anchored direction is *the first axis* or e₁ in a report and `ANCHOR_AXIS = 0`. Slight preference for "the first basis vector" over "basis vector 1", etc.
 
 The slice index $\ell$ is not an exception to this, though it starts at 0. It counts *blocks applied*, so $\ell = 0$ is the token embedding, labeled "emb" in figures.
 

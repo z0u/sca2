@@ -65,8 +65,6 @@ def _():
     /// details | Notation
     Equations are `a + b = mix(a, b)` throughout M2, so $a$ and $b$ stay reserved for the operands, as in ex-2.1.3 and ex-2.1.4. The anchor direction takes M1's symbol for it, $\hat{v}_c$ for concept $c$, written here as $\hat v_{\text{red}}$ since *red* is the only concept in play. The regularizer weight is $\lambda$, also from M1. One symbol changes meaning: M1 wrote the label indicator $\ell^{(i)}_{c}$, but layer subscripts are everywhere in transformer work, so from here $\ell$ indexes layers. If a later experiment needs a label indicator (say, for multiple concepts or per-token labels), it is $y^{(i)}_{c}$. New here: $m$ is reserved for the alignment margin defined under Measurements, so a counter alongside $n$ should be spelled some other way.
 
-    Indices count from 1 in prose and from 0 in code, following the SCA1 paper — so *red* is anchored to the **first** axis here and to `ANCHOR_AXIS = 0` in the source. The layer index is the one that starts at 0, and it is not an exception: $\ell$ counts blocks applied, so $\ell = 0$ is the token embedding, the state before any block has run, and $\ell = 1 \ldots L$ are the block outputs. The things being counted are the blocks, and those start at 1.
-
     For the sweep, the three-tiered vocabulary of ex-2.1.5 carries over. A **condition** is one setting of the swept hyperparameter, aggregated over seeds; a **run** is a condition crossed with a seed, one training run, which is what the legacy stored key `metrics["cells"]` holds; an **arm** is a named extra condition off the ladder, answering one question of its own. Since $\lambda$ here is a ladder, its conditions are also called **rungs**.
     ///
 
@@ -225,7 +223,7 @@ def _():
     mo.md(r"""
     ### Model and anchor term
 
-    The d64-L4 simplified nGPT as used from ex-2.1.1 onward, unchanged. The anchor direction is $\hat v_{\text{red}} = e_1$, the first basis vector of the 64-dimensional residual stream — the vector $(1, 0, 0, \ldots)$, matching M1. (In code that axis is `ANCHOR_AXIS = 0`: prose counts from 1, arrays from 0.) The residual operations of this architecture (LERP toward normalized sub-module output, scalar gains) are rotation-equivariant, so choosing a basis vector is a convenience rather than a hint to the model.
+    The d64-L4 simplified nGPT as used from ex-2.1.1 onward, unchanged. The anchor direction is $\hat v_{\text{red}} = e_1$, the first basis vector of the 64-dimensional residual stream — the vector $(1, 0, 0, \ldots)$, matching M1. The residual operations of this architecture (LERP toward normalized sub-module output, scalar gains) are rotation-equivariant, so choosing a basis vector is a convenience rather than a hint to the model.
 
     For labeled lines, the anchor term is
 
