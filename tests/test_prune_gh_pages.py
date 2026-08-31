@@ -56,14 +56,27 @@ def remote(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def clone(tmp_path: Path, remote: Path) -> Path:
-    """A shallow checkout of `main`, as `actions/checkout` leaves the runner."""
+    """The runner as the prune step inherits it: `actions/checkout` clones `main` at depth 1, and the deploy step then fetches `gh-pages` at depth 1 into the same repository.
+
+    That second fetch is the part worth reproducing. It leaves the tip present as a shallow boundary, so a plain fetch pulls nothing and the branch reads as one commit deep — which is what the first CI run did, on a fixture that cloned shallow but let the pruner meet `gh-pages` fresh.
+    """
     path = tmp_path / "runner"
     git("clone", "-q", "--depth", "1", f"file://{remote}", str(path), cwd=tmp_path)
+    git("fetch", "-q", "--no-recurse-submodules", "--depth=1", "origin", "gh-pages", cwd=path)
     return path
 
 
 def shas(repo: Path, ref: str = "gh-pages") -> list[str]:
     return git("rev-list", ref, cwd=repo).split()
+
+
+def test_sees_the_true_depth_through_a_shallow_prefetch(clone: Path, remote: Path):
+    """The regression from the pruner's first CI run. With `gh-pages` already present at a shallow boundary, a plain fetch pulls nothing and `rev-list` stops after one commit, so a 344-commit branch reads as 1 and the prune declines — a failure shaped exactly like the healthy no-op, which is why it needs a test of its own rather than trust."""
+    assert git("rev-parse", "--is-shallow-repository", cwd=clone) == "true", (
+        "the fixture no longer reproduces a shallow runner"
+    )
+    assert prune_gh_pages.fetch_tip(clone, "origin", "gh-pages") == git("rev-parse", "gh-pages", cwd=remote)
+    assert len(shas(clone, "FETCH_HEAD")) == 8
 
 
 def test_reroots_to_the_keep_window(clone: Path, remote: Path):
