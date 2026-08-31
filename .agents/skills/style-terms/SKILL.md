@@ -37,6 +37,12 @@ Use these terms consistently across all reports.
 
   One clause of a hypothesis gate. Calling these "conditions" would collide with the design sense above and produces sentences like "every condition a condition misses".
 
+## Indexing
+
+Math and prose counts from 1; code counts from 0. So the anchored direction is *the first axis* or e₁ in a report and `ANCHOR_AXIS = 0`. Slight preference for "the first basis vector" over "basis vector 1", etc.
+
+The slice index $\ell$ is not an exception to this, though it starts at 0. It counts *blocks applied*, so $\ell = 0$ is the token embedding, labeled "emb" in figures.
+
 ## Model and measurement terms
 
 - slice

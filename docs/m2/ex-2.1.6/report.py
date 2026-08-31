@@ -223,7 +223,7 @@ def _():
     mo.md(r"""
     ### Model and anchor term
 
-    The d64-L4 simplified nGPT as used from ex-2.1.1 onward, unchanged. The anchor direction is $\hat v_{\text{red}} = e_0$, the first basis vector of the 64-dimensional residual stream — the vector $(1, 0, 0, \ldots)$, matching M1. The residual operations of this architecture (LERP toward normalized sub-module output, scalar gains) are rotation-equivariant, so choosing a basis vector is a convenience rather than a hint to the model.
+    The d64-L4 simplified nGPT as used from ex-2.1.1 onward, unchanged. The anchor direction is $\hat v_{\text{red}} = e_1$, the first basis vector of the 64-dimensional residual stream — the vector $(1, 0, 0, \ldots)$, matching M1. The residual operations of this architecture (LERP toward normalized sub-module output, scalar gains) are rotation-equivariant, so choosing a basis vector is a convenience rather than a hint to the model.
 
     For labeled lines, the anchor term is
 
@@ -638,8 +638,8 @@ def _(CONDS, LABELS, RUNGS, arrays, margin_map):
                 ls="-" if cond in RUNGS else (0, (4, 3)), label=LABELS[cond], marker="o", ms=4,
             )  # fmt: skip
         ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
-        ax.set_xticks(_depths)
-        ax.set_xlabel("layer (0 = embedding)")
+        ax.set_xticks(_depths, ["emb", *map(str, range(1, len(_depths)))])
+        ax.set_xlabel("slice")
         ax.set_ylabel(r"$m$ at op1")
         ax.legend(fontsize=8, frameon=False, ncols=5)
         return fig
@@ -879,8 +879,8 @@ def _(CONDS, LABELS, RUNGS, cells):
                     label=LABELS[cond],
                 )  # fmt: skip
             ax.set_title(title, fontsize=10)
-            ax.set_xticks(_depths)
-            ax.set_xlabel("layer (0 = embedding)")
+            ax.set_xticks(_depths, ["emb", *map(str, range(1, len(_depths)))])
+            ax.set_xlabel("slice")
             ax.set_ylim(-0.05, 1.0)
         axes[0].set_ylabel("R² for redness")
         axes[0].legend(fontsize=8, frameon=False, ncols=2, loc="lower left")
@@ -947,8 +947,8 @@ def _(CONDS, LABELS, RUNGS, geometry):
                     label=LABELS[cond],
                 )  # fmt: skip
             ax.set_title(title, fontsize=10)
-            ax.set_xticks(_depths)
-            ax.set_xlabel("layer (0 = embedding)")
+            ax.set_xticks(_depths, ["emb", *map(str, range(1, len(_depths)))])
+            ax.set_xlabel("slice")
         axes[0].set_ylim(0, 1.0)
         axes[1].set_ylim(-0.1, 1.0)
         axes[1].axhline(0, color=light_dark("#ccc", "#444"), lw=0.8, zorder=0)

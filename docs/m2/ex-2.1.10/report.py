@@ -134,9 +134,10 @@ def _():
     This experiment widens our labels by one step in that direction: either
     operand can draw the label, so a line can be labeled because of a red op2
     while its op1 is blue. The localization then has to vary per-line: on
-    op1-triggered lines the red state is at position 0, on op2-triggered
-    lines at position 2, and a pool that commits to one position for the whole
-    run would pull blue states onto the axis on the lines it got wrong.
+    op1-triggered lines the red state is at the first position of the line,
+    on op2-triggered lines at the third, and a pool that commits to one
+    position for the whole run would pull blue states onto the axis on the
+    lines it got wrong.
 
     Whether that failure would even show up in the scores is not obvious,
     because the span positions share token embeddings. Once red embeddings sit

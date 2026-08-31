@@ -60,7 +60,7 @@ def _():
     We compared two remedies for ablation seed-sensitivity: **1.** optimal ablation, which picks a replacement constant after training, and **2.** fallback control, a decoder-only loss term that teaches the model what to output once the concept has been removed. Fallback control worked well. Neither remedy touches the other half of the variance, where anchoring itself fails.
     ///
 
-    [Ex-2.9.1](../ex-2.9.1/report.py) reproduced the main M1 result: anchor *red* to latent axis 0, zero the axis, and the reconstruction error concentrates on red-like colors. It also reproduced the main weakness: the outcome varies a lot with the random seed. The original study handled that with a 60-seed sweep and Pareto selection, but that won't scale: as models grow, the chance that any given seed allows clean intervention may shrink. So this experiment tries a different approach.
+    [Ex-2.9.1](../ex-2.9.1/report.py) reproduced the main M1 result: anchor *red* to the first latent axis, zero the axis, and the reconstruction error concentrates on red-like colors. It also reproduced the main weakness: the outcome varies a lot with the random seed. The original study handled that with a 60-seed sweep and Pareto selection, but that won't scale: as models grow, the chance that any given seed allows clean intervention may shrink. So this experiment tries a different approach.
 
     The SCA paper suggests optimal ablation ([Li & Janson 2024](https://arxiv.org/abs/2409.09951)) as a fix: replace the removed component with an optimized constant. We test that and also a training-time alternative we'll call "fallback control". The plan is to teach the decoder, during training, what to output once the concept has been removed.
 
@@ -70,17 +70,17 @@ def _():
 
     Optimal ablation measures importance while minimizing spoofing. It replaces the removed component with the constant $a^* = \arg\min_a \mathbb{E}[\mathcal{L}]$, the value that affects loss the least. But for concept removal, that objective points the wrong way: the loss it minimizes includes the loss on the target itself, so $a^*$ gets pulled toward whatever constant best restores *red*. We evaluate both the literal method (`oa`) and a removal-appropriate version (`oa-nontarget`, which optimizes the constant over non-red colors only).
 
-    Fallback control instead makes the post-removal behavior a trained property. The anti-anchor regularizer already keeps the direction −e₀ empty, so we add one decoder-only loss term, MSE(dec(−e₀), mid-gray). This pins that reserved direction to a *null* output of our choosing. A model that has genuinely lost the color information should fall back to a noncommittal guess, and the least committal guess over the RGB cube is mid-gray, so we pick mid-gray as *null*. An intervention can then redirect red to −e₀ and get a predictable response.
+    Fallback control instead makes the post-removal behavior a trained property. The anti-anchor regularizer already keeps the direction −e₁ empty, so we add one decoder-only loss term, MSE(dec(−e₁), mid-gray). This pins that reserved direction to a *null* output of our choosing. A model that has genuinely lost the color information should fall back to a noncommittal guess, and the least committal guess over the RGB cube is mid-gray, so we pick mid-gray as *null*. An intervention can then redirect red to −e₁ and get a predictable response.
 
     ## Conditions
 
-    We run two training variants, otherwise identical to ex-2.9.1 (same model, data, dopesheet), with 32 seeds each: `base` (the ex-2.9.1 loss, unchanged) and `fallback` (the same loss plus 0.05 × the fallback term). Each trained model is then scored under five weight-level interventions on axis 0:
+    We run two training variants, otherwise identical to ex-2.9.1 (same model, data, dopesheet), with 32 seeds each: `base` (the ex-2.9.1 loss, unchanged) and `fallback` (the same loss plus 0.05 × the fallback term). Each trained model is then scored under five weight-level interventions on the first axis:
 
-    - `zero` — zero encoder output row 0 and bias (the status quo).
-    - `oa` — zero row 0, then set the bias to the constant that minimizes mean reconstruction error over the full grid (optimal ablation, taken literally).
+    - `zero` — zero the encoder's first output row and its bias (the status quo).
+    - `oa` — zero that row, then set the bias to the constant that minimizes mean reconstruction error over the full grid (optimal ablation, taken literally).
     - `oa-nontarget` — the same as `oa`, but the constant is optimized over non-red colors only.
-    - `reflect` — negate row 0 and bias, so z₀ → −z₀ and red lands exactly on −e₀. This is a clean redirect, though not a true deletion, since a sign flip undoes it.
-    - `redirect` — zero row 0 and set the bias to −1. The redness computation is deleted, and inputs are also nudged toward −e₀ in proportion to how much of their pre-norm activation the deletion removed. This is permanent, like `zero`, but with a defined destination.
+    - `reflect` — negate that row and its bias, so z₁ → −z₁ and red lands exactly on −e₁. This is a clean redirect, though not a true deletion, since a sign flip undoes it.
+    - `redirect` — zero that row and set the bias to −1. The redness computation is deleted, and inputs are also nudged toward −e₁ in proportion to how much of their pre-norm activation the deletion removed. This is permanent, like `zero`, but with a defined destination.
 
     Each run is scored like M1 Ex-2.9.1: the R² between per-color reconstruction error after the intervention and (HSV similarity to red)³. The experiment lives in [`experiment.py`](./experiment.py):
 
@@ -194,7 +194,7 @@ def _():
     mo.md(r"""
     ## A predictable response
 
-    SCA aims for bounded side effects. With the decoder pinned to mid-gray at −e₀, redirecting pure red there should give MSE(red, gray) = ¼. Without fallback training there is no bound at all, and red lands wherever the untrained region happens to decode. The expectation for zero ablation under random redistribution is ⅓, but the seed-to-seed spread makes that expectation unhelpful.
+    SCA aims for bounded side effects. With the decoder pinned to mid-gray at −e₁, redirecting pure red there should give MSE(red, gray) = ¼. Without fallback training there is no bound at all, and red lands wherever the untrained region happens to decode. The expectation for zero ablation under random redistribution is ⅓, but the seed-to-seed spread makes that expectation unhelpful.
     """)
     return
 
@@ -313,7 +313,7 @@ def _(exemplars):
         )
         axes[0].plot([0], [-1.05], marker="^", color=fg, clip_on=False)
         axes[0].annotate(
-            "−e₀ (fallback)",
+            "−e₁ (fallback)",
             xy=(0, -1.1),
             xytext=(0, -8),
             textcoords="offset points",
@@ -332,7 +332,7 @@ def _(runs):
     _fb = np.array([r["fallback_color"] for r in runs("fallback")])
     _bs = np.array([r["fallback_color"] for r in runs("base")])
     mo.md(f"""
-    The mechanism shows up in the geometry. Both redirect-style interventions move red to −e₀, a region the anti-anchor regularizer kept empty, and fallback training decided what lives there. Across the {len(_fb)} fallback runs, dec(−e₀) is ({_fb[:, 0].mean():.2f}, {_fb[:, 1].mean():.2f}, {_fb[:, 2].mean():.2f}), with a maximum per-channel deviation of {np.abs(_fb - 0.5).max():.3f}: mid-gray on every seed. In the base variant the same point decodes to an uncontrolled color (per-channel spread {_bs.std(axis=0).max():.2f}), which is why `base + reflect` damages red heavily but unpredictably.
+    The mechanism shows up in the geometry. Both redirect-style interventions move red to −e₁, a region the anti-anchor regularizer kept empty, and fallback training decided what lives there. Across the {len(_fb)} fallback runs, dec(−e₁) is ({_fb[:, 0].mean():.2f}, {_fb[:, 1].mean():.2f}, {_fb[:, 2].mean():.2f}), with a maximum per-channel deviation of {np.abs(_fb - 0.5).max():.3f}: mid-gray on every seed. In the base variant the same point decodes to an uncontrolled color (per-channel spread {_bs.std(axis=0).max():.2f}), which is why `base + reflect` damages red heavily but unpredictably.
     """)
     return
 

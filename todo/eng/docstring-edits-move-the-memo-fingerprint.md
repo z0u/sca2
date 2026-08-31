@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [memoization, docs]
 opened: 2026-08-27
+closed: 2026-08-30
 ---
 # A documentation-only edit in `src/` re-runs the DAG
 
@@ -16,3 +17,9 @@ This has almost certainly already happened once. [Un/rewrap all multiline prose 
 The fix is small and the semantics are clean, since a docstring is the one piece of source with no behavior behind it: strip docstrings from each collected source before hashing, by parsing with `ast` and blanking the docstring nodes' line ranges (`_is_docstring` already identifies them, and `_segment` already does line-range slicing). Comments are the same in principle and worse in practice — a changed comment usually accompanies changed code — so leave those in and keep the over-invalidating bias there.
 
 Worth weighing against doing nothing: over-invalidation is the right default, and this is a narrow carve-out. But it is a carve-out that makes the documentation pass safe, and this repo does documentation passes.
+
+## Notes
+
+**2026-08-30, closing** — Fixed as described: `mini.memo._without_docstrings` parses each collected source and blanks the docstring nodes' line ranges, applied at the five sites where source text enters the manifest (`_collect_sources`, `_collect_class`, `_whole_module`, and both branches of `_resolve_ref`). Comments stay in, so the over-invalidating bias holds everywhere else. `tests/mini/test_fingerprint.py::test_docstring_edits_do_not_invalidate` pins all four cases: a function docstring and a module docstring leave the evidence still, a comment and a code edit still move it.
+
+Two things the item didn't say, worth recording. The helper is for source only — a value's JSON encoding must not go through it, since a value encoding to a bare string parses as a module whose only statement is a docstring and would blank to nothing. And the neighbouring item's warning is milder than it reads here: a report reads published refs from the store (`store.get_refs`), never the DAG, so the re-stamped evidence costs nothing until someone deliberately ticks an experiment. The landing order still mattered — this went in ahead of the symbol-normalization pass over `src/` docstrings, so that pass was free.

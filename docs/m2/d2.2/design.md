@@ -60,7 +60,7 @@ This is different from the [layer sweep](#layer-sweep), which tests the model's 
 
 ### Anchor one operation
 
-One op on e₀, the others unlabelled, D2.1's recipe, all slices pulled. Perhaps not the embeddings, depending on [un-anchored embeddings](#un-anchored-embeddings), if it was run first. The layer sweep comes after, on a frozen recipe, so layer effects are not confounded with schedule fragility (the D2.1 kickoff rule). The labeller keys on the op token, with the position-free mechanism from ex-2.1.10.
+One op on e₁, the others unlabelled, D2.1's recipe, all slices pulled. Perhaps not the embeddings, depending on [un-anchored embeddings](#un-anchored-embeddings), if it was run first. The layer sweep comes after, on a frozen recipe, so layer effects are not confounded with schedule fragility (the D2.1 kickoff rule). The labeller keys on the op token, with the position-free mechanism from ex-2.1.10.
 
 Measurements: alignment at the op position by slice; group contrast (anchored op against the others, which is the categorical form of grading); task gates against control; and a probe scan of op-identity decodability at every site, against the control.
 
@@ -108,7 +108,7 @@ The D2.2 post, and the survey-confirmation numbers beside the survey's own.
 
 | Risk | Would look like | Retired at |
 | --- | --- | --- |
-| Suppression does not bite even on _red_ | Accuracy unchanged after projecting e₀ out; color is read from elsewhere | [suppress red](#suppress-_red_-on-the-existing-checkpoints) |
+| Suppression does not bite even on _red_ | Accuracy unchanged after projecting e₁ out; color is read from elsewhere | [suppress red](#suppress-_red_-on-the-existing-checkpoints) |
 | The bound is loose or wrong in a transformer | Observed non-red damage exceeds the geometric prediction | [suppress red](#suppress-_red_-on-the-existing-checkpoints), then [layer sweep](#layer-sweep) |
 | The response to suppression is undesigned | Suppressed lines scatter by seed; completions leave the color vocabulary | [suppress red](#suppress-_red_-on-the-existing-checkpoints) measures it, [suppress operation](#suppress-the-operation-and-the-operands) pins it |
 | Recipe is grammar-specific | The survey's proposals do not reproduce on the new grammar | [new grammar](#the-multi-op-grammar-with-_red_-anchored-again) |

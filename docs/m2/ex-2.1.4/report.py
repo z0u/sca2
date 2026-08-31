@@ -630,7 +630,8 @@ def _(metrics):
             for es, r2s in transfer.items():
                 ax.plot(r2s, styles.get(es, "-"), color=shades[g], label=es.replace("_", " "))
             ax.set(title=g, xlabel="depth", ylim=(-0.1, 1.03))
-            ax.set_xticks(range(len(next(iter(transfer.values())))))
+            _n = len(next(iter(transfer.values())))
+            ax.set_xticks(range(_n), ["emb", *map(str, range(1, _n))])
             ax.grid(alpha=0.3)
         axes[0].set_ylabel("probe R² (mix RGB)")
         axes[0].legend(fontsize=7, loc="upper left")

@@ -24,6 +24,7 @@ import json
 import logging
 import secrets
 import sys
+import textwrap
 import time
 import types
 from abc import ABC, abstractmethod
@@ -109,7 +110,7 @@ def _collect_class(cls: type, seen: dict[str, str]) -> None:
     if cls.__qualname__ in seen:
         return
     try:
-        seen[cls.__qualname__] = inspect.getsource(cls)
+        seen[cls.__qualname__] = _without_docstrings(inspect.getsource(cls))
     except TypeError, OSError:
         return
     for base in cls.__bases__:
@@ -321,6 +322,36 @@ def _is_docstring(node: ast.stmt) -> bool:
     return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
 
 
+_DOCSTRING_HOLDERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+
+
+def _without_docstrings(source: str) -> str:
+    """*source* with every docstring blanked out, so it carries no weight in the evidence.
+
+    A docstring is the one piece of source with nothing behind it: rewording one changes what a reader learns and not what the task computes, so it should not re-stamp the fingerprint and re-run the DAG. Comments stay in. A changed comment usually rides along with changed code, so the over-invalidating bias is the right one there, and this stays a narrow carve-out rather than a general "ignore the prose" rule.
+
+    Blanked line by line rather than cut, so line numbers still line up with the file if anyone reads a manifest back, and a docstring sharing its line with code (``def f(): "doc"``) is left alone rather than taking the code with it. Text that won't parse comes back as it came.
+
+    For *source* only. A value's JSON encoding (:func:`_value_json`) must not come through here: a value that encodes to a bare string parses as a module whose only statement is a docstring, and would blank to nothing.
+    """
+    text = textwrap.dedent(source)
+    try:
+        tree = ast.parse(text)
+    except SyntaxError, ValueError:
+        return source
+    lines = text.splitlines(keepends=True)
+    for node in ast.walk(tree):
+        if not isinstance(node, _DOCSTRING_HOLDERS) or not node.body or not _is_docstring(doc := node.body[0]):
+            continue
+        end = doc.end_lineno or doc.lineno
+        before, after = lines[doc.lineno - 1][: doc.col_offset], lines[end - 1][doc.end_col_offset :]
+        if before.strip() or after.strip():
+            continue  # shares its lines with code
+        for i in range(doc.lineno - 1, end):
+            lines[i] = "\n" if lines[i].endswith("\n") else ""
+    return "".join(lines)
+
+
 @functools.cache
 def _module_index(name: str) -> _ModuleIndex | None:
     """Read *name*'s top-level namespace from source.
@@ -427,7 +458,7 @@ def _node_refs(node: ast.stmt, idx: _ModuleIndex) -> list[_Ref]:
 
 def _whole_module(idx: _ModuleIndex, seen: dict[str, str]) -> list[_Ref]:
     """Fall back to a module's entire source — still following it narrowly."""
-    seen[f"module:{idx.name}"] = idx.source
+    seen[f"module:{idx.name}"] = _without_docstrings(idx.source)
     return _imports_within(idx.tree, idx)
 
 
@@ -442,7 +473,7 @@ def _resolve_ref(ref: _Ref, seen: dict[str, str]) -> list[_Ref]:
         return chain + _whole_module(idx, seen)
     if symbol == _PRELUDE:
         if idx.prelude:  # most modules are all defs and imports — no entry rather than an empty one
-            seen[f"{module}:{_PRELUDE}"] = "\n".join(_segment(idx.source, n) for n in idx.prelude)
+            seen[f"{module}:{_PRELUDE}"] = "\n".join(_without_docstrings(_segment(idx.source, n)) for n in idx.prelude)
         return chain + [r for n in idx.prelude for r in _node_refs(n, idx)]
     if (target := idx.imports.get(symbol)) is not None:
         return [target, (module, _PRELUDE)]  # a re-export: follow it to where it's defined
@@ -454,7 +485,7 @@ def _resolve_ref(ref: _Ref, seen: dict[str, str]) -> list[_Ref]:
         return chain + (
             [(f"{module}.{symbol}", None)] if _module_file(f"{module}.{symbol}") else _whole_module(idx, seen)
         )
-    seen[f"{module}:{symbol}"] = _segment(idx.source, node)
+    seen[f"{module}:{symbol}"] = _without_docstrings(_segment(idx.source, node))
     return chain + [(module, _PRELUDE), *_node_refs(node, idx)]
 
 
@@ -565,7 +596,7 @@ def _collect_sources(fn: Callable, seen: dict[str, str]) -> None:
     if qualname in seen:
         return
     try:
-        seen[qualname] = inspect.getsource(fn)
+        seen[qualname] = _without_docstrings(inspect.getsource(fn))
     except TypeError, OSError:
         return
     for name, obj in _named_refs(fn):

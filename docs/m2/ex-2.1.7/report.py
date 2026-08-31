@@ -974,8 +974,8 @@ def _(CONDS: list[str], LABELS, arrays, geometry, margin_map):
                     ls="-" if cond in ex.FACTORIAL or cond == "lam0" else (0, (4, 3)), label=LABELS[cond],
                 )  # fmt: skip
             ax.set_title(title, fontsize=10)
-            ax.set_xticks(_depths)
-            ax.set_xlabel("layer")
+            ax.set_xticks(_depths, ["emb", *map(str, range(1, len(_depths)))])
+            ax.set_xlabel("slice")
             ax.axhline(0, color=light_dark("#bbb", "#555"), lw=0.8, zorder=0)
         axes[2].set_ylim(0, 1.0)
         axes[0].legend(fontsize=7, frameon=False, ncols=2, loc="upper right")
@@ -1112,8 +1112,8 @@ def _(CONDS: list[str], LABELS, cells):
                     ls="-" if cond in ex.FACTORIAL or cond == "lam0" else (0, (4, 3)), label=LABELS[cond],
                 )  # fmt: skip
             ax.set_title(title, fontsize=10)
-            ax.set_xticks(_depths)
-            ax.set_xlabel("layer")
+            ax.set_xticks(_depths, ["emb", *map(str, range(1, len(_depths)))])
+            ax.set_xlabel("slice")
             ax.set_ylim(-0.05, 1.0)
         # The floor is a property of the target, not of any run: a caret on the
         # axis says where it is without drawing a rule across the conditions.

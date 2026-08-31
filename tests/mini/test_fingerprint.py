@@ -324,6 +324,28 @@ def test_helper_edits_move_evidence_not_identity(load_module, task_src: str):
     assert (key_copy, p_copy["code_fp"]) == (key_v1, p_v1["code_fp"]), "identical source must fingerprint identically"
 
 
+DOCUMENTED = '"""Colour helpers."""\n\n\ndef helper(x):\n    """Add one to *x*."""\n    return x + 1  # the increment\n'
+
+
+@pytest.mark.parametrize(
+    "reworded,moves",
+    [
+        (DOCUMENTED.replace("Add one to *x*.", "Increment *x* by one."), False),
+        (DOCUMENTED.replace("Colour helpers.", "Color helpers."), False),
+        (DOCUMENTED.replace("# the increment", "# add one"), True),
+        (DOCUMENTED.replace("return x + 1", "return x + 2"), True),
+    ],
+    ids=["function docstring", "module docstring", "comment", "code"],
+)
+def test_docstring_edits_do_not_invalidate(load_module, reworded: str, moves: bool):
+    """A documentation pass over ``src/`` should not cost a sweep. A docstring is the one piece of source with no behavior behind it, so rewording one — on the helper or on its module — must leave the evidence where it is.
+
+    Comments are deliberately still evidence: a changed comment usually rides along with changed code, so the over-invalidating bias stays where it earns its keep, and this is a carve-out for docstrings alone."""
+    _, base = _key_and_parts(load_module, TASK_ATTR, DOCUMENTED, "a")
+    _, edited = _key_and_parts(load_module, TASK_ATTR, reworded, "b")
+    assert (base["code_fp"] != edited["code_fp"]) is moves
+
+
 def test_module_level_value_edits_invalidate(load_module):
     """A module-level constant a task reads (``LR``) is part of its behavior: editing the value must change the evidence, exactly like editing code."""
     _, p_v1 = task_key_parts(load_module("tasks", TASK_VALUE, "a").task, (1,))

@@ -675,7 +675,7 @@ def _(metrics):
                 rows = [r["probe_r2"][probe] for r in metrics if r["label"].startswith(f"d{w}-L{d}-")]
                 ax.plot(np.mean(rows, axis=0), "o-", color=shades[w], label=f"width {w}", lw=2)
             ax.set(title=probe.replace("_", " "), xlabel="residual depth", ylim=(-0.05, 1.05))
-            ax.set_xticks(range(max(DEPTHS) + 1))
+            ax.set_xticks(range(max(DEPTHS) + 1), ["emb", *map(str, range(1, max(DEPTHS) + 1))])
             ax.grid(alpha=0.3)
         axes[0].set_ylabel("probe R² (held-out half)")
         axes[0].legend(fontsize=8)
@@ -766,7 +766,7 @@ def _(weights):
             ax.plot(cos.mean(axis=0), "o-", color=shades[w], label=f"width {w}", lw=2)
             ax.axhline(0.8 / np.sqrt(w), color=shades[w], lw=1, ls="--", alpha=0.6)
         ax.set(xlabel="residual depth", ylabel="cross-seed |cos| of redness direction", ylim=(0, 1))
-        ax.set_xticks(range(max(DEPTHS) + 1))
+        ax.set_xticks(range(max(DEPTHS) + 1), ["emb", *map(str, range(1, max(DEPTHS) + 1))])
         ax.grid(alpha=0.3)
         ax.legend(fontsize=8)
         return fig

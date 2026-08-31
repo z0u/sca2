@@ -106,7 +106,7 @@ def _():
     mo.md(r"""
     ## When failures happen
 
-    Each line below is the training run of one seed under the original schedule. The top panel tracks anchor progress: z₀ of pure red, which reaches 1 when *red* sits exactly on its anchor. The middle panel tracks leakage, the mean |z₀| over colors that are clearly not red. The bottom panel is the schedule itself: the learning rate ramps to its 0.1 peak at step 750 and holds there, while the regularizer weights anneal to zero by step 1425.
+    Each line below is the training run of one seed under the original schedule. The top panel tracks anchor progress: z₁ of pure red, which reaches 1 when *red* sits exactly on its anchor. The middle panel tracks leakage, the mean |z₁| over colors that are clearly not red. The bottom panel is the schedule itself: the learning rate ramps to its 0.1 peak at step 750 and holds there, while the regularizer weights anneal to zero by step 1425.
     """)
     return
 
@@ -138,9 +138,9 @@ def _(arm, steps, traj):
                     ax.plot(steps, traj(r, key), color=gray, lw=1)
             for hue, r in zip(hues, _bad, strict=True):
                 ax.plot(steps, traj(r, key), color=hue, lw=1.6, label=_label[r["seed"]])
-        axes[0].set(ylabel="z₀(pure red)", ylim=(-1.05, 1.05))
+        axes[0].set(ylabel="z₁(pure red)", ylim=(-1.05, 1.05))
         axes[0].legend(loc="lower left", fontsize=8, ncols=2)
-        axes[1].set(ylabel="leak (mean |z₀|, non-red)", ylim=(0, 0.7))
+        axes[1].set(ylabel="leak (mean |z₁|, non-red)", ylim=(0, 0.7))
         ax = axes[2]
         ax.plot(_hist.index, _hist["lr"], color=light_dark("#1a5f8a", "#6ab0d4"), lw=2, label="lr")
         ax2 = ax.twinx()
@@ -177,7 +177,7 @@ def _(arm, traj):
         "anchor"
     ].to_numpy()
     mo.md(f"""
-    All {len(_bad)} failing runs reached z₀(red) > 0.9, a clean anchor, between steps {min(_anchored)} and {max(_anchored)}, right as the LR approaches its peak. The {len(_drops)} that later lost it did so between steps {min(_drops)} and {max(_drops)}. Seeds 22 and 8 slip the moment the LR tops out, and reconstruction collapses outright on 22. Seeds 15 and 27 slip only once the anchor weight has annealed low: by step {max(_drops)} it is {float(_w_anchor[min(max(_drops), len(_w_anchor) - 1)]):.3f}, too weak to pull red back.
+    All {len(_bad)} failing runs reached z₁(red) > 0.9, a clean anchor, between steps {min(_anchored)} and {max(_anchored)}, right as the LR approaches its peak. The {len(_drops)} that later lost it did so between steps {min(_drops)} and {max(_drops)}. Seeds 22 and 8 slip the moment the LR tops out, and reconstruction collapses outright on 22. Seeds 15 and 27 slip only once the anchor weight has annealed low: by step {max(_drops)} it is {float(_w_anchor[min(max(_drops), len(_w_anchor) - 1)]):.3f}, too weak to pull red back.
 
     So the anchored solution seems to be metastable at this learning rate. The regularizers hold it in place while they are on, and the timed anneal removes that hold while the optimizer is still hot. Nothing about these seeds stopped them from anchoring; they were unlucky during the plateau. If that is right, whether a run fails should follow the randomness of training rather than the initialization, which we test below.
     """)
@@ -232,7 +232,7 @@ def _(arm):
         ax.set_xticks(range(len(_streams)), [str(s) for s in _streams])
         ax.set_yticks(range(len(_inits)), [str(s) for s in _inits])
         ax.set(xlabel="batch/label stream", ylabel="model init")
-        fig.colorbar(im, ax=ax, label="final leak (mean |z₀|, non-red)", shrink=0.8)
+        fig.colorbar(im, ax=ax, label="final leak (mean |z₁|, non-red)", shrink=0.8)
         ax.set_title("Failures (×) scatter across inits — including 22 and 27")
         return fig
 
@@ -340,7 +340,7 @@ def _(arm):
 
     Catastrophic failures — meaning the anchor was lost, reconstruction collapsed, or leak went beyond 0.3 — occurred only in the fallback-free arms: {_cat(_base)} of {len(_base)} base-config runs, against **{_cat(_fb)} of {len(_fb)}** fallback-trained runs across all eight schedules ({_cat(_like)} of {len(_like)} in the like-for-like condition, the same schedule as the base arms). Ex-2.9.2 saw this pattern at 32 seeds and was careful about reading much into it, since one extra loss term is hard to tell apart from luck at that scale. At {len(_fb)} runs the pattern has held without exception.
 
-    A mechanism seems plausible. The fallback term pins the decoder output at −e₀, which flattens the loss landscape around the redirect direction and may remove the direction along which the instability grows. Only the like-for-like condition is a clean comparison, so the schedule confound prevents this from being conclusive. Still, this is now the second experiment in which fallback training produced zero catastrophes.
+    A mechanism seems plausible. The fallback term pins the decoder output at −e₁, which flattens the loss landscape around the redirect direction and may remove the direction along which the instability grows. Only the like-for-like condition is a clean comparison, so the schedule confound prevents this from being conclusive. Still, this is now the second experiment in which fallback training produced zero catastrophes.
     """)
     return
 
