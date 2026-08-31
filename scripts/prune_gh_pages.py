@@ -46,8 +46,20 @@ def git(*args: str, cwd: Path, env: dict[str, str] | None = None) -> str:
 
 
 def fetch_tip(repo: Path, remote: str, branch: str) -> str:
-    """Fetch the deploy branch and return the sha we found it at — the value the push later holds a lease against."""
-    git("fetch", "--quiet", remote, branch, cwd=repo)
+    """Fetch the deploy branch *completely*, and return the sha we found it at — the value the push later holds a lease against.
+
+    The fetch has to be `--unshallow`, and the reason is worth keeping. `actions/checkout` clones at depth 1, and the deploy step that runs just before this one fetches `gh-pages` at `--depth=1` too, into the same repository. So by the time we get here the tip is already present as a *shallow boundary*: a plain fetch finds nothing to pull, and `rev-list` walks one commit and stops. The first run in CI read the 344-commit branch as 1 commit and declined to prune, which is how this was found.
+
+    A count taken from a shallow graph is short rather than wrong-looking, so it fails as "nothing to do" — indistinguishable from the healthy no-op. Hence the check afterwards: if the repository is somehow still shallow, raise, rather than report a number no one can trust.
+    """
+    if git("rev-parse", "--is-shallow-repository", cwd=repo) == "true":
+        git("fetch", "--quiet", "--unshallow", remote, branch, cwd=repo)
+    else:
+        git("fetch", "--quiet", remote, branch, cwd=repo)
+    if git("rev-parse", "--is-shallow-repository", cwd=repo) == "true":
+        raise RuntimeError(
+            f"{branch} is still shallow after --unshallow; its depth can't be counted, so refusing to guess"
+        )
     return git("rev-parse", "FETCH_HEAD", cwd=repo)
 
 
