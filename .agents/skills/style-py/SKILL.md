@@ -105,9 +105,7 @@ with app.setup(hide_code=True):
     SLICE_NAMES = ["emb", "1", "2", "3", "4"]
     """A docstring for a constant."""
 
-    # A cell renders its last expression, and a trailing docstring is one: without
-    # this `None`, the docstring shows up as a stray string at the top of the report.
-    None
+    None  # Prevent the docstring from rendering
 
 
 @app.function(hide_code=True)
