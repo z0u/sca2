@@ -35,6 +35,9 @@ with app.setup(hide_code=True):
     TARGET_TITLES = {"op1": "The color of op1", "op2": "The color of op2", "ans": "The color of the answer"}
     """Panel titles, one per probe target: which token's color that panel's probes decode."""
 
+    # A cell renders its last expression, and a trailing docstring is one.
+    None
+
 
 @app.function(hide_code=True)
 def load_npz(ref: str) -> dict[str, np.ndarray] | None:

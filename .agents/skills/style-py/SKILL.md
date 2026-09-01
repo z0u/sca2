@@ -105,6 +105,10 @@ with app.setup(hide_code=True):
     SLICE_NAMES = ["emb", "1", "2", "3", "4"]
     """A docstring for a constant."""
 
+    # A cell renders its last expression, and a trailing docstring is one: without
+    # this `None`, the docstring shows up as a stray string at the top of the report.
+    None
+
 
 @app.function(hide_code=True)
 def load_margins() -> tuple[dict[str, dict[str, np.ndarray]], np.ndarray] | None:
