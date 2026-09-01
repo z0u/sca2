@@ -1,6 +1,6 @@
 ---
 status: open
-tags: [archival, versioning, security]
+tags: [archival, versioning, security, needs-design]
 opened: 2026-08-12
 ---
 
@@ -15,3 +15,7 @@ Configure automatic indelible backups. This should be done in such a way that a 
 - HF publish repo `z0u/sca2-pub`
 
 This should be done in a reusable way if possible to allow a backport to `z0u/mi-ni` — even if it's just a script and some instructions (but if we can do better, that would be cool too).
+
+## Notes
+
+**2026-09-01, z0u** — This sounds complicated. Investigate, design, maybe prototype, but let me review the design before building.
