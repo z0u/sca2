@@ -40,6 +40,8 @@ show_help() {
 		  publish <nbs|--all>: export reports and sync their bundles to the publish tier
 		  site:                assemble the public site from *published* bundles into _site/
 		                       (for CI; read-only, never runs a notebook)
+		  strays  [...paths]:  Marimo cells that end on a docstring, which publishes it as
+		                       the cell's output (default: docs/; also runs inside lint)
 		  todo    [...sets] [--tag T] [--status S] [--bundle B] [--priority] [--json] [--check]:
 		                       list backlog items from todo/[set/]
 		  worktrees [--prune] [--dry-run]:
@@ -73,6 +75,12 @@ case "${1:-}" in
     link|links)
         shift
         uv run "$SCRIPT_DIR/check_md_links.py" "$@"
+        ;;
+    stray|strays)
+        # Cells whose last statement is a docstring, which Marimo publishes as the
+        # cell's output. Part of `lint`, and separately runnable on one notebook.
+        shift
+        uv run "$SCRIPT_DIR/trailing_cell_docstrings.py" "$@"
         ;;
     ann|annotations)
         # Advisory, like `dead`: a worklist of public cell variables that reach

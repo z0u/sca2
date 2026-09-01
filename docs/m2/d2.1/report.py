@@ -35,6 +35,9 @@ with app.setup(hide_code=True):
     KEYINGS = {"op1": "first", "op2": "second"}
     """Each keying, and which operand's color it puts on the color axis."""
 
+    # A cell renders its last expression, and a trailing docstring is one.
+    None
+
 
 @app.function(hide_code=True)
 def load_margins() -> tuple[dict[str, dict[str, np.ndarray]], dict[str, dict[str, np.ndarray]], np.ndarray] | None:

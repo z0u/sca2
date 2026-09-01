@@ -105,6 +105,8 @@ with app.setup(hide_code=True):
     SLICE_NAMES = ["emb", "1", "2", "3", "4"]
     """A docstring for a constant."""
 
+    None  # Prevent the docstring from rendering
+
 
 @app.function(hide_code=True)
 def load_margins() -> tuple[dict[str, dict[str, np.ndarray]], np.ndarray] | None:
