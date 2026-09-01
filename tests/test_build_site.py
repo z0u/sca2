@@ -95,7 +95,12 @@ def strips() -> dict[str, "build_site.FigureStrip"]:
             "https://hf.co/d/r/resolve/abc123/exports/probe/report/",
             (
                 ReportFigure(
-                    "grading", light="_assets/grading-light.png", dark="_assets/grading-dark.png", alt="Bands"
+                    "grading",
+                    light="_assets/grading-light.png",
+                    dark="_assets/grading-dark.png",
+                    alt="Bands",
+                    width=640,
+                    height=480,
                 ),
                 ReportFigure("extra", light="_assets/extra.png"),
             ),
@@ -110,26 +115,32 @@ def test_figures_marker_survives_markdown_and_expands_to_pinned_cdn_thumbnails(r
     )
     assert "mini:figures" in body  # the comment came through rendering intact
 
-    out = build_site.expand_figure_strips(body, strips, resolver, from_dir="", externalizing=True)
+    out, expanded = build_site.expand_figure_strips(body, strips, resolver, from_dir="", externalizing=True)
+    assert expanded
     assert "mini:figures" not in out
     assert '<img src="https://hf.co/d/r/resolve/abc123/exports/probe/report/_assets/grading-light.png"' in out
     assert 'srcset="https://hf.co/d/r/resolve/abc123/exports/probe/report/_assets/grading-dark.png"' in out
     assert 'alt="Bands"' in out and 'loading="lazy"' in out
-    assert "<picture>" not in out.split("extra.png")[0].rsplit("<a ", 1)[-1]  # the unthemed figure is a bare <img>
+    assert 'width="640" height="480"' in out  # the export's stamped size, for layout before load
+    # The anchor's href is the light image (no-JS fallback); data-dark carries the swap target.
+    assert 'data-dark="https://hf.co/d/r/resolve/abc123/exports/probe/report/_assets/grading-dark.png"' in out
+    unthemed = out.split("extra.png")[0].rsplit("<a ", 1)[-1]
+    assert "<picture>" not in unthemed and "data-dark" not in unthemed  # the unthemed figure is a bare <img>
 
 
 def test_figures_marker_localizes_to_the_copied_assets(resolver, strips):
-    out = build_site.expand_figure_strips(
+    out, _ = build_site.expand_figure_strips(
         "<!-- mini:figures ./probe/report.py -->", strips, resolver, from_dir="", externalizing=False
     )
     assert '<img src="probe/report/_assets/grading-light.png"' in out  # beside _site/probe/report/index.html
 
 
 def test_figures_marker_for_an_unbuilt_report_renders_nothing(resolver, strips, capsys):
-    out = build_site.expand_figure_strips(
+    out, expanded = build_site.expand_figure_strips(
         "<!-- mini:figures ./acts/report.py --><p>after</p>", strips, resolver, from_dir="", externalizing=True
     )
     assert out == "<p>after</p>"
+    assert not expanded  # no strip on the page, so convert_markdown skips FIG_STRIP_SCRIPT
     assert "names no built report" in capsys.readouterr().out
 
 

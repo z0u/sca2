@@ -55,8 +55,10 @@ def test_relative_urls_finds_only_relative():
 def test_report_figures_folds_themed_pairs_in_document_order():
     """The site index draws its thumbnails from the report's own HTML, which knows the narrative order."""
     html = (
-        '<figure><img class="mini-themed-img-light" src="_assets/grading-light.png" alt="Three panels" />'
-        '<img class="mini-themed-img-dark" src="_assets/grading-dark.png" alt="Three panels" /></figure>'
+        '<figure><img class="mini-themed-img-light" src="_assets/grading-light.png" alt="Three panels"'
+        ' width="640" height="480" />'
+        '<img class="mini-themed-img-dark" src="_assets/grading-dark.png" alt="Three panels"'
+        ' width="641" height="480" /></figure>'
         '<img src="_assets/extra.png" alt="A lone diagram" />'
         '<img src="data:image/png;base64,AAAA" alt="inlined, not an asset" />'
     )
@@ -66,14 +68,16 @@ def test_report_figures_folds_themed_pairs_in_document_order():
         ("extra", "_assets/extra.png", None),
     ]
     assert figs[0].alt == "Three panels"
+    assert (figs[0].width, figs[0].height) == (640, 480)  # the light tag's size, seen first
     assert figs[1].alt == "A lone diagram"
+    assert (figs[1].width, figs[1].height) == (None, None)  # a plain tag carries none
 
 
 def test_report_figures_reads_the_escaped_session_blob():
     """A Marimo export buries its figures in JSON: \\u003C brackets, \\" quotes, escaped alt text."""
     html = (
         '<script>{"outputs":"\\u003Cimg class=\\"mini-themed-img-light\\" src=\\"_assets/cloud-light.png\\" '
-        'alt=\\"Margin \\u2192 1; &quot;red&quot; holds\\" /\\u003E'
+        'alt=\\"Margin \\u2192 1; &quot;red&quot; holds\\" width=\\"512\\" height=\\"384\\" /\\u003E'
         '\\u003Cimg class=\\"mini-themed-img-dark\\" src=\\"_assets/cloud-dark.png\\" alt=\\"ditto\\" /\\u003E"}</script>'
     )
     figs = report_figures(html)
@@ -82,6 +86,7 @@ def test_report_figures_reads_the_escaped_session_blob():
     ]
     # JSON-unescaped (\u2192 → the arrow), then HTML-unescaped (&quot; → "); the first alt seen wins.
     assert figs[0].alt == 'Margin → 1; "red" holds'
+    assert (figs[0].width, figs[0].height) == (512, 384)  # read through the \" quoting
 
 
 def test_stray_links_flags_author_links_not_assets():

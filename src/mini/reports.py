@@ -441,6 +441,8 @@ _IMG_TAG = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
 # leaves the closing \" delimiter to end the match.
 _IMG_SRC_ATTR = re.compile(r'(?<![\w-])src\s*=\s*\\?["\']([^"\'\\]+)', re.IGNORECASE)
 _IMG_ALT_ATTR = re.compile(r'(?<![\w-])alt\s*=\s*\\?["\']((?:\\[^"\']|[^"\'\\])*)', re.IGNORECASE)
+_IMG_WIDTH_ATTR = re.compile(r'(?<![\w-])width\s*=\s*\\?["\']?(\d+)', re.IGNORECASE)
+_IMG_HEIGHT_ATTR = re.compile(r'(?<![\w-])height\s*=\s*\\?["\']?(\d+)', re.IGNORECASE)
 
 _LIGHT_SUFFIX = "-light.png"
 _DARK_SUFFIX = "-dark.png"
@@ -462,13 +464,15 @@ def _decode_attr(value: str) -> str:
 class ReportFigure:
     """One figure in a report's exported HTML, with its light/dark variants folded together.
 
-    ``light`` and ``dark`` are the bundle-relative asset URLs (``_assets/<stem>-light.png``); ``dark`` is ``None`` for an unthemed image. ``alt`` is the figure's own alt text, as authored.
+    ``light`` and ``dark`` are the bundle-relative asset URLs (``_assets/<stem>-light.png``); ``dark`` is ``None`` for an unthemed image. ``alt`` is the figure's own alt text, as authored. ``width``/``height`` are the CSS-pixel display size the export stamped on the ``<img>`` (see :func:`mini.vis.nb.themed_figure_html`), or ``None`` when the tag carried none.
     """
 
     stem: str
     light: str
     dark: str | None = None
     alt: str = ""
+    width: int | None = None
+    height: int | None = None
 
 
 def report_figures(html: str, *, link: str = "_assets") -> list[ReportFigure]:
@@ -495,12 +499,23 @@ def report_figures(html: str, *, link: str = "_assets") -> list[ReportFigure]:
             stem, role = leaf[: -len(_DARK_SUFFIX)], "dark"
         else:
             stem, role = PurePosixPath(leaf).stem, "light"
-        entry = order.setdefault(stem, {"light": None, "dark": None, "alt": None})
+        entry = order.setdefault(stem, {"light": None, "dark": None, "alt": None, "width": None, "height": None})
         entry[role] = entry[role] or src
         if entry["alt"] is None and (alt := _IMG_ALT_ATTR.search(tag)) is not None:
             entry["alt"] = _decode_attr(alt.group(1))
+        # First tag seen wins, like alt: the export writes the light variant first, and
+        # the pair's sizes differ by at most a pixel of tight-bbox rounding.
+        if entry["width"] is None and (w := _IMG_WIDTH_ATTR.search(tag)) and (h := _IMG_HEIGHT_ATTR.search(tag)):
+            entry["width"], entry["height"] = w.group(1), h.group(1)
     return [
-        ReportFigure(stem, light=e["light"] or (e["dark"] or ""), dark=e["dark"], alt=e["alt"] or "")
+        ReportFigure(
+            stem,
+            light=e["light"] or (e["dark"] or ""),
+            dark=e["dark"],
+            alt=e["alt"] or "",
+            width=int(e["width"]) if e["width"] else None,
+            height=int(e["height"]) if e["height"] else None,
+        )
         for stem, e in order.items()
         if e["light"] or e["dark"]
     ]
