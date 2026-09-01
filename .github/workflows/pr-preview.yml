@@ -15,7 +15,17 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, closed]
 
-concurrency: preview-${{ github.ref }}
+# Keyed on the PR, not on `github.ref`, and that is the whole point. A ref-keyed
+# group put a PR's teardown in a *different* group from its own builds: on #59 the
+# teardown removed the preview at 02:06:24-29 and a `synchronize` build that started
+# before the merge deployed it straight back at 02:06:35-40, leaving the preview live
+# for good. `github.event.number` is the same on every event for one PR, so the close
+# now lands in the same group as the builds, cancels whichever is in flight, and is
+# the last writer. Per-PR rather than shared with `publish-docs.yml` on purpose — see
+# eng/publishing.md for why sharing a group would cancel a *pending* teardown instead.
+concurrency:
+  group: preview-pr-${{ github.event.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: write

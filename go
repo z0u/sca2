@@ -11,7 +11,7 @@ is_marimo_notebook() {
 }
 
 show_usage() {
-    echo "usage: $SELF [-h] {install,auth,check,open,preview,publish,site,todo,worktrees} ..."
+    echo "usage: $SELF [-h] {install,auth,check,open,preview,publish,site,stale-previews,todo,worktrees} ..."
 }
 
 show_help() {
@@ -40,6 +40,9 @@ show_help() {
 		  publish <nbs|--all>: export reports and sync their bundles to the publish tier
 		  site:                assemble the public site from *published* bundles into _site/
 		                       (for CI; read-only, never runs a notebook)
+		  stale-previews [--apply] [--max-remove N]:
+		                       PR previews the site still serves for a PR that has closed
+		                       (report-only by default; --apply removes them and pushes)
 		  strays  [...paths]:  Marimo cells that end on a docstring, which publishes it as
 		                       the cell's output (default: docs/; also runs inside lint)
 		  todo    [...sets] [--tag T] [--status S] [--bundle B] [--priority] [--json] [--check]:
@@ -161,6 +164,13 @@ case "${1:-}" in
     site)
         shift
         uv run "$SCRIPT_DIR/build_site.py" --externalize "$@"
+        ;;
+    stale-previews|preview-sweep)
+        # Previews on the site whose PR has closed. Report-only unless --apply, and
+        # it needs push rights on gh-pages; the Preview Sweep workflow runs the same
+        # script from the Actions tab.
+        shift
+        uv run --no-project "$SCRIPT_DIR/stale_previews.py" "$@"
         ;;
     todo)
         shift

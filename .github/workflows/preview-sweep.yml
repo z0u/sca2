@@ -1,0 +1,53 @@
+name: Preview Sweep
+
+# Reconciles the PR previews the site serves against the PRs that are still open,
+# and removes the leftovers. `pr-preview.yml` tears each preview down on close and
+# mostly does, but two causes get past it — a teardown overwritten by a build that
+# was already in flight, and a `closed` event that scheduled no run at all — and
+# only the first has a fix that lives in that workflow. See scripts/stale_previews.py
+# for the evidence, and eng/publishing.md for where this sits among the other
+# writers of the gh-pages branch.
+#
+# Dispatch-only, and report-only unless `apply` is ticked: this deletes from a
+# published site. Run it without `apply` first and read the list. Putting it on a
+# schedule is the obvious next step once its judgement has been watched a few times.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Remove the stale previews (unticked: list them and change nothing)"
+        type: boolean
+        default: false
+
+# Writes gh-pages directly, and reads the open PRs to decide what is stale.
+permissions:
+  contents: write
+  pull-requests: read
+
+# Shares nothing with the preview and production deploys on purpose — the push is a
+# fast-forward, so a deploy that lands mid-sweep rejects it and the next run retries.
+concurrency:
+  group: preview-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # Shallow on main is all this needs: the script fetches gh-pages itself and
+        # writes the removal through a temporary index, never a working tree.
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        # Full-version pin, not a floating major — see lint-check.yml for why, and
+        # bump all three workflows together.
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Sweep stale previews
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # No project dependencies: the script is standard library only, so this runs
+        # on uv's bare interpreter rather than a `uv sync`.
+        run: uv run --no-project scripts/stale_previews.py ${{ inputs.apply && '--apply' || '' }}
