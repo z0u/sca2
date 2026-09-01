@@ -51,6 +51,8 @@ __all__ = [
     "externalize_html",
     "relative_urls",
     "stray_links",
+    "ReportFigure",
+    "report_figures",
     "rewrite_links",
     "github_slug",
     "insert_base",
@@ -424,6 +426,84 @@ def stray_links(html: str, *, link: str = "_assets") -> list[str]:
     """
     prefix = f"{link}/"
     return sorted({u for u in relative_urls(html) if not u.startswith(prefix)})
+
+
+# One <img> tag, whole. Safe against the tag's own text: attribute values are
+# HTML-escaped at authoring time (themed_figure_html html.escape()s them), so a
+# literal ">" never appears inside one.
+_IMG_TAG = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+
+# src / alt attribute values within one tag's text, in plain HTML or JSON-escaped inside
+# Marimo's session blob (hence the optional backslash before each quote). src stops at a
+# backslash — asset paths carry none. alt may contain JSON escapes (\uXXXX for non-ASCII)
+# but never an escaped quote (a literal quote was HTML-escaped to &quot; before the JSON
+# layer), so a backslash is consumed only when it escapes a non-quote character — which
+# leaves the closing \" delimiter to end the match.
+_IMG_SRC_ATTR = re.compile(r'(?<![\w-])src\s*=\s*\\?["\']([^"\'\\]+)', re.IGNORECASE)
+_IMG_ALT_ATTR = re.compile(r'(?<![\w-])alt\s*=\s*\\?["\']((?:\\[^"\']|[^"\'\\])*)', re.IGNORECASE)
+
+_LIGHT_SUFFIX = "-light.png"
+_DARK_SUFFIX = "-dark.png"
+
+
+def _decode_attr(value: str) -> str:
+    """An attribute value as authored: JSON-unescaped if it came from the session blob, then HTML-unescaped."""
+    from html import unescape
+
+    if "\\" in value:
+        try:
+            value = json.loads(f'"{value}"')
+        except ValueError:
+            pass
+    return unescape(value)
+
+
+@dataclass(frozen=True)
+class ReportFigure:
+    """One figure in a report's exported HTML, with its light/dark variants folded together.
+
+    ``light`` and ``dark`` are the bundle-relative asset URLs (``_assets/<stem>-light.png``); ``dark`` is ``None`` for an unthemed image. ``alt`` is the figure's own alt text, as authored.
+    """
+
+    stem: str
+    light: str
+    dark: str | None = None
+    alt: str = ""
+
+
+def report_figures(html: str, *, link: str = "_assets") -> list[ReportFigure]:
+    """The asset-served figures in a report's exported HTML, in document order.
+
+    A ``themed`` figure lands as two sibling ``<img>`` tags — ``<stem>-light.png`` and ``<stem>-dark.png``, one hidden by CSS — which fold into a single :class:`ReportFigure` keyed by the stem; an unpaired image keeps its filename stem and no ``dark``. The first alt text seen for a stem wins (the variants carry the same one). This is how the site build draws an index page's thumbnails from the HTML it already fetched, rather than listing the bucket: the HTML also knows the *narrative* order, which a directory listing doesn't.
+    """
+    prefix = f"{link}/"
+    # Marimo's session blob JSON-escapes angle brackets (< / >), so the tags
+    # are invisible to an HTML-shaped regex until those are folded back. Quotes stay in
+    # their \" form, which the attribute patterns already read.
+    for esc, ch in (("\\u003C", "<"), ("\\u003c", "<"), ("\\u003E", ">"), ("\\u003e", ">")):
+        html = html.replace(esc, ch)
+    order: dict[str, dict[str, str | None]] = {}
+    for tag in _IMG_TAG.findall(html):
+        m = _IMG_SRC_ATTR.search(tag)
+        if m is None or not m.group(1).startswith(prefix):
+            continue
+        src = m.group(1)
+        leaf = src[len(prefix) :]
+        if leaf.endswith(_LIGHT_SUFFIX):
+            stem, role = leaf[: -len(_LIGHT_SUFFIX)], "light"
+        elif leaf.endswith(_DARK_SUFFIX):
+            stem, role = leaf[: -len(_DARK_SUFFIX)], "dark"
+        else:
+            stem, role = PurePosixPath(leaf).stem, "light"
+        entry = order.setdefault(stem, {"light": None, "dark": None, "alt": None})
+        entry[role] = entry[role] or src
+        if entry["alt"] is None and (alt := _IMG_ALT_ATTR.search(tag)) is not None:
+            entry["alt"] = _decode_attr(alt.group(1))
+    return [
+        ReportFigure(stem, light=e["light"] or (e["dark"] or ""), dark=e["dark"], alt=e["alt"] or "")
+        for stem, e in order.items()
+        if e["light"] or e["dark"]
+    ]
 
 
 #: Markup a heading carries that GitHub renders away before slugging: inline HTML, and

@@ -16,6 +16,7 @@ from mini.reports import (
     is_report_notebook,
     load_pins,
     relative_urls,
+    report_figures,
     report_notebooks,
     rewrite_links,
     save_pins,
@@ -49,6 +50,38 @@ def test_relative_urls_finds_only_relative():
     # absolute, data:, and fragment URLs are excluded
     assert "https://cdn.jsdelivr.net/npm/x/favicon.ico" not in urls
     assert not any(u.startswith("data:") or u.startswith("#") for u in urls)
+
+
+def test_report_figures_folds_themed_pairs_in_document_order():
+    """The site index draws its thumbnails from the report's own HTML, which knows the narrative order."""
+    html = (
+        '<figure><img class="mini-themed-img-light" src="_assets/grading-light.png" alt="Three panels" />'
+        '<img class="mini-themed-img-dark" src="_assets/grading-dark.png" alt="Three panels" /></figure>'
+        '<img src="_assets/extra.png" alt="A lone diagram" />'
+        '<img src="data:image/png;base64,AAAA" alt="inlined, not an asset" />'
+    )
+    figs = report_figures(html)
+    assert [(f.stem, f.light, f.dark) for f in figs] == [
+        ("grading", "_assets/grading-light.png", "_assets/grading-dark.png"),
+        ("extra", "_assets/extra.png", None),
+    ]
+    assert figs[0].alt == "Three panels"
+    assert figs[1].alt == "A lone diagram"
+
+
+def test_report_figures_reads_the_escaped_session_blob():
+    """A Marimo export buries its figures in JSON: \\u003C brackets, \\" quotes, escaped alt text."""
+    html = (
+        '<script>{"outputs":"\\u003Cimg class=\\"mini-themed-img-light\\" src=\\"_assets/cloud-light.png\\" '
+        'alt=\\"Margin \\u2192 1; &quot;red&quot; holds\\" /\\u003E'
+        '\\u003Cimg class=\\"mini-themed-img-dark\\" src=\\"_assets/cloud-dark.png\\" alt=\\"ditto\\" /\\u003E"}</script>'
+    )
+    figs = report_figures(html)
+    assert [(f.stem, f.light, f.dark) for f in figs] == [
+        ("cloud", "_assets/cloud-light.png", "_assets/cloud-dark.png"),
+    ]
+    # JSON-unescaped (\u2192 → the arrow), then HTML-unescaped (&quot; → "); the first alt seen wins.
+    assert figs[0].alt == 'Margin → 1; "red" holds'
 
 
 def test_stray_links_flags_author_links_not_assets():
