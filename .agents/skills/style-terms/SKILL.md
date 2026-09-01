@@ -57,6 +57,10 @@ The slice index $\ell$ is not an exception to this, though it starts at 0. It co
 
   The job a position plays in a line: op1, `+`, op2, `=`, answer, newline. Positions are crop-relative and shift with every batch; roles are line-relative, so pulls, masks, and measurements are keyed by role. "Span roles" are the four prompt roles the anchor term can act on.
 
+- op1, op2 vs. op
+
+  `op1` and `op2` are the **operand** roles, and always have a digit. Bare `op` is the **operation**, matching the usual reading outside the repo. In prose, usually write "operand", and reserve the abbreviations for role names, code, and compounds.
+
 - R² vs r²
 
   Two statistics that earlier reports both wrote as R². Write $R^2$ for a probe's held-out coefficient of determination (can be negative; measures a fitted readout), and $r^2$ for a squared Pearson correlation (bounded to [0, 1]; measures proportionality, e.g. the grading track). Say which one in prose on first use.
