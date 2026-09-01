@@ -44,11 +44,11 @@ Post-hoc baseline tier: a probe direction, diff-in-means, and LEACE fitted on th
 
 ### Fallback control
 
-[Queue item 3](/todo/science/d21-kickoff-carry-over-lessons.md) of the kickoff lessons, and M1's [ex-2.9.2](/docs/m1/ex-2.9.2/report.py) result: teach the model what to produce once the concept has been removed, so the intervention has a designed, predictable outcome.
+[Queue item 3](/todo/science/d21-kickoff-carry-over-lessons.md) of the kickoff lessons, and the M1 follow-up [ex-2.9.2](/docs/m1/ex-2.9.2/report.py) result: teach the model what to produce once the concept has been removed, so the intervention has a designed, predictable outcome.
 
-Runs on the D2.1 grammar, before the op work: the term gets proven on the known recipe and a continuous concept before it meets the categorical null. Two ways to build it, chosen when the code is written:
-(a) Redirect to the antipode as M1 did. This may need the *anti-anchor* term, which we haven't used yet in transformers. It's similar to the *anti-subspace* term, but directional, which means it needn't oppose the *anchor* term and can have a higher weight. OTOH we may not notice the difference in these models, since they have plenty of capacity to spare.
-(b) Rehearse the intervention: on a small fraction of training steps, apply the axis-projection operator in the forward pass and train the output toward the designed fallback. Reserves no direction, costs those steps a second forward pass, and the trained response is to the same operator the eval contract applies — where (a) trains the response at the antipode but evaluates at the projection. It also carries an obfuscation risk: training under the operator rewards *looking* suppressed, so the model can keep the concept readable off-axis and emit the fallback only where it detects the projected state — the masked-vs-removed failure the auditing rows exist to catch. If (b) runs, those rows are its gate.
+Runs on the D2.1 grammar, before the op work: the term gets proven on the known recipe and a continuous concept before it meets the categorical null. The mechanism is the antipode redirect from ex-2.9.2. This may need the *anti-anchor* term, which we haven't used yet in transformers. It's similar to the *anti-subspace* term, but directional, which means it needn't oppose the *anchor* term and can have a higher weight. OTOH we may not notice the difference in these models, since they have plenty of capacity to spare.
+
+The known limitation: the response is trained at the antipode while the eval projects to zero, so the score reads how far the designed response carries to a state training never visited. The [two-op concept swap](/todo/science/redirect-between-two-anchored-ops.md) (D2.3) resolves that mismatch — its redirect target is a state training visits in the ordinary course of the task. We considered closing it here instead by rehearsing the intervention (apply the projection operator on a fraction of training steps and train the output toward the fallback) and rejected that: a fallback observed under the operator the model was trained on is a convergence result rather than a removal result, and the training pressure rewards keeping the concept readable off-axis with the fallback emitted only where the projected state is detected — the masked-vs-removed failure itself. Refiled as an auditing question: [rehearsed fallback as an auditing probe](/todo/science/rehearsal-fallback-as-auditing-probe.md).
 
 Unlike in autoencoders, the effect stops being decoder-only, because the intervention is followed by more layers — so the task gate has to watch what it costs.
 
@@ -76,7 +76,7 @@ One operation on e₁, the others unlabelled, D2.1's recipe + the lessons from a
 
 Measurements: alignment at the op position by slice; group contrast (anchored op against the others, which is the categorical form of grading); task gates against control; and a probe scan of op-identity decodability at every site, against the control.
 
-What we hope to see from the scan is approx. _no change_ against control. We are anchoring the hidden state, not relocating the computation, and the scan is the side-effects read (ex-2.1.12's H2, for the op). May need many seeds to properly determine this (20?) — although perhaps a smaller smoke test is warranted beforehand, to check whether anchoring an op will work at all; consider splitting out as a prerequisite.
+What we hope to see from the scan is approx. _no change_ against control — an equivalence claim, so the prereg must declare the margin it has to land within. We are anchoring the hidden state, not relocating the computation, and the scan is the side-effects read (ex-2.1.12's H2, for the op). May need many seeds to properly determine this (20?) — although perhaps a smaller smoke test is warranted beforehand, to check whether anchoring an op will work at all; consider splitting out as a prerequisite.
 
 Nice to have: Sweep over all ops to see whether they can all be anchored equally well.
 
@@ -94,7 +94,7 @@ The per-line prediction at full suppression comes from the designed null. The *n
 
 Read the response off the probability mass on the correct answer, or off the decoded answer's distance from it. Hard accuracy steps rather than grades under an averaged null, since greedy decoding keeps the plurality answer, so accuracy is the gate statistic and not the response statistic.
 
-Conditions test the contrast from m1/ex-2.9.2: control, no-fallback, fallback — plus a filtered-corpus row, a control trained with the anchored op's lines held out. That is the removal reference the [baselines item](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md) wanted placed, and the eval contract scores it like any other triple.
+Conditions test the contrast from m1/ex-2.9.2: control, no-fallback, fallback — plus a filtered-corpus row, a control trained with the anchored op's lines held out. The fallback trains toward the *op-averaged* distribution — the designed null itself, as soft labels — so fallback and no-fallback share the per-line prediction, and the fallback condition's claim is tighter adherence to it: less seed scatter, more mass on the mixture. That is the removal reference the [baselines item](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md) wanted placed, and the eval contract scores it like any other triple.
 
 The same models have an operand anchor too (or a companion condition does), so operand suppression runs beside operation suppression with the machinery from [suppress red](#suppress-red-on-the-existing-checkpoints).
 
@@ -128,6 +128,7 @@ Only what the plan above already commits to; everything else stays open until an
 - [Suppress red](#suppress-red-on-the-existing-checkpoints) runs before the op grammar is ready: no training, and the highest information per dollar in the plan.
 - The survey is confirmed on the new grammar as a set of proposals, and not replicated literally first.
 - The dose axis for the categorical concept is intervention strength; the stimulus side (*op-relevance*) supplies the per-line predictions and the bound.
+- The fallback mechanism is the antipode redirect; rehearsing the intervention during training is refiled as an [auditing question](/todo/science/rehearsal-fallback-as-auditing-probe.md).
 - Which op to anchor is open until the op table lands and its relevance distributions are computed.
 - Layer sweep shape: deferred to the [experiment](#layer-sweep) itself.
 
