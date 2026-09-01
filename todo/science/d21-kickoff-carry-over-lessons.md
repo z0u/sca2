@@ -1,7 +1,8 @@
 ---
-status: partial
+status: done
 tags: [D2.2, anchoring, schedules, superposition]
 opened: 2026-07-11
+closed: 2026-09-01
 ---
 # D2.1 kickoff: carry-over lessons and hypothesis queue from ex-2.9.3/2.9.4
 
@@ -51,3 +52,5 @@ Leave the feedback controller alone, even though the setting is harder now. Ex-2
 **2026-08-22, housekeeping** — retagged `D2.1` → `D2.2` to match that finding, since D2.1 has now closed out at ex-2.1.11 and the tag was the last thing filing this under a finished deliverable. Nothing else changed: the title keeps "D2.1 kickoff" because that is what the document is a record *of*, and the front matter is what `./go todo --tag D2.2` reads. The three queue items still live here — the fallback-control analog, stream-vs-init attribution, and the anchor-layer sweep — so this is the item to read alongside the shortlist when D2.2's design starts, and it closes when that design has consumed or rejected each of them.
 
 **2026-08-28, D2.2 design** — queue item **3** is consumed: the [D2.2 design](/docs/m2/d2.2/design.md) carries fallback control as a dep and defines the dose label against the designed null. The transformer form differs from ex-2.9.2's in one way worth recording — the null there was a constant (mid-gray), because removing the concept left nothing to condition on, whereas removing an op leaves both operands, so the null has to be a function of them. It is the op-mixture: the distribution over the answers the op table gives that pair. Two ways to pin it are still open (anti-anchor redirect, which needs the term ex-2.1.6 dropped, or teaching the response to the projection operator), decided when the code is built. Item **5**, the anchor-layer sweep, is inside D2.2's stop 5. Item **4**, stream-vs-init attribution, is neither consumed nor rejected, so this stays `partial`.
+
+**2026-09-01, design review** — item **4** is now rejected: the [D2.2 design](/docs/m2/d2.2/design.md) places stream-vs-init attribution out of scope until there is an anchoring failure worth attributing, and D2.1 produced none. With 1–2 consumed by D2.1's experiments, 3 and 5 consumed by the D2.2 design, and 4 rejected, the close condition is met. One update to the 08-28 note: both fallback mechanisms (anti-anchor redirect, and rehearsing the projection operator) are now recorded in the design's fallback-control section, still to be decided when the code is built.

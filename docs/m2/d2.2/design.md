@@ -32,7 +32,7 @@ a11 --- a12
 a12 & a2 & a3 --- c --- d --- e & f --- g
 ```
 
-### Suppress _red_ on the existing checkpoints
+### Suppress red on the existing checkpoints
 
 No training. Apply the intervention to the ex-2.1.10 primary (nine seeds) and score completion accuracy on lines with red operands against lines without.
 
@@ -46,11 +46,13 @@ Post-hoc baseline tier: a probe direction, diff-in-means, and LEACE fitted on th
 
 [Queue item 3](/todo/science/d21-kickoff-carry-over-lessons.md) of the kickoff lessons, and M1's [ex-2.9.2](/docs/m1/ex-2.9.2/report.py) result: teach the model what to produce once the concept has been removed, so the intervention has a designed, predictable outcome.
 
-Probably redirect it to the antipode as M1 did. This may need the *anti-anchor* term, which we haven't used yet in transformers. It's similar to the *anti-subspace* term, but directional, which means it needn't oppose the *anchor* term and can have a higher weight. OTOH we may not notice the difference in these models, since they have plenty of capacity to spare.
+Runs on the D2.1 grammar, before the op work: the term gets proven on the known recipe and a continuous concept before it meets the categorical null. Two ways to build it, chosen when the code is written:
+(a) Redirect to the antipode as M1 did. This may need the *anti-anchor* term, which we haven't used yet in transformers. It's similar to the *anti-subspace* term, but directional, which means it needn't oppose the *anchor* term and can have a higher weight. OTOH we may not notice the difference in these models, since they have plenty of capacity to spare.
+(b) Rehearse the intervention: on a small fraction of training steps, apply the axis-projection operator in the forward pass and train the output toward the designed fallback. Reserves no direction, costs those steps a second forward pass, and the trained response is to the same operator the eval contract applies — where (a) trains the response at the antipode but evaluates at the projection.
 
 Unlike in autoencoders, the effect stops being decoder-only, because the intervention is followed by more layers — so the task gate has to watch what it costs.
 
-### The multi-op grammar, with _red_ anchored again
+### The multi-op grammar, with red anchored again
 
 The grammar change forces retraining, so this is the regression check: control, the ex-2.1.10 reference recipe, and the ex-2.1.11 survey's proposals, all on the new grammar.
 
@@ -70,7 +72,7 @@ This is different from the [layer sweep](#layer-sweep), which tests the model's 
 
 ### Anchor one operation
 
-One operation on e₁, the others unlabelled, D2.1's recipe + the lessons from above, all slices pulled. The layer sweep comes after, on a frozen recipe, so layer effects are not confounded with schedule fragility (the D2.1 kickoff rule). The labeller keys on the op token, with the position-free mechanism from ex-2.1.10.
+One operation on e₁, the others unlabelled, D2.1's recipe + the lessons from above, all slices pulled — though perhaps not the embeddings, depending on how [un-anchored embeddings](#un-anchored-embeddings) lands: an anchor on the op token's embedding is token identity by construction, the very collapse the risk table warns about. The layer sweep comes after, on a frozen recipe, so layer effects are not confounded with schedule fragility (the D2.1 kickoff rule). The labeller keys on the op token, with the position-free mechanism from ex-2.1.10.
 
 Measurements: alignment at the op position by slice; group contrast (anchored op against the others, which is the categorical form of grading); task gates against control; and a probe scan of op-identity decodability at every site, against the control.
 
@@ -82,15 +84,17 @@ Nice to have: Sweep over all ops to see whether they can all be anchored equally
 
 The centre of D2.2.
 
-A graded dose-response needs a graded label for a categorical concept, and the label follows from what the model produces once the op signal is nullified.
+The headline claim is selective removal: suppress *add* without suppressing *multiply*. The ops may share a common component that means *this is an operation*, with the specific op only one part of the state; the group contrast from [anchor operation](#anchor-one-operation) says how large that shared part is, and the removal claim covers the op-specific part.
 
-The *null* is *op-averaged* — the least committal prediction available from the operands with no op, given by the distribution over the answers to all ops.[^m] Against the *op-averaged* null, *op-relevance* for a line is the weight the mixture withholds from the anchored op's answer: zero where every op in the table agrees on that pair, $\frac{n-1}{ n}$ where the anchored op is alone in its answer. Predictions: damage on anchored-op lines rises with *op-relevance* and stays within the bound the mixture sets; other ops stay within gate.
+The dose axis is intervention strength, because the stimulus side of a categorical concept grades too coarsely: *op-relevance* (below) occupies only two or three levels on a four-op table. Scale the suppression rather than always projecting fully — keep a fraction $1-γ$ of the component, $γ: 0 → 1$; the [shaped-suppression item](/todo/science/shaped-suppression-rather-than-projecting-whole-axis.md) and the M1 lobe are the machinery. Prediction: anchored-op damage rises monotonically with $γ$, other ops within gate along the whole curve.
+
+The per-line prediction at full suppression comes from the designed null. The *null* is *op-averaged* — the least committal prediction available from the operands with no op, given by the distribution over the answers to all ops.[^m] Against the *op-averaged* null, *op-relevance* for a line is the weight the mixture withholds from the anchored op's answer: zero where every op in the table agrees on that pair, $\frac{n-1}{ n}$ where the anchored op is alone in its answer. Predictions: per-line damage follows *op-relevance* and stays within the bound the mixture sets.
 
 [^m]: We considered calling this *op-marginal*, but we also have a *margin* measurement $m$, which would be confusing.
 
-Read the dose off the probability mass on the correct answer, or off the decoded answer's distance from it. Hard accuracy steps rather than grades under an averaged null, since greedy decoding keeps the plurality answer, so accuracy is the gate statistic and not the dose statistic.
+Read the response off the probability mass on the correct answer, or off the decoded answer's distance from it. Hard accuracy steps rather than grades under an averaged null, since greedy decoding keeps the plurality answer, so accuracy is the gate statistic and not the response statistic.
 
-Conditions test the contrast from m1/ex-2.9.2: control, no-fallback, fallback.
+Conditions test the contrast from m1/ex-2.9.2: control, no-fallback, fallback — plus a filtered-corpus row, a control trained with the anchored op's lines held out. That is the removal reference the [baselines item](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md) wanted placed, and the eval contract scores it like any other triple.
 
 The same models have an operand anchor too (or a companion condition does), so operand suppression runs beside operation suppression with the machinery from [suppress red](#suppress-red-on-the-existing-checkpoints).
 
@@ -113,9 +117,20 @@ The D2.2 post.
 
 ## Deps
 
-- **The operation as a variable.** As specified in the [backlog item](/todo/science/make-operation-variable-before-d2-2-sca.md): an op table (name, surface form, grid function with defined rounding, closed on 0..15), `op` on `Example`, seen-pair bookkeeping keyed on `(op, pair)`, ops spelled as words, the infix frame kept for the probes. First table: `mix` (the default), saturating `add`, `screen`, `multiply`. Between them, one op departs from `mix` on most pairs (the model must read the op) and others only sometimes do (so op-relevance is graded rather than binary). `divide` needs a saturation rule and is lumpy on a 16-level grid, so it stays out of the first table; ops in other color spaces (`hue`, `saturation`, `brightness`) are a separate question, filed.
-- **The eval contract and operator library.** Every method produces `(model, subspace, intervention operator)`; one scorer takes the triple. Operators: axis projection, the M1 lobe, weight ablation. This is far cheaper to fix now than after [anchor operation](#anchor-one-operation) has code.
+- **The operation as a variable.** As specified in the [backlog item](/todo/science/make-operation-variable-before-d2-2-sca.md): an op table (name, surface form, grid function with defined rounding, closed on 0..15), `op` on `Example`, seen-pair bookkeeping keyed on `(op, pair)`, ops spelled as words, the infix frame kept for the probes. First table: `mix` (the default), saturating `add`, `screen`, `multiply`. All three depart from `mix` on nearly every pair, so the model must read the op; agreement lives at the ends of the range, except `add`–`screen`, which coincide on roughly a third of pairs and populate the middle *op-relevance* level. When the table lands, compute and quote the relevance distribution per candidate anchored op under the table's own rounding, since the per-line predictions in [suppress operation](#suppress-the-operation-and-the-operands) rest on it. `divide` needs a saturation rule and is lumpy on a 16-level grid, so it stays out of the first table; ops in other color spaces (`hue`, `saturation`, `brightness`) are a separate question, filed.
+- **The eval contract and operator library.** Every method produces `(model, subspace, intervention operator)`; one scorer takes the triple. Operators: axis projection, the M1 lobe, weight ablation. This is far cheaper to fix now than after [anchor operation](#anchor-one-operation) has code. The contract also declares the 2025 auditing rows where portable — relearning rebound (arXiv:2505.22310), activation-perturbation (ActPert, arXiv:2505.23270), and off-axis recoverability (arXiv:2605.11685) — because a row added after the arms are scored means re-scoring them all; D2.3 speaks their language in full.
 - **Fold the [survey lessons](/todo/science/survey-format-lessons-from-ex-2-1.md) into the plan template**: constraint margins ranked beside the objective, multi-seed promotion near a gate, and the publisher carrying every statistic the analysis promises.
+
+## Decisions
+
+Only what the plan above already commits to; everything else stays open until an experiment forces it.
+
+- [Suppress red](#suppress-red-on-the-existing-checkpoints) runs before the op grammar is ready: no training, and the highest information per dollar in the plan.
+- The survey is confirmed on the new grammar as a set of proposals, and not replicated literally first.
+- The dose axis for the categorical concept is intervention strength; the stimulus side (*op-relevance*) supplies the per-line predictions and the bound.
+- Which op to anchor is open until the op table lands and its relevance distributions are computed.
+- `mix` is the default op *in the table*, which says what the grammar was built around and not what a suppressed model outputs.
+- Layer sweep shape: deferred to the [experiment](#layer-sweep) itself.
 
 ## Risks and mitigations
 
@@ -133,4 +148,4 @@ The first experiments all change one thing from D2.1, so a negative there should
 
 ## Out of scope
 
-Verification lines (D2.3). Several ops on separate axes (a D2.3 candidate, for the subspace bound). The feedback controller (the kickoff advice stands). RMU and SAE baselines. The word-level tokenizer, unless [anchor operation](#anchor-one-operation) fails. Resolving D2.1's H2 decodability question ([its own item](/todo/science/global-structure-preserved-under-anchoring.md)), run when the claim is needed.
+Verification lines (D2.3). Several ops on separate axes (a D2.3 candidate, for the subspace bound). The feedback controller (the kickoff advice stands). RMU and SAE baselines. The word-level tokenizer, unless [anchor operation](#anchor-one-operation) fails. Resolving D2.1's H2 decodability question ([its own item](/todo/science/global-structure-preserved-under-anchoring.md)), run when the claim is needed. Stream-vs-init attribution ([kickoff](/todo/science/d21-kickoff-carry-over-lessons.md) queue item 4), until there is an anchoring failure worth attributing — D2.1 produced none.
