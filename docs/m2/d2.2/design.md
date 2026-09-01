@@ -28,15 +28,17 @@ e(["layer sweep"])
 f(["SGTM baseline"])
 g(["write-up"])
 
-a11 --- a12
-a12 & a2 & a3 --- c --- d --- e & f --- g
+a11 --> a12
+a12 & a2 & a3 --> c --> d --> e & f --> g
 ```
 
 ### Suppress red on the existing checkpoints
 
 No training. Apply the intervention to the ex-2.1.10 primary (nine seeds) and score completion accuracy on lines with red operands against lines without.
 
-Hypotheses, in outline: red-line accuracy drops; non-red lines stay within the task gate; the drop is graded with the operand's redness (similar to the M1 dose-response); and a side-effect prediction computed from the geometry beforehand bounds the observed non-red change.
+Hypotheses, in outline: red-line accuracy drops; non-red lines stay within the task gate; and the drop is graded with the operand's redness (similar to the M1 dose-response).
+
+The bound hypothesis has two parts, because M1's bound had the decoder one linear readout from the intervention, and here every later block sits between the write and the output. The strict part is layer-local, as the [kickoff lessons](/todo/science/d21-kickoff-carry-over-lessons.md) advise: the geometry bounds the immediate write — the activation change at the intervened slice on non-red lines, the $1/\sqrt{1-x_1^2}$ gain included — and it holds by construction. The behavioral part is a prediction rather than a bound: non-red damage stays within what the write size implies, under a relation the prereg has to state. A behavioral miss with the write bound intact means later blocks amplify the edit, which is the [layer sweep](#layer-sweep)'s question arriving early, and a finding rather than a method failure.
 
 These checkpoints have no fallback term, so the response to suppression is whatever the untrained region decodes — M1 called that spoofing, and it is where ex-2.9.1's seed spread came from. This experiment measures the undesigned fallback, and sets the reference the fallback condition has to beat.
 
@@ -76,7 +78,7 @@ One operation on e₁, the others unlabelled, D2.1's recipe + the lessons from a
 
 Measurements: alignment at the op position by slice; group contrast (anchored op against the others, which is the categorical form of grading); task gates against control; and a probe scan of op-identity decodability at every site, against the control.
 
-What we hope to see from the scan is approx. _no change_ against control — an equivalence claim, so the prereg must declare the margin it has to land within. We are anchoring the hidden state, not relocating the computation, and the scan is the side-effects read (ex-2.1.12's H2, for the op). May need many seeds to properly determine this (20?) — although perhaps a smaller smoke test is warranted beforehand, to check whether anchoring an op will work at all; consider splitting out as a prerequisite.
+What we hope to see from the scan is approx. _no change_ against control — an equivalence claim, so the prereg must declare the margin it has to land within. We are anchoring the hidden state, not relocating the computation, and the scan is the side-effects read (ex-2.1.12's H2, for the op). The equivalence read may need many seeds (20?), so a small smoke test runs first: a few seeds against the alignment and task gates alone, to establish that anchoring an op works at all before the seed budget is spent on the margin.
 
 Nice to have: Sweep over all ops to see whether they can all be anchored equally well.
 
@@ -118,14 +120,16 @@ The D2.2 post.
 ## Deps
 
 - **The operation as a variable.** As specified in the [backlog item](/todo/science/make-operation-variable-before-d2-2-sca.md): an op table (name, surface form, grid function with defined rounding, closed on 0..15), `op` on `Example`, seen-pair bookkeeping keyed on `(op, pair)`, ops spelled as words, the infix frame kept for the probes. First table: `mix` (D2.1's op), saturating `add`, `screen`, `multiply`. All three depart from `mix` on nearly every pair, so the model must read the op; agreement lives at the ends of the range, except `add`–`screen`, which coincide on roughly a third of pairs and populate the middle *op-relevance* level. When the table lands, compute and quote the relevance distribution per candidate anchored op under the table's own rounding, since the per-line predictions in [suppress operation](#suppress-the-operation-and-the-operands) rest on it. `divide` needs a saturation rule and is lumpy on a 16-level grid, so it stays out of the first table; ops with implicit conversion via other color spaces (`hue`, `saturation`, `brightness`) are a separate question, filed at [richer op set](/todo/science/richer-op-set-operand-geometry.md).
-- **The eval contract and operator library.** Every method produces `(model, subspace, intervention operator)`; one scorer takes the triple. Operators: axis projection, the M1 lobe, weight ablation. This is far cheaper to fix now than after [anchor operation](#anchor-one-operation) has code. The contract also pins where operators act and what they do to the norm: the hook point is the between-block stream (the slices `residual_stream()` returns, the same states the anchor term reads), and since the stream is unit-norm (nGPT), axis projection composes with re-projection onto the sphere — landing on the great subsphere where zero-concept states live, with a per-position gain of $1/\sqrt{1-x_1^2}$ on the surviving components that is computable beforehand and belongs inside the bound. Weight ablation declares its order against the `normalize_weights` constraint, which rescales a matrix once entries are zeroed. The contract also declares the 2025 auditing rows where portable — relearning rebound (arXiv:2505.22310), activation-perturbation (ActPert, arXiv:2505.23270), and off-axis recoverability (arXiv:2605.11685) — because a row added after the arms are scored means re-scoring them all; D2.3 speaks their language in full.
+- **The eval contract and operator library.** Every method produces `(model, subspace, intervention operator)`; one scorer takes the triple. Operators: axis projection, the M1 lobe, weight ablation. The contract gates [suppress red](#suppress-red-on-the-existing-checkpoints) — the first experiment consumes the scorer and the axis-projection operator — so it is the one piece of engineering between here and the first prereg, and far cheaper to fix now than after [anchor operation](#anchor-one-operation) has code. The contract also pins where operators act and what they do to the norm: the hook point is the between-block stream (the slices `residual_stream()` returns, the same states the anchor term reads), and since the stream is unit-norm (nGPT), axis projection composes with re-projection onto the sphere — landing on the great subsphere where zero-concept states live, with a per-position gain of $1/\sqrt{1-x_1^2}$ on the surviving components that is computable beforehand and belongs inside the bound. Weight ablation declares its order against the `normalize_weights` constraint, which rescales a matrix once entries are zeroed. The contract also declares the 2025 auditing rows where portable — relearning rebound (arXiv:2505.22310), activation-perturbation (ActPert, arXiv:2505.23270), and off-axis recoverability (arXiv:2605.11685) — because a row added after the arms are scored means re-scoring them all; D2.3 speaks their language in full.
 - **Fold the [survey lessons](/todo/science/survey-format-lessons-from-ex-2-1.md) into the plan template**: constraint margins ranked beside the objective, multi-seed promotion near a gate, and the publisher carrying every statistic the analysis promises.
 
 ## Decisions
 
 Only what the plan above already commits to; everything else stays open until an experiment forces it.
 
-- [Suppress red](#suppress-red-on-the-existing-checkpoints) runs before the op grammar is ready: no training, and the highest information per dollar in the plan.
+- [Suppress red](#suppress-red-on-the-existing-checkpoints) runs before the op grammar is ready: no training, and the highest information per dollar in the plan. The eval contract is the one dep it waits on.
+- The bound claim is layer-local from the start: the geometry bounds the write, behavior against the write is a prediction, and a behavioral miss feeds the [layer sweep](#layer-sweep) rather than falsifying the bound.
+- [Anchor operation](#anchor-one-operation) opens with a small smoke test, before the many-seed equivalence read.
 - The survey is confirmed on the new grammar as a set of proposals, and not replicated literally first.
 - The dose axis for the categorical concept is intervention strength; the stimulus side (*op-relevance*) supplies the per-line predictions and the bound.
 - The fallback mechanism is the antipode redirect; rehearsing the intervention during training is refiled as an [auditing question](/todo/science/rehearsal-fallback-as-auditing-probe.md).
@@ -137,7 +141,7 @@ Only what the plan above already commits to; everything else stays open until an
 | Risk | Would look like | Retired at |
 | --- | --- | --- |
 | Suppression does not bite even on _red_ | Accuracy unchanged after projecting e₁ out; color is read from elsewhere | [suppress red](#suppress-red-on-the-existing-checkpoints) |
-| The bound is loose or wrong in a transformer | Observed off-red damage exceeds the geometric prediction | [suppress red](#suppress-red-on-the-existing-checkpoints), then [layer sweep](#layer-sweep) |
+| The bound is loose or wrong in a transformer | The non-red write exceeds its geometric bound, or the damage outruns the write-size prediction | [suppress red](#suppress-red-on-the-existing-checkpoints), then [layer sweep](#layer-sweep) |
 | The response to suppression is undesigned | Suppressed lines scatter by seed; completions leave the color vocabulary | [suppress red](#suppress-red-on-the-existing-checkpoints) measures it, [fallback control](#fallback-control) pins it |
 | Recipe is grammar-specific | The survey's proposals do not reproduce on the new grammar | [new grammar](#the-multi-op-grammar-with-red-anchored-again) |
 | Task cost grows with an abstract concept anchor | Gate misses in [anchor operation](#anchor-one-operation) that [new grammar](#the-multi-op-grammar-with-red-anchored-again) did not have | [anchor operation](#anchor-one-operation) |
