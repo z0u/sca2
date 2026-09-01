@@ -69,22 +69,6 @@ await mermaid.run();
 </script>
 """
 
-# Loaded only by a page with a thumbnail strip. The strip's <picture> already *shows* the
-# scheme-matched variant; this makes the click *open* it too, by pointing each anchor at
-# the URL its `data-dark` carries when the scheme is dark. The href stays on the light
-# image as the no-JS fallback, and `type="module"` defers execution past parsing, so the
-# anchors exist when it runs. Re-syncs live if the reader's scheme changes.
-FIG_STRIP_SCRIPT = """<script type="module">
-const anchors = [...document.querySelectorAll(".fig-strip a[data-dark]")].map((a) => [a, a.href]);
-const scheme = window.matchMedia("(prefers-color-scheme: dark)");
-const sync = () => {
-  for (const [a, light] of anchors) a.href = scheme.matches ? a.dataset.dark : light;
-};
-scheme.addEventListener("change", sync);
-sync();
-</script>
-"""
-
 # Source suffixes that the build renders into a report page (so an author link to one
 # resolves to the rendered result, not the dead source file).
 _RENDERED_SUFFIXES = (".py", ".ipynb", ".md")
@@ -492,7 +476,7 @@ def _marker_key(token: str, links: LinkResolver, *, from_dir: str) -> str | None
 def _figure_strip_html(strip: FigureStrip, *, from_dir: str, externalizing: bool) -> str:
     """A report's thumbnail strip: each figure a lazy full-size image, themed via ``<picture>``.
 
-    Externalizing, URLs use the strip's revision-pinned CDN base — the same assets the report page serves, so the index can never show figures its report doesn't. Localizing they're relative into the copied ``_site/<key>/_assets/``. Each thumbnail links to the full-size image — the light one as the no-JS href, with the dark URL in ``data-dark`` for :data:`FIG_STRIP_SCRIPT` to swap in — and reuses the figure's own alt text and the ``width``/``height`` the export stamped (so the row lays out before the PNGs arrive). The CSS (``scripts/md.css``) sizes them down, so the browser fetches one theme's PNG per figure and only as it scrolls into view.
+    Externalizing, URLs use the strip's revision-pinned CDN base — the same assets the report page serves, so the index can never show figures its report doesn't. Localizing they're relative into the copied ``_site/<key>/_assets/``. Each thumbnail reuses the figure's own alt text and the ``width``/``height`` the export stamped (so the row lays out before the PNGs arrive). The CSS (``scripts/md.css``) sizes them down, so the browser fetches one theme's PNG per figure and only as it scrolls into view. Deliberately no link to the full-size PNG: opening one paints its transparent background on the browser's white canvas, wrong in dark mode, while copying the image in place picks up the scheme-matched variant the ``<picture>`` shows.
     """
     import html
 
@@ -505,22 +489,20 @@ def _figure_strip_html(strip: FigureStrip, *, from_dir: str, externalizing: bool
     for fig in strip.figures:
         alt, title = html.escape(fig.alt), html.escape(fig.stem)
         size = f' width="{fig.width}" height="{fig.height}"' if fig.width and fig.height else ""
-        img = f'<img src="{base}{fig.light}" alt="{alt}"{size} loading="lazy">'
-        dark = f' data-dark="{base}{fig.dark}"' if fig.dark else ""
+        img = f'<img src="{base}{fig.light}" alt="{alt}" title="{title}"{size} loading="lazy">'
         if fig.dark:
             img = f'<picture><source media="(prefers-color-scheme: dark)" srcset="{base}{fig.dark}">{img}</picture>'
-        parts.append(f'<a href="{base}{fig.light}" title="{title}"{dark}>{img}</a>')
+        parts.append(img)
     return f'<div class="fig-strip">{"".join(parts)}</div>'
 
 
 def expand_figure_strips(
     body: str, strips: dict[str, FigureStrip], links: LinkResolver, *, from_dir: str, externalizing: bool
-) -> tuple[str, bool]:
-    """Swap each ``mini:figures`` marker in a rendered page for its report's thumbnail strip, and say whether the page got one (so :data:`FIG_STRIP_SCRIPT` loads only where it has work).
+) -> str:
+    """Swap each ``mini:figures`` marker in a rendered page for its report's thumbnail strip.
 
     Operates on the rendered HTML rather than the Markdown, so the strip's markup never has to survive Python-Markdown's block parsing (it would read a raw ``<div>`` indented inside a list item as code). A marker whose report wasn't built (unpublished, or skipped) renders as nothing, with a build note.
     """
-    expanded = False
 
     def repl(m: re.Match) -> str:
         token = m.group(1)
@@ -528,11 +510,9 @@ def expand_figure_strips(
         if strip is None:
             print(f"  ! {from_dir or '.'}: mini:figures {token!r} names no built report — dropping the strip")
             return ""
-        nonlocal expanded
-        expanded = True
         return _figure_strip_html(strip, from_dir=from_dir, externalizing=externalizing)
 
-    return _FIGURES_MARKER.sub(repl, body), expanded
+    return _FIGURES_MARKER.sub(repl, body)
 
 
 _MERMAID_FENCE = re.compile(r'<pre><code class="language-mermaid">(.*?)</code></pre>', re.DOTALL)
@@ -561,9 +541,7 @@ def convert_markdown(links: LinkResolver, externalizing: bool, strips: dict[str,
         from_dir = "" if from_dir == "." else from_dir
         text = _rewrite_md_links(md_file.read_text("utf-8"), links, from_dir=from_dir, pretty=externalizing)
         body, has_mermaid = promote_mermaid(render_markdown(text))
-        body, has_strips = expand_figure_strips(
-            body, strips or {}, links, from_dir=from_dir, externalizing=externalizing
-        )
+        body = expand_figure_strips(body, strips or {}, links, from_dir=from_dir, externalizing=externalizing)
         title_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
         title = title_match.group(1).strip() if title_match else md_file.stem
         root = site_root(dest)
@@ -574,10 +552,7 @@ def convert_markdown(links: LinkResolver, externalizing: bool, strips: dict[str,
             '<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f"<title>{title}</title>\n"
-            f'<link rel="stylesheet" href="{root}md.css">\n'
-            + (MERMAID_SCRIPT if has_mermaid else "")
-            + (FIG_STRIP_SCRIPT if has_strips else "")
-            + "</head>\n"
+            f'<link rel="stylesheet" href="{root}md.css">\n' + (MERMAID_SCRIPT if has_mermaid else "") + "</head>\n"
             "<body>\n" + body + "\n</body>\n</html>\n"
         )
         dest.write_text(html, "utf-8")
