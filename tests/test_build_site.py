@@ -95,7 +95,12 @@ def strips() -> dict[str, "build_site.FigureStrip"]:
             "https://hf.co/d/r/resolve/abc123/exports/probe/report/",
             (
                 ReportFigure(
-                    "grading", light="_assets/grading-light.png", dark="_assets/grading-dark.png", alt="Bands"
+                    "grading",
+                    light="_assets/grading-light.png",
+                    dark="_assets/grading-dark.png",
+                    alt="Bands",
+                    width=640,
+                    height=480,
                 ),
                 ReportFigure("extra", light="_assets/extra.png"),
             ),
@@ -115,7 +120,12 @@ def test_figures_marker_survives_markdown_and_expands_to_pinned_cdn_thumbnails(r
     assert '<img src="https://hf.co/d/r/resolve/abc123/exports/probe/report/_assets/grading-light.png"' in out
     assert 'srcset="https://hf.co/d/r/resolve/abc123/exports/probe/report/_assets/grading-dark.png"' in out
     assert 'alt="Bands"' in out and 'loading="lazy"' in out
-    assert "<picture>" not in out.split("extra.png")[0].rsplit("<a ", 1)[-1]  # the unthemed figure is a bare <img>
+    assert 'width="640" height="480"' in out  # the export's stamped size, for layout before load
+    # No anchor: a raw PNG opens transparent-on-white (wrong in dark mode); copying the
+    # image in place gets the scheme-matched variant the <picture> shows.
+    strip_html = out.split('<div class="fig-strip">')[1]
+    assert "<a " not in strip_html
+    assert strip_html.count("<picture>") == 1  # only the themed figure; the unthemed one is a bare <img>
 
 
 def test_figures_marker_localizes_to_the_copied_assets(resolver, strips):

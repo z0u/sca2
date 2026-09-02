@@ -476,7 +476,7 @@ def _marker_key(token: str, links: LinkResolver, *, from_dir: str) -> str | None
 def _figure_strip_html(strip: FigureStrip, *, from_dir: str, externalizing: bool) -> str:
     """A report's thumbnail strip: each figure a lazy full-size image, themed via ``<picture>``.
 
-    Externalizing, URLs use the strip's revision-pinned CDN base — the same assets the report page serves, so the index can never show figures its report doesn't. Localizing they're relative into the copied ``_site/<key>/_assets/``. Each thumbnail links to the full-size (light) image and reuses the figure's own alt text; the CSS (``scripts/md.css``) sizes them down, so the browser fetches one theme's PNG per figure and only as it scrolls into view.
+    Externalizing, URLs use the strip's revision-pinned CDN base — the same assets the report page serves, so the index can never show figures its report doesn't. Localizing they're relative into the copied ``_site/<key>/_assets/``. Each thumbnail reuses the figure's own alt text and the ``width``/``height`` the export stamped (so the row lays out before the PNGs arrive). The CSS (``scripts/md.css``) sizes them down, so the browser fetches one theme's PNG per figure and only as it scrolls into view. Deliberately no link to the full-size PNG: opening one paints its transparent background on the browser's white canvas, wrong in dark mode, while copying the image in place picks up the scheme-matched variant the ``<picture>`` shows.
     """
     import html
 
@@ -488,10 +488,11 @@ def _figure_strip_html(strip: FigureStrip, *, from_dir: str, externalizing: bool
     parts = []
     for fig in strip.figures:
         alt, title = html.escape(fig.alt), html.escape(fig.stem)
-        img = f'<img src="{base}{fig.light}" alt="{alt}" loading="lazy">'
+        size = f' width="{fig.width}" height="{fig.height}"' if fig.width and fig.height else ""
+        img = f'<img src="{base}{fig.light}" alt="{alt}" title="{title}"{size} loading="lazy">'
         if fig.dark:
             img = f'<picture><source media="(prefers-color-scheme: dark)" srcset="{base}{fig.dark}">{img}</picture>'
-        parts.append(f'<a href="{base}{fig.light}" title="{title}">{img}</a>')
+        parts.append(img)
     return f'<div class="fig-strip">{"".join(parts)}</div>'
 
 
