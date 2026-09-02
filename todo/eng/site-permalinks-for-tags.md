@@ -14,3 +14,7 @@ The shape that fits what's already there: build the site at the tag and deploy i
 Two things make this cheaper than it looks. The build is read-only — it assembles HTML around bundles that are already on the publish tier — so a snapshot costs a CI minute and no compute. And history pruning doesn't threaten it: the pruner re-roots the branch but copies the tip's tree verbatim, so files under `v/` survive a prune exactly as the preview trees do. The durability of a snapshot rests on the files at the tip, never on an old commit still resolving.
 
 Open questions worth settling before building it: whether the trigger is `on: push: tags:` or a manual dispatch (tags get cut by hand and rarely, so dispatch may be enough); whether the index at the site root should list the snapshots, or the release notes carry the link; and how much a snapshot's assets actually cost, given the `<base href>` leaves them on the CDN and the pin means two snapshots sharing a report share its bundle rather than copying it.
+
+## Notes
+
+**2026-09-02** — The deploy is now a whole-site rebuild by one writer (`scripts/deploy_site.py`), so there is no `clean-exclude` to add and no prune to survive. A snapshot would instead be one more checkout in that script's loop: build `main` and each open PR as now, plus each tag under `v/<tag>/` with `MINI_SITE_URL` pointed there. Tags are few and the build is read-only, so the cost stays a CI minute each.
