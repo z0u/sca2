@@ -57,6 +57,8 @@ def _():
     While this draft was written we ran a one-seed smoke test of the operator library (seed 0 of each condition), to check the code path from checkpoint to score. The gates come from the clean statistics instead: the published alignment maps, the task-gate width the D2.1 experiments used, and the reference values from M1. None of the smoke-test numbers are quoted here.
 
     One smoke-test observation is worth stating in advance. At one syntax position, the alignment arriving at the second slice under intervention sat above the clean envelope on that seed. We keep the deeper-slice clause of H4 as the design states it; the nine-seed read will say how general that behavior is.
+
+    One design change was made after the smoke test and before the run. The post-hoc tier's directions were first fitted on the op1 states and applied at every position, and on the control seed the oblique fit edited the syntax states heavily, an extrapolation rather than an erasure. The tier now fits and applies at the same sites, as the Method describes. No gate changed.
     ///
 
     ## Why this experiment
@@ -150,7 +152,9 @@ def _():
     | `lobe` | the M1 lobe, threshold 0.5, in place of the plain projection | does leaving the low-alignment bulk alone keep the removal and cut the collateral? |
     | `ablate` | the weights that read and write e₁ zeroed, then re-normalized | the permanent removal from M1, scored under H5 |
 
-    **The post-hoc tier**, on the un-anchored condition, no gates. For each `lam0` run we fit one direction per slice on its own op1-position states (one line per color, 216 states), then apply it at that slice at every position through the same scorer. Three fits beside e₁ itself: diff-in-means[^dim] between the colors at or above the red dose and the rest, a ridge probe[^probe] for redness, and LEACE[^leace] for redness. This calibrates what a searched-for direction removes from a model that was never asked to place one.
+    **The post-hoc tier**, on the un-anchored condition, no gates. For each `lam0` run we fit one direction per slice and site on that run's own clean states, then apply it at that slice, at the positions it was fitted on, through the same scorer. Two sites: the operand positions, and the `=` position the answer is decoded from. The label is the redness a state can have seen under causal attention: the first operand's at op1, the higher of the two after that, which at `=` is the line's dose. Three fits beside e₁ itself: diff-in-means[^dim] between the states labelled at or above the red dose and the rest, a ridge probe[^probe] for that redness, and LEACE[^leace] for it. The fit and the edit share a distribution because an oblique eraser needs them to: LEACE reads its coefficient along a covariance-whitened direction, so a state far from the fitted cloud can draw an edit of any size. Beside each fitted direction sits e₁ at the same footprint, so the calibration is like for like. The operand site pairs with the `operands` arm; the decode site is the sharpest lever a post-hoc method can be given, an edit where the answer is read off. This calibrates what a searched-for direction removes from a model that was never asked to place one.
+
+    <!-- REVIEW: changed before any run. As first written, each direction was fitted on the 216 op1 states and applied at every position. The control-seed smoke cell showed the oblique fit editing the syntax states heavily, which is extrapolation rather than erasure. Recorded as a pre-run amendment under "How to read this draft". -->
 
     [^dim]: The unit vector pointing from the mean non-red state to the mean red state. It is the simplest fitted direction, and the one most steering work uses.
 
@@ -238,9 +242,9 @@ def _():
     ## The post-hoc tier
 
     /// admonition | TODO
-    No gate. The H1–H3 statistics for each fitted direction on the un-anchored condition, beside e₁ on the same condition and beside the anchored primary. The comparison to read: how much red damage a searched-for direction buys per unit of non-red damage, compared with the placed axis.
+    No gate. The H1–H3 statistics for each fitted direction on the un-anchored condition, at each of its two sites, beside e₁ at the same footprint on the same condition and beside the anchored primary and `operands` arm. The comparison to read: how much red damage a searched-for direction buys per unit of non-red damage, compared with the placed axis. That ratio compares outcomes, so the decode site can be read against the anchored arms even though no arm shares its footprint; the e₁ row there says what the axis itself does at that site on the un-anchored model.
 
-    Expected: diff-in-means and the probe remove some accuracy on red lines at a real non-red cost, LEACE less of both, and none of them come close to the selectivity of the placed axis. A post-hoc direction that matched the anchored result would mean the un-anchored model already keeps redness on a single linear direction at op1, which the probe maps in ex-2.1.12 make plausible at the embedding. The per-slice breakdown says where the two part company.
+    Expected, at the operand site: diff-in-means and the probe remove some accuracy on red lines at a real non-red cost, LEACE less of both, and none of them come close to the selectivity of the placed axis. At the decode site the label is the dose itself, so the fits should remove more red accuracy than at the operand site, at a non-red cost we do not predict. A post-hoc direction that matched the anchored result at the operand site would mean the un-anchored model already keeps redness on a single linear direction there, which the probe maps in ex-2.1.12 make plausible at the embedding. The same at the decode site says less, since the readout of a mixing task has to carry redness somewhere. The per-slice breakdown says where the two part company.
     ///
 
     ## Exploratory analyses

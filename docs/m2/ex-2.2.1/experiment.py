@@ -59,6 +59,9 @@ POSITIONS = ("op1", "+", "op2", "=", "ans", "\n")
 
 #: The answer token's position; the response is read from the logits one position earlier.
 ANSWER_POS = 4
+"""Where the answer token sits; its log-prob is read from the state one position earlier."""
+DECODE_POS = ANSWER_POS - 1
+"""The `=` position: the state the answer is decoded from, and the post-hoc tier's second site."""
 
 #: Positions whose state can reach the answer: the prompt. Writes at the answer and newline positions
 #: are measured for the bound but cannot move the response.
@@ -200,8 +203,16 @@ assert tuple(a.name for a in ARM_INTERVENTIONS) == tuple(ARMS), "one arm per row
 
 STRENGTH_INTERVENTIONS = tuple(Intervention(f"gamma-{g}", "projection", gamma=g) for g in GAMMAS if g != PRIMARY_GAMMA)
 
+POSTHOC_SITES: dict[str, tuple[int, ...]] = {"operands": OPERAND_POSITIONS, "decode": (DECODE_POS,)}
+"""Where a post-hoc direction is fitted, and the only positions it is applied at: the fit and the edit
+share a distribution. Applying an oblique eraser fitted on operand states to the syntax states edited
+those heavily in the smoke test, which said nothing about the direction and everything about extrapolation."""
+
 POSTHOC_INTERVENTIONS = tuple(
-    Intervention(f"{fit}@{s}", "posthoc", slices=(s,), fit=fit) for fit in POSTHOC for s in SLICES
+    Intervention(f"{fit}@{s}:{site}", "posthoc", slices=(s,), positions=pos, fit=fit)
+    for site, pos in POSTHOC_SITES.items()
+    for fit in POSTHOC
+    for s in SLICES
 )
 
 
@@ -257,7 +268,9 @@ class Lines:
     """Token id → palette index, −1 off the color vocabulary."""
     red_operand: np.ndarray
     """Per line, the position of the operand carrying the dose (op1 on a tie)."""
-    n_partners: int
+    seen_redness: np.ndarray
+    """(N, T) the highest redness among the color tokens at or before each position: the first operand's
+    at op1, the dose from op2 onward. The post-hoc tier's label, since a causal state can carry no more."""
 
     @property
     def n(self) -> int:
@@ -303,10 +316,12 @@ def read_lines(tokens: np.ndarray, r1: np.ndarray, r2: np.ndarray, color_redness
     tok2color[color_ids] = np.arange(n_colors)
     colors = tok2color[tokens]
     assert (colors[:, [0, 2, ANSWER_POS]] >= 0).all() and (colors[:, [1, 3, 5]] < 0).all()
-    # The op1 column walks the palette in order, one color per partner group: what the post-hoc fits rely on.
+    # The op1 column walks the palette in order, one color per partner group, as the design describes the set.
     n_partners = len(tokens) // n_colors
     np.testing.assert_array_equal(colors[:, 0], np.repeat(np.arange(n_colors), n_partners))
-    return Lines(tokens, red, nonred, bins, color_ids, tok2color, np.where(r1 >= r2, 0, 2), n_partners)
+    seen = np.maximum.accumulate(np.where(colors >= 0, color_redness[np.maximum(colors, 0)], 0.0), axis=1)
+    np.testing.assert_array_equal(seen[:, DECODE_POS], dose)
+    return Lines(tokens, red, nonred, bins, color_ids, tok2color, np.where(r1 >= r2, 0, 2), seen)
 
 
 def composition(lines: Lines, guess: np.ndarray) -> np.ndarray:
@@ -359,24 +374,24 @@ def decode_groups(decoders: dict[str, list[list]], states: np.ndarray, lines: Li
     return out
 
 
-def fitted_direction(fit: str, x: np.ndarray, color_redness: np.ndarray):
-    """The post-hoc tier's direction from one run's clean op1 states at a slice, one state per color."""
+def fitted_direction(fit: str, x: np.ndarray, z: np.ndarray):
+    """The post-hoc tier's direction from one run's clean states `x` at a slice and site, labelled `z`."""
     from sca.intervention import Subspace, diff_in_means, leace, probe_direction
 
-    assert x.shape == (len(color_redness), x.shape[1])
+    assert x.shape == (len(z), x.shape[1])
     match fit:
         case "axis":
             return Subspace.axis(x.shape[1])
         case "diff-in-means":
-            return diff_in_means(x, color_redness >= RED_DOSE - 1e-9)
+            return diff_in_means(x, z >= RED_DOSE - 1e-9)
         case "probe":
-            return probe_direction(x, color_redness, l2=DECODE_L2)
+            return probe_direction(x, z, l2=DECODE_L2)
         case "leace":
-            return leace(x, color_redness)
+            return leace(x, z)
     raise ValueError(fit)
 
 
-def build_triple(iv: Intervention, model, clean_pre: np.ndarray, lines: Lines, color_redness: np.ndarray):
+def build_triple(iv: Intervention, model, clean_pre: np.ndarray, lines: Lines):
     """The (model, subspace, operator) triple for one intervention, from the run's clean stream."""
     from sca.anchoring import ANCHOR_AXIS
     from sca.intervention import Subspace, ablate_weights, lobe, projection
@@ -390,8 +405,10 @@ def build_triple(iv: Intervention, model, clean_pre: np.ndarray, lines: Lines, c
         case "ablate":
             return ablate_weights(model, sub), sub, projection(sub)
         case "posthoc":
-            assert iv.fit is not None and len(iv.slices) == 1
-            edited = fitted_direction(iv.fit, clean_pre[iv.slices[0], :: lines.n_partners, 0], color_redness)
+            assert iv.fit is not None and iv.positions is not None and len(iv.slices) == 1
+            site = list(iv.positions)
+            x = clean_pre[iv.slices[0]][:, site].reshape(-1, clean_pre.shape[-1])
+            edited = fitted_direction(iv.fit, x, lines.seen_redness[:, site].ravel())
             return model, edited, projection(edited)
     raise ValueError(iv.kind)
 
@@ -478,7 +495,7 @@ def score_run(exp: str, cond: str, seed: int, interventions: tuple[Intervention,
     # --- Each intervention: build the triple, score it, contract the per-line quantities.
     for iv in interventions:
         positions = None if iv.positions is None else np.isin(np.arange(lines.n_pos), iv.positions).astype(np.float32)
-        target, edited, op = build_triple(iv, model, clean.pre, lines, color_redness)
+        target, edited, op = build_triple(iv, model, clean.pre, lines)
         out = apply(target, tokens, op, slices=iv.slices, positions=positions)
 
         lp = answer_logprobs(out.logits, ANSWER_POS)
@@ -488,7 +505,7 @@ def score_run(exp: str, cond: str, seed: int, interventions: tuple[Intervention,
         offvocab = 1.0 - np.exp(lp[:, lines.color_ids]).sum(1)
         theta = angle_between(out.pre, out.post)  # (L1, N, T): the write at every site
         alpha_pre = out.pre[..., ANCHOR_AXIS]  # the alignment each operator saw arrive
-        disp = angle_between(out.post[-1, :, ANSWER_POS - 1], clean.post[-1, :, ANSWER_POS - 1])
+        disp = angle_between(out.post[-1, :, DECODE_POS], clean.post[-1, :, DECODE_POS])
         comp = composition(lines, guess)
         check_contract(iv, out, alpha_clean, theta, positions)
         q99_write = top_quantile(theta[:, lines.nonred], axis=1)  # (L1, T)
@@ -602,6 +619,7 @@ def publish_results(results: list[dict]) -> dict:
             "lobe": LOBE,
             "gammas": GAMMAS,
             "posthoc": POSTHOC,
+            "posthoc_sites": POSTHOC_SITES,
             "groups": GROUPS,
             "composition": COMPOSITION,
             "decode_targets": DECODE_TARGETS,
