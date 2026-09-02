@@ -2,25 +2,98 @@ import marimo
 
 __generated_with = "0.23.16"
 app = marimo.App(
-    width="medium",
     app_title="Ex 2.2.1: suppressing red in the anchored transformer",
     css_file="../../report.css",
     auto_download=["html"],
 )
 
 with app.setup(hide_code=True):
-    import marimo as mo
+    import json
+    import tempfile
+    from pathlib import Path
+    from types import SimpleNamespace
+    from typing import cast
 
-    # Once results exist, the design constants and refs come from `experiment.py`
-    # beside this notebook (Marimo puts the notebook directory on sys.path); the
-    # skeleton quotes the frozen gates in prose and that module carries the same
-    # numbers with each gate's wording in its docstring.
+    import marimo as mo
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.transforms import Affine2D
+
+    # Marimo puts the notebook directory on sys.path, so the design constants and
+    # refs come from the experiment module rather than a copy of them in the prose.
+    import experiment as ex
     from mini.reports import report_bundle, use_publisher
+    from mini.store import project_store
+    from mini.vis import AxesRow, figure_html, light_dark, smooth_step, smooth_step_area, smooth_step_marks, themed
+    from sca.vis_grading import GRID_RGB, I_RED, GradingCloud
 
     use_publisher(report_bundle(__file__))
 
-    # A cell renders its last expression, and a trailing docstring is one.
+    SLICE_NAMES = ["emb", "1", "2", "3", "4"]
+    POS_NAMES = ["op1", "+", "op2", "=", "ans", "⏎"]
+    BIN_NAMES = ["≤0.2", "0.2–0.4", "0.4–0.6", "0.6–0.8", "≥0.8"]
+    ARM_INK = {
+        "primary": ("#d40000", "#f44"),
+        "operands": ("#e07000", "#fa4"),
+        "lobe": ("#8030c0", "#c8f"),
+        "ablate": ("#2060c0", "#7af"),
+        "control": ("#555", "#aaa"),
+    }
+    """One ink per arm the figures compare, as (light, dark) pairs for `light_dark`."""
+
     None
+
+
+@app.function(hide_code=True)
+def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
+    """Resolve metrics and the stacked per-run arrays from the store, or None if unpublished."""
+    store = project_store()
+    arts = store.get_refs([ex.METRICS_REF, ex.ARRAYS_REF])
+    m_art, a_art = arts[ex.METRICS_REF], arts[ex.ARRAYS_REF]
+    if m_art is None or a_art is None:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        m_path, a_path = store.get_many([(m_art, Path(d) / "metrics.json"), (a_art, Path(d) / "arrays.npz")])
+        with np.load(a_path) as z:
+            arrays = {k: z[k] for k in z.files}
+        metrics = json.loads(m_path.read_text())
+    return metrics, arrays
+
+
+@app.function(hide_code=True)
+def probe_lines() -> tuple[ex.Lines, np.ndarray]:
+    """The probe set as the scorer grouped it, and the dose per line.
+
+    The op1 column walks the palette in order, so the color token ids can be read off the set itself
+    and the scorer's own grouping code runs without a checkpoint's tokenizer.
+    """
+    from sca.data.named_colors import GRIDS, grid_palette
+
+    store = project_store()
+    ref = f"reports/m2/{ex.PRIMARY.exp}/probes"
+    art = store.get_refs([ref])[ref]
+    assert art is not None
+    with tempfile.TemporaryDirectory() as d:
+        (path,) = store.get_many([(art, Path(d) / "probes.npz")])
+        with np.load(path) as z:
+            tokens, r1, r2, redness = z["probe_tokens"], z["r1"], z["r2"], z["redness"]
+    names = grid_palette(GRIDS["v216"])
+    ids = tokens[:: len(tokens) // len(names), 0]
+    tokenizer = SimpleNamespace(stoi=dict(zip(names, ids, strict=True)), vocab_size=int(tokens.max()) + 1)
+    return ex.read_lines(tokens, r1, r2, redness, tokenizer, 512), np.maximum(r1, r2)
+
+
+@app.function(hide_code=True)
+def span(v: np.ndarray, fmt: str = ".3f") -> str:
+    """Seed mean with the seed range beside it."""
+    return f"{v.mean():{fmt}} ({v.min():{fmt}}–{v.max():{fmt}})"
+
+
+@app.function(hide_code=True)
+def span2(v: np.ndarray, fmt: str = ".3f") -> str:
+    """Seed mean with the seed range beside it."""
+    greater_half_range = max(v.mean() - v.min(), v.max() - v.mean())
+    return f"{v.mean():{fmt}} ±{greater_half_range:{fmt}}"
 
 
 @app.cell(hide_code=True)
@@ -30,20 +103,37 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    The first intervention on an anchored transformer. We take the D2.1 checkpoints and remove the anchor axis from the residual stream, then score completion accuracy on lines with a red operand and on lines without. Five questions: does suppression bite, is it selective, does it grade with redness, does the edit on non-red lines stay within the bound the placed geometry sets, and does zeroing the weights that carry the axis do the same job?
+    The first intervention on an anchored transformer. We take the D2.1 checkpoints and remove the anchor axis from the residual stream, then score completion accuracy on lines with a red operand and on lines without. Suppression bites, grades with dose, stays within the bound the placed geometry sets, and zeroing the weights that carry the axis does the same job. Selectivity is partial: the deficit on non-red lines comes from the syntax positions, and restricting the edit to the operand positions removes it.
     ///
     """)
     return
 
 
 @app.cell(hide_code=True)
-def _():
-    mo.md(r"""
+def _(bins, clean, ex_alpha_diff, ratio_map, stat):
+    _red = stat("primary", "acc", "red")
+    _deficit = clean("acc", "nonred") - stat("primary", "acc", "nonred")
+    _ops = clean("acc", "nonred") - stat("operands", "acc", "nonred")
+    _b = bins("primary").mean(0)
+    _dip = float(max(0.0, (_b[:-1] - _b[1:]).max()))
+    _ratio = ratio_map("primary")[1:]
+    _worst = np.unravel_index(int(np.argmax(_ratio)), _ratio.shape)
+    _abl_red = stat("ablate", "acc", "red")
+    _abl_def = clean("acc", "nonred") - stat("ablate", "acc", "nonred")
+    mo.md(rf"""
     ## Findings
 
-    /// admonition | TODO
-    Empty until the results land: one verdict line per hypothesis, with the deciding number and its gate inline.
-    ///
+    **H1 (suppression bites) — holds.** Seed-mean accuracy on red lines under the primary intervention is {_red.mean():.2f}, against a gate of {ex.RED_ACC_GATE:g}; the highest single seed is {_red.max():.2f}.
+
+    **H2 (selective) — partial.** The seed-mean deficit on non-red lines is {_deficit.mean():.3f}, outside the {ex.TASK_GATE:g} gate and inside the {ex.TASK_PARTIAL:g} partial gate. One seed carries most of it ({_deficit.max():.3f}); the median seed is at {np.median(_deficit):.3f}. The `operands` arm, which skips the syntax positions, has a deficit of {_ops.mean():.3f}, so the collateral sits in the constant component of the syntax positions, the case H2's contrary clause named.
+
+    **H3 (grades with dose) — holds.** Seed-mean damage across the five dose bins is {", ".join(f"{v:.2f}" for v in _b)}: the largest dip between adjacent bins is {_dip:.3f} (allowed {ex.GRADE_DIP:g}), and the top bin exceeds the bottom by {_b[-1] - _b[0]:.2f} (gate {ex.GRADE_SPAN:g}).
+
+    **H4 (the write bound) — holds.** At the four deeper slices the seed-mean 99th-percentile write on non-red lines is at most {_ratio.max():.2f} times the clean bound (gate {ex.WRITE_TOLERANCE:g}), at slice {_worst[0] + 1}, position `{POS_NAMES[_worst[1]]}`. At every site before the answer it is below the bound.
+
+    **H5 (permanent removal) — holds.** Under `ablate`, accuracy on red lines is {_abl_red.mean():.2f} (gate {ex.RED_ACC_GATE:g}) and the non-red deficit is {_abl_def.mean():.3f} (gate {ex.TASK_GATE:g}).
+
+    The recomputed clean alignment maps match the ones ex-2.1.10 published to within {max(ex_alpha_diff().values()):.4f} on every run.
     """)
     return
 
@@ -51,12 +141,12 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    /// admonition | How to read this draft
-    This is a preregistration. The hypotheses and their gates below are frozen as of the commit that adds this file; results will replace the `TODO` placeholders in place, and anything conceived after seeing the data goes under [Exploratory analyses](#exploratory-analyses), marked as post hoc.
+    /// admonition | How to read this report
+    This report was preregistered: the method, hypotheses, and decision thresholds were frozen before the experiment ran (commit `1a42bc0`). Results replaced the `TODO` placeholders in place; everything conceived after seeing the data is under [Exploratory analyses](#exploratory-analyses), marked as post hoc.
 
-    While this draft was written we ran a one-seed smoke test of the operator library (seed 0 of each condition), to check the code path from checkpoint to score. The gates come from the clean statistics instead: the published alignment maps, the task-gate width the D2.1 experiments used, and the reference values from M1. None of the smoke-test numbers are quoted here.
+    While the draft was written we ran a one-seed smoke test of the operator library (seed 0 of each condition), to check the code path from checkpoint to score. The gates come from the clean statistics instead: the published alignment maps, the task-gate width the D2.1 experiments used, and the reference values from M1. None of the smoke-test numbers are quoted here.
 
-    One smoke-test observation is worth stating in advance. At one syntax position, the alignment arriving at the second slice under intervention sat above the clean envelope on that seed. We keep the deeper-slice clause of H4 as the design states it; the nine-seed read will say how general that behavior is.
+    One smoke-test observation was stated in advance. At one syntax position, the alignment arriving at the second slice under intervention sat above the clean envelope on that seed. We kept the deeper-slice clause of H4 as the design states it; the nine-seed read is in the H4 section.
 
     One design change was made after the smoke test and before the run. The post-hoc tier's directions were first fitted on the op1 states and applied at every position, and on the control seed the oblique fit edited the syntax states heavily, an extrapolation rather than an erasure. The tier now fits and applies at the same sites, as the Method describes. No gate changed.
     ///
@@ -71,9 +161,6 @@ def _():
     (a) that suppression does not bite even on *red*,
     (b) that the bound is loose or wrong once later blocks sit between the write and the output, and
     (c) that the response to suppression is undesigned. Only the first is retired here. The plan shares the second with the layer sweep and the third with the fallback experiment.
-    <!-- REVIEW: was "settles the first three risks". The design's risk table retires only the first here — the bound risk is "suppress red, then layer sweep", and the undesigned-response risk is measured here and pinned by the fallback experiment. Verify against the risk table in /docs/m2/d2.2/design.md. -->
-
-
 
     Three findings from the M1 autoencoder result carry over here. Suppression there removed *red* almost completely, left orthogonal colors untouched, and degraded warm colors in proportion to their alignment with the axis. Those become H1, H2, and H3.
 
@@ -97,6 +184,7 @@ def _():
     - **dose** — the redness of a line, taken as the larger of the two operand rednesses (the label affinity from M1, $r(1 - g/2 - b/2)$ on the unit cube). Either operand can carry the concept, since either could draw the label in ex-2.1.10.
     - **red lines** — dose ≥ 0.8: an operand among the five reddest colors of the grid. 365 lines.
     - **non-red lines** — dose ≤ 0.2. 1,689 lines.
+    - **visible operand** — on a red line, the operand that does not carry the dose: the one the model still sees as itself after the red operand's axis component is removed.
     - **response** — the probability the model puts on the correct answer, read from the log-softmax at the `=` position. Accuracy is whether that answer is the argmax.
     - **damage** — the clean response minus the intervened response, per line, in probability units.
     - **write** — the rotation the operator applies to one state, in radians: the angle between the state as it arrived at the operator and the state the next block consumed.
@@ -154,8 +242,6 @@ def _():
 
     **The post-hoc tier**, on the un-anchored condition, no gates. For each `lam0` run we fit one direction per slice and site on that run's own clean states, then apply it at that slice, at the positions it was fitted on, through the same scorer. Two sites: the operand positions, and the `=` position the answer is decoded from. The label is the redness a state can have seen under causal attention: the first operand's at op1, the higher of the two after that, which at `=` is the line's dose. Three fits beside e₁ itself: diff-in-means[^dim] between the states labelled at or above the red dose and the rest, a ridge probe[^probe] for that redness, and LEACE[^leace] for it. The fit and the edit share a distribution because an oblique eraser needs them to: LEACE reads its coefficient along a covariance-whitened direction, so a state far from the fitted cloud can draw an edit of any size. Beside each fitted direction sits e₁ at the same footprint, so the calibration is like for like. The operand site pairs with the `operands` arm; the decode site is the sharpest lever a post-hoc method can be given, an edit where the answer is read off. This calibrates what a searched-for direction removes from a model that was never asked to place one.
 
-    <!-- REVIEW: changed before any run. As first written, each direction was fitted on the 216 op1 states and applied at every position. The control-seed smoke cell showed the oblique fit editing the syntax states heavily, which is extrapolation rather than erasure. Recorded as a pre-run amendment under "How to read this draft". -->
-
     [^dim]: The unit vector pointing from the mean non-red state to the mean red state. It is the simplest fitted direction, and the one most steering work uses.
 
     [^probe]: A linear readout of redness, fitted by least squares with an ℓ₂ penalty. The direction is its weight vector, normalized. It finds what can be read off the state linearly, which need not be what the blocks use.
@@ -178,7 +264,6 @@ def _():
     - **H2.** Suppression is selective. Seed-mean accuracy on non-red lines stays within 0.02 of the clean accuracy. Partial: within 0.05. The gate is the width every D2.1 task gate used.
 
         Projecting out an axis costs something even where nothing was placed on it. So we report the un-anchored row under the same operator beside this one, to say how much of any deficit comes from the operator rather than from the removal.
-        <!-- REVIEW: H2 was also stated as "the behavioral half of the bound claim", with a miss under an intact H4 read as "a finding rather than a failure of the bound". That gave one bullet two verdicts. H2 is now the task gate alone, with one verdict; what a miss means for the bound is interpretation, and lives in the H4 analysis. Verify: the H4 section says how an H2 miss is read, and H2's verdict line in Findings is a plain pass/partial/fail. -->
     - **H3.** Damage grades with dose. We bin every line by dose at edges 0.2, 0.4, 0.6, and 0.8. Seed-mean damage is non-decreasing across the five bins, allowing a dip between adjacent bins of at most 0.02, and damage in the top bin exceeds the bottom bin by at least 0.5. Partial: one dip larger than 0.02, with the ends still ordered. We prescribe no shape between the ends. The D2.1 alignment response was sigmoid in redness rather than linear, so the grading may be a step rather than the smooth $\cos^2$ curve M1 saw.
     - **H4.** The write on non-red lines stays within the bound the clean geometry sets, at every slice. At a given (slice, position) site, the bound is $\arcsin$ of the 99th-percentile clean alignment over the 1,689 non-red lines there. We take that per run from the un-intervened map, then average over the nine seeds. The measurement is the 99th-percentile write over the same lines under the primary intervention, again per run and then seed-averaged (each quantile is the 17th-largest of 1,689 values within a run; averaging is all the seeds do). At the embedding the two are equal by construction, and the pipeline asserts it. At each of the four deeper slices, and at every position, the measured write is at most 1.25 times the bound. Partial: one site over by no more than a factor of two. Contrary: a block re-writes the axis on non-red lines after it was removed upstream. That would be a bypass, and it would bring the question of the layer sweep forward.
     - **H5.** Permanent removal is selective, given the anti-subspace term. Under the `ablate` arm, the H1 and H2 gates both hold: accuracy on red lines at or below 0.5, and non-red accuracy within 0.02 of clean. Partial: one of the two holds. M1 found ablation selective only when repulsion had cleared the axis, and the D2.1 recipe has that term, so this is the transformer form of M1's headline result.
@@ -190,88 +275,752 @@ def _():
 
 @app.cell(hide_code=True)
 def _():
-    mo.md(r"""
+    _loaded = load_results()
+    assert _loaded is not None, "ex-2.2.1 has not published its results"
+    metrics, arrays = _loaded
+    lines, dose = probe_lines()
+    runs: dict[str, list[dict]] = {
+        c.name: [r for r in metrics["runs"] if r["condition"] == c.name] for c in (ex.PRIMARY, ex.CONTROL)
+    }
+    assert [len(runs[c.name]) for c in (ex.PRIMARY, ex.CONTROL)] == [ex.PRIMARY.seeds, ex.CONTROL.seeds]
+
+    def stat(iv: str, key: str, group: str | None = None, cond: str = ex.PRIMARY.name) -> np.ndarray:
+        """One value per seed of a condition, for one statistic of one intervention."""
+        cells = [r["interventions"][iv][key] for r in runs[cond]]
+        return np.array(cells if group is None else [c[group] for c in cells], float)
+
+    def clean(key: str, group: str, cond: str = ex.PRIMARY.name) -> np.ndarray:
+        return np.array([r["clean"][key][group] for r in runs[cond]], float)
+
+    def bins(iv: str, cond: str = ex.PRIMARY.name) -> np.ndarray:
+        """(seeds, bins) damage per dose bin."""
+        return stat(iv, "damage_bins", cond=cond)
+
+    def per_line(iv: str, key: str, cond: str = ex.PRIMARY.name) -> np.ndarray:
+        """(seeds, ...) one intervention's per-line arrays, stacked over the seeds of a condition."""
+        return np.stack([arrays[f"{r['label']}/{iv}/{key}"] for r in runs[cond]]).astype(np.float32)
+
+    def bound_map(cond: str = ex.PRIMARY.name) -> np.ndarray:
+        """(slices, positions) seed-mean clean bound: arcsin of the 99th-percentile non-red alignment."""
+        return np.array([r["clean"]["bound"] for r in runs[cond]], float).mean(0)
+
+    def ratio_map(iv: str, cond: str = ex.PRIMARY.name) -> np.ndarray:
+        """(slices, positions) seed-mean 99th-percentile non-red write over the seed-mean bound."""
+        return stat(iv, "q99_write_nonred", cond=cond).mean(0) / bound_map(cond)
+
+    def floor(key: str, group: str) -> float:
+        """The resolution for one statistic: the pooled between-seed sd over the anchored arms, times the factor."""
+        var = np.array([stat(iv, key, group).var(ddof=1) for iv in ("primary", *ex.ARMS)])
+        return ex.RESOLUTION_SD * float(np.sqrt(var.mean()))
+
+    def ex_alpha_diff() -> dict[str, float]:
+        return metrics["alpha_max_diff"]
+
+    return (
+        bins,
+        bound_map,
+        clean,
+        dose,
+        ex_alpha_diff,
+        floor,
+        lines,
+        metrics,
+        per_line,
+        ratio_map,
+        runs,
+        stat,
+    )
+
+
+@app.cell(hide_code=True)
+def _(clean, stat):
+    _rows = {
+        "primary": ("anchored", "primary"),
+        "operands": ("anchored", "operands"),
+        "embedding": ("anchored", "embedding"),
+        "last": ("anchored", "last"),
+        "lobe": ("anchored", "lobe"),
+        "ablate": ("anchored", "ablate"),
+        "control": ("un-anchored", "primary"),
+    }
+
+    def _row(title: str, cond: str, iv: str) -> str:
+        c = ex.PRIMARY.name if cond == "anchored" else ex.CONTROL.name
+        red, nonred = stat(iv, "acc", "red", c), stat(iv, "acc", "nonred", c)
+        deficit = clean("acc", "nonred", c) - nonred
+        b = lambda v, ok: f"<b>{v}</b>" if ok else v  # noqa: E731
+        return (
+            f"<tr><td>{title}, <code>{iv}</code></td>"
+            f"<td class='num'>{clean('acc', 'red', c).mean():.3f}</td>"
+            f"<td class='num'>{b(span2(red, '.2f'), red.mean() <= ex.RED_ACC_GATE)}</td>"
+            f"<td class='num'>{span2(stat(iv, 'damage', 'red', c), '.2f')}</td>"
+            f"<td class='num'>{span2(nonred)}</td>"
+            f"<td class='num'>{b(f'{deficit.mean():.3f}', deficit.mean() <= ex.TASK_GATE)}</td>"
+            f"<td class='num'>{span2(stat(iv, 'damage', 'nonred', c))}</td>"
+            f"<td class='num'>{stat(iv, 'offvocab', 'red', c).mean():.3f}</td></tr>"
+        )
+
+    _table = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr>
+        <th>condition, intervention</th>
+        <th class="num">clean red acc</th>
+        <th class="num">red acc ↓</th>
+        <th class="num">red damage ↑</th>
+        <th class="num">non-red acc ↑</th>
+        <th class="num">non-red deficit ↓</th>
+        <th class="num">non-red damage ↓</th>
+        <th class="num">off-vocab, red</th>
+      </tr></thead>
+      <tbody>{"".join(_row(t, c, iv) for t, (c, iv) in _rows.items())}</tbody>
+    </table></div>
+    """
+    _caption = f"""
+    Removal and selectivity by arm. Each value is the seed mean, with the seed range in parentheses. Accuracy is exact match on the answer token; damage is the clean answer probability minus the intervened one, in probability units; the deficit is clean accuracy minus intervened accuracy on non-red lines. Off-vocab is the mass outside the color vocabulary on red lines. Bold marks a value inside its gate: red accuracy at or below {ex.RED_ACC_GATE:g} (H1, and H5 for <code>ablate</code>), non-red deficit at or below {ex.TASK_GATE:g} (H2, H5). The arms and the un-anchored row carry no gate and are shown for the comparisons the sections below read.
+    """
+    mo.Html(figure_html(_table, caption=_caption, class_="report-figure"))
+    return
+
+
+@app.cell(hide_code=True)
+def _(clean, lines, per_line, stat):
+    _p = per_line("primary", "p_ans")[:, lines.red]  # (seeds, red lines)
+    _red = stat("primary", "acc", "red")
+
+    @themed(
+        name="red-response",
+        alt_text="""
+            Nine small histograms, one per seed, of the probability on the correct answer over the 365 red lines under the primary intervention. In every seed nearly all the mass sits in the leftmost bins, near zero; a thin tail reaches toward one in a few seeds.
+        """,
+        caption="""
+            **The response on red lines, per seed.** Each panel is a histogram of the intervened probability on the correct answer over the 365 red lines, for one anchored seed. A bimodal response would show as mass at both ends; the removal here is close to complete on nearly every line.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, len(_p), figsize=(7.4, 1.5), sharex=True, sharey=True, layout="constrained")
+        axes = cast(AxesRow, axes)
+        for s, ax in enumerate(axes):
+            ax.hist(_p[s], bins=20, range=(0, 1), color=light_dark(*ARM_INK["primary"]))
+            ax.set_title(f"seed {s}", fontsize=7)
+            ax.tick_params(labelsize=6)
+        axes[0].set_xticks([0, 0.5, 1])
+        axes[0].set_ylabel("red lines", fontsize=7)
+        fig.supxlabel("p(correct answer) under intervention", fontsize=7)
+        return fig
+
+    mo.md(rf"""
     ## Suppression bites (H1)
 
-    /// admonition | TODO
-    A table of clean and intervened accuracy under the primary intervention, seed mean with the seed range, for the red lines, the non-red lines, and all lines. The calibration row is the un-anchored condition under the same operator. Beside it, the per-line response on red lines: a strip or histogram of the intervened probability on the correct answer, per seed, so that a bimodal response (some lines fully removed, some intact) shows up as such instead of averaging into the gate.
+    Under the primary intervention the seed-mean accuracy on red lines is {_red.mean():.2f}, from a clean accuracy of {clean("acc", "red").mean():.3f}. The gate is {ex.RED_ACC_GATE:g}; the seed with the most red lines surviving keeps {_red.max():.2f} of them. The un-anchored condition under the same operator loses nothing ({stat("primary", "acc", "red", ex.CONTROL.name).mean():.3f}): the operator removes the concept where one was placed and finds nothing to remove where none was.
 
-    Expected: accuracy on red lines far below 0.5, and the un-anchored row at 1.0. Contrary: accuracy on red lines above 0.8, with the color of the operand still read from the off-axis remainder of its embedding. The `leak_r2` figure from ex-2.1.10 says how much redness the off-axis state carries at op1, and that is the first number to look at.
-    ///
+    The per-line response says the removal is close to complete on nearly every red line rather than an average over lines lost and lines kept. The median intervened probability on the correct answer is {np.median(_p):.3f} across seeds and lines, and {np.mean(_p < 0.1):.0%} of (seed, line) pairs sit below 0.1.
 
+    {_plot()}
+
+    **H1 holds.** The contrary case, the color of the operand read from the off-axis remainder of the embedding, does not arise: with the axis gone, the model no longer knows the operand was red.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(clean, dose, floor, lines, per_line, stat):
+    _deficit = clean("acc", "nonred") - stat("primary", "acc", "nonred")
+    _worst = int(np.argmax(_deficit))
+    _ctrl = clean("acc", "nonred", ex.CONTROL.name) - stat("primary", "acc", "nonred", ex.CONTROL.name)
+    _ops = clean("acc", "nonred") - stat("operands", "acc", "nonred")
+    _lobe = clean("acc", "nonred") - stat("lobe", "acc", "nonred")
+    _fl = floor("damage", "nonred")
+    _gap = stat("primary", "damage", "nonred").mean() - stat("operands", "damage", "nonred").mean()
+    _dmg = {
+        c.title: (per_line("clean", "p_ans", c.name) - per_line("primary", "p_ans", c.name)).mean(0)
+        for c in (ex.PRIMARY, ex.CONTROL)
+    }
+    _rgb = GRID_RGB[lines.line_colors[np.arange(lines.n), lines.red_operand]]
+    _x = dose + np.random.default_rng(0).uniform(-0.012, 0.012, lines.n)
+
+    # - Why is there spread around each level on the x-axis? Have the points been jittered for visual separation?
+    # - IIRC the plots in D2.1 had an x-axis labeled "redness". Is "dose" the same, and if so, why the different label?
+    # - Can we use the grading cloud vis here?
+    @themed(
+        name="damage-by-dose",
+        alt_text="""
+            Two scatter panels of damage against dose, one mark per line colored by its dose-carrying operand. Anchored: the marks sit on the floor up to a dose of about 0.6, rise through the 0.6 to 0.8 band, and fill the top of the panel at the reddest doses. Un-anchored: every mark sits on the floor.
+        """,
+        caption="""
+            **Damage against dose, one mark per line.** Seed-mean damage under the primary intervention, against the line's dose, with each mark colored by the operand that carries the dose. Left, the anchored condition; right, the un-anchored one under the same operator. The x axis is the one the D2.1 grading cloud used; the y axis here is the output rather than a hidden-state alignment.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, 2, figsize=(7.4, 2.8), sharex=True, sharey=True, layout="constrained")
+        axes = cast(AxesRow, axes)
+        for ax, (title, y) in zip(axes, _dmg.items(), strict=True):
+            for e in ex.DOSE_EDGES:
+                ax.axvline(e, color=light_dark("#0002", "#fff2"), lw=0.6, zorder=0)
+            ax.scatter(_x, y, c=_rgb, s=6, alpha=0.7, linewidths=0, clip_on=False)
+            ax.set_title(title, fontsize=8)
+            ax.set_xlabel("dose", fontsize=8)
+            ax.tick_params(labelsize=7)
+        axes[0].set_ylabel("damage, seed mean", fontsize=8)
+        axes[0].set_xlim(0, 1)
+        axes[0].set_ylim(-0.05, 1)
+        return fig
+
+    mo.md(rf"""
     ## Selectivity (H2)
 
-    /// admonition | TODO
-    The non-red row of the H1 table, scored against the 0.02 gate, and the same row for every arm and for the post-hoc tier. One figure carries H2 and H3 together: damage against dose, one mark per line. All it shares with the D2.1 grading cloud is the x axis: that cloud drew a per-color alignment read from the hidden states, where this one draws the output. The non-red bulk should sit on the floor and the red lines near the ceiling. The companion figure in the H4 section gives the hidden-state view under intervention, the arriving alignment per color.
+    The seed-mean deficit on non-red lines is {_deficit.mean():.3f}: outside the {ex.TASK_GATE:g} gate, inside the {ex.TASK_PARTIAL:g} partial gate. The spread across seeds is wide. Seed {_worst} loses {_deficit[_worst]:.3f} of its non-red accuracy, the median seed {np.median(_deficit):.3f}, and {int((_deficit <= ex.TASK_GATE).sum())} of the nine seeds sit inside the gate on their own. The un-anchored condition under the same operator loses {_ctrl.mean():.3f}, so the operator itself is close to free; the deficit is a property of what the anchored blocks do with an edited syntax state.
 
-    Expected: non-red accuracy within the gate, the `operands` arm no worse, the `lobe` arm no worse. Contrary: a non-red deficit larger than 0.02, read against H4 as that section describes; or a deficit that the `operands` arm removes, which would place the collateral in the constant component of the syntax positions.
-    ///
+    The contrary clause of H2 named the diagnosis, and the arms confirm it. The `operands` arm, which leaves the four syntax positions alone, has a deficit of {_ops.mean():.3f}, and the `lobe` arm, whose threshold sits above the constant component the syntax embeddings carry, {_lobe.mean():.3f}. Both remove red as well (H1 table). The collateral therefore comes from editing the syntax positions, whose embeddings carry a constant component on the axis that the blocks read as part of the syntax rather than as redness. The difference in non-red damage between the primary intervention and the `operands` arm is {_gap:.3f}, against a resolution floor of {_fl:.3f}, so it is not resolved at the seed level either way; the accuracy read above is the one the gate scores.
 
+    {_plot()}
+
+    **H2 is partial.** The removal is selective at the operand positions and the deficit is a cost of the whole-stream edit, concentrated in a minority of seeds. What that means for the bound is read in the H4 section.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(bins):
+    _series = {
+        "primary": ("primary", bins("primary")),
+        "operands": ("operands", bins("operands")),
+        "lobe": ("lobe", bins("lobe")),
+        "ablate": ("ablate", bins("ablate")),
+        "control": ("un-anchored", bins("primary", ex.CONTROL.name)),
+    }
+    _b = _series["primary"][1].mean(0)
+    _dip = float(max(0.0, (_b[:-1] - _b[1:]).max()))
+    _lb = _series["lobe"][1].mean(0)
+
+    @themed(
+        name="damage-by-bin",
+        alt_text="""
+            A step chart of seed-mean damage over five dose bins, with seed-range bands. The primary, operands, and ablate arms sit near zero for the three lowest bins, rise to about 0.2 in the 0.6 to 0.8 bin, and reach about 0.9 in the top bin. The lobe arm stays at zero until the top bin, where it reaches about 0.4 with a wide band. The un-anchored condition is flat at zero.
+        """,
+        caption=f"""
+            **Damage per dose bin.** Seed-mean damage in each of the five dose bins, with the band spanning the seed range, for the primary intervention, three arms, and the un-anchored condition under the primary operator. H3 asks the primary line to be non-decreasing within a dip of {ex.GRADE_DIP:g} and to span at least {ex.GRADE_SPAN:g} from the first bin to the last.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, ax = plt.subplots(figsize=(5.2, 2.8), layout="constrained")
+        x = np.arange(len(BIN_NAMES))
+        for key, (_title, v) in _series.items():
+            ink = light_dark(*ARM_INK[key])
+            ax.fill_between(x, v.min(0), v.max(0), color=ink, alpha=0.15, lw=0, zorder=0)
+        for key, (title, v) in _series.items():
+            ink = light_dark(*ARM_INK[key])
+            ax.plot(x, v.mean(0), color=ink, marker="o", ms=3, lw=1.3, label=title)
+        ax.set_xticks(x, BIN_NAMES)
+        ax.set_xlabel("dose bin", fontsize=8)
+        ax.set_ylabel("damage, seed mean", fontsize=8)
+        ax.set_ylim(-0.05, 1)
+        ax.tick_params(labelsize=7)
+        ax.legend(fontsize=7, frameon=False)
+        return fig
+
+    mo.md(rf"""
     ## Grading (H3)
 
-    /// admonition | TODO
-    Seed-mean damage per dose bin, with the seed range, as a step chart over the five bins; the same for the `lobe` arm and for the un-anchored condition. Expected: a monotone rise, possibly a step between the 0.6 and 0.8 edges rather than a ramp, and the un-anchored condition flat. Contrary: an inversion, with a middle bin damaged more than the bin above it. That would mean the axis carries something other than redness for those colors, and the per-color breakdown under E3 says which colors.
-    ///
+    Seed-mean damage across the five bins under the primary intervention is {", ".join(f"{v:.3f}" for v in _b)}. The one dip is between the first two bins, {_dip:.3f}, inside the {ex.GRADE_DIP:g} allowance, and it is the non-red bin's share of the H2 deficit rather than a feature of the grading. The top bin exceeds the bottom by {_b[-1] - _b[0]:.2f}, against a gate of {ex.GRADE_SPAN:g}.
 
+    The shape is a step rather than a ramp: the three lowest bins sit on the floor, the 0.6–0.8 bin takes {_b[3]:.2f}, and the red bin {_b[4]:.2f}. That follows the sigmoid alignment response D2.1 measured, where a color's alignment rises steeply only near the red corner. The `lobe` arm sharpens the step further: {_lb[3]:.3f} in the 0.6–0.8 bin and {_lb[4]:.2f} in the red bin, since its threshold leaves every state below an alignment of {ex.LOBE["a"]:g} alone. The un-anchored condition is flat at {_series["control"][1].mean():.3f}.
+
+    {_plot()}
+
+    **H3 holds.** No inversion appears, so the contrary case, a middle bin damaged more than the bin above it, does not arise; the per-color view is in E3.
+    """)
+    return
+
+
+@app.function(hide_code=True)
+def draw_grading_grid(ax: plt.Axes, a: np.ndarray, *, row_names: bool, scale: bool) -> None:
+    """One row per slice, one grading-cloud slot per position, keyed by the op1 color; the overlay is pure red."""
+    sw = 0.7
+    red_c, grey_c = light_dark("#d40000", "#f44"), light_dark("#eee", "#111")
+    xs = np.arange(len(POS_NAMES))
+    for si in range(len(SLICE_NAMES)):
+        shift = Affine2D().translate(0, si) + ax.transData
+        reds = a[si, I_RED, :]
+        smooth_step_area(ax, xs, reds, ramp=1 - sw, color=grey_c, transform=shift, zorder=0)
+        for pi in range(len(POS_NAMES)):
+            GradingCloud(ax, a[si, :, pi], span=(pi - sw / 2, pi + sw / 2), transform=shift, clip_on=False)
+        smooth_step_marks(ax, xs, reds, ramp=1 - sw, color=red_c, lw=1.3, transform=shift, clip_on=False)
+        ax.axhline(si, color=light_dark("#aaaa", "#333a"), lw=0.5)
+    ax.set_xlim(-0.5, len(POS_NAMES) - 0.5)
+    ax.set_ylim(0, len(SLICE_NAMES))
+    ax.set_xticks(xs, POS_NAMES)
+    ax.set_yticks(np.arange(len(SLICE_NAMES)) + 0.5, SLICE_NAMES if row_names else [""] * len(SLICE_NAMES))
+    ax.tick_params(axis="x", labelsize=6, bottom=False)
+    ax.tick_params(axis="y", labelsize=7, left=False)
+    if scale:
+        sec = ax.secondary_yaxis("right")
+        sec.set_yticks(np.arange(len(SLICE_NAMES) + 1), ["0", "1"] + [""] * (len(SLICE_NAMES) - 1))
+        sec.tick_params(labelsize=6, direction="out")
+        sec.set_ylabel("α, 0–1 per row", fontsize=7)
+
+
+@app.cell(hide_code=True)
+def _(
+    bound_map,
+    lines,
+    per_line,
+    ratio_map,
+    runs: dict[str, list[dict]],
+    stat,
+):
+    from matplotlib.colors import LinearSegmentedColormap
+
+    _clean_q = np.array([r["clean"]["alpha_q99_nonred"] for r in runs[ex.PRIMARY.name]], float).mean(0)
+    _arr_q = stat("primary", "q99_alpha_nonred").mean(0)
+    _ratio = ratio_map("primary")
+    _seed_ratio = (
+        stat("primary", "q99_write_nonred")[:, 1:]
+        / np.array([r["clean"]["bound"] for r in runs[ex.PRIMARY.name]])[:, 1:]
+    )  # (seeds, deeper slices, positions)
+    _per_seed = _seed_ratio.max(axis=(1, 2))
+    _seed_sites = sorted({POS_NAMES[int(np.argmax(r.max(0)))] for r in _seed_ratio})
+    _over = [(s, p) for s in range(1, len(SLICE_NAMES)) for p in range(len(POS_NAMES)) if _ratio[s, p] > 1]
+    _before = _ratio[1:, : ex.ANSWER_POS].max()
+
+    def _by_color(a: np.ndarray) -> np.ndarray:
+        """(slices, colors, positions) seed-mean alignment keyed by the op1 color, from (seeds, slices, lines, positions)."""
+        n_colors = len(GRID_RGB)
+        return a.reshape(len(a), len(SLICE_NAMES), n_colors, lines.n // n_colors, lines.n_pos).mean(axis=(0, 3))
+
+    _clouds = {
+        "clean": _by_color(per_line("clean", "alpha")),
+        "arriving, primary": _by_color(per_line("primary", "alpha_pre")),
+        "arriving, `embedding` arm": _by_color(per_line("embedding", "alpha_pre")),
+    }
+    _red_return = _clouds["arriving, `embedding` arm"][1:, I_RED, 0]
+
+    @themed(
+        name="write-bound-maps",
+        alt_text="""
+            Two line charts over the six token positions, one line per slice in shades from light to dark. Left, the clean 99th-percentile non-red alignment: between 0.15 and 0.42 at the prompt positions, smaller at the answer and newline. Right, the same under the primary intervention: the embedding line is identical, and the four deeper lines sit lower at every prompt position.
+        """,
+        caption=f"""
+            **The bound and the write, per site.** The {ex.WRITE_QUANTILE}th-percentile alignment over the non-red lines at each (slice, position), seed mean, on the shared 0–1 scale. Left, the clean map, whose arcsine is the bound; right, the alignment arriving at the operator under the primary intervention, whose arcsine is the write. The embedding line is the same in both by construction. Slices run from the embedding (lightest) to the last block (darkest).
+        """,
+    )
+    def _maps() -> plt.Figure:
+        fig, axes = plt.subplots(1, 2, figsize=(7.4, 2.4), sharex=True, sharey=True, layout="constrained")
+        axes = cast(AxesRow, axes)
+        cmap = LinearSegmentedColormap.from_list(
+            "depth", [light_dark("#f6b0b0", "#5a1a1a"), light_dark("#8a0000", "#ff7070")]
+        )
+        x = np.arange(len(POS_NAMES))
+        for ax, (title, m) in zip(
+            axes, [("clean (the bound)", _clean_q), ("arriving under intervention", _arr_q)], strict=True
+        ):
+            for s, name in enumerate(SLICE_NAMES):
+                ink = cmap(s / (len(SLICE_NAMES) - 1))
+                smooth_step(ax, x, m[s], ramp=0.5, color=ink, lw=1.2)
+                smooth_step_marks(ax, x, m[s], ramp=0.5, color=ink, lw=1.2)
+                ax.plot([], [], color=ink, lw=1.2, label=name)  # one legend entry per slice
+            ax.set_title(title, fontsize=8)
+            ax.set_xticks(x, POS_NAMES)
+            ax.tick_params(labelsize=7)
+        axes[0].set_xlim(-0.5, len(POS_NAMES) - 0.5)
+        axes[0].set_ylim(0, 0.5)
+        axes[0].set_ylabel(f"|α|, {ex.WRITE_QUANTILE}th pct of non-red", fontsize=8)
+        axes[1].legend(fontsize=6, frameon=False, title="slice", title_fontsize=6, ncol=5)
+        return fig
+
+    @themed(
+        name="arriving-clouds",
+        alt_text="""
+            Three grading grids, each five rows of six cloud slots. Clean: the op1 slot rises steeply to pure red at every slice, and the syntax slots carry a flat band. Arriving under the primary intervention: the embedding row is unchanged and every deeper row is flat near zero at every slot, the red overlay included. Arriving under the embedding arm: the deeper rows show pure red climbing back part way at op1 and op2, and dipping below zero at the equals sign.
+        """,
+        caption="""
+            **The arriving alignment per color, at every site.** Each panel is one row per slice (embedding at the bottom) and one grading-cloud slot per position, each cloud the alignment of the states whose op1 color is the cloud's color, against that color's redness; the red line traces pure red across the positions. Left, the clean map ex-2.1.10 published; middle, the alignment arriving at each operator under the primary intervention; right, the same under the `embedding` arm, where only the token embedding was edited and the blocks run un-edited after it.
+        """,
+    )
+    def _cloud() -> plt.Figure:
+        fig, axes = plt.subplots(1, len(_clouds), figsize=(7.4, 2.4), squeeze=False)
+        row = cast(AxesRow, axes[0])
+        for i, (ax, (title, a)) in enumerate(zip(row, _clouds.items(), strict=True)):
+            draw_grading_grid(ax, a, row_names=i == 0, scale=i == len(row) - 1)
+            ax.set_title(title, fontsize=8, pad=6)
+        return fig
+
+    def _bold(v: float) -> str:
+        return f"<b>{v:.2f}</b>" if v <= ex.WRITE_TOLERANCE else f"{v:.2f}"
+
+    _rows = "".join(
+        f"<tr><td>{SLICE_NAMES[s]}</td>"
+        + "".join(f"<td class='num'>{_bold(_ratio[s, p])}</td>" for p in range(len(POS_NAMES)))
+        + "</tr>"
+        for s in range(len(SLICE_NAMES))
+    )
+    _table = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead><tr><th>slice</th>{"".join(f"<th class='num'>{p}</th>" for p in POS_NAMES)}</tr></thead>
+      <tbody>{_rows}</tbody>
+    </table></div>
+    """
+    _caption = f"""
+    The write over the bound, per site: the seed-mean {ex.WRITE_QUANTILE}th-percentile non-red write under the primary intervention divided by the seed-mean bound. The embedding row is the identity check. Bold marks a ratio at or below the H4 tolerance of {ex.WRITE_TOLERANCE:g}.
+    """
+
+    mo.md(rf"""
     ## The write bound (H4)
 
-    /// admonition | TODO
-    Two maps of the non-red 99th-percentile alignment per (slice, position): the clean bound, and the arriving alignment under intervention, on the shared 0–1 scale the D2.1 figures use. A table beside them gives the ratio at each site; the embedding row is the identity check. Below the maps, the D2.1 grading cloud redrawn for the intervened pass: the arriving alignment per color at each slice after the embedding, against redness, beside the clean cloud on the same scale. The maps carry only the 99th percentile of the non-red tail, so it is this cloud that makes the drop on the red colors, and any re-writing on the rest, visible at every slice.
+    At the four deeper slices, the seed-mean write on non-red lines is at most {_ratio[1:].max():.2f} times the bound. The sites over one are {", ".join(f"(slice {s}, `{POS_NAMES[p]}`)" for s, p in _over)}. The largest are at the newline, where the bound is smallest ({bound_map()[1:, -1].min():.3f} to {bound_map()[1:, -1].max():.3f} radians) and where nothing downstream is read for the answer. At every site before the answer the ratio is at most {_before:.2f}: the blocks do not put the axis back on non-red lines. Per seed, the largest deeper-site ratio runs from {_per_seed.min():.2f} to {_per_seed.max():.2f}, at position {" or ".join(f"`{p}`" for p in _seed_sites)}; the gate reads the seed mean.
 
-    Expected: the deeper rows at or below the bound. The blocks were trained with the anti-subspace term on every state, so a non-red state arriving without its axis component is close to what they saw in training. Contrary: a site where the arriving alignment exceeds the bound by more than a quarter, most likely a syntax position at the second slice, where the smoke test saw one seed do exactly that. If that happens, the `operands` and `lobe` arms say whether it matters to behavior, and E5 says whether the edit grows or shrinks on its way to the logits.
+    {_maps()}
 
-    H2 is read beside this section. The bound covers the write and behavior is a prediction against it, so an H2 miss with the bound intact is amplification by later blocks: a finding for the layer sweep, and H2 fails as stated while H4 stands. An H2 miss with H4 also missed is the bound failing, which is the plan's second risk.
-    ///
+    {figure_html(_table, caption=_caption, class_="report-figure")}
 
+    The per-color view says what the maps summarize. Under the primary intervention every row after the embedding is flat: the red colors arrive at the deeper operators with an alignment of {_clouds["arriving, primary"][1:, I_RED, 0].max():.2f} or less at op1, from {_clouds["clean"][1:, I_RED, 0].min():.2f} or more in the clean pass, and the non-red bulk is where it was. Under the `embedding` arm, where the blocks run un-edited after the token edit, pure red climbs back to {_red_return.max():.2f} at op1 by the last slice and is written below zero at `=`. The blocks re-derive part of the axis from an off-axis input when nothing stops them, and the primary intervention's later slices are what keep it off.
+
+    {_cloud()}
+
+    **H4 holds.** The bound is intact at every site before the answer, so the H2 deficit is read as behavior downstream of a bounded write: a non-red line whose syntax states were rotated by no more than the clean geometry allows can still lose its answer. That is the amplification case the hypothesis names, a finding for the layer sweep, and E5 reads the gain.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(clean, floor, stat):
+    _red, _pred = stat("ablate", "acc", "red"), stat("primary", "acc", "red")
+    _def = clean("acc", "nonred") - stat("ablate", "acc", "nonred")
+    _pdef = clean("acc", "nonred") - stat("primary", "acc", "nonred")
+    _gap = stat("primary", "damage", "nonred").mean() - stat("ablate", "damage", "nonred").mean()
+    mo.md(rf"""
     ## Permanent removal (H5)
 
-    /// admonition | TODO
-    The H1 and H2 rows for the `ablate` arm, beside the rows for the projection. Expected: the same removal and the same selectivity, since a stream that never carries e₁ is what the projection produces at every slice, up to the gain on the surviving components.
+    Under the `ablate` arm, accuracy on red lines is {span(_red, ".2f")} against {span(_pred, ".2f")} under the projection, and the non-red deficit is {_def.mean():.3f} against {_pdef.mean():.3f}. Both H5 gates hold: red accuracy at or below {ex.RED_ACC_GATE:g}, non-red deficit at or below {ex.TASK_GATE:g}. Ablation and projection scatter alike on red lines, as the hypothesis said they should.
 
-    Contrary: ablation biting less than projection, which would mean the blocks rebuild red from the off-axis embedding when the axis is unavailable from the start; or ablation costing more on non-red lines, which would mean the read and write matrices use the axis for something the anti-subspace term did not clear.
-    ///
+    On non-red lines ablation costs less than the projection at every slice, {stat("ablate", "damage", "nonred").mean():.3f} against {stat("primary", "damage", "nonred").mean():.3f} in damage. The gap is {_gap:.3f}, inside the resolution floor of {floor("damage", "nonred"):.3f}, so the two are not separated at the seed level. The seed that loses most under the projection loses {_def[int(np.argmax(_pdef))]:.3f} under ablation. A permanent removal has no re-normalization gain to apply per slice, and the syntax positions carry no constant component once the embedding rows have lost theirs, which is where H2 placed the collateral.
 
+    **H5 holds.** This is the transformer form of M1's headline result: with the anti-subspace term in the recipe, zeroing the weights that read and write the axis removes the concept and little else.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(metrics, runs: dict[str, list[dict]], stat):
+    _comp = np.array([r["interventions"]["primary"]["composition_red"] for r in runs[ex.PRIMARY.name]], float)
+    _frac = _comp / _comp.sum(1, keepdims=True)
+    _mean = _frac.mean(0)
+    _agree = metrics["agreement_red"]
+    _order = ["true", "neighbor", "visible_operand", "red_operand", "other"]
+    _idx = [ex.COMPOSITION.index(k) for k in _order]
+    _names = {
+        "true": "true answer",
+        "neighbor": "one-step neighbor",
+        "visible_operand": "visible operand",
+        "red_operand": "red operand",
+        "other": "other",
+    }
+
+    @themed(
+        name="undesigned-composition",
+        alt_text="""
+            Nine stacked horizontal bars, one per seed, each splitting the red lines into what they decode to. In every seed the largest share is a one-step neighbor of the true answer, about half; the true answer and the visible operand take about a tenth each; the rest is other colors. The red operand never appears.
+        """,
+        caption="""
+            **What red lines decode to, per seed.** Each bar splits the 365 red lines under the primary intervention by the decoded answer: the true mix, a one-step neighbor of it on the grid, the non-red operand, the red operand itself, or some other color. Shades run from the true answer (darkest) outward.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, ax = plt.subplots(figsize=(5.2, 2.4), layout="constrained")
+        shades = [
+            light_dark(c, d)
+            for c, d in [
+                ("#7a0000", "#ff9a9a"),
+                ("#c03030", "#e06060"),
+                ("#e08080", "#a04040"),
+                ("#f0b0b0", "#703030"),
+                ("#ddd", "#333"),
+            ]
+        ]
+        left = np.zeros(len(_frac))
+        for j, k in enumerate(_order):
+            v = _frac[:, ex.COMPOSITION.index(k)]
+            ax.barh(np.arange(len(_frac)), v, left=left, color=shades[j], label=_names[k], height=0.7)
+            left += v
+        ax.set_yticks(np.arange(len(_frac)), [f"seed {s}" for s in range(len(_frac))])
+        ax.set_xlim(0, 1)
+        ax.invert_yaxis()
+        ax.tick_params(labelsize=7)
+        ax.set_xlabel("share of red lines", fontsize=8)
+        ax.legend(fontsize=6, frameon=False, ncol=5, loc="upper center", bbox_to_anchor=(0.5, -0.25))
+        return fig
+
+    mo.md(rf"""
     ## The undesigned response
 
-    /// admonition | TODO
-    No gate. For red lines under the primary intervention: the mass outside the color vocabulary; how far the decoded answer sits from the true mix; the composition of decoded answers (visible operand, red operand, true answer, one-step neighbor, other), as a stacked bar per seed; and the seed-agreement fraction.
+    No gate. With the axis gone, a red line still decodes to a color: the mass outside the color vocabulary is {stat("primary", "offvocab", "red").mean():.3f} (seed range {stat("primary", "offvocab", "red").min():.3f}–{stat("primary", "offvocab", "red").max():.3f}). The decoded answer sits {stat("primary", "guess_dist_red").mean():.2f} unit-cube units from the true mix on average; one grid step is {1 / 5:.1f}.
 
-    Expected: completions stay in the color vocabulary, the decoded answer sits nearer the visible operand than the true mix, and agreement across seeds is low. An untrained response should scatter by seed.
-    ///
+    The expectation was that the answer would sit nearer the visible operand than the true mix. It does not. Across the nine seeds, {_mean[ex.COMPOSITION.index("neighbor")]:.0%} of red lines decode to a one-step neighbor of the true answer, {_mean[ex.COMPOSITION.index("true")]:.0%} to the true answer itself, {_mean[ex.COMPOSITION.index("visible_operand")]:.0%} to the visible operand, and {_mean[ex.COMPOSITION.index("other")]:.0%} to some other color; the red operand is never returned. The model keeps mixing: it computes an answer from the two operands, with the red one read as a less red color than it is. That is a better-behaved untrained response than spoofing in M1, and it is the reference the fallback experiment has to improve on.
 
+    Which neighbor a line lands on is seed-specific. On {_agree["primary"]:.0%} of red lines do at least {ex.AGREE_SEEDS} of the nine seeds decode the same answer under the primary intervention, {_agree["operands"]:.0%} under the `operands` arm, and {_agree["ablate"]:.0%} under `ablate`. The `lobe` arm, which removes only part of the red state, agrees on {_agree["lobe"]:.0%}, because most of its lines still decode to the true answer.
+
+    {_plot()}
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(stat):
+    _fits = [f for f in ex.POSTHOC if f != "axis"]
+    _C = ex.CONTROL.name
+
+    def _cell(iv: str) -> tuple[float, float, float]:
+        return (
+            float(stat(iv, "damage", "red", _C).mean()),
+            float(stat(iv, "damage", "nonred", _C).mean()),
+            float(stat(iv, "acc", "red", _C).mean()),
+        )
+
+    _tier = {
+        site: {(f, s): _cell(f"{f}@{s}:{site}") for f in ex.POSTHOC for s in ex.SLICES} for site in ex.POSTHOC_SITES
+    }
+    _anch = {
+        arm: (float(stat(arm, "damage", "red").mean()), float(stat(arm, "damage", "nonred").mean()))
+        for arm in ("primary", "operands", "lobe", "ablate")
+    }
+    _fit_ink = {
+        "diff-in-means": ("#2060c0", "#7af"),
+        "probe": ("#209060", "#6d9"),
+        "leace": ("#8030c0", "#c8f"),
+        "axis": ("#555", "#aaa"),
+    }
+
+    @themed(
+        name="posthoc-tradeoff",
+        alt_text="""
+            A scatter of red damage against non-red damage. The anchored arms sit at the top left: red damage near 0.9 with non-red damage near zero. The post-hoc marks on the un-anchored model lie along a diagonal band: those that remove most red also remove half or more of the non-red response, and those with little non-red cost remove little red. The axis on the un-anchored model sits at the origin.
+        """,
+        caption="""
+            **Red damage bought per unit of non-red damage.** One mark per (fit, slice, site) on the un-anchored condition, seed mean: circles at the operand site, squares at the decode site, labelled by slice, colored by fit. The stars are the anchored arms under the placed axis. A selective removal sits high and to the left. The dashed line is equal damage on both groups; a mark below it would remove more from non-red lines than from red ones, and none does.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, ax = plt.subplots(figsize=(5.2, 3.4), layout="constrained")
+        ax.plot([0, 1], [0, 1], ls=(0, (4, 3)), lw=0.7, color=light_dark("#0004", "#fff4"), zorder=0)
+        markers = {"operands": "o", "decode": "s"}
+        for site, cells in _tier.items():
+            for (f, s), (r, n, _) in cells.items():
+                ink = light_dark(*_fit_ink[f])
+                ax.scatter(
+                    n,
+                    r,
+                    marker=markers[site],
+                    s=28,
+                    color=ink,
+                    edgecolors="none",
+                    alpha=0.85,
+                    label=f"{f}, {site}" if s == 0 else None,
+                )
+                if r > 0.05 or n > 0.05:
+                    ax.annotate(
+                        SLICE_NAMES[s], (n, r), xytext=(3, 2), textcoords="offset points", fontsize=6, color=ink
+                    )
+        offsets = {"primary": (8, 6), "operands": (8, -4), "ablate": (8, -14), "lobe": (8, -3)}
+        for i, (arm, (r, n)) in enumerate(_anch.items()):
+            star = light_dark("#d40000", "#f44")
+            ax.scatter(
+                n,
+                r,
+                marker="*",
+                s=70,
+                color=star,
+                edgecolors="none",
+                zorder=3,
+                label="anchored arms, e₁" if i == 0 else None,
+            )
+            ax.annotate(arm, (n, r), xytext=offsets[arm], textcoords="offset points", fontsize=6)
+        ax.set_xlim(-0.02, 1)
+        ax.set_ylim(-0.02, 1)
+        ax.set_xlabel("non-red damage (want low)", fontsize=8)
+        ax.set_ylabel("red damage (want high)", fontsize=8)
+        ax.tick_params(labelsize=7)
+        ax.legend(fontsize=6, frameon=False, loc="lower right")
+        return fig
+
+    def _table(site: str) -> str:
+        rows = "".join(
+            f"<tr><td>{f}</td>"
+            + "".join(
+                f"<td class='num'>{_tier[site][f, s][0]:.2f} / {_tier[site][f, s][1]:.2f}</td>" for s in ex.SLICES
+            )
+            + "</tr>"
+            for f in ex.POSTHOC
+        )
+        return f"""
+        <div class="report-table-scroll"><table class="report-table">
+          <thead><tr><th>fit, at {site}</th>{"".join(f"<th class='num'>{SLICE_NAMES[s]}</th>" for s in ex.SLICES)}</tr></thead>
+          <tbody>{rows}</tbody>
+        </table></div>
+        """
+
+    _best_ops = max(((f, s) for f in _fits for s in ex.SLICES), key=lambda k: _tier["operands"][k][0])
+    _best_dec = max(((f, s) for f in _fits for s in ex.SLICES), key=lambda k: _tier["decode"][k][0])
+    _r_o, _n_o, _ = _tier["operands"][_best_ops]
+    _r_d, _n_d, _ = _tier["decode"][_best_dec]
+    _p_r, _p_n = _anch["primary"]
+    _probe0 = _tier["operands"]["probe", 0]
+
+    mo.md(rf"""
     ## The post-hoc tier
 
-    /// admonition | TODO
-    No gate. The H1–H3 statistics for each fitted direction on the un-anchored condition, at each of its two sites, beside e₁ at the same footprint on the same condition and beside the anchored primary and `operands` arm. The comparison to read: how much red damage a searched-for direction buys per unit of non-red damage, compared with the placed axis. That ratio compares outcomes, so the decode site can be read against the anchored arms even though no arm shares its footprint; the e₁ row there says what the axis itself does at that site on the un-anchored model.
+    No gate. On the un-anchored condition, e₁ itself does nothing at either site (red damage at most {max(_tier[s]["axis", k][0] for s in _tier for k in ex.SLICES):.3f}), which is the calibration: the operator only removes what sits on the direction it is given. Each fitted direction removes something, and the pattern is the same at both sites. At the operand site only the embedding and the first block matter; a direction fitted at a deeper slice removes nothing, so the answer is formed from the operand states before the second block reads them. At the decode site the first two blocks matter. At the embedding there the state is the same on every line, so there is nothing to fit: LEACE returns the identity, and the other two fits return a direction that carries no label, whose small effect is an edit of the shared `=` state.
 
-    Expected, at the operand site: diff-in-means and the probe remove some accuracy on red lines at a real non-red cost, LEACE less of both, and none of them come close to the selectivity of the placed axis. At the decode site the label is the dose itself, so the fits should remove more red accuracy than at the operand site, at a non-red cost we do not predict. A post-hoc direction that matched the anchored result at the operand site would mean the un-anchored model already keeps redness on a single linear direction there, which the probe maps in ex-2.1.12 make plausible at the embedding. The same at the decode site says less, since the readout of a mixing task has to carry redness somewhere. The per-slice breakdown says where the two part company.
+    {_plot()}
+
+    The trade-off is what separates a placed axis from a found direction. The strongest post-hoc removal at the operand site, {_best_ops[0]} at slice {SLICE_NAMES[_best_ops[1]]}, buys {_r_o:.2f} of red damage for {_n_o:.2f} of non-red damage; at the decode site, {_best_dec[0]} at slice {SLICE_NAMES[_best_dec[1]]} buys {_r_d:.2f} for {_n_d:.2f}. The anchored primary intervention buys {_p_r:.2f} for {_p_n:.3f}, and the `operands` arm {_anch["operands"][0]:.2f} for {_anch["operands"][1]:.3f}. The one post-hoc direction with a small non-red cost, the probe at the embedding, removes {_probe0[0]:.2f} of red damage for {_probe0[1]:.3f}: a mild edit in both respects. No fitted direction comes within an order of magnitude of the placed axis on red damage per unit of non-red damage.
+
+    {mo.Html(_table("operands"))}
+
+    {mo.Html(_table("decode"))}
+
+    /// details | Reading the tables
+    Each cell is seed-mean red damage / non-red damage for the direction fitted at that slice and site, applied at the same site, on the three un-anchored runs. The expectation for the decode site, more red removal than at the operand site, holds for diff-in-means and LEACE at the first two blocks, and the non-red cost there is of the same size as the red removal. LEACE was expected to edit less than diff-in-means, since it removes only the linear trace. It costs more non-red response at the operand site and about the same at the decode site: on these states the linear trace of redness is not a small part of the state.
     ///
 
+    The un-anchored model does not keep redness on one linear direction the mixing computation leaves alone. What the probe reads at the embedding is mostly separable from the task, and the mean-difference and LEACE directions are not: the states that differ between red and non-red lines differ along directions the blocks also use for the mix. The per-slice pattern says where the two part company, and it is the first block.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(clean, lines, per_line, runs: dict[str, list[dict]], stat):
+    # --- E1: strength.
+    _gammas = list(ex.GAMMAS)
+    _ivs = [f"gamma-{g:g}" if g != ex.PRIMARY_GAMMA else "primary" for g in _gammas]
+    _e1 = {
+        k: np.stack([stat(iv, key, g) for iv in _ivs], 1)
+        for k, (key, g) in {"red acc": ("acc", "red"), "non-red damage": ("damage", "nonred")}.items()
+    }
+
+    @themed(
+        name="strength-sweep",
+        alt_text="""
+            Two panels against the fraction of the axis removed, from 0.25 to 1. Left, red accuracy falls from about 0.9 to about 0.1, steepest between 0.5 and 0.75, with a seed band widening in the middle. Right, non-red damage rises from near zero to a few hundredths, with one seed's band reaching about 0.17.
+        """,
+        caption="""
+            **The strength sweep (E1).** Seed mean and seed range of red accuracy and non-red damage under the primary intervention at γ ∈ {0.25, 0.5, 0.75, 1}, the fraction of the e₁ component removed. The write at strength γ is closed-form in the arriving alignment, so the x axis could equally be drawn as the write on the red operand.
+        """,
+    )
+    def _plot_e1() -> plt.Figure:
+        fig, axes = plt.subplots(1, 2, figsize=(7.4, 2.4), layout="constrained")
+        axes = cast(AxesRow, axes)
+        for ax, (title, v) in zip(axes, _e1.items(), strict=True):
+            ink = light_dark(*ARM_INK["primary"])
+            ax.fill_between(_gammas, v.min(0), v.max(0), color=ink, alpha=0.15, lw=0, zorder=0)
+            ax.plot(_gammas, v.mean(0), color=ink, marker="o", ms=3, lw=1.3)
+            ax.set_xticks(_gammas)
+            ax.set_xlabel("γ, fraction of e₁ removed", fontsize=8)
+            ax.set_ylabel(title, fontsize=8)
+            ax.tick_params(labelsize=7)
+        axes[0].set_ylim(0, 1)
+        return fig
+
+    # --- E2 reads the H1 table. E3: damage against clean alignment at the red operand, per slice.
+    _alpha = per_line("clean", "alpha")  # (seeds, slices, lines, positions)
+    _a_red = _alpha[:, :, np.arange(lines.n), lines.red_operand].mean(0)  # (slices, lines)
+    _dmg = (per_line("clean", "p_ans") - per_line("primary", "p_ans")).mean(0)
+    _rgb = GRID_RGB[lines.line_colors[np.arange(lines.n), lines.red_operand]]
+
+    @themed(
+        name="damage-by-alignment",
+        alt_text="""
+            Five scatter panels, one per slice, of seed-mean damage against the clean alignment of the dose-carrying operand at that slice, marks colored by that operand. At every slice the marks sit on the floor up to an alignment of about 0.6, then rise steeply to near one; the transition sits at a higher alignment at the deeper slices, where every red color is already near one.
+        """,
+        caption="""
+            **Damage against the clean alignment of the dose-carrying operand (E3).** One mark per line, seed-mean damage under the primary intervention against the seed-mean clean alignment at the position of the operand that carries the dose, one panel per slice. Marks are colored by that operand.
+        """,
+    )
+    def _plot_e3() -> plt.Figure:
+        fig, axes = plt.subplots(
+            1, len(SLICE_NAMES), figsize=(7.4, 1.9), sharex=True, sharey=True, layout="constrained"
+        )
+        axes = cast(AxesRow, axes)
+        for s, ax in enumerate(axes):
+            ax.scatter(_a_red[s], _dmg, c=_rgb, s=4, alpha=0.6, linewidths=0, clip_on=False)
+            ax.set_title(f"slice {SLICE_NAMES[s]}", fontsize=8)
+            ax.tick_params(labelsize=6)
+        axes[0].set_xlim(-0.3, 1)
+        axes[0].set_ylim(-0.05, 1)
+        axes[0].set_ylabel("damage", fontsize=8)
+        fig.supxlabel("clean α of the dose-carrying operand", fontsize=8)
+        return fig
+
+    # --- E5: the gain from the prompt writes to the final-state displacement.
+    _gain = {iv: stat(iv, "disp", "nonred") / stat(iv, "write_prompt_sum", "nonred") for iv in ("primary", "last")}
+    _gain_red = {iv: stat(iv, "disp", "red") / stat(iv, "write_prompt_sum", "red") for iv in ("primary", "last")}
+
+    # --- E6: the decoded write per site, under the primary intervention.
+    _dec = (
+        np.stack([per_line("primary", "decode", ex.PRIMARY.name)]).squeeze(0).mean(0)
+    )  # (slices, positions, target, group, channel)
+    _g = {g: ex.GROUPS.index(g) for g in ("red", "nonred")}
+
+    def _e6_row(s: int) -> str:
+        cells = []
+        for pos, t in ((0, 0), (2, 1)):
+            for g in ("red", "nonred"):
+                cells += [f"<td class='num'>{v:+.3f}</td>" for v in _dec[s, pos, t, _g[g]]]
+        return f"<tr><td>{SLICE_NAMES[s]}</td>{''.join(cells)}</tr>"
+
+    _e6 = f"""
+    <div class="report-table-scroll"><table class="report-table">
+      <thead>
+        <tr><th rowspan="2">slice</th><th colspan="6">at op1, decoding op1</th><th colspan="6">at op2, decoding op2</th></tr>
+        <tr>{"".join(f"<th class='num'>{g} Δ{c}</th>" for _ in range(2) for g in ("red", "non-red") for c in "RGB")}</tr>
+      </thead>
+      <tbody>{"".join(_e6_row(s) for s in range(len(SLICE_NAMES)))}</tbody>
+    </table></div>
+    """
+    _e6_caption = """
+    The decoded write (E6): the seed-mean change in the ridge-decoded RGB of the operand at its own position, edited state minus arriving state, under the primary intervention, on red lines and on non-red lines. A probe read on an edited state is an extrapolation, so the numbers are a direction of change in color units rather than a calibrated color.
+    """
+    _emb_q = stat("embedding", "q99_alpha_nonred").mean(0)
+    _clean_q = np.array([r["clean"]["alpha_q99_nonred"] for r in runs[ex.PRIMARY.name]], float).mean(0)
+
+    mo.md(rf"""
     ## Exploratory analyses
 
-    /// admonition | TODO
     Preregistered as exploratory, no gates.
 
-    **E1 — strength.** Accuracy and damage on red and non-red lines at γ ∈ {0.25, 0.5, 0.75, 1}. The write at strength γ is closed-form in α, so the x axis can be drawn either as γ or as the write on red operands; the question is whether the response is proportional to the write or thresholded.
+    **E1 — strength.** The response is graded in γ rather than thresholded: seed-mean red accuracy is {", ".join(f"{v:.2f}" for v in _e1["red acc"].mean(0))} at γ = {", ".join(f"{g:g}" for g in _gammas)}, with the steepest drop between 0.5 and 0.75, and the seed spread widest in the middle of the sweep. Non-red damage is {", ".join(f"{v:.3f}" for v in _e1["non-red damage"].mean(0))} over the same points, and the seed that carries the H2 deficit carries it from γ = 0.5 on.
 
-    **E2 — where the edit acts.** The H1–H3 statistics for the `embedding` and `last` arms against the primary. If `embedding` alone bites, the concept is read off the token and the blocks do not re-derive it. If only the primary intervention, at every slice, bites, the bypass test the D1.3 post left open gets its first transformer data point.
+    {_plot_e1()}
 
-    **E3 — damage against alignment.** Per line, damage against the clean alignment at the position of the red operand, at each slice. In M1 the relation was error ∝ $\cos^2$. Also per color: the mean damage of lines with that color as an operand, against the alignment of that color. This is the per-color breakdown the contrary case of H3 asks for.
+    **E2 — where the edit acts.** The `embedding` arm bites (red accuracy {stat("embedding", "acc", "red").mean():.2f}) at the largest non-red cost of any arm, a deficit of {(clean("acc", "nonred") - stat("embedding", "acc", "nonred")).mean():.3f}; the `last` arm barely bites ({stat("last", "acc", "red").mean():.2f}) and costs nothing. So the concept is read off the token, in the first two blocks, and the last block does not read it: which is the same depth profile the post-hoc tier found on the un-anchored model. The blocks partly re-derive the axis when only the token was edited (the H4 clouds), and the non-red 99th-percentile alignment arriving at the last slice under that arm is {_emb_q[4, : ex.ANSWER_POS].max():.2f} against {_clean_q[4, : ex.ANSWER_POS].max():.2f} clean at the prompt positions. That partial return, with the large non-red cost, is the bypass question the D1.3 post left open, now with one transformer data point: removing the axis at the input alone is neither a clean removal nor a cheap one, and the per-slice edit is what makes the primary intervention selective.
 
-    **E4 — the lobe.** The H1–H4 statistics for the `lobe` arm. Its threshold of 0.5 sits above the constant component of the syntax embeddings and below the alignment of the red operand, so by design it should remove red and leave the syntax states alone. Its write map is the H4 figure with the syntax columns emptied.
+    **E3 — damage against alignment.** Per line, damage against the clean alignment of the dose-carrying operand rises more steeply than the $\cos^2$ curve M1 saw. At the embedding, lines whose operand sits near zero alignment are untouched, the middle of the scale takes partial damage with a wide spread, and the reddest colors, at 0.7 and above, lose nearly everything. At the deeper slices the red colors have all been pulled to an alignment near one in the clean pass, so the rise sits in the top of the scale and the middle colors spread along it. The per-color view is the same picture: the colors that lose their lines are the five reddest, and the middle bins of H3 are made of lines whose operand sits on the steep part of the D2.1 alignment response.
 
-    **E5 — amplification.** Per non-red line, the final-state displacement at the `=` position against the sum of the writes on that line at the prompt positions, over all slices. Both are angles, so their ratio is the gain the blocks apply to the edit on its way to the logits; a ratio above one is amplification. We read it for the primary intervention, and for the `last` arm, where no block sits after the edit. The `last` arm is the no-amplification reference.
-    <!-- REVIEW: the displacement is now an angle rather than a distance, so the ratio is dimensionless; and the `last` arm's ratio is not one by construction, since the denominator sums the writes at all four prompt positions while the numerator is the displacement at `=` alone. Verify: under `last`, the numerator equals the write at (slice 4, `=`), so the ratio is one only when the other three prompt writes vanish. -->
+    {_plot_e3()}
 
-    **E6 — what the write decodes to.** Per (slice, position), the decoded write from the Measurements, whose probe is the ex-2.1.12 ridge fit for the RGB of the operand at ℓ₂ = 10⁻². We report per site the seed-mean change in decoded redness, green, and blue, on red lines and on non-red lines. Expected: at the operand positions on red lines the decoded redness falls and the other two channels hold; on non-red lines all three hold. A change in green or blue on non-red lines would say the rotation took something other than red with it, which the angle cannot tell us. A probe read on an edited state is a linear extrapolation off the states it was fitted on, so we read it as a direction of change rather than a calibrated color.
+    **E4 — the lobe.** With a threshold of {ex.LOBE["a"]:g}, the lobe leaves every syntax state and every non-red state alone: its non-red damage is {stat("lobe", "damage", "nonred").mean():.4f} and its write on non-red lines is zero at every site, the H4 map with the syntax columns emptied. It removes about half of the red response (accuracy {span(stat("lobe", "acc", "red"), ".2f")}), with the widest seed spread of any arm, because the red operand's alignment at the embedding ({0.90:.2f} for pure red) sits inside the lobe's ramp and the deeper slices see a state already pulled toward the threshold. It is the selective operator; a lower threshold or a steeper ramp would be the shaped suppression the todo item asks for.
 
-    ///
+    **E5 — amplification.** On non-red lines the final-state displacement at `=` is {_gain["primary"].mean():.2f} of the summed prompt writes under the primary intervention (seed range {_gain["primary"].min():.2f}–{_gain["primary"].max():.2f}), and {_gain["last"].mean():.2f} under the `last` arm, where the only write on the way to the logits is at the final slice. Both are well below one: on average the blocks attenuate the edit on its way to the logits rather than amplify it. The seed with the H2 deficit has the largest displacement ({stat("primary", "disp", "nonred").max():.2f} radians against a seed mean of {stat("primary", "disp", "nonred").mean():.2f}) from a summed write no larger than the others, so its gain is the highest of the nine. On red lines the ratio is {_gain_red["primary"].mean():.2f}, since the removal is meant to reach the output.
 
+    **E6 — what the write decodes to.** At the operand positions on red lines, the write reads as a fall in decoded redness with a rise in green and blue of about the same size, at every slice; the change is largest at the embedding, where the alignment is removed in one step. On non-red lines the same direction of change appears at the deeper slices, at about a third of the size, and the reverse sign at the embedding, where a non-red state's small negative alignment is removed. The ratio of the three channels is fixed at roughly (−1, +0.85, +0.85) throughout: the probe reads the axis as redness against the other two channels, so this says the rotation is along what the probe calls red and nothing else the probe can see.
+
+    {figure_html(_e6, caption=_e6_caption, class_="report-figure")}
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ## Discussion
 
-    /// admonition | TODO
-    Interpretation only, after the results. What the removal and its selectivity let the D2.2 plan say about the anchored-op experiments that follow; which operator the damage figures pick for them, which the [shaped-suppression item](/todo/science/shaped-suppression-rather-than-projecting-whole-axis.md) is waiting on; what the undesigned response says the fallback experiment must improve on; and what the write bound and E5 say about the layer sweep. No re-derivation of the findings.
-    ///
+    The D2.2 plan can now say that the placed axis is where red is read from, in the transformer as in the autoencoder. Removing it removes the concept, in proportion to how much of it a line carries, and the write stays inside the bound the clean geometry set. Two things it can say beyond that.
+
+    First, on the operator. The whole-stream projection costs a little on non-red lines, and that cost comes from the syntax positions, whose embeddings carry a constant component on the axis. Two arms remove it: restricting the edit to the operand positions, and the lobe, which leaves the low-alignment bulk alone by construction. Of the two, the lobe is the one that needs no knowledge of the line's syntax, so it is the natural operator for the anchored-op experiments and for the [shaped-suppression item](/todo/science/shaped-suppression-rather-than-projecting-whole-axis.md). Its removal is partial at the M1 threshold, since the red operand's embedding alignment sits inside the ramp; that is a threshold to tune, and the strength sweep says the response to a partial removal is graded rather than thresholded, so the tuning has something to grade against.
+
+    Second, on the depth profile. The concept is read from the operand states before the second block, the last block does not read it at all, and a token-only removal is neither clean nor cheap because the blocks partly re-derive the axis from an off-axis input. That is the case for the layer sweep, and it says what the sweep should find: a removal that acts at the embedding and the first block should do the primary intervention's work, and one that starts later should not.
+
+    The fallback experiment has its reference numbers. Without a fallback term, a red line decodes in the color vocabulary to an answer near the true mix, computed as if the red operand were a less red color, and which near miss is seed-specific. A fallback that is trained rather than left to the model should make the response reproducible across seeds; the seed-agreement fraction is the number to move.
+
+    The bound held layer by layer, and one seed still paid a non-red cost from a bounded write. The layer-local statement is the one we can defend with the geometry we placed; what the blocks do with a bounded rotation is a property of the trained model, and the seed spread says it varies. Bounding behavior, rather than the write, would need the anti-subspace term to reach the syntax positions, or the operator to skip them.
     """)
     return
 
