@@ -30,6 +30,8 @@ Color the marks with the colors they represent; a legend or colorbar is almost a
 
 A grading figure shows how a response measured per grid color varies with redness. A mean line or envelope hides too much of the structure, and drawing grid vertices is too visually heavy. Use `sca.vis_grading.GradingCloud` to draw a dithered cloud instead. You can use it to draw single charts, or align it with `smooth_step` overlays.
 
+When each color has a distribution of responses rather than one value (per-line damage grouped by the line's dose-carrying color, say), hand the cloud `quantile_stack(values, color)` with `lerp=True`: each sample then draws its height from its color's quantile function, so the cloud's vertical extent is the spread and a bimodal response shows as two bands. The dither gives a rare line almost no ink, so where single unusual lines matter, overlay them: per x level, a thin rule from the least to the most extreme line, capped by a dot in the line's own color, plus a mean line with a halo (`withStroke`) so it survives crossing a dense cloud. Reference: the damage-by-dose figure in `docs/m2/ex-2.2.1/report.py`.
+
 ## Sublines
 
 A subline is the text itself with one sparkline per series running underneath, aligned to the tokens: `subline.subline.Subline(…).plot(tokens, series)`, whose docstring holds the mechanics. Tokens may be any width — a wide one draws as a plateau across its glyphs, the same grammar as `smooth_step`. Reach for it when the reader needs to see _which_ token a value lands on; per-character surprisal and predictive entropy over one prompt is the standing case (ex-2.1.1, ex-2.1.2). A matplotlib chart of the same series gives up the alignment with the glyphs, and a heatmap gives up the rate of change.

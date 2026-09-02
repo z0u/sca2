@@ -2,6 +2,7 @@ import marimo
 
 __generated_with = "0.23.16"
 app = marimo.App(
+    width="medium",
     app_title="Ex 2.2.1: suppressing red in the anchored transformer",
     css_file="../../report.css",
     auto_download=["html"],
@@ -17,6 +18,7 @@ with app.setup(hide_code=True):
     import marimo as mo
     import matplotlib.pyplot as plt
     import numpy as np
+    from matplotlib.patheffects import withStroke
     from matplotlib.transforms import Affine2D
 
     # Marimo puts the notebook directory on sys.path, so the design constants and
@@ -25,7 +27,7 @@ with app.setup(hide_code=True):
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import AxesRow, figure_html, light_dark, smooth_step, smooth_step_area, smooth_step_marks, themed
-    from sca.vis_grading import GRID_RGB, I_RED, GradingCloud
+    from sca.vis_grading import GRID_RGB, I_RED, GradingCloud, quantile_stack
 
     use_publisher(report_bundle(__file__))
 
@@ -103,7 +105,7 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    The first intervention on an anchored transformer. We take the D2.1 checkpoints and remove the anchor axis from the residual stream, then score completion accuracy on lines with a red operand and on lines without. The removal works, and it scales with how red the line is. It stays inside the bound the placed geometry sets. Zeroing the weights that carry the axis does the same job. Selectivity is only partial: the loss on non-red lines comes from the syntax positions, and it goes away when we edit the operand positions only.
+    The first intervention on an anchored transformer. We take the D2.1 checkpoints and remove the anchor axis from the residual stream, then score completion accuracy on lines with a red operand and on lines without. The removal works, and it scales with how red the line is. It stays inside the bound the placed geometry sets. Zeroing the axis weights does the same job. Selectivity is only partial: the loss on non-red lines comes from the syntax positions, and it goes away when we edit the operand positions only.
     ///
     """)
     return
@@ -128,7 +130,7 @@ def _(bins, clean, ex_alpha_diff, ratio_map, stat):
 
     **H1 (suppression bites) — holds.** Seed-mean accuracy on red lines under the primary intervention is {_red.mean():.2f}, against a gate of {ex.RED_ACC_GATE:g}; the highest single seed is {_red.max():.2f}.
 
-    **H2 (selective) — partial.** The seed-mean drop in accuracy on non-red lines is {_deficit.mean():.3f}. That is outside the {ex.TASK_GATE:g} gate but inside the {ex.TASK_PARTIAL:g} partial gate. One seed carries most of it ({_deficit.max():.3f}); the median seed is at {np.median(_deficit):.3f}. The `operands` arm, which skips the syntax positions, drops only {_ops.mean():.3f}. So the side-effect sits in the constant component the syntax positions carry, which is the case the contrary clause of H2 named.
+    **H2 (selective) — partial.** The seed-mean drop in accuracy on non-red lines is {_deficit.mean():.3f}. That is outside the {ex.TASK_GATE:g} gate but inside the {ex.TASK_PARTIAL:g} partial gate. One seed accounts for most of it ({_deficit.max():.3f}); the median seed is at {np.median(_deficit):.3f}. The `operands` arm, which skips the syntax positions, drops only {_ops.mean():.3f}. So the side-effect is due to the constant component in the syntax positions, which is the case the contrary clause of H2 named.
 
     **H3 (grades with dose) — holds.** Seed-mean damage across the five dose bins[^dose] is {", ".join(f"{v:.2f}" for v in _b)}. The largest dip between adjacent bins is {_dip:.3f} (allowed {ex.GRADE_DIP:g}), and the top bin exceeds the bottom by {_b[-1] - _b[0]:.2f} (gate {ex.GRADE_SPAN:g}).
 
@@ -443,34 +445,43 @@ def _(clean, dose, floor, lines, per_line, stat):
         c.title: (per_line("clean", "p_ans", c.name) - per_line("primary", "p_ans", c.name)).mean(0)
         for c in (ex.PRIMARY, ex.CONTROL)
     }
-    _rgb = GRID_RGB[lines.line_colors[np.arange(lines.n), lines.red_operand]]
-    _x = dose + np.random.default_rng(0).uniform(-0.012, 0.012, lines.n)
-    # The same data per color: the mean damage of the lines whose dose-carrying operand is that color. Dose is
-    # that operand's redness, so this is the scatter's x axis with the per-line scatter collapsed onto the grid.
     _carrier = lines.line_colors[np.arange(lines.n), lines.red_operand]
-    _per_color = np.array([_dmg[ex.PRIMARY.title][_carrier == c].mean() for c in range(len(GRID_RGB))])
-    assert not np.isnan(_per_color).any(), "every grid color carries the dose on some line"
+    _rgb = GRID_RGB[_carrier]
+    _stacks = {title: quantile_stack(y, _carrier) for title, y in _dmg.items()}
+    # Dose is a float computation, so equal levels differ in the last bits; round before grouping.
+    _dose = np.round(dose, 6)
+    _levels = np.unique(_dose)
+    assert len(_levels) == 29, len(_levels)
+    _means = {title: np.array([y[_dose == d].mean() for d in _levels]) for title, y in _dmg.items()}
+    # The dither gives a rare line its fair share of samples, which is nearly none, so the least and most
+    # damaged line at each dose are drawn as opaque dots in their own carrier color: the extremes are the
+    # evidence H2 reads. Per condition, (min, max) line indices interleaved per dose level.
+    _at = [np.flatnonzero(_dose == d) for d in _levels]
+    _extremes = {
+        title: np.array([i[f(y[i])] for i in _at for f in (np.argmin, np.argmax)]) for title, y in _dmg.items()
+    }
 
     @themed(
         name="damage-by-dose",
         alt_text="""
-            Three panels of damage against dose. Two scatters, one mark per line colored by its dose-carrying operand. Anchored: the marks sit on the floor up to a dose of about 0.6, rise through the 0.6 to 0.8 band, and fill the top of the panel at the reddest doses. Un-anchored: every mark sits on the floor. The third panel is a grading cloud of the anchored per-color means over the color cube, with the same rise near the red corner.
+            Two grading clouds of damage against dose, with a mean line, and at each dose value a thin rule from the least to the most damaged line, capped by small dots. Anchored: the cloud sits on the floor up to a dose of about 0.6, then rises steeply through the 0.6 to 0.8 band to the top of the panel, dense at its center and thin at its edges. At dose 0.7 the rule spans the whole panel. Un-anchored: the cloud sits on the floor throughout, with a few rules reaching up to isolated lines at about 0.3.
         """,
         caption="""
-            **Damage against dose, one mark per line.** Seed-mean damage under the primary intervention, plotted against the dose of each line, with each mark colored by the operand that carries the dose. Left, the anchored condition; middle, the un-anchored one under the same operator; right, the anchored condition again as a grading cloud, each color's mean damage over the lines on which it carries the dose, drawn over the whole cube. Dose takes 29 distinct values on this grid, so the marks are jittered by ±0.012 in x to separate them. Dose belongs to the line as a whole: it is the larger of the two operand rednesses, where the D2.1 grading clouds plotted the redness of a single color. The vertical rules are the H3 bin edges.
+            **Damage against dose, as a grading cloud.** Seed-mean damage under the primary intervention, against the dose of each line: the redness of the operand that carries it. Left, the anchored condition; right, the un-anchored one under the same operator, on the same scale. Each cloud is dithered from the per-color distribution of line damage, so its density at a height is the share of that color's lines at that damage. Between the 216 grid colors the distributions are interpolated, so the fill between dose values is not measured, and colors far from red, which carry the dose on few lines, are a band interpolated between them. Dose takes 29 values on this grid. The grey line is the mean damage per dose value; the thin rule at each runs from the least to the most damaged line, capped by a dot in that line's carrier color, so a single unusual line stays visible where the dither would give it almost no ink. The vertical rules are the H3 bin edges.
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(1, 3, figsize=(7.4, 2.5), sharex=True, sharey=True, layout="constrained")
+        fig, axes = plt.subplots(1, 2, figsize=(7, 3.5), sharex=True, sharey=True, layout="constrained")
         axes = cast(AxesRow, axes)
-        GradingCloud(axes[2], _per_color, (-0.05, 1), k=35, dpr=2, clip_on=False)
-        axes[2].set_title(f"{ex.PRIMARY.title}, per color", fontsize=8)
-        axes[2].set_xlabel("redness of the dose-carrying operand", fontsize=8)
-        axes[2].tick_params(labelsize=7)
-        for ax, (title, y) in zip(axes[:2], _dmg.items(), strict=True):
+        halo = [withStroke(linewidth=3, foreground=light_dark("#fff2", "#0002"))]
+        for ax, (title, y) in zip(axes, _dmg.items(), strict=True):
             for e in ex.DOSE_EDGES:
                 ax.axvline(e, color=light_dark("#0002", "#fff2"), lw=0.6, zorder=0)
-            ax.scatter(_x, y, c=_rgb, s=6, alpha=0.7, linewidths=0, clip_on=False)
+            GradingCloud(ax, _stacks[title], (-0.05, 1), k=45, dpr=2, lerp=True, clip_on=False)
+            ax.plot(_levels, _means[title], lw=0.5, c=light_dark("#000", "#fff"), zorder=3, path_effects=halo)
+            i = _extremes[title]
+            ax.vlines(_levels, y[i[0::2]], y[i[1::2]], lw=0.2, color=light_dark("#0006", "#fff6"), zorder=3)
+            ax.scatter(_dose[i], y[i], s=2, c=_rgb[i], edgecolors=light_dark("#000", "#fff"), lw=0.15, zorder=3)
             ax.set_title(title, fontsize=8)
             ax.set_xlabel("dose", fontsize=8)
             ax.tick_params(labelsize=7)
