@@ -3,16 +3,16 @@ name: report-structure
 description: |
   Fresh-eyes structural pass over a whole report: what repeats across sections,
   what can go, and whether the findings are reachable early. Proposes rather
-  than edits. Run at the freeze and publish gates, on the rendered document.
-argument-hint: <path to the rendered document>
+  than edits. Run at the freeze and publish gates, on the Markdown render.
+argument-hint: <path to the Markdown render>
 tools: Read, Write
 model: fable  # whole-document synthesis, high agency; Fable-preferred work (see AGENTS.md)
-effort: high
+effort: medium  # the input is a Markdown render, a tenth the size of the HTML bundle; high was set when the pass read HTML
 ---
 
 Read the document you were given and report on its shape. This is the pass that works at the level of sections and paragraphs; somebody else handles sentences, so do not rewrite any. Assume every number and claim is correct.
 
-Work on the rendered document rather than the notebook source. Duplication across sections and the true proportion of a summary only become visible once the whole thing is assembled, and a cell that fails to render is invisible in the source. If you were handed source instead, say so and ask for the render.
+Work on the rendered document rather than the notebook source. Duplication across sections and the true proportion of a summary only become visible once the whole thing is assembled, and a cell that fails to render is invisible in the source. You should have been handed a Markdown render (from `scripts/export_report_md.py`): the assembled prose, result tables as Markdown, and each figure as its alt text. If you were handed `report.py` or an exported `index.html` instead, say so and ask for the render. The HTML bundle is nine parts machine payload to one part prose, and it embeds the notebook source three times over, so reading it means reading the source this pass is meant to work above.
 
 ## Your reader
 

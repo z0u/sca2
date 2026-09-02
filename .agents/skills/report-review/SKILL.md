@@ -53,7 +53,13 @@ Then, for up to 3 rounds:
     - Something structural it couldn't fix itself, a design question, or a disagreement about how a result should be read: stop and escalate to the user.
     - It reversed something an earlier round decided, or it reports a claim pulling in two directions: stop and escalate. Another round will flip it back. Put both readings to the user and say what would separate them: splitting the hypothesis into two tracks, dropping one, or narrowing its scope. Only the human can make that call, since it changes what the experiment claims.
     - Otherwise (substantive fixes, not yet at "no blockers"): another round.
-4. If the loop converged and the report is heading for a freeze or a publish, export the document and give it to the `report-structure` agent. Reviewers edit one section at a time, so duplication between sections, a tl;dr that has grown into a second conclusion, and a findings section that a result never reached only show up in the assembled render. It proposes rather than edits, so bring its cut list to the user rather than acting on it — deleting a paragraph is their call. Skip this step when you escalated: the text will move again.
+4. If the loop converged and the report is heading for a freeze or a publish, render the document to Markdown and hand that file to the `report-structure` agent:
 
-   Read the render, not the source. A cell can fail to render and leave no trace in `report.py`; ex-2.1.7 published without its H2 verdict that way.
+   ```bash
+   uv run scripts/export_report_md.py docs/<key>/report.py .mini/renders/<key>.md
+   ```
+
+   Reviewers edit one section at a time, so duplication between sections, a tl;dr that has grown into a second conclusion, and a findings section that a result never reached only show up in the assembled render. It proposes rather than edits, so bring its cut list to the user rather than acting on it — deleting a paragraph is their call. Skip this step when you escalated: the text will move again.
+
+   Hand it the render, not `report.py`: a cell can fail to render and leave no trace in the source (ex-2.1.7 published without its H2 verdict that way). And the Markdown render, not the bundle's `index.html`: same document, about ten times the size, most of it the notebook source. The export re-runs the notebook, so allow a few minutes; `report-render` has the details.
 5. After the loop ends (converged, escalated, or 3 rounds reached), summarize for the user: what changed across all rounds, any open questions, and the final recommendation. Include `git diff --stat` for the report so they can see the size of the change, and list any `REVIEW` notes the rounds added — those are decisions the reviewers made on their own authority, and the user should get the chance to overrule them. Leave the diff staged rather than committed, and offer to commit.
