@@ -10,3 +10,5 @@ Two frictions observed the first time the format ran. (a) A scalar objective wal
 ## Notes
 
 **2026-08-17, housekeeping** — promoted, because this is worth the least when it is read late. All three lessons are edits to how the *next* search plan is written, and D2.2's first survey is the next one; fold them in while the plan is being drafted and the cost is a paragraph, after it runs and the cost is another run. Shortlist was 1/6.
+
+**2026-09-02, housekeeping** — the window is still ahead, unlike its shortlist neighbour on report structure. D2.2's first experiment, [ex-2.2.1](/docs/m2/ex-2.2.1/report.py), is hypothesis-driven with frozen gates rather than a search over a trial space, so none of the three lessons applied to it and nothing was missed by not folding them in. The first D2.2 survey is still unwritten.
