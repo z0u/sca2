@@ -127,6 +127,7 @@ def _():
     - **The write** per (slice, line, position): the angle between the arriving state and the edited state. The pipeline asserts that this equals $\arcsin|\alpha_{\text{arriving}}|$ at every site, so where a map reads more easily we report the write as that alignment.
     - **The clean alignment map** per run, from the un-intervened pass. This is the same array ex-2.1.10 published, recomputed here so every quantity comes from one code path.
     - **The final-state displacement** per line: the angle between the intervened and clean states at the last slice, `=` position. That is the state the logits are read from. We report it in radians, the same scale as a write.
+    - **The decoded write** per (slice, position): a ridge probe for the RGB of the operand, fitted per run on the clean states at that site, then read on the arriving state and on the edited state. The difference is what the write removed, in color units. The angle says how far a state moved; this says whether what moved was redness (E6).
 
     **The undesigned response**, on red lines under the primary intervention, without a gate. We record the mass outside the color vocabulary; how far the decoded answer sits from the true mix, in unit-cube units; which answer it is (the visible operand, the red operand itself, the true answer, a one-step neighbor of it, or something else); and seed agreement, the fraction of red lines on which at least five of the nine seeds decode the same answer. These are the reference numbers for the fallback experiment.
 
@@ -149,9 +150,15 @@ def _():
     | `lobe` | the M1 lobe, threshold 0.5, in place of the plain projection | does leaving the low-alignment bulk alone keep the removal and cut the collateral? |
     | `ablate` | the weights that read and write e₁ zeroed, then re-normalized | the permanent removal from M1, scored under H5 |
 
-    **The post-hoc tier**, on the un-anchored condition, no gates. For each `lam0` run we fit one direction per slice on its own op1-position states (one line per color, 216 states), then apply it at that slice at every position through the same scorer. Three fits beside e₁ itself: diff-in-means between the colors at or above the red dose and the rest, a ridge probe for redness, and LEACE for redness. This calibrates what a searched-for direction removes from a model that was never asked to place one.
+    **The post-hoc tier**, on the un-anchored condition, no gates. For each `lam0` run we fit one direction per slice on its own op1-position states (one line per color, 216 states), then apply it at that slice at every position through the same scorer. Three fits beside e₁ itself: diff-in-means[^dim] between the colors at or above the red dose and the rest, a ridge probe[^probe] for redness, and LEACE[^leace] for redness. This calibrates what a searched-for direction removes from a model that was never asked to place one.
 
-    **The strength sweep**, on the anchored condition: the primary intervention at γ ∈ {0.25, 0.5, 0.75, 1}, where γ is the fraction of the e₁ component removed. Exploratory (E1).
+    [^dim]: The unit vector pointing from the mean non-red state to the mean red state. It is the simplest fitted direction, and the one most steering work uses.
+
+    [^probe]: A linear readout of redness, fitted by least squares with an ℓ₂ penalty. The direction is its weight vector, normalized. It finds what can be read off the state linearly, which need not be what the blocks use.
+
+    [^leace]: Least-squares concept erasure ([Belrose et al., 2023](https://arxiv.org/abs/2306.03819)). It zeroes the covariance between the states and the label, and is the smallest linear edit, in the covariance-whitened norm, after which no linear probe can recover the concept. The projection is oblique: it removes the covariance-weighted direction along a different one. It usually edits less than the other two, since it removes only the linear trace.
+
+    **The strength sweep**, on the anchored condition: the primary intervention at γ ∈ {0.25, 0.5, 0.75, 1}, where γ is the fraction of the e₁ component that is removed. Exploratory (E1).
     """)
     return
 
@@ -169,8 +176,10 @@ def _():
         Projecting out an axis costs something even where nothing was placed on it. So we report the un-anchored row under the same operator beside this one, to say how much of any deficit comes from the operator rather than from the removal.
         <!-- REVIEW: H2 was also stated as "the behavioral half of the bound claim", with a miss under an intact H4 read as "a finding rather than a failure of the bound". That gave one bullet two verdicts. H2 is now the task gate alone, with one verdict; what a miss means for the bound is interpretation, and lives in the H4 analysis. Verify: the H4 section says how an H2 miss is read, and H2's verdict line in Findings is a plain pass/partial/fail. -->
     - **H3.** Damage grades with dose. We bin every line by dose at edges 0.2, 0.4, 0.6, and 0.8. Seed-mean damage is non-decreasing across the five bins, allowing a dip between adjacent bins of at most 0.02, and damage in the top bin exceeds the bottom bin by at least 0.5. Partial: one dip larger than 0.02, with the ends still ordered. We prescribe no shape between the ends. The D2.1 alignment response was sigmoid in redness rather than linear, so the grading may be a step rather than the smooth $\cos^2$ curve M1 saw.
-    - **H4.** The write on non-red lines stays within the bound the clean geometry sets, at every slice. At a given (slice, position) site, the bound is $\arcsin$ of the seed-mean 99th-percentile clean alignment over non-red lines there, taken from the un-intervened map. The measurement is the seed-mean 99th-percentile write over the same lines under the primary intervention. At the embedding the two are equal by construction, and the pipeline asserts it. At each of the four deeper slices, and at every position, the measured write is at most 1.25 times the bound. Partial: one site over by no more than a factor of two. Contrary: a block re-writes the axis on non-red lines after it was removed upstream. That would be a bypass, and the question of the layer sweep arriving early.
-    - **H5.** Permanent removal is selective, given the anti-subspace term. Under the `ablate` arm, the H1 and H2 gates both hold: red-line accuracy at or below 0.5, and non-red accuracy within 0.02 of clean. Partial: one of the two holds. M1 found that ablation was selective only when repulsion had cleared the axis, and the D2.1 recipe has that term, so this is the transformer form of the headline result from M1.
+    - **H4.** The write on non-red lines stays within the bound the clean geometry sets, at every slice. At a given (slice, position) site, the bound is $\arcsin$ of the 99th-percentile clean alignment over the 1,689 non-red lines there. We take that per run from the un-intervened map, then average over the nine seeds. The measurement is the 99th-percentile write over the same lines under the primary intervention, again per run and then seed-averaged (each quantile is the 17th-largest of 1,689 values within a run; averaging is all the seeds do). At the embedding the two are equal by construction, and the pipeline asserts it. At each of the four deeper slices, and at every position, the measured write is at most 1.25 times the bound. Partial: one site over by no more than a factor of two. Contrary: a block re-writes the axis on non-red lines after it was removed upstream. That would be a bypass, and it would bring the question of the layer sweep forward.
+    - **H5.** Permanent removal is selective, given the anti-subspace term. Under the `ablate` arm, the H1 and H2 gates both hold: accuracy on red lines at or below 0.5, and non-red accuracy within 0.02 of clean. Partial: one of the two holds. M1 found ablation selective only when repulsion had cleared the axis, and the D2.1 recipe has that term, so this is the transformer form of M1's headline result.
+
+        Ablation and the projection at every slice give nearly the same forward pass: the reads see no e₁ either way, so the two differ only in the gain applied to the output of a block before it joins the stream. The seed scatter under `ablate` should therefore match the scatter under the primary intervention. On red lines both scatter because these checkpoints have no fallback term, so the response there is untrained. That is why every gate reads a seed mean and every table carries the seed range.
     """)
     return
 
@@ -183,13 +192,13 @@ def _():
     /// admonition | TODO
     A table of clean and intervened accuracy under the primary intervention, seed mean with the seed range, for the red lines, the non-red lines, and all lines. The calibration row is the un-anchored condition under the same operator. Beside it, the per-line response on red lines: a strip or histogram of the intervened probability on the correct answer, per seed, so that a bimodal response (some lines fully removed, some intact) shows up as such instead of averaging into the gate.
 
-    Expected: red-line accuracy far below 0.5, and the un-anchored row at 1.0. Contrary: red-line accuracy above 0.8, with the color of the operand still read from the off-axis remainder of its embedding. The `leak_r2` figure from ex-2.1.10 says how much redness the off-axis state carries at op1, and that is the first number to look at.
+    Expected: accuracy on red lines far below 0.5, and the un-anchored row at 1.0. Contrary: accuracy on red lines above 0.8, with the color of the operand still read from the off-axis remainder of its embedding. The `leak_r2` figure from ex-2.1.10 says how much redness the off-axis state carries at op1, and that is the first number to look at.
     ///
 
     ## Selectivity (H2)
 
     /// admonition | TODO
-    The non-red row of the H1 table, scored against the 0.02 gate, and the same row for every arm and for the post-hoc tier. One figure carries H2 and H3 together: damage against dose, per line, which is the grading cloud from D2.1 with damage on the y axis. The non-red bulk should sit on the floor and the red lines near the ceiling.
+    The non-red row of the H1 table, scored against the 0.02 gate, and the same row for every arm and for the post-hoc tier. One figure carries H2 and H3 together: damage against dose, one mark per line. All it shares with the D2.1 grading cloud is the x axis: that cloud drew a per-color alignment read from the hidden states, where this one draws the output. The non-red bulk should sit on the floor and the red lines near the ceiling. The companion figure in the H4 section gives the hidden-state view under intervention, the arriving alignment per color.
 
     Expected: non-red accuracy within the gate, the `operands` arm no worse, the `lobe` arm no worse. Contrary: a non-red deficit larger than 0.02, read against H4 as that section describes; or a deficit that the `operands` arm removes, which would place the collateral in the constant component of the syntax positions.
     ///
@@ -203,7 +212,7 @@ def _():
     ## The write bound (H4)
 
     /// admonition | TODO
-    Two maps of the non-red 99th-percentile alignment per (slice, position): the clean bound, and the arriving alignment under intervention, on the shared 0–1 scale the D2.1 figures use. A table beside them gives the ratio at each site. The embedding row is the identity check.
+    Two maps of the non-red 99th-percentile alignment per (slice, position): the clean bound, and the arriving alignment under intervention, on the shared 0–1 scale the D2.1 figures use. A table beside them gives the ratio at each site; the embedding row is the identity check. Below the maps, the D2.1 grading cloud redrawn for the intervened pass: the arriving alignment per color at each slice after the embedding, against redness, beside the clean cloud on the same scale. The maps carry only the 99th percentile of the non-red tail, so it is this cloud that makes the drop on the red colors, and any re-writing on the rest, visible at every slice.
 
     Expected: the deeper rows at or below the bound. The blocks were trained with the anti-subspace term on every state, so a non-red state arriving without its axis component is close to what they saw in training. Contrary: a site where the arriving alignment exceeds the bound by more than a quarter, most likely a syntax position at the second slice, where the smoke test saw one seed do exactly that. If that happens, the `operands` and `lobe` arms say whether it matters to behavior, and E5 says whether the edit grows or shrinks on its way to the logits.
 
@@ -231,7 +240,7 @@ def _():
     /// admonition | TODO
     No gate. The H1–H3 statistics for each fitted direction on the un-anchored condition, beside e₁ on the same condition and beside the anchored primary. The comparison to read: how much red damage a searched-for direction buys per unit of non-red damage, compared with the placed axis.
 
-    Expected: diff-in-means and the probe remove some red-line accuracy at a real non-red cost, LEACE less of both, and none of them come close to the selectivity of the placed axis. A post-hoc direction that matched the anchored result would mean the un-anchored model already keeps redness on a single linear direction at op1, which the probe maps in ex-2.1.12 make plausible at the embedding. The per-slice breakdown says where the two part company.
+    Expected: diff-in-means and the probe remove some accuracy on red lines at a real non-red cost, LEACE less of both, and none of them come close to the selectivity of the placed axis. A post-hoc direction that matched the anchored result would mean the un-anchored model already keeps redness on a single linear direction at op1, which the probe maps in ex-2.1.12 make plausible at the embedding. The per-slice breakdown says where the two part company.
     ///
 
     ## Exploratory analyses
@@ -239,7 +248,7 @@ def _():
     /// admonition | TODO
     Preregistered as exploratory, no gates.
 
-    **E1 — strength.** Red-line and non-red-line accuracy and damage at γ ∈ {0.25, 0.5, 0.75, 1}. The write at strength γ is closed-form in α, so the x axis can be drawn either as γ or as the write on red operands; the question is whether the response is proportional to the write or thresholded.
+    **E1 — strength.** Accuracy and damage on red and non-red lines at γ ∈ {0.25, 0.5, 0.75, 1}. The write at strength γ is closed-form in α, so the x axis can be drawn either as γ or as the write on red operands; the question is whether the response is proportional to the write or thresholded.
 
     **E2 — where the edit acts.** The H1–H3 statistics for the `embedding` and `last` arms against the primary. If `embedding` alone bites, the concept is read off the token and the blocks do not re-derive it. If only the primary intervention, at every slice, bites, the bypass test the D1.3 post left open gets its first transformer data point.
 
@@ -249,6 +258,8 @@ def _():
 
     **E5 — amplification.** Per non-red line, the final-state displacement at the `=` position against the sum of the writes on that line at the prompt positions, over all slices. Both are angles, so their ratio is the gain the blocks apply to the edit on its way to the logits; a ratio above one is amplification. We read it for the primary intervention, and for the `last` arm, where no block sits after the edit. The `last` arm is the no-amplification reference.
     <!-- REVIEW: the displacement is now an angle rather than a distance, so the ratio is dimensionless; and the `last` arm's ratio is not one by construction, since the denominator sums the writes at all four prompt positions while the numerator is the displacement at `=` alone. Verify: under `last`, the numerator equals the write at (slice 4, `=`), so the ratio is one only when the other three prompt writes vanish. -->
+
+    **E6 — what the write decodes to.** Per (slice, position), the decoded write from the Measurements, whose probe is the ex-2.1.12 ridge fit for the RGB of the operand at ℓ₂ = 10⁻². We report per site the seed-mean change in decoded redness, green, and blue, on red lines and on non-red lines. Expected: at the operand positions on red lines the decoded redness falls and the other two channels hold; on non-red lines all three hold. A change in green or blue on non-red lines would say the rotation took something other than red with it, which the angle cannot tell us. A probe read on an edited state is a linear extrapolation off the states it was fitted on, so we read it as a direction of change rather than a calibrated color.
 
     ///
 
