@@ -1,6 +1,6 @@
 ---
 status: open
-tags: [anchoring, metrics, m3]
+tags: [anchoring, metrics, M3]
 opened: 2026-08-26
 ---
 # Does anchoring make a direction "natural" under the amplification score?

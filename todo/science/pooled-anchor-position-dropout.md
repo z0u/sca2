@@ -1,6 +1,6 @@
 ---
 status: open
-tags: [anchoring, ex-2.1.9, m3]
+tags: [anchoring, ex-2.1.9, M3]
 opened: 2026-08-23
 ---
 # Position dropout in the pooled anchor
