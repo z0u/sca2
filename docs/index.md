@@ -173,3 +173,11 @@ These experiments were preparation for the main work: exercising the infrastruct
 - [D2.2 design](./m2/d2.2/design.md)
 
     The plan: the claims D2.2 exists to make, the experiments in order with the engineering that precedes them, the risk each retires, and what is out of scope.
+
+- [2.2.1. Suppressing *red* in the anchored transformer](./m2/ex-2.2.1/report.py)
+
+    Preregistered, not yet run. The first intervention on an anchored transformer: project the anchor axis out of the D2.1 checkpoints and score red lines against non-red lines, for removal, selectivity, grading, and a layer-local write bound. Weight ablation, the M1 lobe, and a post-hoc tier (diff-in-means, probe, LEACE on the un-anchored control) ride along.
+
+    <span class="tags">`word-tokens` `intervention` `suppression` `checkpoints` `eval-contract`</span>
+
+    <!-- mini:figures ./m2/ex-2.2.1/report.py -->
