@@ -32,7 +32,7 @@ jobs:
         # astral-sh stopped publishing `@v8`-style tags — a mutable major is a supply
         # chain the pin can't see, so upstream's contract is now "name the release".
         # The cost is that this one doesn't drift forward on its own; bumping it is a
-        # manual edit here and in pr-preview.yml / publish-docs.yml.
+        # manual edit here and in site.yml.
         uses: astral-sh/setup-uv@v10.0.1
 
       - name: Install dependencies

@@ -26,3 +26,5 @@ The window was first set at 40/120, sized against clone bytes, and cut to 3/10 o
 Worth keeping as a testing lesson rather than just a bug. The original fixture cloned `main` shallow, which felt like it covered the runner, but let the pruner meet `gh-pages` fresh — so it tested a sequence CI never runs. The fixture now performs the deploy action's own `--depth=1` fetch first, and reverting the fix fails five tests with the same line CI printed.
 
 The tag-permalink rider is split out as [`site-permalinks-for-tags`](./site-permalinks-for-tags.md). It needs its own deploy path, and pruning doesn't get in its way: a prune copies the tip's tree verbatim, so a `v/<tag>/` subtree would survive one the same way the preview trees do.
+
+**2026-09-02** — The prune retired. `site.yml` now rebuilds the whole site on every event and deploys it as a single parentless commit, so the branch is always one commit deep. The coin-flip that ruled out `single-commit: true` above was a race against the preview teardown, and there is no teardown any more: a closed PR is absent from the next build.
