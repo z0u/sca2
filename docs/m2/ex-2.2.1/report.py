@@ -30,7 +30,7 @@ def _():
 
     /// tip |
     <!-- tl;dr -->
-    The first intervention on an anchored transformer. We take the D2.1 checkpoints and remove the anchor axis from the residual stream, then score completion accuracy on lines with a red operand and on lines without. Four questions: does suppression bite, is it selective, does it grade with redness, and does the edit on non-red lines stay within the bound the placed geometry sets?
+    The first intervention on an anchored transformer. We take the D2.1 checkpoints and remove the anchor axis from the residual stream, then score completion accuracy on lines with a red operand and on lines without. Five questions: does suppression bite, is it selective, does it grade with redness, does the edit on non-red lines stay within the bound the placed geometry sets, and does zeroing the weights that carry the axis do the same job?
     ///
     """)
     return
@@ -191,7 +191,7 @@ def _():
     /// admonition | TODO
     The non-red row of the H1 table, scored against the 0.02 gate, and the same row for every arm and for the post-hoc tier. One figure carries H2 and H3 together: damage against dose, per line, which is the grading cloud from D2.1 with damage on the y axis. The non-red bulk should sit on the floor and the red lines near the ceiling.
 
-    Expected: non-red accuracy within the gate, the `operands` arm no worse, the `lobe` arm no worse. Contrary: a non-red deficit larger than 0.02 while H4 holds, which is amplification; or a deficit that the `operands` arm removes, which would place the collateral in the constant component of the syntax positions.
+    Expected: non-red accuracy within the gate, the `operands` arm no worse, the `lobe` arm no worse. Contrary: a non-red deficit larger than 0.02, read against H4 as that section describes; or a deficit that the `operands` arm removes, which would place the collateral in the constant component of the syntax positions.
     ///
 
     ## Grading (H3)
