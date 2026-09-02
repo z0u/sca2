@@ -297,8 +297,14 @@ class Lines:
         return {g: float(np.nanmean(v[m])) for g, m in self.groups.items()}
 
 
-def read_lines(tokens: np.ndarray, r1: np.ndarray, r2: np.ndarray, color_redness: np.ndarray, tokenizer) -> Lines:
-    """Group the probe lines by dose, and check the set is the one the design describes."""
+def read_lines(
+    tokens: np.ndarray, r1: np.ndarray, r2: np.ndarray, color_redness: np.ndarray, tokenizer, n_logits: int
+) -> Lines:
+    """Group the probe lines by dose, and check the set is the one the design describes.
+
+    `n_logits` is the padded width of the output: a garbled state can put the argmax on a padding row,
+    which the color map reads as off the color vocabulary like any other non-color token.
+    """
     from sca.colorcube import redness as colorcube_redness
     from sca.data.named_colors import GRIDS, grid_palette
     from sca.vis_grading import GRID_RGB
@@ -312,7 +318,8 @@ def read_lines(tokens: np.ndarray, r1: np.ndarray, r2: np.ndarray, color_redness
     np.testing.assert_array_equal(bins == len(DOSE_EDGES), red)
     color_ids = np.array([tokenizer.stoi[n] for n in grid_palette(GRIDS["v216"])])
     np.testing.assert_allclose(colorcube_redness(GRID_RGB), color_redness, rtol=0, atol=1e-12)
-    tok2color = np.full(tokenizer.vocab_size, -1)
+    assert n_logits >= tokenizer.vocab_size
+    tok2color = np.full(n_logits, -1)
     tok2color[color_ids] = np.arange(n_colors)
     colors = tok2color[tokens]
     assert (colors[:, [0, 2, ANSWER_POS]] >= 0).all() and (colors[:, [1, 3, 5]] < 0).all()
@@ -464,7 +471,7 @@ def score_run(exp: str, cond: str, seed: int, interventions: tuple[Intervention,
         tokens, r1, r2, color_redness = z["probe_tokens"], z["r1"], z["r2"], z["redness"]
     model, config, _ = load_checkpoint(workdir)
     assert isinstance(model, NGPT), "the contract's operators act on nGPT's between-block stream"
-    lines = read_lines(tokens, r1, r2, color_redness, WordTokenizer(config.tokenizer))
+    lines = read_lines(tokens, r1, r2, color_redness, WordTokenizer(config.tokenizer), model.transformer.wte.shape[0])
     rows = np.arange(lines.n)
 
     # --- The clean pass: the scorer's own control, and the reference every intervention is read against.
