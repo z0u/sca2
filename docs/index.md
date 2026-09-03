@@ -176,7 +176,7 @@ These experiments were preparation for the main work: exercising the infrastruct
 
 - [2.2.1. Suppressing *red* in the anchored transformer](./m2/ex-2.2.1/report.py)
 
-    Preregistered, not yet run. The first intervention on an anchored transformer: project the anchor axis out of the D2.1 checkpoints and score red lines against non-red lines, for removal, selectivity, grading, and a layer-local write bound. Weight ablation, the M1 lobe, and a post-hoc tier (diff-in-means, probe, LEACE on the un-anchored control) ride along.
+    Preregistered, not yet run. The first intervention on an anchored transformer: project the anchor axis out of the D2.1 checkpoints and score red lines against non-red lines, for removal, selectivity, grading, and a layer-local write bound. Weight ablation, M1's shaped suppression, and a post-hoc tier (diff-in-means, probe, LEACE on the un-anchored control) ride along.
 
     <span class="tags">`word-tokens` `intervention` `suppression` `checkpoints` `eval-contract`</span>
 

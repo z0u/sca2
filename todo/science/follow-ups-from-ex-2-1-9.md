@@ -1,6 +1,6 @@
 ---
 status: done
-tags: [ex-2.1.9, anchoring, schedules, ex-2.1.7, labels, m3]
+tags: [ex-2.1.9, anchoring, schedules, ex-2.1.7, labels, M3]
 opened: 2026-08-06
 closed: 2026-08-23
 ---

@@ -17,7 +17,7 @@ A chart (loss curve, score sweep, schedule) keeps its axes. Use the stylesheet d
 
 - Draw range bands (`fill_between`) before any summary line, or give the bands a lower `zorder`.
 - Encode an _ordinal_ series (depth, size) as ordered shades of one colormap rather than categorical hues, with stops picked via `light_dark` — a colormap's dark end vanishes on a dark background.
-- For per-token series, draw plateaus joined by S-curve risers with `mini.vis.smooth_step` and its band/area/marks companions (`smooth_step_marks` puts the weight on the plateaus, for a handful of discrete sites). The docstrings cover `ramp`, `breaks`, and `elide`; `sca.vis_probes` is the reference implementation.
+- For per-token series, draw plateaus joined by S-curve risers with `mini.vis.smooth_step` and its band/area/marks companions (`smooth_step_marks` puts the weight on the plateaus, for a handful of discrete sites). The docstrings cover `ramp`, `breaks`, `elide`, and `fillet` (straight risers with circular corners of a given radius in points, for when the slope carries rate information); `sca.vis_probes` is the reference implementation.
 - For all other ordinal series, use a regular line chart.
 - We never use heat maps for sequences. Where the series runs over the tokens of one specific piece of text, use a subline (below) rather than either.
 - Decide `sharex`/`sharey` from the units: panels measuring the same quantity share; panels measuring different quantities get their own scale, however close the numbers. Two panels with nearly-but-not-quite equal limits look like a bug.
@@ -29,6 +29,8 @@ Color the marks with the colors they represent; a legend or colorbar is almost a
 ## Grading clouds
 
 A grading figure shows how a response measured per grid color varies with redness. A mean line or envelope hides too much of the structure, and drawing grid vertices is too visually heavy. Use `sca.vis_grading.GradingCloud` to draw a dithered cloud instead. You can use it to draw single charts, or align it with `smooth_step` overlays.
+
+When each color has a distribution of responses rather than one value (per-line damage grouped by the line's dose-carrying color, say), hand the cloud `quantile_stack(values, color)` with `lerp=True`: each sample then draws its height from its color's quantile function, so the cloud's vertical extent is the spread and a bimodal response shows as two bands. The dither gives a rare line almost no ink, so where single unusual lines matter, overlay them: per x level, a thin rule from the least to the most extreme line, capped by a dot in the line's own color, plus a mean line with a halo (`withStroke`) so it survives crossing a dense cloud. Reference: the damage-by-dose figure in `docs/m2/ex-2.2.1/report.py`.
 
 ## Sublines
 

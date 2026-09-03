@@ -9,7 +9,7 @@ docs/  Experiments and reports (both in Python, as Marimo notebooks) — see doc
 eng/  Decision register — the *why* behind mini's storage/artifacts/publishing/gc internals. eng/README.md indexes it by question; check there before re-deriving infrastructure rationale from scratch.
 references/  Related documents, such as earlier papers and blog posts
 README.md  Details about the project including a list of deliverables, and where this milestone fits within the program of work
-todo/**/*.md  Three sets of backlogs, one file per item: eng (infrastructure and tooling), science (experiment questions and findings), style (text and visuals). `./go todo [...sets]` lists them, `./go todo --priority` is the shortlist to answer "what next", `rg` searches. Check before starting work that might already be tracked there. todo/README.md carries the schema and the conventions for writing an item or leaving a note; it loads on its own when you touch a file in the tree
+todo/**/*.md  Three sets of backlogs, one file per item: eng (infrastructure and tooling), science (experiment questions and findings), style (text and visuals). `./go todo [...sets]` lists them, `./go todo --priority` is the shortlist to answer "what next", `./go todo --grep PATTERN` searches live items (`--full` prints bodies). Check before starting work that might already be tracked there. todo/README.md carries the schema and the conventions for writing an item or leaving a note; it loads on its own when you touch a file in the tree
 ```
 
 ## Collaboration style
@@ -46,8 +46,10 @@ uvx --from yq tomlq '.tool.mini' pyproject.toml
 Prose is soft-wrapped: one line per paragraph (see `style-md`), so a plain `rg` would print whole paragraphs. Use these flags:
 
 ```bash
-rg -l anneal todo/science/           # which files
-rg -no '.{0,55}anneal.{0,55}' todo/  # a {0,N} window around each match
+rg -l anneal docs/                   # which files
+rg -no '.{0,55}anneal.{0,55}' docs/  # a {0,N} window around each match
 ```
+
+For the backlogs, prefer `./go todo --grep anneal`, which skips settled items.
 
 Take care to not leak secrets into the chat transcript. To see which environment variables are set (e.g. "is there an `HF_*` token?"), use `compgen -v HF_` (bash builtin).

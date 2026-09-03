@@ -42,8 +42,9 @@ show_help() {
 		                       (for CI; read-only, never runs a notebook)
 		  strays  [...paths]:  Marimo cells that end on a docstring, which publishes it as
 		                       the cell's output (default: docs/; also runs inside lint)
-		  todo    [...sets] [--tag T] [--status S] [--bundle B] [--priority] [--json] [--check]:
-		                       list backlog items from todo/[set/]
+		  todo    [...sets] [--tag T] [--status S] [--bundle B] [--priority] [--grep RE] [--full]
+		          [--tags] [--json] [--check]:
+		                       list or search backlog items from todo/[set/]
 		  worktrees [--prune] [--dry-run]:
 		                       list agent worktrees; --prune removes the clean, landed ones
 

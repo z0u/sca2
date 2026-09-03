@@ -15,13 +15,19 @@ One file per item keeps two branches from colliding, since adding items adds fil
 ./go todo --status finding      # settled results worth keeping
 ./go todo --bundle cli-devx    # one session's worth
 ./go todo --priority           # the shortlist: what to pick up next
-./go todo --check              # validate frontmatter and priority budget
-./go todo --json               # for scripts
+./go todo --grep anneal        # title or body matches a regex; shows a window around each hit
+./go todo --grep anneal --grep margin --window 30   # conjunctive; N characters of context each side
+./go todo --priority --full    # print whole bodies, wrapped to the terminal
+./go todo --grep anneal --tags # count the tags across the selection, most-used first
+./go todo --check              # validate frontmatter, priority budget, and tag spelling
+./go todo --json               # for scripts; with --grep, each row carries its match windows
 ```
 
 The default view shows `open` and `partial` only. Settled work and findings are still there and `--status` reaches them. Shortlisted items take a `!` beside their status mark and sort to the head of their group, so a plain `./go todo` shows the ranking without being asked.
 
-To search bodies rather than titles, use `rg` over the directory, so each match comes with its own filename. Reminder that paragraphs are one line each and soft-wrapped, so print files or windows rather than whole lines (see `../AGENTS.md`).
+`--tags` is how to learn the vocabulary: it counts the tags over whatever the other filters kept, so `--tag anchoring --tags` is one step of a drill-down. Tags are case-sensitive, and `--check` refuses two spellings of one tag; deliverable and milestone tags are capitalised (`D2.1`, `M3`), the rest lower-case.
+
+`--grep` goes through the same filters as the listing, so it searches live work by default and `--status done --grep` reaches settled items, which a plain `rg` over the directory can't do. Paragraphs are one line each in the files, which is why hits are shown as windows and `--full` wraps.
 
 ## Writing
 
