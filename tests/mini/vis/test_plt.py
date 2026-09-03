@@ -186,14 +186,32 @@ def test_an_oversize_fillet_is_capped_by_the_plateaus(ax):
     assert np.all(np.diff(v[:, 0]) >= -1e-9)  # and neighbouring arcs never cross on a shared plateau
 
 
-def test_without_plateaus_neighbouring_arcs_never_overlap(ax):
-    """At ramp=1 the plateaus have no width, so arcs may only exist where they stay inside their own riser."""
+def test_without_plateaus_every_riser_is_still_filleted(ax):
+    """At ramp=1 the plateaus have no width, so each arc curls to horizontal at the shared sample point instead."""
     y = [0.0, 1.0, 0.5, 0.2]
     patch = smooth_step(ax, range(len(y)), y, ramp=1.0, fillet=6)
     ax.figure.canvas.draw()
     v = verts(patch)
+    assert code_count(patch, MplPath.CURVE4) == 6 * 3  # two arcs on every riser, the steep one included
     assert np.all(np.diff(v[:, 0]) >= -1e-6)  # the path never doubles back on itself
-    assert v[1, 0] >= ax.transData.transform((0, 0))[0] - 1e-6  # the first arc starts at or after its shoulder
+    samples = ax.transData.transform([(i, 0) for i in range(len(y))])[:, 0]
+    for i in range(len(y) - 1):  # each arc ends where its sample sits, so neighbours meet there with level tangents
+        assert v[1 + 8 * i, 0] >= samples[i] - 1e-6 and v[8 + 8 * i, 0] <= samples[i + 1] + 1e-6
+
+
+def test_fillet_radius_shrinks_smoothly_as_the_plateaus_close(ax):
+    """The peak's arcs at ramp=0.95 and ramp=1 are near neighbours, rather than one round and one sharp."""
+    y = [0.0, 1.0, 0.0]
+    v = {}
+    for ramp in (0.95, 1.0):
+        patch = smooth_step(ax, range(len(y)), y, ramp=ramp, fillet=6)
+        ax.figure.canvas.draw()
+        v[ramp] = verts(patch)
+    r_px = 6 * ax.figure.dpi / 72
+    extents = {ramp: w[8] - w[5] for ramp, w in v.items()}  # the peak's arc on the way up, hand-over to crest
+    for extent in extents.values():
+        assert extent[0] > 0.3 * r_px  # it has a visible size
+    assert np.allclose(extents[0.95], extents[1.0], atol=0.1 * r_px)
 
 
 def test_fillet_band_edges_follow_the_same_path_as_the_line(ax):

@@ -2,6 +2,7 @@
 Utilities for working with matplotlib stylesheets, and drawing primitives it lacks.
 """
 
+import math
 from collections.abc import Sequence
 from contextlib import contextmanager
 from pathlib import Path
@@ -63,33 +64,48 @@ def _step_path(x: np.ndarray, y: np.ndarray, half_widths: np.ndarray, breaks: se
     return MplPath(np.array(verts), codes)
 
 
-def _fillet_angle(d: float, dy: float, r: float) -> float:
-    """``tan(ψ/2)`` for a filleted riser of shoulder span *d*, rise *dy* and arc radius *r*.
+def _fillet_run(d: float, r: float, psi: float, rooms: tuple[float, float], inset: float) -> tuple[float, float, float]:
+    """The straight run's span and the two hand-over insets, for arcs of radius *r* turning through *psi*.
 
-    Each arc turns through ψ from its plateau and hands over to the straight run ``r·(1 − cos ψ)`` above (or below) it; the run then covers the remaining rise over its span *d*: ``d·tan ψ + 2r·(1 − cos ψ) = dy``. In ``u = tan(ψ/2)`` that is a quartic with one root in (0, 1], found by bisection. With no span the arcs meet directly, which has a closed form.
+    Each arc leaves its plateau ``r·sin ψ`` before its hand-over, which sits ``e·r`` inside the shoulder line, so it reaches ``r·(sin ψ − e)`` into the plateau. The inset *e* is the design value where the plateau has room for that, and grows just enough to keep the arc within its half of the plateau where it hasn't: with no plateau at all the arc curls to horizontal exactly at the shoulder. The run covers what the insets leave of the span *d*.
     """
-    if d == 0:
-        return 1.0 if dy >= 2 * r else float(np.sqrt(dy / (4 * r - dy)))
-    lo, hi = 0.0, 1.0
+    e = tuple(max(inset, math.sin(psi) - room / r) for room in rooms)
+    return d - (e[0] + e[1]) * r, e[0], e[1]
+
+
+def _fillet_solve(
+    d: float, dy: float, r: float, rooms: tuple[float, float], inset: float
+) -> tuple[float, float, float] | None:
+    """``(ψ, e_a, e_b)`` for a filleted riser of shoulder span *d* and rise *dy* with arcs of radius *r*, or None if they don't fit.
+
+    Each arc turns through ψ from its plateau and hands over to the straight run ``r·(1 − cos ψ)`` above (or below) it; the run then covers the remaining rise over its span: ``run(ψ)·tan ψ + 2r·(1 − cos ψ) = dy``. The rise is increasing in ψ (its derivative is ``run·sec²ψ`` plus a non-negative term), so ψ is found by bisection over the angles whose run is non-negative. Where the run closes before the rise is met the arcs would have to cross, and the radius is too large for this riser; where it closes exactly at ψ = π/2 the run is vertical and covers any rise.
+    """
+    if _fillet_run(d, r, math.pi / 2, rooms, inset)[0] >= 0:
+        psi_max = math.pi / 2
+    else:  # the run closes before the arcs reach vertical: that angle is the steepest the riser can be
+        lo, hi = 0.0, math.pi / 2
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            lo, hi = (mid, hi) if _fillet_run(d, r, mid, rooms, inset)[0] >= 0 else (lo, mid)
+        psi_max = lo
+        if 2 * r * (1 - math.cos(psi_max)) < dy:
+            return None
+
+    def rise(psi: float) -> float:
+        return max(_fillet_run(d, r, psi, rooms, inset)[0], 0.0) * math.tan(psi) + 2 * r * (1 - math.cos(psi))
+
+    lo, hi = 0.0, psi_max
     for _ in range(48):
-        u = (lo + hi) / 2
-        if 2 * d * u * (1 + u * u) + 4 * r * u * u * (1 - u * u) < dy * (1 - u**4):
-            lo = u
-        else:
-            hi = u
-    return (lo + hi) / 2
-
-
-def _fillet_reach(d: float, dy: float, r: float, inset: float) -> float:
-    """How far an arc of radius *r* extends past its shoulder line into the plateau (negative if it stays inside)."""
-    u = _fillet_angle(d - 2 * inset * r, dy, r)
-    return r * (2 * u / (1 + u * u) - inset)  # r·sin ψ back from the hand-over, which sits inset·r inside the line
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if rise(mid) < dy else (lo, mid)
+    psi = (lo + hi) / 2
+    return psi, *_fillet_run(d, r, psi, rooms, inset)[1:]
 
 
 _FILLET_INSET = 2 / 3
-"""How far, as a fraction of the radius, each arc's hand-over to the straight run sits inside the shoulder line.
+"""How far, as a fraction of the radius, each arc's hand-over to the straight run sits inside the shoulder line, given room.
 
-At 1 a vertical riser's arc starts exactly at the shoulder, so the whole transition sits inside the ramp footprint. At 0 the hand-over is on the shoulder line and the arcs reach a full ``r·sin ψ`` into the plateaus. Values between trade a little plateau for a run that keeps more of the footprint; two thirds looked best across steepnesses.
+At 1 a vertical riser's arc starts exactly at the shoulder, so the whole transition sits inside the ramp footprint. At 0 the hand-over is on the shoulder line and the arcs reach a full ``r·sin ψ`` into the plateaus. Values between trade a little plateau for a run that keeps more of the footprint; two thirds looked best across steepnesses. Where the plateau is too short for that reach, the inset grows so the arc stops at the plateau's midpoint (see :func:`_fillet_run`).
 """
 
 
@@ -98,7 +114,7 @@ def _fillet_path(
 ) -> MplPath:
     """Step path whose risers are straight lines eased into the plateaus by circular arcs of *radius*.
 
-    Everything here is in one uniform coordinate system (display space, in practice), which is what makes the arcs circles. *a[i]* and *b[i]* are riser *i*'s shoulders and *ends* the path's extremities. Each arc hands over to the straight run ``inset·r`` inside its shoulder line and leaves its plateau ``r·sin ψ`` before that, so a vertical riser gets a quarter-circle and a shallow one a sliver, with the run spanning the same horizontal distance whatever the steepness (see :func:`_fillet_angle`). The radius is capped per riser so the run keeps a non-negative length and no arc reaches more than half-way across its plateau; where neither leaves room the corners stay sharp.
+    Everything here is in one uniform coordinate system (display space, in practice), which is what makes the arcs circles. *a[i]* and *b[i]* are riser *i*'s shoulders and *ends* the path's extremities. Each arc hands over to the straight run ``inset·r`` inside its shoulder line and leaves its plateau ``r·sin ψ`` before that, so a vertical riser gets a quarter-circle and a shallow one a sliver, with the run spanning the same horizontal distance whatever the steepness (see :func:`_fillet_run`). An arc never reaches past the midpoint of its plateau: where the plateau is too short, the hand-over moves inward instead, and with no plateau at all (``ramp=1``) the arc curls to horizontal at the shared sample point, so a peak is rounded by the two arcs meeting there. The radius is capped per riser where even that leaves the run no room; a riser with no span (``ramp=0``) stays sharp.
     """
     xa, xb, x0, x1 = a[:, 0], b[:, 0], ends[0, 0], ends[1, 0]
     left_room = np.abs(xa - np.concatenate([[x0], xb[:-1]])) / 2  # half the plateau before each riser
@@ -110,22 +126,23 @@ def _fillet_path(
             codes += [MplPath.LINETO, MplPath.MOVETO]
             continue
         sx, sy = np.sign(bx - ax_) or 1.0, np.sign(by - ay) or 1.0
-        d, dy, room = abs(bx - ax_), abs(by - ay), float(min(left_room[i], right_room[i]))
-        r = min(radius, d / (2 * inset)) if inset > 0 else radius  # the run must not turn negative
-        if dy > 0 and _fillet_reach(d, dy, r, inset) > room:  # past the plateau's midpoint: bisect the radius down
-            lo, hi = 0.0, r
+        d, dy, rooms = abs(bx - ax_), abs(by - ay), (float(left_room[i]), float(right_room[i]))
+        r, sol = radius, _fillet_solve(d, dy, radius, rooms, inset) if dy > 0 and radius > 0 else None
+        if dy > 0 and radius > 0 and sol is None:  # too large for this riser: bisect the radius down to what fits
+            lo, hi = 0.0, radius
             for _ in range(30):
                 mid = (lo + hi) / 2
-                lo, hi = (mid, hi) if _fillet_reach(d, dy, mid, inset) <= room else (lo, mid)
+                fit = _fillet_solve(d, dy, mid, rooms, inset)
+                lo, hi, sol = (mid, hi, fit) if fit is not None else (lo, mid, sol)
             r = lo
-        if dy == 0 or r <= 0:
+        if sol is None:
             verts += [(ax_, ay), (bx, by)]
             codes += [MplPath.LINETO, MplPath.LINETO]
             continue
-        psi = 2 * np.arctan(_fillet_angle(d - 2 * inset * r, dy, r))
+        psi, ea, eb = sol
         c, sn = np.cos(psi), np.sin(psi)
         k = 4 / 3 * np.tan(psi / 4) * r  # cubic handle length that best approximates a circular arc of angle ψ
-        px, qx = ax_ + sx * inset * r, bx - sx * inset * r  # where the arcs hand over to the straight run
+        px, qx = ax_ + sx * ea * r, bx - sx * eb * r  # where the arcs hand over to the straight run
         p = (px, ay + sy * r * (1 - c))
         q = (qx, by - sy * r * (1 - c))
         verts += [
@@ -263,7 +280,7 @@ def smooth_step(
 
     *ramp* may be a scalar or one value per riser (length ``len(x) - 1``), so individual transitions flatten or square off independently: 1 is a pure ramp with no rest, 0 is a vertical step. Use a per-riser ramp when neighbours differ in kind — draw the jump across a run of unsampled positions as a smooth slide (→1) while keeping genuine neighbours as discrete plateaus (< 1). Any two adjacent ramps must sum to ≤ 2, which holds for values in [0, 1].
 
-    *fillet* swaps the S for a straight riser whose two corners are rounded by circular arcs of that radius, in points — the corner-radius idea from vector editors. The straight run makes the slope constant across most of the transition, so the rate a reader estimates from the line is the chord slope, where the S peaks at twice it; prefer it when the risers carry rate information the reader will compare, and the S when the transitions are just connective. The arcs are circles on the page, whatever the axes' aspect, because the path is laid out in display space at draw time (so the returned patch carries the identity transform, and a *transform* keyword is applied to the data instead). The straight run spans the footprint set by *ramp* less a fixed fraction of the radius at each end, and the arcs curl out from there, so risers of different steepness read as covering the same horizontal distance and a vertical one stays inside its footprint. A radius too large for its riser or plateau is capped so the run never inverts and neighbouring arcs never meet.
+    *fillet* swaps the S for a straight riser whose two corners are rounded by circular arcs of that radius, in points — the corner-radius idea from vector editors. The straight run makes the slope constant across most of the transition, so the rate a reader estimates from the line is the chord slope, where the S peaks at twice it; prefer it when the risers carry rate information the reader will compare, and the S when the transitions are just connective. The arcs are circles on the page, whatever the axes' aspect, because the path is laid out in display space at draw time (so the returned patch carries the identity transform, and a *transform* keyword is applied to the data instead). The straight run spans the footprint set by *ramp* less a fixed fraction of the radius at each end, and the arcs curl out from there, so risers of different steepness read as covering the same horizontal distance and a vertical one stays inside its footprint. Where a plateau is too short for the arcs to reach into it (at *ramp* = 1 there are none), each arc curls to horizontal at the plateau's midpoint instead, so neighbouring risers meet with level tangents and a peak is rounded; a radius too large for its riser is capped so the run never inverts.
 
     *breaks* holds indices *i* after which to leave a gap instead of a riser: sample *i*'s plateau ends at its right shoulder and sample *i+1*'s begins at its left one, with nothing between. Use it where consecutive samples are the same underlying point (e.g. two ordinal slots that alias onto one character) so the connecting riser would span zero real distance. The gap is the riser's footprint, so it's widest when the plateaus are narrow — pair breaks with *ramp* < 1 to keep a visible flat on each side.
 
