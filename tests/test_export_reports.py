@@ -1,4 +1,7 @@
-"""Tests for the preview-path staleness heuristic — which bundles `--stale-only` re-exports."""
+"""Tests for the preview-path staleness heuristic — which bundles `--stale-only` re-exports.
+
+The heuristic itself is :func:`mini.reports.is_stale`, shared with the Markdown render; these drive it through the bundle path that names ``index.html`` as the output.
+"""
 
 import os
 from pathlib import Path
@@ -37,30 +40,30 @@ def report(tmp_path: Path) -> Path:
 
 
 def test_a_fresh_bundle_is_not_stale(report):
-    assert export_reports.is_stale(report) is False
+    assert export_reports.bundle_is_stale(report) is False
 
 
 def test_a_missing_bundle_is_stale(report):
     (export_reports.export_dir(report) / "index.html").unlink()
-    assert export_reports.is_stale(report) is True
+    assert export_reports.bundle_is_stale(report) is True
 
 
 def test_an_edited_notebook_is_stale(report):
     stamp(report, AFTER)
-    assert export_reports.is_stale(report) is True
+    assert export_reports.bundle_is_stale(report) is True
 
 
 def test_an_edited_input_beside_the_notebook_is_stale(report):
     """The re-run case: new results arrive through `experiment.py` while `report.py` sits still."""
     stamp(report.parent / "experiment.py", AFTER)
-    assert export_reports.is_stale(report) is True
+    assert export_reports.bundle_is_stale(report) is True
 
 
 def test_a_deleted_input_is_stale(report):
     """No surviving file carries the news, so the directory's own mtime is what registers it."""
     (report.parent / "experiment.py").unlink()
     stamp(report.parent, AFTER)
-    assert export_reports.is_stale(report) is True
+    assert export_reports.bundle_is_stale(report) is True
 
 
 def test_recompiled_bytecode_is_not_an_edit(report):
@@ -70,4 +73,4 @@ def test_recompiled_bytecode_is_not_an_edit(report):
     for p in (cache, cache / "experiment.cpython-313.pyc"):
         stamp(p, AFTER)
     stamp(report.parent, BEFORE)  # a rewrite touches the .pyc, not the directory holding it
-    assert export_reports.is_stale(report) is False
+    assert export_reports.bundle_is_stale(report) is False

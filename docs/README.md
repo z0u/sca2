@@ -48,4 +48,6 @@ docs/
 
 Exported bundles live (gitignored) under `.mini/exports/<key>/` locally; their durable home is the bucket. Nothing under `docs/` holds generated HTML.
 
+`./go render <notebook>` writes a third thing, for reading rather than serving: the same document as plain Markdown at `.mini/renders/<key>.md`, figures as `![alt](…)` links to the files on disk. Same key, also gitignored, also regenerated on demand — it skips a report no older than its last render, and `--force` overrides that. See the `report-render` skill.
+
 Heavier or multi-step experiments live in a subdirectory as an importable `experiment.py` (the definition, driven by the `mini` CLI) plus a `report.py` notebook, which reads durable results and publishes. A plain `.py` that isn't a Marimo notebook is ignored by the build, so the definition module never lands on the site. See the `mi-ni` skill for authoring, running, and monitoring.
