@@ -1,6 +1,6 @@
 ---
 status: open
-tags: [anchoring, m3]
+tags: [anchoring, M3]
 opened: 2026-08-23
 ---
 # Early lock-in vs late-forming concepts

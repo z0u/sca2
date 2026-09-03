@@ -149,6 +149,31 @@ def _raster(
     return img
 
 
+def quantile_stack(values: np.ndarray, color: np.ndarray, q: int = 17) -> np.ndarray:
+    """Per-color quantiles of a per-sample response, as a layer stack for :class:`GradingCloud`.
+
+    `values` is one response per sample and `color` that sample's grid index, so
+    each grid color has a distribution of responses rather than one. The result,
+    shape ``(q, n³)``, holds each color's quantile function at `q` evenly spaced
+    levels from 0 to 1, min to max. Handed to :class:`GradingCloud` with ``lerp``,
+    the loft coordinate `u` becomes the probability level and each sample's y is
+    the interpolated quantile function at `u`: an inverse-transform draw from that
+    color's distribution. The trilinear step then blends the quantile functions of
+    neighbouring grid colors, which is the natural interpolation between 1-D
+    distributions and keeps two bands as two bands rather than a mean between them.
+    The cloud's vertical extent is the spread, and a color measured on few samples
+    reads as a band interpolated between them.
+
+    Every grid color needs at least one sample.
+    """
+    out = np.full((q, len(GRID_RGB)), np.nan, np.float32)
+    levels = np.linspace(0, 1, q)
+    for c in np.unique(color):
+        out[:, c] = np.quantile(values[color == c], levels)
+    assert not np.isnan(out).any(), "every grid color needs at least one sample"
+    return out
+
+
 class GradingCloud(AxesImage):
     """A grading cloud that rasters itself at the axes' device size, at draw time.
 

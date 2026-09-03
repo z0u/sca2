@@ -2,7 +2,7 @@
 
 Every method that claims to have located a concept, whether it placed the concept there during training (`sca.anchoring`) or found it afterwards (`diff_in_means`, `probe_direction`, `leace`), produces the same triple: a model, a `Subspace`, and an operator that edits the stream at that subspace. One scorer, `apply`, takes the triple and returns what every downstream statistic reads: the stream as it arrived at each operator, the stream after it, and the logits. Keeping the contract method-agnostic is what lets a post-hoc baseline and an anchored model be scored on identical lines with identical code.
 
-Three operators. `projection` removes a fraction γ of the concept component and re-projects onto the sphere — M1's suppression, with strength as a dose axis. `lobe` is M1's shaped suppression (`asec_intervention_lobes.tex`): a falloff that leaves states below an alignment threshold untouched. `ablate_weights` is the permanent form: it zeroes the subspace in every matrix that reads from or writes to the stream, then re-normalizes the weights, in that order.
+Three operators. `projection` removes a fraction γ of the concept component and re-projects onto the sphere — M1's suppression, with strength as a dose axis. `shaped_suppression` is M1's bounded falloff (`asec_intervention_lobes.tex`): a fraction of the component that leaves states below an alignment threshold untouched. `ablate_weights` is the permanent form: it zeroes the subspace in every matrix that reads from or writes to the stream, then re-normalizes the weights, in that order.
 
 Where operators act: on the between-block stream, the same slices `NGPT.residual_stream` returns and the anchor term reads. The stream is unit-norm, so an operator's output goes back onto the sphere before the next block consumes it, and the re-projection is part of the write: removing a component of size α rescales what survives by `gain(α, γ)`, and the whole edit is a rotation by `write_angle(α, γ)`. Both are closed-form in the pre-intervention alignment, which is what makes a write bound computable from a published alignment map before any intervention runs.
 """
@@ -81,12 +81,12 @@ def falloff(alpha: Array, a: float, b: float, p: float) -> Array:
     return jnp.where(alpha >= a, b * t**p, 0.0)
 
 
-def lobe(sub: Subspace, a: float = 0.0, b: float = 1.0, p: float = 1.0, renorm: bool = True) -> Operator:
+def shaped_suppression(sub: Subspace, a: float = 0.0, b: float = 1.0, p: float = 1.0, renorm: bool = True) -> Operator:
     """Shaped suppression on a rank-1 subspace: remove `h(α) · α` of the direction, α = max(0, coefficient).
 
-    `a = 0, b = 1, p = 0` reduces to `projection` at γ = 1 for positively aligned states, so the lobe's extra freedom is the threshold that leaves the low-alignment bulk alone — the answer to a common component on the axis, if the plain projection turns out to move everything.
+    `a = 0, b = 1, p = 0` reduces to `projection` at γ = 1 for positively aligned states, so its extra freedom is the threshold that leaves the low-alignment bulk alone — the answer to a common component on the axis, if the plain projection turns out to move everything.
     """
-    assert sub.basis.shape[0] == 1, "the lobe is defined on a single direction"
+    assert sub.basis.shape[0] == 1, "the shaped suppression is defined on a single direction"
 
     def op(h: Float[Array, "... C"]) -> Float[Array, "... C"]:
         alpha = jnp.maximum(sub.coefficients(h)[..., 0], 0.0)

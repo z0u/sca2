@@ -1,6 +1,7 @@
 ---
 status: open
 tags: [agents, skills]
+bundle: skills-workflow
 ---
 # Skills/agents reorg
 

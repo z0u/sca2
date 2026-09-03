@@ -190,6 +190,81 @@ def test_sets_are_the_directories_that_exist(backlog):
     assert todo._sets(backlog) == ["eng", "science"]
 
 
+# --- searching -----------------------------------------------------------
+
+
+@pytest.fixture
+def prose(backlog: Path) -> Path:
+    """The backlog plus two items with real bodies, one of them settled, that both mention annealing."""
+    eng = backlog / "eng"
+    write(
+        eng,
+        "live",
+        "---\nstatus: open\n---\n# Anneal the margin\n\nThe margin anneals from 2.5 to 0.03 over the run.\n\nA second paragraph, which also anneals.\n",
+    )
+    write(eng, "settled", "---\nstatus: done\n---\n# Shipped annealing\n\nThe anneal landed.\n")
+    return backlog
+
+
+def test_grep_searches_live_items_only_by_default(prose):
+    """The reason this exists: `rg` over the tree can't tell a done item from an open one."""
+    items, _ = todo.load(prose)
+    assert slugs(todo.select(items, grep=["anneal"])) == ["live"]
+    assert slugs(todo.select(items, grep=["anneal"], status="done")) == ["settled"]
+
+
+def test_grep_is_case_insensitive_and_conjunctive(prose):
+    items, _ = todo.load(prose)
+    assert slugs(todo.select(items, grep=["ANNEAL"])) == ["live"]
+    assert slugs(todo.select(items, grep=["anneal", "margin"])) == ["live"]
+    assert slugs(todo.select(items, grep=["anneal", "nowhere"])) == []
+
+
+def test_grep_matches_the_title_too(prose):
+    items, _ = todo.load(prose)
+    assert slugs(todo.select(items, grep=["^anneal the"])) == ["live"]
+
+
+def test_a_bad_pattern_is_reported_rather_than_raised_raw():
+    with pytest.raises(todo.TodoError, match="bad --grep pattern"):
+        todo.compile_patterns(["["])
+
+
+def test_windows_merge_overlaps_and_mark_truncation():
+    text = "aaaa X bbbb X cccc " * 3 + "tail"
+    patterns = todo.compile_patterns(["X"])
+    snippets, more = todo.windows(text, patterns, window=3, limit=2)
+    assert snippets == ["…aa X bbbb X cc…", "…aa X bbbb X cc…"]
+    assert more == 1
+    snippets, more = todo.windows("X at the start", patterns, window=2)
+    assert snippets == ["X a…"]
+    assert more == 0
+
+
+def test_windows_flatten_paragraph_breaks():
+    (snippet,), _ = todo.windows("one\n\ntwo X three", todo.compile_patterns(["X"]), window=20)
+    assert snippet == "one two X three"
+
+
+def test_render_shows_a_window_under_each_hit(prose):
+    items, _ = todo.load(prose)
+    patterns = todo.compile_patterns(["anneal"])
+    out = todo.render(todo.select(items, grep=["anneal"]), patterns, window=10)
+    assert "live.md" in out
+    assert "…he margin anneals from 2.5…" in out
+    assert "\x1b[" not in out, "no escapes unless writing to a terminal"
+    assert "\x1b[1manneal" in todo.render(todo.select(items, grep=["anneal"]), patterns, tty=True)
+
+
+def test_full_wraps_the_body_to_the_given_width(prose):
+    items, _ = todo.load(prose)
+    out = todo.render(todo.select(items, grep=["anneal"]), full=True, columns=40)
+    body = [line for line in out.splitlines() if line.startswith(todo.INDENT)]
+    assert len(body) >= 3, "the two paragraphs wrap to several lines"
+    assert all(len(line) <= 40 for line in body)
+    assert body[0].strip().startswith("The margin anneals")
+
+
 # --- the shortlist -------------------------------------------------------
 
 
@@ -219,6 +294,37 @@ def test_the_budget_holds_until_it_is_exceeded(backlog):
         item(backlog / "eng", f"urgent-{n}", priority="high")
     items, _ = todo.load(backlog)
     assert len(todo.over_budget(items)) == 1
+
+
+# --- tags ----------------------------------------------------------------
+
+
+def test_tag_counts_follow_the_selection(backlog):
+    """Counts are over what the filters kept, so `--grep x --tags` is the threads that x touches."""
+    items, _ = todo.load(backlog)
+    assert todo.tag_counts(todo.select(items)) == [("cli", 2), ("storage", 1), ("vis", 1)]
+    assert todo.tag_counts(todo.select(items, status="finding")) == [("anchoring", 1)]
+    assert todo.tag_counts([]) == []
+
+
+def test_render_tags_aligns_counts_first(backlog):
+    items, _ = todo.load(backlog)
+    for n in range(10):
+        item(backlog / "eng", f"many-{n}", tags="[cli]")
+    items, _ = todo.load(backlog)
+    out = todo.render_tags(todo.tag_counts(todo.select(items)))
+    assert out.splitlines()[0] == "12  cli"
+    assert " 1  storage" in out.splitlines()
+    assert todo.render_tags([]) == "(nothing matches)"
+
+
+def test_tags_differing_only_by_case_are_a_check_failure(backlog):
+    items, _ = todo.load(backlog)
+    assert todo.tag_collisions(items) == []
+    item(backlog / "eng", "shouty", tags="[CLI]")
+    items, _ = todo.load(backlog)
+    (problem,) = todo.tag_collisions(items)
+    assert "CLI" in str(problem) and "cli" in str(problem) and "shouty.md" in str(problem)
 
 
 # --- rendering -----------------------------------------------------------
@@ -273,3 +379,8 @@ def test_the_committed_backlog_is_well_formed():
 def test_the_committed_backlog_stays_within_its_priority_budget():
     items, _ = todo.load()
     assert not (over := todo.over_budget(items)), "\n".join(str(e) for e in over)
+
+
+def test_the_committed_backlog_has_one_spelling_per_tag():
+    items, _ = todo.load()
+    assert not (clash := todo.tag_collisions(items)), "\n".join(str(e) for e in clash)

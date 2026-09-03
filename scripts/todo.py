@@ -5,7 +5,9 @@
 
 The cost of that split is the overview, which a single file gave away for free. This script buys it back — and prints it rather than writing it down, so there is no committed index to fall out of step with the files. Nothing here caches, and nothing writes.
 
-Front matter is a fixed six-key subset of YAML (scalars and inline lists), parsed here rather than with a library: `pyyaml` is only a transitive dependency, and this tool should keep running before `uv sync` does. `--check` is the gate that keeps the schema honest, and it runs as part of `./go check --lint`.
+The other cost is search. A plain `rg` over the tree can't tell a live item from a settled one, and settled items are close to half the backlog, so `--grep` runs the pattern through the same filters as the listing: the default view searches live work only, and `--status done --grep` reaches the rest. Bodies are one line per paragraph, so a hit is shown as a window of characters around the match rather than the whole line.
+
+Front matter is a fixed six-key subset of YAML (scalars and inline lists), parsed here rather than with a library: `pyyaml` is only a transitive dependency, and this tool should keep running before `uv sync` does. `--check` is the gate that keeps the schema honest — headers, the priority budget, and tags that differ only by case — and it runs as part of `./go check --lint`.
 
     ---
     status: open          # open | partial | done
@@ -24,7 +26,10 @@ Done items stay where they are rather than moving to an archive directory: the d
 
 import argparse
 import json
+import re
+import shutil
 import sys
+import textwrap
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -38,6 +43,9 @@ PRIORITIES = ("high",)  # absence is the default, so one level is all the vocabu
 BUDGET = 6  # live `priority: high` items allowed at once — see `over_budget`
 KEYS = ("status", "tags", "opened", "closed", "bundle", "priority")
 FENCE = "---"
+WINDOW = 60  # characters of context either side of a `--grep` match
+SNIPPETS = 3  # match windows shown per item before "and n more"
+INDENT = "      "  # under the `[ ]  path` column
 
 
 class TodoError(Exception):
@@ -74,6 +82,11 @@ class Item:
             return self.path.relative_to(ROOT).as_posix()
         except ValueError:
             return self.path.as_posix()
+
+    @property
+    def text(self) -> str:
+        """What `--grep` searches: the title and the body, as one document."""
+        return f"{self.title}\n{self.body}"
 
     def as_dict(self) -> dict:
         """The item as JSON-ready data, dates as ISO strings and the body left out."""
@@ -222,6 +235,50 @@ def over_budget(items: list[Item]) -> list[TodoError]:
     ]
 
 
+def compile_patterns(patterns: list[str] | None) -> list[re.Pattern[str]]:
+    """`--grep` arguments as case-insensitive regexes. A bad pattern is a usage error, reported as one."""
+    try:
+        return [re.compile(p, re.IGNORECASE) for p in patterns or ()]
+    except re.error as e:
+        raise TodoError(f"bad --grep pattern {e.pattern!r}: {e.msg}") from None
+
+
+def tag_collisions(items: list[Item]) -> list[TodoError]:
+    """Tags that differ only by case — `m3` beside `M3` — which split one thread across two names.
+
+    The deliverable and milestone tags are capitalised (`D2.1`, `M3`) and the rest are lower-case; whichever spelling is right, two of them is wrong.
+    """
+    seen: dict[str, dict[str, list[Item]]] = {}
+    for it in items:
+        for tag in it.tags:
+            seen.setdefault(tag.casefold(), {}).setdefault(tag, []).append(it)
+    return [
+        TodoError(
+            "tags differing only by case: "
+            + "; ".join(f"{tag} ({', '.join(i.rel for i in its)})" for tag, its in sorted(forms.items()))
+        )
+        for forms in seen.values()
+        if len(forms) > 1
+    ]
+
+
+def tag_counts(items: list[Item]) -> list[tuple[str, int]]:
+    """How many of *items* carry each tag, most-used first and ties alphabetical, so near-duplicates sit together."""
+    counts: dict[str, int] = {}
+    for it in items:
+        for tag in it.tags:
+            counts[tag] = counts.get(tag, 0) + 1
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+
+
+def render_tags(counts: list[tuple[str, int]]) -> str:
+    """Count first, right-aligned, as `uniq -c` prints it — so the columns line up without knowing the longest name."""
+    if not counts:
+        return "(nothing matches)"
+    width = len(str(counts[0][1]))
+    return "\n".join(f"{n:>{width}}  {tag}" for tag, n in counts)
+
+
 def select(
     items: list[Item],
     tags: list[str] | None = None,
@@ -229,12 +286,14 @@ def select(
     bundle: str | None = None,
     sets: list[str] | None = None,
     priority: str | None = None,
+    grep: list[str] | None = None,
 ) -> list[Item]:
     """The items matching every filter given, shortlisted work first, then newest first and undated last.
 
-    Tags are conjunctive — `--tag cli --tag storage` is the intersection, which is the useful direction when narrowing a backlog. Without a status filter, only live work shows: settled items and findings are still there, and `--status` reaches them.
+    Tags are conjunctive — `--tag cli --tag storage` is the intersection, which is the useful direction when narrowing a backlog. So are patterns: `--grep anneal --grep margin` is the items mentioning both. Without a status filter, only live work shows: settled items and findings are still there, and `--status` reaches them.
     """
     wanted = set(tags or ())
+    patterns = compile_patterns(grep)
     keep = [
         it
         for it in items
@@ -243,6 +302,7 @@ def select(
         and (it.bundle == bundle if bundle else True)
         and (it.set in sets if sets else True)
         and (it.priority == priority if priority else True)
+        and all(p.search(it.text) for p in patterns)
     ]
     return sorted(
         keep,
@@ -255,10 +315,54 @@ def select(
     )
 
 
-def render(items: list[Item]) -> str:
+def windows(
+    text: str, patterns: list[re.Pattern[str]], window: int = WINDOW, limit: int = SNIPPETS
+) -> tuple[list[str], int]:
+    """Snippets of *text* around each match, *window* characters either side, and how many more there were.
+
+    Windows that overlap merge into one, so two hits in a sentence read as one snippet rather than the same sentence twice. Paragraph breaks become spaces: a snippet is one line, whatever it spans.
+    """
+    spans: list[list[int]] = []
+    for s, e in sorted(m.span() for p in patterns for m in p.finditer(text)):
+        s, e = max(0, s - window), min(len(text), e + window)
+        if spans and s <= spans[-1][1]:
+            spans[-1][1] = max(spans[-1][1], e)
+        else:
+            spans.append([s, e])
+    out = [
+        ("…" if s > 0 else "") + " ".join(text[s:e].split()) + ("…" if e < len(text) else "") for s, e in spans[:limit]
+    ]
+    return out, max(0, len(spans) - limit)
+
+
+def _emphasize(snippet: str, patterns: list[re.Pattern[str]], tty: bool) -> str:
+    """Bold each match when writing to a terminal; plain text when piped, so nothing has to strip escapes."""
+    if not tty:
+        return snippet
+    for p in patterns:
+        snippet = p.sub(lambda m: f"\x1b[1m{m.group(0)}\x1b[0m", snippet)
+    return snippet
+
+
+def _wrapped(body: str, columns: int) -> list[str]:
+    """An item body as terminal-width lines, indented under the listing. Paragraphs are one line each in the file, so this is where they get their width."""
+    out: list[str] = []
+    for para in body.split("\n"):
+        out.extend(textwrap.wrap(para, width=columns, initial_indent=INDENT, subsequent_indent=INDENT) or [""])
+    return out
+
+
+def render(
+    items: list[Item],
+    patterns: list[re.Pattern[str]] | None = None,
+    window: int = WINDOW,
+    full: bool = False,
+    columns: int | None = None,
+    tty: bool = False,
+) -> str:
     """The items as a grouped, aligned listing — by set, then by bundle, with unbundled last in each.
 
-    A shortlisted item carries a `!` beside its status mark and sorts to the head of its group, so the ranking is visible in the ordinary listing without needing `--priority` to find it.
+    A shortlisted item carries a `!` beside its status mark and sorts to the head of its group, so the ranking is visible in the ordinary listing without needing `--priority` to find it. With *patterns*, each item is followed by a window around each match; with *full*, by its whole body, wrapped to *columns*.
     """
     if not items:
         return "(nothing matches)"
@@ -266,6 +370,7 @@ def render(items: list[Item]) -> str:
     for it in items:
         groups.setdefault((it.set, it.bundle or ""), []).append(it)
     width = max(len(it.rel) for it in items)
+    columns = columns or shutil.get_terminal_size().columns
 
     out = []
     for key in sorted(groups, key=lambda k: (k[0], k[1] == "", k[1])):
@@ -275,7 +380,15 @@ def render(items: list[Item]) -> str:
             tags = f"  [{' '.join(it.tags)}]" if it.tags else ""
             flag = "!" if it.priority == "high" else " "
             out.append(f"  [{MARKS[it.status]}]{flag} {it.rel:<{width}}  {it.title}{tags}")
-    return "\n".join(out).lstrip("\n")
+            if full:
+                out.extend(_wrapped(it.body, columns))
+                out.append("")
+            elif patterns:
+                snippets, more = windows(it.body, patterns, window)
+                out.extend(f"{INDENT}{_emphasize(s, patterns, tty)}" for s in snippets)
+                if more:
+                    out.append(f"{INDENT}… and {more} more")
+    return "\n".join(out).lstrip("\n").rstrip()
 
 
 def main() -> None:
@@ -299,6 +412,26 @@ def main() -> None:
         choices=PRIORITIES,
         help=f"only shortlisted items (at most {BUDGET} are live at a time)",
     )
+    ap.add_argument(
+        "--grep",
+        action="append",
+        metavar="PATTERN",
+        help="only items whose title or body matches this case-insensitive regex (repeatable, conjunctive); shows a window around each match",
+    )
+    ap.add_argument(
+        "--window",
+        type=int,
+        default=WINDOW,
+        metavar="N",
+        help=f"characters of context either side of a --grep match (default {WINDOW})",
+    )
+    ap.add_argument("--full", action="store_true", help="print each item's body, wrapped to the terminal width")
+    ap.add_argument(
+        "--tags",
+        action="store_true",
+        dest="count_tags",
+        help="count the tags across the selection instead of listing it",
+    )
     ap.add_argument("--json", action="store_true", help="emit the selection as JSON")
     ap.add_argument("--check", action="store_true", help="validate every item's header and exit non-zero on a problem")
     args = ap.parse_args()
@@ -308,7 +441,7 @@ def main() -> None:
 
     items, errors = load()
     if args.check:
-        problems = [*errors, *over_budget(items)]
+        problems = [*errors, *over_budget(items), *tag_collisions(items)]
         for e in problems:
             print(e, file=sys.stderr)
         ok = f"✅ {len(items)} todo items parse, {len(shortlist(items))}/{BUDGET} priority slots used"
@@ -320,10 +453,30 @@ def main() -> None:
     if errors:
         print(f"warning: skipped {len(errors)} malformed item(s); run --check to see them", file=sys.stderr)
 
-    chosen = select(
-        items, tags=args.tags, status=args.status, bundle=args.bundle, sets=args.sets, priority=args.priority
-    )
-    print(json.dumps([it.as_dict() for it in chosen], indent=1) if args.json else render(chosen))
+    try:
+        chosen = select(
+            items,
+            tags=args.tags,
+            status=args.status,
+            bundle=args.bundle,
+            sets=args.sets,
+            priority=args.priority,
+            grep=args.grep,
+        )
+    except TodoError as e:
+        ap.error(str(e))
+    patterns = compile_patterns(args.grep)
+    if args.count_tags:
+        counts = tag_counts(chosen)
+        print(json.dumps(dict(counts), indent=1) if args.json else render_tags(counts))
+    elif args.json:
+        rows = [
+            it.as_dict() | ({"matches": windows(it.body, patterns, args.window)[0]} if patterns else {})
+            for it in chosen
+        ]
+        print(json.dumps(rows, indent=1))
+    else:
+        print(render(chosen, patterns, window=args.window, full=args.full, tty=sys.stdout.isatty()))
 
 
 if __name__ == "__main__":

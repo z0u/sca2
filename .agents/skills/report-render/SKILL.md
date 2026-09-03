@@ -1,6 +1,6 @@
 ---
 name: report-render
-description: View a report's figures. Read matplotlib or inline/JS figures and the full page in a headless browser (offline, by bundling Marimo assets).
+description: View a report's figures, or export its text to Markdown. Read matplotlib or inline/JS figures and the full page in a headless browser (offline, by bundling Marimo assets).
 ---
 
 # Rendering a report to check it
@@ -14,6 +14,8 @@ Most report figures are matplotlib, and the `report_bundle` publisher (`mini.rep
 ls .mini/exports/m2/ex-2.1.1/_assets/*.png           # then Read the ones you want
 ```
 
+The preview also assembles `_site/`, which has a copy of each bundle's `_assets/`, so `_site/<key>/_assets/*.png` is the same file. The two differ only in `report.css` (see the gotchas).
+
 This covers the bulk of every current report. Inline-HTML figures (e.g. `subline` sparklines) that the report wraps in `externalize_html(html, name=…)` (`mini.reports`) are likewise on disk as `_assets/<name>.html`, plain markup you can `Read` (or rasterize, below) without touching the page. Reach for the browser in two cases. The first is inline/JS output without such a sidecar: it lives only inside marimo's client-hydrated data island (JSON, unicode-escaped `<svg…`), so there's no file to read and the page is blank until the runtime renders it. The second is when you need the whole page (prose + figures together, layout, the show-code toggle).
 
 A standalone `.svg` file (no marimo runtime involved) rasterizes to a readable PNG without a browser via cairosvg — `libcairo`/`librsvg` are present in this env:
@@ -21,6 +23,16 @@ A standalone `.svg` file (no marimo runtime involved) rasterizes to a readable P
 ```bash
 uv run --with cairosvg python -c "import cairosvg; cairosvg.svg2png(url='x.svg', write_to='x.png', scale=2)"
 ```
+
+## Text path: read the report as Markdown
+
+To *read* a report — prose, headings, tables and figure alt text, assembled in order — export it to Markdown. No browser, no bundle:
+
+```bash
+uv run scripts/export_report_md.py docs/m2/ex-2.1.1/report.py .mini/renders/m2/ex-2.1.1.md
+```
+
+It re-runs the notebook (allow a few minutes), injects each cell's rendered output into the Markdown, and fails loudly if a cell's output went missing rather than dropping the cell. Figures arrive as `![alt](…)` with the report's real alt text; the links point into the notebook's live `public/.mini/` and resolve only from there, but for a text pass the alt text is the point. This is what the `report-structure` agent reads. The bundle's `index.html` holds the same document at about ten times the size, nearly all of it marimo's data island, so reach for it only when you need the page as a page.
 
 ## Browser path: for inline/JS figures, full page, or DOM assertions
 

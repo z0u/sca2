@@ -7,7 +7,7 @@ This replaces the ``marimo-md-export`` console script. It reuses that package's 
 
 **Dropped cells were unreported.** ``inject_outputs`` cannot tell a cell that genuinely produces no output from one whose hash failed to match, so it says nothing either way. Checking the source text instead is decisive, and catches the whole class rather than this one instance: the HTML export lists a hash for every cell in the notebook, so a code fence in the Markdown whose hash is absent from that list is a fence some transform has rewritten. :func:`check_sources_agree` raises on that rather than letting the gap reach the published document.
 
-Usage: ``uv run scripts/export_report_md.py <notebook.py> <out.md>``. Images are externalized beside the output; see ``clean_marimo_md.py`` for what the cleanup pass does and for the options this script forwards to it.
+Usage: ``uv run scripts/export_report_md.py <notebook.py> <out.md>``. Inlined images are externalized beside the output; a report that publishes through ``mini.reports.report_bundle`` has already written its figures to its ``public/.mini/`` dir, and the links point there. See ``clean_marimo_md.py`` for what the cleanup pass does and for the options this script forwards to it.
 """
 
 from __future__ import annotations

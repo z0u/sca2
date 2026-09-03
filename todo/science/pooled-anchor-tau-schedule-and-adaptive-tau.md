@@ -1,6 +1,6 @@
 ---
 status: open
-tags: [anchoring, schedules, ex-2.1.9, m3]
+tags: [anchoring, schedules, ex-2.1.9, M3]
 opened: 2026-08-23
 ---
 # Let τ move during training in the pooled anchor
