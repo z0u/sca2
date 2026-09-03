@@ -247,6 +247,8 @@ def _():
     | `lobe` | the M1 lobe, threshold 0.5, in place of the plain projection | does leaving the low-alignment bulk alone keep the removal and cut the collateral? |
     | `ablate` | the weights that read and write e₁ zeroed, then re-normalized | the permanent removal from M1, scored under H5 |
 
+    ¿How exactly is the `lobe` configured? Is the "threshold" an angle or cos, or a reduced projection amount? It would be nice to have a figure here illustrating it. See scratch-lobe-figures.py and https://z0u.github.io/ex-preppy/m2-control/large-assets/ex-2.1-suppression.png
+
     **The post-hoc tier**, on the un-anchored condition, no gates. For each `lam0` run we fit one direction per slice and site on that run's own clean states, then apply it at that slice, at the positions it was fitted on, through the same scorer. Two sites: the operand positions, and the `=` position the answer is decoded from. The label is the redness a state can have seen under causal attention: the first operand's at op1, the higher of the two after that, which at `=` is the line's dose. Three fits beside e₁ itself: diff-in-means[^dim] between the states labelled at or above the red dose and the rest, a ridge probe[^probe] for that redness, and LEACE[^leace] for it. The fit and the edit share a distribution because an oblique eraser needs them to: LEACE reads its coefficient along a covariance-whitened direction, so a state far from the fitted cloud can draw an edit of any size. Beside each fitted direction sits e₁ at the same footprint, so the calibration is like for like. The operand site pairs with the `operands` arm; the decode site is the sharpest lever a post-hoc method can be given, an edit where the answer is read off. This calibrates what a searched-for direction removes from a model that was never asked to place one.
 
     [^dim]: The unit vector pointing from the mean non-red state to the mean red state. It is the simplest fitted direction, and the one most steering work uses.
@@ -394,6 +396,7 @@ def _(clean, lines, per_line, stat):
     _p = per_line("primary", "p_ans")[:, lines.red]  # (seeds, red lines)
     _red = stat("primary", "acc", "red")
 
+    # I'm not sure if having each seed as a separate sub-figure adds much? Maybe this should be a single stacked bar chart :thinking: Happy for you to push back if you disagree.
     @themed(
         name="red-response",
         alt_text="""
@@ -461,6 +464,9 @@ def _(clean, dose, floor, lines, per_line, stat):
         title: np.array([i[f(y[i])] for i in _at for f in (np.argmin, np.argmax)]) for title, y in _dmg.items()
     }
 
+    # Caption needs to be cut down a lot. Key points only. What would you say out loud, if you were presenting this on a slide?
+    # Full report needs reduction/removal of "carry"
+    # "Dose" always trips me up. It's max(redness_op1, redness_op2), right? Can we use a term that conveys that?
     @themed(
         name="damage-by-dose",
         alt_text="""
@@ -568,10 +574,10 @@ def draw_grading_grid(ax: plt.Axes, a: np.ndarray, *, row_names: bool, scale: bo
     for si in range(len(SLICE_NAMES)):
         shift = Affine2D().translate(0, si) + ax.transData
         reds = a[si, I_RED, :]
-        smooth_step_area(ax, xs, reds, ramp=1 - sw, color=grey_c, transform=shift, zorder=0)
+        smooth_step_area(ax, xs, reds, ramp=1 - sw, color=grey_c, transform=shift, zorder=0, fillet=3)
         for pi in range(len(POS_NAMES)):
             GradingCloud(ax, a[si, :, pi], span=(pi - sw / 2, pi + sw / 2), transform=shift, clip_on=False)
-        smooth_step_marks(ax, xs, reds, ramp=1 - sw, color=red_c, lw=1.3, transform=shift, clip_on=False)
+        smooth_step_marks(ax, xs, reds, ramp=1 - sw, color=red_c, lw=1.3, transform=shift, clip_on=False, fillet=3)
         ax.axhline(si, color=light_dark("#aaaa", "#333a"), lw=0.5)
     ax.set_xlim(-0.5, len(POS_NAMES) - 0.5)
     ax.set_ylim(0, len(SLICE_NAMES))
@@ -643,8 +649,8 @@ def _(
         ):
             for s, name in enumerate(SLICE_NAMES):
                 ink = cmap(s / (len(SLICE_NAMES) - 1))
-                smooth_step(ax, x, m[s], ramp=0.5, color=ink, lw=1.2)
-                smooth_step_marks(ax, x, m[s], ramp=0.5, color=ink, lw=1.2)
+                smooth_step(ax, x, m[s], breaks=False, ramp=0.5, color=ink, lw=0.7, fillet=3)
+                smooth_step(ax, x, m[s], breaks=True, ramp=0.5, color=ink, lw=1.4)
                 ax.plot([], [], color=ink, lw=1.2, label=name)  # one legend entry per slice
             ax.set_title(title, fontsize=8)
             ax.set_xticks(x, POS_NAMES)
@@ -691,6 +697,7 @@ def _(
     The write over the bound, per site: the seed-mean {ex.WRITE_QUANTILE}th-percentile non-red write under the primary intervention divided by the seed-mean bound. The embedding row is the identity check. Bold marks a ratio at or below the H4 tolerance of {ex.WRITE_TOLERANCE:g}.
     """
 
+    # Landmarks (headings) need to be in plain Markdown cells (no interpolation)
     mo.md(rf"""
     ## The write bound (H4)
 

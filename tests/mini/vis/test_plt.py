@@ -10,7 +10,7 @@ import pytest
 from matplotlib.colors import to_hex
 from matplotlib.path import Path as MplPath
 
-from mini.vis.plt import smooth_step, smooth_step_area, smooth_step_band
+from mini.vis.plt import _FILLET_INSET, smooth_step, smooth_step_area, smooth_step_band
 
 Y = [0.0, 1.0, 0.5, 0.5]
 
@@ -112,3 +112,104 @@ def test_band_edges_follow_the_same_plateaus_as_the_line(ax):
     band = smooth_step_band(ax, range(len(Y)), 0.0, Y, ramp=0.5)
     upper = verts(band)[: len(verts(line))]
     assert np.allclose(upper, verts(line))
+
+
+def bezier(p0, p1, p2, p3, n=50) -> np.ndarray:
+    """Points along one cubic segment."""
+    u = np.linspace(0, 1, n)[:, None]
+    return (1 - u) ** 3 * p0 + 3 * (1 - u) ** 2 * u * p1 + 3 * (1 - u) * u**2 * p2 + u**3 * p3
+
+
+def test_fillet_risers_are_a_straight_run_between_two_arcs(ax):
+    patch = smooth_step(ax, range(len(Y)), Y, ramp=0.5, fillet=4)
+    assert code_count(patch, MplPath.CURVE4) == 6 * 2  # two cubic arcs per riser; the flat riser needs none
+    assert subpaths(patch) == 1
+
+
+def test_fillet_arcs_are_circles_on_the_page_whatever_the_aspect(ax):
+    """The arc is laid out in display space, so its radius in pixels matches the one asked for in points."""
+    ax.set_xlim(-0.5, 1.5)
+    ax.set_ylim(0, 10)  # a strongly anisotropic data space
+    radius_pt = 6
+    patch = smooth_step(ax, [0, 1], [1.0, 9.0], ramp=0.5, fillet=radius_pt)
+    ax.figure.canvas.draw()
+    v = verts(patch)  # display coords: end, shoulder, c1, c2, p, q, c1, c2, shoulder, end
+    r_px = radius_pt * ax.figure.dpi / 72
+    lower_centre = v[1] + [0, r_px]  # the arc leaves the lower plateau at the shoulder, curving upward
+    arc = bezier(*v[1:5])
+    assert np.allclose(np.hypot(*(arc - lower_centre).T), r_px, rtol=2e-3)
+    upper_centre = v[8] - [0, r_px]
+    assert np.allclose(np.hypot(*(bezier(*v[5:9]) - upper_centre).T), r_px, rtol=2e-3)
+
+
+def test_fillet_run_is_tangent_to_both_arcs(ax):
+    patch = smooth_step(ax, [0, 1], [0.0, 1.0], ramp=0.6, fillet=5)
+    ax.figure.canvas.draw()
+    v = verts(patch)
+    run = v[5] - v[4]
+    for handle in (v[4] - v[3], v[6] - v[5]):  # the handles either side of the run point along it
+        cross = run[0] * handle[1] - run[1] * handle[0]
+        assert np.isclose(cross, 0, atol=1e-6 * np.linalg.norm(run) * np.linalg.norm(handle))
+        assert np.dot(run, handle) > 0
+
+
+def test_fillet_run_sits_a_fixed_inset_inside_the_shoulders_whatever_the_slope(ax):
+    """Both hand-overs sit the same distance inside the shoulder lines, so every riser's run covers the same width."""
+    inset_px = _FILLET_INSET * 6 * ax.figure.dpi / 72
+    for rise in (0.05, 0.4, 1.0):
+        patch = smooth_step(ax, [0, 1], [0.0, rise], ramp=0.5, fillet=6)
+        ax.figure.canvas.draw()
+        v = verts(patch)
+        shoulders = ax.transData.transform([(0.25, 0), (0.75, 0)])[:, 0]
+        assert np.allclose(v[[4, 5], 0], shoulders + [inset_px, -inset_px])
+
+
+def test_a_vertical_riser_keeps_its_arcs_inside_the_footprint(ax):
+    ax.set_xlim(-0.5, 1.5)
+    ax.set_ylim(0, 1)  # a tall, narrow step: near-vertical on the page
+    patch = smooth_step(ax, [0, 1], [0.0, 1.0], ramp=0.1, fillet=2)
+    ax.figure.canvas.draw()
+    v = verts(patch)
+    shoulders = ax.transData.transform([(0.45, 0), (0.55, 0)])[:, 0]
+    spill = (1 - _FILLET_INSET) * 2 * ax.figure.dpi / 72  # a quarter-circle pokes out by the un-inset part of r
+    assert v[1, 0] >= shoulders[0] - spill - 0.5 and v[8, 0] <= shoulders[1] + spill + 0.5  # within half a pixel
+
+
+def test_an_oversize_fillet_is_capped_by_the_plateaus(ax):
+    y = [0.0, 1.0, 0.5, 0.2]
+    patch = smooth_step(ax, range(len(y)), y, ramp=0.5, fillet=1000)
+    ax.figure.canvas.draw()
+    v = verts(patch)
+    for i in range(len(y) - 1):  # each riser's vertices climb (or fall) monotonically
+        ys = v[1 + 8 * i : 9 + 8 * i, 1]
+        assert np.all(np.diff(ys) * np.sign(y[i + 1] - y[i]) >= -1e-9)
+    assert np.all(np.diff(v[:, 0]) >= -1e-9)  # and neighbouring arcs never cross on a shared plateau
+
+
+def test_without_plateaus_neighbouring_arcs_never_overlap(ax):
+    """At ramp=1 the plateaus have no width, so arcs may only exist where they stay inside their own riser."""
+    y = [0.0, 1.0, 0.5, 0.2]
+    patch = smooth_step(ax, range(len(y)), y, ramp=1.0, fillet=6)
+    ax.figure.canvas.draw()
+    v = verts(patch)
+    assert np.all(np.diff(v[:, 0]) >= -1e-6)  # the path never doubles back on itself
+    assert v[1, 0] >= ax.transData.transform((0, 0))[0] - 1e-6  # the first arc starts at or after its shoulder
+
+
+def test_fillet_band_edges_follow_the_same_path_as_the_line(ax):
+    """The band walks its lower edge backwards, which must re-describe the arcs too."""
+    line = smooth_step(ax, range(len(Y)), Y, ramp=0.5, fillet=3)
+    band = smooth_step_band(ax, range(len(Y)), 0.0, Y, ramp=0.5, fillet=3)
+    floor = smooth_step(ax, range(len(Y)), [0.0] * len(Y), ramp=0.5, fillet=3)
+    ax.figure.canvas.draw()
+    n = len(verts(line))
+    assert np.allclose(verts(band)[:n], verts(line))
+    assert code_count(band, MplPath.CLOSEPOLY) == 1
+    assert np.allclose(verts(band)[n:-1][::-1], verts(floor))
+
+
+def test_fillet_patch_still_feeds_autoscale(ax):
+    smooth_step(ax, range(len(Y)), Y, fillet=3)
+    ax.autoscale_view()
+    assert ax.get_xlim()[0] <= -0.5 and ax.get_xlim()[1] >= len(Y) - 0.5
+    assert ax.get_ylim()[0] <= min(Y) and ax.get_ylim()[1] >= max(Y)

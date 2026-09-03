@@ -17,7 +17,7 @@ A chart (loss curve, score sweep, schedule) keeps its axes. Use the stylesheet d
 
 - Draw range bands (`fill_between`) before any summary line, or give the bands a lower `zorder`.
 - Encode an _ordinal_ series (depth, size) as ordered shades of one colormap rather than categorical hues, with stops picked via `light_dark` — a colormap's dark end vanishes on a dark background.
-- For per-token series, draw plateaus joined by S-curve risers with `mini.vis.smooth_step` and its band/area/marks companions (`smooth_step_marks` puts the weight on the plateaus, for a handful of discrete sites). The docstrings cover `ramp`, `breaks`, and `elide`; `sca.vis_probes` is the reference implementation.
+- For per-token series, draw plateaus joined by S-curve risers with `mini.vis.smooth_step` and its band/area/marks companions (`smooth_step_marks` puts the weight on the plateaus, for a handful of discrete sites). The docstrings cover `ramp`, `breaks`, `elide`, and `fillet` (straight risers with circular corners of a given radius in points, for when the slope carries rate information); `sca.vis_probes` is the reference implementation.
 - For all other ordinal series, use a regular line chart.
 - We never use heat maps for sequences. Where the series runs over the tokens of one specific piece of text, use a subline (below) rather than either.
 - Decide `sharex`/`sharey` from the units: panels measuring the same quantity share; panels measuring different quantities get their own scale, however close the numbers. Two panels with nearly-but-not-quite equal limits look like a bug.

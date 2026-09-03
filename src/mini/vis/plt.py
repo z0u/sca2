@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Mapping
 
 import matplotlib as mpl
+import matplotlib.transforms as mtransforms
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
@@ -62,6 +63,127 @@ def _step_path(x: np.ndarray, y: np.ndarray, half_widths: np.ndarray, breaks: se
     return MplPath(np.array(verts), codes)
 
 
+def _fillet_angle(d: float, dy: float, r: float) -> float:
+    """``tan(ψ/2)`` for a filleted riser of shoulder span *d*, rise *dy* and arc radius *r*.
+
+    Each arc turns through ψ from its plateau and hands over to the straight run ``r·(1 − cos ψ)`` above (or below) it; the run then covers the remaining rise over its span *d*: ``d·tan ψ + 2r·(1 − cos ψ) = dy``. In ``u = tan(ψ/2)`` that is a quartic with one root in (0, 1], found by bisection. With no span the arcs meet directly, which has a closed form.
+    """
+    if d == 0:
+        return 1.0 if dy >= 2 * r else float(np.sqrt(dy / (4 * r - dy)))
+    lo, hi = 0.0, 1.0
+    for _ in range(48):
+        u = (lo + hi) / 2
+        if 2 * d * u * (1 + u * u) + 4 * r * u * u * (1 - u * u) < dy * (1 - u**4):
+            lo = u
+        else:
+            hi = u
+    return (lo + hi) / 2
+
+
+def _fillet_reach(d: float, dy: float, r: float, inset: float) -> float:
+    """How far an arc of radius *r* extends past its shoulder line into the plateau (negative if it stays inside)."""
+    u = _fillet_angle(d - 2 * inset * r, dy, r)
+    return r * (2 * u / (1 + u * u) - inset)  # r·sin ψ back from the hand-over, which sits inset·r inside the line
+
+
+_FILLET_INSET = 2 / 3
+"""How far, as a fraction of the radius, each arc's hand-over to the straight run sits inside the shoulder line.
+
+At 1 a vertical riser's arc starts exactly at the shoulder, so the whole transition sits inside the ramp footprint. At 0 the hand-over is on the shoulder line and the arcs reach a full ``r·sin ψ`` into the plateaus. Values between trade a little plateau for a run that keeps more of the footprint; two thirds looked best across steepnesses.
+"""
+
+
+def _fillet_path(
+    a: np.ndarray, b: np.ndarray, ends: np.ndarray, breaks: set[int], radius: float, inset: float = _FILLET_INSET
+) -> MplPath:
+    """Step path whose risers are straight lines eased into the plateaus by circular arcs of *radius*.
+
+    Everything here is in one uniform coordinate system (display space, in practice), which is what makes the arcs circles. *a[i]* and *b[i]* are riser *i*'s shoulders and *ends* the path's extremities. Each arc hands over to the straight run ``inset·r`` inside its shoulder line and leaves its plateau ``r·sin ψ`` before that, so a vertical riser gets a quarter-circle and a shallow one a sliver, with the run spanning the same horizontal distance whatever the steepness (see :func:`_fillet_angle`). The radius is capped per riser so the run keeps a non-negative length and no arc reaches more than half-way across its plateau; where neither leaves room the corners stay sharp.
+    """
+    xa, xb, x0, x1 = a[:, 0], b[:, 0], ends[0, 0], ends[1, 0]
+    left_room = np.abs(xa - np.concatenate([[x0], xb[:-1]])) / 2  # half the plateau before each riser
+    right_room = np.abs(np.concatenate([xa[1:], [x1]]) - xb) / 2  # and after it
+    verts, codes = [ends[0]], [MplPath.MOVETO]
+    for i, ((ax_, ay), (bx, by)) in enumerate(zip(a, b, strict=True)):
+        if i in breaks:
+            verts += [(ax_, ay), (bx, by)]
+            codes += [MplPath.LINETO, MplPath.MOVETO]
+            continue
+        sx, sy = np.sign(bx - ax_) or 1.0, np.sign(by - ay) or 1.0
+        d, dy, room = abs(bx - ax_), abs(by - ay), float(min(left_room[i], right_room[i]))
+        r = min(radius, d / (2 * inset)) if inset > 0 else radius  # the run must not turn negative
+        if dy > 0 and _fillet_reach(d, dy, r, inset) > room:  # past the plateau's midpoint: bisect the radius down
+            lo, hi = 0.0, r
+            for _ in range(30):
+                mid = (lo + hi) / 2
+                lo, hi = (mid, hi) if _fillet_reach(d, dy, mid, inset) <= room else (lo, mid)
+            r = lo
+        if dy == 0 or r <= 0:
+            verts += [(ax_, ay), (bx, by)]
+            codes += [MplPath.LINETO, MplPath.LINETO]
+            continue
+        psi = 2 * np.arctan(_fillet_angle(d - 2 * inset * r, dy, r))
+        c, sn = np.cos(psi), np.sin(psi)
+        k = 4 / 3 * np.tan(psi / 4) * r  # cubic handle length that best approximates a circular arc of angle ψ
+        px, qx = ax_ + sx * inset * r, bx - sx * inset * r  # where the arcs hand over to the straight run
+        p = (px, ay + sy * r * (1 - c))
+        q = (qx, by - sy * r * (1 - c))
+        verts += [
+            (px - sx * r * sn, ay),
+            (px - sx * (r * sn - k), ay),
+            (p[0] - sx * k * c, p[1] - sy * k * sn),
+            p,
+            q,
+            (q[0] + sx * k * c, q[1] + sy * k * sn),
+            (qx + sx * (r * sn - k), by),
+            (qx + sx * r * sn, by),
+        ]
+        codes += [MplPath.LINETO, *[MplPath.CURVE4] * 3, MplPath.LINETO, *[MplPath.CURVE4] * 3]
+    verts.append(ends[1])
+    codes.append(MplPath.LINETO)
+    return MplPath(np.array(verts), codes)
+
+
+class _FilletStepPatch(PathPatch):
+    """A filleted step line or band, laid out in display space each time it is drawn.
+
+    A circle in data coordinates is an ellipse on the page unless the axes happen to be isotropic, so the fillets are built from the data transform's *current* output — after layout, resizing, and any change of limits — and the patch itself carries the identity transform. *ys* holds one series for a line, or (upper, lower) for a band.
+    """
+
+    def __init__(self, ax: "Axes", x, ys, half_widths, breaks, radius_pt, transform, **kwargs):
+        super().__init__(MplPath([(0.0, 0.0)]), **kwargs)
+        self._layout = (ax, np.asarray(x, float), [np.asarray(y, float) for y in ys], half_widths, breaks, radius_pt)
+        self._data_transform = transform
+        self.set_transform(mtransforms.IdentityTransform())
+
+    def get_path(self) -> MplPath:
+        ax, x, ys, hs, breaks, radius_pt = self._layout
+        dx, m = (x[-1] - x[0]) / (len(x) - 1), (x[:-1] + x[1:]) / 2
+        to_display = self._data_transform.transform
+        paths = []
+        for y in ys:
+            a = to_display(np.column_stack([m - hs, y[:-1]]))
+            b = to_display(np.column_stack([m + hs, y[1:]]))
+            ends = to_display([(x[0] - dx / 2, y[0]), (x[-1] + dx / 2, y[-1])])
+            paths.append(_fillet_path(a, b, ends, breaks, radius_pt * ax.figure.dpi / 72))
+        return paths[0] if len(paths) == 1 else _band_path(*paths)
+
+
+def _add_step_patch(ax: "Axes", x, ys, hs, breaks, fillet, style: dict) -> PathPatch:
+    """Add a step line (one series) or band (upper, lower) to *ax*, filleted or S-curved."""
+    if fillet is None:
+        paths = [_step_path(x, y, hs, breaks) for y in ys]
+        patch = PathPatch(paths[0] if len(paths) == 1 else _band_path(*paths), **style)
+    else:
+        transform = style.pop("transform", ax.transData)
+        patch = _FilletStepPatch(ax, x, ys, hs, breaks, fillet, transform, **style)
+        # The identity transform hides the patch from autoscaling; report the data extent ourselves.
+        dx = (x[-1] - x[0]) / (len(x) - 1)
+        ax.update_datalim([(x[0] - dx / 2, min(map(np.min, ys))), (x[-1] + dx / 2, max(map(np.max, ys)))])
+    ax.add_patch(patch)
+    return patch
+
+
 def _strokes(path: MplPath) -> list[tuple[np.ndarray, np.ndarray]]:
     """Split a path into its connected strokes, one (vertices, codes) pair per MOVETO."""
     verts, codes = np.asarray(path.vertices, float), np.asarray(path.codes, int)
@@ -89,11 +211,12 @@ def smooth_step_band(
     *,
     ramp: "float | ArrayLike" = 1.0,
     breaks: "Iterable[int] | None" = None,
+    fillet: float | None = None,
     **kwargs,
 ) -> PathPatch:
     """Fill the ribbon between two :func:`smooth_step` curves.
 
-    Both edges are stepped the same way, so the band keeps the plateau-and-riser shape of the lines it belongs to and never disagrees with them about where a value starts and stops. Use it for a spread the reader should take in as a thickness rather than read off — a min–max over seeds, a quantile range — behind the series it belongs to. Pass a scalar *lower* for the common case of an area down to a baseline.
+    Both edges are stepped the same way, so the band keeps the plateau-and-riser shape of the lines it belongs to and never disagrees with them about where a value starts and stops. Use it for a spread the reader should take in as a thickness rather than read off — a min–max over seeds, a quantile range — behind the series it belongs to. Pass a scalar *lower* for the common case of an area down to a baseline. Pass the same *ramp* and *fillet* (a corner radius in points; see :func:`smooth_step`) as the line it sits behind.
     """
     x = np.asarray(x, float)
     if len(x) < 2:
@@ -102,9 +225,7 @@ def smooth_step_band(
     dx = (x[-1] - x[0]) / (len(x) - 1)
     hs = np.broadcast_to(ramp, len(x) - 1) * dx / 2
     brk = set(breaks or ())
-    patch = PathPatch(_band_path(_step_path(x, hi, hs, brk), _step_path(x, lo, hs, brk)), lw=0, **kwargs)
-    ax.add_patch(patch)
-    return patch
+    return _add_step_patch(ax, x, [hi, lo], hs, brk, fillet, dict(lw=0) | kwargs)
 
 
 def smooth_step_area(
@@ -128,9 +249,10 @@ def smooth_step(
     y: "ArrayLike",
     *,
     ramp: "float | ArrayLike" = 1.0,
-    breaks: "Iterable[int] | None" = None,
+    breaks: "Iterable[int] | bool | None" = None,
     elide: "Iterable[int] | None" = None,
     fade: "float | str" = 0.3,
+    fillet: float | None = None,
     **kwargs,
 ) -> PathPatch:
     """Draw a step plot whose risers are S-curves rather than vertical jumps.
@@ -141,6 +263,8 @@ def smooth_step(
 
     *ramp* may be a scalar or one value per riser (length ``len(x) - 1``), so individual transitions flatten or square off independently: 1 is a pure ramp with no rest, 0 is a vertical step. Use a per-riser ramp when neighbours differ in kind — draw the jump across a run of unsampled positions as a smooth slide (→1) while keeping genuine neighbours as discrete plateaus (< 1). Any two adjacent ramps must sum to ≤ 2, which holds for values in [0, 1].
 
+    *fillet* swaps the S for a straight riser whose two corners are rounded by circular arcs of that radius, in points — the corner-radius idea from vector editors. The straight run makes the slope constant across most of the transition, so the rate a reader estimates from the line is the chord slope, where the S peaks at twice it; prefer it when the risers carry rate information the reader will compare, and the S when the transitions are just connective. The arcs are circles on the page, whatever the axes' aspect, because the path is laid out in display space at draw time (so the returned patch carries the identity transform, and a *transform* keyword is applied to the data instead). The straight run spans the footprint set by *ramp* less a fixed fraction of the radius at each end, and the arcs curl out from there, so risers of different steepness read as covering the same horizontal distance and a vertical one stays inside its footprint. A radius too large for its riser or plateau is capped so the run never inverts and neighbouring arcs never meet.
+
     *breaks* holds indices *i* after which to leave a gap instead of a riser: sample *i*'s plateau ends at its right shoulder and sample *i+1*'s begins at its left one, with nothing between. Use it where consecutive samples are the same underlying point (e.g. two ordinal slots that alias onto one character) so the connecting riser would span zero real distance. The gap is the riser's footprint, so it's widest when the plateaus are narrow — pair breaks with *ramp* < 1 to keep a visible flat on each side.
 
     *elide* holds indices *i* whose riser spans ground the samples never covered — a run of unmeasured positions between two measured ones. Those risers are drawn at *fade* times the line's opacity, so interpolated stretches carry visibly less ink than the measurements they join, and the eye stops reading them as another step. The faded riser is a second, lighter artist beneath the returned one (which is broken at those gaps), so the effect is real transparency: it needs no opaque mask matched to the background, and survives a transparent figure over any page color. Where *breaks* and *elide* name the same riser, the break wins and nothing is drawn.
@@ -150,20 +274,17 @@ def smooth_step(
     x, y = np.asarray(x, float), np.asarray(y, float)
     if len(x) < 2:
         raise ValueError("smooth_step needs at least two samples")
-    brk, eli = set(breaks or ()), set(elide or ())
+    brk, eli = set(range(len(x))) if breaks is True else set(breaks or ()), set(elide or ())
     dx = (x[-1] - x[0]) / (len(x) - 1)
     hs = np.broadcast_to(ramp, len(x) - 1) * dx / 2  # riser half-widths (one per gap)
     style = dict(fill=False, capstyle="round", joinstyle="round") | kwargs
 
-    if eli - brk:
-        ghost = _step_path(x, y, hs, brk)  # keeps the elided risers; the solid path drops them
+    if eli - brk:  # a fainter companion keeps the elided risers; the solid path drops them
         quiet = (
             {"color": fade, "alpha": None} if isinstance(fade, str) else {"alpha": fade * (kwargs.get("alpha") or 1.0)}
         )
-        ax.add_patch(PathPatch(ghost, **style | quiet))
-    patch = PathPatch(_step_path(x, y, hs, brk | eli), **style)
-    ax.add_patch(patch)
-    return patch
+        _add_step_patch(ax, x, [y], hs, brk, fillet, style | quiet)
+    return _add_step_patch(ax, x, [y], hs, brk | eli, fillet, style)
 
 
 def smooth_step_marks(
