@@ -14,7 +14,7 @@ from sca.intervention import (
     diff_in_means,
     gain,
     leace,
-    lobe,
+    shaped_suppression,
     probe_direction,
     projection,
     write_angle,
@@ -55,11 +55,11 @@ def test_write_angle_at_full_strength_is_arcsin_alpha():
     np.testing.assert_allclose(write_angle([0.0, 0.5, 1.0]), [0.0, np.pi / 6, np.pi / 2], rtol=0, atol=1e-7)
 
 
-def test_lobe_leaves_states_below_the_threshold_alone():
+def test_shaped_suppression_leaves_states_below_the_threshold_alone():
     h = np.zeros((2, WIDTH), dtype=np.float32)
     h[0, :3] = [0.3, 0.0, np.sqrt(1 - 0.09)]
     h[1, :3] = [0.8, 0.0, 0.6]
-    out = np.asarray(lobe(Subspace.axis(WIDTH), a=0.5, b=1.0, p=1.0)(jnp.asarray(h)))
+    out = np.asarray(shaped_suppression(Subspace.axis(WIDTH), a=0.5, b=1.0, p=1.0)(jnp.asarray(h)))
     np.testing.assert_allclose(out[0], h[0], rtol=0, atol=1e-6)
     # At α = 0.8 with a = 0.5: h(α) = (0.8 − 0.5) / 0.5 = 0.6, so 0.6 · 0.8 = 0.48 of the axis is removed.
     expected = np.zeros(WIDTH)

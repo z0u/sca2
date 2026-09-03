@@ -96,15 +96,15 @@ ARMS = {
     "operands": "positions restricted to op1 and op2",
     "embedding": "slice 0 only",
     "last": "slice 4 only",
-    "lobe": "the M1 lobe in place of the plain projection",
+    "shaped": "M1's shaped suppression in place of the plain projection",
     "ablate": "the weights that read and write e₁ zeroed, then re-normalized",
 }
 # REVIEW: added the `ablate` row. The report's arm table listed five arms and H5 scores `ablate`,
 # so the module was one arm short of the frozen prose. Verify: `ARMS` should have a row for every
 # row of the arm table in the report's Method, and H5 needs this one.
 
-LOBE = dict(a=0.5, b=1.0, p=1.0)
-"""The lobe arm: no suppression below α = 0.5, ramping linearly to full removal at α = 1. The threshold sits
+SHAPED = dict(a=0.5, b=1.0, p=1.0)
+"""The shaped arm: no suppression below α = 0.5, ramping linearly to full removal at α = 1. The threshold sits
 above the constant component the syntax embeddings carry (α ≈ 0.3–0.4 in the published map) and below the
 red operand's (α ≈ 0.9), so it is the operator that leaves the bulk alone by design."""
 
@@ -182,7 +182,7 @@ class Intervention:
 
     name: str
     kind: str
-    """`projection`, `lobe`, `ablate`, or `posthoc`."""
+    """`projection`, `shaped`, `ablate`, or `posthoc`."""
     slices: tuple[int, ...] = SLICES
     positions: tuple[int, ...] | None = None
     gamma: float = PRIMARY_GAMMA
@@ -196,7 +196,7 @@ ARM_INTERVENTIONS = (
     Intervention("operands", "projection", positions=OPERAND_POSITIONS),
     Intervention("embedding", "projection", slices=(0,)),
     Intervention("last", "projection", slices=(SLICES[-1],)),
-    Intervention("lobe", "lobe"),
+    Intervention("shaped", "shaped"),
     Intervention("ablate", "ablate", slices=()),
 )
 assert tuple(a.name for a in ARM_INTERVENTIONS) == tuple(ARMS), "one arm per row of the arm table"
@@ -401,14 +401,14 @@ def fitted_direction(fit: str, x: np.ndarray, z: np.ndarray):
 def build_triple(iv: Intervention, model, clean_pre: np.ndarray, lines: Lines):
     """The (model, subspace, operator) triple for one intervention, from the run's clean stream."""
     from sca.anchoring import ANCHOR_AXIS
-    from sca.intervention import Subspace, ablate_weights, lobe, projection
+    from sca.intervention import Subspace, ablate_weights, projection, shaped_suppression
 
     sub = Subspace.axis(model.transformer.wte.shape[1], ANCHOR_AXIS)
     match iv.kind:
         case "projection":
             return model, sub, projection(sub, gamma=iv.gamma)
-        case "lobe":
-            return model, sub, lobe(sub, a=LOBE["a"], b=LOBE["b"], p=LOBE["p"])
+        case "shaped":
+            return model, sub, shaped_suppression(sub, a=SHAPED["a"], b=SHAPED["b"], p=SHAPED["p"])
         case "ablate":
             return ablate_weights(model, sub), sub, projection(sub)
         case "posthoc":
@@ -623,7 +623,7 @@ def publish_results(results: list[dict]) -> dict:
             "positions": POSITIONS,
             "slices": SLICES,
             "arms": ARMS,
-            "lobe": LOBE,
+            "shaped": SHAPED,
             "gammas": GAMMAS,
             "posthoc": POSTHOC,
             "posthoc_sites": POSTHOC_SITES,

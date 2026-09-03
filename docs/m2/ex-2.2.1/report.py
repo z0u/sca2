@@ -27,7 +27,7 @@ with app.setup(hide_code=True):
     from mini.reports import report_bundle, use_publisher
     from mini.store import project_store
     from mini.vis import AxesRow, figure_html, light_dark, smooth_step, smooth_step_area, smooth_step_marks, themed
-    from sca.intervention import Subspace, angle_between, lobe, projection
+    from sca.intervention import Subspace, angle_between, projection, shaped_suppression
     from sca.vis_grading import GRID_RGB, I_RED, GradingCloud, quantile_stack
 
     use_publisher(report_bundle(__file__))
@@ -38,7 +38,7 @@ with app.setup(hide_code=True):
     ARM_INK = {
         "primary": ("#d40000", "#f44"),
         "operands": ("#e07000", "#fa4"),
-        "lobe": ("#8030c0", "#c8f"),
+        "shaped": ("#8030c0", "#c8f"),
         "ablate": ("#2060c0", "#7af"),
         "control": ("#555", "#aaa"),
     }
@@ -251,10 +251,10 @@ def _():
     | `operands` | positions restricted to op1 and op2 | does the edit need the syntax positions, whose embeddings have a constant component on the axis? |
     | `embedding` | slice 0 only | is removing the token's component enough, or do the blocks re-derive red? |
     | `last` | slice 4 only | the one-readout case, closest to M1's geometry |
-    | `lobe` | the M1 lobe, threshold α = 0.5, in place of the plain projection | does leaving the low-alignment bulk alone keep the removal and cut the collateral? |
+    | `shaped` | M1's shaped suppression, threshold α = 0.5, in place of the plain projection | does leaving the low-alignment bulk alone keep the removal and cut the collateral? |
     | `ablate` | the weights that read and write e₁ zeroed, then re-normalized | the permanent removal from M1, scored under H5 |
 
-    The lobe is the shaped suppression from M1. Where the projection removes the whole e₁ component of every state, the lobe removes only a fraction $h(\alpha)$ of it, set by the alignment the state arrived with. Below a threshold $a$ it removes nothing; above it, the fraction rises linearly to all of it at $\alpha = 1$ (in the notation of the M1 appendix, $b = 1$ and $p = 1$).
+    The shaped suppression is M1's alternative to the plain projection.<!-- REVIEW: this arm was named `lobe` at the freeze, after the polar plots in M1's appendix; in M1 a lobe is the plot, so the arm, the operator, and the result key were renamed and the scoring re-run. Nothing else changed. --> Where the projection removes the whole e₁ component of every state, the shaped suppression removes only a fraction $h(\alpha)$ of it, set by the alignment the state arrived with. Below a threshold $a$ it removes nothing; above it, the fraction rises linearly to all of it at $\alpha = 1$ (in the notation of the M1 appendix, $b = 1$ and $p = 1$).
 
     Alignment here is a cosine: 1 for a state pointing along e₁, 0 for one at right angles to it. A threshold of $a = 0.5$ sits 60° from the axis. States with a negative alignment are left alone too.
 
@@ -292,7 +292,7 @@ def polar_chord(ax: PolarAxes, t: float, to: float, color) -> None:
 
 @app.function(hide_code=True)
 def polar_panel(ax: PolarAxes, name: str, op, ink, rim, threshold: float | None = None) -> None:
-    """One operator on the unit circle, e₁ at the top: its rotation lobe, scaled so 90° reaches the rim, and a chord per direction to the dot where it lands. *threshold* draws the lobe's alignment threshold as two dashed radials."""
+    """One operator on the unit circle, e₁ at the top: its rotation lobe, scaled so 90° reaches the rim, and a chord per direction to the dot where it lands. *threshold* draws the operator's alignment threshold as two dashed radials."""
     theta = np.linspace(-np.pi, np.pi, 721)
     h = np.stack([np.cos(theta), np.sin(theta)], -1).astype(np.float32)
     ax.set_theta_zero_location("N")
@@ -305,7 +305,7 @@ def polar_panel(ax: PolarAxes, name: str, op, ink, rim, threshold: float | None 
         to = float(np.arctan2(o[1], o[0]))
         if abs(to - t) > 1e-3:
             polar_chord(ax, t, to, rim)
-        ax.plot(to, [1], "o", ms=1.5, color=rim)  # where the state lands
+        ax.plot(to, [1], "o", ms=1, color=rim)  # where the state lands
     if threshold is not None:
         a = float(np.arccos(threshold))
         for sign in (1, -1):
@@ -324,7 +324,7 @@ def polar_panel(ax: PolarAxes, name: str, op, ink, rim, threshold: float | None 
 def alignment_marks(
     ax: plt.Axes, top: float, rim, syntax_alpha: tuple[float, float], red_alpha: float, threshold: float
 ) -> None:
-    """On an alignment axis: the lobe's threshold dashed, and the two alignments it was set between, a band for the syntax embeddings and a line for pure red, labeled at height *top*."""
+    """On an alignment axis: the operator's threshold dashed, and the two alignments it was set between, a band for the syntax embeddings and a line for pure red, labeled at height *top*."""
     ax.axvspan(*syntax_alpha, color=light_dark("#0001", "#fff1"), lw=0)
     ax.axvline(red_alpha, color=rim, lw=0.5)
     ax.axvline(threshold, color=rim, lw=0.6, ls="--")
@@ -336,11 +336,14 @@ def alignment_marks(
 @app.cell(hide_code=True)
 def _():
     _sub = Subspace.direction(np.array([1.0, 0.0]))
-    _LOBE = f"lobe, a = {ex.LOBE['a']:g}"
-    _ops = {"projection": projection(_sub), _LOBE: lobe(_sub, a=ex.LOBE["a"], b=ex.LOBE["b"], p=ex.LOBE["p"])}
-    _ink = {"projection": ARM_INK["primary"], _LOBE: ARM_INK["lobe"]}
+    _SHAPED = f"shaped suppression, a = {ex.SHAPED['a']:g}"
+    _ops = {
+        "projection": projection(_sub),
+        _SHAPED: shaped_suppression(_sub, a=ex.SHAPED["a"], b=ex.SHAPED["b"], p=ex.SHAPED["p"]),
+    }
+    _ink = {"projection": ARM_INK["primary"], _SHAPED: ARM_INK["shaped"]}
     # Where the clean map ex-2.1.10 published puts the states the threshold was set between: the constant
-    # component of the `+` and `=` embeddings, and pure red at op1 (see `experiment.LOBE`).
+    # component of the `+` and `=` embeddings, and pure red at op1 (see `experiment.SHAPED`).
     _SYNTAX_ALPHA, _RED_ALPHA = (0.3, 0.4), 0.9
 
     _red_write = {name: float(op_rotation(op, np.array([_RED_ALPHA]))[0]) for name, op in _ops.items()}
@@ -349,10 +352,10 @@ def _():
     @themed(
         name="operators",
         alt_text="""
-            Four panels. Two polar views of the unit circle with e₁ at the top: the projection rotates every direction to the equator, and its rotation lobe peaks at both poles; the lobe with threshold 0.5 leaves every direction more than 60 degrees from e₁ where it is and rotates the rest part way. A line chart of rotation against alignment: the projection rises from zero at α = 0 to 90 degrees at α = 1, and the lobe stays at zero until 0.5 and then rises to meet it at 1. A line chart of the landing alignment against the arriving one: the projection sits at zero throughout; the lobe follows the identity line up to 0.5, then bends down through the threshold to reach zero at α = 1.
+            Four panels. Two polar views of the unit circle with e₁ at the top: the projection rotates every direction to the equator, and its rotation lobe peaks at both poles; the shaped suppression with threshold 0.5 leaves every direction more than 60 degrees from e₁ where it is and rotates the rest part way. A line chart of rotation against alignment: the projection rises from zero at α = 0 to 90 degrees at α = 1, and the shaped suppression stays at zero until 0.5 and then rises to meet it at 1. A line chart of the landing alignment against the arriving one: the projection sits at zero throughout; the shaped suppression follows the identity line up to 0.5, then bends down through the threshold to reach zero at α = 1.
         """,
         caption=f"""
-            **The two operators, in the plane of e₁ and the state.** Left and middle, each chord runs from a unit state at some angle from e₁ (top) to the dot where the operator moves it; the filled lobe is the size of that rotation against the direction, scaled so 90° reaches the rim. Third, the same rotation against the alignment α. Fourth, the alignment the state leaves with against the one it arrived with; the dotted line is no change. The threshold $a = {ex.LOBE["a"]:g}$ is dashed, with the alignments it was set between marked from the published clean map: the `+` and `=` embeddings (band) and pure red at op1 (line).
+            **The two operators, in the plane of e₁ and the state.** Left and middle, each chord runs from a unit state at some angle from e₁ (top) to the dot where the operator moves it; the filled lobe is the size of that rotation against the direction, scaled so 90° reaches the rim. Third, the same rotation against the alignment α. Fourth, the alignment the state leaves with against the one it arrived with; the dotted line is no change. The threshold $a = {ex.SHAPED["a"]:g}$ is dashed, with the alignments it was set between marked from the published clean map: the `+` and `=` embeddings (band) and pure red at op1 (line).
         """,
     )
     def _plot() -> plt.Figure:
@@ -361,13 +364,13 @@ def _():
         rim = light_dark("#0008", "#fff8")
         for i, (name, op) in enumerate(_ops.items()):
             ax = cast(PolarAxes, fig.add_subplot(gs[0, i], projection="polar"))
-            polar_panel(ax, name, op, light_dark(*_ink[name]), rim, ex.LOBE["a"] if name == _LOBE else None)
+            polar_panel(ax, name, op, light_dark(*_ink[name]), rim, ex.SHAPED["a"] if name == _SHAPED else None)
 
         ax = fig.add_subplot(gs[0, 2])
         alpha = np.linspace(-1, 1, 401)
         for name, op in _ops.items():
             ax.plot(alpha, op_rotation(op, alpha), color=light_dark(*_ink[name]), lw=1.3, label=name)
-        alignment_marks(ax, 92, rim, _SYNTAX_ALPHA, _RED_ALPHA, ex.LOBE["a"])
+        alignment_marks(ax, 92, rim, _SYNTAX_ALPHA, _RED_ALPHA, ex.SHAPED["a"])
         ax.set_xlim(-1, 1)
         ax.set_ylim(0, 90)
         ax.set_yticks([0, 30, 60, 90])
@@ -380,8 +383,8 @@ def _():
         ax.plot(alpha, alpha, color=rim, lw=0.5, ls=":")
         for name, op in _ops.items():
             ax.plot(alpha, op_landing(op, alpha), color=light_dark(*_ink[name]), lw=1.3)
-        alignment_marks(ax, 1.02, rim, _SYNTAX_ALPHA, _RED_ALPHA, ex.LOBE["a"])
-        ax.axhline(ex.LOBE["a"], color=rim, lw=0.6, ls="--")
+        alignment_marks(ax, 1.02, rim, _SYNTAX_ALPHA, _RED_ALPHA, ex.SHAPED["a"])
+        ax.axhline(ex.SHAPED["a"], color=rim, lw=0.6, ls="--")
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         ax.set_aspect("equal")
@@ -392,9 +395,9 @@ def _():
     mo.md(rf"""
     {_plot()}
 
-    At $a = {ex.LOBE["a"]:g}$ the lobe leaves the syntax embeddings where they are. It rotates a pure-red operand at the embedding by about {_red_write[_LOBE]:.0f}°, where the projection rotates it by {_red_write["projection"]:.0f}°. So the red operand sits partway up the ramp rather than at the top.
+    At $a = {ex.SHAPED["a"]:g}$ the shaped suppression leaves the syntax embeddings where they are. It rotates a pure-red operand at the embedding by about {_red_write[_SHAPED]:.0f}°, where the projection rotates it by {_red_write["projection"]:.0f}°. So the red operand sits partway up the ramp rather than at the top.
 
-    A pure-red operand arrives at α = {_RED_ALPHA:g} and leaves at {_red_land[_LOBE]:.2f}, past the threshold and about where the syntax embeddings sit: the lobe sets how much of the component is removed, and the re-normalization sets where the state lands. Above the threshold the order reverses, so the more aligned a state arrives, the less aligned it leaves (fourth panel). The repulsion form from M1 sets the landing alignment instead, and would hold the red operand at the threshold. We did not test it here; the [repulsion item](/todo/science/repulsion-sets-the-landing-alignment.md) has the case for it.
+    A pure-red operand arrives at α = {_RED_ALPHA:g} and leaves at {_red_land[_SHAPED]:.2f}, past the threshold and about where the syntax embeddings sit: the falloff sets how much of the component is removed, and the re-normalization sets where the state lands. Above the threshold the order reverses, so the more aligned a state arrives, the less aligned it leaves (fourth panel). The repulsion form from M1 sets the landing alignment instead, and would hold the red operand at the threshold. We did not test it here; the [repulsion item](/todo/science/repulsion-sets-the-landing-alignment.md) has the case for it.
     """)
     return
 
@@ -502,7 +505,7 @@ def _(clean, stat):
         "operands": ("anchored", "operands"),
         "embedding": ("anchored", "embedding"),
         "last": ("anchored", "last"),
-        "lobe": ("anchored", "lobe"),
+        "shaped": ("anchored", "shaped"),
         "ablate": ("anchored", "ablate"),
         "control": ("un-anchored", "primary"),
     }
@@ -611,10 +614,10 @@ def _(clean, dose, floor, lines, per_line, stat):
     _worst = int(np.argmax(_deficit))
     _ctrl = clean("acc", "nonred", ex.CONTROL.name) - stat("primary", "acc", "nonred", ex.CONTROL.name)
     _ops = clean("acc", "nonred") - stat("operands", "acc", "nonred")
-    _lobe = clean("acc", "nonred") - stat("lobe", "acc", "nonred")
-    # REVIEW: the H2 diagnosis sentence said both arms "remove red as well". The `lobe` arm's red
+    _shaped = clean("acc", "nonred") - stat("shaped", "acc", "nonred")
+    # REVIEW: the H2 diagnosis sentence said both arms "remove red as well". The `shaped` arm's red
     # accuracy is 0.60, above the H1 gate, so only `operands` removes red at the primary's level; the
-    # sentence now gives both numbers. Verify: `stat("lobe", "acc", "red")` against RED_ACC_GATE.
+    # sentence now gives both numbers. Verify: `stat("shaped", "acc", "red")` against RED_ACC_GATE.
     _fl = floor("damage", "nonred")
     _gap = stat("primary", "damage", "nonred").mean() - stat("operands", "damage", "nonred").mean()
     _dmg = {
@@ -669,7 +672,7 @@ def _(clean, dose, floor, lines, per_line, stat):
     mo.md(rf"""
     The seed-mean drop in accuracy on non-red lines is {_deficit.mean():.3f}: outside the {ex.TASK_GATE:g} gate, inside the {ex.TASK_PARTIAL:g} partial gate. The spread across seeds is wide. Seed {_worst} loses {_deficit[_worst]:.3f} of its non-red accuracy and the median seed loses {np.median(_deficit):.3f}, with {int((_deficit <= ex.TASK_GATE).sum())} of the nine seeds inside the gate on their own. The un-anchored condition under the same operator loses {_ctrl.mean():.3f}, so the operator itself is close to free. The loss comes from what the anchored blocks do with an edited syntax state.
 
-    The contrary clause of H2 predicted where the damage would come from, and the arms agree. The `operands` arm, which leaves the four syntax positions alone, loses {_ops.mean():.3f}. The `lobe` arm, whose threshold sits above the constant component of the syntax embeddings, loses {_lobe.mean():.3f}. The `operands` arm still removes red (red accuracy {stat("operands", "acc", "red").mean():.2f}); the `lobe` arm removes only part of it ({stat("lobe", "acc", "red").mean():.2f}), trading some of the removal for the extra selectivity (E4).
+    The contrary clause of H2 predicted where the damage would come from, and the arms agree. The `operands` arm, which leaves the four syntax positions alone, loses {_ops.mean():.3f}. The `shaped` arm, whose threshold sits above the constant component of the syntax embeddings, loses {_shaped.mean():.3f}. The `operands` arm still removes red (red accuracy {stat("operands", "acc", "red").mean():.2f}); the `shaped` arm removes only part of it ({stat("shaped", "acc", "red").mean():.2f}), trading some of the removal for the extra selectivity (E4).
 
     So editing the syntax positions is what costs us the non-red lines. Those embeddings have a constant component on the axis, and the blocks read that component as part of the syntax rather than as redness. In damage terms the primary intervention and the `operands` arm differ by {_gap:.3f}, against a resolution floor of {_fl:.3f}, so at the seed level they are not separated either way. The accuracy read above is the one the gate scores.
 
@@ -693,18 +696,18 @@ def _(bins):
     _series = {
         "primary": ("primary", bins("primary")),
         "operands": ("operands", bins("operands")),
-        "lobe": ("lobe", bins("lobe")),
+        "shaped": ("shaped", bins("shaped")),
         "ablate": ("ablate", bins("ablate")),
         "control": ("un-anchored", bins("primary", ex.CONTROL.name)),
     }
     _b = _series["primary"][1].mean(0)
     _dip = float(max(0.0, (_b[:-1] - _b[1:]).max()))
-    _lb = _series["lobe"][1].mean(0)
+    _lb = _series["shaped"][1].mean(0)
 
     @themed(
         name="damage-by-bin",
         alt_text="""
-            A step chart of seed-mean damage over five redness bins, with seed-range bands. The primary, operands, and ablate arms sit near zero for the three lowest bins, rise to about 0.2 in the 0.6 to 0.8 bin, and reach about 0.9 in the top bin. The lobe arm stays at zero until the top bin, where it reaches about 0.4 with a wide band. The un-anchored condition is flat at zero.
+            A step chart of seed-mean damage over five redness bins, with seed-range bands. The primary, operands, and ablate arms sit near zero for the three lowest bins, rise to about 0.2 in the 0.6 to 0.8 bin, and reach about 0.9 in the top bin. The shaped arm stays at zero until the top bin, where it reaches about 0.4 with a wide band. The un-anchored condition is flat at zero.
         """,
         caption=f"""
             **Damage per redness bin.** Seed-mean damage in each of the five redness bins, with the band spanning the seed range, for the primary intervention, three arms, and the un-anchored condition under the primary operator. H3 asks the primary line to be non-decreasing within a dip of {ex.GRADE_DIP:g} and to span at least {ex.GRADE_SPAN:g} from the first bin to the last.
@@ -730,7 +733,7 @@ def _(bins):
     mo.md(rf"""
     Seed-mean damage across the five bins under the primary intervention is {", ".join(f"{v:.3f}" for v in _b)}. There is one dip, {_dip:.3f} between the first two bins, inside the {ex.GRADE_DIP:g} allowance. It is the share of the H2 deficit that falls in the lowest bin rather than anything about the grading. The top bin exceeds the bottom by {_b[-1] - _b[0]:.2f}, against a gate of {ex.GRADE_SPAN:g}.
 
-    The shape is a step rather than a ramp: the three lowest bins sit on the floor, the 0.6–0.8 bin takes {_b[3]:.2f}, and the red bin {_b[4]:.2f}. That follows the S-shaped alignment response D2.1 measured, where the alignment of a color rises steeply only near the red corner. The `lobe` arm sharpens the step further, to {_lb[3]:.3f} in the 0.6–0.8 bin and {_lb[4]:.2f} in the red bin, since its threshold leaves every state below an alignment of {ex.LOBE["a"]:g} alone. The un-anchored condition is flat at {_series["control"][1].mean():.3f}.
+    The shape is a step rather than a ramp: the three lowest bins sit on the floor, the 0.6–0.8 bin takes {_b[3]:.2f}, and the red bin {_b[4]:.2f}. That follows the S-shaped alignment response D2.1 measured, where the alignment of a color rises steeply only near the red corner. The `shaped` arm sharpens the step further, to {_lb[3]:.3f} in the 0.6–0.8 bin and {_lb[4]:.2f} in the red bin, since its threshold leaves every state below an alignment of {ex.SHAPED["a"]:g} alone. The un-anchored condition is flat at {_series["control"][1].mean():.3f}.
 
     {_plot()}
 
@@ -1014,7 +1017,7 @@ def _(arrays, lines, metrics, runs: dict[str, list[dict]], stat):
 
     [^lessred]: By the redness label, $r(1 - g/2 - b/2)$: less red in the red channel, or more green or blue.
 
-    Which neighbor a line lands on varies from seed to seed. Under the primary intervention, at least {ex.AGREE_SEEDS} of the nine seeds decode the same answer on {_agree["primary"]:.0%} of red lines; the figure is {_agree["operands"]:.0%} under the `operands` arm and {_agree["ablate"]:.0%} under `ablate`. The `lobe` arm, which removes only part of the red state, agrees on {_agree["lobe"]:.0%}, because most of its lines still decode to the true answer.
+    Which neighbor a line lands on varies from seed to seed. Under the primary intervention, at least {ex.AGREE_SEEDS} of the nine seeds decode the same answer on {_agree["primary"]:.0%} of red lines; the figure is {_agree["operands"]:.0%} under the `operands` arm and {_agree["ablate"]:.0%} under `ablate`. The `shaped` arm, which removes only part of the red state, agrees on {_agree["shaped"]:.0%}, because most of its lines still decode to the true answer.
 
     {_plot()}
     """)
@@ -1046,7 +1049,7 @@ def _(stat):
     }
     _anch = {
         arm: (float(stat(arm, "damage", "red").mean()), float(stat(arm, "damage", "nonred").mean()))
-        for arm in ("primary", "operands", "lobe", "ablate")
+        for arm in ("primary", "operands", "shaped", "ablate")
     }
     _fit_ink = {
         "diff-in-means": ("#2060c0", "#7af"),
@@ -1085,7 +1088,7 @@ def _(stat):
                     ax.annotate(
                         SLICE_NAMES[s], (n, r), xytext=(3, 2), textcoords="offset points", fontsize=6, color=ink
                     )
-        offsets = {"primary": (8, 6), "operands": (8, -4), "ablate": (8, -14), "lobe": (8, -3)}
+        offsets = {"primary": (8, 6), "operands": (8, -4), "ablate": (8, -14), "shaped": (8, -3)}
         for i, (arm, (r, n)) in enumerate(_anch.items()):
             star = light_dark("#d40000", "#f44")
             ax.scatter(
@@ -1260,17 +1263,17 @@ def _(clean, lines, per_line, runs: dict[str, list[dict]], stat):
       <tbody>{"".join(_e5_row(iv) for iv in _E5_ARMS)}</tbody>
     </table></div>
     """
-    _e5_caption = """
+    _e5_caption = mo.md("""
     Readout displacement against the summed prompt write (E5). Seed means, in radians. Summed write: over the four prompt positions and every edited slice. Displacement: how far the `=` state at the last slice moved from its clean position. Ratio: the mean across seeds of the per-seed ratio of the two.
-    """
+    """).text
 
-    # --- E4: the lobe's arriving states at depth, on red lines at op1, against the clean pass.
+    # --- E4: the shaped arm's arriving states at depth, on red lines at op1, against the clean pass.
     _MID = slice(1, 4)
-    _lobe_arrive = per_line("lobe", "alpha_pre")[:, _MID][:, :, lines.red, 0].mean()
+    _shaped_arrive = per_line("shaped", "alpha_pre")[:, _MID][:, :, lines.red, 0].mean()
     _clean_arrive = per_line("clean", "alpha")[:, _MID][:, :, lines.red, 0].mean()
-    _lobe_again = (per_line("lobe", "theta")[:, _MID][:, :, lines.red, 0] > 1e-3).mean()
-    _lobe_comp = np.array([r["interventions"]["lobe"]["composition_red"] for r in runs[ex.PRIMARY.name]]).sum(0)
-    _lobe_comp = dict(zip(ex.COMPOSITION, _lobe_comp / _lobe_comp.sum(), strict=True))
+    _shaped_again = (per_line("shaped", "theta")[:, _MID][:, :, lines.red, 0] > 1e-3).mean()
+    _shaped_comp = np.array([r["interventions"]["shaped"]["composition_red"] for r in runs[ex.PRIMARY.name]]).sum(0)
+    _shaped_comp = dict(zip(ex.COMPOSITION, _shaped_comp / _shaped_comp.sum(), strict=True))
 
     # --- E6: the decoded write per site, under the primary intervention.
     _dec = (
@@ -1294,9 +1297,9 @@ def _(clean, lines, per_line, runs: dict[str, list[dict]], stat):
       <tbody>{"".join(_e6_row(s) for s in range(len(SLICE_NAMES)))}</tbody>
     </table></div>
     """
-    _e6_caption = """
+    _e6_caption = mo.md("""
     The decoded write (E6): the seed-mean change in the ridge-decoded RGB of the operand at its own position, edited state minus arriving state, under the primary intervention, on red lines and on non-red lines. A probe read on an edited state is an extrapolation, so the numbers are a direction of change in color units rather than a calibrated color.
-    """
+    """).text
     _emb_q = stat("embedding", "q99_alpha_nonred").mean(0)
     _clean_q = np.array([r["clean"]["alpha_q99_nonred"] for r in runs[ex.PRIMARY.name]], float).mean(0)
 
@@ -1313,13 +1316,13 @@ def _(clean, lines, per_line, runs: dict[str, list[dict]], stat):
 
     {_plot_e3()}
 
-    **E4 — the lobe.** With a threshold of {ex.LOBE["a"]:g}, the lobe leaves every syntax state and every non-red state alone: its non-red damage has magnitude {abs(stat("lobe", "damage", "nonred").mean()):.5f}, and at every site its 99th-percentile write on non-red lines falls to at most {np.array([r["interventions"]["lobe"]["q99_write_nonred"] for r in runs[ex.PRIMARY.name]], float).mean(0).max():.3f} radians. That is the H4 map with the syntax columns emptied.
+    **E4 — the shaped suppression.** With a threshold of {ex.SHAPED["a"]:g}, the `shaped` arm leaves every syntax state and every non-red state alone: its non-red damage has magnitude {abs(stat("shaped", "damage", "nonred").mean()):.5f}, and at every site its 99th-percentile write on non-red lines falls to at most {np.array([r["interventions"]["shaped"]["q99_write_nonred"] for r in runs[ex.PRIMARY.name]], float).mean(0).max():.3f} radians. That is the H4 map with the syntax columns emptied.
 
-    It removes about half of the red response (accuracy {span(stat("lobe", "acc", "red"), ".2f")}), with the widest seed spread of any arm. The reason is that the alignment of the red operand at the embedding, 0.90 for pure red, sits partway up the ramp of the lobe rather than at its top (see the operator figure in the Method).
+    It removes about half of the red response (accuracy {span(stat("shaped", "acc", "red"), ".2f")}), with the widest seed spread of any arm. The reason is that the alignment of the red operand at the embedding, 0.90 for pure red, sits partway up the ramp of the falloff rather than at its top (see the operator figure in the Method).
 
-    The edit at the embedding sends pure red past the threshold, and the blocks then bring the red operand partway back. At the three middle slices it arrives with a mean alignment of {_lobe_arrive:.2f} under the lobe, against {_clean_arrive:.2f} clean, and {_lobe_again:.0%} of those states sit above the threshold and are written again.<!-- REVIEW: an earlier draft said "the deeper slices see a state already pulled toward the threshold" without measuring it. The arriving alignment under the lobe is stored, and the sentence now quotes it. Verify: `lobe/alpha_pre` at op1 on red lines, slices 1-3, against `clean/alpha`. -->
+    The edit at the embedding sends pure red past the threshold, and the blocks then bring the red operand partway back. At the three middle slices it arrives with a mean alignment of {_shaped_arrive:.2f} under the shaped suppression, against {_clean_arrive:.2f} clean, and {_shaped_again:.0%} of those states sit above the threshold and are written again.<!-- REVIEW: an earlier draft said "the deeper slices see a state already pulled toward the threshold" without measuring it. The arriving alignment under the `shaped` arm is stored, and the sentence now quotes it. Verify: `shaped/alpha_pre` at op1 on red lines, slices 1-3, against `clean/alpha`. -->
 
-    What it decodes to is still a color: on red lines the mass outside the color vocabulary is {stat("lobe", "offvocab", "red").mean():.3f}, {_lobe_comp["true"]:.0%} of the decodes are the true answer, and {_lobe_comp["neighbor"]:.0%} are a one-step neighbor of it. The lobe is the selective operator. A lower threshold or a steeper ramp would remove more of red, and the repulsion form from M1 would bound where the red operand lands. Both are open ([shaped-suppression item](/todo/science/shaped-suppression-rather-than-projecting-whole-axis.md), [repulsion item](/todo/science/repulsion-sets-the-landing-alignment.md)).
+    What it decodes to is still a color: on red lines the mass outside the color vocabulary is {stat("shaped", "offvocab", "red").mean():.3f}, {_shaped_comp["true"]:.0%} of the decodes are the true answer, and {_shaped_comp["neighbor"]:.0%} are a one-step neighbor of it. The shaped suppression is the selective operator. A lower threshold or a steeper ramp would remove more of red, and the repulsion form from M1 would bound where the red operand lands. Both are open ([shaped-suppression item](/todo/science/shaped-suppression-rather-than-projecting-whole-axis.md), [repulsion item](/todo/science/repulsion-sets-the-landing-alignment.md)).
 
     **E5 — how much of the write reaches the answer.** The logits are read from one state, the `=` state at the last slice. Its displacement is how far it moved, intervened against clean. We compare that with the writes summed over every edited slice and all four prompt positions, since attention moves information across positions. Both quantities are angles.
 
@@ -1349,11 +1352,11 @@ def _():
 
     The D2.2 plan can now say that the placed axis is where red is read from, in the transformer as in the autoencoder. Removing it removes the concept, in proportion to how red the line is, and the write stays inside the bound the clean geometry set. There is more to say about the operator and about depth.
 
-    The whole-stream projection costs a little on non-red lines, and that cost comes from the syntax positions, whose embeddings have a constant component on the axis. Two arms avoid it: the edit restricted to the operand positions, and the lobe, which by construction leaves the low-alignment bulk alone. Of the two, only the lobe needs no knowledge of the syntax of the line, so it is the natural operator for the anchored-op experiments and for the [shaped-suppression item](/todo/science/shaped-suppression-rather-than-projecting-whole-axis.md).
+    The whole-stream projection costs a little on non-red lines, and that cost comes from the syntax positions, whose embeddings have a constant component on the axis. Two arms avoid it: the edit restricted to the operand positions, and the shaped suppression, which by construction leaves the low-alignment bulk alone. Of the two, only the shaped suppression needs no knowledge of the syntax of the line, so it is the natural operator for the anchored-op experiments and for the [shaped-suppression item](/todo/science/shaped-suppression-rather-than-projecting-whole-axis.md).
 
-    At the M1 threshold the removal by the lobe is only partial: the embedding alignment of the red operand sits inside the ramp, and the blocks bring the operand partway back at the deeper slices. So the threshold is something to tune, and the strength sweep says the response to a partial removal is graded, which gives the tuning something to grade against.
+    At the M1 threshold the removal by the shaped suppression is only partial: the embedding alignment of the red operand sits inside the ramp, and the blocks bring the operand partway back at the deeper slices. So the threshold is something to tune, and the strength sweep says the response to a partial removal is graded, which gives the tuning something to grade against.
 
-    Repulsion is the shape to reach for when the dose is a target alignment rather than a fraction removed, since it sets the landing alignment where the lobe leaves it to the re-normalization ([repulsion item](/todo/science/repulsion-sets-the-landing-alignment.md)).
+    Repulsion is the shape to reach for when the dose is a target alignment rather than a fraction removed, since it sets the landing alignment where the suppression leaves it to the re-normalization ([repulsion item](/todo/science/repulsion-sets-the-landing-alignment.md)).
 
     On depth: the concept is read from the operand states before the second block, the last block does not read it at all, and a token-only removal is neither clean nor cheap, because the blocks partly re-derive the axis from an off-axis input. That is the case for the layer sweep, and it says what the sweep should find. A removal acting at the embedding and the first block should do the work of the primary intervention, and one that starts later should not.
 
