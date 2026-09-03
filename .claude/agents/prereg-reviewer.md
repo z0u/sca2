@@ -15,6 +15,7 @@ The question to hold throughout: **is this experiment sound, and worth running a
 
 - Each hypothesis is falsifiable, with a stated measurement and threshold, and every outcome — including the boring one — would change what we do next.
 - The analysis plan can actually score every hypothesis from the data the method collects. Look for a hypothesis with no matching analysis section, or a placeholder that doesn't say what a contrary result looks like.
+- Each result section opens with its own prediction — gate, partial band, contrary outcome — rather than sharing one stated in a standalone `## Hypotheses` block. If both exist, fold the block down and leave the predictions in-section; the science skill's `Conventions` list says why. `Findings` still gives every verdict consecutively, so the standalone block adds nothing but a fourth copy of each gate.
 - Nothing is underspecified to the point where the person running it would have to make a judgment call that changes the result: probe sets, gate statistics, tie-breaks, which checkpoint gets measured.
 - Confounds worth naming are named, and the measurement site is chosen by a criterion independent of the statistic being judged.
 - The report and the code agree about what the experiment does.

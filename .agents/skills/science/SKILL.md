@@ -8,32 +8,35 @@ description: |
 
 Design the experiment with the human, and draft the report skeleton before writing any experiment code. The skeleton doubles as the analysis plan: writing it before the data exists lets a later "we predicted X and found Y" carry weight, because the prediction is verifiably older than the result.
 
-The skeleton is usually a text-only notebook. It runs: intro (the question, why it matters for anchoring, lineage from earlier experiments), a `Findings` section left empty until the results land, a "How to read this draft" note, the method (data spec, measurements), the hypotheses with decision thresholds, analysis sections (consider having one section per hypothesis), an "Exploratory analyses" section, and a discussion.
+The skeleton is usually a text-only notebook. It runs, in order: the tl;dr, a `Findings` section left empty until results land, a "How to read this draft" note, a short background (the question, why it matters for anchoring, lineage from earlier experiments — around 250 words), a glossary and the conditions table, one analysis section per hypothesis, an "Exploratory analyses" section, a short discussion (implications only, around 200 words), and the method (data spec, calibration, measurements) at the end. A reader who stops at Findings has the verdicts; one who reads on gets the reasoning before the plumbing.
 
 Conventions:
 
 - Placeholders are admonitions marked `TODO`. Each states what its figure or table will show (axes, panels), the hypothesis it scores, the expected pattern, and what a contrary result would look like. The marker is greppable, so no placeholder survives to publication; results replace placeholders in place, so review reads as a prediction → observation diff.
 - Hypotheses are falsifiable: state the measurement, the threshold, and which outcomes count as partial.
+- **Each result section opens with its own prediction** — gate, partial band, contrary outcome — then the evidence, then the verdict. No standalone `## Hypotheses` block: stating every prediction in one block *and* in each analysis section *and* in Findings *and* often in a caption duplicates at the source. `Findings` above still gives the four verdicts consecutively, and the how-to-read note's frozen-commit hash still attests that the predictions predate the results.
+- **The Discussion references results, never requotes them.** They are above it, in Findings and in each section's verdict; the Discussion interprets what they mean. This falls out of putting Findings first: with the verdicts above, re-deriving them below is duplication rather than exposition.
+- **Method, calibration, and measurements go at the end.** They're needed to defend the numbers, not to read them; the glossary and conditions table are what results can't be read without, and they're above. Two things to watch when the method sits last: the glossary has to define every term the verdicts use, since verdicts now precede definitions; and calibration cells read oddly in present tense — frame them "before anything ran…" so past position matches past sense.
 - A constants-only `experiment.py` is marked `DESIGN_ONLY = True`. Landing the design constants — grid sizes, thresholds, schedules — as a module during preregistration lets the report import them instead of restating numbers the code will later own. But `tests/mini/test_experiments_e2e.py` globs every `docs/**/experiment.py` and asserts it loads into a named experiment with a callable `main(ctx)`, which a design module doesn't have yet; `DESIGN_ONLY = True` at module level skips that check. Delete the line in the same change that adds the DAG, or the implemented experiment silently loses its load coverage.
 - Freeze the hypotheses once the skeleton is agreed (immaterial edits aside), and say so in the report under "How to read this draft": results replace placeholders, and anything conceived after seeing the data goes under "Exploratory analyses", marked as post hoc.
 - Avoid over-claiming in the analysis and discussion. An experiment may _inform_ the next, but committing to an interpretation now can close off the follow-up.
 - A claim stated before its evidence exists gets paid for twice, once where it is stated and once where it is met. That is inherent to preregistration and worth the cost for hypotheses and thresholds, and not for anything else, so keep rationales, caveats, and worked reasoning at the point of use rather than in the method. Where a restatement is unavoidable, quote the frozen line rather than paraphrasing it, since a paraphrase drifts.
 - Numbers in prose earn their place by being part of an argument. A coordinate the reader looks up, a constant of the apparatus, or a value derivable from an adjacent table belongs in a table or in the method, with the prose referring to it. Writing the same quantity out in two sections is how two roundings of it end up in the report.
 
-Example:
+Example of one result section:
 
 ```md
-## Hypotheses
-
-- **H1.** Describe what we're testing (no title).
-
-<!-- Then in the results/analysis section further down... -->
-
 ## Short name for H1 (H1)
 
+- **Gate.** The measurement and threshold that counts as a pass.
+- **Partial.** A weaker outcome that would still be informative.
+- **Contrary.** What a fail looks like, and what it would mean.
+
 /// admonition | TODO
-Describe what is needed (figure, table, expectations).
+The figure or table that scores it (axes, panels, expected pattern).
 ///
+
+<!-- Verdict prose lands here once the number is in. -->
 ```
 
 ## Surveys
@@ -65,7 +68,7 @@ Then report the landscape rather than the winner. "The margin holds above 0.5 fo
 Same skeleton, with three differences.
 
 - `## Findings` becomes `## Observations` — same place, same brevity, but each line carries its noise floor where a verdict would carry its gate, and one line names the proposed operating point.
-- `## Hypotheses` becomes `## Search plan`.
+- One `## Search plan` block, in place of the per-hypothesis in-section predictions an experiment carries. A survey has one plan, not one per trial, so the block is standalone.
 - `### Conditions` becomes the space specification plus the full trial table. This is the convention that has to bend: elsewhere the report imports hand-justified condition dicts and renders them as prose, which is why there's no generic grid builder, and a hundred trials can't each carry a docstring. So the justification attaches to the dimension rather than the level, and the trial table is generated from stored results.
 
 Say "survey" in the first clause of the tl;dr and label it the same way in `docs/index.md`. Numbering stays in the `ex-2.1.N` sequence.
