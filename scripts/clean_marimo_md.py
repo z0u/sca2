@@ -183,6 +183,14 @@ def convert_admonitions(text: str) -> str:
     return ADMONITION_RE.sub(replace, text)
 
 
+def image_alt(raw: str) -> str:
+    """An ``<img>``'s alt text, normalized for Markdown's ``![...]`` syntax.
+
+    Alt text is written as prose and wraps across lines in the export; ``![...]`` is a single-line construct, and an unescaped ``]`` inside it would close the label early.
+    """
+    return re.sub(r"\s+", " ", raw).strip().replace("[", "(").replace("]", ")")
+
+
 def externalize_images(text: str, assets_dir: Path, rel_dir: str) -> str:
     """Write the light-theme variant of each inlined image to ``assets_dir``, as ``![alt](...)``."""
     used_names: set[str] = set()
@@ -210,9 +218,7 @@ def externalize_images(text: str, assets_dir: Path, rel_dir: str) -> str:
         assets_dir.mkdir(parents=True, exist_ok=True)
         (assets_dir / f"{candidate}.{ext}").write_bytes(base64.b64decode(b64data))
 
-        alt = re.sub(r"\s+", " ", attrs.get("alt", "")).strip()
-        alt = alt.replace("[", "(").replace("]", ")")
-        return f"![{alt}]({rel_dir}/{candidate}.{ext})"
+        return f"![{image_alt(attrs.get('alt', ''))}]({rel_dir}/{candidate}.{ext})"
 
     return IMG_RE.sub(replace, text)
 

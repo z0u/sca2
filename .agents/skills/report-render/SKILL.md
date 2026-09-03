@@ -29,10 +29,12 @@ uv run --with cairosvg python -c "import cairosvg; cairosvg.svg2png(url='x.svg',
 To *read* a report — prose, headings, tables and figure alt text, assembled in order — export it to Markdown. No browser, no bundle:
 
 ```bash
-uv run scripts/export_report_md.py docs/m2/ex-2.1.1/report.py .mini/renders/m2/ex-2.1.1.md
+./go render docs/m2/ex-2.1.1/report.py      # -> .mini/renders/m2/ex-2.1.1.md
 ```
 
-It re-runs the notebook (allow a few minutes), injects each cell's rendered output into the Markdown, and fails loudly if a cell's output went missing rather than dropping the cell. Figures arrive as `![alt](…)` with the report's real alt text; the links point into the notebook's live `public/.mini/` and resolve only from there, but for a text pass the alt text is the point. This is what the `report-structure` agent reads. The bundle's `index.html` holds the same document at about ten times the size, nearly all of it marimo's data island, so reach for it only when you need the page as a page.
+It re-runs the notebook (allow a few minutes), injects each cell's rendered output into the Markdown, and fails loudly if a cell's output went missing rather than dropping the cell. A report newer than its last render is skipped; `--force` re-renders. Figures arrive as `![alt](…)` with the report's real alt text, and the links resolve from the render's own directory, so `Read` follows one straight to the PNG. This is what the `report-structure` agent reads.
+
+The default output keeps one render per report, named by the same key as its bundle (`mini.reports.render_path`). To put it elsewhere, call the script under the verb with an output path: `uv run scripts/export_report_md.py <nb> out.md`. The bundle's `index.html` holds the same document at about ten times the size, nearly all of it marimo's data island, so reach for it only when you need the page as a page.
 
 ## Browser path: for inline/JS figures, full page, or DOM assertions
 

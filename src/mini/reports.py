@@ -32,9 +32,12 @@ __all__ = [
     "report_bundle",
     "export_key",
     "export_dir",
+    "render_path",
     "public_dir",
     "PUBLIC_LINK",
     "input_dir",
+    "inputs_touched_at",
+    "is_stale",
     "PUBLISH_LOCK",
     "load_pins",
     "save_pins",
@@ -227,6 +230,17 @@ def export_dir(notebook_file: str | Path) -> Path:
     return _project_root(p) / ".mini" / "exports" / export_key(p)
 
 
+def render_path(notebook_file: str | Path) -> Path:
+    """The local (gitignored) Markdown render of a report: ``<root>/.mini/renders/<key>.md``.
+
+    The text-only sibling of :func:`export_dir`, written by ``./go render``. Same key, so a report's bundle and its render are named alike and one report can't overwrite another's. A single file rather than a directory, since the render's externalized images (the inlined ones; see ``scripts/clean_marimo_md.py``) go beside it under ``<key>.assets/`` by the same rule any Markdown output follows.
+
+    Scratch, like the bundle: regenerated on demand and never committed. The durable copy of a report is its published bundle.
+    """
+    p = Path(notebook_file).resolve()
+    return _project_root(p) / ".mini" / "renders" / f"{export_key(p)}.md"
+
+
 def input_dir(notebook_file: str | Path) -> Path | None:
     """The directory whose files are this report's *local* inputs, or ``None`` if it has none.
 
@@ -239,6 +253,30 @@ def input_dir(notebook_file: str | Path) -> Path | None:
     parent = Path(notebook_file).resolve().parent
     docs = _project_root(parent) / "docs"
     return parent if parent != docs and docs in parent.parents else None
+
+
+def inputs_touched_at(notebook_file: str | Path) -> float:
+    """The mtime of the most recently edited thing *notebook_file* is built from.
+
+    The notebook, plus everything in its input directory (:func:`input_dir`) — an experiment definition, a dopesheet — since editing one of those dates any render of the report exactly as editing the notebook does. Directories are stamped too, so deleting an input registers (a delete bumps the parent's mtime while touching no surviving file).
+
+    Skips ``__pycache__`` and dotfiles: importing ``experiment.py`` rewrites its bytecode, which would otherwise read as an edit and re-render the report every time something imported it. The *first* such import still registers, since creating ``__pycache__/`` stamps the directory holding it — one spurious re-render per fresh checkout, which is the price of noticing deletes at all.
+    """
+    nb = Path(notebook_file).resolve()
+    paths = [nb]
+    if d := input_dir(nb):
+        junk = (".", "__pycache__")
+        paths += [d, *(p for p in d.rglob("*") if not any(s.startswith(junk) for s in p.relative_to(d).parts))]
+    return max(p.stat().st_mtime for p in paths if p.exists())
+
+
+def is_stale(notebook_file: str | Path, output: Path) -> bool:
+    """Whether *output* is missing or older than anything *notebook_file* is built from (:func:`inputs_touched_at`).
+
+    A cheap mtime heuristic shared by both renders of a report — the bundle's ``index.html`` (``./go preview``) and the Markdown (``./go render``). It misses edits to imported ``src/`` modules and to the stored results a report reads, so callers offer a ``--force`` that skips the check.
+    """
+    out = Path(output)
+    return not out.exists() or out.stat().st_mtime < inputs_touched_at(notebook_file)
 
 
 # The pin manifest: export key → the publish-tier commit sha its bundle was last

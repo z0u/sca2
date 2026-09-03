@@ -11,7 +11,7 @@ is_marimo_notebook() {
 }
 
 show_usage() {
-    echo "usage: $SELF [-h] {install,auth,check,open,preview,publish,site,todo,worktrees} ..."
+    echo "usage: $SELF [-h] {install,auth,check,open,render,preview,publish,site,todo,worktrees} ..."
 }
 
 show_help() {
@@ -34,6 +34,10 @@ show_help() {
 		                       open a Marimo notebook for live editing — watches the file so
 		                       the IDE stays the editor, and prints a URL that lands in the
 		                       app view; anything else opens in \$EDITOR
+		  render  [...nbs] [--force]:
+		                       render each report to readable Markdown at .mini/renders/<key>.md,
+		                       figures as ![alt](path) links — for reading a report as a document
+		                       (skips reports newer than their inputs; --force re-renders)
 		  preview [...nbs] [--no-serve] [--force] [--port N]:
 		                       export stale reports, assemble the site with local assets
 		                       (never touches the network), and serve it
@@ -128,6 +132,29 @@ case "${1:-}" in
             fi
             ( set -x; "$editor" "$@" )
         fi
+        ;;
+    render)
+        # One notebook at a time: rendering re-runs the notebook, so a bare `render` over
+        # every report would be an hour's compute nobody asked for. Flags pass through to
+        # the script (--force, --no-reflow, --sandbox, --timeout N).
+        shift
+        nbs=() flags=()
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --timeout) flags+=("$1" "${2:?--timeout needs a value}"); shift ;;
+                -*) flags+=("$1") ;;
+                *) nbs+=("$1") ;;
+            esac
+            shift
+        done
+        if [[ ${#nbs[@]} -eq 0 ]]; then
+            echo "render what? name one or more report notebooks, e.g." 1>&2
+            echo "  $0 render docs/m2/ex-2.1.1/report.py" 1>&2
+            exit 2
+        fi
+        for nb in "${nbs[@]}"; do
+            ( set -x; uv run "$SCRIPT_DIR/export_report_md.py" "$nb" "${flags[@]}" )
+        done
         ;;
     p|preview)
         shift
