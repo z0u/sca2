@@ -1,7 +1,6 @@
 ---
-status: open
+status: partial
 opened: 2026-08-10
-priority: high
 ---
 # Findings-first report skeleton, from the `report-structure` pass at the ex-2.1.10 publish gate
 
@@ -22,3 +21,5 @@ The pass found the residual duplication in an otherwise clean report is generate
 One of the three authoring rules is already in the skill, though, so it doesn't need re-deriving: "keep rationales, caveats, and worked reasoning at the point of use rather than in the method" landed with ex-2.1.8. What's left to write in is the prediction-at-the-top-of-its-own-section rule, the Discussion-may-reference-but-not-requote rule, and the deferral of Method/Calibration/Measurements to the end.
 
 Now aimed at D2.2's first prereg. Promoted on the same reasoning as the survey-format lessons: while the skeleton is being drafted this costs a paragraph, and afterwards it costs a restructure that the freeze rule forbids anyway. Shortlist was 4/6.
+
+**2026-09-04, adoption** — the window passed a second time: ex-2.2.1 (#139) took the old shape too, with about 3,600 of its 8,000 prose words ahead of the first result section, and each gate in the Hypotheses block, in Findings, in the section verdict, and often in a caption. The cause is that a skeleton's author loads the `science` skill and never this item, so the running order is now in the skill and in the `prereg-reviewer`'s checklist, with two adjustments. The Method is split rather than deferred whole: glossary, conditions table and the intervention paragraph stay up front, and calibration, data spec and measurement definitions go to the end. And the draft's `Findings` is an index of the hypotheses with blank verdicts, in place of the block, so a reviewer still reads every prediction in one place. Left `partial`, and off the shortlist since the skill now carries it, until a prereg has been frozen in this shape and the `report-structure` pass at its publish gate has said whether the saving matched the estimate.

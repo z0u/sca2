@@ -8,14 +8,16 @@ description: |
 
 Design the experiment with the human, and draft the report skeleton before writing any experiment code. The skeleton doubles as the analysis plan: writing it before the data exists lets a later "we predicted X and found Y" carry weight, because the prediction is verifiably older than the result.
 
-The skeleton is usually a text-only notebook. It runs: intro (the question, why it matters for anchoring, lineage from earlier experiments), a `Findings` section left empty until the results land, a "How to read this draft" note, the method (data spec, measurements), the hypotheses with decision thresholds, analysis sections (consider having one section per hypothesis), an "Exploratory analyses" section, and a discussion.
+The skeleton is usually a text-only notebook. Findings come first and method last, so a reader meets evidence early and nothing is stated twice. It runs: the tl;dr; `Findings`, which in a draft is an index of the hypotheses with the verdicts blank; a "How to read this draft" note; a short intro (the question, why it matters for anchoring, lineage from earlier experiments — about 250 words); the glossary and the conditions table, plus a paragraph on the intervention if there is one, which is all a reader needs to parse a result; one section per hypothesis, each opening with its frozen prediction and followed by the placeholder for its evidence and verdict; an "Exploratory analyses" section; a discussion of implications, about 200 words; and then the rest of the method (data spec, calibration, measurement definitions), which the results refer back to.
 
 Conventions:
 
-- Placeholders are admonitions marked `TODO`. Each states what its figure or table will show (axes, panels), the hypothesis it scores, the expected pattern, and what a contrary result would look like. The marker is greppable, so no placeholder survives to publication; results replace placeholders in place, so review reads as a prediction → observation diff.
+- Placeholders are admonitions marked `TODO`, one under each section's prediction. Each states what its figure or table will show (axes, panels); the prediction above it already says what pattern is expected and what a contrary result looks like, so the placeholder does not repeat them. The marker is greppable, so no placeholder survives to publication; results replace placeholders in place, so review reads as a prediction → observation diff.
 - Hypotheses are falsifiable: state the measurement, the threshold, and which outcomes count as partial.
+- A prediction lives at the top of its own result section and nowhere else: no standalone `## Hypotheses` block. A reviewer reads them in sequence through the `Findings` index, and in a draft the sections are consecutive anyway, with only a placeholder between them. A block up front would state every gate a second time before its section states it again.
 - A constants-only `experiment.py` is marked `DESIGN_ONLY = True`. Landing the design constants — grid sizes, thresholds, schedules — as a module during preregistration lets the report import them instead of restating numbers the code will later own. But `tests/mini/test_experiments_e2e.py` globs every `docs/**/experiment.py` and asserts it loads into a named experiment with a callable `main(ctx)`, which a design module doesn't have yet; `DESIGN_ONLY = True` at module level skips that check. Delete the line in the same change that adds the DAG, or the implemented experiment silently loses its load coverage.
-- Freeze the hypotheses once the skeleton is agreed (immaterial edits aside), and say so in the report under "How to read this draft": results replace placeholders, and anything conceived after seeing the data goes under "Exploratory analyses", marked as post hoc.
+- Freeze the hypotheses once the skeleton is agreed (immaterial edits aside), and say so in the report under "How to read this draft", quoting the commit — with the predictions spread over their sections, that hash is what says they were fixed in advance. Results replace placeholders, and anything conceived after seeing the data goes under "Exploratory analyses", marked as post hoc.
+- The discussion interprets. It may refer to a result and never requotes it: the verdict and its deciding number live in the result section and in `Findings`.
 - Avoid over-claiming in the analysis and discussion. An experiment may _inform_ the next, but committing to an interpretation now can close off the follow-up.
 - A claim stated before its evidence exists gets paid for twice, once where it is stated and once where it is met. That is inherent to preregistration and worth the cost for hypotheses and thresholds, and not for anything else, so keep rationales, caveats, and worked reasoning at the point of use rather than in the method. Where a restatement is unavoidable, quote the frozen line rather than paraphrasing it, since a paraphrase drifts.
 - Numbers in prose earn their place by being part of an argument. A coordinate the reader looks up, a constant of the apparatus, or a value derivable from an adjacent table belongs in a table or in the method, with the prose referring to it. Writing the same quantity out in two sections is how two roundings of it end up in the report.
@@ -23,16 +25,19 @@ Conventions:
 Example:
 
 ```md
-## Hypotheses
+## Findings
 
-- **H1.** Describe what we're testing (no title).
+- [Short name for H1 (H1)](#short-name-for-h1-h1) —
+- [Short name for H2 (H2)](#short-name-for-h2-h2) —
 
-<!-- Then in the results/analysis section further down... -->
+<!-- Then, one section per hypothesis... -->
 
 ## Short name for H1 (H1)
 
+**H1.** The prediction: the measurement, the gate, the partial band, and what a contrary result would mean.
+
 /// admonition | TODO
-Describe what is needed (figure, table, expectations).
+What the figure or table will show (axes, panels).
 ///
 ```
 
@@ -40,7 +45,7 @@ Describe what is needed (figure, table, expectations).
 
 Some questions are about choosing an operating point in a space too large to give every point a hypothesis: the anchor weight's selectivity optimum, the mellowmax temperature, how much repulsion to deliver and when. A *survey* is the experiment type for those. It preregisters the search plan instead of an outcome, and it scores nothing.
 
-What makes a search credible is the same thing that makes preregistration work — the analysis was fixed before the data existed. So freeze the procedure, in place of `## Hypotheses`:
+What makes a search credible is the same thing that makes preregistration work — the analysis was fixed before the data existed. So freeze the procedure in a `## Search plan` section, where a scored report's result sections would begin:
 
 - **The space.** Each dimension with its bounds and its scale (log for weights and temperatures).
 - **The sampling rule**, with its seed, so the trial list can be reviewed before the run. Prefer Sobol (`scipy.stats.qmc`) over uniform draws: it fills the box more evenly, so the one-dimensional marginals are less lumpy for the same budget. SciPy only reaches us through scikit-learn, so declare it when the first survey lands.
@@ -65,7 +70,7 @@ Then report the landscape rather than the winner. "The margin holds above 0.5 fo
 Same skeleton, with three differences.
 
 - `## Findings` becomes `## Observations` — same place, same brevity, but each line carries its noise floor where a verdict would carry its gate, and one line names the proposed operating point.
-- `## Hypotheses` becomes `## Search plan`.
+- The search plan is one `## Search plan` block, where a scored report's first result section would sit, since there are no hypotheses to spread over sections.
 - `### Conditions` becomes the space specification plus the full trial table. This is the convention that has to bend: elsewhere the report imports hand-justified condition dicts and renders them as prose, which is why there's no generic grid builder, and a hundred trials can't each carry a docstring. So the justification attaches to the dimension rather than the level, and the trial table is generated from stored results.
 
 Say "survey" in the first clause of the tl;dr and label it the same way in `docs/index.md`. Numbering stays in the `ex-2.1.N` sequence.
@@ -129,7 +134,7 @@ not larger; the ordering holds within every seed.
 
 The tl;dr says which way it came out; this says what happened. A reader who stops here should be able to tell that three of four hypotheses missed, without reading a discussion to find out. Without it, a reader gets nothing until they have read the whole report.
 
-Verdicts only. Interpretation, mechanism, and whether an outcome was named in advance belong to the analysis sections. In a preregistration draft the heading goes in empty, since writing it is the first thing to do when results land.
+Verdicts only. Interpretation, mechanism, and whether an outcome was named in advance belong to the analysis sections. Link each line to its section, so this doubles as the report's index. In a preregistration draft it is only that: one line per hypothesis, ID and short name linking to the section, verdict blank. That is where a reviewer sees every prediction in one place, and writing the verdicts in is the first thing to do when results land.
 
 Two consequences for the rest of the report. The discussion no longer opens by re-deriving the results, because they are above it — it interprets, and nothing else. And a section that cannot supply its own line here has a gap worth fixing: if a verdict or its deciding number is missing, or first appears in some other section, that is the section's problem rather than the summary's.
 
