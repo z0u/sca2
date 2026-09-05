@@ -1,0 +1,193 @@
+<svg
+  id="milestones"
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 800 232"
+  width="800"
+  height="232"
+  role="img"
+  aria-labelledby="milestones-title"
+>
+  <title id="milestones-title">Two rows of stops. Milestones: M1 (autoencoders) complete, M2 (transformers) in progress, M3 (language models) and M4 (LLM fine-tunes) planned. M2's deliverables: D2.1 (anchor a concept) complete, D2.2 (operations and steering) in progress, D2.3 (asymmetric verification) planned, and D2.4 (publication) already under way.</title>
+
+  <!-- ═══ Layout ═══════════════════════════════════════════════════════════════
+       A row carries the four numbers that define its grid, as CSS custom
+       properties: first column (x0), spacing (col), baseline (y), and stop
+       radius (r). A node carries only its column index, i, and its state.
+
+         milestones     x0 100   col 200   y 44    r 15
+         deliverables   x0 130   col 180   y 150   r 12
+
+       Everything else derives from r in the stylesheet: the labels sit 21
+       and 39 below a stop, and a rail spans the gap between two stops,
+       clearing each by 6. So resizing a row is one number.
+
+       Every node has the same four children — a rail, a stop, and two
+       labels — and its state class decides the rest. The last node in a row
+       hides its rail, so nodes stay interchangeable.
+
+       Shapes are unit-sized defs, scaled to fit by the use that places them,
+       with non-scaling-stroke so an outline stays 2 wide however far it
+       scales. To restyle every stop in the figure, edit one def.
+
+       Nothing is in absolute coordinates: the second row reads as M2's
+       contents from its inset, its smaller stops, and the D2.x naming.
+
+       Note: XML comments cannot contain a double hyphen, so the property
+       names above are written without their CSS prefix.
+       ═════════════════════════════════════════════════════════════════ -->
+
+  <defs>
+    <!-- A stop reads like a radio button: a ring of fixed size, holding a
+         pip that fills it when complete and half-fills it when underway.
+         Unit-sized, about the origin. -->
+    <g id="stop" class="stop">
+      <circle class="ring" r="1" />
+      <circle class="pip" r="1" />
+    </g>
+    <line id="rail" x1="0" y1="0" x2="1" y2="0" vector-effect="non-scaling-stroke" />
+  </defs>
+
+  <style>
+    /* ── Palette (mirrors docs/md.css; edit here, nowhere else) ────────── */
+    #milestones {
+      --fg:      #1a1a1a;
+      --muted:   #555555;
+      --accent:  #0066cc;
+    }
+    @media (prefers-color-scheme: dark) {
+      #milestones {
+        --fg:     #ffffff;
+        --muted:  #aaaaaa;
+        --accent: #6cb6ff;
+      }
+    }
+
+    /* ── The stop, drawn inside a use shadow tree ──────────────────────────
+       A selector cannot reach past a use, so these three rules are the one
+       place in the file that sits outside the #milestones scope, and every
+       per-node difference arrives instead as an inherited custom property.
+       Only r, stop-color and pip reach in here. ────────────────────────── */
+    .stop circle {
+      transform-origin: 0 0;
+      vector-effect: non-scaling-stroke;
+    }
+    .stop .ring {
+      transform: scale(var(--r));
+      fill: none;
+      stroke: var(--stop-color, var(--muted));
+      stroke-width: 2;
+    }
+    .stop .pip {
+      transform: scale(calc(var(--r) * var(--pip, 0)));
+      fill: var(--stop-color, var(--muted));
+    }
+
+    /* ── State ─────────────────────────────────────────────────────────── */
+    #milestones .done    { --stop-color: var(--fg);     --pip: 1; }
+    #milestones .current { --stop-color: var(--accent); --pip: 0.5; }
+
+    /* ── Grid ──────────────────────────────────────────────────────────── */
+    #milestones .node {
+      transform: translate(
+        calc((var(--x0) + var(--i) * var(--col)) * 1px),
+        calc(var(--y) * 1px)
+      );
+    }
+
+    /* The track to the next stop, clearing both by 6. Dashed by default,
+       since a rail is only travelled once the stop behind it is complete. */
+    #milestones use[href="#rail"] {
+      transform-origin: 0 0;
+      transform:
+        translateX(calc((var(--r) + 6) * 1px))
+        scaleX(calc(var(--col) - 2 * var(--r) - 12));
+      stroke: var(--muted);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-dasharray: 2 7;
+    }
+    #milestones .done use[href="#rail"] { stroke-dasharray: none; }
+    #milestones .node:last-child use[href="#rail"] { display: none; }
+
+    /* ── Type ──────────────────────────────────────────────────────────── */
+    #milestones text {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      text-anchor: middle;
+    }
+    #milestones .label {
+      transform: translateY(calc((var(--r) + 21) * 1px));
+      font-size: 15px;
+      font-weight: 600;
+      fill: var(--fg);
+    }
+    #milestones .sub {
+      transform: translateY(calc((var(--r) + 39) * 1px));
+      font-size: 12.5px;
+      fill: var(--muted);
+    }
+  </style>
+
+  <!-- ═══ Milestones ═══════════════════════════════════════════════════ -->
+
+  <g class="row" style="--x0: 100; --col: 200; --y: 44; --r: 15">
+    <g class="node done" style="--i: 0">
+      <use href="#rail" />
+      <use href="#stop" />
+      <text class="label">M1</text>
+      <text class="sub">autoencoders</text>
+    </g>
+
+    <g class="node current" style="--i: 1">
+      <use href="#rail" />
+      <use href="#stop" />
+      <text class="label">M2</text>
+      <text class="sub">transformers</text>
+    </g>
+
+    <g class="node" style="--i: 2">
+      <use href="#rail" />
+      <use href="#stop" />
+      <text class="label">M3</text>
+      <text class="sub">language models</text>
+    </g>
+
+    <g class="node" style="--i: 3">
+      <use href="#rail" />
+      <use href="#stop" />
+      <text class="label">M4</text>
+      <text class="sub">LLM fine-tunes</text>
+    </g>
+  </g>
+
+  <!-- ═══ M2's deliverables ═══════════════════════════════════════════ -->
+
+  <g class="row" style="--x0: 130; --col: 180; --y: 150; --r: 12">
+    <g class="node done" style="--i: 0">
+      <use href="#rail" />
+      <use href="#stop" />
+      <text class="label">D2.1</text>
+      <text class="sub">anchor a concept</text>
+    </g>
+
+    <g class="node current" style="--i: 1">
+      <use href="#rail" />
+      <use href="#stop" />
+      <text class="label">D2.2</text>
+      <text class="sub">operations &amp; steering</text>
+    </g>
+
+    <g class="node" style="--i: 2">
+      <use href="#rail" />
+      <use href="#stop" />
+      <text class="label">D2.3</text>
+      <text class="sub">asymmetric verification</text>
+    </g>
+
+    <g class="node current" style="--i: 3">
+      <use href="#rail" />
+      <use href="#stop" />
+      <text class="label">D2.4</text>
+      <text class="sub">publication</text>
+    </g>
+  </g>
+</svg>
