@@ -68,9 +68,13 @@ def pins_at(base: str, root: Path = ROOT) -> dict[str, str]:
 def unpublished(base: str, root: Path = ROOT) -> list[Path]:
     """Changed reports whose pin hasn't moved since *base* — the ones to publish.
 
-    A report that was never published reads as unpublished too: its key is absent from both manifests, so the pin is unchanged in the sense that matters.
+    A report that was never published reads as unpublished too: its key is absent from both manifests, so the pin is unchanged in the sense that matters. The exception is a project with no manifest at all: until the first ``./go publish`` writes one, there is nothing to hold reports to, so nothing is reported.
     """
-    before, after = pins_at(base, root), load_pins(root)
+    if not (root / PUBLISH_LOCK).exists():
+        return []
+    # Production's manifest, whatever storage profile this shell has active: the question is
+    # whether the *site* will serve a stale export, and a dev publish never moves that pin.
+    before, after = pins_at(base, root), load_pins(root, profile=None)
     return [nb for nb in changed_reports(base, root) if after.get(key := export_key(nb)) == before.get(key)]
 
 
