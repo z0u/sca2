@@ -2,6 +2,7 @@
 status: open
 tags: [tooling, storage]
 opened: 2026-09-05
+bundle: backup-template
 ---
 # The backup template's `ruff.toml` extends a file the backup repo doesn't have
 

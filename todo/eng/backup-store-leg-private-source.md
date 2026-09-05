@@ -2,6 +2,7 @@
 status: partial
 tags: [storage, tooling, security]
 opened: 2026-09-05
+bundle: backup-template
 ---
 # The backup's store leg can't copy from a private source bucket
 

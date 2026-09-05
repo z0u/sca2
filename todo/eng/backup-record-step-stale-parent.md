@@ -2,6 +2,7 @@
 status: open
 tags: [tooling, storage]
 opened: 2026-09-05
+bundle: backup-template
 ---
 # A queued backup run can't record itself: the push is rejected on a stale parent
 
@@ -26,3 +27,7 @@ The fix belongs upstream in mi-ni's `templates/backup/.github/workflows/backup.y
 Write the retry limit as `if [ … ]; then exit 1; fi` rather than `[ … ] && exit 1`: Actions runs the step under `bash -e`, where the `&&` form returns 1 when the test is false and aborts the step. Verified against two clones sharing a parent — clean push, rejected-then-rebased push, and nothing-to-commit all behave.
 
 Re-running after a rejection is safe meanwhile, and costs no repeated work: every leg reads its resume point from its target rather than from `state/`. `pub` reads `pub/SOURCE_COMMIT`, written into the same commit as each replayed revision; `code` reads the mirror's `mirror` branch; `store` diffs the two bucket listings. Only `store-missing.json` lives solely in `state/`, and losing it delays expiry rather than hurrying it.
+
+## Notes
+
+**2026-09-05, setup** — The patch above is applied in `z0u-bot/sca2-backup`, so sca2's copy of the workflow is ahead of the template. What is left here is carrying it upstream.

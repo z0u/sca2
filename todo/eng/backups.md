@@ -1,7 +1,8 @@
 ---
-status: partial
+status: done
 tags: [archival, versioning, security, publishing, storage]
 opened: 2026-08-12
+closed: 2026-09-05
 bundle: env-hardening
 ---
 
@@ -26,3 +27,5 @@ This should be done in a reusable way if possible to allow a backport to `z0u/mi
 The code lives once, in the mi-ni template's `templates/backup/` (workflow, `backup.py`, restore note), and the setup fetches it from there rather than this repo carrying a second copy. So what is left here is the human half of the runbook, none of which an agent session can do: create the backup account, create the four target repos, add the trusted publishers, and run it once. Move this to `done` when that has happened and `state/last-run.json` shows a clean run.
 
 **2026-09-05, setup** — The four targets exist (`z0u-bot/sca2-backup` for the runner and the dataset, `z0u-bot/sca2-mirror`, bucket `z0u-bot/sca2-backup-store`), both Hub targets have their trusted publisher, and the mirror PAT is issued. A `--dry-run` of `backup.py` against the real sources came back clean: code at `6a093da`, store 1954 files / 895 MB (all of it bucket → bucket, server-side; only the 246 `refs/` files, 126 kB, go into the dataset), pub 1232 commits, so the first replay takes seven nights at the default `--max-commits 200`, or a few manual dispatches. Two things to settle before the first real run. `z0u/sca2-store` is private while `z0u-bot/sca2-backup-store` and `z0u-bot/sca2-backup` are public, so the copy as configured would publish the store; and a private source needs the read-only `SOURCE_HF_TOKEN` secret, which isn't set yet. The workflow itself still has to be committed to the backup repo, which only a session holding a backup-account credential can do. The first run happened on 09-05: the code and publish legs landed (200 of 1232 commits replayed), and the store leg failed — see [the store-leg item](./backup-store-leg-private-source.md), which needs a decision before this can close.
+
+**2026-09-05, setup** — Done. All three legs run clean: the mirror tracks `main` with a `snap/2026-09-05` tag, the backup bucket holds all 1954 store files (copied server-side once `z0u/sca2-store` went public, which is what the store leg needs to read it), and the dataset carries `store/refs/` and the `pub/` replay. The replay is finishing under its own steam — two dispatches left of the 1232-commit history at `--max-commits 200` — and needs nothing further. What the setup turned up along the way stays live as three fixes to mi-ni's template, bundled as `backup-template`; none of them blocks this project's backup.
