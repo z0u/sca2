@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [storage, tooling, security]
 opened: 2026-09-05
 ---
@@ -16,3 +16,7 @@ Three fixes, and the first two are configuration rather than code. Make the sour
 The third is the durable one, and belongs upstream in mi-ni's `templates/backup/backup.py`. `backup_store` already has a download-then-upload path for files the Hub does not track with Xet; make it the fallback for every file when the write client cannot read the source, chosen by one `bucket_info` probe at the top of the leg. That keeps the design's promise that no token spans both accounts. For sca2 it would move 895 MB on the first run and little after — the files are small (median 26 kB, max 74 MB, largest 200 summing to 0.6 GB), so a staged batch of 200 stays well inside a runner's disk.
 
 Fix the diagnostics in the same pass. The batch endpoint returns a per-file reason (`{"success":false,"failed":[{"path":…,"error":…}]}`), and `hf_raise_for_status` discards the body, so `state/last-run.json` recorded only a URL. Reading the response before raising is what turns this class of failure from opaque into obvious.
+
+## Notes
+
+**2026-09-05, setup** — For sca2 we took the first fix: `z0u/sca2-store` is now public, which nothing in it argued against, and all three sources are read anonymously. `SOURCE_HF_TOKEN` is no longer needed for access, though the runbook's rate-limit point still stands while the `pub/` replay catches up. What stays open is the upstream half: mi-ni's template cannot back up a *private* bucket at all, and the run record swallows the reason. Both are worth fixing there so the next project isn't asked to choose between a private store and a working backup.
