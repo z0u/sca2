@@ -1,7 +1,8 @@
 ---
-status: partial
+status: done
 tags: [archival, versioning, security, publishing, storage]
 opened: 2026-08-12
+closed: 2026-09-05
 bundle: env-hardening
 ---
 
@@ -24,3 +25,7 @@ This should be done in a reusable way if possible to allow a backport to `z0u/mi
 **2026-09-05, port** — Designed and built upstream, and the runbook is now here as the `backup` skill; the reasoning is in [`eng/environments.md`](/eng/environments.md). The shape answers the "reusable" ask: a nightly Actions job in a separate repo, under a separate account, that *pulls* from the three sources into a mirror repo, a Hub dataset and a Hub bucket. No token a development environment holds can reach any of them. The job never deletes what the source still has, keeps a dropped store file for 90 days against `mini gc --store`'s 14-day grace, and never runs code fetched from the sources.
 
 The code lives once, in the mi-ni template's `templates/backup/` (workflow, `backup.py`, restore note), and the setup fetches it from there rather than this repo carrying a second copy. So what is left here is the human half of the runbook, none of which an agent session can do: create the backup account, create the four target repos, add the trusted publishers, and run it once. Move this to `done` when that has happened and `state/last-run.json` shows a clean run.
+
+**2026-09-05, setup** — The four targets exist (`z0u-bot/sca2-backup` for the runner and the dataset, `z0u-bot/sca2-mirror`, bucket `z0u-bot/sca2-backup-store`), both Hub targets have their trusted publisher, and the mirror PAT is issued. A `--dry-run` of `backup.py` against the real sources came back clean: code at `6a093da`, store 1954 files / 895 MB (all of it bucket → bucket, server-side; only the 246 `refs/` files, 126 kB, go into the dataset), pub 1232 commits, so the first replay takes seven nights at the default `--max-commits 200`, or a few manual dispatches. Two things to settle before the first real run. `z0u/sca2-store` is private while `z0u-bot/sca2-backup-store` and `z0u-bot/sca2-backup` are public, so the copy as configured would publish the store; and a private source needs the read-only `SOURCE_HF_TOKEN` secret, which isn't set yet. The workflow itself still has to be committed to the backup repo, which only a session holding a backup-account credential can do. The first run happened on 09-05: the code and publish legs landed (200 of 1232 commits replayed), and the store leg failed against the then-private source bucket, which needed a decision before this could close.
+
+**2026-09-05, setup** — Done. All three legs run clean: the mirror tracks `main` with a `snap/2026-09-05` tag, the backup bucket holds all 1954 store files (copied server-side once `z0u/sca2-store` went public, which is what the store leg needs to read it), and the dataset carries `store/refs/` and the `pub/` replay. The replay is finishing under its own steam — two dispatches left of the 1232-commit history at `--max-commits 200` — and needs nothing further. What the setup turned up along the way is three fixes to mi-ni's template — the store leg's inability to read a private source bucket, a queued run unable to push its own record, and a `ruff.toml` that extends a path the backup repo doesn't have. They are tracked in that repo's backlog under the `backup-template` bundle, since every one of them is a file there; none of them blocks this project's backup.
