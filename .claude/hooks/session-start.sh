@@ -81,10 +81,14 @@ if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
 fi
 
 # 0.5. Skip mechanical-reformat commits in `git blame` (see .git-blame-ignore-revs).
-#      The dev container sets this in post-create.sh; the web image needs its own copy
-#      since it doesn't run that script. Fast and local, so it runs synchronously here
-#      rather than in the async block below.
-git config blame.ignoreRevsFile .git-blame-ignore-revs
+#      The dev container sets this in post-create.sh and `./go install` sets it for
+#      local checkouts; the web image runs neither, and the config is repo-local so
+#      it can't be committed. Fast and local, so it runs synchronously here rather
+#      than in the async block below.
+if [[ -d .git ]]; then
+    git config --local blame.ignoreRevsFile .git-blame-ignore-revs \
+        && log 'configured blame.ignoreRevsFile' || true
+fi
 
 # Everything below is slow; run it in the background so the session starts now.
 # `uv run` syncs on demand anyway, so the worst case is the first command

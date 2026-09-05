@@ -144,6 +144,16 @@ def test_repinning_clears_it(repo):
     assert flagged(repo) == set()
 
 
+def test_a_publish_under_a_profile_does_not_count(repo, monkeypatch):
+    """A dev publish moves the dev manifest only; the report is still unpublished as far as the site knows."""
+    (repo / "docs" / "ex-1" / "report.py").write_text(_APP + "# edited\n")
+    (repo / ".mini").mkdir()
+    (repo / ".mini" / "publish.dev.lock").write_text(json.dumps({"ex-1": "ccc"}))
+    commit(repo, "edit a report, publish it to dev")
+    monkeypatch.setenv("MINI_PROFILE", "dev")
+    assert flagged(repo) == {"docs/ex-1/report.py"}
+
+
 def test_only_the_unpinned_report_is_flagged(repo):
     (repo / "docs" / "ex-1" / "report.py").write_text(_APP + "# edited\n")
     (repo / "docs" / "overview.py").write_text(_APP + "# edited\n")
@@ -189,3 +199,19 @@ def test_a_stale_base_does_not_produce_noise(repo):
 def test_unknown_base_ref_fails_loudly(repo):
     with pytest.raises(SystemExit, match="nope"):
         unpub.changed_reports("nope", root=repo)
+
+
+def test_a_project_without_a_manifest_is_not_held_to_one(tmp_path: Path):
+    """Until the first publish writes docs/publish.lock, a changed report is nothing to report."""
+    git(tmp_path, "init", "-q", "-b", "main")
+    git(tmp_path, "config", "user.email", "test@example.com")
+    git(tmp_path, "config", "user.name", "Test")
+    git(tmp_path, "config", "commit.gpgsign", "false")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "overview.py").write_text(_APP)
+    commit(tmp_path, "report, never published")
+    git(tmp_path, "checkout", "-q", "-b", "work")
+    (tmp_path / "docs" / "overview.py").write_text(_APP + "# edited\n")
+    commit(tmp_path, "edit")
+    assert changed(tmp_path) == {"docs/overview.py"}
+    assert flagged(tmp_path) == set()

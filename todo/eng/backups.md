@@ -1,7 +1,8 @@
 ---
-status: open
-tags: [archival, versioning, security, needs-design]
+status: partial
+tags: [archival, versioning, security, publishing, storage]
 opened: 2026-08-12
+bundle: env-hardening
 ---
 
 # Create hard-to-delete backups of code and experiment data
@@ -19,3 +20,7 @@ This should be done in a reusable way if possible to allow a backport to `z0u/mi
 ## Notes
 
 **2026-09-01, z0u** — This sounds complicated. Investigate, design, maybe prototype, but let me review the design before building.
+
+**2026-09-05, port** — Designed and built upstream, and the runbook is now here as the `backup` skill; the reasoning is in [`eng/environments.md`](/eng/environments.md). The shape answers the "reusable" ask: a nightly Actions job in a separate repo, under a separate account, that *pulls* from the three sources into a mirror repo, a Hub dataset and a Hub bucket. No token a development environment holds can reach any of them. The job never deletes what the source still has, keeps a dropped store file for 90 days against `mini gc --store`'s 14-day grace, and never runs code fetched from the sources.
+
+The code lives once, in the mi-ni template's `templates/backup/` (workflow, `backup.py`, restore note), and the setup fetches it from there rather than this repo carrying a second copy. So what is left here is the human half of the runbook, none of which an agent session can do: create the backup account, create the four target repos, add the trusted publishers, and run it once. Move this to `done` when that has happened and `state/last-run.json` shows a clean run.
