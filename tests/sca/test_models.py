@@ -10,6 +10,7 @@ import numpy as np
 
 from sca.config import ModelConfig
 from sca.model import build_model
+from sca.model.ngpt import NGPT
 
 
 def make_config(**overrides: Any) -> ModelConfig:
@@ -145,11 +146,17 @@ def test_untied_checkpoint_round_trips(tmp_path):
         scheduler=SchedulerConfig(epochs=1, warmup_epochs=0, min_lr_factor=0.01),
     )
     model = build_model(config.model, key=jr.key(0))
+    assert isinstance(model, NGPT)
+    head = model.transformer.lm_head
+    assert head is not None
     rng = np.random.default_rng(0)
-    model = model.with_tables(readout=model.transformer.lm_head + rng.normal(size=(64, 64))).normalize_weights()
+    model = model.with_tables(readout=head + rng.normal(size=(64, 64))).normalize_weights()
     save_checkpoint(model, config, None, tmp_path)
     loaded, loaded_config, _ = load_checkpoint(tmp_path)
     assert loaded_config.model.tie_embeddings is False
-    np.testing.assert_allclose(loaded.transformer.lm_head, model.transformer.lm_head, rtol=0, atol=0)
+    assert isinstance(loaded, NGPT)
+    np.testing.assert_allclose(
+        np.asarray(loaded.transformer.lm_head), np.asarray(model.transformer.lm_head), rtol=0, atol=0
+    )
     idx = jr.randint(jr.key(1), (2, 16), 0, 64)
     np.testing.assert_allclose(loaded(idx), model(idx), rtol=0, atol=0)

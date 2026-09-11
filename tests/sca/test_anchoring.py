@@ -38,6 +38,7 @@ from sca.config import (
     TrainingConfig,
 )
 from sca.model import build_model
+from sca.model.ngpt import NGPT
 
 # A miniature of the real corpus: colors 4..11 as opaque tokens, syntax at 1..3.
 PLUS, EQ, NEWLINE = 1, 2, 3
@@ -609,6 +610,7 @@ def test_train_anchored_threads_slices_and_clean_rows(data_dir, tmp_path):
         traj_stride=5,
     )
     assert len(metrics) == 3
+    assert isinstance(model, NGPT)
     wte = np.asarray(model.transformer.wte)
     np.testing.assert_allclose(wte[list(rows), ANCHOR_AXIS], 0.0, rtol=0, atol=0)
     assert traj["anchor"][-1] < traj["anchor"][0]
