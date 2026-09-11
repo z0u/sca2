@@ -224,5 +224,13 @@ These experiments were preparation for the main work: exercising the infrastruct
 
     <!-- mini:figures ./m2/ex-2.2.6/report.py -->
 
+- [2.2.7. A pilot of the syntax rows](./m2/ex-2.2.7/report.py)
+
+    A pilot, no gates, on the anchor axis that every anchored model carries on the embedding rows of the op words and `=`. Part A strips the component from ex-2.2.3's stored checkpoints on the input side or the output side of the tied table: the output side carries the `=` prediction after a red operand, which is the tied-readout mechanism as hypothesised, and the input side reads as the blocks having learned where the rows sit. Part B retrains the recipe three ways, each removing one candidate mechanism. Anchoring the blocks only does not clean the rows and makes the projection less complete; untying the readout moves the component onto the readout table; holding the rows at zero after every step costs nothing visible on three seeds and brings the full-position projection's non-red cost down to the operand-only edit's. The pilot proposes carrying that constraint into the handover.
+
+    <span class="tags">`pilot` `multi-op` `anchoring` `selectivity`</span>
+
+    <!-- mini:figures ./m2/ex-2.2.7/report.py -->
+
 
 </details>

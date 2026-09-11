@@ -195,20 +195,20 @@ class Results:
 
 @app.cell(hide_code=True)
 def _(res: Results):
-    _c_in = {c: res.strip_acc(c, "input", MIX, "red", 3).mean() for c in STORED}
-    _c_out = {c: res.strip_acc(c, "output", MIX, "red", 3).mean() for c in STORED}
-    _c_ctl = {c: res.strip_acc(c, "input-control", MIX, "red", 3).mean() for c in STORED}
-    _c_clean = {c: res.strip_acc(c, "clean", MIX, "red", 3).mean() for c in STORED}
-    _eq = {c: res.component(c, EQ).mean() for c in ROW_ARMS}
+    _ans = lambda c, s, g: res.strip_acc(c, s, MIX, g, 3).mean()  # noqa: E731
+    _eq = lambda c, s: res.strip_acc(c, s, MIX, "red", 2).mean()  # noqa: E731
+    _row = {c: res.component(c, EQ).mean() for c in ROW_ARMS}
     _ops = {c: np.mean([res.component(c, w).mean() for w in OPS]) for c in ROW_ARMS}
-    _eq_head = {c: res.component(c, EQ, "rows_readout").mean() for c in ROW_ARMS if not res.tied(c)}
+    _head = {c: res.component(c, EQ, "rows_readout").mean() for c in ROW_ARMS if not res.tied(c)}
+    _nl = {c: res.component(c, NL).mean() for c in ROW_ARMS}
     _em_floor = min(res.em(c, op).mean() for c in ARMS for op in OPS)
     _ml = {c: res.stat(c, "m_line") for c in ARMS}
     _pilot_ml = [_ml[c].mean() for c in ARMS if c != ex.REFERENCE]
     _ref = _ml[ex.REFERENCE]
-    _proj_def = {c: res.deficit(c, MIX, PROJECTION).mean() for c in ARMS}
-    _opnd_def = {c: res.deficit(c, MIX, OPERANDS).mean() for c in ARMS}
-    _proj_red = {c: res.score(c, MIX, PROJECTION, "acc", "red").mean() for c in ARMS}
+    _proj_def = {c: res.deficit(c, MIX, PROJECTION) for c in ARMS}
+    _opnd_def = res.deficit(ex.REFERENCE, MIX, OPERANDS).mean()
+    _proj_red = {c: res.score(c, MIX, PROJECTION, "acc", "red") for c in ARMS}
+    _bo_worst = _proj_red["blocks-only"].max()
     mo.md(rf"""
     # Ex 2.2.7: a pilot of the syntax rows
 
@@ -216,16 +216,16 @@ def _(res: Results):
     <!-- tl;dr -->
     A scouting run, with no gates. Every anchored model carries the anchor axis on the embedding rows of the op words and `=`, and a full-position projection pays for that on the non-red lines. We asked where that component does its work, by stripping it from the stored checkpoints on the input side or the output side of the tied table, and then retrained the recipe three ways that each remove one candidate mechanism: anchoring the blocks only, untying the readout, and holding the rows clean by a hard constraint.
 
-    <!-- TODO: outcome line, once the numbers are in. -->
+    The logit path puts it there. With a readout table of its own the model moves the component onto that table and the embedding rows come mostly clean, while leaving the embedding out of the anchor does not remove it and makes the projection less complete. Holding the rows at zero after every step costs nothing we can see, and the full-position projection's non-red cost comes down to the operand-only edit's. The pilot proposes carrying that constraint into the handover.
     ///
 
     ## Observations
 
-    - **The component works on the input side.** On the stored `{ex.REFERENCE}` checkpoints, stripping it from the embedding rows takes the red-line answer accuracy on `mix` from {_c_clean["recipe-short"]:.2f} to {_c_in["recipe-short"]:.2f}; stripping it from the readout leaves {_c_out["recipe-short"]:.2f}. Moving the rows the same distance off the axis costs {_c_ctl["recipe-short"]:.2f}. On `t00` the three read {_c_in["t00"]:.2f}, {_c_out["t00"]:.2f} and {_c_ctl["t00"]:.2f} ([figure](#where-the-component-works)).
-    - **The row table.** The `=` row carries {_eq["recipe-short"]:.2f} on `{ex.REFERENCE}` and {_eq["t00"]:.2f} on `t00`, against {_eq["control-short"]:.2f} un-anchored; the op words {_ops["recipe-short"]:.2f} and {_ops["t00"]:.2f}. Under the three fixes the `=` row reads {_eq["blocks-only"]:.2f} (`blocks-only`), {_eq["untied"]:.2f} (`untied`, with {_eq_head["untied"]:.2f} on its readout table) and {_eq["rows-clean"]:.2f} (`rows-clean`) ([figure](#the-row-table)).
+    - **Where the component works.** On the stored `{ex.REFERENCE}` checkpoints, stripping it from the readout side costs the `=` prediction on the red lines ({_eq("recipe-short", "clean"):.2f} to {_eq("recipe-short", "output"):.2f}; {_eq("t00", "output"):.2f} on `t00`) and nothing else. Stripping it from the embedding side costs the answer instead ({_ans("recipe-short", "clean", "red"):.2f} to {_ans("recipe-short", "input", "red"):.2f} on the red lines, {_ans("recipe-short", "input", "nonred"):.2f} on the non-red), but turning the rows by the same angle in a random direction costs at least as much ({_ans("recipe-short", "input-control", "red"):.2f}), so that side reads as the blocks having learned where the `=` row sits ([figure](#where-the-component-works)).
+    - **The row table.** The `=` row carries {_row["recipe-short"]:.2f} on `{ex.REFERENCE}` and {_row["t00"]:.2f} on `t00`, the op words {_ops["recipe-short"]:.2f} and {_ops["t00"]:.2f}. Anchoring the blocks only leaves it at {_row["blocks-only"]:.2f}. Untying the readout brings the embedding's `=` row to {_row["untied"]:.2f} and puts {_head["untied"]:.2f} on the readout's; under the whole-line labeller the `⏎` row takes the axis as well ({_nl["blocks-only-line"]:.2f} on `blocks-only-line`, {_head["untied-line"]:.2f} on `untied-line`'s readout). `rows-clean` holds every syntax row at zero by construction ([figure](#the-row-table)).
     - **Task cost.** Held-out exact match is at least {_em_floor:.3f} on every op of every arm ([table](#task-cost)).
-    - **Placement.** m_line runs {min(_pilot_ml):.3f}–{max(_pilot_ml):.3f} across the pilot arms, against {_ref.mean():.3f} <span class='range'>±{(_ref.max() - _ref.min()) / 2:.3f}</span> on `{ex.REFERENCE}` ([table](#where-the-pull-lands)).
-    - **Selectivity under the full-position projection.** The non-red `mix` deficit is {_proj_def["recipe-short"]:.3f} on `{ex.REFERENCE}`, {_proj_def["blocks-only"]:.3f} on `blocks-only`, {_proj_def["untied"]:.3f} on `untied` and {_proj_def["rows-clean"]:.3f} on `rows-clean`; the operand-only edit reads {_opnd_def["recipe-short"]:.3f} on the reference. Red-line accuracy under projection runs {min(_proj_red.values()):.2f}–{max(_proj_red.values()):.2f} ([table](#suppression-and-selectivity)).
+    - **Placement.** m_line runs {min(_pilot_ml):.3f}–{max(_pilot_ml):.3f} across the pilot arms, against {_ref.mean():.3f} <span class='range'>±{(_ref.max() - _ref.min()) / 2:.3f}</span> on `{ex.REFERENCE}`; `blocks-only` is the low end ([table](#where-the-pull-lands)).
+    - **Suppression and selectivity.** Under the full-position projection the non-red `mix` deficit is {span2(_proj_def["recipe-short"])} on `{ex.REFERENCE}` (the operand-only edit reads {_opnd_def:.3f} there), and {span2(_proj_def["untied"])} on `untied`, {span2(_proj_def["rows-clean"])} on `rows-clean` and {span2(_proj_def["blocks-only"])} on `blocks-only`. Red-line `mix` accuracy under the projection is {_proj_red["recipe-short"].mean():.2f} on the reference, {_proj_red["untied"].mean():.2f} on `untied` and {_proj_red["rows-clean"].mean():.2f} on `rows-clean`; on `blocks-only` it is {_proj_red["blocks-only"].mean():.2f}, with one seed at {_bo_worst:.2f} ([table](#suppression-and-selectivity)).
     """)
     return
 
@@ -343,7 +343,7 @@ def _(res: Results):
                 + [span2(res.strip_acc(_c, _s, MIX, g, 3), ".2f") for g in ("red", "nonred")]
                 + [span2(res.strip_p(_c, _s, MIX, g, 3), ".2f") for g in ("red", "nonred")]
                 + [span2(res.strip_proj(_c, _s, MIX, "acc", "red"), ".2f")]
-                + [span2(res.strip_proj(_c, _s, MIX, "deficit", "nonred"), ".3f")]
+                + [span2(res.strip_proj(_c, _s, MIX, "acc", "nonred"), ".3f")]
             )
     _head = [
         "arm",
@@ -353,10 +353,10 @@ def _(res: Results):
         "P(answer), red",
         "P(answer), non-red",
         "projection: red acc",
-        "projection: non-red deficit",
+        "projection: non-red acc",
     ]
     _caption = """
-    The answer prediction on the <code>mix</code> probe lines under each strip, per arm, and the full-position projection read on the stripped model: exact-match accuracy on the red lines (the removal read) and the P(answer) deficit on the non-red lines (the selectivity read). Seed means with half the seed range. The pilot arms follow the stored ones, so a fix that has already cleaned its rows shows no difference across its strips.
+    The answer prediction on the <code>mix</code> probe lines under each strip, per arm, and the full-position projection read on the stripped model: exact-match accuracy on the red lines (the removal read) and on the non-red lines (the selectivity read, as an accuracy rather than a deficit, since a strip moves the clean baseline too). Seed means with half the seed range. The pilot arms follow the stored ones; a fix that has already cleaned its rows shows no difference across its strips.
     """
     _n = len(ex.STRIPS)
     mo.Html(table_html(_head, _rows, _caption, ref_rows=frozenset(range(0, 3 * _n))))
@@ -564,12 +564,18 @@ def _():
     mo.md(r"""
     ## What we make of it
 
-    <!-- TODO: written once the results are in. -->
+    **Which mechanism.** Each of the three arms removed one candidate, and two of the three results point the same way. Leaving the embedding out of the anchor did not clean the rows, so the direct pull at slice 0 was not the cause. Giving the readout a table of its own moved the component onto that table, at about the reference's size, and left the embedding rows mostly clean, so the logit path is what places it. Part A reads the same from the stored checkpoints: the readout side's component is what the `=` prediction after a red op2 leans on, which is the [tied-readout item](https://github.com/z0u/sca2/blob/main/todo/science/syntax-rows-carry-the-axis-via-tied-readout.md)'s mechanism as written, and that is the only thing the readout side does. What the embedding-side strips show is that the blocks learn to read the rows where the logit path leaves them: the random-direction control costs as much, and on `t00`, where the `=` row sits about 70° off a clean one, a stripped model is a different model. So the component is not vestigial either; a stronger anti-subspace term on those rows would be working against the logits.
+
+    **Prep C.** Of the design's three hypotheses, (a) holds in the blocks, with the contrast and the similarity grading at the reference's values and m_line a little lower; (b) holds, since the color rows still lead the pull at the embedding even though nothing pulls them there; and (c) does not hold, because the rows keep the axis. The cost Prep C did not anticipate is completeness: with the embedding un-anchored and the anti-subspace term skipping it too, the red operand's information stays readable off the axis at slice 0, and on one of three seeds most red `mix` lines survive the full-position projection.
+
+    **The fix to carry.** Holding the syntax rows at zero after every step costs nothing this pilot can see: task, placement, and removal all read as the reference on three seeds, and the projection's non-red cost sits at the operand-only edit's level. That comparison is the one to hold loosely, since the reference's twenty seeds spread across most of that range and three seeds cannot resolve it; the handover's twenty can. The constraint keeps the table shared, so it is the arm that carries to tied models, and the untied arm stays a diagnostic. Under the whole-line labeller the `⏎` row takes the axis the same way, since it follows the newly pulled answer; the constraint covers every non-color row, so it should hold there too, but that arm did not run here. The `untied-line` arm read a larger non-red cost on one of its two seeds under both edits, which points at the labeller rather than the rows, and two seeds is too few to say more.
+
+    **What it changes.** The handover can adopt the row constraint and read the full-position projection beside the operand-only edit as its removal operator, which is what the M3-shaped operator needs. The operator pass in the D2.2 design chooses between plain projection and the shaped forms on that footing.
 
     ## Method notes
 
     - Part A's strips edit the tables of a loaded checkpoint and nothing else; `input` and `output` give the tied model a readout table of its own for the scoring pass (`NGPT.with_tables`), so the two sides can differ. The stripped rows are re-normalized to unit length, as nGPT keeps them.
-    - The control strip replaces each row's axis component with one of the same size along a random unit direction orthogonal to e₁ (one fixed draw), so the row turns by about the same angle as under `input`.
+    - The control strip replaces each row's axis component with one of the same size along a random unit direction orthogonal to e₁ (one fixed draw), so the row turns by about the same angle as under `input` and ends up off the axis as well. It reads how much of the `input` cost is the turn itself.
     - Part B's arms share ex-2.2.3's corpus, eval sets and probe lines (the same seeds through its `prepare_corpus`); the line arms train against ex-2.2.6's line-keyed probe table.
     - `rows-clean` applies `sca.anchoring.clean_embedding_rows` after every optimizer step, to every non-color row but the pad; `blocks-only` passes `anchor_slices=(1, 2, 3, 4)` to `train_anchored`, so both the anchor and the anti-subspace term skip the embedding; `untied` sets `tie_embeddings=False` on the model config, and its checkpoints carry the second table.
     - The eval and score tasks are ex-2.2.3's, unchanged; on the untied arms the eval contract reads logits through the readout table and `ablate_weights` projects both tables.
