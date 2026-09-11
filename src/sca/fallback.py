@@ -110,7 +110,7 @@ def reflected_logits(model: NGPT, h: Float[Array, "B T C"], slice_: int) -> Floa
     run_block = eqx.filter_checkpoint(lambda block, h: block(h, enc))
     for block in model.transformer.blocks[slice_:]:
         h = run_block(block, h)
-    return (h @ model.transformer.wte.T) * model.s_z()
+    return (h @ model.transformer.readout.T) * model.s_z()
 
 
 def fallback_term(

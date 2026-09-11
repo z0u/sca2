@@ -136,6 +136,7 @@ class Block(eqx.Module):
 
 class Transformer(eqx.Module):
     wte: Float[Array, "V C"]
+    lm_head: Float[Array, "V C"] | None
     blocks: tuple[Block, ...]
     rotary_enc: RotaryEncoding
 
@@ -145,8 +146,16 @@ class Transformer(eqx.Module):
         # re-projected onto the sphere by `normalize_weights` below.
         lim = config.n_embd**-0.5
         self.wte = jr.uniform(wte_key, (config.vocab_size, config.n_embd), minval=-lim, maxval=lim)
+        # An untied readout starts as a copy of the embedding, so the two tables
+        # only differ by what training does to them.
+        self.lm_head = None if config.tie_embeddings else self.wte
         self.blocks = tuple(Block(config, key=k) for k in block_keys)
         self.rotary_enc = RotaryEncoding(config.n_head_dim)
+
+    @property
+    def readout(self) -> Float[Array, "V C"]:
+        """The table the logits are read against: the embedding when tied, the separate head otherwise."""
+        return self.wte if self.lm_head is None else self.lm_head
 
 
 class NGPT(LanguageModel):
@@ -180,9 +189,9 @@ class NGPT(LanguageModel):
         for block in self.transformer.blocks:
             x = run_block(block, x)
 
-        # Hidden state is already normalized, so just project (tied LM head) and
-        # apply the learnable logit temperature.
-        return (x @ self.transformer.wte.T) * self.s_z()
+        # Hidden state is already normalized, so just project onto the readout
+        # table (the embedding, when tied) and apply the learnable logit temperature.
+        return (x @ self.transformer.readout.T) * self.s_z()
 
     def residual_stream(self, idx: Int[Array, "B T"]) -> Float[Array, "L1 B T C"]:
         """The residual stream at every depth: the embedding plus the state after each block (n_layer + 1 slices, all unit-norm).
@@ -208,17 +217,19 @@ class NGPT(LanguageModel):
         for block in self.transformer.blocks:
             x = run_block(block, x)
             states.append(x)
-        return jnp.stack(states), (x @ self.transformer.wte.T) * self.s_z()
+        return jnp.stack(states), (x @ self.transformer.readout.T) * self.s_z()
 
     def normalize_weights(self) -> "NGPT":
         """Project every hidden-dim matrix back onto the unit hypersphere.
 
-        Apply after each optimizer step to enforce nGPT's weight constraint: `model = model.normalize_weights()`. Matrices that read from the residual stream are normalized over their input axis (axis=1); matrices that write to it, over their output axis (axis=0). The LM head shares the embedding array, so it is covered once.
+        Apply after each optimizer step to enforce nGPT's weight constraint: `model = model.normalize_weights()`. Matrices that read from the residual stream are normalized over their input axis (axis=1); matrices that write to it, over their output axis (axis=0). A tied LM head shares the embedding array, so it is covered once; an untied one is a second stack of unit rows.
         """
+        tables = [self.transformer.wte] + ([] if self.transformer.lm_head is None else [self.transformer.lm_head])
 
         def where(m: NGPT):
             return (
                 [m.transformer.wte]
+                + ([] if m.transformer.lm_head is None else [m.transformer.lm_head])
                 + [b.attn.qkv.weight for b in m.transformer.blocks]
                 + [b.attn.proj.weight for b in m.transformer.blocks]
                 + [b.mlp.fc.weight for b in m.transformer.blocks]
@@ -227,7 +238,7 @@ class NGPT(LanguageModel):
 
         def replacements(m: NGPT):
             return (
-                [normalize(m.transformer.wte, axis=1)]
+                [normalize(t, axis=1) for t in tables]
                 + [normalize(b.attn.qkv.weight, axis=1) for b in m.transformer.blocks]
                 + [normalize(b.attn.proj.weight, axis=0) for b in m.transformer.blocks]
                 + [normalize(b.mlp.fc.weight, axis=1) for b in m.transformer.blocks]
@@ -235,6 +246,18 @@ class NGPT(LanguageModel):
             )  # fmt: skip
 
         return eqx.tree_at(where, self, replacements(self))
+
+    def with_tables(self, wte: Float[Array, "V C"] | None = None, readout: Float[Array, "V C"] | None = None) -> "NGPT":
+        """A copy with the embedding and/or the readout table replaced.
+
+        Passing *readout* to a tied model unties it: the logits then come from the given table while the embedding stays as it was. That is how a scoring pass edits one side of a shared table without touching the other.
+        """
+        model = self
+        if wte is not None:
+            model = eqx.tree_at(lambda m: m.transformer.wte, model, wte)
+        if readout is not None:
+            model = eqx.tree_at(lambda m: m.transformer.lm_head, model, readout, is_leaf=lambda x: x is None)
+        return model
 
     def scale_report(self) -> dict[str, list[float] | float]:
         """Read back the learned scalar temperatures, per layer.

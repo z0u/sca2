@@ -33,6 +33,11 @@ class ModelConfig(BaseModel, validate_assignment=True):
     """Make the residual step a learnable scalar gain (init n_layer ** -exp) per sublayer,
     rather than a fixed constant."""
 
+    tie_embeddings: bool = True
+    """Share one table between the token embedding and the LM head (nGPT's default). With
+    `False` the model carries a second `[V, C]` table for the readout, initialized as a copy
+    of the embedding and trained separately from it."""
+
 
 class DataConfig(BaseModel, validate_assignment=True):
     batch_size: PositiveInt
