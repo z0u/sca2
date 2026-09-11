@@ -156,7 +156,7 @@ def _forward(
         pre.append(x)
         post.append(edit(x) if i in slices else x)
         x = post[-1]
-    return jnp.stack(pre), jnp.stack(post), (x @ model.transformer.wte.T) * model.s_z()
+    return jnp.stack(pre), jnp.stack(post), (x @ model.transformer.readout.T) * model.s_z()
 
 
 def apply(
@@ -190,14 +190,17 @@ def answer_logprobs(logits: Float[np.ndarray, "N T V"], answer_pos: int) -> Floa
 def ablate_weights(model: NGPT, sub: Subspace) -> NGPT:
     """Zero the subspace in every matrix that reads from or writes to the stream, then re-normalize the weights.
 
-    Matrices that read the stream (the embedding table, which doubles as the LM head, and the qkv and MLP up-projections) lose the subspace on their input axis; matrices that write it (the attention and MLP down-projections) lose it on their output axis. `normalize_weights` runs after, since zeroing entries shortens the rows nGPT keeps at unit length; the ablation's declared order is project first, re-normalize second. No block can then read the concept or write it back, and the embedding never carries it, so the stream stays off the subspace at every slice — which is M1's permanent removal, and needs the subspace to have been cleared for it to be selective.
+    Matrices that read the stream (the embedding table, the LM head when it is a table of its own, and the qkv and MLP up-projections) lose the subspace on their input axis; matrices that write it (the attention and MLP down-projections) lose it on their output axis. `normalize_weights` runs after, since zeroing entries shortens the rows nGPT keeps at unit length; the ablation's declared order is project first, re-normalize second. No block can then read the concept or write it back, and the embedding never carries it, so the stream stays off the subspace at every slice — which is M1's permanent removal, and needs the subspace to have been cleared for it to be selective.
     """
     assert sub.orthogonal, "weight ablation removes an orthogonal subspace; an oblique eraser has no weight form"
     P = jnp.asarray(np.eye(sub.width, dtype=np.float32) - sub.basis.T @ sub.basis)
 
+    tables = [model.transformer.wte] + ([] if model.transformer.lm_head is None else [model.transformer.lm_head])
+
     def where(m: NGPT):
         return (
             [m.transformer.wte]
+            + ([] if m.transformer.lm_head is None else [m.transformer.lm_head])
             + [b.attn.qkv.weight for b in m.transformer.blocks]
             + [b.mlp.fc.weight for b in m.transformer.blocks]
             + [b.attn.proj.weight for b in m.transformer.blocks]
@@ -206,7 +209,7 @@ def ablate_weights(model: NGPT, sub: Subspace) -> NGPT:
 
     def replacements(m: NGPT):
         return (
-            [m.transformer.wte @ P]
+            [t @ P for t in tables]
             + [b.attn.qkv.weight @ P for b in m.transformer.blocks]
             + [b.mlp.fc.weight @ P for b in m.transformer.blocks]
             + [P @ b.attn.proj.weight for b in m.transformer.blocks]

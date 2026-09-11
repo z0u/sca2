@@ -107,15 +107,26 @@ def train_model(
 
 
 def _anchored_step(
-    optimizer, anchor: AnchorSpec, n_lines: int, fallback: FallbackSpec | None, fb_w: float, aa_w: float
+    optimizer,
+    anchor: AnchorSpec,
+    n_lines: int,
+    fallback: FallbackSpec | None,
+    fb_w: float,
+    aa_w: float,
+    slices: tuple[int, ...] | None = None,
+    clean_rows: tuple[int, ...] | None = None,
 ):
     """One call shape for both steps: (model, opt_state, task, anchor, anti, fallback, anti_anchor, fb_lines).
 
-    Without a fallback spec the last three are zeros, so the loop reads eight outputs either way.
+    Without a fallback spec the last three are zeros, so the loop reads eight outputs either way. The slice selection and the row constraint exist on the plain step only; the fallback step has its own reflected pass and has not needed either.
     """
     if fallback is None:
-        step = make_anchored_train_step(optimizer, tau=anchor.tau, n_lines=n_lines)
+        step = make_anchored_train_step(
+            optimizer, tau=anchor.tau, n_lines=n_lines, slices=slices, clean_rows=clean_rows
+        )
         return lambda *args: (*step(*args), 0.0, 0.0, 0.0)
+    if slices is not None or clean_rows is not None:
+        raise ValueError("anchor_slices and clean_rows are not supported together with a fallback spec")
     step = make_fallback_train_step(optimizer, fallback, tau=anchor.tau, n_lines=n_lines)
     fb_w_, aa_w_ = jnp.asarray(fb_w), jnp.asarray(aa_w)
     return lambda *args: step(*args, fb_w_, aa_w_)
@@ -157,6 +168,8 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     fallback: FallbackSpec | None = None,
     fallback_weight: float = 0.0,
     anti_anchor_weight: float = 0.0,
+    anchor_slices: tuple[int, ...] | None = None,
+    clean_rows: tuple[int, ...] | None = None,
     checkpoint_dir: Path,
     checkpoint_every: int | None = None,
     traj_stride: int = 50,
@@ -197,6 +210,12 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             mean number of qualifying lines per crop over the same window).
         fallback_weight: constant weight of the fallback cross-entropy.
         anti_anchor_weight: constant weight of the anti-anchor hinge.
+        anchor_slices: residual-stream slices the anchor and anti-subspace terms
+            act on, or None for every slice. `(1, ..., n_layer)` anchors the
+            blocks' outputs and leaves the embedding table to the task alone.
+        clean_rows: embedding rows held off the anchor axis by a hard
+            constraint after every step (`sca.anchoring.clean_embedding_rows`),
+            or None for no constraint. Neither option combines with a fallback spec.
         checkpoint_dir: Where to write checkpoints; sweep cells sharing a volume
             must each pass their own.
         checkpoint_every: Save a checkpoint every N epochs. None = about 50 in all.
@@ -221,7 +240,9 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     optimizer = configure_optimizer(model, config.optimizer, schedule)
     opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
     n_lines = config.model.block_size // LINE_TOKENS + 2  # a crop straddles at most this many lines
-    train_step = _anchored_step(optimizer, anchor, n_lines, fallback, fallback_weight, anti_anchor_weight)
+    train_step = _anchored_step(
+        optimizer, anchor, n_lines, fallback, fallback_weight, anti_anchor_weight, anchor_slices, clean_rows
+    )
 
     # A fixed validation sample, drawn off its own stream so the training crops
     # stay identical to what an unanchored run of the same seed would see.

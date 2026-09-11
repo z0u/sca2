@@ -101,6 +101,15 @@ def test_ablated_model_never_carries_the_axis():
     np.testing.assert_allclose(np.linalg.norm(wte, axis=1), 1.0, rtol=0, atol=1e-6)
 
 
+def test_ablation_clears_an_untied_head_too():
+    """With a readout table of its own, the ablation zeroes the axis on it as well as on the embedding."""
+    config = ModelConfig(**{**model_config().model_dump(), "tie_embeddings": False})
+    model = ablate_weights(build_model(config, key=jr.PRNGKey(1)), Subspace.axis(WIDTH))
+    head = np.asarray(model.transformer.lm_head)
+    np.testing.assert_allclose(head[:, 0], 0.0, rtol=0, atol=0)
+    np.testing.assert_allclose(np.linalg.norm(head, axis=1), 1.0, rtol=0, atol=1e-6)
+
+
 def test_ablation_refuses_an_oblique_subspace():
     sub = Subspace(basis=np.eye(WIDTH)[:1], dual=np.eye(WIDTH)[1:2], mean=np.zeros(WIDTH))
     with pytest.raises(AssertionError):

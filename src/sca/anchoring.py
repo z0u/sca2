@@ -25,6 +25,7 @@ from jaxtyping import Array, Float, Int, PyTree
 
 from sca.config import DataConfig, ModelConfig
 from sca.model import LanguageModel
+from sca.model.ngpt import NGPT
 from sca.training.loop import cross_entropy
 
 ANCHOR_AXIS = 0
@@ -261,13 +262,21 @@ def make_anchored_train_step(
     optimizer: optax.GradientTransformation,
     tau: float | None = None,
     n_lines: int = 0,
+    slices: tuple[int, ...] | None = None,
+    clean_rows: tuple[int, ...] | None = None,
 ):
     """Build a jitted training step for cross-entropy plus the two weighted anchor terms.
 
     The weights are arguments rather than closures, so the schedules move without recompiling; *tau* is fixed per build, since a condition's pooling does not move over training. With `tau=None` the anchor term is the flat per-position mean (`anchor_term`); with a float (∞ allowed) it is the per-line mellowmax (`pooled_anchor_term`), and *n_lines* bounds the local line index the step's `line_id` argument carries. Returns the three loss terms separately: the anchor term is the training-side view of what the alignment measurements read later, and the anti-subspace term is the same view of the mean alignment the containment gates score. Pass `anti_weight=0` for a bare anchor.
+
+    *slices* restricts both terms to the named residual-stream slices (slice 0 is the embedding); `None` is every slice, the term as ex-2.1 and ex-2.2 trained it. *clean_rows* names embedding rows that may not carry the anchor axis: after each optimizer step and nGPT's re-normalization, the axis component of those rows is zeroed and the rows re-normalized, the same kind of hard constraint as the unit norm. It is the tied-table fix for the syntax-row leak: the rows stay shared between the embedding and the readout, and training finds whatever solution it can with them held off the axis.
     """
     if tau is not None and n_lines < 1:
         raise ValueError(f"pooled anchor (tau={tau}) needs n_lines >= 1, got {n_lines}")
+    if slices is not None and len(slices) == 0:
+        raise ValueError("slices must name at least one residual-stream slice, or be None for all")
+    sel = None if slices is None else jnp.asarray(sorted(set(slices)))
+    rows = None if clean_rows is None else jnp.asarray(sorted(set(clean_rows)))
 
     @eqx.filter_jit
     def train_step(
@@ -284,6 +293,8 @@ def make_anchored_train_step(
             states, logits = model.stream_and_logits(x)
             live = (x != 0).astype(states.dtype)
             task = cross_entropy(logits, y)
+            if sel is not None:
+                states = states[sel]
             anchor = (
                 anchor_term(states, mask) if tau is None else pooled_anchor_term(states, mask, line_id, n_lines, tau)
             )
@@ -293,9 +304,23 @@ def make_anchored_train_step(
         (_, (task, anchor, anti)), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(model)
         updates, opt_state = optimizer.update(grads, opt_state, eqx.filter(model, eqx.is_inexact_array))
         model = eqx.apply_updates(model, updates)
-        return model.normalize_weights(), opt_state, task, anchor, anti
+        model = model.normalize_weights()
+        if rows is not None:
+            model = clean_embedding_rows(model, rows)
+        return model, opt_state, task, anchor, anti
 
     return train_step
+
+
+def clean_embedding_rows(model: NGPT, rows: Int[Array, " R"]) -> NGPT:
+    """Zero the anchor-axis component of the named embedding rows and put them back on the sphere.
+
+    Applied after `normalize_weights`, so the rows leave at unit length with no component on `ANCHOR_AXIS`. A tied readout reads through the same rows, so the constraint holds on both sides of the table.
+    """
+    wte = model.transformer.wte
+    cleaned = wte[rows].at[:, ANCHOR_AXIS].set(0.0)
+    cleaned = cleaned / jnp.maximum(jnp.linalg.norm(cleaned, axis=1, keepdims=True), 1e-12)
+    return eqx.tree_at(lambda m: m.transformer.wte, model, wte.at[rows].set(cleaned))
 
 
 def sample_anchored_batches(

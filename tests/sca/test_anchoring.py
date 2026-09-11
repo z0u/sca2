@@ -2,9 +2,11 @@
 
 from dataclasses import replace
 
+import equinox as eqx
 import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
+import optax
 import pytest
 
 import jax
@@ -530,3 +532,83 @@ def test_the_labeller_draws_the_same_crops_whatever_it_labels(corpus):
         np.testing.assert_array_equal(x0, x1)
         np.testing.assert_array_equal(y0, y1)
         assert m0.sum() == 0 and m1.sum() > 0  # only the mask moved
+
+
+def test_slice_selection_restricts_both_terms(corpus):
+    """With `slices` named, the step's anchor and anti terms are the terms on those slices alone."""
+    from sca.anchoring import make_anchored_train_step
+
+    config = model_config()
+    model = build_model(config, key=jr.key(0))
+    optimizer = optax.sgd(1e-3)
+    opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+    x = jnp.asarray(corpus[: 2 * config.block_size].reshape(2, config.block_size))
+    y = jnp.asarray(corpus[1 : 2 * config.block_size + 1].reshape(2, config.block_size))
+    mask = (x == COLORS[0]).astype(jnp.float32)
+    line_id = jnp.zeros_like(x)
+    states, _ = model.stream_and_logits(x)
+    live = (x != 0).astype(jnp.float32)
+
+    every = make_anchored_train_step(optimizer)
+    blocks = make_anchored_train_step(optimizer, slices=(1, 2))
+    _, _, task_a, anchor_a, anti_a = every(model, opt_state, x, y, mask, line_id, jnp.asarray(1.0), jnp.asarray(1.0))
+    _, _, task_b, anchor_b, anti_b = blocks(model, opt_state, x, y, mask, line_id, jnp.asarray(1.0), jnp.asarray(1.0))
+    np.testing.assert_allclose(task_a, task_b, rtol=1e-6, atol=0)
+    np.testing.assert_allclose(anchor_a, anchor_term(states, mask), rtol=1e-5, atol=0)
+    np.testing.assert_allclose(anchor_b, anchor_term(states[1:], mask), rtol=1e-5, atol=0)
+    np.testing.assert_allclose(anti_b, anti_subspace_term(states[1:], live), rtol=1e-5, atol=0)
+    assert abs(float(anchor_a - anchor_b)) > 1e-6  # the embedding slice made a difference
+    with pytest.raises(ValueError):
+        make_anchored_train_step(optimizer, slices=())
+
+
+def test_clean_rows_leave_each_step_off_the_axis(corpus):
+    """The row constraint zeroes the axis on the named rows after the update; the rest of the table moves freely."""
+    from sca.anchoring import ANCHOR_AXIS, make_anchored_train_step
+
+    config = model_config()
+    model = build_model(config, key=jr.key(0))
+    optimizer = optax.sgd(3e-2)
+    opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
+    x = jnp.asarray(corpus[: 2 * config.block_size].reshape(2, config.block_size))
+    y = jnp.asarray(corpus[1 : 2 * config.block_size + 1].reshape(2, config.block_size))
+    mask = (x == COLORS[0]).astype(jnp.float32)
+    line_id = jnp.zeros_like(x)
+    rows = (PLUS, EQ, NEWLINE)
+
+    step = make_anchored_train_step(optimizer, clean_rows=rows)
+    for _ in range(3):
+        model, opt_state, *_ = step(model, opt_state, x, y, mask, line_id, jnp.asarray(1.0), jnp.asarray(0.0))
+    wte = np.asarray(model.transformer.wte)
+    np.testing.assert_allclose(wte[list(rows), ANCHOR_AXIS], 0.0, rtol=0, atol=0)
+    np.testing.assert_allclose(np.linalg.norm(wte, axis=1), 1.0, rtol=0, atol=1e-5)
+    # Rows outside the constraint still carry whatever the pull gave them.
+    assert abs(wte[COLORS[0], ANCHOR_AXIS]) > 1e-4
+
+
+def test_train_anchored_threads_slices_and_clean_rows(data_dir, tmp_path):
+    """The loop accepts both options, and a blocks-only run with clean rows ends with the rows clean."""
+    from sca.anchoring import ANCHOR_AXIS
+
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    tokens, weights = probe_set()
+    rows = (PLUS, EQ, NEWLINE)
+    model, metrics, traj = train_anchored(
+        training_config().model_copy(
+            update={"scheduler": SchedulerConfig(epochs=3, warmup_epochs=1, min_lr_factor=0.01)}
+        ),
+        data_dir,
+        anchor=AnchorSpec(peak=1.0, warmup_epochs=1, anneal_start=2, anneal_end=3),
+        label_p=label_p,
+        probe_tokens=tokens,
+        probe_weights=weights,
+        anchor_slices=(1, 2),
+        clean_rows=rows,
+        checkpoint_dir=tmp_path / "ckpt",
+        traj_stride=5,
+    )
+    assert len(metrics) == 3
+    wte = np.asarray(model.transformer.wte)
+    np.testing.assert_allclose(wte[list(rows), ANCHOR_AXIS], 0.0, rtol=0, atol=0)
+    assert traj["anchor"][-1] < traj["anchor"][0]
