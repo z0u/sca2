@@ -1,0 +1,22 @@
+---
+status: open
+tags: [D2.2, intervention, fallback, superposition, ex-2.2.2, ex-2.2.8]
+opened: 2026-09-11
+---
+# Repulsion onto the fallback: give the trained landing a guaranteed operator
+
+Every operator in the eval contract moves a state along one path: the great circle through the state and the anchor pole. The projection walks it to the equator, the shaped suppression walks it partway and stops wherever re-normalization leaves it, and repulsion walks it partway and stops at a landing alignment named in advance. None of them chooses a direction; where the state ends up off-axis is whatever it was already carrying there, $\mathbf{u}_\perp$. In the toy model the equator on that circle is empty, and [ex-2.2.8](/docs/m2/ex-2.2.8/report.py) found the projection's decodes on red lines to be near misses of the true answer. In a model with superposition, that landing is whichever feature shares the direction $\mathbf{u}_\perp$ points at, so a full swing lands in some other concept's region. A bounded landing (repulsion at $b > 0$) stays in *red*'s own lobe, but ex-2.2.8 also found that the lobe below about 0.26 is where the non-red lines already sit on the adopted point, so a landing there is ambiguous to the readout: it read as partial removal.
+
+The one landing site the model has set aside is the fallback. [Ex-2.2.2](/docs/m2/ex-2.2.2/report.py) trains the response at the antipode, using the reflection ($\gamma = 2$ in the projection operator, a state at $\alpha$ lands at $-\alpha$), and the [D2.2 design](/docs/m2/d2.2/design.md) names the mismatch: the response is trained at the antipode, while the deployed projection lands the state at zero, a place training never visited. H4 of ex-2.2.2 found the fallback transfers to zero at more than half strength; it also found the reflection destructive on non-red lines in every anchored model, because the syntax rows carry the axis and the reflection at every position flips them too.
+
+Repulsion closes the gap with one parameter. `repulsion_mapper` accepts a negative landing and the operator handles it as written: above the threshold *a*, land at $-b$ along the state's own circle, keeping $\mathbf{u}_\perp$; at $b = -1$ every edited state lands on the fallback pole itself. That makes the reflection ($b = -\alpha$, no threshold) and the projection ($b = 0$) two rows of one sweep, and it separates the two things the reflection did at once: send red operands to the trained side, and flip the syntax rows. The claim to test is that a thresholded negative landing recovers the reflection's fallback accuracy without its non-red cost. The fallback gives the landing a meaning, and repulsion gives the landing a guarantee, which is the anchoring argument applied to the destination as well as the origin.
+
+What it would take, in order of commitment:
+
+- A test that `repulsion` with $b < 0$ lands where the mapper says and keeps $\mathbf{u}_\perp$ (the current tests only cover $b \ge 0$; the Bézier monotone condition $b \ge a + (1 - a)/3$ does not hold for a negative landing, so use the linear mapper or state the Bézier's overshoot).
+- A scoring-only pass on ex-2.2.2's twelve stored checkpoints, in the ex-2.2.8 survey format: repulsion at thresholds above the non-red band and landings $b \in \{-0.25, -0.5, -1\}$, at every position and at the operand positions, beside the reflection and the projection rows already scored, reading fallback accuracy, red accuracy, and the non-red deficit. The operand-only rows are the fair comparison on those checkpoints: they are the D2.1 recipe, on which the syntax rows carry the axis at about the level `t00` does, and ex-2.2.8 found no whole-sequence edit feasible on such a point. The whole-sequence rows still say how much of the reflection's cost the threshold alone removes.
+- The whole-sequence version becomes testable once a fallback is trained on the adopted `recipe-short` point (whose non-red band tops out near 0.26), in the anchored-op prereg or a fallback re-run there.
+
+The landing figure in ex-2.2.8 shows the linear mapper holding a positive landing through slice 3 before the last block pulls it down; whether a negative landing holds the same way, and whether the fallback readout needs it to, is part of what the pass would show.
+
+Grew out of the [repulsion item](./repulsion-sets-the-landing-alignment.md) and the ex-2.2.2 fallback finding; the [LUNAR item](./lunar-fit-retain-term-and-weight-sweep.md) is the post-hoc counterpart, a fitted redirect into a region the model already produces.
