@@ -15,3 +15,5 @@ Ex-2.2.3's frozen rule adopted `t00` (λ_a 0.557, τ 0.265, anti peak 1.376, 50 
 The fallback if these prove too expensive: `t12` was the runner-up on m_line, with contrast 0.44, lead 0.48, and an H1 gap of 0.002. The recipe itself stays feasible on the six-op grammar (H2 holds), at the lower plateau the H3 section describes.
 
 From [ex-2.2.3](/docs/m2/ex-2.2.3/report.py#discussion), Discussion.
+
+**2026-09-11, Fable** — the fourth bullet is priced: [ex-2.2.8](/docs/m2/ex-2.2.8/report.py) scored a hundred operators on `t00`'s five stored seeds. Every edit applied at every position costs between 0.32 and 0.95 of the non-red `mix` lines (the plain projection 0.62, and every thresholded step more than that), and every operand-only edit is inside the gate; `operands` reads red accuracy 0.078 at a deficit of 0.024, and the lowest feasible red accuracy is `shaped-a0.1-p0-operands` at 0.071, not resolved apart at five seeds. On the adopted `recipe-short` the same survey picks the plain projection. So a prereg on `t00` names an operand-only operator up front; the choice of point and the choice of operator go together.

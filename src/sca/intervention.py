@@ -2,7 +2,7 @@
 
 Every method that claims to have located a concept, whether it placed the concept there during training (`sca.anchoring`) or found it afterwards (`diff_in_means`, `probe_direction`, `leace`), produces the same triple: a model, a `Subspace`, and an operator that edits the stream at that subspace. One scorer, `apply`, takes the triple and returns what every downstream statistic reads: the stream as it arrived at each operator, the stream after it, and the logits. Keeping the contract method-agnostic is what lets a post-hoc baseline and an anchored model be scored on identical lines with identical code.
 
-Three operators. `projection` removes a fraction γ of the concept component and re-projects onto the sphere — M1's suppression, with strength as a dose axis. `shaped_suppression` is M1's bounded falloff (`asec_intervention_lobes.tex`): a fraction of the component that leaves states below an alignment threshold untouched. `ablate_weights` is the permanent form: it zeroes the subspace in every matrix that reads from or writes to the stream, then re-normalizes the weights, in that order.
+Four operators. `projection` removes a fraction γ of the concept component and re-projects onto the sphere — M1's suppression, with strength as a dose axis. `shaped_suppression` is M1's bounded falloff (`asec_intervention_lobes.tex`): a fraction of the component that leaves states below an alignment threshold untouched. `repulsion` is M1's other form from the same appendix: it sets where a state lands on the axis (a mapper from the arriving alignment to the leaving one) rather than how much is removed, so its write is a known function of its input. `ablate_weights` is the permanent form: it zeroes the subspace in every matrix that reads from or writes to the stream, then re-normalizes the weights, in that order.
 
 Where operators act: on the between-block stream, the same slices `NGPT.residual_stream` returns and the anchor term reads. The stream is unit-norm, so an operator's output goes back onto the sphere before the next block consumes it, and the re-projection is part of the write: removing a component of size α rescales what survives by `gain(α, γ)`, and the whole edit is a rotation by `write_angle(α, γ)`. Both are closed-form in the pre-intervention alignment, which is what makes a write bound computable from a published alignment map before any intervention runs.
 """
@@ -92,6 +92,52 @@ def shaped_suppression(sub: Subspace, a: float = 0.0, b: float = 1.0, p: float =
         alpha = jnp.maximum(sub.coefficients(h)[..., 0], 0.0)
         out = h - (falloff(alpha, a, b, p) * alpha)[..., None] * sub.basis[0]
         return normalize(out) if renorm else out
+
+    return op
+
+
+def repulsion_mapper(alpha, a: float, b: float, kind: str = "linear"):
+    """M1's landing map m(α) for `repulsion`: the identity below the threshold *a*, and above it the alignment a state is sent to.
+
+    `linear` is the appendix's ceiling: every state at or above *a* lands at *b* (a step at *a* unless a = b, where it is `min(α, b)`). `bezier` is its smooth form: a cubic Bézier from (a, a) to (1, b), leaving with unit slope and arriving flat, so the map is continuous in α; it is monotone when b ≥ a + (1 − a)/3 (the control points' heights are then ordered), and otherwise rises before it settles at *b*, staying within the span of those heights. Both are closed-form (the Bézier by a fixed bisection on its parameter), and both accept numpy or JAX input, which is what lets the scorer check an operator's write against this function.
+    """
+    xp = jnp if isinstance(alpha, jax.Array) else np
+    alpha = xp.asarray(alpha)
+    if kind == "linear":
+        return xp.where(alpha >= a, b, alpha)
+    if kind != "bezier":
+        raise ValueError(kind)
+    d = (1.0 - a) / 3.0
+    p0, p1, p2, p3 = (a, a), (a + d, a + d), (1.0 - d, b), (1.0, b)
+
+    def curve(t, i):
+        return (1 - t) ** 3 * p0[i] + 3 * (1 - t) ** 2 * t * p1[i] + 3 * (1 - t) * t**2 * p2[i] + t**3 * p3[i]
+
+    lo, hi = xp.zeros_like(alpha), xp.ones_like(alpha)
+    for _ in range(40):  # B_x is monotone in t, so a bisection finds t* to float precision
+        mid = (lo + hi) / 2
+        below = curve(mid, 0) < alpha
+        lo, hi = xp.where(below, mid, lo), xp.where(below, hi, mid)
+    return xp.where(alpha > a, curve((lo + hi) / 2, 1), alpha)
+
+
+def repulsion(sub: Subspace, a: float, b: float, kind: str = "linear") -> Operator:
+    """Repulsion on a rank-1 subspace: rotate each state within the plane it spans with the direction, so that it lands at alignment m(α).
+
+    `x' = m(α)·v + √(1 − m(α)²)·u⊥`, with u⊥ the unit vector of what is left of *x* once the direction is removed (`asec_intervention_lobes.tex`). Unlike `projection` and `shaped_suppression`, the output alignment is set rather than what re-normalization leaves, so the write is `arccos m(α) − arccos α` by construction, and a state that arrives fully aligned (u⊥ undefined) is left where it is. States below the threshold, and states with a negative coefficient, are untouched.
+    """
+    assert sub.basis.shape[0] == 1, "repulsion is defined on a single direction"
+    v = sub.basis[0]
+
+    def op(h: Float[Array, "... C"]) -> Float[Array, "... C"]:
+        alpha = jnp.maximum(sub.coefficients(h)[..., 0], 0.0)
+        rest = h - alpha[..., None] * v
+        norm = jnp.linalg.norm(rest, axis=-1)
+        m = repulsion_mapper(alpha, a, b, kind)
+        u = rest / jnp.maximum(norm, 1e-12)[..., None]
+        out = m[..., None] * v + jnp.sqrt(jnp.maximum(1.0 - m**2, 0.0))[..., None] * u
+        moved = (m != alpha) & (norm > 1e-6)
+        return jnp.where(moved[..., None], out, h)
 
     return op
 

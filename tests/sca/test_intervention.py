@@ -17,6 +17,8 @@ from sca.intervention import (
     shaped_suppression,
     probe_direction,
     projection,
+    repulsion,
+    repulsion_mapper,
     write_angle,
 )
 from sca.model import build_model
@@ -137,3 +139,43 @@ def test_leace_leaves_no_linear_trace_of_the_concept():
     w = probe_direction(erased, z)
     pred = erased @ w.basis[0]
     assert abs(np.corrcoef(pred, z)[0, 1]) < 0.05
+
+
+def test_repulsion_lands_where_the_mapper_says_and_stays_on_the_sphere():
+    h = unit(np.random.default_rng(2), 9)
+    h[:, 0] = np.linspace(-0.2, 0.95, 9)
+    h[:, 1:] *= np.sqrt(1 - h[:, :1] ** 2) / np.linalg.norm(h[:, 1:], axis=-1, keepdims=True)
+    for kind, a, b in [("linear", 0.5, 0.2), ("linear", 0.4, 0.4), ("bezier", 0.0, 0.5), ("bezier", 0.2, 0.2)]:
+        out = np.asarray(repulsion(Subspace.axis(WIDTH), a=a, b=b, kind=kind)(jnp.asarray(h)))
+        m = repulsion_mapper(np.maximum(h[:, 0], 0.0), a, b, kind)
+        np.testing.assert_allclose(np.linalg.norm(out, axis=-1), 1.0, rtol=0, atol=1e-6)
+        np.testing.assert_allclose(out[:, 0], np.where(h[:, 0] > 0, m, h[:, 0]), rtol=0, atol=1e-6)
+        # The write is the angle between the arriving and the landing alignment, by construction.
+        expected = np.abs(np.arccos(np.clip(m, -1, 1)) - np.arccos(np.clip(np.maximum(h[:, 0], 0.0), -1, 1)))
+        np.testing.assert_allclose(angle_between(h, out), expected, rtol=0, atol=1e-5)
+        # The off-axis direction is kept: only the plane spanned by the state and the axis is touched.
+        rest_in, rest_out = h[:, 1:], out[:, 1:]
+        cos = (rest_in * rest_out).sum(-1) / (np.linalg.norm(rest_in, axis=-1) * np.linalg.norm(rest_out, axis=-1))
+        np.testing.assert_allclose(cos, 1.0, rtol=0, atol=1e-5)
+    # Negative and below-threshold states are untouched.
+    out = np.asarray(repulsion(Subspace.axis(WIDTH), a=0.5, b=0.2)(jnp.asarray(h)))
+    np.testing.assert_allclose(out[h[:, 0] < 0.5], h[h[:, 0] < 0.5], rtol=0, atol=1e-6)
+
+
+def test_repulsion_mapper_endpoints_and_monotone_region():
+    alpha = np.linspace(0, 1, 101)
+    lin = repulsion_mapper(alpha, 0.5, 0.2, "linear")
+    np.testing.assert_allclose(lin[alpha < 0.5], alpha[alpha < 0.5])
+    np.testing.assert_allclose(lin[alpha >= 0.5], 0.2)
+    bez = repulsion_mapper(alpha, 0.0, 0.5, "bezier")
+    np.testing.assert_allclose([bez[0], bez[-1]], [0.0, 0.5], rtol=0, atol=1e-6)
+    assert np.all(np.diff(bez) >= -1e-9), "monotone when b ≥ a + (1 − a)/3"
+    # The JAX path agrees with numpy.
+    np.testing.assert_allclose(np.asarray(repulsion_mapper(jnp.asarray(alpha), 0.0, 0.5, "bezier")), bez, atol=1e-6)
+
+
+def test_repulsion_leaves_a_fully_aligned_state_where_it_is():
+    h = np.zeros((1, WIDTH), dtype=np.float32)
+    h[0, 0] = 1.0
+    out = np.asarray(repulsion(Subspace.axis(WIDTH), a=0.5, b=0.0)(jnp.asarray(h)))
+    np.testing.assert_allclose(out, h, rtol=0, atol=1e-6)
