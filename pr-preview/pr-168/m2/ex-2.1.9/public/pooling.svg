@@ -1,0 +1,166 @@
+<svg
+  width="479"
+  height="388"
+  viewBox="0 0 479 388"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+  style="color-scheme: light dark; --cube-fill: light-dark(#fff, #222);"
+>
+  <!-- cube-fill is different from the color cube fill to keep them visually distinct. -->
+    <rect
+      width="479"
+      height="388"
+      style="fill: light-dark(white, transparent)"
+    />
+    <g id="cube">
+      <path
+        id="cube-silhouette"
+        d="M69.0496 123.175V264.744L204.593 343L340.136 264.744V123.175L204.593 44.919L69.0496 123.175Z"
+        stroke-width="2"
+        style="stroke: light-dark(black, white); fill: var(--cube-fill);"
+      />
+      <path
+        id="cube-edges-in"
+        d="M69.0496 123.175L204.481 201.495M204.593 343V201.56L204.481 201.495M340.136 123.175L204.481 201.495"
+        style="stroke: light-dark(black, white); opacity: 0.7;"
+        stroke-width="1"
+      />
+      <g
+        id="cube-subdivisions"
+        opacity="0.33"
+        stroke-width="0.5"
+        style="stroke: light-dark(black, white)"
+      >
+        <path d="M69.3643 159.026L204.593 237.018" />
+        <path d="M339.821 159.026L204.593 237.018" />
+        <path d="M69.3643 123.175L204.593 201.167" />
+        <path d="M205.222 45.1825L340.45 123.175" />
+        <path d="M171.257 64.6806L306.486 142.673" />
+        <path d="M103.329 103.677L238.557 181.669" />
+        <path d="M137.293 84.1786L272.522 162.171" />
+        <path d="M339.821 123.175L204.593 201.167" />
+        <path d="M298.938 99.903L163.71 177.895" />
+        <path d="M69.3643 194.248L204.593 272.241" />
+        <path d="M339.821 194.248L204.593 272.241" />
+        <path d="M69.3643 229.471L204.593 307.463" />
+        <path d="M339.821 229.471L204.593 307.463" />
+        <path d="M69.3643 264.693L204.593 342.685" />
+        <path d="M339.821 264.693L204.593 342.685" />
+        <path d="M204.593 201.167V342.685" />
+        <path d="M339.821 123.175V264.693" />
+        <path d="M273.151 162.171V303.689" />
+        <path d="M238.557 181.669V323.187" />
+        <path d="M306.486 142.673V284.191" />
+        <path d="M163.71 177.895V213.747" />
+        <path d="M103.329 177.895V213.747" />
+        <path d="M163.71 248.34V284.191" />
+        <path d="M103.329 248.34V284.191" />
+      </g>
+
+      <g
+        id="mellowmax-connectors"
+        stroke-width="1"
+        stroke-linecap="round"
+        stroke="magenta"
+        stroke-dasharray="2 2"
+      >
+        <path d="M 273.465 103.493 L 323.165 132.208" />
+        <path d="M 239.501 122.991 L 289.201 151.706" />
+        <path d="M 205.536 142.489 L 255.236 171.204" />
+        <path d="M 171.572 161.988 L 221.272 190.703" />
+      </g>
+      <g
+        id="mellowmax-long"
+        stroke-width="5"
+        stroke-linecap="round"
+        stroke="magenta"
+      >
+        <path d="M 199.247 60.6432 L 273.465 103.493" />
+        <path d="M 165.282 80.1413 L 239.501 122.991" />
+        <path d="M 131.318 99.6394 L 205.536 142.489" />
+        <path d="M 97.3533 119.137 L 171.572 161.988" />
+      </g>
+      <g
+        id="mellowmax-short"
+        stroke-width="5"
+        stroke-linecap="round"
+        stroke="magenta"
+      >
+        <path d="M 290.447 113.477 L 313.719 126.685" />
+        <path d="M 256.483 132.975 L 279.755 146.183" />
+        <path d="M 222.518 152.473 L 245.790 165.681" />
+        <path d="M 188.554 171.971 L 211.826 185.179" />
+      </g>
+      <g
+        id="mean-outline"
+        stroke-width="8"
+        stroke-linecap="round"
+        style="stroke: var(--cube-fill)"
+      >
+        <path d="M273.465 161.907V285.815" />
+        <path d="M221 191.494L322.893 133" />
+      </g>
+      <g id="mean" stroke-width="5" stroke-linecap="round" stroke="orange">
+        <path d="M273.465 161.907V285.815" />
+        <path d="M221 191.494L322.893 133" />
+      </g>
+    </g>
+    <g
+      id="axis-labels"
+      style="white-space: pre"
+      xml:space="preserve"
+      font-family="sans-serif"
+      font-size="14"
+      text-anchor="middle"
+      letter-spacing="0.3"
+    >
+      <text
+        id="sequence"
+        style="fill: light-dark(black, white)"
+        transform="translate(280 80) rotate(60) skewY(-30)"
+      >
+        <tspan>line, sequence</tspan>
+      </text>
+      <text
+        id="slice"
+        style="fill: light-dark(black, white)"
+        transform="translate(130 80) rotate(-30) skewX(30)"
+      >
+        <tspan>slice</tspan>
+      </text>
+      <text
+        id="batch"
+        style="fill: light-dark(black, white)"
+        transform="translate(360 187) rotate(-90) skewX(30)"
+      >
+        <tspan>batch</tspan>
+      </text>
+    </g>
+    <g
+      id="legend"
+      style="white-space: pre"
+      xml:space="preserve"
+      font-family="sans-serif"
+      font-size="14"
+      transform="translate(-10 280)"
+    >
+      <path
+        d="M322 41.7499H350"
+        stroke="magenta"
+        stroke-width="5"
+        stroke-linecap="round"
+      />
+      <path
+        d="M322 70.7499H350"
+        stroke="orange"
+        stroke-width="5"
+        stroke-linecap="round"
+      />
+      <text id="mellowmax" style="fill: light-dark(black, white)">
+        <tspan x="365.5" y="47.3182">mellowmax</tspan>
+      </text>
+      <text id="mean_2" style="fill: light-dark(black, white)">
+        <tspan x="365.5" y="76.3182">mean</tspan>
+      </text>
+    </g>
+</svg>

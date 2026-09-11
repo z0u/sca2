@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D2.2 design: anchoring an operation, and the first interventions (DRAFT)</title>
+<link rel="stylesheet" href="../../md.css">
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.12.3/dist/mermaid.esm.min.mjs";
+const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+mermaid.initialize({ startOnLoad: false, theme: dark ? "dark" : "default" });
+await mermaid.run();
+</script>
+</head>
+<body>
+<h1 id="d22-design-anchoring-an-operation-and-the-first-interventions-draft">D2.2 design: anchoring an operation, and the first interventions (DRAFT)</h1>
+<p>A plan for the second deliverable of M2, laid out several ways: the claims we want to be able to make, the experiments in order, the engineering that has to come first, the risks each experiment retires, and what is out of scope.</p>
+<p>Inputs: the D2.1 close-out (<a href="../ex-2.1.11/">ex-2.1.11</a>, <a href="../ex-2.1.12/">ex-2.1.12</a>, and the <a href="https://github.com/z0u/sca2/blob/main/references/d2.1-anchored-transformer.md">post</a>), the first D2.2 result (<a href="../ex-2.2.1/">ex-2.2.1</a>), the D2.2-tagged backlog (<code>./go todo --tag D2.2</code>), the D2.1 kickoff lessons carried over from the autoencoders, and the <a href="https://github.com/z0u/sca2/blob/main/references/related-work-delta-2026.md">related-work delta</a>.</p>
+<h2 id="what-we-want-to-be-able-to-say">What we want to be able to say</h2>
+<ol>
+<li><strong>Anchoring generalizes past a token attribute.</strong> <em>Red</em> is a property of the token at a known position. An <em>operation</em> is a property of the computation: its evidence is at the op token, and its use is at <code>=</code> and after, deeper in the stack. D2.2 is where we find out whether the anchor captures more than the identity of a token at a labelled site.</li>
+<li><strong>Suppressing the anchor removes the ability, and the removal is graded and selective.</strong> In M1 this had three parts: a dose-response curve, selectivity (orthogonal colors untouched), and an analytic bound the observed damage approached.</li>
+<li><strong>The side-effects were boundable before intervening.</strong> Post-hoc methods now bound side-effects too, estimated from emergent geometry (COAST, arXiv:2605.01167; pre-intervention prediction, arXiv:2606.08365). SCA's distinctive claim is that its bound holds by construction, because the geometry was placed.</li>
+</ol>
+<p><strong>D2.1 never ran an intervention.</strong> The first suppression of a transformer was <a href="../ex-2.2.1/">ex-2.2.1</a>, on the <em>red</em> checkpoints already in the store; the second claim now has its first transformer data, and the third its write-bound half.</p>
+<h2 id="experiments-sketch">Experiments sketch</h2>
+<p>Loose plan for experiments to run.</p>
+<pre class="mermaid">flowchart LR
+a1([&quot;suppress red (ex-2.2.1)&quot;])
+a2([&quot;fallback control (ex-2.2.2)&quot;])
+b1([&quot;new grammar (ex-2.2.3)&quot;])
+b2([&quot;scouting and pilots (ex-2.2.4 to 2.2.6)&quot;])
+b3([&quot;grammar handover&quot;])
+c1([&quot;un-anchored embeddings&quot;])
+main1([&quot;anchor operation&quot;])
+main2([&quot;suppress operation&quot;])
+sweep([&quot;layer sweep&quot;])
+comp([&quot;SGTM baseline&quot;])
+w([&quot;write-up&quot;])
+
+a1 --&gt; a2
+b1 --&gt; b2 --&gt; b3
+a2 &amp; b3 &amp; c1 --&gt; main1 --&gt; main2 --&gt; sweep &amp; comp --&gt; w
+</pre>
+<h3 id="prep-a-suppression-of-concrete-concepts-operands">Prep A: Suppression of concrete concepts (operands)</h3>
+<h4 id="suppress-red-on-the-existing-checkpoints">Suppress red on the existing checkpoints</h4>
+<p>Ran as <a href="../ex-2.2.1/">ex-2.2.1</a>. No training: axis projection applied to the ex-2.1.10 primary (nine seeds), completion accuracy scored on lines with a red operand against lines without, through the eval contract.</p>
+<p>What it found: the removal takes effect, it grades with how red the line is, and it stays inside the layer-local write bound at every slice. Zeroing the axis weights does the same job. Selectivity is only partial. The cost to non-red lines comes from the <code>+</code> and <code>=</code> positions, whose embeddings carry a constant component on the axis. The <code>operands</code> and <code>shaped</code> arms both avoid that cost, with the shaped suppression removing only about half of <em>red</em> at the M1 threshold. On depth, the concept is read from the operand states in the first two blocks, and the last block does not read it; a removal applied only at the embeddings is partly re-derived later. The post-hoc tier (a probe, diff-in-means, and LEACE on the un-anchored control) removes red only at a non-red cost an order of magnitude above the cost of the placed axis.</p>
+<p>The bound was stated as layer-local, as the <a href="https://github.com/z0u/sca2/blob/main/todo/science/d21-kickoff-carry-over-lessons.md">kickoff lessons</a> advise. The geometry bounds the immediate write at the slice we intervene on, including the $1/\sqrt{1-x_1^2}$ gain; what the behavior does in response is a prediction rather than part of the bound. The write bound held. One seed still paid a non-red cost from a write that stayed within bound, so what the later blocks do with a bounded rotation is a property of the trained model, and that is the question for the <a href="#layer-sweep">layer sweep</a>.</p>
+<p>These checkpoints have no fallback term, so the response to suppression was undesigned. A red line decodes in the color vocabulary to a near miss of the true answer, a one-step neighbor about half the time, and which neighbor varies by seed. At least five of nine seeds agree on 13% of red lines. That is the reference (baseline) for the <a href="#fallback-control">fallback control</a>.</p>
+<p><strong>The intervention is still open.</strong> Ex-2.2.1 leaves two selective interventions (<code>operands</code> and <code>shaped</code>) and one that removes fully (the plain projection). None are both complete and selective. Before the <a href="#anchor-one-operation">anchor-op prereg</a> commits to one, we will run a scoring-only pass on the stored ex-2.2.1 runs: tune the threshold and ramp of the shaped suppression, and try the repulsion form, which sets where the state lands rather than how much is removed (<a href="https://github.com/z0u/sca2/blob/main/todo/science/repulsion-sets-the-landing-alignment.md">item</a>). There is no training, so it costs what ex-2.2.1 cost to score, and it settles the <a href="https://github.com/z0u/sca2/blob/main/todo/science/shaped-suppression-rather-than-projecting-whole-axis.md">shaped-suppression item</a>. Meanwhile the fallback experiment carries all three as ride-along rows.</p>
+<h4 id="fallback-control">Fallback control</h4>
+<p>Preregistered as <a href="../ex-2.2.2/">ex-2.2.2</a>. This is <a href="https://github.com/z0u/sca2/blob/main/todo/science/d21-kickoff-carry-over-lessons.md">queue item 3</a> of the kickoff lessons, and it follows the M1 result <a href="../../m1/ex-2.9.2/">ex-2.9.2</a>: teach the model what to produce once the concept has been removed, so the intervention has a designed, predictable outcome. Ex-2.2.1 set the reference at 13% seed agreement on red lines, with a response that is a near miss of the true answer.</p>
+<p>It runs on the D2.1 grammar, before the op work. So we test the term on a known recipe with a continuous concept first (<em>red</em>), and only later on the categorical null (an operator).</p>
+<p>The mechanism is the antipode redirect from m1/ex-2.9.2, in transformer form. At the first anchored slice (the embedding) we reflect every position's state through the axis, flipping α to −α. A stop-gradient holds the reflected states fixed,<sup id="fnref:sg"><a class="footnote-ref" href="#fn:sg">1</a></sup> so the term trains the blocks and the unembedding but cannot move the embedding, which is where the concept is placed first. The blocks also write the later anchored slices. The placement there is held by the anchor term on the clean pass rather than by the stop-gradient, and the margin gate of ex-2.2.2 watches it. Each state moves in proportion to how well it aligns with the axis, so the term needs no labels, no target position, and no target role. On red lines we then train the answer at <code>=</code> toward the fallback answer.</p>
+<p>The <em>anti-anchor</em> term is added to clear out the antipode hemisphere. Its influence does not overlap with the <em>anchor</em> term, so it can have a higher weight than the <em>anti-subspace</em> term. Arms without each term will say whether either matters in models with this much spare capacity.</p>
+<p><strong>The fallback answer for a continuous concept.</strong> For <em>red</em> the null has no mode. The operand-averaged null is the answer with the red operand replaced by any closed partner of the visible operand, and on this grid it is uniform over 27 colors, so a greedy decode or a seed-agreement read has nothing to converge on.</p>
+<p>We use the center of the null instead: the visible operand mixed with <em>mid-gray</em> and rounded to the grid. That is the per-channel median of the null, and it carries over the <em>gray</em> target from M1. A prereg for a continuous concept has to state this choice. The op experiments have a null with a mode, and the later categorical experiments should use it.</p>
+<p>There is a known mismatch. We train the response at the antipode, while the ex-2.2.1 projection rewrites the state as zero, which is off-manifold. So fallback accuracy under the projection tells us how far the designed response carries over to a state that training never visited. Nothing is deployed yet, and the reflection may turn out to be the intervention we use. The two differ in that a reflection can be undone. That matters if we want unlearning, and not if we only want a designed response.</p>
+<p>Weight ablation has both forms as well: <code>ablate</code> in the contract puts the projector into every matrix, and putting the reflector there instead gives the reflection in weight space.</p>
+<p>Ex-2.2.2 measures the mismatch as a sweep in intervention strength, from the trained state (reflection, γ = 2) down through zero (γ = 1). The <a href="https://github.com/z0u/sca2/blob/main/todo/science/redirect-between-two-anchored-ops.md">two-op concept swap</a> (D2.3) removes the mismatch outright, since it redirects to a state that training visits in the ordinary course of the task.</p>
+<p>We considered closing the gap here instead, by rehearsing the intervention: apply the projection operator on a fraction of training steps and train the output toward the fallback. We rejected it because:
+<strong>1.</strong> A fallback seen under the same operator the model trained on tells us the model converged, not that anything was removed, and
+<strong>2.</strong> The training pressure would reward keeping the concept readable off the axis and emitting the fallback only when the projected state is detected (masked, rather than removed).
+It is refiled as an auditing question: <a href="https://github.com/z0u/sca2/blob/main/todo/science/rehearsal-fallback-as-auditing-probe.md">rehearsed fallback as an auditing probe</a>.</p>
+<p>More of the model follows the edit than in the autoencoders, four blocks and the unembedding rather than one decoder, so the task gate watches what the term costs.</p>
+<p><strong>Relation to the Most Forbidden Technique.</strong> Fallback control trains on the anchor axis, which is also the signal we read. Training against an interpretability signal is what <a href="https://thezvi.substack.com/p/the-most-forbidden-technique">the Most Forbidden Technique</a> warns about: once the model has been optimized on the signal, the signal stops meaning what it meant. The failure mode here would be a model that detects the edit and emits the fallback while keeping the concept readable elsewhere, so that a mask looks like removal.</p>
+<p>Mitigations:
+<strong>(a)</strong> The stop-gradient, so the fallback term cannot move the placement at or before the edit.
+<strong>(b)</strong> The antipode as the trained state. No clean state sits there, so the readout can key on the axis alone. A fallback trained at the projected state would instead have to tell a projected red line from a non-red one, and only off-axis features could do that.
+<strong>(c)</strong> The off-axis audit, which checks whether red stays linearly readable off the axis.
+<strong>(d)</strong> No rehearsal, since training under the intervention would reward masking.
+The discussion in ex-2.2.2 interprets its results against this paragraph.</p>
+<p><strong>Auditing rows.</strong> The eval-contract dep promised the 2025 auditing rows before any arm was scored, and ex-2.2.1 scored its arms without them, so this prereg decides them row by row. <em>Off-axis recoverability</em> runs in ex-2.2.2 as an exploratory row: a ridge probe for redness, fitted per slice on the intervened operand states, in the fallback and no-fallback conditions. A response trained at the antipode is one case where red could stay readable off-axis. <em>Activation perturbation</em> (ActPert) and <em>relearning rebound</em> wait for D2.3. ActPert goes beside the RMU row; relearning rebound needs a fine-tuning budget, costed then, and will relearn from the <code>ablate</code> weights as the permanent removal.</p>
+<h3 id="prep-b-new-grammar-with-more-operations">Prep B: New grammar with more operations</h3>
+<h4 id="the-multi-op-grammar-with-red-anchored-again">The multi-op grammar, with red anchored again</h4>
+<p>Preregistered as <a href="../ex-2.2.3/">ex-2.2.3</a>. The grammar change forces retraining, so this is the regression check: control, the ex-2.1.10 reference recipe, and the ex-2.1.11 survey's proposals, all on the new grammar.</p>
+<p>Which proposals: <code>t00</code> and the trials the survey could not tell apart from it (four sit within one band, spanning $λ_a$ 0.28–0.94; <code>t48</code> and <code>t12</code> among them). Confirming the set corrects for winner's-curse. This is how the survey's handoff ("D2.2 confirms at fresh seeds before any of these numbers is quoted") is honoured on the grammar we will use.</p>
+<p>The <a href="https://github.com/z0u/sca2/blob/main/todo/science/operation-can-make-answer-redder-than-both.md">redder-than-both</a> item lands here too, since every op but <code>lighten</code> allows that.</p>
+<p>Optional arm: control models at one, three, and six operations, with the cube probed as in ex-2.1.12, to ask whether a richer op set gives the model a better operand geometry (see the <a href="https://github.com/z0u/sca2/blob/main/todo/science/richer-op-set-operand-geometry.md">backlog item</a>). It is an arm on un-anchored models only, so it cannot confound the anchored conditions. Task-diversity phase transitions in in-context learning (memorization below a diversity threshold, generalization above; arXiv:2306.15063, arXiv:2405.11751) motivate a companion question on the same sweep: run on the ex-2.1.5 two-form corpus, does added op diversity move hex and named colors toward the shared representation D2.1 never found (<a href="https://github.com/z0u/sca2/blob/main/todo/science/does-op-diversity-buy-cross-form-sharing.md">backlog item</a>)?</p>
+<h4 id="scouting-pilots-and-the-grammar-handover">Scouting, pilots, and the grammar handover</h4>
+<p>Ex-2.2.3 left the grammar with a problem for the removal reads: on four of the six ops, most red lines have an answer that a model without <em>red</em> can still give, because the op saturates or copies the other operand's channel. Rather than preregister the anchored-op experiments on that footing, a <a href="../ex-2.2.4/">scouting round</a> read candidate ops on the grid, and three pilots retrained the adopted point under a <a href="../ex-2.2.5/">stochastically rounded corpus</a> and a <a href="../ex-2.2.6/">whole-line labeller</a>, and the recipe with <a href="../ex-2.2.7/">the syntax rows held clean</a>. None of these is scored; each proposes.</p>
+<p>The proposals, from ex-2.2.4: table A+ (drop <code>add</code>; add <code>difference</code>, <code>exclusion</code>, and <code>hsvmix</code>; carry <code>hue-hsv</code>, <code>sat-hsv</code>, and <code>value-hsv</code> as a marked subset, the first ops that read operand order); a removal statistic that is a distance from the correct answer, scored on lines where zeroing the red operand's R moves the answer far, with exact match beside it; and, for comparability with M3, stochastic rounding and the whole-line labeller, which the pilots found cost nothing on the anchoring side. From ex-2.2.7: hold the syntax rows at zero after every step, so the full-position projection can be read beside the operand-only edit as the removal operator. Under stochastic rounding an answer is a distribution, so dependence, removal, and calibration are all read as how much answer mass moves, and <em>op-relevance</em> becomes the expected agreement between ops rather than a count.</p>
+<p>The <strong>handover</strong> is the preregistered experiment that adopts these: ex-2.2.3's recipe on table A+ with the new corpus and labeller, against ex-2.2.3's twenty seeds, with <code>mix</code> kept as the reference op and <code>hsvmix</code> beside it, and one arm each with only the corpus or only the labeller changed. Until it runs, the grammar of record is ex-2.2.3's; thereafter, plain <code>mix</code> will likely be dropped. Open questions it has to settle: whether to hold lines per op fixed at eleven ops (E4 of ex-2.2.3 found the operand cube less decodable at six ops than at three, with lines per op as a confound), and a probe draw that walks every color as op2 for the non-commutative subset.</p>
+<h3 id="prep-c-embeddings">Prep C: Embeddings</h3>
+<h4 id="un-anchored-embeddings">Un-anchored embeddings</h4>
+<p>Anchor all slices except the embeddings. We don't expect concepts to map to tokens in more complex models and languages anyway.</p>
+<p>Hypotheses:
+<strong>(a)</strong> the hidden-state slices align as they did in earlier experiments, which would let later experiments leave the embeddings out;
+<strong>(b)</strong> the color embeddings become somewhat aligned anyway, because their directions correlate with the anchored hidden states;
+<strong>(c)</strong> the constant component that ex-2.2.1 found on the syntax embeddings is gone, and with it the non-red cost of the plain projection.</p>
+<p>Hypothesis (c) is scored because every training experiment from here scores its checkpoints through the eval contract. Hypotheses (b) and (c) split the embedding table by token class, so they conflict only if the correlation in (b) reaches the syntax tokens, whose hidden states are not pulled. If it does reach them, that may resolve once there are several operations and the op token does work of its own.</p>
+<p>This is different from the <a href="#layer-sweep">layer sweep</a>, which tests the model's ability to route around intervention.</p>
+<p><em>Note, 2026-09-11.</em> Run as the <code>blocks-only</code> arm of <a href="../ex-2.2.7/">ex-2.2.7</a>, a pilot with nine seeds per arm. (a) holds in the blocks and (b) holds, but (c) does not: the syntax rows keep the axis, because the tied readout puts it there rather than the pull at slice 0. Leaving the embedding un-anchored also leaves about half of a red operand's redness off the axis at slice 0, so the full-position projection is less complete on every op, and on one seed most red lines survive it. The pilot's proposal is to keep anchoring every slice and untie the readout, which moved the component onto the readout table at no visible cost. A hard row constraint cleaned the rows as well, but it selects rows by token class, so it does not carry beyond this grammar; it stands as the ceiling the untied arm should match.</p>
+<h3 id="anchor-one-operation">Anchor one operation</h3>
+<p>One operation on e₁, the others unlabelled, D2.1's recipe + the lessons from above, all slices pulled — though perhaps not the embeddings, depending on how <a href="#un-anchored-embeddings">un-anchored embeddings</a> lands: an anchor on the op token's embedding is token identity by construction, the very collapse the risk table warns about. The layer sweep comes after, on a frozen recipe, so layer effects are not confounded with schedule fragility (the D2.1 kickoff rule). The labeller keys on the op token, with the position-free mechanism from ex-2.1.10.</p>
+<p>Measurements: alignment at the op position by slice; group contrast (anchored op against the others, which is the categorical form of grading); task gates against control; and a probe scan of op-identity decodability at every site, against the control.</p>
+<p>What we hope to see from the scan is approx. <em>no change</em> against control — an equivalence claim, so the prereg must declare the margin it has to land within. We are anchoring the hidden state, not relocating the computation, and the scan is the side-effects read (ex-2.1.12's H2, for the op). The equivalence read may need many seeds (20?), so a small smoke test runs first: a few seeds against the alignment and task gates alone, to establish that anchoring an op works at all before the seed budget is spent on the margin.</p>
+<p>Nice to have: Sweep over all ops to see whether they can all be anchored equally well.</p>
+<h3 id="suppress-the-operation-and-the-operands">Suppress the operation (and the operands)</h3>
+<p>The centre of D2.2.</p>
+<p>The headline claim is selective removal: suppress <em>add</em> without suppressing <em>multiply</em>. The ops may share a common component that means <em>this is an operation</em>, with the specific op only one part of the state; the group contrast from <a href="#anchor-one-operation">anchor operation</a> says how large that shared part is, and the removal claim covers the op-specific part.</p>
+<p>The dose axis is intervention strength, because the stimulus side of a categorical concept grades too coarsely: <em>op-relevance</em> (below) occupies only three or four levels on a six-op table, and a few more on the eleven-op table A+. Scale the suppression rather than always projecting fully — keep a fraction $1-γ$ of the component, $γ: 0 → 1$; the <a href="https://github.com/z0u/sca2/blob/main/todo/science/shaped-suppression-rather-than-projecting-whole-axis.md">shaped-suppression item</a> and M1's shaped suppression are the machinery. Prediction: anchored-op damage rises monotonically with $γ$, other ops within gate along the whole curve.</p>
+<p>The per-line prediction at full suppression comes from the designed null. The <em>null</em> is <em>op-averaged</em> — the least committal prediction available from the operands with no op, given by the distribution over the answers to all ops.<sup id="fnref:m"><a class="footnote-ref" href="#fn:m">2</a></sup> Against the <em>op-averaged</em> null, <em>op-relevance</em> for a line is the weight the mixture withholds from the anchored op's answer: zero where every op in the table agrees on that pair, $\frac{n-1}{ n}$ where the anchored op is alone in its answer. Predictions: per-line damage follows <em>op-relevance</em> and stays within the bound the mixture sets.</p>
+<p>Read the response off the probability mass on the correct answer, or off the decoded answer's distance from it. Hard accuracy steps rather than grades under an averaged null, since greedy decoding keeps the plurality answer, so accuracy is the gate statistic and not the response statistic.</p>
+<p>Conditions test the contrast from m1/ex-2.9.2: control, no-fallback, fallback — plus a filtered-corpus row, a control trained with the anchored op's lines held out. The fallback trains toward the <em>op-averaged</em> distribution — the designed null itself, as soft labels — so fallback and no-fallback share the per-line prediction, and the fallback condition's claim is tighter adherence to it: less seed scatter, more mass on the mixture. That is the removal reference the <a href="https://github.com/z0u/sca2/blob/main/todo/science/baseline-comparisons-sca-plan-related-work-delta.md">baselines item</a> wanted placed, and the eval contract scores it like any other triple.</p>
+<p>The same models have an operand anchor too (or a companion condition does), so operand suppression runs beside operation suppression with the machinery from <a href="#suppress-red-on-the-existing-checkpoints">suppress red</a>.</p>
+<p>The <strong>bypass test</strong> the D1.3 post left open: suppress at the op-token position only, at all positions, at one slice, at all slices. Where suppression fails to bite, the model is reading the op from somewhere the axis does not reach. That is a finding about anchoring, and it feeds the <a href="#layer-sweep">layer sweep</a>.</p>
+<p>Nice to have: Sweep over all ops to see whether they can all be suppressed equally well.</p>
+<h3 id="layer-sweep">Layer sweep</h3>
+<p>Anchor at subsets of slices (single ℓ, prefix ≤ ℓ, suffix ≥ ℓ, all) on a frozen schedule, then run the <a href="#suppress-the-operation-and-the-operands">suppress operation</a> intervention at the anchored slices. This tests the claim that bounds are layer-local. The geometric bound covers the immediate write, and we need to know whether later blocks amplify or absorb the edit.</p>
+<p>Ex-2.2.1 already says what to expect for <em>red</em>. The concept is read in the first two blocks, and the last block does not read it. So a removal acting at the embedding and the first block should match the full intervention, and one that starts later should not. That is a prediction about prefixes and suffixes, so we favor a prefix/suffix bracket over single slices.</p>
+<p>Caveat on reading depth this way: at d64-L4 on one operation the model has capacity to spare, so where it reads the concept may say more about what it can afford than about what the task needs. Several operations may draw on more of the depth, and the character-level runs (ex-2.1.5, ex-2.1.6) already used more layers than the word-level ones. Still to decide: whether this is one experiment or two, since anchor layer × intervention layer is a grid.</p>
+<h3 id="sgtm-baseline">SGTM baseline</h3>
+<p>Its own preregistered experiment (arXiv:2512.05648), method-agnostic through the eval contract, reusing our labels. RMU and SAE rows wait for D2.3, as the <a href="https://github.com/z0u/sca2/blob/main/todo/science/baseline-comparisons-sca-plan-related-work-delta.md">baselines item</a> sequences them.</p>
+<h3 id="write-up">Write-up</h3>
+<p>The D2.2 post.</p>
+<h2 id="deps">Deps</h2>
+<ul>
+<li><strong>The operation as a variable.</strong> As specified in the <a href="https://github.com/z0u/sca2/blob/main/todo/science/make-operation-variable-before-d2-2-sca.md">backlog item</a>: an op table (name, surface form, grid function with defined rounding, closed on 0..15), <code>op</code> on <code>Example</code>, seen-pair bookkeeping keyed on <code>(op, pair)</code>, ops spelled as words, and the infix frame kept for the probes. The first table is <code>mix</code> (the D2.1 op), saturating <code>add</code>, <code>screen</code>, <code>multiply</code>, <code>lighten</code> (per-channel max), and <code>darken</code> (per-channel min), specified in <a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.3/experiment.py">ex-2.2.3</a>: each rule is computed on the 0..15 scale and snapped to the nearest level of the six-level grid, so every op answers every pair with a vocabulary color. An earlier draft of that prereg kept D2.1's closed-pair rule instead, under which <code>screen</code> and <code>multiply</code> are degenerate; the rounding rule makes all six total and distinct (no two agree on more than about 38% of pairs). Every new op departs from <code>mix</code> on more than 90% of pairs, so the model has to read the op; <code>add</code>–<code>screen</code>, <code>screen</code>–<code>lighten</code>, and <code>multiply</code>–<code>darken</code> each agree on about a third of pairs and populate the middle <em>op-relevance</em> levels. The relevance distribution for each candidate anchored op, under the table's own rounding, is rendered in ex-2.2.3's method, since the per-line predictions in <a href="#suppress-the-operation-and-the-operands">suppress operation</a> rest on it. <code>divide</code> needs a saturation rule and is lumpy on a 16-level grid, so it stays out of the first table. Ops that convert through other color spaces (<code>hue</code>, <code>saturation</code>, <code>brightness</code>) were filed at <a href="https://github.com/z0u/sca2/blob/main/todo/science/richer-op-set-operand-geometry.md">richer op set</a> and have since been read on the grid by <a href="../ex-2.2.4/">ex-2.2.4</a>, which proposes the second table, A+, described under <a href="#scouting-pilots-and-the-grammar-handover">scouting</a>. With ops that read operand order in the table, relevance is counted over ordered pairs.</li>
+<li><strong>The eval contract and operator library.</strong> Landed with <a href="../ex-2.2.1/">ex-2.2.1</a> as <a href="https://github.com/z0u/sca2/blob/main/src/sca/intervention.py"><code>sca.intervention</code></a>: the triple, the three operators, and the post-hoc fitters. Every method produces a triple of <code>(model, subspace, intervention operator)</code>, and one scorer takes that triple. The operators are axis projection with a strength γ (γ = 2 is reflection), the shaped suppression from M1, and weight ablation. Every training experiment from <a href="#fallback-control">fallback control</a> on scores its checkpoints through the contract, so adding an operator or a row is a change to one module.</li>
+</ul>
+<p>The contract also pins where operators act and what they do to the norm. The hook point is the between-block stream, meaning the slices that <code>residual_stream()</code> returns, which are the same states the anchor term reads. The stream is unit-norm (nGPT), so axis projection composes with a re-projection back onto the sphere. The state lands on the great subsphere where zero-concept states live, and the surviving components pick up a per-position gain of $1/\sqrt{1-x_1^2}$. That gain is computable beforehand, so it belongs inside the bound. Weight ablation declares its order against the <code>normalize_weights</code> constraint, which rescales a matrix once entries are zeroed.</p>
+<p>The 2025 auditing rows are relearning rebound (arXiv:2505.22310), activation perturbation (ActPert, arXiv:2505.23270), and off-axis recoverability (arXiv:2605.11685). They were to be declared before any arm was scored. Ex-2.2.1 scored its arms without them, and the decision is now recorded under <a href="#fallback-control">fallback control</a>: off-axis recoverability runs there, and the other two wait for D2.3, which speaks their language in full.
+- <strong>Fold the <a href="https://github.com/z0u/sca2/blob/main/todo/science/survey-format-lessons-from-ex-2-1.md">survey lessons</a> into the plan template</strong>: constraint margins ranked beside the objective, multi-seed promotion near a gate, and the publisher carrying every statistic the analysis promises.</p>
+<h2 id="decisions">Decisions</h2>
+<p>Only what the plan above already commits to; everything else stays open until an experiment forces it.</p>
+<ul>
+<li><a href="#suppress-red-on-the-existing-checkpoints">Suppress red</a> ran before the op grammar was ready: no training, and the highest information per dollar in the plan. Done.</li>
+<li>The intervention for the op experiments is chosen by a scoring-only tuning pass on the stored ex-2.2.1 runs, before the <a href="#anchor-one-operation">anchor-op</a> prereg; until then the fallback experiment carries all three as ride-along rows.</li>
+<li>The bound claim is layer-local from the start. The geometry bounds the write; what the behavior does in response is a prediction, so a behavioral miss feeds the <a href="#layer-sweep">layer sweep</a> rather than falsifying the bound.</li>
+<li><a href="#anchor-one-operation">Anchor operation</a> opens with a small smoke test, before the many-seed equivalence read.</li>
+<li>The survey is confirmed on the new grammar as a set of proposals, and not replicated literally first.</li>
+<li>The dose axis for the categorical concept is intervention strength; the stimulus side (<em>op-relevance</em>) supplies the per-line predictions and the bound.</li>
+<li>The fallback mechanism is the antipode redirect at the first anchored slice, which is the embedding while the embeddings are anchored, with a stop-gradient at the reflected state. Rehearsing the intervention during training is refiled as an <a href="https://github.com/z0u/sca2/blob/main/todo/science/rehearsal-fallback-as-auditing-probe.md">auditing question</a>.</li>
+<li>The fallback answer for a continuous concept is the center of the operand-averaged null; for <em>red</em> that is the visible operand mixed with mid-gray. A categorical concept takes the mode of its null instead. Either is a design choice, since the answer can be any function of the line: to have <em>red</em> read as <em>black</em> under intervention, we would use the same term with black mixed with the visible operand as its answer.</li>
+<li>Auditing rows: off-axis recoverability in <a href="../ex-2.2.2/">ex-2.2.2</a> as an exploratory row; ActPert and relearning rebound at D2.3.</li>
+<li>Which op to anchor is open until the op table lands and its relevance distributions are computed.</li>
+<li>The second table (A+), stochastic rounding, and the whole-line labeller are proposals from the <a href="#scouting-pilots-and-the-grammar-handover">scouting round</a>, adopted only by the handover prereg; the removal statistic there is a distance rather than exact match.</li>
+<li>The layer sweep takes the shape of a prefix/suffix bracket, following the depth read from ex-2.2.1. The grid question is deferred to the <a href="#layer-sweep">experiment</a> itself.</li>
+</ul>
+<h2 id="risks-and-mitigations">Risks and mitigations</h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Would look like</th>
+<th>Retired at</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Suppression does not bite even on <em>red</em></td>
+<td>Accuracy unchanged after projecting e₁ out; color is read from elsewhere</td>
+<td>Retired: <a href="../ex-2.2.1/">ex-2.2.1</a> (red accuracy 0.09)</td>
+</tr>
+<tr>
+<td>The bound is loose or wrong in a transformer</td>
+<td>The non-red write exceeds its geometric bound, or the damage outruns the write-size prediction</td>
+<td>Write half retired at <a href="../ex-2.2.1/">ex-2.2.1</a>; the behavioral half belongs to the <a href="#layer-sweep">layer sweep</a></td>
+</tr>
+<tr>
+<td>The response to suppression is undesigned</td>
+<td>Suppressed lines scatter by seed; completions leave the color vocabulary</td>
+<td>Measured at <a href="../ex-2.2.1/">ex-2.2.1</a> (13% seed agreement, completions stay in vocabulary); <a href="#fallback-control">fallback control</a> pins it</td>
+</tr>
+<tr>
+<td>Recipe is grammar-specific</td>
+<td>The proposals from the survey do not reproduce on the new grammar</td>
+<td>Retired at <a href="../ex-2.2.3/">ex-2.2.3</a>: the recipe and every proposal reproduce (H2, H3), at a plateau 0.05 lower than the survey's; the frozen rule adopted <code>t00</code>, and a post hoc read with the lead and selectivity gates narrows the choice to the recipe, whose short arm D2.2 builds on (<code>recipe-short</code>, by decision after the twenty-seed E6 read)</td>
+</tr>
+<tr>
+<td>Task cost grows with an abstract concept anchor</td>
+<td>Gate misses in <a href="#anchor-one-operation">anchor operation</a> that <a href="#the-multi-op-grammar-with-red-anchored-again">new grammar</a> did not have</td>
+<td><a href="#anchor-one-operation">anchor operation</a></td>
+</tr>
+<tr>
+<td>Anchoring an op captures the token, not the operation</td>
+<td>Alignment lands, and suppression is inert</td>
+<td><a href="#suppress-the-operation-and-the-operands">suppress operation</a></td>
+</tr>
+<tr>
+<td>Bypass through attention or the residual</td>
+<td>Suppression works only when applied at every site</td>
+<td><a href="#suppress-the-operation-and-the-operands">suppress operation</a>, <a href="#layer-sweep">layer sweep</a></td>
+</tr>
+</tbody>
+</table>
+<p>The first experiments all change one thing from D2.1, so a negative there should be interpretable.</p>
+<h2 id="out-of-scope">Out of scope</h2>
+<p>Verification lines (D2.3). Several ops on separate axes (a D2.3 candidate, for the subspace bound and the <a href="https://github.com/z0u/sca2/blob/main/todo/science/redirect-between-two-anchored-ops.md">two-op concept swap</a>). The feedback controller (the kickoff advice stands). RMU and SAE baselines, and a full LUNAR row beside them; a LUNAR-style redirect, the nearest analogue of the fallback, runs as an exploratory row of ex-2.2.2. Resolving D2.1's H2 decodability question (<a href="https://github.com/z0u/sca2/blob/main/todo/science/global-structure-preserved-under-anchoring.md">its own item</a>), run when the claim is needed. Stream-vs-init attribution (<a href="https://github.com/z0u/sca2/blob/main/todo/science/d21-kickoff-carry-over-lessons.md">kickoff</a> queue item 4), until there is an anchoring failure worth attributing — D2.1 produced none.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:sg">
+<p>A stop-gradient is an identity in the forward pass with a gradient of zero: a loss downstream of it cannot move anything upstream of it. Here it sits on the reflected states, so the fallback loss reaches the blocks and the unembedding and leaves the embedding table alone, and with it where the anchor put the concept. The other losses see the clean pass and are unaffected.&#160;<a class="footnote-backref" href="#fnref:sg" title="Jump back to footnote 1 in the text">&#8617;</a></p>
+</li>
+<li id="fn:m">
+<p>We considered calling this <em>op-marginal</em>, but we also have a <em>margin</em> measurement $m$, which would be confusing.&#160;<a class="footnote-backref" href="#fnref:m" title="Jump back to footnote 2 in the text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</body>
+</html>
