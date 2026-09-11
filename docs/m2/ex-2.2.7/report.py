@@ -104,6 +104,25 @@ def ink(cond: str):
 
 
 @app.function(hide_code=True)
+def dots(ax, x: float, v, color, *, marker: str = "o", mfc=None, ms: float = 4.5, jitter: float = 0.08) -> None:
+    """One seed per small dot, spread a little in x, with the seed mean as a larger marker on top."""
+    v = np.asarray(v, float)
+    if len(v) == 0:
+        return
+    xs = x + (np.linspace(-jitter, jitter, len(v)) if len(v) > 1 else np.zeros(1))
+    ax.plot(xs, v, ".", ms=2.2, color=color, alpha=0.45, zorder=2, ls="")
+    ax.plot([x], [v.mean()], marker, ms=ms, color=color, mfc=color if mfc is None else mfc, zorder=3, ls="")
+
+
+@app.function(hide_code=True)
+def bare(ax, *, ylabel: str | None = None) -> None:
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(axis="y", c="#888", alpha=0.2)
+    if ylabel is not None:
+        ax.set_ylabel(ylabel, fontsize=7.5)
+
+
+@app.function(hide_code=True)
 def table_html(head: list[str], rows: list[list[str]], caption: str, *, ref_rows: frozenset[int] = frozenset()) -> str:
     ths = "".join(f"<th{' class=num' if i else ''}>{h}</th>" for i, h in enumerate(head))
     body = "".join(
@@ -177,6 +196,11 @@ class Results:
                 continue
             out.append(np.mean([abs(v) for w, v in r[table].items() if w not in SYNTAX]))
         return np.array(out, float)
+
+    def red_rows(self, cond: str, table: str = "rows") -> np.ndarray:
+        """Per seed, the mean signed component over the red color rows (redness at least the red dose)."""
+        words = [w for w, r in zip(ex.PALETTE, ex.REDNESS, strict=True) if r >= ex.ex223.RED_DOSE]
+        return np.array([np.mean([r[table][w] for w in words]) for r in self.rows(cond) if r[table] is not None])
 
     def strip_acc(self, cond: str, strip: str, op: str, group: str, pos: int) -> np.ndarray:
         """Next-token accuracy at one predicting position, per seed, under one strip condition."""
@@ -293,7 +317,7 @@ def _():
     mo.md(r"""
     ## Where the component works
 
-    Part A on the stored checkpoints. Each panel is one of the three informative next-token predictions on the `mix` probe lines: `=` from op2, the answer from `=`, and the newline from the answer. The x axis is the strip condition. A filled marker is the red lines (both operands' redness at least 0.8), a hollow one the non-red lines; bars are the seed range over five seeds.
+    Part A on the stored checkpoints. Each panel is one of the three informative next-token predictions on the `mix` probe lines: `=` from op2, the answer from `=`, and the newline from the answer. The x axis is the strip condition. A filled marker is the red lines (both operands' redness at least 0.8), a hollow one the non-red lines; the small dots are the seeds and the larger marker their mean.
     """)
     return
 
@@ -306,10 +330,10 @@ def _(res: Results):
     @themed(
         name="strip-accuracy",
         alt_text="""
-            A grid of small panels, three rows by three columns. Rows are the three next-token predictions: the equals sign, the answer, and the newline. Columns are the stored arms recipe-short, t00, and control-short. In each panel the five strip conditions run along the x axis (clean, input, output, both, and the input control) and next-token accuracy along the y axis, with filled markers for the red lines and hollow ones for the non-red lines, and a bar for the seed range.
+            A grid of small panels, three rows by three columns. Rows are the three next-token predictions: the equals sign, the answer, and the newline. Columns are the stored arms recipe-short, t00, and control-short. In each panel the five strip conditions run along the x axis (clean, input, output, both, and the input control) and next-token accuracy along the y axis, with filled markers for the red lines and hollow ones for the non-red lines; each seed is a small dot beside the mean.
         """,
         caption=r"""
-            **Next-token accuracy on the `mix` probe lines under each strip, on the stored checkpoints.** Rows are the predictions of `=`, the answer, and the newline; columns are the stored arms. Filled markers are the red lines, hollow the non-red; bars span the five seeds. `input` strips the axis component from the syntax rows of the embedding and keeps the original table as the readout; `output` the reverse; `both` strips it from the shared table; the control moves the embedding rows the same distance along a random direction off the axis.
+            **Next-token accuracy on the `mix` probe lines under each strip, on the stored checkpoints.** Rows are the predictions of `=`, the answer, and the newline; columns are the stored arms. Filled markers are the seed means on the red lines, hollow on the non-red, with one small dot per seed. `input` strips the axis component from the syntax rows of the embedding and keeps the original table as the readout; `output` the reverse; `both` strips it from the shared table; the control moves the embedding rows the same distance along a random direction off the axis.
         """,
     )
     def _plot() -> plt.Figure:
@@ -319,16 +343,54 @@ def _(res: Results):
             color = ink(c)
             for row, (pos, name) in enumerate(PRED.items()):
                 ax = axes[row][col]
-                for group, fill in (("red", color), ("nonred", "none")):
-                    m = np.array([res.strip_acc(c, s, MIX, group, pos).mean() for s in _strips])
-                    lo = np.array([res.strip_acc(c, s, MIX, group, pos).min() for s in _strips])
-                    hi = np.array([res.strip_acc(c, s, MIX, group, pos).max() for s in _strips])
-                    ax.errorbar(_x, m, yerr=[m - lo, hi - m], fmt="o", ms=3.5, lw=0.8, color=color, mfc=fill)
-                ax.spines[["top", "right"]].set_visible(False)
-                ax.grid(axis="y", c="#888", alpha=0.2)
+                for group, fill, dx in (("red", color, -0.14), ("nonred", "none", 0.14)):
+                    for j, strip in enumerate(_strips):
+                        dots(ax, j + dx, res.strip_acc(c, strip, MIX, group, pos), color, mfc=fill, ms=3.5, jitter=0.06)
+                bare(ax, ylabel=f"acc, predicting {name}" if col == 0 else None)
                 ax.set_ylim(-0.05, 1.05)
-                if col == 0:
-                    ax.set_ylabel(f"acc, predicting {name}", fontsize=7.5)
+            axes[0][col].set_title(c, fontsize=8, color=color)
+            axes[2][col].set_xticks(_x, [STRIP_LABEL[s] for s in _strips], fontsize=6.5)
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    The same strips on the pilot arms. An arm whose rows are already clean should show no difference across its strips; the untied arms split the two tables, so `input` and `output` strip different tables there.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(res: Results):
+    _strips = list(ex.STRIPS)
+    _x = np.arange(len(_strips))
+    _arms = [a.name for a in ex.ARMS]
+
+    @themed(
+        name="strip-accuracy-arms",
+        alt_text="""
+            A grid of small panels, three rows by five columns. Rows are the three next-token predictions: the equals sign, the answer, and the newline. Columns are the pilot arms blocks-only, untied, rows-clean, blocks-only-line, and untied-line. In each panel the five strip conditions run along the x axis and next-token accuracy along the y axis, with filled markers for the red lines and hollow ones for the non-red lines; each seed is a small dot beside the mean.
+        """,
+        caption=r"""
+            **Next-token accuracy on the `mix` probe lines under each strip, on the pilot arms.** Same layout as the stored figure: rows are the predictions of `=`, the answer, and the newline; filled markers are the seed means on the red lines, hollow on the non-red, with one small dot per seed.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(3, len(_arms), figsize=(8.4, 4.2), sharex=True, sharey="row")
+        axes = cast(AxesGrid, axes)
+        for col, c in enumerate(_arms):
+            color = ink(c)
+            for row, (pos, name) in enumerate(PRED.items()):
+                ax = axes[row][col]
+                for group, fill, dx in (("red", color, -0.14), ("nonred", "none", 0.14)):
+                    for j, strip in enumerate(_strips):
+                        dots(ax, j + dx, res.strip_acc(c, strip, MIX, group, pos), color, mfc=fill, ms=3.5, jitter=0.06)
+                bare(ax, ylabel=f"acc, predicting {name}" if col == 0 else None)
+                ax.set_ylim(-0.05, 1.05)
             axes[0][col].set_title(c, fontsize=8, color=color)
             axes[2][col].set_xticks(_x, [STRIP_LABEL[s] for s in _strips], fontsize=6.5)
         return fig
@@ -372,7 +434,7 @@ def _():
     mo.md(r"""
     ## The row table
 
-    Ex-2.2.2's E8, read on every arm: the axis component of each syntax row of the embedding table, with the mean absolute component over the 216 color rows beside it. nGPT's rows are unit vectors, so a component is a cosine. The untied arms carry a second table; its rows are drawn hollow.
+    Ex-2.2.2's E8, read on every arm: the axis component of each syntax row of the embedding table, with the mean absolute component over the 216 color rows beside it, and the mean signed component of the red color rows (redness at least 0.8), which is how far the red operands themselves sit along the axis before any block runs. nGPT's rows are unit vectors, so a component is a cosine. The untied arms carry a second table; its rows are drawn hollow.
     """)
     return
 
@@ -384,10 +446,10 @@ def _(res: Results):
     @themed(
         name="row-components",
         alt_text="""
-            A single panel. The arms run along the x axis, from the stored checkpoints on the left to the pilot arms on the right, and the axis component of an embedding row along the y axis. At each arm there is a marker for the equals sign, one for the newline, a cluster for the six op words, and a grey marker for the mean absolute component of the color rows; bars span the seeds. The untied arms show a second, hollow set for their readout table.
+            A single panel. The arms run along the x axis, from the stored checkpoints on the left to the pilot arms on the right, and the axis component of an embedding row along the y axis. At each arm there is a marker for the equals sign, one for the newline, a cluster for the six op words, a grey diamond for the mean absolute component of the color rows, and a grey triangle for the mean component of the red color rows; bars span the seeds. The untied arms show a second, hollow set for their readout table.
         """,
         caption=r"""
-            **Axis component per syntax row, by arm.** Each marker is the seed mean of one row's component on e₁ (a cosine, since the rows are unit vectors), with the seed range as a bar; the op words are drawn small and the color rows' mean absolute component in grey. Hollow markers are the readout table of the untied arms. The stored arms are ex-2.2.3's; every pilot arm is Part B's.
+            **Axis component per syntax row, by arm.** Each marker is the seed mean of one row's component on e₁ (a cosine, since the rows are unit vectors), with the seed range as a bar; the op words are drawn small, and in grey are the color rows' mean absolute component (diamond) and the red color rows' mean component (triangle). Hollow markers are the readout table of the untied arms. The stored arms are ex-2.2.3's; every pilot arm is Part B's.
         """,
     )
     def _plot() -> plt.Figure:
@@ -417,6 +479,8 @@ def _(res: Results):
                     ax.plot(i + off + (j - 2.5) * 0.03, v.mean(), "o", ms=2, color=color, mfc=fill)
                 v = res.color_abs(c, table)
                 ax.plot(i + off, v.mean(), "D", ms=3, color=grey, mfc=grey if table == "rows" else "none")
+                v = res.red_rows(c, table)
+                ax.plot(i + off, v.mean(), "v", ms=4, color=grey, mfc=grey if table == "rows" else "none")
         ax.set_xticks(_x, ROW_ARMS, fontsize=7, rotation=25, ha="right")
         ax.set_ylabel("component on e₁", fontsize=8)
         ax.spines[["top", "right"]].set_visible(False)
@@ -428,6 +492,7 @@ def _(res: Results):
             Line2D([], [], marker="^", ls="", color=grey, ms=4.5, label="⏎"),
             Line2D([], [], marker="o", ls="", color=grey, ms=2, label="op words"),
             Line2D([], [], marker="D", ls="", color=grey, ms=3, label="colors, mean |·|"),
+            Line2D([], [], marker="v", ls="", color=grey, ms=4, label="red colors, mean"),
         ]
         ax.legend(handles=handles, fontsize=6.5, frameon=False, loc="upper left", bbox_to_anchor=(1.0, 1.0))
         return fig
@@ -448,7 +513,7 @@ def _(res: Results):
                 span2(res.component(_c, NL), ".2f"),
             ]
             + [span2(res.component(_c, w), ".2f") for w in OPS]
-            + [span2(res.color_abs(_c), ".3f")]
+            + [span2(res.color_abs(_c), ".3f"), span2(res.red_rows(_c), ".2f")]
         )
         if not res.tied(_c):
             _rows.append(
@@ -459,10 +524,10 @@ def _(res: Results):
                     span2(res.component(_c, NL, "rows_readout"), ".2f"),
                 ]
                 + [span2(res.component(_c, w, "rows_readout"), ".2f") for w in OPS]
-                + [span2(res.color_abs(_c, "rows_readout"), ".3f")]
+                + [span2(res.color_abs(_c, "rows_readout"), ".3f"), span2(res.red_rows(_c, "rows_readout"), ".2f")]
             )
-    _head = ["arm", "table", "=", "⏎"] + [f"<code>{w}</code>" for w in OPS] + ["colors, mean |·|"]
-    _caption = "The row table as numbers: the signed axis component of each syntax row, per arm and table, seed mean with half the seed range; the last column is the mean absolute component over the color rows."
+    _head = ["arm", "table", "=", "⏎"] + [f"<code>{w}</code>" for w in OPS] + ["colors, mean |·|", "red colors, mean"]
+    _caption = "The row table as numbers: the signed axis component of each syntax row, per arm and table, seed mean with half the seed range; the last two columns are the mean absolute component over the color rows and the mean signed component over the red color rows."
     mo.Html(table_html(_head, _rows, _caption, ref_rows=frozenset(range(len(STORED)))))
     return
 
@@ -472,8 +537,43 @@ def _():
     mo.md(r"""
     ## Task cost
 
-    Exact match on the held-out pairs of each op. The reference is production's twenty seeds; the pilot arms have two or three each, so the half-ranges are rough.
+    Exact match on the held-out pairs of each op. The reference is production's twenty seeds; the pilot arms have nine each.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(res: Results):
+    _markers = ["o", "s", "^", "D", "v", "P"]
+
+    @themed(
+        name="task-cost",
+        alt_text="""
+            A single panel. The arms run along the x axis, the production reference last, and held-out exact match along the y axis, from 0.98 to 1. At each arm there is one marker per op, drawn in the arm's colour, with the seeds as small dots beside each mean.
+        """,
+        caption=r"""
+            **Held-out exact match per op, by arm.** One marker shape per op, the seed mean, with one small dot per seed; the y axis starts at 0.98. The reference is ex-2.2.3's production recipe.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, ax = plt.subplots(figsize=(5.6, 2.4))
+        for i, c in enumerate(ARMS):
+            color = ink(c)
+            for j, op in enumerate(OPS):
+                dots(ax, i + (j - 2.5) * 0.11, res.em(c, op), color, marker=_markers[j], ms=3.5, jitter=0.03)
+        ax.set_xticks(np.arange(len(ARMS)), ARMS, fontsize=7, rotation=25, ha="right")
+        ax.set_ylim(0.98, 1.002)
+        bare(ax, ylabel="held-out exact match")
+        from matplotlib.lines import Line2D
+
+        grey = light_dark("#999", "#777")
+        handles = [
+            Line2D([], [], marker=m, ls="", color=grey, ms=3.5, label=op) for m, op in zip(_markers, OPS, strict=True)
+        ]
+        ax.legend(handles=handles, fontsize=6.5, frameon=False, loc="upper left", bbox_to_anchor=(1.0, 1.0))
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -509,6 +609,44 @@ def _():
 
 @app.cell(hide_code=True)
 def _(res: Results):
+    _stats = [
+        ("m_line", "m_line"),
+        ("alpha_op1", "ᾱ op1"),
+        ("lead_emb", "lead (emb)"),
+        ("contrast", "contrast"),
+        ("r2_sim", "r² sim"),
+        ("latch_pi", "latch π"),
+        ("retention", "retention"),
+    ]
+
+    @themed(
+        name="placement",
+        alt_text="""
+            A grid of small panels, two rows by four columns, one per placement statistic: m_line, alpha at op1, lead at the embedding, contrast, r squared of the similarity grading, latch pi, and retention; the last cell is empty. In each panel the arms run along the x axis with the production reference last, and the statistic along the y axis, with one small dot per seed and a larger marker at the seed mean, in the arm's colour.
+        """,
+        caption=r"""
+            **Placement on the `mix` probe lines, by arm.** One panel per statistic of the table below; the larger marker is the seed mean and the small dots are the seeds. The reference is ex-2.2.3's production recipe.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(2, 4, figsize=(8.4, 3.6), sharex=True)
+        axes = cast(AxesGrid, axes)
+        flat = [axes[r][c] for r in range(2) for c in range(4)]
+        for ax, (key, label) in zip(flat, _stats, strict=False):
+            for i, c in enumerate(ARMS):
+                dots(ax, i, res.stat(c, key), ink(c), ms=4)
+            bare(ax, ylabel=label)
+            ax.set_xticks(np.arange(len(ARMS)), ARMS, fontsize=6.5, rotation=35, ha="right")
+            ax.tick_params(labelbottom=True)
+        flat[-1].axis("off")
+        return fig
+
+    mo.Html(_plot())
+    return
+
+
+@app.cell(hide_code=True)
+def _(res: Results):
     _rows = []
     for _c in ARMS:
         _rows.append(
@@ -538,6 +676,57 @@ def _():
 
     Ex-2.2.3's H4 statistics per arm: red-line accuracy under the full-position `projection` on each op (the removal read, lower is more complete), and the non-red `mix` deficit under `projection` and under the operand-only edit (the selectivity read). The question for each fix is whether the full-position deficit comes down to the operand-only one.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(res: Results):
+    _markers = ["o", "s", "^", "D", "v", "P"]
+
+    @themed(
+        name="suppression",
+        alt_text="""
+            Two panels side by side. Left: red-line accuracy under the full-position projection, with the arms along the x axis, the production reference last, and one marker per op at each arm; lower is a more complete removal. Right: the non-red mix accuracy deficit, filled markers under the projection and hollow ones under the operand-only edit. In both, each seed is a small dot beside the mean, in the arm's colour.
+        """,
+        caption=r"""
+            **Suppression and selectivity, by arm.** Left, exact-match accuracy on the red lines under the full-position projection, one marker shape per op (the removal read; lower is more complete). Right, the non-red `mix` deficit under the projection (filled) and under the operand-only edit (hollow). Larger markers are seed means, small dots the seeds.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.4, 2.6), width_ratios=[1.3, 1])
+        for i, c in enumerate(ARMS):
+            color = ink(c)
+            for j, op in enumerate(OPS):
+                dots(
+                    ax1,
+                    i + (j - 2.5) * 0.11,
+                    res.score(c, op, PROJECTION, "acc", "red"),
+                    color,
+                    marker=_markers[j],
+                    ms=3.5,
+                    jitter=0.03,
+                )
+            dots(ax2, i - 0.14, res.deficit(c, MIX, PROJECTION), color, ms=4.5, jitter=0.06)
+            dots(ax2, i + 0.14, res.deficit(c, MIX, OPERANDS), color, mfc="none", ms=4.5, jitter=0.06)
+        for ax, label in ((ax1, "red acc, projection"), (ax2, "non-red mix deficit")):
+            ax.set_xticks(np.arange(len(ARMS)), ARMS, fontsize=7, rotation=25, ha="right")
+            bare(ax, ylabel=label)
+        ax1.set_ylim(-0.05, 1.05)
+        from matplotlib.lines import Line2D
+
+        grey = light_dark("#999", "#777")
+        handles = [
+            Line2D([], [], marker=m, ls="", color=grey, ms=3.5, label=op) for m, op in zip(_markers, OPS, strict=True)
+        ]
+        ax1.legend(handles=handles, fontsize=6.5, frameon=False, loc="upper right")
+        handles = [
+            Line2D([], [], marker="o", ls="", color=grey, ms=4.5, label="projection"),
+            Line2D([], [], marker="o", ls="", color=grey, mfc="none", ms=4.5, label="operands"),
+        ]
+        ax2.legend(handles=handles, fontsize=6.5, frameon=False, loc="upper right")
+        return fig
+
+    mo.Html(_plot())
     return
 
 
@@ -595,7 +784,7 @@ def _():
     - Part B's arms share ex-2.2.3's corpus, eval sets and probe lines (the same seeds through its `prepare_corpus`); the line arms train against ex-2.2.6's line-keyed probe table.
     - `rows-clean` applies `sca.anchoring.clean_embedding_rows` after every optimizer step, to every non-color row but the pad; `blocks-only` passes `anchor_slices=(1, 2, 3, 4)` to `train_anchored`, so both the anchor and the anti-subspace term skip the embedding; `untied` sets `tie_embeddings=False` on the model config, and its checkpoints carry the second table.
     - The eval and score tasks are ex-2.2.3's, unchanged; on the untied arms the eval contract reads logits through the readout table and `ablate_weights` projects both tables.
-    - This is a pilot: five arms with two or three seeds each, five seeds of each stored arm, and production's twenty for the reference. Nothing here is gated, and nothing in it should be quoted as a result.
+    - This is a pilot: five arms with nine seeds each (the first run had three, or two on the line arms; the rest were added on request, and the earlier seeds are memoized), Part A on five seeds of each frozen stored arm and on all twenty of the reference, and production's twenty for the reference elsewhere. Nothing here is gated, and nothing in it should be quoted as a result.
     """)
     return
 

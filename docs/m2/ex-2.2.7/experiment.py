@@ -93,10 +93,17 @@ EX223_CHECKPOINT_REF = ex223.CHECKPOINT_REF
 
 # --- Part A: the stored checkpoints -----------------------------------------------------------
 
-STORED = {"recipe-short": 5, "t00": 5, "control-short": 5}
+STORED = {"recipe-short": 20, "t00": 5, "control-short": 5}
 """Ex-2.2.3 arms whose stored checkpoints Part A scores, and how many seeds of each: the recipe (the
-reference), the adopted point (twice the recipe's row component), and the un-anchored control (the floor)."""
-STORED_LABELS = [f"{c}-s{s}" for c, seeds in STORED.items() for s in range(seeds)]
+reference, with its fifteen addendum seeds), the adopted point (twice the recipe's row component), and the
+un-anchored control (the floor). The frozen arms have five stored seeds each."""
+STORED_RUNS = [
+    (c, s, f"{c}-more-s{s}" if s >= len(ex223.SEEDS[c]) else f"{c}-s{s}")
+    for c, seeds in STORED.items()
+    for s in range(seeds)
+]
+"""(condition, seed, stored label) per Part A checkpoint; the addendum seeds live under the `-more` arm."""
+STORED_LABELS = [lb for _, _, lb in STORED_RUNS]
 
 SYNTAX_WORDS = (*ex223.OP_NAMES, "=", "\n")
 """The rows Part A strips and the `rows-clean` arm holds clean: every word of the grammar that is not a
@@ -150,13 +157,16 @@ class Arm:
         return self.fix == "rows-clean"
 
 
-BLOCKS_ONLY = Arm("blocks-only", 3, "both terms skip the embedding slice (Prep C)", "blocks-only")
-UNTIED = Arm("untied", 3, "a readout table of its own, from a copy of the embedding", "untied")
-ROWS_CLEAN = Arm("rows-clean", 3, "tied table; the syntax rows held off the axis every step", "rows-clean")
+SEEDS = 9
+"""Seeds per pilot arm. The first run had three (two on the line arms); the rest were added on request, and
+the run is memoized, so only the new seeds train."""
+BLOCKS_ONLY = Arm("blocks-only", SEEDS, "both terms skip the embedding slice (Prep C)", "blocks-only")
+UNTIED = Arm("untied", SEEDS, "a readout table of its own, from a copy of the embedding", "untied")
+ROWS_CLEAN = Arm("rows-clean", SEEDS, "tied table; the syntax rows held off the axis every step", "rows-clean")
 BLOCKS_ONLY_LINE = Arm(
-    "blocks-only-line", 2, "blocks-only, under the whole-line labeller", "blocks-only", "line", WHOLE
+    "blocks-only-line", SEEDS, "blocks-only, under the whole-line labeller", "blocks-only", "line", WHOLE
 )
-UNTIED_LINE = Arm("untied-line", 2, "untied, under the whole-line labeller", "untied", "line", WHOLE)
+UNTIED_LINE = Arm("untied-line", SEEDS, "untied, under the whole-line labeller", "untied", "line", WHOLE)
 ARMS = (BLOCKS_ONLY, UNTIED, ROWS_CLEAN, BLOCKS_ONLY_LINE, UNTIED_LINE)
 REFERENCE = "recipe-short"
 """Production's arm the three fixes are read against: tied, every slice anchored, no row constraint."""
@@ -521,8 +531,8 @@ def main(ctx: Ctx) -> dict:
     a_labels = STORED_LABELS + [r["label"] for r in rows]
     a_trained = [stored[lb] for lb in STORED_LABELS] + list(trained)
     a_probes = [prep["probes"]] * len(STORED_LABELS) + [r["probes"] for r in rows]
-    a_conditions = [lb.rsplit("-s", 1)[0] for lb in STORED_LABELS] + [r["condition"] for r in rows]
-    a_seeds = [int(lb.rsplit("-s", 1)[1]) for lb in STORED_LABELS] + [r["seed"] for r in rows]
+    a_conditions = [c for c, _, _ in STORED_RUNS] + [r["condition"] for r in rows]
+    a_seeds = [s for _, s, _ in STORED_RUNS] + [r["seed"] for r in rows]
     rowed = ctx.map(rows_one, a_trained, a_probes, a_conditions, a_seeds, a_labels, role="score")
 
     return ctx.run(publish_results, trained, evaled, scored, rowed, prep["stats"], lined["probes"], role="prep")
