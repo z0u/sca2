@@ -124,7 +124,7 @@ Hypothesis (c) is scored because every training experiment from here scores its 
 
 This is different from the [layer sweep](#layer-sweep), which tests the model's ability to route around intervention.
 
-*Note, 2026-09-11.* Run as the `blocks-only` arm of [ex-2.2.7](../ex-2.2.7/report.py), a pilot with three seeds. (a) holds in the blocks and (b) holds, but (c) does not: the syntax rows keep the axis, because the tied readout puts it there rather than the pull at slice 0. Leaving the embedding un-anchored also leaves the red operand readable off the axis at slice 0, and on one seed most red lines survive the full-position projection. The pilot's proposal is to keep anchoring every slice and hold the syntax rows at zero by a constraint after each step, which cleaned the rows at no visible cost.
+*Note, 2026-09-11.* Run as the `blocks-only` arm of [ex-2.2.7](../ex-2.2.7/report.py), a pilot with nine seeds per arm. (a) holds in the blocks and (b) holds, but (c) does not: the syntax rows keep the axis, because the tied readout puts it there rather than the pull at slice 0. Leaving the embedding un-anchored also leaves about half of a red operand's redness off the axis at slice 0, so the full-position projection is less complete on every op, and on one seed most red lines survive it. The pilot's proposal is to keep anchoring every slice and untie the readout, which moved the component onto the readout table at no visible cost. A hard row constraint cleaned the rows as well, but it selects rows by token class, so it does not carry beyond this grammar; it stands as the ceiling the untied arm should match.
 
 ### Anchor one operation
 

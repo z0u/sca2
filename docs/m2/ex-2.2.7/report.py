@@ -41,6 +41,8 @@ with app.setup(hide_code=True):
     OPS = list(ex.ex223.OP_NAMES)
     SYNTAX = list(ex.SYNTAX_WORDS)
     EQ, NL = "=", "\n"
+    TAIL = 0.07
+    """A non-red `mix` deficit above this counts as a tail seed: the reference's twenty seeds run to about this value."""
 
     INK = {
         "blocks-only": ("#1f6fb4", "#5fa8dd"),
@@ -104,13 +106,35 @@ def ink(cond: str):
 
 
 @app.function(hide_code=True)
-def dots(ax, x: float, v, color, *, marker: str = "o", mfc=None, ms: float = 4.5, jitter: float = 0.08) -> None:
-    """One seed per small dot, spread a little in x, with the seed mean as a larger marker on top."""
+def dots(
+    ax,
+    x: float,
+    v,
+    color,
+    *,
+    marker: str = "o",
+    mfc=None,
+    ms: float = 4.5,
+    jitter: float = 0.08,
+    clip: tuple[float, float] | None = None,
+) -> None:
+    """One seed per small dot, spread a little in x, with the seed mean as a larger marker on top. With `clip`,
+    seeds beyond the panel are drawn as small hollow triangles at its edge (the mean is still of every seed).
+    """
     v = np.asarray(v, float)
     if len(v) == 0:
         return
     xs = x + (np.linspace(-jitter, jitter, len(v)) if len(v) > 1 else np.zeros(1))
-    ax.plot(xs, v, ".", ms=2.2, color=color, alpha=0.45, zorder=2, ls="")
+    if clip is not None:
+        lo, hi = clip
+        for beyond, edge, tri in ((v > hi, hi, "^"), (v < lo, lo, "v")):
+            if beyond.any():
+                ax.plot(xs[beyond], np.full(beyond.sum(), edge), tri, ms=3, color=color, mfc="none", zorder=2, ls="")
+        v_in = np.clip(v, lo, hi)
+        shown = (v >= lo) & (v <= hi)
+        ax.plot(xs[shown], v_in[shown], ".", ms=2.2, color=color, alpha=0.45, zorder=2, ls="")
+    else:
+        ax.plot(xs, v, ".", ms=2.2, color=color, alpha=0.45, zorder=2, ls="")
     ax.plot([x], [v.mean()], marker, ms=ms, color=color, mfc=color if mfc is None else mfc, zorder=3, ls="")
 
 
@@ -233,27 +257,36 @@ def _(res: Results):
     _opnd_def = res.deficit(ex.REFERENCE, MIX, OPERANDS).mean()
     _proj_red = {c: res.score(c, MIX, PROJECTION, "acc", "red") for c in ARMS}
     _bo_worst = _proj_red["blocks-only"].max()
+    _op_red = {c: [res.score(c, op, PROJECTION, "acc", "red").mean() for op in OPS] for c in ARMS}
+    _red = {c: res.red_rows(c).mean() for c in ROW_ARMS}
+    _alpha = {c: res.stat(c, "alpha_op1").mean() for c in ARMS}
+    _ret = res.stat("untied-line", "retention")
+    _bol_ml = _ml["blocks-only-line"]
+    _tail = {c: int((_proj_def[c] > TAIL).sum()) for c in ("blocks-only-line", "untied-line")}
+    _tail_ref = int((_proj_def[ex.REFERENCE] > TAIL).sum())
+    _w = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+    _line_opnd = res.deficit("untied-line", MIX, OPERANDS)
     mo.md(rf"""
     # Ex 2.2.7: a pilot of the syntax rows
 
     /// tip |
     <!-- tl;dr -->
-    A scouting run, with no gates. In every anchored model, the embedding rows of the op words and `=` hold part of the anchor axis, and a full-position projection costs accuracy on the non-red lines because of it.
+    A scouting run, with no gates. In every anchored model, the embedding rows of the op words and `=` hold part of the anchor axis. That is why a full-position projection costs accuracy on the non-red lines.
 
-    To find where that component does its work, we stripped it from the stored checkpoints, on the input side or the output side of the tied table. We then retrained the recipe three ways, each removing one candidate mechanism: anchoring the blocks only, untying the readout, and holding the rows clean by a hard constraint.
+    To find where that component works, we stripped it from the stored checkpoints, on the input side or the output side of the tied table. We then retrained the recipe three ways, each removing one candidate mechanism: anchoring the blocks only, untying the readout, and holding the rows clean by a hard constraint.
 
-    The logit path puts it there. Given a readout table of its own, the model moves the component onto that table and the embedding rows come mostly clean. Leaving the embedding out of the anchor does not remove the component, and makes the projection less complete.
+    The logit path puts it there. Given a readout table of its own, the model moves the component onto that table, and the embedding rows come mostly clean. Leaving the embedding out of the anchor does not remove the component, and it makes the projection less complete.
 
-    Holding the rows at zero after every step costs nothing we can see, and brings the non-red cost of the full-position projection down to the level of the operand-only edit. The pilot proposes carrying that constraint into the handover.
+    Untying the readout costs nothing we can see, and neither does holding the rows at zero after every step. Either one brings the non-red cost of the full-position projection down toward the cost of the operand-only edit. The pilot proposes the untied readout for the handover, since it needs nothing from the grammar. It also flags a tail of poor selectivity under the whole-line labeller.
     ///
 
     ## Observations
 
-    - **Where the component works.** On the stored `{ex.REFERENCE}` checkpoints, stripping it from the readout side costs the `=` prediction on the red lines ({_eq("recipe-short", "clean"):.2f} to {_eq("recipe-short", "output"):.2f}; {_eq("t00", "output"):.2f} on `t00`) and nothing else. Stripping it from the embedding side costs the answer instead ({_ans("recipe-short", "clean", "red"):.2f} to {_ans("recipe-short", "input", "red"):.2f} on the red lines, {_ans("recipe-short", "input", "nonred"):.2f} on the non-red). But turning the rows by the same angle in a random direction costs at least as much ({_ans("recipe-short", "input-control", "red"):.2f}), so on that side the blocks seem to have learned where the `=` row sits ([figure](#where-the-component-works)).
-    - **The row table.** The `=` row carries {_row["recipe-short"]:.2f} on `{ex.REFERENCE}` and {_row["t00"]:.2f} on `t00`, the op words {_ops["recipe-short"]:.2f} and {_ops["t00"]:.2f}. Anchoring the blocks only leaves it at {_row["blocks-only"]:.2f}. Untying the readout brings the `=` row of the embedding to {_row["untied"]:.2f} and puts {_head["untied"]:.2f} on the readout row. Under the whole-line labeller the `⏎` row takes the axis as well ({_nl["blocks-only-line"]:.2f} on `blocks-only-line`, {_head["untied-line"]:.2f} on the readout of `untied-line`). `rows-clean` holds every syntax row at zero by construction ([figure](#the-row-table)).
+    - **Where the component works.** On the stored `{ex.REFERENCE}` checkpoints, stripping it from the readout side costs the `=` prediction on the red lines ({_eq("recipe-short", "clean"):.2f} to {_eq("recipe-short", "output"):.2f}; {_eq("t00", "output"):.2f} on `t00`) and nothing else. Stripping it from the embedding side costs the answer instead ({_ans("recipe-short", "clean", "red"):.2f} to {_ans("recipe-short", "input", "red"):.2f} on the red lines, {_ans("recipe-short", "input", "nonred"):.2f} on the non-red). But turning the rows by the same angle in a random direction costs at least as much ({_ans("recipe-short", "input-control", "red"):.2f}), so on that side the blocks seem to have learned where the `=` row sits. The pilot arms repeat the pattern. On `untied`, stripping the readout side costs the `=` prediction ({_eq("untied", "output"):.2f}) and stripping the embedding side costs little ({_ans("untied", "input", "red"):.2f} on the answer). On `rows-clean` and `untied-line`, no strip changes anything ([figures](#where-the-component-works)).
+    - **The row table.** The `=` row is at {_row["recipe-short"]:.2f} on `{ex.REFERENCE}` and {_row["t00"]:.2f} on `t00`; the op words are at {_ops["recipe-short"]:.2f} and {_ops["t00"]:.2f}. Anchoring the blocks only leaves the `=` row at {_row["blocks-only"]:.2f}. Untying the readout brings the `=` row of the embedding down to {_row["untied"]:.2f}, and puts {_head["untied"]:.2f} on the readout row. Under the whole-line labeller the `⏎` row takes the axis as well ({_nl["blocks-only-line"]:.2f} on `blocks-only-line`, {_head["untied-line"]:.2f} on the readout of `untied-line`). `rows-clean` holds every syntax row at zero by construction. The red color rows themselves sit at {_red["recipe-short"]:.2f} on the reference, {_red["rows-clean"]:.2f} on `rows-clean` and {_red["untied"]:.2f} on `untied`, but at {_red["blocks-only"]:.2f} on `blocks-only` and {_red["blocks-only-line"]:.2f} on `blocks-only-line`, where nothing pulls the embedding ([figure](#the-row-table)).
     - **Task cost.** Held-out exact match is at least {_em_floor:.3f} on every op of every arm ([table](#task-cost)).
-    - **Placement.** m_line runs {min(_pilot_ml):.3f}–{max(_pilot_ml):.3f} across the pilot arms, against {_ref.mean():.3f} <span class='range'>±{(_ref.max() - _ref.min()) / 2:.3f}</span> on `{ex.REFERENCE}`; `blocks-only` is the low end ([table](#where-the-pull-lands)).
-    - **Suppression and selectivity.** Under the full-position projection the non-red `mix` deficit is {span2(_proj_def["recipe-short"])} on `{ex.REFERENCE}`, where the operand-only edit gives {_opnd_def:.3f}. On the other arms it is {span2(_proj_def["untied"])} on `untied`, {span2(_proj_def["rows-clean"])} on `rows-clean` and {span2(_proj_def["blocks-only"])} on `blocks-only`. Red-line `mix` accuracy under the projection is {_proj_red["recipe-short"].mean():.2f} on the reference, {_proj_red["untied"].mean():.2f} on `untied` and {_proj_red["rows-clean"].mean():.2f} on `rows-clean`; on `blocks-only` it is {_proj_red["blocks-only"].mean():.2f}, with one seed at {_bo_worst:.2f} ([table](#suppression-and-selectivity)).
+    - **Placement.** m_line runs {min(_pilot_ml):.3f}–{max(_pilot_ml):.3f} across the pilot arms, against {_ref.mean():.3f} <span class='range'>±{(_ref.max() - _ref.min()) / 2:.3f}</span> on `{ex.REFERENCE}`; `blocks-only` is the low end, and one seed of `blocks-only-line` did not place (m_line {_bol_ml.min():.2f}, against {np.sort(_bol_ml)[1]:.2f} for its next seed). ᾱ at op1, the containment read, is {_alpha["untied"]:.2f} on `untied` and {_alpha["untied-line"]:.2f} on `untied-line` against {_alpha[ex.REFERENCE]:.2f} on the reference, and retention on `untied-line` is {_ret.mean():.2f} <span class='range'>±{(_ret.max() - _ret.min()) / 2:.2f}</span> ([figure](#where-the-pull-lands)).
+    - **Suppression and selectivity.** Under the full-position projection the non-red `mix` deficit is {span2(_proj_def["recipe-short"])} on `{ex.REFERENCE}`, where the operand-only edit gives {_opnd_def:.3f}. On the other arms it is {span2(_proj_def["untied"])} on `untied`, {span2(_proj_def["rows-clean"])} on `rows-clean` and {span2(_proj_def["blocks-only"])} on `blocks-only`. Red-line `mix` accuracy under the projection is {_proj_red["recipe-short"].mean():.2f} on the reference, {_proj_red["untied"].mean():.2f} on `untied` and {_proj_red["rows-clean"].mean():.2f} on `rows-clean`. On `blocks-only` it is {_proj_red["blocks-only"].mean():.2f}, with one seed at {_bo_worst:.2f}, and across the six ops the two blocks-only arms sit at {min(_op_red["blocks-only"] + _op_red["blocks-only-line"]):.2f}–{max(_op_red["blocks-only"] + _op_red["blocks-only-line"]):.2f} where the reference sits at {min(_op_red[ex.REFERENCE]):.2f}–{max(_op_red[ex.REFERENCE]):.2f}. Under the whole-line labeller the non-red cost has a tail: {_w[_tail["untied-line"]]} of nine `untied-line` seeds and {_w[_tail["blocks-only-line"]]} of nine `blocks-only-line` seeds lose more than {TAIL:g} of the non-red `mix` lines under the projection, against {_w[_tail_ref]} of the twenty reference seeds, and `untied-line` pays {span2(_line_opnd)} under the operand-only edit as well ([figure](#suppression-and-selectivity)).
     """)
     return
 
@@ -622,10 +655,10 @@ def _(res: Results):
     @themed(
         name="placement",
         alt_text="""
-            A grid of small panels, two rows by four columns, one per placement statistic: m_line, alpha at op1, lead at the embedding, contrast, r squared of the similarity grading, latch pi, and retention; the last cell is empty. In each panel the arms run along the x axis with the production reference last, and the statistic along the y axis, with one small dot per seed and a larger marker at the seed mean, in the arm's colour.
+            A grid of small panels, two rows by four columns, one per placement statistic: m_line, alpha at op1, lead at the embedding, contrast, r squared of the similarity grading, latch pi, and retention; the last cell is empty. In each panel the arms run along the x axis with the production reference last, and the statistic along the y axis, with one small dot per seed and a larger marker at the seed mean, in the arm's colour; a seed beyond a panel's range is a hollow triangle at its edge.
         """,
         caption=r"""
-            **Placement on the `mix` probe lines, by arm.** One panel per statistic of the table below; the larger marker is the seed mean and the small dots are the seeds. The reference is ex-2.2.3's production recipe.
+            **Placement on the `mix` probe lines, by arm.** One panel per statistic of the table below; the larger marker is the seed mean and the small dots are the seeds. Each panel spans the bulk of the seeds, and a seed beyond it is drawn as a hollow triangle at the edge (one `blocks-only-line` seed did not place, and sits off most panels; the table has it). The reference is ex-2.2.3's production recipe.
         """,
     )
     def _plot() -> plt.Figure:
@@ -633,8 +666,12 @@ def _(res: Results):
         axes = cast(AxesGrid, axes)
         flat = [axes[r][c] for r in range(2) for c in range(4)]
         for ax, (key, label) in zip(flat, _stats, strict=False):
+            pooled = np.concatenate([res.stat(c, key) for c in ARMS])
+            lo, hi = np.percentile(pooled, [3, 97])
+            pad = 0.15 * (hi - lo) + 1e-6
             for i, c in enumerate(ARMS):
-                dots(ax, i, res.stat(c, key), ink(c), ms=4)
+                dots(ax, i, res.stat(c, key), ink(c), ms=4, clip=(lo - pad, hi + pad))
+            ax.set_ylim(lo - 1.6 * pad, hi + 1.6 * pad)
             bare(ax, ylabel=label)
             ax.set_xticks(np.arange(len(ARMS)), ARMS, fontsize=6.5, rotation=35, ha="right")
             ax.tick_params(labelbottom=True)
@@ -686,10 +723,10 @@ def _(res: Results):
     @themed(
         name="suppression",
         alt_text="""
-            Two panels side by side. Left: red-line accuracy under the full-position projection, with the arms along the x axis, the production reference last, and one marker per op at each arm; lower is a more complete removal. Right: the non-red mix accuracy deficit, filled markers under the projection and hollow ones under the operand-only edit. In both, each seed is a small dot beside the mean, in the arm's colour.
+            Two panels side by side. Left: red-line accuracy under the full-position projection, with the arms along the x axis, the production reference last, and one marker per op at each arm; lower is a more complete removal. Right: the non-red mix accuracy deficit, filled markers under the projection and hollow ones under the operand-only edit, with seeds above the panel drawn as hollow triangles at its top edge. In both, each seed is a small dot beside the mean, in the arm's colour.
         """,
         caption=r"""
-            **Suppression and selectivity, by arm.** Left, exact-match accuracy on the red lines under the full-position projection, one marker shape per op (the removal read; lower is more complete). Right, the non-red `mix` deficit under the projection (filled) and under the operand-only edit (hollow). Larger markers are seed means, small dots the seeds.
+            **Suppression and selectivity, by arm.** Left, exact-match accuracy on the red lines under the full-position projection, one marker shape per op (the removal read; lower is more complete). Right, the non-red `mix` deficit under the projection (filled) and under the operand-only edit (hollow); the panel stops at 0.12, and a seed above it is a hollow triangle at the top edge (the table has the values). Larger markers are seed means, small dots the seeds.
         """,
     )
     def _plot() -> plt.Figure:
@@ -706,12 +743,15 @@ def _(res: Results):
                     ms=3.5,
                     jitter=0.03,
                 )
-            dots(ax2, i - 0.14, res.deficit(c, MIX, PROJECTION), color, ms=4.5, jitter=0.06)
-            dots(ax2, i + 0.14, res.deficit(c, MIX, OPERANDS), color, mfc="none", ms=4.5, jitter=0.06)
+            dots(ax2, i - 0.14, res.deficit(c, MIX, PROJECTION), color, ms=4.5, jitter=0.06, clip=(-0.02, 0.12))
+            dots(
+                ax2, i + 0.14, res.deficit(c, MIX, OPERANDS), color, mfc="none", ms=4.5, jitter=0.06, clip=(-0.02, 0.12)
+            )
         for ax, label in ((ax1, "red acc, projection"), (ax2, "non-red mix deficit")):
             ax.set_xticks(np.arange(len(ARMS)), ARMS, fontsize=7, rotation=25, ha="right")
             bare(ax, ylabel=label)
         ax1.set_ylim(-0.05, 1.05)
+        ax2.set_ylim(-0.025, 0.125)
         from matplotlib.lines import Line2D
 
         grey = light_dark("#999", "#777")
@@ -759,23 +799,35 @@ def _():
 
     **Which mechanism.** Each of the three arms removed one candidate, and two of the three results point the same way. Leaving the embedding out of the anchor did not clean the rows, so the direct pull at slice 0 was not the cause. Giving the readout a table of its own moved the component onto that table, at about the size it has on the reference, and left the embedding rows mostly clean.
 
-    So the logit path is what places it. Part A says the same from the stored checkpoints: after a red op2, the `=` prediction leans on the component on the readout side, and that is the only thing the readout side does. This is the mechanism as written in the [tied-readout item](https://github.com/z0u/sca2/blob/main/todo/science/syntax-rows-carry-the-axis-via-tied-readout.md).
+    So the logit path is what places it. Part A says the same from the stored checkpoints: after a red op2, the `=` prediction leans on the component on the readout side, and that is the only thing the readout side does. The untied arm shows it from the other side: stripping the readout table costs the same prediction, and stripping the embedding costs almost nothing. This is the mechanism as written in the [tied-readout item](https://github.com/z0u/sca2/blob/main/todo/science/syntax-rows-carry-the-axis-via-tied-readout.md).
 
-    The embedding-side strips show something else: the blocks learn to read the rows where the logit path leaves them. The random-direction control costs as much, and on `t00`, where the `=` row sits about 70° off a clean one, a stripped model is a different model. So the component is not vestigial either, and a stronger anti-subspace term on those rows would be working against the logits.
+    The embedding-side strips show something else: the blocks learn to read the rows where the logit path leaves them. The random-direction control costs as much, and on `t00`, where the `=` row sits about 70° off a clean one, a stripped model is a different model. So the component is doing work, and a stronger anti-subspace term on those rows would pull against the logits.
 
-    **Prep C.** Of the three hypotheses in the design, (a) holds in the blocks, with the contrast and the similarity grading at the values of the reference and m_line a little lower. (b) holds, since the color rows still lead the pull at the embedding even though nothing pulls them there. (c) does not hold, because the rows keep the axis.
+    **Prep C.** Of the three hypotheses in the design, (a) holds in the blocks: the contrast and the similarity grading are at the values of the reference, with m_line a little lower. (b) holds, since the color rows still lead the pull at the embedding even though nothing pulls them there. (c) does not hold, because the rows keep the axis.
 
-    The cost Prep C did not anticipate is completeness: with the embedding un-anchored and the anti-subspace term skipping it too, information about the red operand stays readable off the axis at slice 0, and on one of three seeds most red `mix` lines survive the full-position projection.
+    The cost Prep C did not anticipate is completeness. On both blocks-only arms the full-position projection leaves more red lines with their answer, on every op, and on one seed it leaves most of them. The row table says why: the projection removes the e₁ component of the stream at every slice and nothing else, so anything that survives it sits off the axis.
 
-    **The fix to carry.** Holding the syntax rows at zero after every step costs nothing this pilot can see. Task, placement, and removal all match the reference on three seeds, and the non-red cost of the projection sits at the level of the operand-only edit.
+    In the reference, the anchor at slice 0 and the anti-subspace term together put the redness of a red operand onto the axis before any block runs, with the red color rows at about 0.8 on e₁. With nothing pulling the embedding they sit at about half that, so half of the redness enters the stream off the axis.
 
-    Hold that last comparison loosely: the twenty seeds of the reference spread across most of that range, and three seeds cannot resolve it, though twenty at the handover can. The constraint keeps the table shared, so it is the arm that carries to tied models, and the untied arm stays a diagnostic.
+    The blocks are as well aligned as the reference's, since the contrast and the similarity grading match. They read the redness from the stream and write it onto the axis, and the projection removes what they wrote. The off-axis half is still in the residual stream at the last slice, where the readout can use it. So "the states at the later slices are aligned" describes what the blocks add, and how well that part is aligned does not decide whether the projection is complete.
 
-    Under the whole-line labeller the `⏎` row takes the axis the same way, since it follows the newly pulled answer. The constraint covers every non-color row, so it should hold there too, but that arm did not run here.
+    **What transfers.** `rows-clean` chooses its rows by token class: the non-color rows are the ones held clean. That is a rule about which vocabulary entries may hold the axis, the same kind of built-in position knowledge that the mellowmax pooling was adopted to avoid, and natural language has no such class. So the constraint as run here is a fix for this grammar, and what it measures is the ceiling: what a fully clean shared table buys.
 
-    The `untied-line` arm gave a larger non-red cost on one of its two seeds under both edits, which points at the labeller rather than the rows, and two seeds is too few to say more.
+    The other two arms need nothing from the grammar. Untying is available on any model, as a copy of the table, and many models already ship untied. `blocks-only` keeps the table shared but pays in completeness, above.
 
-    **What it changes.** The handover can adopt the row constraint, and use the full-position projection alongside the operand-only edit as its removal operator, which is what the M3-shaped operator needs. The operator pass in the D2.2 design chooses between plain projection and the shaped forms on that footing.
+    A tied-table variant we did not run would hold every row clean, so the embedding has no axis component at all. It would need no token class, but the redness would then enter off the axis by construction, the completeness cost again. That question belongs with the operator pass, where the reflection and the shaped forms are also up for decision.
+
+    **The fix to carry.** On nine seeds, `untied` and `rows-clean` match each other and the reference on task, placement and removal. Both have a lower non-red cost under the projection on most seeds, with a two-seed tail at the level of the upper seeds of the reference. The pilot proposes the untied readout for the handover, with the full-position projection read beside the operand-only edit, and `rows-clean` as the in-grammar ceiling it should match.
+
+    The concern from the discussion in ex-2.2.3 still stands, that a method needing an untied readout is a harder sell where the tables are tied; the all-rows-clean variant above is the tied option to test if that becomes the target. Two things to watch on the untied arms: ᾱ at op1, the containment read, is higher than on the reference, and the `=` row of the embedding is lower rather than at zero.
+
+    **The whole-line labeller.** Under it the `⏎` row takes the axis the same way, since it follows the newly pulled answer, and on the untied arm it lands on the readout table like the rest.
+
+    The larger finding is the tail. On both line arms a few seeds lose a large share of the non-red lines under the projection, `untied-line` pays under the operand-only edit as well, and the margin on `untied-line` drifts down over training (the retention read). One `blocks-only-line` seed did not place at all.
+
+    There is no plain-recipe line arm at nine seeds here, and ex-2.2.6 has two or three, so the pilot cannot say whether the tail comes from the labeller alone or from pairing it with a fix. The handover should read the selectivity of the line labeller at more seeds before adopting it.
+
+    **What it changes.** The handover can adopt the untied readout, and use the full-position projection alongside the operand-only edit as its removal operator, which is what the M3-shaped operator needs. The operator pass in the D2.2 design chooses between plain projection and the shaped forms on that footing, and the whole-line labeller goes in with a selectivity check rather than by default.
 
     ## Method notes
 
