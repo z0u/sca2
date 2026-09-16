@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [D2.2, anchoring, ex-2.2.1, evaluation]
 opened: 2026-09-03
+closed: 2026-09-15
 ---
 # Repulsion: shape where the state lands, rather than how much is removed
 
@@ -29,3 +30,5 @@ Sibling of the [shaped-suppression item](./shaped-suppression-rather-than-projec
 **2026-09-11, Fable** — done as specified: `sca.intervention.repulsion` (linear and Bézier mappers, `repulsion_mapper` shared with numpy for the checks), the contract check that the write equals the angle between α and m(α), tests, and twenty-one repulsion rows in the [ex-2.2.8](/docs/m2/ex-2.2.8/report.py) survey, each also at the operand positions. What it found: at the same landing the repulsion rows sit with the shaped rows in every read, the Bézier rows with the linear ones, and the landing figure shows the linear mapper holding its landing through slice 3, as designed. For removal it buys nothing over the shaped suppression, as the first reading above expected; the graded-edit use (a landing as a dose with a meaning in the clean map) is untested and is what would keep this item alive. The survey's proposal on the adopted point is the plain projection, so the anchored-op prereg does not carry a repulsion row unless it wants the dose dial. The landing that does have a meaning is the trained fallback: [repulsion onto the fallback](./repulsion-onto-the-fallback.md) takes that up.
 
 **2026-09-14, Fable** — the survey was re-run on production before publishing, and it now carries the linear mapper only: thirteen landings, each at the whole sequence and at the operands, so twenty-six repulsion rows. The Bézier rows were dropped from the production plan on the strength of the rehearsal's read above (each matched its linear row at the same landing). The mapper itself stays in `sca.intervention` with its tests. The linear-mapper numbers reproduce the rehearsal.
+
+**2026-09-15, Fable** — closing. The operator is in the contract with tests, and the survey read it: at the same landing the repulsion rows sit with the shaped rows in every read, and the write angle and the behavioral cost decouple. The [D2.2 design](/docs/m2/d2.2/design.md) records the operator decision (plain projection, with `operands` as the selective reference), and the handover prereg carries no repulsion row. Where the state lands stays available for the fallback work in D2.3.

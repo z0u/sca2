@@ -240,4 +240,12 @@ These experiments were preparation for the main work: exercising the infrastruct
 
     <!-- mini:figures ./m2/ex-2.2.8/report.py -->
 
+- [2.2.9. The grammar handover](./m2/ex-2.2.9/report.py)
+
+    Preregistration draft, before any run. The four proposals from the scouting round and the pilots go in together at fresh seeds: table A+ (eleven ops, three of which read operand order), stochastic rounding, the whole-line labeller, and the untied readout, on ex-2.2.3's adopted recipe. Twenty seeds of the full handover and twenty with ex-2.2.3's labeller, nine with the tied readout, five un-anchored, and an exploratory arm that holds lines per op at the six-op count. Five hypotheses with ex-2.2.3's gates, a removal read scored on the lines where the answer needs *red*, and a decision rule that names the grammar of record.
+
+    <span class="tags">`prereg` `multi-op` `anchoring` `selectivity`</span>
+
+    <!-- mini:figures ./m2/ex-2.2.9/report.py -->
+
 </details>

@@ -53,6 +53,8 @@ uv run --with playwright python .claude/skills/report-render/render.py \
 
 Then `Read` the PNG. `--suffix '?show-code=true'` appends to the URL; `--wait-text 'some heading'` blocks until that text renders instead of a fixed timeout.
 
+An `-o` ending in `.pdf` prints the page instead of screenshotting it, through the same engine as Chrome's print dialog, so it honours the `@page` size and `@media print` rules in `docs/report.css` (paper sized for a reMarkable 2, sections starting on fresh pages, tables unscrolled). It is how to check a print-style edit: rebuild the site (`./go preview --no-serve <report>`) so the edit is inlined, print from `_site/<key>/`, then rasterize pages with `uv run --with pypdfium2` (`PdfDocument(path)[i].render(scale=1.5).to_pil().save(...)`) and `Read` them, or tile them into a contact sheet to see the page breaks at a glance.
+
 To inspect one element instead of the whole page, pass a CSS selector. `render.py` shoots each match (numbering `out.png` → `out-0.png`, `out-1.png`, … when several match) after scrolling it into view:
 
 ```bash

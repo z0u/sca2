@@ -28,7 +28,7 @@ Images, SVGs, and the like are copied as-is into `_site/`.
 
 ### Shared report styles
 
-[`report.css`](./report.css) is one stylesheet for cross-report polish: centering narrow figures, `.sw` color swatches via [`colors.swatch`](../src/sca/data/colors.py), `.report-table` headings, and `.report-subline-row`.
+[`report.css`](./report.css) is one stylesheet for cross-report polish: centering narrow figures, `.sw` color swatches via [`colors.swatch`](../src/sca/data/colors.py), `.report-table` headings, and `.report-subline-row`. Its `@media print` block sizes the page for a reMarkable 2 (print from the browser with headers and footers off; the `report-render` skill prints headless for checking).
 
 Each report points at it with `marimo.App(css_file="…/report.css")`, so it shows live in edit mode and bakes into the export. The build re-inlines it from source as well (`mini.reports.set_report_styles`), so editing `report.css` restyles every published report without re-exporting any notebook. Keep it small and selector-scoped, since it layers on top of Marimo's own CSS.
 

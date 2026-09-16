@@ -95,6 +95,45 @@ body.dark-theme .sw-themed {
   }
 }
 
+/* Markdown tables. Marimo right-aligns every cell, as if all were numbers; text reads
+ * better ragged-right, so cells start left and a numeric column opts in with `---:` in
+ * the Markdown (which lands as an inline text-align, outranking this). Cells sit at the
+ * top of their row, so a wrapped cell reads from the same line as its neighbours, and
+ * rows carry no stripe: the shading reads as meaning on paper. The selectors carry
+ * `.output` to outrank Marimo's own `.markdown table tr` and `tr:nth-child` rules. */
+.markdown table :is(th, td) {
+  text-align: left;
+}
+.output .markdown table :is(tr, th, td) {
+  vertical-align: top;
+}
+.output .markdown table tbody tr:nth-child(n) {
+  background: transparent;
+}
+
+/* A definition list (a glossary). Marimo's Markdown has no definition-list syntax, so a
+ * report writes the <dl> itself; this gives it the shape of one. */
+.markdown dl > dt {
+  font-weight: 600;
+  margin-top: 0.8em;
+}
+.markdown dl > dd {
+  margin-inline-start: 1.5em;
+  margin-block: 0.25em 0;
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right, beside the title rather than under it. */
+.markdown mark.draft {
+  float: right;
+  margin: 0.4em 0 0.5em 1em;
+  padding: 0.1em 0.5em;
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
 /* Authored report tables. Headings left-align with their columns by default; annotate
  * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
 .report-table th {
@@ -206,5 +245,129 @@ body.dark-theme .sw-themed {
     &:hover {
       opacity: 1;
     }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. Print from the browser with headers/footers off; the `report-render` skill
+ * prints the same way headless (`-o report.pdf`) for checking. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    margin: 10mm 20mm 12mm;
+  }
+  /* Marimo's print rule zeroes the page margin and pads #App instead, which only pads
+   * the first and last page. Real page margins apply to every page, so undo that. */
+  #App {
+    padding: 0 !important;
+  }
+  /* The content panel is a flex item; its automatic minimum width is the widest thing
+   * inside it, so one wide table would push the whole column past the page edge. */
+  [data-panel] {
+    min-width: 0;
+  }
+  nav[data-mini-banner] {
+    display: none;
+  }
+
+  /* Type. Marimo sizes everything in rem, so the root size scales the whole page —
+   * headings, admonitions, tables, code — in proportion. 11pt body on a ~120mm
+   * column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  .prose,
+  .markdown,
+  .markdown .paragraph,
+  .markdown li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: Marimo's link blue prints as a mid grey that reads as faded text. */
+  .output .footnote > ol > li,
+  .output .footnote .footnote-backref {
+    opacity: 0.85;
+  }
+  .output .markdown a,
+  .output .markdown a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title cell has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  .markdown h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. Headings already carry break-after: avoid from Marimo. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  .report-table-scroll,
+  .markdown details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.nb) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box, the nowrap that fed it, and the viewport-relative margins that let a
+   * table overflow the text column. A Markdown table becomes a real table again (Marimo
+   * makes it a scrolling block), so auto layout can wrap its cells to fit the column,
+   * and the type is a step smaller so more columns fit before they do. A swatch stays
+   * with its word (`colors.swatch` joins them with a non-breaking space). The selectors
+   * carry `.output` to outrank Marimo's own `.markdown table` rule, which loads later. */
+  .report-table-scroll {
+    overflow: visible;
+  }
+  .output .markdown table,
+  .output .report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.8em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: 0;
+    > thead,
+    > tbody {
+      transform: none;
+    }
+  }
+  .output :is(.markdown, .report-table-scroll) table.report-table {
+    font-size: 0.75em;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  .output :is(.markdown table, .report-table) :is(th, td) {
+    padding-inline: 0.35em;
   }
 }

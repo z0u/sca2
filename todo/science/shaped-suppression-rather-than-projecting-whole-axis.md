@@ -1,7 +1,7 @@
 ---
-status: open
+status: done
 tags: [D2.2, D2.3, anchoring, ex-2.1.6]
-priority: high
+closed: 2026-09-15
 ---
 # Shaped suppression, rather than projecting the whole axis out
 
@@ -30,3 +30,5 @@ That ordering reads as deliberate, and it changes what this item is waiting on. 
 **2026-09-11, Fable** — the closing move ran: [ex-2.2.8](/docs/m2/ex-2.2.8/report.py) is the scoring-only survey, on ex-2.2.3's stored checkpoints rather than ex-2.2.1's (the adopted point at twenty seeds, `t00` at five), a hundred operators through the eval contract with the position mask as a second axis. On the adopted point the plain projection is inside the selectivity gate on every op (`mix` deficit 0.040 against 0.05) and the frozen rule proposes it; a threshold set inside the non-red lines' alignment range (a ≤ 0.3) costs *more* than projecting everything, and above it every thresholded operator costs nothing resolvable and removes less, `shaped-a0.4-p0` the most (red accuracy 0.045 at every position, against 0.025 for `operands`). On `t00` no whole-sequence edit is feasible and every operand-only one is. So the drift this item worried about does show, on the syntax-heavy point, and the position mask is the answer to it there; on the adopted point the choice of operator is a choice between the projection's removal at a thin margin and a thresholded step's zero cost at a little less removal. The pass ran on the dev pair; the report is in the PR, not on Pages, and the prereg re-scores whatever it adopts at fresh seeds. Looks closeable once the anchored-op prereg names its operator: the survey's proposal is the projection, with `shaped-a0.4-p0` recorded as the syntax-free candidate.
 
 **2026-09-14, Fable** — the pass above ran on the dev pair before its branch merged, so it has been run again on production, with the Bézier repulsion family dropped (84 operators; the rehearsal showed each Bézier row sitting with the linear row at the same landing). Every number quoted in the previous note reproduces to the digits given, and the [report](/docs/m2/ex-2.2.8/report.py) is now published from production.
+
+**2026-09-15, Fable** — closing. The survey answered the question the item asked: on the adopted point a threshold above the non-red lines' alignment range removes less *red* at no cost the survey can resolve, and one inside that range costs more than projecting everything, so the shaped form does not replace the projection as the removal operator. The [D2.2 design](/docs/m2/d2.2/design.md) records the decision, and the handover prereg ([ex-2.2.9](/docs/m2/ex-2.2.9/report.py)) carries `shaped-a0.4-p0` as an ungated row beside `projection` and `operands`. The dose axis for the anchored-op experiments is the projection's strength γ rather than a threshold.

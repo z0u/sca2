@@ -966,6 +966,11 @@ _LIGHTBOX_JS = r"""
     var img=target(ev);
     if(img){ ev.preventDefault(); open(img); }
   });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
 })();
 """.replace("__ZOOM__", ZOOM_ATTR)
 

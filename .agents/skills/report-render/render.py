@@ -18,7 +18,9 @@ Pass a bundle dir (containing index.html + _assets/) or an index.html directly.
 `--suffix '?show-code=true'` appends to the URL; `--wait-text STR` blocks until STR
 appears (or times out). `--selector CSS` shoots just the matching element(s) instead
 of the full page — e.g. `--selector '.output svg'` for one figure, numbering the
-output when several match. See SKILL.md for driving the DOM instead of screenshotting.
+output when several match. An `-o` ending in `.pdf` prints the page instead (Chrome's
+print engine, `@page`/`@media print` rules honoured), for checking the print styles in
+`docs/report.css`. See SKILL.md for driving the DOM instead of screenshotting.
 """
 
 import argparse
@@ -74,7 +76,9 @@ def _serve(root: Path) -> tuple[socketserver.TCPServer, int]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("bundle", type=Path, help="export bundle dir (with index.html + _assets/) or an index.html")
-    ap.add_argument("-o", "--out", type=Path, default=Path("report.png"), help="screenshot path (PNG)")
+    ap.add_argument(
+        "-o", "--out", type=Path, default=Path("report.png"), help="screenshot path (PNG), or a PDF to print instead"
+    )
     ap.add_argument("--suffix", default="", help="appended to the URL, e.g. '?show-code=true'")
     ap.add_argument("--selector", default=None, help="CSS: shoot matching element(s), not the full page")
     ap.add_argument("--wait-text", default=None, help="block until this text appears (else fixed timeout)")
@@ -102,7 +106,17 @@ def main() -> None:
                 page.get_by_text(args.wait_text).first.wait_for(timeout=args.timeout * 1000)
             else:
                 page.wait_for_timeout(args.timeout * 1000)
-            if args.selector:
+            if args.out.suffix.lower() == ".pdf":
+                # Same engine as Chrome's print dialog. The size and margins come from the
+                # stylesheet's @page rule; header/footer are off, as they should be there.
+                page.emulate_media(color_scheme="light")
+                # Deferred figures have no pixels until scrolled to; the site's beforeprint
+                # handler does the same, but printing headless may not fire it.
+                page.evaluate("document.querySelectorAll('img[loading=lazy]').forEach(i => i.loading = 'eager')")
+                page.wait_for_timeout(3000)
+                page.pdf(path=str(args.out), prefer_css_page_size=True, print_background=True)
+                shot = str(args.out)
+            elif args.selector:
                 loc = page.locator(args.selector)
                 n = loc.count()
                 if n == 0:

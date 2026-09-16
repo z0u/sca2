@@ -82,7 +82,7 @@ def swatch(text: str | None) -> str:
     rgb = PALETTE.get(text)
     if rgb is None:
         return f"<code>{text}</code>"
-    return f'<span class="sw" style="--sw: {to_hex(rgb)};" aria-hidden="true"></span> {text}'
+    return f'<span class="sw" style="--sw: {to_hex(rgb)};" aria-hidden="true"></span>&nbsp;{text}'
 
 
 def redness(c: Rgb) -> float:
