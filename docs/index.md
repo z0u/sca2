@@ -256,4 +256,12 @@ These experiments were preparation for the main work: exercising the infrastruct
 
     <!-- mini:figures ./m2/ex-2.2.10/report.py -->
 
+- [Geometry under anchoring: a whole-geometry read over the stored runs](./m2/geometry-rsa/report.py)
+
+    A reanalysis, no training and no gates: 131 stored checkpoints from ex-2.1.10, ex-2.2.3, and ex-2.2.9, each read against its own experiment's un-anchored controls by representational similarity (the correlation of two runs' colour-distance matrices) and by Procrustes, at every residual slice and two sites, with the anchor axis e₁ kept and dropped. Past the first block an anchored run's colour geometry correlates with a control's at about half the control-against-control level, in every condition. Dropping e₁ brings the six-op recipe at 50 epochs back to the control band and the heavier anchors, the longer training, and the handover arms only part way or not at all. Anchored seeds agree with each other more closely than control seeds do, so anchoring moves the deep geometry to a different, more reproducible arrangement, less like the RGB cube. Proposes a preregistered read of the handover grammar through training.
+
+    <span class="tags">`scouting` `anchoring` `geometry` `representations`</span>
+
+    <!-- mini:figures ./m2/geometry-rsa/report.py -->
+
 </details>

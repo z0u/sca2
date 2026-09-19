@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [probes, anchoring, representations, geometry]
 opened: 2026-08-27
 ---
@@ -13,3 +13,8 @@ Two things would make the claim defensible:
 2. **A whole-geometry statistic rather than per-channel R².** Compare the anchored and control embedding geometries directly: e.g. Procrustes distance or RSA (representational similarity analysis: correlate the pairwise-distance matrices of the 216 color states across models) between each anchored run and each control run, against the control-vs-control baseline. That asks "is the anchored geometry within the spread of un-anchored geometries, apart from the anchored axis?", which is the actual claim. Projecting out the anchor direction first would isolate the *rest* of the space.
 
 Until one of these is run, the post should say something like: linear probes decode RGB about as well from anchored models as from un-anchored ones, though that comparison is noisy and could only have caught a large loss.
+
+## Notes
+
+**2026-09-18, science desk** — Point 2 is run, as a reanalysis of the stored checkpoints (`docs/m2/geometry-rsa/`, 131 runs from ex-2.1.10, ex-2.2.3, and ex-2.2.9, each against its own experiment's controls). The whole-geometry read does not support the post's claim in the deeper blocks: at the last block an anchored run's RSA to the controls is about half the control-against-control level in every condition, and Procrustes agrees. Dropping e₁ first puts ex-2.2.3's recipe at 50 epochs back inside the control band at the last two blocks, the D2.1 recipe and the mid-weight survey points most of the way, the 100-epoch recipe and the heaviest point about a third of the way, and the handover arms (ex-2.2.9) hardly at all. Seed agreement tells the same story: with e₁ dropped, the 50-epoch λ=0.1 recipes agree with each other as controls do, while the heavier, longer, and handover conditions agree more closely than controls, so where the geometry differs beyond the axis it is a different, reproducible arrangement rather than a noisier one, and one less like the RGB cube. So the claim holds for a light anchor at 50 epochs, once the axis is set aside, and not for the heavier, longer, or handover runs. The post's wording at the foot of this item still stands as the safe statement. Point 1 (more control seeds) is unaddressed; ex-2.1.10 has three. What would close the item is a preregistered run reading the handover grammar through training with e₁ dropped, which the report's closing section sketches. The pass ran on the dev pair and needs a production re-run before it is quoted.
+
