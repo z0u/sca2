@@ -1,0 +1,1886 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/25acd29ee5dfcd8b2788f3b71ed45d668c53bdfd/exports/m2/ex-2.2.10/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.2.10: three reads before the handover re-run</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The page style for a woven document. Base typography follows scripts/md.css (the site's
+ * Markdown pages), figure and table rules follow docs/report.css. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 50rem;
+  --gutter: 1.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Lora", serif;
+  font-weight: 400;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 { margin-top: 0; font-size: 2.25em; }
+p { margin-block: 1em; }
+
+code, pre, kbd {
+  font-family: "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+}
+code { background-color: var(--code-bg); padding: 0.1em 0.3em; border-radius: 3px; }
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code { background: none; padding: 0; border-radius: 0; font-size: 1em; }
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Anchor links on headings. */
+a.anchor-link { opacity: 0; color: var(--fg-muted); transition: opacity 0.2s ease; }
+a.anchor-link::after { content: '#'; font-size: 0.8em; margin-inline: 0.4em; }
+:hover > a.anchor-link { opacity: 1; }
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. */
+table { border-collapse: collapse; margin-block: 1.5em; margin-inline: auto; }
+th, td { padding: 0.35em 0.8em; border: 0; text-align: left; vertical-align: top; }
+th { font-weight: 600; }
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) { border-top: 2px solid var(--rule); }
+thead > tr:last-child > :is(th, td) { border-bottom: 1px solid var(--rule); padding-bottom: 0.5em; }
+tbody > tr:first-child > :is(th, td) { padding-top: 0.5em; }
+tbody > tr:last-child > :is(th, td) { border-bottom: 2px solid var(--rule); }
+
+img, video { max-width: 100%; height: auto; }
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure { margin-inline: 0; text-align: center; }
+figure img { margin-inline: auto; display: block; }
+figure:has(> figure) { text-wrap: balance; }
+figure:has(> figure) > figure { display: inline-block; vertical-align: top; margin: 0 0.5em; }
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { font-size: 11pt; display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  pre, figure, table { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1.5rem -1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-190/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.10/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.2.10</strong> · <code>e8624e5-dirty</code> (dirty) · run 2026-09-17<div>via reports/m2/ex-2.2.10/arrays, reports/m2/ex-2.2.10/metrics</div></div><div><strong>ex-2.2.9</strong> · <code>09f0ce4</code> · run 2026-09-16<div>via reports/m2/ex-2.2.9/metrics, reports/m2/ex-2.2.9/probes, reports/m2/ex-2.2.9/trajectories</div></div></details>
+<main class="lit">
+<h1 id="ex-2210-three-reads-before-the-handover-re-run">Ex 2.2.10: three reads before the handover re-run<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#ex-2210-three-reads-before-the-handover-re-run" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>Ex-2.2.9 moved the anchor onto the larger grammar and left three loose ends. Removal was one-sided on the three HSV ops, one seed in twenty fell under the retention gate, and the non-red alignment at op1 sat above the old reference. This notebook reads each off the stored runs, with one small scoring pass for the cube figures and no new training.</p>
+<p>The removal miss comes from the rule we used to pick the lines. The projection acts like a change in the hue of red, and the lines that missed are the ones whose answer takes only the saturation or value of the red operand. Red is the one anchored concept, so these reads cannot say whether another concept would come apart the same way.</p>
+<p>The retention drop happens before the anneal begins. The op1 alignment rises under either half of the handover, so it belongs to the new grammar rather than to the readout alone. We propose the re-run.</p>
+</div>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#observations" title="Link to this heading">&para;</a></h2>
+<p>None of the lines below is a result; ex-2.2.11 will adopt what it needs from here and score it at fresh seeds.</p>
+<ul>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#removal-on-the-order-sensitive-ops">Removal</a>: on the three HSV ops the kept share follows a change of hue on the red operand, and not the to-zero rule we used to pick the removal lines. Where the answer takes only the saturation or value of the red operand (<code>sat-hsv</code> and <code>value-hsv</code> with red at op2), two thirds of the clean exact match survives the projection. Where the answer takes the hue of red, or the whole color, it goes. One case no counterfactual predicts: <code>hue-hsv</code> with red at op1, whose answer needs only the saturation and value of red, and where a third of the clean exact match survives. A linear probe on the stream reads the projected red operand as a hue rotated away from red, at a lower value, and the rotation grows block by block.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#retention-and-the-anneal">Retention</a>: on <code>handover</code> the alignment reaches a noisy plateau by epoch 10, and its peak is just the high point of that noise. By the time the anneal begins at epoch 45 the seeds sit at 0.66, a few of them drifting downward. Through the anneal itself every condition is flat, so the gate is reading the noise in the plateau plus the drift. <code>handover-slot</code> and <code>handover-tied</code> hold their plateaus, so the drift needs the whole-line labeller and the untied readout together.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#containment-under-the-untied-readout">Containment</a>: ᾱ at op1 on the non-red lines is 0.28 on <code>handover</code>, 0.18 on <code>handover-slot</code>, and 0.16 on <code>handover-tied</code>, against 0.02 on the control. Each half of the handover raises it, so the untied readout is not the whole story. The <code>⏎</code> embedding row picks up the axis only under the whole-line labeller: 0.17 on <code>handover</code> and zero on <code>handover-slot</code>.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#what-we-make-of-it">What we make of it</a>: score removal on the lines whose answer takes the hue of the red operand, judge retention against the alignment at the start of the anneal (or drop the ratio and report a level), and carry the op1 alignment as a report line rather than a gate.</li>
+</ul>
+<h2 id="how-to-read-this">How to read this<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#how-to-read-this" title="Link to this heading">&para;</a></h2>
+<p>This is a scouting notebook in the shape of <a href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.4/">ex-2.2.4</a>: no hypotheses, no gates, no verdicts. Everything here comes from the checkpoints, probe set, metrics, and training trajectories that ex-2.2.9 stored. The cube figures also needed the answer distributions and residual states of the red lines, which ex-2.2.9 did not keep, so a scoring-only experiment (<a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.10/experiment.py"><code>experiment.py</code></a>) re-ran its projection read on the twenty <code>handover</code> checkpoints and stored those.</p>
+<p>The reads use the vocabulary of ex-2.2.9, and the report for ex-2.2.9 has the <a href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.9/">full glossary</a>. A <em>red line</em> has a red operand, meaning redness at or above 0.8; that operand sits in slot op1 or op2. The <em>projection</em> removes the anchored axis from the residual stream at every slice and position.<sup id="fnref:stream"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#fn:stream">2</a></sup> <em>Kept</em> is the share of the clean expected exact match that survives the projection, over a group of lines. A <em>removal line</em> is a red line where setting the R channel of the red operand to zero moves the true answer by at least 0.4 in the unit cube; the removal gate of ex-2.2.9 wanted kept to fall under 0.2 on those.</p>
+<p>Neither set matches what the training labeller used.<sup id="fnref:labeller"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#fn:labeller">1</a></sup></p>
+<h2 id="removal-on-the-order-sensitive-ops">Removal on the order-sensitive ops<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#removal-on-the-order-sensitive-ops" title="Link to this heading">&para;</a></h2>
+<p>Ex-2.2.9 scored removal on eleven ops, and the projection cleared the gate on eight. The three that missed are the ones that read operand order: <code>hue-hsv</code>, <code>sat-hsv</code>, and <code>value-hsv</code> each take one HSV attribute from op2 and the other two from op1. On each the miss was one-sided by slot: with red at op1 the projection removed most of the answer on <code>sat-hsv</code> and <code>value-hsv</code>, and with red at op2 the answer largely survived. <code>hue-hsv</code> ran the other way.</p>
+<p>Those removal lines were picked by the <em>to-zero</em> rule of ex-2.2.4: a red line counts if setting the R channel of the red operand to zero moves the true answer far. That rule says nothing about which attribute of red the answer actually needs, and it has a blind spot on pure red. Zeroing R on (5, 0, 0) gives black, which has no saturation and no value, so every <code>sat-hsv</code> and <code>value-hsv</code> line that takes only the saturation or value of red counts as a removal line.</p>
+<h3 id="three-counterfactuals">Three counterfactuals<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#three-counterfactuals" title="Link to this heading">&para;</a></h3>
+<p>Each is a different reading of what "losing red" should do to the red operand.
+<em>To zero</em> sets its R channel to zero; this is the rule that picked the lines.
+A <em>change of hue</em> replaces the operand by a permutation of its channels, keeping its saturation and value while moving its hue; a line survives when every permutation leaves the true answer within 0.4. A permutation reaches only six hues, a sixth of a turn apart, so this is a coarse hue rotation, and a finer one could behave differently between the hues it samples.
+<em>To gray</em> replaces it by the gray of the same value, which keeps value and removes hue and saturation together.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>Op and slot</th><th class=num>Red lines</th><th class=num>To zero</th><th class=num>Change of hue</th><th class=num>To gray</th><th class=num>Observed, red lines</th><th class=num>Observed, removal lines</th></tr></thead><tbody><tr><td><code>mix</code>, red at op1</td><td class=num>187</td><td class=num>0.00</td><td class=num>0.00</td><td class=num>0.00</td><td class=num>0.02 (0.00–0.12)</td><td class=num>0.02 (0.00–0.12)</td></tr><tr><td><code>mix</code>, red at op2</td><td class=num>178</td><td class=num>0.00</td><td class=num>0.00</td><td class=num>0.00</td><td class=num>0.02 (0.00–0.09)</td><td class=num>0.02 (0.00–0.09)</td></tr><tr><td><code>hue-hsv</code>, red at op1</td><td class=num>406</td><td class=num>0.00</td><td class=num>1.00</td><td class=num>0.00</td><td class=num>0.31 (0.11–0.56)</td><td class=num>0.31 (0.11–0.56)</td></tr><tr><td><code>hue-hsv</code>, red at op2</td><td class=num>404</td><td class=num>0.43</td><td class=num>0.18</td><td class=num>0.90</td><td class=num>0.25 (0.08–0.39)</td><td class=num>0.17 (0.01–0.32)</td></tr><tr><td><code>sat-hsv</code>, red at op1</td><td class=num>406</td><td class=num>0.00</td><td class=num>0.07</td><td class=num>0.80</td><td class=num>0.11 (0.05–0.30)</td><td class=num>0.11 (0.05–0.30)</td></tr><tr><td><code>sat-hsv</code>, red at op2</td><td class=num>404</td><td class=num>0.71</td><td class=num>1.00</td><td class=num>0.04</td><td class=num>0.59 (0.30–0.91)</td><td class=num>0.65 (0.28–0.97)</td></tr><tr><td><code>value-hsv</code>, red at op1</td><td class=num>406</td><td class=num>0.04</td><td class=num>0.04</td><td class=num>0.04</td><td class=num>0.07 (0.02–0.15)</td><td class=num>0.06 (0.01–0.15)</td></tr><tr><td><code>value-hsv</code>, red at op2</td><td class=num>404</td><td class=num>0.00</td><td class=num>1.00</td><td class=num>1.00</td><td class=num>0.71 (0.27–0.91)</td><td class=num>0.71 (0.27–0.91)</td></tr></tbody></table><figcaption><p><strong>Predicted and observed kept share, by op and red slot.</strong> The three middle columns are the share of red lines whose true answer survives the counterfactual on the red operand (moves by less than 0.4). The last two are what the <code>handover</code> seeds kept under the projection, mean with the seed range, on the red lines and on the removal subset. The removal subset is the lines that fail the to-zero counterfactual, so the to-zero share there is zero by construction.</p></figcaption></figure>
+
+<style>
+.mini-themed-figure-ace68c445c0f {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-ace68c445c0f {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-ace68c445c0f {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-ace68c445c0f > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-ace68c445c0f">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/counterfactuals-light.png" alt="Chart of kept share by op and red slot. Observed kept shares track the change-of-hue prediction in six of eight columns; hue-hsv with red at op1 sits at a third where the hue prediction is one, and mix and value-hsv with red at op1 sit near zero under every prediction." width="702" height="288" style="max-width: 100%; height: auto;" data-asset-name="counterfactuals" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/counterfactuals-dark.png" alt="Chart of kept share by op and red slot. Observed kept shares track the change-of-hue prediction in six of eight columns; hue-hsv with red at op1 sits at a third where the hue prediction is one, and mix and value-hsv with red at op1 sit near zero under every prediction." width="702" height="288" style="max-width: 100%; height: auto;" data-asset-name="counterfactuals" />
+<figcaption><p><strong>Kept share against the two counterfactuals that could differ from the rule, by op and red slot.</strong> Each column is one op and slot. Dots are the kept share of the twenty <code>handover</code> seeds on the red lines under the projection, with the seed mean in the larger marker. Beside them: the share of those lines whose true answer would survive a change in the hue of the red operand (plus), or its replacement by gray of the same value (cross). To zero is the rule that picked the removal lines, and it predicts near zero everywhere.</p></figcaption></figure>
+
+<p>The projection behaves like the change-of-hue counterfactual, and nothing like the other two. Where a change of hue leaves the answer alone (100% of <code>sat-hsv</code> red-at-op2 lines, 100% of <code>value-hsv</code> red-at-op2 lines) the seeds keep 59% and 71%. Where it moves the answer (<code>mix</code> in either slot, <code>hue-hsv</code> with red at op2, <code>sat-hsv</code> and <code>value-hsv</code> with red at op1), the seeds keep 25% or less.</p>
+<p>To gray would have preserved <code>sat-hsv</code> red-at-op1 (80%) and <code>hue-hsv</code> red-at-op2 (90%). The model keeps neither, so the projection does not turn red into gray.</p>
+<p>One slot the hue reading does not predict is <code>hue-hsv</code> with red at op1, whose answer is the hue of op2 at the saturation and value of red. A change of hue leaves every one of those answers alone, yet the seeds keep only 31%.</p>
+<p>So when the red operand supplies saturation and value and something else supplies the hue, the projection costs the model most of that saturation and value read as well. The same loss shows up more mildly in the two slots that survive: <code>sat-hsv</code> and <code>value-hsv</code> red-at-op2 keep two thirds where the hue reading says all of it.</p>
+<p>One reading is that the removal gate should count the lines whose answer needs the <em>hue</em> of the red operand, which is what the to-zero rule was meant to proxy. Under a change-of-hue rule, <code>sat-hsv</code> and <code>value-hsv</code> red-at-op2 drop out of the gate, and <code>hue-hsv</code> red-at-op1 drops out with them. What remains are the cases the projection already clears, and the rule rests on the six hues a permutation can reach.</p>
+<p>What stays open is whether the partial loss of saturation and value comes from the projection itself or from this checkpoint.</p>
+<h3 id="where-the-answers-go">Where the answers go<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#where-the-answers-go" title="Link to this heading">&para;</a></h3>
+<p>The counterfactual table says which answers are lost. The next three figures show what the model answers instead, on the removal lines of each op and slot, from the twenty <code>handover</code> checkpoints. All three use the same view of the RGB cube, the one the probe-cube figures of ex-2.1.1 use: looking down the gray diagonal, so hue runs around the hexagon with red at the top and lightness collapses onto the center.</p>
+<figure aria-label="Cube panels of greedy answers per op and red slot, clean beside projected. Clean, nearly every mark sits on its ring; projected, marks move off their rings wherever the answer needs the hue of red, and stay on them on sat-hsv and value-hsv with red at op2."><figure>
+<style>
+.mini-themed-figure-f7b6ec7b0e04 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-f7b6ec7b0e04 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-f7b6ec7b0e04 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-f7b6ec7b0e04 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-f7b6ec7b0e04">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/guess-mix-light.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="guess-mix" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/guess-mix-dark.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="guess-mix" />
+</figure><figcaption><p><code>mix</code></p></figcaption></figure><figure>
+<style>
+.mini-themed-figure-eadb236b61d4 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-eadb236b61d4 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-eadb236b61d4 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-eadb236b61d4 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-eadb236b61d4">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/guess-hue-hsv-light.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="guess-hue-hsv" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/guess-hue-hsv-dark.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="guess-hue-hsv" />
+</figure><figcaption><p><code>hue-hsv</code></p></figcaption></figure><figure>
+<style>
+.mini-themed-figure-9e09d5eda02b {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-9e09d5eda02b {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-9e09d5eda02b {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-9e09d5eda02b > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-9e09d5eda02b">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/guess-sat-hsv-light.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="guess-sat-hsv" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/guess-sat-hsv-dark.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="guess-sat-hsv" />
+</figure><figcaption><p><code>sat-hsv</code></p></figcaption></figure><figure>
+<style>
+.mini-themed-figure-af22a2281e6a {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-af22a2281e6a {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-af22a2281e6a {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-af22a2281e6a > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-af22a2281e6a">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/guess-value-hsv-light.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="guess-value-hsv" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/guess-value-hsv-dark.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="guess-value-hsv" />
+</figure><figcaption><p><code>value-hsv</code></p></figcaption></figure><figcaption><p><strong>Greedy answers on the removal lines, clean and under the projection.</strong> One block per op; each pair of panels is one red slot, clean on the left and projected on the right, with the number of (line, seed) answers in the title. Wheel view of the RGB cube. Each mark is a greedy answer, placed at its own color and colored by the true answer, with an open ring at the true answer and a stub between them. Marks are sized by how many answers made that move, and a mark sitting on its ring is an answer that matches the truth.</p></figcaption></figure>
+
+<p>Clean, the greedy answer is the true one on almost every removal line, so the clean panels are where the truth lies. On <code>mix</code> the projected answers move toward the center of the cube, and their mean is a gray with a little red left in it. Their hues stay near red: nine in ten sit within a third of a turn of it, which is why the green and blue half of the wheel stays empty. A <code>mix</code> answer is the midpoint of its two operands, and a red operand that reads as orange or pink after the projection cannot pull a midpoint to the far side of the wheel.</p>
+<p>The greedy answer is only one token. The whole answer distribution says how confidently the model moved, and whether the mass that left the true answer went to one color or spread out. The next figure draws that distribution as a dithered cloud in the cube.</p>
+<figure aria-label="Dithered cube clouds of answer mass per op and red slot, clean beside projected. Each clean cloud sits where the true answers are; projected, the cloud spreads over the whole wheel wherever red supplies the hue, and stays close to the clean one on sat-hsv and value-hsv with red at op2."><figure>
+<style>
+.mini-themed-figure-3d594b92728d {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-3d594b92728d {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-3d594b92728d {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-3d594b92728d > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-3d594b92728d">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/cloud-mix-light.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="cloud-mix" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/cloud-mix-dark.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="cloud-mix" />
+</figure><figcaption><p><code>mix</code></p></figcaption></figure><figure>
+<style>
+.mini-themed-figure-6c871709fdfc {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-6c871709fdfc {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-6c871709fdfc {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-6c871709fdfc > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-6c871709fdfc">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/cloud-hue-hsv-light.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="cloud-hue-hsv" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/cloud-hue-hsv-dark.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="cloud-hue-hsv" />
+</figure><figcaption><p><code>hue-hsv</code></p></figcaption></figure><figure>
+<style>
+.mini-themed-figure-fc9f0414c9b6 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-fc9f0414c9b6 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-fc9f0414c9b6 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-fc9f0414c9b6 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-fc9f0414c9b6">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/cloud-sat-hsv-light.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="cloud-sat-hsv" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/cloud-sat-hsv-dark.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="cloud-sat-hsv" />
+</figure><figcaption><p><code>sat-hsv</code></p></figcaption></figure><figure>
+<style>
+.mini-themed-figure-27c4c38775a5 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-27c4c38775a5 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-27c4c38775a5 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-27c4c38775a5 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-27c4c38775a5">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/cloud-value-hsv-light.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="cloud-value-hsv" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/cloud-value-hsv-dark.png" alt="Plot" width="818" height="228" style="max-width: 100%; height: auto;" data-asset-name="cloud-value-hsv" />
+</figure><figcaption><p><code>value-hsv</code></p></figcaption></figure><figcaption><p><strong>The answer distribution on the removal lines, clean and under the projection.</strong> One block per op; each pair of panels is one red slot, clean on the left and projected on the right. Wheel view of the RGB cube. The dots of each panel are shared out over the 216 grid colors in proportion to the mean answer mass those lines put on each color, so a dense patch is where the model expects the answer to be. The clean panels show where the true answers of those lines lie.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>Op and slot</th><th class=num>Top mass, clean</th><th class=num>Top mass, proj.</th><th class=num>Colors, clean</th><th class=num>Colors, proj.</th></tr></thead><tbody><tr><td><code>mix</code>, red at op1</td><td class=num>0.95</td><td class=num>0.44</td><td class=num>1.3</td><td class=num>7.4</td></tr><tr><td><code>mix</code>, red at op2</td><td class=num>0.95</td><td class=num>0.65</td><td class=num>1.3</td><td class=num>2.8</td></tr><tr><td><code>hue-hsv</code>, red at op1</td><td class=num>0.88</td><td class=num>0.53</td><td class=num>1.3</td><td class=num>5.3</td></tr><tr><td><code>hue-hsv</code>, red at op2</td><td class=num>0.83</td><td class=num>0.71</td><td class=num>1.5</td><td class=num>2.4</td></tr><tr><td><code>sat-hsv</code>, red at op1</td><td class=num>0.81</td><td class=num>0.38</td><td class=num>1.7</td><td class=num>10.9</td></tr><tr><td><code>sat-hsv</code>, red at op2</td><td class=num>0.92</td><td class=num>0.83</td><td class=num>1.2</td><td class=num>1.7</td></tr><tr><td><code>value-hsv</code>, red at op1</td><td class=num>0.86</td><td class=num>0.40</td><td class=num>1.4</td><td class=num>9.1</td></tr><tr><td><code>value-hsv</code>, red at op2</td><td class=num>0.81</td><td class=num>0.76</td><td class=num>1.6</td><td class=num>2.0</td></tr></tbody></table><figcaption><p><strong>How peaked the answer distribution of each line is, clean and under the projection.</strong> Mean over the removal lines and the twenty seeds. <em>Top mass</em> is the probability on the most likely grid color. <em>Colors</em> is the effective number of colors, the exponential of the mean entropy: 1 for a certain answer, 216 for a uniform one.</p></figcaption></figure>
+
+<p>Per line, the projected answer is unsure among a handful of colors rather than spread over the wheel. On the cases the projection breaks, the mass on the top color falls from about 0.9 clean to about 0.5, and the effective number of colors rises from one or two to about 7. On the two cases it leaves alone, the top mass stays at 0.8 or above.</p>
+<p>So the wheel-wide spread of the projected clouds is a spread across lines, each moved to its own neighbourhood. That is what we would expect if the operand reads as a hue rotated one way or the other, which is what the probe finds.</p>
+<p>The structure inside each cloud is the set of answers the op can produce on the grid, carried around the wheel by the rotation. Take <code>sat-hsv</code> with red at op1: the clean answers are reds of every saturation, a ray from white at the center out to red at the top, and projected that ray appears at every hue. With red at op2 the answers are fully saturated colors at the hue and value of op1, which in the wheel view are the rim and the spokes running in toward the center, and the projected panel keeps that skeleton.</p>
+<h3 id="what-the-stream-says">What the stream says<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#what-the-stream-says" title="Link to this heading">&para;</a></h3>
+<p>The answers show what the model concluded. The residual stream shows what it was working from. For each op we fit a linear probe from the stream at each slice and position to the three colors a line carries: op1, op2, and the answer the rule gives. The probes were fit on the clean stream of the non-red lines, and we then decoded the red lines through them, clean and under the projection.<sup id="fnref:probes"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#fn:probes">3</a></sup></p>
+<p>Fitting on the non-red lines keeps the axis out of the probes. A probe fit on lines with red in them would learn the axis as the direction of red, and would then read its removal as a loss of red at the embedding as much as anywhere. A probe blind to the axis reads what the blocks make of its absence, which is the question here. The red lines are outside the fit set, so they are held out without a leave-one-out scheme.</p>
+<figure aria-label="Cube panels of probe-decoded colors across five slices, projected marks with rings at the clean decode. The operand marks start on their rings at red and slide further from them with each slice, toward orange on one side and pink on the other; the answer marks stop short of rings that spread toward the rim."><figure>
+<style>
+.mini-themed-figure-17f1bd62ddd4 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-17f1bd62ddd4 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-17f1bd62ddd4 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-17f1bd62ddd4 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-17f1bd62ddd4">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/decoded-mix-light.png" alt="Plot" width="851" height="376" style="max-width: 100%; height: auto;" data-asset-name="decoded-mix" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/decoded-mix-dark.png" alt="Plot" width="851" height="376" style="max-width: 100%; height: auto;" data-asset-name="decoded-mix" />
+</figure><figcaption><p><code>mix</code></p></figcaption></figure><figure>
+<style>
+.mini-themed-figure-bf2396c9fb56 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-bf2396c9fb56 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-bf2396c9fb56 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-bf2396c9fb56 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-bf2396c9fb56">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/decoded-hue-hsv-light.png" alt="Plot" width="851" height="377" style="max-width: 100%; height: auto;" data-asset-name="decoded-hue-hsv" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/decoded-hue-hsv-dark.png" alt="Plot" width="851" height="377" style="max-width: 100%; height: auto;" data-asset-name="decoded-hue-hsv" />
+</figure><figcaption><p><code>hue-hsv</code></p></figcaption></figure><figure>
+<style>
+.mini-themed-figure-0c936d6898fd {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-0c936d6898fd {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-0c936d6898fd {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-0c936d6898fd > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-0c936d6898fd">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/decoded-sat-hsv-light.png" alt="Plot" width="851" height="377" style="max-width: 100%; height: auto;" data-asset-name="decoded-sat-hsv" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/decoded-sat-hsv-dark.png" alt="Plot" width="851" height="377" style="max-width: 100%; height: auto;" data-asset-name="decoded-sat-hsv" />
+</figure><figcaption><p><code>sat-hsv</code></p></figcaption></figure><figure>
+<style>
+.mini-themed-figure-0d11bcaa3e20 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-0d11bcaa3e20 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-0d11bcaa3e20 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-0d11bcaa3e20 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-0d11bcaa3e20">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/decoded-value-hsv-light.png" alt="Plot" width="851" height="377" style="max-width: 100%; height: auto;" data-asset-name="decoded-value-hsv" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/decoded-value-hsv-dark.png" alt="Plot" width="851" height="377" style="max-width: 100%; height: auto;" data-asset-name="decoded-value-hsv" />
+</figure><figcaption><p><code>value-hsv</code></p></figcaption></figure><figcaption><p><strong>Colors of the removal lines decoded from the residual stream, projected against clean.</strong> One block per op, mean over the twenty seeds. <strong>Top row:</strong> the red operand, read at its own position by the probe fit at that slice. One mark per line, at the RGB decoded under the projection and colored by the true color of the operand, with an open ring at the clean decode of the same line and a stub between them, so the stub is what the projection changed. <strong>Bottom row:</strong> the answer from the rule, read at <code>=</code> and colored by the true answer. Wheel view of the RGB cube. Slice 0 is the embedding, and each later slice is the stream after one more block.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>Op and site</th><th class=num>slice 0</th><th class=num>slice 1</th><th class=num>slice 2</th><th class=num>slice 3</th><th class=num>slice 4</th></tr></thead><tbody><tr><td><code>mix</code>, op1@op1</td><td class=num>0.95</td><td class=num>0.93</td><td class=num>0.90</td><td class=num>0.88</td><td class=num>0.87</td></tr><tr><td><code>mix</code>, op2@op2</td><td class=num>0.95</td><td class=num>0.92</td><td class=num>0.87</td><td class=num>0.81</td><td class=num>0.78</td></tr><tr><td><code>mix</code>, ans@=</td><td class=num>-1.76</td><td class=num>0.76</td><td class=num>0.92</td><td class=num>0.90</td><td class=num>0.89</td></tr><tr><td><code>hue-hsv</code>, op1@op1</td><td class=num>0.95</td><td class=num>0.94</td><td class=num>0.91</td><td class=num>0.88</td><td class=num>0.88</td></tr><tr><td><code>hue-hsv</code>, op2@op2</td><td class=num>0.95</td><td class=num>0.93</td><td class=num>0.88</td><td class=num>0.82</td><td class=num>0.79</td></tr><tr><td><code>hue-hsv</code>, ans@=</td><td class=num>-0.13</td><td class=num>0.54</td><td class=num>0.85</td><td class=num>0.92</td><td class=num>0.94</td></tr><tr><td><code>sat-hsv</code>, op1@op1</td><td class=num>0.95</td><td class=num>0.94</td><td class=num>0.91</td><td class=num>0.88</td><td class=num>0.88</td></tr><tr><td><code>sat-hsv</code>, op2@op2</td><td class=num>0.95</td><td class=num>0.93</td><td class=num>0.88</td><td class=num>0.83</td><td class=num>0.80</td></tr><tr><td><code>sat-hsv</code>, ans@=</td><td class=num>-0.22</td><td class=num>0.65</td><td class=num>0.88</td><td class=num>0.93</td><td class=num>0.94</td></tr><tr><td><code>value-hsv</code>, op1@op1</td><td class=num>0.95</td><td class=num>0.94</td><td class=num>0.91</td><td class=num>0.88</td><td class=num>0.88</td></tr><tr><td><code>value-hsv</code>, op2@op2</td><td class=num>0.95</td><td class=num>0.93</td><td class=num>0.88</td><td class=num>0.83</td><td class=num>0.79</td></tr><tr><td><code>value-hsv</code>, ans@=</td><td class=num>-0.25</td><td class=num>0.67</td><td class=num>0.91</td><td class=num>0.94</td><td class=num>0.94</td></tr></tbody></table><figcaption><p><strong>Probe fit on the red lines, R² per slice, mean over seeds.</strong> Each probe is a ridge fit on the clean stream of the non-red lines, and is read here on the clean stream of the red lines. <code>op1@op1</code> reads op1 at position 0, <code>op2@op2</code> reads op2 at position 2, and <code>ans@=</code> reads the raw answer from the rule at <code>=</code>. The negative fit of the answer probe at slice 0 is expected: at the embedding, <code>=</code> has nothing of the line in it.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>Op, site, slice</th><th class=num>clean move</th><th class=num>clean |ΔH|</th><th class=num>clean S</th><th class=num>clean V</th><th class=num>proj. move</th><th class=num>proj. |ΔH|</th><th class=num>proj. S</th><th class=num>proj. V</th></tr></thead><tbody><tr><td><code>mix</code>, red operand, slice 1</td><td class=num>0.19</td><td class=num>0.01</td><td class=num>0.82</td><td class=num>0.88</td><td class=num>0.64</td><td class=num>0.10</td><td class=num>0.79</td><td class=num>0.69</td></tr><tr><td><code>mix</code>, red operand, slice 4</td><td class=num>0.27</td><td class=num>0.02</td><td class=num>0.73</td><td class=num>0.88</td><td class=num>0.94</td><td class=num>0.18</td><td class=num>0.82</td><td class=num>0.72</td></tr><tr><td><code>mix</code>, answer at <code>=</code>, slice 1</td><td class=num>0.08</td><td class=num>0.01</td><td class=num>0.73</td><td class=num>0.73</td><td class=num>0.37</td><td class=num>0.15</td><td class=num>0.49</td><td class=num>0.67</td></tr><tr><td><code>mix</code>, answer at <code>=</code>, slice 4</td><td class=num>0.07</td><td class=num>0.01</td><td class=num>0.71</td><td class=num>0.73</td><td class=num>0.35</td><td class=num>0.15</td><td class=num>0.51</td><td class=num>0.65</td></tr><tr><td><code>hue-hsv</code>, red operand, slice 1</td><td class=num>0.18</td><td class=num>0.01</td><td class=num>0.83</td><td class=num>0.89</td><td class=num>0.65</td><td class=num>0.11</td><td class=num>0.79</td><td class=num>0.75</td></tr><tr><td><code>hue-hsv</code>, red operand, slice 4</td><td class=num>0.26</td><td class=num>0.02</td><td class=num>0.74</td><td class=num>0.88</td><td class=num>1.03</td><td class=num>0.21</td><td class=num>0.87</td><td class=num>0.78</td></tr><tr><td><code>hue-hsv</code>, answer at <code>=</code>, slice 1</td><td class=num>0.34</td><td class=num>0.03</td><td class=num>0.70</td><td class=num>0.75</td><td class=num>0.47</td><td class=num>0.07</td><td class=num>0.50</td><td class=num>0.68</td></tr><tr><td><code>hue-hsv</code>, answer at <code>=</code>, slice 4</td><td class=num>0.10</td><td class=num>0.01</td><td class=num>0.89</td><td class=num>0.89</td><td class=num>0.36</td><td class=num>0.06</td><td class=num>0.69</td><td class=num>0.77</td></tr><tr><td><code>sat-hsv</code>, red operand, slice 1</td><td class=num>0.19</td><td class=num>0.01</td><td class=num>0.83</td><td class=num>0.87</td><td class=num>0.66</td><td class=num>0.09</td><td class=num>0.78</td><td class=num>0.61</td></tr><tr><td><code>sat-hsv</code>, red operand, slice 4</td><td class=num>0.27</td><td class=num>0.01</td><td class=num>0.75</td><td class=num>0.88</td><td class=num>1.05</td><td class=num>0.19</td><td class=num>0.87</td><td class=num>0.61</td></tr><tr><td><code>sat-hsv</code>, answer at <code>=</code>, slice 1</td><td class=num>0.26</td><td class=num>0.02</td><td class=num>0.75</td><td class=num>0.86</td><td class=num>0.56</td><td class=num>0.18</td><td class=num>0.39</td><td class=num>0.62</td></tr><tr><td><code>sat-hsv</code>, answer at <code>=</code>, slice 4</td><td class=num>0.09</td><td class=num>0.01</td><td class=num>0.79</td><td class=num>0.89</td><td class=num>0.45</td><td class=num>0.14</td><td class=num>0.45</td><td class=num>0.68</td></tr><tr><td><code>value-hsv</code>, red operand, slice 1</td><td class=num>0.19</td><td class=num>0.01</td><td class=num>0.83</td><td class=num>0.88</td><td class=num>0.64</td><td class=num>0.10</td><td class=num>0.80</td><td class=num>0.69</td></tr><tr><td><code>value-hsv</code>, red operand, slice 4</td><td class=num>0.28</td><td class=num>0.02</td><td class=num>0.73</td><td class=num>0.87</td><td class=num>0.94</td><td class=num>0.18</td><td class=num>0.85</td><td class=num>0.72</td></tr><tr><td><code>value-hsv</code>, answer at <code>=</code>, slice 1</td><td class=num>0.23</td><td class=num>0.02</td><td class=num>0.77</td><td class=num>0.80</td><td class=num>0.51</td><td class=num>0.13</td><td class=num>0.53</td><td class=num>0.72</td></tr><tr><td><code>value-hsv</code>, answer at <code>=</code>, slice 4</td><td class=num>0.10</td><td class=num>0.01</td><td class=num>0.83</td><td class=num>0.84</td><td class=num>0.38</td><td class=num>0.08</td><td class=num>0.62</td><td class=num>0.76</td></tr></tbody></table><figcaption><p><strong>Where the decoded colors land, clean and under the projection.</strong> Mean over the removal lines and the twenty seeds, at the first block and the last. <em>Move</em> is the distance from the decoded color to the true one in the unit RGB cube. <em>|ΔH|</em> is the hue offset from the true color, in turns, so 0.5 is the opposite hue. <em>S</em> and <em>V</em> are the decoded saturation and value; the true operands have both near 1.</p></figcaption></figure>
+
+<p>At the embedding, the projection changes nothing the probe can see. Clean and projected reads coincide at slice 0, on operand and answer alike, and the small offset both show is the shrinkage of the ridge fit. The probes are blind to the axis, so whatever the projection takes at slice 0 becomes visible only once the blocks have acted on it.<sup id="fnref:slice0"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#fn:slice0">4</a></sup></p>
+<p>From the first block on, the projected red operand reads as a different color, and the difference grows with depth. The move roughly doubles from slice 1 to slice 4 on every op. In HSV terms it is a rotation of hue away from red, a fifth of a turn by the last slice, at nearly full saturation and with a lower value. In the figure that is the marks sliding along the upper edges of the hexagon, toward orange on one side and pink on the other, rather than toward the center.</p>
+<p>So this is the change-of-hue counterfactual that the kept shares followed, with a loss of value alongside it. M1 saw a related asymmetry when it deleted the hue subspace of an autoencoder (ex-2.7 in <a href="https://github.com/z0u/ex-preppy">ex-preppy</a>, under its ablation figures): red, green, and blue darkened, and yellow, cyan, and magenta lightened. One reading of both is that the primaries sit nearer black on the gray diagonal than the secondaries do, so what remains of red once a hue direction is gone leans toward black.</p>
+<p>The slots that take the saturation and value of the red operand have only what the stream keeps of it, so that lost value is the partial loss the counterfactual table could not explain.</p>
+<p>The answer at <code>=</code> follows the operand. Clean, it reaches its ring by the last slice. Projected, it stops short, with a smaller hue offset than the operand and a saturation about two tenths under the clean read. The answers that survive on <code>sat-hsv</code> and <code>value-hsv</code> with red at op2 are the ones whose true color the rotated, dimmer operand still snaps to.</p>
+<h2 id="retention-and-the-anneal">Retention and the anneal<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#retention-and-the-anneal" title="Link to this heading">&para;</a></h2>
+<p>The retention read of ex-2.2.9 asks whether the alignment survives the anneal of the anchor weight: every run whose line alignment peaks above 0.2 should end at 0.8 of that peak. One <code>handover</code> seed in twenty ended at 0.77, and the seed mean was 0.88 against 0.96 on the references.</p>
+<p>The natural reading was that the anneal, over the last tenth of training, lets the alignment slip. The trajectories say otherwise.</p>
+<style>
+.mini-themed-figure-8e220124401d {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-8e220124401d {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-8e220124401d {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-8e220124401d > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-8e220124401d">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/retention-light.png" alt="Three panels. Left, alignment trajectories: handover seeds rise to about 0.75 by epoch 20 and drift down to about 0.66 before the anneal band begins at epoch 45, then stay flat; handover-slot and handover-tied peak later and drift less. Middle, end over peak: handover sits around 0.88 with one seed under the 0.8 gate, the other two conditions above 0.9. Right, end over the alignment at the anneal start: all three conditions sit at 1.0." width="817" height="279" style="max-width: 100%; height: auto;" data-asset-name="retention" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/retention-dark.png" alt="Three panels. Left, alignment trajectories: handover seeds rise to about 0.75 by epoch 20 and drift down to about 0.66 before the anneal band begins at epoch 45, then stay flat; handover-slot and handover-tied peak later and drift less. Middle, end over peak: handover sits around 0.88 with one seed under the 0.8 gate, the other two conditions above 0.9. Right, end over the alignment at the anneal start: all three conditions sit at 1.0." width="817" height="279" style="max-width: 100%; height: auto;" data-asset-name="retention" />
+<figcaption><p><strong>Line alignment over training, and two retention ratios.</strong> Left: every seed's line alignment against epoch, one thin line per seed, for the three handover conditions; the shaded band is the anneal window, where the anchor weight falls from 0.1 to its floor. Middle: the retention ratio ex-2.2.9 gated, the final alignment over its peak, per seed with the seed mean in the larger marker; the dashed rule is the gate and the hatched side misses it. Right: the final alignment over its value at the start of the anneal, the ratio that would measure the cost of the anneal alone, with the same gate level dotted for reference.</p></figcaption></figure>
+
+<p>The anneal costs nothing. Over the anneal window the <code>handover</code> seeds end at 0.998 of where they started it, and <code>handover-slot</code> and <code>handover-tied</code> at 0.997 and 0.994. The whole of the drop the gate measured happens earlier.</p>
+<p><code>handover</code> climbs to a plateau by epoch 10. Its peak, at 0.75 and epoch 19 on average, is just the high point of a noisy series. We cannot tell whether the high epochs are the ones with more red lines in their batches, since the stored trajectories do not record what each epoch drew; the corpus sampler is seeded, so a replay could tell.</p>
+<p>By the start of the anneal the seeds sit at 0.66, a few of them drifting down to the bottom of the band. The two references peak later (epoch 33 on <code>handover-slot</code>, 30 on <code>handover-tied</code>) because their plateaus are still rising, and they drift less, which is why their ratio comes out higher.</p>
+<p>So the ratio of the end to the peak is comparing the last sample of a noisy plateau against the height of that plateau, with a slow drift under a constant anchor weight added on some seeds. That drift needs both the whole-line labeller and the untied readout: either one alone holds its plateau.</p>
+<p>Whether the drift matters is a different question from the one the gate asked. The end-of-training alignment is 0.66 on <code>handover</code>, against 0.72 and 0.70 on the references. Every read downstream of it (grading, removal, containment) is taken at the end, so that level is what the later experiments inherit. A stepped anneal, which the <a href="https://github.com/z0u/sca2/blob/main/todo/science/retention-under-longer-training.md">backlog item</a> floated, would act on the window where nothing is lost.</p>
+<h2 id="containment-under-the-untied-readout">Containment under the untied readout<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#containment-under-the-untied-readout" title="Link to this heading">&para;</a></h2>
+<p>Ex-2.2.9 reported ᾱ, the mean alignment of the non-red lines at op1, at 0.28 on <code>handover</code>. The reference from ex-2.2.3 read 0.1, and the old gate was set there. The report put the rise down to the untied readout, which is what the pilot in ex-2.2.7 had suggested.</p>
+<p>But <code>handover</code> changed two things at once relative to the recipe of ex-2.2.3: the whole-line labeller as well as the readout. Ex-2.2.9 ran one arm with each change undone.</p>
+<style>
+.mini-themed-figure-47acb2c42ed1 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-47acb2c42ed1 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-47acb2c42ed1 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-47acb2c42ed1 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-47acb2c42ed1">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/containment-light.png" alt="Three dot panels by condition. Alpha at op1: control near 0, handover-tied 0.16, handover-slot 0.18, handover 0.28, handover-narrow 0.30. Non-red rows: all conditions between 0.06 and 0.10. The newline row: near zero on control and handover-slot, 0.17 on handover, 0.27 on handover-tied." width="818" height="270" style="max-width: 100%; height: auto;" data-asset-name="containment" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/containment-dark.png" alt="Three dot panels by condition. Alpha at op1: control near 0, handover-tied 0.16, handover-slot 0.18, handover 0.28, handover-narrow 0.30. Non-red rows: all conditions between 0.06 and 0.10. The newline row: near zero on control and handover-slot, 0.17 on handover, 0.27 on handover-tied." width="818" height="270" style="max-width: 100%; height: auto;" data-asset-name="containment" />
+<figcaption><p><strong>Containment by condition.</strong> Per seed, with the seed mean in the larger marker. Left: the mean alignment of the stream on the non-red lines with the anchor axis at op1, with the reference level from ex-2.2.3 dotted. Middle: the mean absolute axis component of the embedding rows for the 209 non-red color words. Right: the axis component of the <code>⏎</code> embedding row, with the same row of the untied readout as an open marker beside it where the condition has one.</p></figcaption></figure>
+
+<p>ᾱ at op1 is 0.28 on <code>handover</code>, 0.18 with the slot labeller back, and 0.16 with the readout tied again. Undoing either change takes back about half the rise. So the rise belongs to the handover as a whole, and the untied readout is one of two contributors. <code>handover-narrow</code>, which has fewer lines per op, sits at 0.30.</p>
+<p>Why either half raises it is open. For the labeller half there is a candidate: under the whole-line labeller a line can earn its label from its answer, and the pull then lands on every position of that line, op1 included. So a non-red operand is pulled toward the axis whenever its answer draws. For the readout half we have no candidate yet. The <a href="https://github.com/z0u/sca2/blob/main/todo/science/containment-rises-under-the-untied-readout.md">backlog item</a> carries both.</p>
+<p>Whatever the mechanism, none of it reaches the embedding table: the non-red color rows hold 0.08 of the axis on <code>handover</code> against 0.09 on the control.</p>
+<p>The <code>⏎</code> row is a separate matter, and a cleaner one. Its embedding component is 0.17 on <code>handover</code> and -0.02 on <code>handover-slot</code>, so the whole-line labeller is what puts it there. The pull lands on every position of a red line, <code>⏎</code> included, and the slot labeller never touches that position.</p>
+<p>The readout row for <code>⏎</code> is at 0.13 on <code>handover</code> too. On <code>handover-tied</code> the row reads 0.28, and so does <code>=</code>, which is the shared table doing double duty.</p>
+<p>The backlog item on the <a href="https://github.com/z0u/sca2/blob/main/todo/science/eol-embedding-row-keeps-the-axis.md"><code>⏎</code> row</a> asks whether the residual redness of the answer position is part of this. Answering that needs a per-position alignment on the red lines, which ex-2.2.9 did not store, so it stays open here.</p>
+<h2 id="what-we-make-of-it">What we make of it<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#what-we-make-of-it" title="Link to this heading">&para;</a></h2>
+<p>Three changes to the design of the re-run, and one read to carry.</p>
+<p><strong>Removal lines by hue.</strong> Define a removal line as a red line whose true answer moves by at least 0.4 under some channel permutation of the red operand. Those are the lines whose answer needs the <em>hue</em> of red. On <code>mix</code> and the eight other channel-wise ops this is the to-zero set, or close to it. On the three HSV ops it drops the slots that take only saturation or value (<code>sat-hsv</code> and <code>value-hsv</code> with red at op2), and <code>hue-hsv</code> with red at op1 goes with them.</p>
+<p>The gate stays at kept under 0.2, and on the lines that remain every <code>handover</code> seed already clears it. The permutation rule reaches six hues; if a finer rotation of the operand in HSV, snapped to the grid, ever disagrees with it, the finer one is the rule to keep.</p>
+<p>The saturation- and value-taking slots become a second read, with no gate. The kept share there says how much of the saturation and value of the red operand the projection takes with it, which is a cost of the operator worth reporting.</p>
+<p><strong>Retention against the start of the anneal.</strong> The retention read keeps its name and changes its denominator, to the final alignment over the alignment at the start of the anneal, gated at 0.8 as before. That is the question the read was written to ask.</p>
+<p>A high percentile of the plateau, in place of the peak, would soften the ratio and keep the drift inside it; the anneal-start denominator takes the drift out and leaves it to the level line. The early peak and the drift get a line of their own in the report: the level at the end of training, beside the references.</p>
+<p><strong>The op1 alignment as a line rather than a gate.</strong> ᾱ at op1 rises under either half of the handover, and the embedding rows do not move, so the old reference of 0.1 belonged to the old grammar. The re-run reports ᾱ at op1 with <code>handover-slot</code> and <code>handover-tied</code> as its references, and gates nothing on it. A gate can return once we can name a mechanism.</p>
+<p><strong>The <code>⏎</code> row</strong> stays as it is, with its backlog item open. The whole-line labeller is what puts it there, and the slot labeller is not coming back for it. If the edits in M3 ever touch the answer position, this row is the first place to look.</p>
+<p>One question this notebook could not settle: whether the partial loss of saturation and value under the projection comes from the operator or from this checkpoint. Answering it would take the same read on <code>handover-tied</code> and <code>handover-slot</code>, which the scoring pass can run at no design cost, so it is worth adding to the scoring for the re-run.</p>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#method" title="Link to this heading">&para;</a></h2>
+<p><strong>What ran.</strong> A scoring-only experiment over the 20 <code>handover</code> checkpoints of ex-2.2.9 (20 scored so far), on the ops <code>mix</code>, <code>hue-hsv</code>, <code>sat-hsv</code>, <code>value-hsv</code>, using the probe set of ex-2.2.9. For each checkpoint and op, the task ran two forward passes over every probe line: one clean, and one with the <code>projection</code> operator applied at every slice and position. For the red lines it stored the answer distribution over the 216 grid colors, the greedy answer, and the expected exact match under both passes. Its per-group kept shares reproduce those of ex-2.2.9 to the third decimal, which is our check that it ran the same read.</p>
+<p><strong>Probes.</strong> One ridge regression (λ = 0.01) per slice, position, and target, from the 64-wide residual state to a color in the unit cube, fit on the clean stream of the non-red lines and read on the red lines. The three targets are op1, op2, and the raw (unrounded) answer the rule gives. The sites read in the figures are each operand at its own position, and the answer at <code>=</code> (position 3). We store the decoded coordinates of every red line under both passes for all seeds, and the raw states for the first 5 seeds.</p>
+<p><strong>Counterfactuals.</strong> For each red line, the red operand is the one with the higher redness. <em>To zero</em> sets its R channel to zero. <em>Change of hue</em> takes the five other permutations of its channels, and the line survives if all five move the true answer by less than 0.4. <em>To gray</em> replaces it by the gray of its value. Answers are the snapped answers of the op, and distances are in the unit cube, the same as <code>to_zero_move</code> in ex-2.2.9.</p>
+<p><strong>Retention.</strong> From the trajectories stored by ex-2.2.9 (100 points over training). The anneal starts at the first point where the anchor weight is under 0.99 of its plateau, and the alignment at that start is the last point before it.</p>
+<p><strong>Containment.</strong> From the run metrics stored by ex-2.2.9: ᾱ at op1 as defined there, plus the axis component of each embedding row and, where the readout is untied, each readout row.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:labeller">
+<p>Under the whole-line labeller, each of the three colors in a line draws a label at a small rate that rises steeply with its redness (4% per visit at pure red), and the line is labeled if any of them draws. So a red line is labeled on some of its visits, and a line with a red answer can earn the label too.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#fnref:labeller" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:stream">
+<p>The <em>residual stream</em> is the running vector the transformer carries from block to block; each block reads it and adds to it. A <em>slice</em> is that vector at one depth, and a <em>position</em> is one token in the line.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#fnref:stream" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:probes">
+<p>The probe-cube figures of ex-2.1.3 are the precedent. The probes read RGB, so their output lands in the cube with no rotation needed to fit it. A hue probe would be ill-posed, since hue is circular, and saturation and value are piecewise-linear in RGB, so we convert the decoded RGB whenever an HSV number is wanted.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#fnref:probes" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:slice0">
+<p>At slice 0 the stream at <code>=</code> is the same vector on every line, since nothing of the line has reached that position yet. A probe there can only return one color for every answer: the mean of its fit set, near the center of the wheel.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.2.10/#fnref:slice0" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

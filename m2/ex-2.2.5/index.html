@@ -1,0 +1,1254 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/b25cd33c19a4ae3fe2eb7e2576cdecb9d059428e/exports/m2/ex-2.2.5/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/ex-2.2.5/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.2.5: a pilot of stochastic rounding</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The page style for a woven document. Base typography follows scripts/md.css (the site's
+ * Markdown pages), figure and table rules follow docs/report.css. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 50rem;
+  --gutter: 1.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Lora", serif;
+  font-weight: 400;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 { margin-top: 0; font-size: 2.25em; }
+p { margin-block: 1em; }
+
+code, pre, kbd {
+  font-family: "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+}
+code { background-color: var(--code-bg); padding: 0.1em 0.3em; border-radius: 3px; }
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code { background: none; padding: 0; border-radius: 0; font-size: 1em; }
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Anchor links on headings. */
+a.anchor-link { opacity: 0; color: var(--fg-muted); transition: opacity 0.2s ease; }
+a.anchor-link::after { content: '#'; font-size: 0.8em; margin-inline: 0.4em; }
+:hover > a.anchor-link { opacity: 1; }
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. */
+table { border-collapse: collapse; margin-block: 1.5em; margin-inline: auto; }
+th, td { padding: 0.35em 0.8em; border: 0; text-align: left; vertical-align: top; }
+th { font-weight: 600; }
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) { border-top: 2px solid var(--rule); }
+thead > tr:last-child > :is(th, td) { border-bottom: 1px solid var(--rule); padding-bottom: 0.5em; }
+tbody > tr:first-child > :is(th, td) { padding-top: 0.5em; }
+tbody > tr:last-child > :is(th, td) { border-bottom: 2px solid var(--rule); }
+
+img, video { max-width: 100%; height: auto; }
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure { margin-inline: 0; text-align: center; }
+figure img { margin-inline: auto; display: block; }
+figure:has(> figure) { text-wrap: balance; }
+figure:has(> figure) > figure { display: inline-block; vertical-align: top; margin: 0 0.5em; }
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { font-size: 11pt; display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  pre, figure, table { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1.5rem -1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.5/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/ex-2.2.5/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.2.3</strong> · <code>5680915</code> · run 2026-09-09<div>via reports/m2/ex-2.2.3/geometry, reports/m2/ex-2.2.3/metrics</div></div><div><strong>ex-2.2.5</strong> · <code>d2.1-332-gca72577d-dirty</code> (dirty) · run 2026-09-11<div>via reports/m2/ex-2.2.5/arrays, reports/m2/ex-2.2.5/geometry, reports/m2/ex-2.2.5/metrics</div></div></details>
+<main class="lit">
+<h1 id="ex-225-a-pilot-of-stochastic-rounding-of-off-grid-answers">Ex 2.2.5: a pilot of stochastic rounding of off-grid answers<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#ex-225-a-pilot-of-stochastic-rounding-of-off-grid-answers" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>A scouting run, no gates. We retrained two models on a new corpus: the un-anchored control for the six-op grammar, and the adopted recipe. In this corpus an answer that lands between grid levels rounds <em>stochastically</em>, going to the upper level with probability equal to how far up it sits. The model learns the rule's answer distribution rather than a rounding: it puts as much mass on each candidate as the coin does, so exact match against a drawn answer sits at the ceiling the rule sets. Read the expected exact match and the calibration instead. Anchoring is unchanged. The geometry of the answer looked no more graded, though the probes were on lines that never round.</p>
+</div>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#observations" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><strong>The models reach the ceiling a stochastic target sets.</strong> Expected exact match on the held-out pairs sits on the holdout ceiling on <code>mix</code>, and within 0.04 of it on <code>screen</code> and <code>multiply</code>, for the control and the recipe alike (<a href="https://z0u.github.io/sca2/m2/ex-2.2.5/#exact-match-against-a-moving-target">table</a>). Exact match against the drawn answer adds the noise of a single draw, about ±0.03 over 256 lines. Model seeds share that noise, so it does not average away.</li>
+<li><strong>The answer distribution is calibrated to the rule.</strong> On the rounded held-out lines the control puts 0.33 / 0.59 / 0.59 of its mass on the mode for <code>mix</code> / <code>screen</code> / <code>multiply</code>, against 0.33 / 0.58 / 0.57 for the rule. KL from the rule<sup id="fnref:kl"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#fn:kl">1</a></sup> runs 0.13–0.25 nats on the stochastic arms, against 2.3–5.1 on the nearest-rounded control, which commits to one level. At least 0.965 of the mass is on the candidate colors (<a href="https://z0u.github.io/sca2/m2/ex-2.2.5/#exact-match-against-a-moving-target">figure</a>).</li>
+<li><strong>Exact match against the mode is an argmax read, and on <code>mix</code> a coin toss.</strong> It is 0.82 / 0.86 on <code>screen</code> / <code>multiply</code>, and 0.35 on the rounded pairs of <code>mix</code>, where half-way ties make the mode arbitrary.</li>
+<li><strong>Anchoring does not notice the corpus.</strong> The m_line of <code>recipe-stoch</code> is 0.391 <span class='range'>±0.001</span>, against 0.392 <span class='range'>±0.020</span> in production. Every other placement statistic is inside the seed band of production (<a href="https://z0u.github.io/sca2/m2/ex-2.2.5/#anchoring-on-the-stochastic-corpus">table</a>).</li>
+<li><strong>Suppression reads shift through their clean baseline.</strong> On the nearest-rounded probe lines of <code>multiply</code>, the clean red-line accuracy of the recipe is 0.88: the argmax of a calibrated model lands on the nearest level only where the mode is clear. The redder lines go 0.78 → 0.54 under <code>projection</code>, against 1.00 → 0.61 in production. On <code>mix</code>, whose probe lines are on-grid, nothing moves.</li>
+<li><strong>Redder-than-both counts rise on the ops that round up.</strong> With no model in the loop, the expected count changes by +14.5% on <code>screen</code>, +20.8% on <code>multiply</code>, and -1.0% on <code>mix</code> (<a href="https://z0u.github.io/sca2/m2/ex-2.2.5/#the-grammar-under-each-rounding">table</a>).</li>
+<li><strong>No clearer gradedness at the answer, on probes that could not show it.</strong> Peak strict R² of the answer RGB over the slices is 0.92 at <code>=</code> and 0.95 at the answer on the stochastic control, against 0.85 and 0.83 on the nearest one. At the deep slices, the two nearest-rounded seeds differ from each other by more than the corpora differ. The probe lines come from <code>mix</code>, which never rounds (<a href="https://z0u.github.io/sca2/m2/ex-2.2.5/#the-answers-geometry">figure</a>).</li>
+</ul>
+<h2 id="why-and-what-we-ran">Why, and what we ran<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#why-and-what-we-ran" title="Link to this heading">&para;</a></h2>
+<p>Ex-2.2.3's grammar computes each answer channel on the 0..15 scale and snaps it to the nearer grid level, so <code>screen</code>, <code>multiply</code>, and (off its on-grid pairs) <code>mix</code> are step functions of their raw value. The <a href="https://github.com/z0u/sca2/blob/main/todo/science/stochastic-rounding-of-off-grid-answers.md">stochastic-rounding item</a> asks what a variant that rounds by coin flip would settle: (a) the exact-match ceiling, and whether exact match is then the wrong statistic; (b) whether the answer's representation becomes more graded; (c) whether the redder-than-both counts, and so E3, move.</p>
+<p>The variant is <code>sca.data.ops.Rounding = "stochastic"</code>: per channel and per line, the upper neighbour is drawn with probability equal to how far up the interval the raw value sits, so the mean target is the raw value itself and a tie is a coin flip. The (op, pair) sequence of the corpus and the eval lines are the production ones at the same seed; only the answers of rounded lines differ. Three arms, all at the adopted point's length (50 epochs), all under ex-2.2.3's either-slot labeller:</p>
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th style="text-align: right;">seeds</th>
+<th>corpus</th>
+<th>anchor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>control-stoch</code></td>
+<td style="text-align: right;">2</td>
+<td>stochastic</td>
+<td>none — un-anchored, stochastic corpus</td>
+</tr>
+<tr>
+<td><code>recipe-stoch</code></td>
+<td style="text-align: right;">3</td>
+<td>stochastic</td>
+<td>λ = 0.1 — the adopted recipe, stochastic corpus</td>
+</tr>
+<tr>
+<td><code>control-near</code></td>
+<td style="text-align: right;">2</td>
+<td>nearest</td>
+<td>none — un-anchored, nearest-rounded corpus</td>
+</tr>
+</tbody>
+</table>
+<p><code>control-near</code> is two fresh seeds of production's <code>control-short</code>, trained here so the rounding readout and the cube probes have a same-code nearest-rounded comparison. The anchored arm reads against production's <code>recipe-short</code> at twenty seeds. Every task but the corpus build and the rounding readout is ex-2.2.3's code, loaded from its module unchanged, so the placement statistics mean what they meant there.</p>
+<h2 id="the-grammar-under-each-rounding">The grammar under each rounding<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#the-grammar-under-each-rounding" title="Link to this heading">&para;</a></h2>
+<p>With no model in the loop: how much of each op rounds, the exact-match ceiling a stochastic target imposes (the mean over unordered pairs of the mode's probability, which is the most a predictor that knows the rule can match a drawn answer), and the redder-than-both count of each op's lines, where under stochastic rounding an answer counts with its probability.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>op</th><th class=num>pairs that round</th><th class=num>EM ceiling</th><th class=num>ceiling on rounded pairs</th><th class=num>redder (nearest)</th><th class=num>redder (stochastic, expected)</th><th class=num>change</th></tr></thead><tbody><tr><td><code>mix</code></td><td class=num>87.1%</td><td class=num>0.425</td><td class=num>0.339</td><td class=num>4,920</td><td class=num>4,870</td><td class=num>-1.0%</td></tr><tr><td><code>add</code></td><td class=num>0.0%</td><td class=num>1.000</td><td class=num>1.000</td><td class=num>2,165</td><td class=num>2,165</td><td class=num>+0.0%</td></tr><tr><td><code>screen</code></td><td class=num>82.9%</td><td class=num>0.651</td><td class=num>0.579</td><td class=num>1,427</td><td class=num>1,634</td><td class=num>+14.5%</td></tr><tr><td><code>multiply</code></td><td class=num>82.9%</td><td class=num>0.651</td><td class=num>0.579</td><td class=num>3,893</td><td class=num>4,703</td><td class=num>+20.8%</td></tr><tr><td><code>lighten</code></td><td class=num>0.0%</td><td class=num>1.000</td><td class=num>1.000</td><td class=num>0</td><td class=num>0</td><td class=num>—</td></tr><tr><td><code>darken</code></td><td class=num>0.0%</td><td class=num>1.000</td><td class=num>1.000</td><td class=num>4,258</td><td class=num>4,258</td><td class=num>+0.0%</td></tr></tbody></table><figcaption><p>The six ops under the two rounding rules. The ceiling is 1 on the three ops that never round; on the other three it is the mean mode probability over all unordered pairs, and over the pairs that round. Redder-than-both counts are over each op's 46,656 lines.</p></figcaption></figure>
+
+<h2 id="exact-match-against-a-moving-target">Exact match against a moving target<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#exact-match-against-a-moving-target" title="Link to this heading">&para;</a></h2>
+<p>Ex-2.2.3 reads holdout exact match against the corpus answer. On a stochastic corpus that answer is one draw, so the statistic has a ceiling below 1 on the rounded ops however well the model knows the rule. Three readings of the same eval pass, all on held-out pairs: exact match against the drawn answer (what the production statistic is), against the rule's mode (the nearest answer, which a stochastic model should still name), and the <em>expected</em> exact match, which is the chance a fresh draw of the line would match the model's guess and is what the drawn-answer statistic converges to over many draws.</p>
+<style>
+.mini-themed-figure-fdb55c96f352 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-fdb55c96f352 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-fdb55c96f352 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-fdb55c96f352 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-fdb55c96f352">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/em-readings-light.png" alt="Three panels side by side, each with the six ops on the horizontal axis and accuracy from 0 to 1 on the vertical. Left: exact match against the drawn answer; the two stochastic-corpus arms sit near a short black ceiling tick on mix, screen and multiply and near 1 elsewhere, while the nearest-rounded arms sit near 1 on every op. Middle: exact match against the rule&#x27;s mode, where every arm sits near 1. Right: expected exact match, where the stochastic arms again meet the ceiling ticks." width="818" height="260" style="max-width: 100%; height: auto;" data-asset-name="em-readings" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/em-readings-dark.png" alt="Three panels side by side, each with the six ops on the horizontal axis and accuracy from 0 to 1 on the vertical. Left: exact match against the drawn answer; the two stochastic-corpus arms sit near a short black ceiling tick on mix, screen and multiply and near 1 elsewhere, while the nearest-rounded arms sit near 1 on every op. Middle: exact match against the rule&#x27;s mode, where every arm sits near 1. Right: expected exact match, where the stochastic arms again meet the ceiling ticks." width="818" height="260" style="max-width: 100%; height: auto;" data-asset-name="em-readings" />
+<figcaption><p><strong>Three readings of holdout accuracy, per op and condition.</strong> Each mark is one seed. Left: exact match against the corpus answer, the production statistic. The black tick is the stochastic ceiling of the op (its mean mode probability); pale marks are production's <code>control-short</code>, on the nearest-rounded corpus. Middle: exact match against the rule's mode, the nearest answer. Right: the exact match a model would score on average over fresh draws of each line, which is what the left panel estimates with one draw.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>op</th><th class=num>holdout ceiling</th><th class=num>EM vs drawn</th><th class=num>expected EM</th><th class=num>EM vs mode</th><th class=num>EM vs mode, rounded pairs</th></tr></thead><tbody><tr><td><code>control-stoch</code></td><td class=num><code>mix</code></td><td class=num>0.443</td><td class=num>0.443 <span class='range'>±0.006</span></td><td class=num>0.443 <span class='range'>±0.000</span></td><td class=num>0.457 <span class='range'>±0.020</span></td><td class=num>0.350 <span class='range'>±0.023</span></td></tr><tr><td><code>control-stoch</code></td><td class=num><code>screen</code></td><td class=num>0.638</td><td class=num>0.564 <span class='range'>±0.002</span></td><td class=num>0.606 <span class='range'>±0.001</span></td><td class=num>0.818 <span class='range'>±0.006</span></td><td class=num>0.788 <span class='range'>±0.007</span></td></tr><tr><td><code>control-stoch</code></td><td class=num><code>multiply</code></td><td class=num>0.652</td><td class=num>0.627 <span class='range'>±0.002</span></td><td class=num>0.629 <span class='range'>±0.000</span></td><td class=num>0.859 <span class='range'>±0.004</span></td><td class=num>0.826 <span class='range'>±0.005</span></td></tr><tr><td><code>recipe-stoch</code></td><td class=num><code>mix</code></td><td class=num>0.443</td><td class=num>0.424 <span class='range'>±0.010</span></td><td class=num>0.443 <span class='range'>±0.000</span></td><td class=num>0.451 <span class='range'>±0.053</span></td><td class=num>0.343 <span class='range'>±0.063</span></td></tr><tr><td><code>recipe-stoch</code></td><td class=num><code>screen</code></td><td class=num>0.638</td><td class=num>0.581 <span class='range'>±0.006</span></td><td class=num>0.598 <span class='range'>±0.013</span></td><td class=num>0.801 <span class='range'>±0.029</span></td><td class=num>0.767 <span class='range'>±0.034</span></td></tr><tr><td><code>recipe-stoch</code></td><td class=num><code>multiply</code></td><td class=num>0.652</td><td class=num>0.624 <span class='range'>±0.008</span></td><td class=num>0.622 <span class='range'>±0.005</span></td><td class=num>0.845 <span class='range'>±0.020</span></td><td class=num>0.808 <span class='range'>±0.024</span></td></tr><tr><td><code>control-near</code></td><td class=num><code>mix</code></td><td class=num>0.443</td><td class=num>1.000 <span class='range'>±0.000</span></td><td class=num>0.443 <span class='range'>±0.000</span></td><td class=num>1.000 <span class='range'>±0.000</span></td><td class=num>1.000 <span class='range'>±0.000</span></td></tr><tr><td><code>control-near</code></td><td class=num><code>screen</code></td><td class=num>0.638</td><td class=num>0.998 <span class='range'>±0.002</span></td><td class=num>0.637 <span class='range'>±0.001</span></td><td class=num>0.998 <span class='range'>±0.002</span></td><td class=num>0.998 <span class='range'>±0.002</span></td></tr><tr><td><code>control-near</code></td><td class=num><code>multiply</code></td><td class=num>0.652</td><td class=num>1.000 <span class='range'>±0.000</span></td><td class=num>0.652 <span class='range'>±0.000</span></td><td class=num>1.000 <span class='range'>±0.000</span></td><td class=num>1.000 <span class='range'>±0.000</span></td></tr></tbody></table><figcaption><p>The three readings on the ops that round, held-out pairs. Seed means with half the seed range. The last column restricts the mode reading to the pairs that round at all, where the two corpora differ.</p></figcaption></figure>
+
+<h2 id="where-the-answer-mass-goes">Where the answer mass goes<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#where-the-answer-mass-goes" title="Link to this heading">&para;</a></h2>
+<p>A model trained on a stochastic target has a reason to spread its answer probability over the two (or up to eight) candidate colors of a line in proportion to their probabilities, which is what "reads the effective geometry rather than the snap" meant in the item. The read is on the rounded eval lines only, pooled over ops and splits: the model's probability on the mode against the mode's true probability (a calibrated model sits on the diagonal; a nearest-trained one sits near 1 whatever the ceiling), and the model's total mass on the line's candidate set (near 1 for any model that has learned the rule, whichever way it rounds).</p>
+<style>
+.mini-themed-figure-e152337e4e85 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-e152337e4e85 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-e152337e4e85 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-e152337e4e85 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-e152337e4e85">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/calibration-light.png" alt="Two panels. Left: the model&#x27;s probability on the mode answer against the mode&#x27;s true probability, from about 0.15 to 1, with a dashed diagonal. The stochastic-corpus arms run close to the diagonal; the nearest-rounded arm stays near the top whatever the true probability. Right: the model&#x27;s total mass on the candidate colors against the same axis; every arm sits near 1." width="626" height="290" style="max-width: 100%; height: auto;" data-asset-name="calibration" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/calibration-dark.png" alt="Two panels. Left: the model&#x27;s probability on the mode answer against the mode&#x27;s true probability, from about 0.15 to 1, with a dashed diagonal. The stochastic-corpus arms run close to the diagonal; the nearest-rounded arm stays near the top whatever the true probability. Right: the model&#x27;s total mass on the candidate colors against the same axis; every arm sits near 1." width="626" height="290" style="max-width: 100%; height: auto;" data-asset-name="calibration" />
+<figcaption><p><strong>Calibration of the answer distribution on rounded lines.</strong> Lines binned by the true probability of their mode answer (the line's exact-match ceiling), pooled over ops, splits and seeds; each mark is a bin with at least twenty lines, placed at the bin's mean ceiling. Left: mean model probability on the mode; the dashed line is perfect calibration. Right: mean model mass on the line's candidate set, the colors the stochastic rule can produce.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>op</th><th class=num>KL(rule ‖ model) ↓</th><th class=num>model P(mode)</th><th class=num>rule P(mode)</th><th class=num>mass on candidates ↑</th></tr></thead><tbody><tr><td><code>control-stoch</code></td><td class=num><code>mix</code></td><td class=num>0.249 <span class='range'>±0.001</span></td><td class=num>0.325 <span class='range'>±0.006</span></td><td class=num>0.334 <span class='range'>±0.000</span></td><td class=num>0.968 <span class='range'>±0.002</span></td></tr><tr><td><code>control-stoch</code></td><td class=num><code>screen</code></td><td class=num>0.129 <span class='range'>±0.000</span></td><td class=num>0.591 <span class='range'>±0.004</span></td><td class=num>0.577 <span class='range'>±0.000</span></td><td class=num>0.978 <span class='range'>±0.000</span></td></tr><tr><td><code>control-stoch</code></td><td class=num><code>multiply</code></td><td class=num>0.151 <span class='range'>±0.012</span></td><td class=num>0.593 <span class='range'>±0.004</span></td><td class=num>0.570 <span class='range'>±0.000</span></td><td class=num>0.974 <span class='range'>±0.001</span></td></tr><tr><td><code>recipe-stoch</code></td><td class=num><code>mix</code></td><td class=num>0.239 <span class='range'>±0.028</span></td><td class=num>0.321 <span class='range'>±0.018</span></td><td class=num>0.334 <span class='range'>±0.000</span></td><td class=num>0.965 <span class='range'>±0.003</span></td></tr><tr><td><code>recipe-stoch</code></td><td class=num><code>screen</code></td><td class=num>0.136 <span class='range'>±0.018</span></td><td class=num>0.567 <span class='range'>±0.023</span></td><td class=num>0.577 <span class='range'>±0.000</span></td><td class=num>0.977 <span class='range'>±0.003</span></td></tr><tr><td><code>recipe-stoch</code></td><td class=num><code>multiply</code></td><td class=num>0.158 <span class='range'>±0.017</span></td><td class=num>0.580 <span class='range'>±0.009</span></td><td class=num>0.570 <span class='range'>±0.000</span></td><td class=num>0.970 <span class='range'>±0.001</span></td></tr><tr><td><code>control-near</code></td><td class=num><code>mix</code></td><td class=num>5.127 <span class='range'>±0.136</span></td><td class=num>0.983 <span class='range'>±0.003</span></td><td class=num>0.334 <span class='range'>±0.000</span></td><td class=num>0.990 <span class='range'>±0.003</span></td></tr><tr><td><code>control-near</code></td><td class=num><code>screen</code></td><td class=num>2.262 <span class='range'>±0.072</span></td><td class=num>0.989 <span class='range'>±0.000</span></td><td class=num>0.577 <span class='range'>±0.000</span></td><td class=num>0.997 <span class='range'>±0.001</span></td></tr><tr><td><code>control-near</code></td><td class=num><code>multiply</code></td><td class=num>2.259 <span class='range'>±0.026</span></td><td class=num>0.982 <span class='range'>±0.003</span></td><td class=num>0.570 <span class='range'>±0.000</span></td><td class=num>0.994 <span class='range'>±0.001</span></td></tr></tbody></table><figcaption><p>The same readings as means over the rounded held-out lines of each op. KL is from the rule's answer distribution to the model's, over the palette; it is zero for a model that reproduces the rule's spread and grows as the model commits to one level.</p></figcaption></figure>
+
+<h2 id="anchoring-on-the-stochastic-corpus">Anchoring on the stochastic corpus<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#anchoring-on-the-stochastic-corpus" title="Link to this heading">&para;</a></h2>
+<p>The labeller and the anchor are ex-2.2.3's; only the corpus changed. The placement statistics of the anchored arm against production's <code>recipe-short</code> at twenty seeds, on the <code>mix</code> probe lines, plus the two task-cost reads: holdout exact match on <code>mix</code> (whose held-out lines include rounded pairs) and against the mode.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>seeds</th><th class=num>m_line ↑</th><th class=num>r² grading ↑</th><th class=num>contrast ↑</th><th class=num>lead ↓</th><th class=num>latch π ↓</th><th class=num>ᾱ op1 ↓</th><th class=num>retention ↑</th><th class=num>holdout EM mix</th></tr></thead><tbody><tr><td><code>recipe-stoch</code></td><td class=num>3</td><td class=num>0.391 <span class='range'>±0.001</span></td><td class=num>0.884 <span class='range'>±0.013</span></td><td class=num>0.867 <span class='range'>±0.009</span></td><td class=num>0.848 <span class='range'>±0.031</span></td><td class=num>0.021 <span class='range'>±0.003</span></td><td class=num>0.077 <span class='range'>±0.030</span></td><td class=num>0.986 <span class='range'>±0.010</span></td><td class=num>0.424 <span class='range'>±0.010</span></td></tr><tr class=ref><td><code>recipe-short</code> (production)</td><td class=num>20</td><td class=num>0.392 <span class='range'>±0.020</span></td><td class=num>0.886 <span class='range'>±0.044</span></td><td class=num>0.868 <span class='range'>±0.019</span></td><td class=num>0.826 <span class='range'>±0.044</span></td><td class=num>0.018 <span class='range'>±0.006</span></td><td class=num>0.083 <span class='range'>±0.056</span></td><td class=num>0.993 <span class='range'>±0.012</span></td><td class=num>0.999 <span class='range'>±0.002</span></td></tr></tbody></table><figcaption><p>Ex-2.2.3's gated statistics on the recipe, stochastic corpus against production. Arrows are the direction the gates read as good. Seed means with half the seed range.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>op</th><th class=num>red acc clean</th><th class=num>red acc projected ↓</th><th class=num>non-red deficit ↓</th><th class=num>redder acc clean</th><th class=num>redder acc projected</th></tr></thead><tbody><tr><td><code>recipe-stoch</code></td><td class=num><code>mix</code></td><td class=num>1.00 <span class='range'>±0.00</span></td><td class=num>0.04 <span class='range'>±0.05</span></td><td class=num>0.001 <span class='range'>±0.001</span></td><td class=num>1.00 <span class='range'>±0.00</span></td><td class=num>0.98 <span class='range'>±0.01</span></td></tr><tr><td><code>recipe-stoch</code></td><td class=num><code>multiply</code></td><td class=num>0.88 <span class='range'>±0.01</span></td><td class=num>0.12 <span class='range'>±0.05</span></td><td class=num>0.016 <span class='range'>±0.008</span></td><td class=num>0.78 <span class='range'>±0.03</span></td><td class=num>0.54 <span class='range'>±0.05</span></td></tr><tr class=ref><td><code>recipe-short (production)</code></td><td class=num><code>mix</code></td><td class=num>1.00 <span class='range'>±0.00</span></td><td class=num>0.01 <span class='range'>±0.04</span></td><td class=num>0.026 <span class='range'>±0.035</span></td><td class=num>1.00 <span class='range'>±0.01</span></td><td class=num>0.94 <span class='range'>±0.07</span></td></tr><tr class=ref><td><code>recipe-short (production)</code></td><td class=num><code>multiply</code></td><td class=num>1.00 <span class='range'>±0.00</span></td><td class=num>0.08 <span class='range'>±0.11</span></td><td class=num>0.012 <span class='range'>±0.012</span></td><td class=num>1.00 <span class='range'>±0.00</span></td><td class=num>0.61 <span class='range'>±0.12</span></td></tr></tbody></table><figcaption><p>The eval contract's suppression reads under the full projection, on the probe lines (nearest-rounded, as production's). Red lines have dose ≥ 0.8; non-red ≤ 0.2; redder lines have an answer redder than both operands.</p></figcaption></figure>
+
+<h2 id="the-answers-geometry">The answer's geometry<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#the-answers-geometry" title="Link to this heading">&para;</a></h2>
+<p>Question (b) of the item: does a stochastic target make the answer's representation more graded? The cube probes are ex-2.2.3's: strict-holdout ridge R² of each slot's RGB at every (slice, position) site, on <code>mix</code>'s on-grid probe lines, where no rounding ever happens. The read is the answer's own RGB at <code>=</code> (the prediction site) and at the answer position, un-anchored control on each corpus, with production's full-length <code>control</code> pale.</p>
+<style>
+.mini-themed-figure-2e3a3eedab62 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-2e3a3eedab62 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-2e3a3eedab62 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-2e3a3eedab62 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-2e3a3eedab62">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/answer-r2-light.png" alt="Two panels, one for the equals position and one for the answer position, each with the five residual-stream slices on the horizontal axis and strict-holdout R-squared from 0 to 1 on the vertical. In the equals panel the stochastic-corpus control sits at or above the nearest-rounded control at every slice, peaking near 0.9 at slice 2. In the answer panel the two overlap through slice 2 and fall together after it, with the two nearest-rounded seeds far apart at the deepest slice. Production&#x27;s full-length control is pale beside them, lower in both panels." width="626" height="251" style="max-width: 100%; height: auto;" data-asset-name="answer-r2" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/answer-r2-dark.png" alt="Two panels, one for the equals position and one for the answer position, each with the five residual-stream slices on the horizontal axis and strict-holdout R-squared from 0 to 1 on the vertical. In the equals panel the stochastic-corpus control sits at or above the nearest-rounded control at every slice, peaking near 0.9 at slice 2. In the answer panel the two overlap through slice 2 and fall together after it, with the two nearest-rounded seeds far apart at the deepest slice. Production&#x27;s full-length control is pale beside them, lower in both panels." width="626" height="251" style="max-width: 100%; height: auto;" data-asset-name="answer-r2" />
+<figcaption><p><strong>Strict-holdout R² of the answer's RGB, by slice, at <code>=</code> and at the answer position.</strong> Mean over the three channels; one line per seed. Production's <code>control</code> ran twice as long as the two pilot arms.</p></figcaption></figure>
+
+<h2 id="what-we-make-of-it">What we make of it<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#what-we-make-of-it" title="Link to this heading">&para;</a></h2>
+<p>A model trained on a coin-flip target learns the coin. Its answer distribution mirrors the one the rule defines, so the ceiling the item asked about is a fact about the corpus, and the model sits on it. That settles question (a).</p>
+<p>Exact match against the drawn answer is the wrong statistic twice over: it is capped, and it carries the noise of a single draw that every seed shares. Read instead the expected exact match against the holdout ceiling, the calibration of the answer mass (P(mode) against the same quantity for the rule, or the KL), and, on ops without ties, exact match against the mode. The off-grid channels of <code>mix</code> are always half-way ties, so there the mode read is a coin toss and the calibration read is the one to keep.</p>
+<p>The corpus changes nothing on the prompt side. The labeller reads operands, the anchor pulls the prompt span, and the placement statistics on the stochastic corpus match production to the third decimal.</p>
+<p>The answer side does move. Every clean accuracy on a rounded line falls to the level a calibrated argmax can reach, and the suppression reads follow it down. They are still a deficit measured from clean, which the contract already handles, and the redder lines go on holding their answers under <code>projection</code> at the same ratio as production.</p>
+<p>Redder-than-both counts on <code>screen</code> and <code>multiply</code> rise by a fifth, because a line that would round down under nearest rounding sometimes rounds up. An E3 on those ops would have more lines to read and the same finding.</p>
+<p>Question (b), whether the representation of the answer becomes more graded, is still open. The cube probes come from ex-2.2.3, which runs them on the on-grid lines of <code>mix</code>, where nothing rounds. A pilot that could answer it would probe the rounded lines of <code>screen</code> or <code>multiply</code> and compare the spread of the answer distribution against the raw value: a graded representation would show up as a smooth function of the odds of the coin.</p>
+<p>For D2.2 we would keep nearest rounding: it keeps every accuracy read simple, and the anchored-op experiments read the prompt side, where the corpus makes no difference. What the variant adds, a calibrated answer distribution, is not something those experiments ask about. It earns a place when a question is about the representation of the answer itself, and then it comes with the reads above and probes on the lines that round.</p>
+<h2 id="method-notes">Method notes<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#method-notes" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><strong>Corpus.</strong> <code>sca.data.ops.sample_corpus(..., rounding="stochastic")</code> and <code>eval_sets(..., rounding="stochastic")</code>: the (op, pair) sequence and the eval lines are the production ones at seed 0; each rounded line's answer is one draw from its own stream. The probe lines keep the nearest answer: they read the prompt's geometry, and on <code>mix</code> they are on-grid lines that never round.</li>
+<li><strong>Runs.</strong> The d64-L4 nGPT and the ex-2.2.3 training step, fifty epochs (1,650 steps), the either-slot labeller at the per-slot rate; the recipe is λ = 0.1, τ = 0.1, anti-subspace 2.5 → 0.3 by 90%, annealed anchor. Seeds 0–1 (controls) and 0–2 (recipe).</li>
+<li><strong>Rounding readout.</strong> Per eval line, the rule's answer distribution is the product of its per-channel two-point distributions (<code>answer_dist</code>); the ceiling is the mode's probability (<code>mode_prob</code>). The model's distribution is its softmax at the pre-answer position restricted to the 216 palette tokens, renormalized for the KL only.</li>
+<li><strong>Everything else</strong> is ex-2.2.3's: the eval pass, the eval contract's scorer, and the cube probes, run from that module's functions on this pilot's checkpoints.</li>
+</ul>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:kl">
+<p>Kullback–Leibler divergence, in nats: how much surprise you take on average by predicting with the model's distribution when the rule's is the truth. Zero means the two match.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.2.5/#fnref:kl" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

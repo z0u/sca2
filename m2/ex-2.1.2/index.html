@@ -1,0 +1,1434 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/517990641f8b02cbf98a282084a2dda1896a8198/exports/m2/ex-2.1.2/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/ex-2.1.2/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.1.2: making composition necessary</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The page style for a woven document. Base typography follows scripts/md.css (the site's
+ * Markdown pages), figure and table rules follow docs/report.css. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 50rem;
+  --gutter: 1.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Lora", serif;
+  font-weight: 400;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 { margin-top: 0; font-size: 2.25em; }
+p { margin-block: 1em; }
+
+code, pre, kbd {
+  font-family: "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+}
+code { background-color: var(--code-bg); padding: 0.1em 0.3em; border-radius: 3px; }
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code { background: none; padding: 0; border-radius: 0; font-size: 1em; }
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Anchor links on headings. */
+a.anchor-link { opacity: 0; color: var(--fg-muted); transition: opacity 0.2s ease; }
+a.anchor-link::after { content: '#'; font-size: 0.8em; margin-inline: 0.4em; }
+:hover > a.anchor-link { opacity: 1; }
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. */
+table { border-collapse: collapse; margin-block: 1.5em; margin-inline: auto; }
+th, td { padding: 0.35em 0.8em; border: 0; text-align: left; vertical-align: top; }
+th { font-weight: 600; }
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) { border-top: 2px solid var(--rule); }
+thead > tr:last-child > :is(th, td) { border-bottom: 1px solid var(--rule); padding-bottom: 0.5em; }
+tbody > tr:first-child > :is(th, td) { padding-top: 0.5em; }
+tbody > tr:last-child > :is(th, td) { border-bottom: 2px solid var(--rule); }
+
+img, video { max-width: 100%; height: auto; }
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure { margin-inline: 0; text-align: center; }
+figure img { margin-inline: auto; display: block; }
+figure:has(> figure) { text-wrap: balance; }
+figure:has(> figure) > figure { display: inline-block; vertical-align: top; margin: 0 0.5em; }
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { font-size: 11pt; display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  pre, figure, table { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1.5rem -1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.1.2/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/ex-2.1.2/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.1.2</strong> · <code>d036074-dirty</code> (dirty) · run 2026-07-15<div>via reports/m2/ex-2.1.2/margins, reports/m2/ex-2.1.2/metrics</div></div></details>
+<main class="lit">
+<h1 id="ex-212-making-composition-necessary">Ex 2.1.2: making composition necessary<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#ex-212-making-composition-necessary" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>The previous model never answered a held-out <em>named</em> pair, so we changed the grammar to make composition the only route: reverse alias lines, and named equations whose mix falls off the palette. The model picks up both new skills and still won't chain them within one forward pass, leaving held-out named accuracy at zero.</p>
+</div>
+<p><a href="https://z0u.github.io/sca2/m2/ex-2.1.1/">Ex-2.1.1</a> gave us a decent baseline, but no model in the sweep ever solved <code>named_holdout</code>. That eval set contains pairs of named colors whose named-answer equation never appears in training, so the expected way to answer is to combine two skills: the alias dictionary, which says which name goes with which hex color, and the mixing arithmetic itself.</p>
+<p>That report looked into why the models never learn to combine them. In this experiment, we keep everything from ex-2.1.1 fixed, including the d64-L4 architecture, the split, and the training recipe, and add two new kinds of sequence:</p>
+<ul>
+<li>Reverse alias lines (<code>#f00 = red</code>). The base grammar never trained the hex → name readout.</li>
+<li>Named equations that mix to a color that falls <em>off</em> the palette, answered in hex (<code>red + navy = #804</code>). Now the surface form of the answer depends on the mix rather than on the operand forms alone, so a name + name prompt can't be settled by lookup.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Named pairs</td>
+<td><code>red + blue = purple</code></td>
+</tr>
+<tr>
+<td>Hex pairs</td>
+<td><code>#f00 + #00f = #808</code></td>
+</tr>
+<tr>
+<td>Cross-form</td>
+<td><code>red + #00f = #808</code></td>
+</tr>
+<tr>
+<td>Alias</td>
+<td><code>red = #f00</code></td>
+</tr>
+<tr>
+<td><strong>Reverse</strong></td>
+<td><code>#f00 = red</code></td>
+</tr>
+<tr>
+<td><strong>Open</strong></td>
+<td><code>red + orange = #f40</code></td>
+</tr>
+</tbody>
+</table>
+<p>We run the two grammar changes as a 2 × 2 factorial. Each one replaces the same number of tokens from the hex slice, so the four conditions differ only in what they add on top of the baseline.</p>
+<p>This is still an <strong>un-anchored</strong> experiment.</p>
+<h2 id="training-data">Training data<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#training-data" title="Link to this heading">&para;</a></h2>
+<p>We regenerate the <code>both</code> corpus here. It shows the two new forms in their natural context: reverse aliases and off-palette named equations, sitting among the lines we already had.</p>
+<div class="highlight"><pre><span></span><code>#044 + mint = #4a6
+#18a + #c0b = #74b
+#1bc + #3e5 = #2d9
+#0c1 + #890 = #4b1
+lavender = #88f
+purple + orchid = #c4c
+#720 + white = #b98
+#f7b + cyan = #8bd
+azure + azure = azure
+mint + lavender = #8cc
+teal = #088
+#eba + #bd1 = #dc6
+</code></pre></div>
+<figure class="report-figure"><table class="report-table"><tr><th>condition</th><th class="num"><code>hex</code></th><th class="num"><code>named</code></th><th class="num"><code>cross</code></th><th class="num"><code>alias</code></th><th class="num"><code>alias_rev</code></th><th class="num"><code>open</code></th></tr><tr><td><code>control</code></td><td class="num">23924</td><td class="num">6078</td><td class="num">6101</td><td class="num">3897</td><td class="num">—</td><td class="num">—</td></tr><tr><td><code>rev</code></td><td class="num">21949</td><td class="num">6031</td><td class="num">6148</td><td class="num">3869</td><td class="num">2003</td><td class="num">—</td></tr><tr><td><code>open</code></td><td class="num">19921</td><td class="num">5964</td><td class="num">6153</td><td class="num">4065</td><td class="num">—</td><td class="num">3897</td></tr><tr><td><code>both</code></td><td class="num">17858</td><td class="num">6066</td><td class="num">6078</td><td class="num">4126</td><td class="num">1975</td><td class="num">3897</td></tr></table><figcaption><p>Lines per form in the 40,000-line corpus of each condition. The named equations draw from the same 66 training pairs as ex-2.1.1, with the same 10 pairs held out. The open equations draw from 242 of the 302 off-palette named pairs, and 60 are held out entirely.</p></figcaption></figure>
+
+<h2 id="hypotheses">Hypotheses<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#hypotheses" title="Link to this heading">&para;</a></h2>
+<p>Written before looking at any results.</p>
+<p><strong>H1.</strong> Accuracy: <code>named_holdout</code> stays at zero in <code>control</code> and is lifted well off zero by <code>both</code>. <code>rev</code> alone lifts <code>named_holdout</code> part of the way: the garden path showed the mix is already half-computed on named prompts, and <code>rev</code> supplies the missing readout for whatever computation is there. <code>open</code> alone forces the computation, but leaves name emission supervised only through the memorizable named slice.</p>
+<p><strong>H2.</strong> Margins: scoring all 27 names as complete answers gives each held-out pair a <em>margin</em>, the log-probability of the true name minus that of the best competitor. In <code>control</code> the margins are negative (accuracy is zero) but spread out well above the random floor. The pairs with the least-negative control margins should be the first to flip positive under intervention. The interventions shift the whole margin distribution upward, while <code>named_seen</code> margins stay large and positive.</p>
+<p><strong>H3.</strong> The answer schedule: probing each answer position for each RGB channel (on hex prompts, strictly before each digit lands in the context) shows a stair-step: channel k stays low and becomes strongly decodable at the position that emits digit k.</p>
+<p><strong>H4.</strong> Computed but not emitted: a result-color probe fit on open-pair prompts (name + name surface form) at the pre-answer position transfers to the held-out named prompts in proportion to how much the mix is actually computed there: middling R² in <code>control</code> (partial computation), rising toward the fit ceiling in the <code>open</code> conditions, and tracking <code>named_holdout</code> accuracy across conditions.</p>
+<p><strong>H5.</strong> No side effects: <code>named_seen</code>, <code>hex_unseen</code>, and <code>cross_unseen</code> stay saturated in every condition, even though we are displacing up to 15% of the hex data. The <code>alias_rev</code> eval set reads ≈ 1 wherever reverse aliases are trained and stays random elsewhere, as in ex-2.1.1.</p>
+<p>If the H1 interaction shows up but the single interventions do nothing, then composition needed both ingredients at once. If <code>rev</code> alone saturates the set, then the readout was the only missing piece and the pull toward lookup never mattered. If nothing moves, then the diagnosis was wrong somewhere.</p>
+<p><strong>Headline numbers.</strong> Mean <code>named_holdout</code> accuracy by condition: <code>control</code> <strong>0.00</strong>, <code>rev</code> <strong>0.00</strong>, <code>open</code> <strong>0.00</strong>, <code>both</code> <strong>0.00</strong>. The saturated sets (named seen, hex and cross unseen) average 0.997, 0.997, 0.999, 0.999 in the same order.</p>
+<h2 id="completion-accuracy-across-the-factorial">Completion accuracy across the factorial<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#completion-accuracy-across-the-factorial" title="Link to this heading">&para;</a></h2>
+<p>Did the changes move <code>named_holdout</code> off zero, and did the two new forms train the way we meant them to? The figure below shows exact-match accuracy for all seven eval sets, in each of the four conditions.</p>
+<style>
+.mini-themed-figure-5e73155c5d89 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-5e73155c5d89 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-5e73155c5d89 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-5e73155c5d89 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-5e73155c5d89">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/accuracy-factorial-light.png" alt="Seven bar-and-dot panels of completion accuracy (0 to 1) against condition (control, rev, open, both), one panel per eval set: named seen, named holdout, hex unseen, cross unseen, open seen, open holdout, and reverse alias. Bars show the mean over three seeds, dots the individual seeds." width="1211" height="299" style="max-width: 100%; height: auto;" data-asset-name="accuracy-factorial" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/accuracy-factorial-dark.png" alt="Seven bar-and-dot panels of completion accuracy (0 to 1) against condition (control, rev, open, both), one panel per eval set: named seen, named holdout, hex unseen, cross unseen, open seen, open holdout, and reverse alias. Bars show the mean over three seeds, dots the individual seeds." width="1211" height="299" style="max-width: 100%; height: auto;" data-asset-name="accuracy-factorial" />
+<figcaption><p>Each panel is one eval set: the bar is the mean over three seeds and the dots are the individual seeds. <code>named_holdout</code> is the set H1 is about; <code>open_holdout</code> asks whether the forced computation carries over to off-palette pairs never seen in training; <code>alias_rev</code> checks the reverse-alias supervision. In <code>control</code> and <code>rev</code>, the open-form sets ask for a surface form those corpora never train on (a name + name prompt), so a low score there means the grammar is simply missing from that corpus, rather than a genuine attempt that fell short.</p></figcaption></figure>
+
+<p>H1 is refuted: <code>named_holdout</code> stays at zero in every condition (its interaction term is a degenerate +0.00). The other panels show that both changes did train, though. The <code>open</code> conditions answer held-out off-palette pairs at ≈ 0.9, so the mixing arithmetic runs on name + name prompts and carries over to operand pairs never seen in that surface form. And <code>alias_rev</code> reads 1.0 right where reverse aliases were trained, so the hex → name readout exists and works in the frame it was taught in. We supplied both of the missing ingredients, and still the composition does not surface as a named answer.</p>
+<h2 id="right-value-wrong-spelling">Right value, wrong spelling<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#right-value-wrong-spelling" title="Link to this heading">&para;</a></h2>
+<p>Let's look at what the model actually writes. Below are the greedy completions of the held-out named prompts, meaning we take the single most likely character at each step and read off the answer. In <code>control</code> and <code>rev</code> the answers are the familiar retrieval-like wrong names. But in the <code>open</code> conditions, some of the pairs the model writes a <em>hex</em> answer, and when it does, the value is the correct mix.</p>
+<figure class="report-figure"><table class="report-table"><tr><th>prompt</th><th><span class="sw sw-ghost" aria-hidden="true"></span> expected</th><th><span class="sw sw-ghost" aria-hidden="true"></span> control</th><th><span class="sw sw-ghost" aria-hidden="true"></span> rev</th><th><span class="sw sw-ghost" aria-hidden="true"></span> open</th><th><span class="sw sw-ghost" aria-hidden="true"></span> both</th></tr><tr><td><code>blue + black = </code></td><td><span aria-hidden="true" style="background: #008; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> navy</td><td><span aria-hidden="true" style="background: #000; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> black</td><td><span aria-hidden="true" style="background: #000; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> black</td><td><span aria-hidden="true" style="background: #000; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> black</td><td><span aria-hidden="true" style="background: #000; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> black</td></tr><tr><td><code>lime + black = </code></td><td><span aria-hidden="true" style="background: #080; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> green</td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> gray</td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> gray</td><td><span aria-hidden="true" style="background: #088; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> teal</td><td><span aria-hidden="true" style="background: #088; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> teal</td></tr><tr><td><code>black + red = </code></td><td><span aria-hidden="true" style="background: #800; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> maroon</td><td><span aria-hidden="true" style="background: #808; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> purple</td><td><span aria-hidden="true" style="background: #808; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> purple</td><td><span aria-hidden="true" style="background: #800; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> #800 ✓</td><td><span aria-hidden="true" style="background: #800; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> #800 ✓</td></tr><tr><td><code>rose + navy = </code></td><td><span aria-hidden="true" style="background: #808; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> purple</td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> gray</td><td><span aria-hidden="true" style="background: #008; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> navy</td><td><span aria-hidden="true" style="background: #808; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> #808 ✓</td><td><span aria-hidden="true" style="background: #808; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> #808 ✓</td></tr><tr><td><code>blue + cyan = </code></td><td><span aria-hidden="true" style="background: #08f; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> azure</td><td><span aria-hidden="true" style="background: #088; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> teal</td><td><span aria-hidden="true" style="background: #088; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> teal</td><td><span aria-hidden="true" style="background: #000; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> black</td><td><span aria-hidden="true" style="background: #088; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> teal</td></tr><tr><td><code>blue + magenta = </code></td><td><span aria-hidden="true" style="background: #80f; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> violet</td><td><span aria-hidden="true" style="background: #88f; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> lavender</td><td><span aria-hidden="true" style="background: #808; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> purple</td><td><span aria-hidden="true" style="background: #808; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> purple</td><td><span aria-hidden="true" style="background: #808; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> purple</td></tr><tr><td><code>orchid + azure = </code></td><td><span aria-hidden="true" style="background: #88f; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> lavender</td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> gray</td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> gray</td><td><span aria-hidden="true" style="background: #88f; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> #88f ✓</td><td><span aria-hidden="true" style="background: #88f; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> #88f ✓</td></tr><tr><td><code>white + lime = </code></td><td><span aria-hidden="true" style="background: #8f8; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> mint</td><td><span aria-hidden="true" style="background: #fff; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> white</td><td><span aria-hidden="true" style="background: #fff; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> white</td><td><span aria-hidden="true" style="background: #0f0; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> lime</td><td><span aria-hidden="true" style="background: #0f8; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> spring</td></tr><tr><td><code>chartreuse + maroon = </code></td><td><span aria-hidden="true" style="background: #880; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> olive</td><td><span aria-hidden="true" style="background: #800; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> maroon</td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> gray</td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> gray</td><td><span aria-hidden="true" style="background: #880; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> #880 ✓</td></tr><tr><td><code>olive + lavender = </code></td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> gray</td><td><span aria-hidden="true" style="background: #88f; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> lavender</td><td><span aria-hidden="true" style="background: #88f; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> lavender</td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> #888 ✓</td><td><span aria-hidden="true" style="background: #888; border: 1px solid #8886; border-radius: 2px; display: inline-block; width: 0.8em; height: 0.8em"></span> #888 ✓</td></tr></table><figcaption><p>Greedy completions of the <code>named_holdout</code> prompts, seed 0, one column per condition. A ✓ marks an answer whose value equals the true mix, but is given in the wrong form.</p></figcaption></figure>
+
+<p>Across all seeds, the hex-form answers on the 10 held-out prompts number <code>control</code> <strong>0/30</strong>, <code>rev</code> <strong>0/30</strong>, <code>open</code> <strong>11/30</strong>, <code>both</code> <strong>10/30</strong>, and the value-correct answers <code>control</code> <strong>0/30</strong>, <code>rev</code> <strong>0/30</strong>, <code>open</code> <strong>11/30</strong>, <code>both</code> <strong>10/30</strong>. Every value-correct answer is hex, and every name answer has the wrong value. The form-choice margin agrees at <code>control</code> -5.2, <code>rev</code> -3.3, <code>open</code> +8.1, <code>both</code> +7.6 nats<sup id="fnref:form"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#fn:form">1</a></sup>.</p>
+<p>So the <code>open</code> intervention worked, in that the mix is computed on name + name prompts. But the <em>form rule</em> ("answer with a name exactly when the mix lands on the palette") did not carry over: the model treats a held-out closed pair like an open one and answers in hex, or else falls back on a name near the mix. Whether that name is the answer of the closest memorized equation is a further claim we haven't tested here.</p>
+<p>So the reverse mapping <code>rev</code> didn't help.</p>
+<h2 id="error-margins">Error margins<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#error-margins" title="Link to this heading">&para;</a></h2>
+<p>Exact-match accuracy tells us whether the true name came out on top, but how close it was. So let's grade the name-identity question on a continuous scale.</p>
+<style>
+.mini-themed-figure-e1957391ae6b {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-e1957391ae6b {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-e1957391ae6b {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-e1957391ae6b > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-e1957391ae6b">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/margin-trajectories-light.png" alt="Line chart of the answer margin (log-probability of the true name minus the best competitor) against condition (control, rev, open, both), one line per held-out named pair, averaged over seeds. A horizontal line marks zero, where the true answer starts to come out ahead; a shaded band shows the range of margins on the seen named pairs." width="722" height="416" style="max-width: 100%; height: auto;" data-asset-name="margin-trajectories" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/margin-trajectories-dark.png" alt="Line chart of the answer margin (log-probability of the true name minus the best competitor) against condition (control, rev, open, both), one line per held-out named pair, averaged over seeds. A horizontal line marks zero, where the true answer starts to come out ahead; a shaded band shows the range of margins on the seen named pairs." width="722" height="416" style="max-width: 100%; height: auto;" data-asset-name="margin-trajectories" />
+<figcaption><p>Margins between predicted and true named colors. Positive means the true name comes out ahead of the other names, and the magnitude says by how much. One line per held-out pair, averaged over seeds and traced across the four conditions; the shaded band is the range of <code>named_seen</code> margins, for reference.</p></figcaption></figure>
+
+<p><strong>H2 mostly refuted.</strong> The distribution barely moves: the mean margin is -9.7 nats in <code>control</code> and -8.8 in <code>both</code>, with 0/10 pairs ending positive. The true name never gets close among the names; it stays about ten nats off while <code>named_seen</code> is far above zero. So the value → name translation is not <em>almost there</em> and narrowly behind. It simply never engages, even in the condition whose greedy answers prove the value has been computed. There is some rank structure, but it is weak: the rank correlation between <code>control</code> and <code>both</code> is 0.76.</p>
+<h2 id="when-each-channel-becomes-readable-in-sequence">When each channel becomes readable in-sequence<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#when-each-channel-becomes-readable-in-sequence" title="Link to this heading">&para;</a></h2>
+<p>The ex-2.1.1 probes read one pre-answer position and averaged over R, G, and B, which hides at which token the mix gets computed. So here we fit a separate ridge probe for every combination of position, channel, and layer on the hex prompts. We then watch each channel become readable as the answer is spelled out.</p>
+<p>H3 predicts a stair-step: each channel stays low until the position that emits its own digit, then climbs sharply.</p>
+<style>
+.mini-themed-figure-dd92490cfa83 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-dd92490cfa83 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-dd92490cfa83 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-dd92490cfa83 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-dd92490cfa83">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/answer-schedule-light.png" alt="Line charts of probe R-squared against position offset around the answer, one panel per residual-stream depth, three lines per panel for the R, G, and B channels of the result. Lines are solid before the digit of each channel enters the context and dotted after. In the deeper layers each channel peaks near 1 at its own emission position and falls away on either side, so the three channels form a sequence of staggered peaks rather than a cumulative plateau; at depth 0 the dotted segments jump to 1 as each digit becomes readable from the context." width="1211" height="290" style="max-width: 100%; height: auto;" data-asset-name="answer-schedule" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/answer-schedule-dark.png" alt="Line charts of probe R-squared against position offset around the answer, one panel per residual-stream depth, three lines per panel for the R, G, and B channels of the result. Lines are solid before the digit of each channel enters the context and dotted after. In the deeper layers each channel peaks near 1 at its own emission position and falls away on either side, so the three channels form a sequence of staggered peaks rather than a cumulative plateau; at depth 0 the dotted segments jump to 1 as each digit becomes readable from the context." width="1211" height="290" style="max-width: 100%; height: auto;" data-asset-name="answer-schedule" />
+<figcaption><p>Probe alignment per color channel of the answer. One panel per transformer layer. Offset 0 is the <code>#</code>, digit k sits at offset k + 1 and is emitted from offset k. A line is solid where its digit is not yet in the context (so decoding it is computation) and dotted once it has landed (decoding is copying).</p></figcaption></figure>
+
+<p>At the final layer, channel k is almost perfectly decodable right at its emission offset (R² ≈ 0.97), and <em>only</em> there. One position earlier it is much weaker, and once emission moves on to the next digit, the earlier channels mostly fade from the deep residual stream.</p>
+<p>So each answer position holds just the one channel it is about to emit, riding on a diffuse trace of the whole mix (around 0.5 R²) that lingers from the pre-answer position. The mix is never fully represented at any single position; the "result" that the pre-answer probe reads is more of a head start than a finished value. This looks like just-in-time computation.</p>
+<h2 id="is-the-mix-computed-on-the-named-prompts">Is the mix computed on the named prompts?<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#is-the-mix-computed-on-the-named-prompts" title="Link to this heading">&para;</a></h2>
+<p>If the mix really is computed on the named prompts, then a probe trained to read the result somewhere else should carry over to them. So we fit the probe on the open-pair prompts (the name + name surface form) at the pre-answer position, then score it on the named eval sets. Where the mix is never represented, no probe fit elsewhere can recover it.</p>
+<style>
+.mini-themed-figure-2cce0e23817d {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-2cce0e23817d {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-2cce0e23817d {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-2cce0e23817d > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-2cce0e23817d">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/transfer-probe-light.png" alt="Four line charts of probe R-squared against residual-stream depth, one panel per prompt set: the held-back half of the fit set, open holdout, named seen, and named holdout. One line per condition (control, rev, open, both; darker means richer corpus). The probes were fit on open-pair prompts at the pre-answer position." width="1115" height="299" style="max-width: 100%; height: auto;" data-asset-name="transfer-probe" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/transfer-probe-dark.png" alt="Four line charts of probe R-squared against residual-stream depth, one panel per prompt set: the held-back half of the fit set, open holdout, named seen, and named holdout. One line per condition (control, rev, open, both; darker means richer corpus). The probes were fit on open-pair prompts at the pre-answer position." width="1115" height="299" style="max-width: 100%; height: auto;" data-asset-name="transfer-probe" />
+<figcaption><p>One panel per scored set: the held-back half of the fit set, open holdout, named seen, and named holdout. R² against residual depth, one line per condition (darker means a richer corpus). Depth 0 is left out, since the pre-answer embedding is constant across prompts until attention runs.</p></figcaption></figure>
+
+<p>Partial computation shows up everywhere, <code>control</code> included. The held-out named prompts carry about as much linearly-decodable result as the ceiling of the fit set (≈ 0.6 at the deep layers). The <code>open</code> conditions lift the mid-depth transfer a little, which fits the idea that the arithmetic is doing real work on these prompts, and their <em>final</em>-layer R² drops on the named sets, where the job of the last layer has become committing to a surface form. The main point, though, is that "computed but not emitted" was already true in <code>control</code>: making the computation stronger (<code>open</code>) or the readout available (<code>rev</code>) still does not join the two up.</p>
+<h2 id="the-garden-path-revisited">The garden path, revisited<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#the-garden-path-revisited" title="Link to this heading">&para;</a></h2>
+<p>Let's return to the walkthrough example from ex-2.1.1. A garden-path sentence is one that leads you into a wrong reading until a later word forces a correction, and that's what happens here. On <code>lime + black = green</code>, the model guesses the second operand as <em>blue</em>, revises to <em>black</em> when it sees the <code>a</code>, and then only half-corrects the answer, so a memorized neighbor of the mix comes out ahead.</p>
+<p>Which neighbor varies. At seed 0 the completions are <code>control</code> gray, <code>rev</code> gray, <code>open</code> teal, <code>both</code> teal, and across the other seeds <code>control</code> also gives olive and teal. The competitor is not one fixed wrong answer.</p>
+<p>With the new corpora, does the correction finally overtake the lookup? It does not: the margin stays several nats negative. The sublines below trace per-character surprisal and entropy for seed 0.</p>
+<figure class="report-figure"><table class="report-table"><tr><th>condition</th><th class="num">seed 0</th><th class="num">seed 1</th><th class="num">seed 2</th><th class="num">mean</th></tr><tr><td><code>control</code></td><td class="num">-11.4</td><td class="num">-10.6</td><td class="num">-18.4</td><td class="num"><b>-13.4</b></td></tr><tr><td><code>rev</code></td><td class="num">-7.1</td><td class="num">-9.4</td><td class="num">-9.7</td><td class="num"><b>-8.7</b></td></tr><tr><td><code>open</code></td><td class="num">-7.5</td><td class="num">-13.9</td><td class="num">-7.1</td><td class="num"><b>-9.5</b></td></tr><tr><td><code>both</code></td><td class="num">-19.6</td><td class="num">-11.9</td><td class="num">-11.2</td><td class="num"><b>-14.2</b></td></tr></table><figcaption><p>Margin of <code>green</code> over its best competitor on the <code>lime + black</code> prompt, per seed and condition. A positive value means the arithmetic comes out ahead.</p></figcaption></figure>
+
+<figure data-mini-asset="_assets/sublines-garden-path.html" aria-label="The equation lime plus black equals green, repeated once per condition, each with a sparkline of per-character surprisal (solid) and predictive entropy (dashed) under the text on a shared 0-to-log-V scale."><figure style="display: inline-block; margin: 0 1em 0 0"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 188.0px; max-width: 100%; display: inline-block;" viewBox="0 0 188.0 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">l</tspan><tspan x="12.6">i</tspan><tspan x="21">m</tspan><tspan x="29.4">e</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">b</tspan><tspan x="71.4">l</tspan><tspan x="79.8">a</tspan><tspan x="88.2">c</tspan><tspan x="96.6">k</tspan><tspan x="105"> </tspan><tspan x="113.4">=</tspan><tspan x="121.8"> </tspan><tspan x="130.2">g</tspan><tspan x="138.6">r</tspan><tspan x="147">e</tspan><tspan x="155.4">e</tspan><tspan x="163.8">n</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-8"><rect x="0" y="-20" width="168" height="40" /></clipPath><path d="M 12.6,9.6 S 16.8,16.4 21.0,16.4 S 25.2,20.0 29.4,20.0 S 33.6,19.5 37.8,19.5 S 42.0,15.8 46.2,15.8 S 50.4,20.0 54.6,20.0 S 58.8,12.1 63.0,12.1 S 67.2,20.0 71.4,20.0 S 75.6,0.0 79.8,0.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,16.7 130.2,16.7 S 134.4,20.0 138.6,20.0 S 142.8,0.0 147.0,0.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-8)" /><path d="M 12.6,8.2 S 16.8,15.9 21.0,15.9 S 25.2,20.0 29.4,20.0 S 33.6,18.5 37.8,18.5 S 42.0,16.2 46.2,16.2 S 50.4,20.0 54.6,20.0 S 58.8,9.6 63.0,9.6 S 67.2,20.0 71.4,20.0 S 75.6,19.7 79.8,19.7 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,13.6 130.2,13.6 S 134.4,20.0 138.6,20.0 S 142.8,20.0 147.0,20.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-8)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0 M155.2,20.0 L155.6,20.0 M163.6,20.0 L164.0,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">surprisal</text><line x1="85" y1="0" x2="105" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="110" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">entropy</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">control</span></p></figcaption></figure><figure style="display: inline-block; margin: 0 1em 0 0"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 188.0px; max-width: 100%; display: inline-block;" viewBox="0 0 188.0 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">l</tspan><tspan x="12.6">i</tspan><tspan x="21">m</tspan><tspan x="29.4">e</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">b</tspan><tspan x="71.4">l</tspan><tspan x="79.8">a</tspan><tspan x="88.2">c</tspan><tspan x="96.6">k</tspan><tspan x="105"> </tspan><tspan x="113.4">=</tspan><tspan x="121.8"> </tspan><tspan x="130.2">g</tspan><tspan x="138.6">r</tspan><tspan x="147">e</tspan><tspan x="155.4">e</tspan><tspan x="163.8">n</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-9"><rect x="0" y="-20" width="168" height="40" /></clipPath><path d="M 12.6,10.0 S 16.8,15.8 21.0,15.8 S 25.2,20.0 29.4,20.0 S 33.6,19.2 37.8,19.2 S 42.0,15.2 46.2,15.2 S 50.4,20.0 54.6,20.0 S 58.8,6.2 63.0,6.2 S 67.2,20.0 71.4,20.0 S 75.6,0.0 79.8,0.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,19.0 130.2,19.0 S 134.4,20.0 138.6,20.0 S 142.8,0.0 147.0,0.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-9)" /><path d="M 12.6,8.0 S 16.8,15.8 21.0,15.8 S 25.2,20.0 29.4,20.0 S 33.6,17.7 37.8,17.7 S 42.0,16.2 46.2,16.2 S 50.4,20.0 54.6,20.0 S 58.8,9.6 63.0,9.6 S 67.2,20.0 71.4,20.0 S 75.6,20.0 79.8,20.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,16.3 130.2,16.3 S 134.4,20.0 138.6,20.0 S 142.8,20.0 147.0,20.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-9)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0 M155.2,20.0 L155.6,20.0 M163.6,20.0 L164.0,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">surprisal</text><line x1="85" y1="0" x2="105" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="110" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">entropy</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">rev</span></p></figcaption></figure><figure style="display: inline-block; margin: 0 1em 0 0"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 188.0px; max-width: 100%; display: inline-block;" viewBox="0 0 188.0 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">l</tspan><tspan x="12.6">i</tspan><tspan x="21">m</tspan><tspan x="29.4">e</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">b</tspan><tspan x="71.4">l</tspan><tspan x="79.8">a</tspan><tspan x="88.2">c</tspan><tspan x="96.6">k</tspan><tspan x="105"> </tspan><tspan x="113.4">=</tspan><tspan x="121.8"> </tspan><tspan x="130.2">g</tspan><tspan x="138.6">r</tspan><tspan x="147">e</tspan><tspan x="155.4">e</tspan><tspan x="163.8">n</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-a"><rect x="0" y="-20" width="168" height="40" /></clipPath><path d="M 12.6,9.7 S 16.8,16.6 21.0,16.6 S 25.2,20.0 29.4,20.0 S 33.6,19.7 37.8,19.7 S 42.0,15.2 46.2,15.2 S 50.4,20.0 54.6,20.0 S 58.8,5.4 63.0,5.4 S 67.2,20.0 71.4,20.0 S 75.6,0.0 79.8,0.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,7.1 130.2,7.1 S 134.4,20.0 138.6,20.0 S 142.8,0.0 147.0,0.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-a)" /><path d="M 12.6,8.1 S 16.8,15.8 21.0,15.8 S 25.2,20.0 29.4,20.0 S 33.6,18.7 37.8,18.7 S 42.0,16.2 46.2,16.2 S 50.4,20.0 54.6,20.0 S 58.8,6.8 63.0,6.8 S 67.2,20.0 71.4,20.0 S 75.6,19.9 79.8,19.9 S 84.0,20.0 88.2,20.0 S 92.4,19.9 96.6,19.9 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,15.8 130.2,15.8 S 134.4,19.9 138.6,19.9 S 142.8,19.8 147.0,19.8 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-a)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0 M155.2,20.0 L155.6,20.0 M163.6,20.0 L164.0,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">surprisal</text><line x1="85" y1="0" x2="105" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="110" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">entropy</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">open</span></p></figcaption></figure><figure style="display: inline-block; margin: 0 1em 0 0"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 188.0px; max-width: 100%; display: inline-block;" viewBox="0 0 188.0 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">l</tspan><tspan x="12.6">i</tspan><tspan x="21">m</tspan><tspan x="29.4">e</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">b</tspan><tspan x="71.4">l</tspan><tspan x="79.8">a</tspan><tspan x="88.2">c</tspan><tspan x="96.6">k</tspan><tspan x="105"> </tspan><tspan x="113.4">=</tspan><tspan x="121.8"> </tspan><tspan x="130.2">g</tspan><tspan x="138.6">r</tspan><tspan x="147">e</tspan><tspan x="155.4">e</tspan><tspan x="163.8">n</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-b"><rect x="0" y="-20" width="168" height="40" /></clipPath><path d="M 12.6,10.3 S 16.8,17.5 21.0,17.5 S 25.2,20.0 29.4,20.0 S 33.6,19.2 37.8,19.2 S 42.0,15.2 46.2,15.2 S 50.4,20.0 54.6,20.0 S 58.8,4.7 63.0,4.7 S 67.2,20.0 71.4,20.0 S 75.6,0.0 79.8,0.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,0.0 130.2,0.0 S 134.4,20.0 138.6,20.0 S 142.8,0.0 147.0,0.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-b)" /><path d="M 12.6,8.3 S 16.8,16.2 21.0,16.2 S 25.2,19.9 29.4,19.9 S 33.6,17.9 37.8,17.9 S 42.0,16.2 46.2,16.2 S 50.4,20.0 54.6,20.0 S 58.8,6.9 63.0,6.9 S 67.2,20.0 71.4,20.0 S 75.6,19.9 79.8,19.9 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,17.9 130.2,17.9 S 134.4,20.0 138.6,20.0 S 142.8,20.0 147.0,20.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-b)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0 M155.2,20.0 L155.6,20.0 M163.6,20.0 L164.0,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">surprisal</text><line x1="85" y1="0" x2="105" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="110" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">entropy</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">both</span></p></figcaption></figure></figure>
+
+<p>Every set the model fails, it fails confidently rather than hedging, which is what the garden-path sublines illustrate. Across the 30 condition and eval-set pairs at zero accuracy, s₂ averages 0.61 and spans 0.41 to 0.85.</p>
+<h2 id="findings">Findings<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#findings" title="Link to this heading">&para;</a></h2>
+<p>Adding the inverse dictionary and the pressure to compute on named prompts did teach the model those two skills: reverse aliases reach 1.0, and off-palette generalization reaches ≈ 0.92. But the model didn't learn to combine them: <code>named_holdout</code> stays at zero everywhere.</p>
+<p>The model often gets the value right but writes it as hex instead of as a name, and the value → name translation never runs partway through an equation, even though the model has learned that mapping perfectly well on its own. Nothing in training ever asks the model to chain the two skills inside a single forward pass, and the just-in-time answer schedule suggests it never holds a full intermediate result anywhere as a latent embedding.</p>
+<p>So for D2.1, <code>named_holdout</code> is not able to identify degradation: it sits at zero, so it has no headroom to lose. <code>open_holdout</code> from the new corpus may be a better indicator: it is compositional (unseen pairs, with the form of the answer decided by a computed value), and it sits near the ceiling without quite reaching it.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:form">
+<p>"Form choice margin": the log-probability of the correct hex minus
+that of the true name under teacher forcing.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.2/#fnref:form" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

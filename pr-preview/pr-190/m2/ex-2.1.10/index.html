@@ -1,0 +1,1804 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/f209df1f80c5d5bffcab298fb9111c2a2074327a/exports/m2/ex-2.1.10/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.1.10: A label that doesn&#x27;t point</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The page style for a woven document. Base typography follows scripts/md.css (the site's
+ * Markdown pages), figure and table rules follow docs/report.css. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 50rem;
+  --gutter: 1.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Lora", serif;
+  font-weight: 400;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 { margin-top: 0; font-size: 2.25em; }
+p { margin-block: 1em; }
+
+code, pre, kbd {
+  font-family: "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+}
+code { background-color: var(--code-bg); padding: 0.1em 0.3em; border-radius: 3px; }
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code { background: none; padding: 0; border-radius: 0; font-size: 1em; }
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Anchor links on headings. */
+a.anchor-link { opacity: 0; color: var(--fg-muted); transition: opacity 0.2s ease; }
+a.anchor-link::after { content: '#'; font-size: 0.8em; margin-inline: 0.4em; }
+:hover > a.anchor-link { opacity: 1; }
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. */
+table { border-collapse: collapse; margin-block: 1.5em; margin-inline: auto; }
+th, td { padding: 0.35em 0.8em; border: 0; text-align: left; vertical-align: top; }
+th { font-weight: 600; }
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) { border-top: 2px solid var(--rule); }
+thead > tr:last-child > :is(th, td) { border-bottom: 1px solid var(--rule); padding-bottom: 0.5em; }
+tbody > tr:first-child > :is(th, td) { padding-top: 0.5em; }
+tbody > tr:last-child > :is(th, td) { border-bottom: 2px solid var(--rule); }
+
+img, video { max-width: 100%; height: auto; }
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure { margin-inline: 0; text-align: center; }
+figure img { margin-inline: auto; display: block; }
+figure:has(> figure) { text-wrap: balance; }
+figure:has(> figure) > figure { display: inline-block; vertical-align: top; margin: 0 0.5em; }
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { font-size: 11pt; display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  pre, figure, table { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1.5rem -1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-190/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.1.10/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.1.10</strong> · <code>63e613c</code> · run 2026-08-09<div>via reports/m2/ex-2.1.10/arrays, reports/m2/ex-2.1.10/metrics</div></div><div><strong>ex-2.1.9</strong> · <code>aa30757-dirty</code> (dirty) · run 2026-08-06<div>via reports/m2/ex-2.1.9/arrays, reports/m2/ex-2.1.9/metrics</div></div></details>
+<main class="lit">
+<h1 id="ex-2110-a-label-that-doesnt-point">Ex 2.1.10: A label that doesn't point<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#ex-2110-a-label-that-doesnt-point" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>Mellowmax pooling found the concept position on its own in ex-2.1.9, but every label was keyed on op1, so only one position ever carried the evidence. Now we label lines when either operand is <em>red</em>, and the pull has to find the right operand line by line. It does, with selectivity matching that of the oracle.</p>
+</div>
+<h2 id="findings">Findings<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#findings" title="Link to this heading">&para;</a></h2>
+<p><strong>H1 (task cost) — holds.</strong> The largest <code>named_holdout</code> exact-match gap from the control across the five anchored conditions is 0.0065, against a gate of 0.02.</p>
+<p><strong>H2 (the pull selects the labelled operand) — holds.</strong> On the primary (<code>either-t100</code>): (a) at the embedding the leading role in each group is its own operand, at weight 0.77 (gate ≥ 0.4; uniform is 0.25), in all nine runs individually; (b) the deep-slice between-group op2 contrast is +0.85 (gate ≥ 0.2).</p>
+<p><strong>H3 (the operating point survives) — holds.</strong> On <code>either-t100</code>: containment <span class="arithmatex">\(\bar\alpha\)</span> at op1 = 0.050 (gate ≤ 0.1); retention 0.98 (gate ≥ 0.8, minimum across nine seeds); grading <span class="arithmatex">\(r^2\)</span> = 0.82 against 0.83 for the reference arm, a drop of 0.008 (gate ≤ 0.1).</p>
+<p><strong>H4 (selectivity without the pointer) — holds.</strong> Control-subtracted m_line of the primary is 102% of the value for the slot oracle (gate ≥ 75%).</p>
+<p>The reference arm reproduced <code>pool-t100</code> from ex-2.1.9 through the new labelling code path, matching every carried statistic to three decimals (<em>Reproduction</em>, in the H2 section).</p>
+<div class="admonition">
+<p class="admonition-title">How to read this report</p>
+<p>This report was preregistered: the method, hypotheses and decision thresholds were frozen before the experiment ran (commit <code>b36a590</code>). Results replaced the <code>TODO</code> placeholders in place; everything conceived after seeing the data is under <em>Exploratory analyses</em>, marked as post hoc.</p>
+</div>
+<p>Ex-2.1.9 took away the position oracle: the pooled (mellowmax) anchor term
+asks each labeled line to align <em>somewhere</em> in its span, and the pull put
+0.77 of its weight on op1 at the embedding without being told. But the
+labels still pointed. A label is a per-visit Bernoulli draw: each time a
+line is visited in training, it <em>draws</em> a label with a small probability.
+In ex-2.1.9 that probability depended only on the redness of the first
+operand, so op1 was the only position whose evidence ever justified a label,
+and a pull that settled on op1 <em>by position</em> could never be wrong. RoPE
+never writes position into the stream, but causal attention gives each role
+a different view of the line (e.g. op1 attends only to itself), so from the
+first block on, the roles are distinguishable states a pull could latch.</p>
+<p>Labels that don't point are a step toward M3, which will target natural
+text. There, labels arrive at the document level ("this review is
+negative", "this tweet is obscene"), since nobody marks which tokens carry
+the concept. A document-level label says the concept occurs, but not where.
+This experiment widens our labels by one step in that direction: either
+operand can draw the label, so a line can be labeled because of a red op2
+while its op1 is blue. The localization then has to vary per-line: on
+op1-triggered lines the red state is at the first position of the line,
+on op2-triggered lines at the third, and a pool that commits to one
+position for the whole run would pull blue states onto the axis on the
+lines it got wrong.</p>
+<p>Whether that failure would even show up in the scores is not obvious,
+because the span positions share token embeddings. Once red embeddings sit
+on the axis, a red op2 line has an aligned position for free: the
+labeller's slot-symmetry is satisfied by the lexicon before any per-line
+choice happens. It only really matters after attention: in ex-2.1.9, we
+found the pool's deep-slice choice is winner-take-all <em>per run</em>, committed
+by epoch 8. If that winner is global, the two label groups will show the
+same weight profile; if the pool localizes per line, a red op2 should carry
+the weight on the lines where it is the evidence (H2). The selectivity
+delivered to labeled lines is scored separately (H4), since the embedding
+give-away means the second can pass while the first fails.</p>
+<p>One scope limit: our mixing operation can't make the
+answer redder than both operands, so "the concept is only at a position
+the labeller never sees" doesn't exist in this language. Two candidate
+positions, correlated with the answer, is as blind as this testbed gets;
+enough to test per-line localization; a concept at a position the
+labeller gave no hint of is out of reach here.</p>
+<details>
+<summary>Glossary</summary>
+<ul>
+<li><strong>line</strong> — one equation, <code>c1 + c2 = answer</code>. Training samples lines from this grammar; the probe set enumerates all 5832 of them.</li>
+<li><strong>span</strong> — a line's four prompt positions, the ones the pooled pull chooses among.</li>
+<li><strong>role</strong> — what a span position holds: op1, <code>+</code>, op2, <code>=</code>. The grammar is fixed in this experiment, so role and position name the same thing here.</li>
+<li><strong>slice</strong> (<span class="arithmatex">\(\ell\)</span>) — a depth at which the residual stream is read: the embedding, plus the stream after each of the four blocks.</li>
+<li><strong>alignment</strong> (<span class="arithmatex">\(\alpha\)</span>) — <span class="arithmatex">\(\cos(h, \hat v)\)</span>, a state's cosine to the anchor axis; <span class="arithmatex">\(\bar\alpha\)</span> is its mean over colors or lines, called <em>drift</em> when the mean runs over the unlabeled bulk.</li>
+<li><strong>margin</strong> (<span class="arithmatex">\(m\)</span>) — label-weighted minus unweighted mean alignment: how much closer the labeled-ish material is to the axis than everything else.</li>
+<li><strong>softmin temperature</strong> (<span class="arithmatex">\(\tau\)</span>) — how sharply the pooled pull concentrates on its best-aligned position: small τ approaches a hard min, large τ approaches the span mean.</li>
+<li><strong>softmin weight</strong> (<span class="arithmatex">\(\pi\)</span>) — the share of the pooled pull a span position receives; sums to 1 over the span.</li>
+<li><strong>G1</strong>, <strong>G2</strong> — the label groups: probe lines weighted by P(only op1) and P(only op2) respectively.</li>
+</ul>
+</details>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#method" title="Link to this heading">&para;</a></h2>
+<p>Everything follows ex-2.1.9 except the labelling rule: the word-level <code>v216</code> corpus from ex-2.1.3 (216 colors, one token each, d64-L4), the same seeds, the mellowmax-pooled anchor term, the anchor schedule, and the anti-subspace schedule fixed at ex-2.1.8's operating point (<code>end90-hold30</code>) in every anchored cell.</p>
+<h3 id="the-labelling-rule">The labelling rule<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#the-labelling-rule" title="Link to this heading">&para;</a></h3>
+<p>Labels are as they have been since ex-2.1.6 (binary, drawn per visit,
+with probability graded in redness), except that now both operands draw.
+Each operand of a line draws independently at redness⁸ × 0.04, and
+the line is labeled when either draws. The per-slot rate is half of the
+op1 labeller's 0.08, which keeps the expected labeled-line rate where
+it was, up to the tiny both-draw overlap; the label-budget check below
+computes both. A labeled line's pulled positions are its prompt
+span, as before: the label never says which operand drew.</p>
+<p>The answer position stays outside the span: the model has to <em>produce</em>
+the mix there, so pulling that state toward red would oppose the task on
+every labeled line whose answer isn't red, entangling the anchor with the
+output rather than with the concept. The span will have to widen
+eventually: in M3 the span is the whole document, answer-analogues
+included. That widening is its own variable, so it stays out of this
+experiment; a full-line arm (answer included, a position where the
+concept is diluted) is queued in todo-science as the intermediate step.
+Lines whose operands are <em>both</em> reddish exist too; their weight maps are
+on the exploratory list.</p>
+<p>The <code>slot-oracle</code> condition is the exception that measures what the label
+withholds: it pulls only the operand(s) that actually drew, no pooling
+needed. And the <code>op1-labels</code> condition keeps the old labeller entirely
+(op1-keyed at 0.08), reproducing ex-2.1.9's <code>pool-t100</code>
+through the new code path.</p>
+<p>One bookkeeping consequence: label draws are consumed per line whatever
+the anchor weight, so conditions sharing a labeller see identical batches
+and masks at a given seed. Conditions with <em>different</em> labellers consume
+different draws, so comparisons across the labelling rules carry
+corpus-draw noise on top of seed noise. The control runs the either-slot
+labeller, keeping it batch-identical with the primary.</p>
+<h3 id="conditions">Conditions<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#conditions" title="Link to this heading">&para;</a></h3>
+<p>Six conditions, most run with three seeds each. The primary condition runs
+with nine seeds: the deep-slice mellowmax in ex-2.1.9 was one-hot per <em>run</em>,
+and we can measure the failure rate better with more seeds. 24 runs in
+all. Every anchored cell runs the anti-subspace term at the operating point;
+only the labelling rule and τ vary.</p>
+<!-- tau renders as T in this font in table headers, so using mathmode -->
+
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th><span class="arithmatex">\(\lambda_a\)</span></th>
+<th><span class="arithmatex">\(τ\)</span></th>
+<th>labels</th>
+<th>pulled positions</th>
+<th>seeds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lam0</code></td>
+<td>0</td>
+<td>∞</td>
+<td>either</td>
+<td>prompt span, pooled</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>op1-labels</code></td>
+<td>0.1</td>
+<td>0.1</td>
+<td>op1</td>
+<td>prompt span, pooled</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>either-t100</code> <strong>(primary)</strong></td>
+<td>0.1</td>
+<td>0.1</td>
+<td>either</td>
+<td>prompt span, pooled</td>
+<td>9</td>
+</tr>
+<tr>
+<td><code>either-t500</code></td>
+<td>0.1</td>
+<td>0.5</td>
+<td>either</td>
+<td>prompt span, pooled</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>either-t2500</code></td>
+<td>0.1</td>
+<td>2.5</td>
+<td>either</td>
+<td>prompt span, pooled</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>slot-oracle</code></td>
+<td>0.1</td>
+<td>∞</td>
+<td>either</td>
+<td>the operand that drew</td>
+<td>3</td>
+</tr>
+</tbody>
+</table>
+<p><code>either-t100</code> is the primary: the either-slot labeller at τ = 0.1. That
+temperature was the only rung ex-2.1.9 found graded in every seed (latch
+rate 0/3). The τ = 0.5 and 2.5 arms are softer,<sup id="fnref:tau-geo"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#fn:tau-geo">1</a></sup> reported but not
+gated.</p>
+<p><code>op1-labels</code> re-runs ex-2.1.9's <code>pool-t100</code> verbatim: the reproduction
+check for the new labelling code path, and the baseline the widened
+labels are judged against. <code>slot-oracle</code> shows what knowing the triggering slot is worth,
+measured through identical code: a reference rather than a strict
+ceiling, for the same reason ex-2.1.9's <code>op1-oracle</code> was.</p>
+<h3 id="calibration">Calibration<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#calibration" title="Link to this heading">&para;</a></h3>
+<p>A few checks before anything runs, computed from the design constants and the published arrays from ex-2.1.9: the label budget, the placement of the soft-τ rungs, and the reproduction targets for the reference arm.</p>
+<p><strong>The label budget.</strong> Over the closed-pair set the corpus draws from, the op1 labeller labels 0.0012 of lines per visit and the either-slot labeller at the halved rate labels 0.0012, a 0.1% difference. The halving does keep the budget, so a margin change is attributable to the labelling rule rather than to more or less total pull. Of the either-slot label mass, 50% is op1-only, 50% op2-only and 0.1% both-draw. The near-even split between the one-slot groups is what H2's group weighting and H4's latch arithmetic lean on.</p>
+<style>
+.mini-themed-figure-c77ccab457c7 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-c77ccab457c7 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-c77ccab457c7 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-c77ccab457c7 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-c77ccab457c7">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/tau-ladder-light.png" alt="Two line charts of leading softmin weight against temperature tau on a log scale from 0.003 to 8. Left panel: the un-anchored control&#x27;s alignment profile from ex-2.1.9; right panel: its pool-t100 condition. Each panel has five curves, one per residual slice, descending from near 1 at the left edge to 0.25 at the right edge. Three vertical dashed lines mark tau = 0.1, 0.5 and 2.5. At tau = 2.5 every curve has flattened to within a few hundredths of 0.25, the uniform value marked by a faint horizontal line." width="702" height="270" style="max-width: 100%; height: auto;" data-asset-name="tau-ladder" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/tau-ladder-dark.png" alt="Two line charts of leading softmin weight against temperature tau on a log scale from 0.003 to 8. Left panel: the un-anchored control&#x27;s alignment profile from ex-2.1.9; right panel: its pool-t100 condition. Each panel has five curves, one per residual slice, descending from near 1 at the left edge to 0.25 at the right edge. Three vertical dashed lines mark tau = 0.1, 0.5 and 2.5. At tau = 2.5 every curve has flattened to within a few hundredths of 0.25, the uniform value marked by a faint horizontal line." width="702" height="270" style="max-width: 100%; height: auto;" data-asset-name="tau-ladder" />
+<figcaption><p><strong>Where the soft-τ rungs land.</strong> The check the ladder was chosen by (the rungs are not derivable from first principles): the share of softmin weight held by the leading span position, as a function of τ, computed on the stored alignments from ex-2.1.9 under the un-anchored control (<strong>left</strong>) and under <code>pool-t100</code> (<strong>right</strong>). Dashed verticals mark the rungs chosen here, and the curves say what each will do. τ = 0.1 keeps a clear leader on the trained profile; τ = 2.5 sits within a few hundredths of uniform (0.25) on both, so it <em>is</em> the tiny-bias arm and a τ = ∞ arm would add nothing; τ = 0.5 splits the gap. Had a rung landed on the flat shoulder next to another, we would have moved it.</p></figcaption></figure>
+
+<p>The ex-2.1.9 arrays give the reproduction targets for the <code>op1-labels</code> arm, as means of per-run statistics: m_span = 0.70, ᾱ_span = 0.24, ᾱ at op1 = 0.08. A miss there means the new labelling code path moved the numbers, and gets settled before any either-slot condition is read.</p>
+<h3 id="measurements">Measurements<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#measurements" title="Link to this heading">&para;</a></h3>
+<p>Task evals, the readability profile, grading, and the trajectory
+instrument are from ex-2.1.9. Two measurements change and two are new,
+all on the same probe set: all 5832 ordered closed pairs, so every color
+appears both as op1 and as op2. (Terms like <em>line</em>, <em>role</em>, <em>slice</em> and
+<em>alignment</em> are pinned down in the Glossary above; alignment throughout
+is <span class="arithmatex">\(\cos(h, \hat v)\)</span>, a state's cosine to the anchor axis.)</p>
+<p><strong>Per-line alignment maps.</strong> The eval step now stores alignment per probe
+<em>line</em> (slices, lines, positions) rather than averaged into per-color rows.
+The per-color maps that earlier statistics used are recovered by averaging
+over partners, so the line-keyed statistics below are computed from those.
+Per-line softmin weights are stored the same way.<sup id="fnref:data-volume"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#fn:data-volume">2</a></sup></p>
+<p><strong>m_line</strong>, the selectivity this experiment scores: m_span, generalized
+from colors to lines, to measure "how much closer does a line sit to the
+axis for being the kind of line the labeller flags".<sup id="fnref:m_span"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#fn:m_span">3</a></sup> The max over
+roles is applied to every condition and the control alike, so its
+maximum-of-noise inflation cancels in the control-subtracted comparisons, as
+before. The trajectory records m_line, so retention reads off it. m_span and
+<span class="arithmatex">\(m_\text{op1}\)</span> are reported beside it for continuity.</p>
+<p><strong>Per-group weight profiles.</strong> The localization instrument. Probe lines
+are weighted into two groups by the labeller's own one-slot-only
+probabilities (G1 by P(op1 drew and op2 didn't), G2 by the reverse), so
+no redness threshold has to be invented, and both-red lines (where either
+answer is defensible) get almost no say. Within each group,
+<span class="arithmatex">\(\bar\pi_G(\ell, t)\)</span> is the group-weighted mean softmin weight per slice
+and role. Under per-line localization the two profiles should differ:
+G1 stepping at op1, G2 at op2. Under a global winner they are identical
+no matter what: if every line carries the same weight profile, the two
+group means, which differ only in how lines are weighted, both return
+that one profile.</p>
+<p><strong>Per-role drift in the trajectory.</strong> Ex-2.1.9 couldn't say <em>when</em> the
+<code>+</code> embedding climbed to 0.30 alignment because the trajectory recorded
+op1 drift only; it now records <span class="arithmatex">\(\bar\alpha(\ell, t)\)</span> over all span roles
+at each measurement, which is the data that question needs. Report-side
+only; nothing is gated on it.</p>
+<h2 id="hypotheses">Hypotheses<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#hypotheses" title="Link to this heading">&para;</a></h2>
+<p>Gates and noise floors are from ex-2.1.6 through ex-2.1.9 wherever the
+statistic is unchanged; derivations for the new ones are in
+<a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.1.10/experiment.py">experiment.py</a>, next to their constants.</p>
+<p>Throughout, "the primary" is <code>either-t100</code> (fixed in advance, marked in the
+<em>Conditions</em> table). The τ = 0.5 and 2.5 arms are reported beside it but
+not gated. If the primary turns out task-dirty, H2–H4 go unscored and the
+refuted H1 is the finding.</p>
+<p><strong>H1: Task cost.</strong> Every condition is task-clean: <code>named_holdout</code> exact
+match within 0.02 (absolute) of the seed mean of the in-experiment
+control. No partial credit; nothing in this design adds task pressure,
+and no anchored condition on this testbed has ever shown any.</p>
+<p><strong>H2: The pull selects the labelled operand.</strong> On the primary's per-group
+weight profiles:
+<strong>(a)</strong> at the embedding slice, each group's leading role is its own
+operand (op1 for G1, op2 for G2) with weight <span class="arithmatex">\(\ge 0.4\)</span> in both
+(uniform is 0.25);
+<strong>(b)</strong> across the four post-attention slices, the between-group contrast in
+op2 weight, <span class="arithmatex">\(\mathrm{mean}_\ell\,[\bar\pi_{G2}(\ell, \text{op2}) -
+\bar\pi_{G1}(\ell, \text{op2})]\)</span>, is <span class="arithmatex">\(\ge 0.2\)</span>.
+Partial: (a) holds and (b) lands in <span class="arithmatex">\([0.1, 0.2)\)</span>.
+(a) is close to forced by the shared embeddings <em>if</em> the pull aligns red
+tokens at all, so on its own it mostly rules out the syntax latch. (b) is
+the real question: ex-2.1.9's deep-slice winner-take-all was per <em>run</em>,
+and (b) asks whether the winner can vary per line when the label demands it.
+Contrary outcomes:
+<em>global latch</em> — both groups lead at the same role (op1, or worse, <code>+</code>), the
+contrast sits near 0, and on op2-triggered lines the pull is dragging
+non-red states onto the axis, which H3(a) should catch as ᾱ contamination;
+<em>uniform</em> — the primary reaches 0.4 in neither group at any slice
+(τ = 0.1 is the sharpest rung, so if it can't concentrate, the softer
+arms won't either), meaning the pool can't tell the positions apart once
+the label stops pointing.</p>
+<p><strong>H3: The operating point survives the wider labeller.</strong> On the primary:
+<strong>(a)</strong> containment, <span class="arithmatex">\(\bar\alpha \le 0.1\)</span> at op1 (also the contamination
+detector for H2's global-latch outcome);
+<strong>(b)</strong> retention, every run whose running maximum of m_line reaches
+0.2 ending at <span class="arithmatex">\(\ge 0.8\times\)</span> that maximum (quoted as the minimum
+across seeds);
+<strong>(c)</strong> grading, the primary's seed-mean op1 response <span class="arithmatex">\(r^2\)</span> against
+<code>sim¹·⁵</code> no more than 0.1 below the <code>op1-labels</code> arm's (higher is
+fine).
+Partial: (a) and (b) hold, (c) misses.</p>
+<p><strong>H4: Selectivity holds without the pointer.</strong> Control-subtracted
+m_line of the primary reaches <span class="arithmatex">\(\ge 0.75\)</span> of the control-subtracted
+m_line of <code>slot-oracle</code>. Partial: <span class="arithmatex">\([0.5, 0.75)\)</span>.
+The latch account predicts roughly the op1-triggered share of the label
+mass (~half) plus whatever the shared embeddings give away, so a pass has
+to clear that; for scale, ex-2.1.9's pooled arms recovered 91–98% of
+their oracle.</p>
+<p>Note that H4 can pass while H2(b) fails: the shared embeddings can deliver
+selectivity to labeled lines with no per-line localization at depth. That
+would suggest selectivity from the lexicon rather than from localization.</p>
+<h2 id="task-cost-h1">Task cost (H1)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#task-cost-h1" title="Link to this heading">&para;</a></h2>
+<figure class="report-figure"><table class="report-table">
+  <thead><tr>
+    <th>condition</th><th class="num">seen EM ↑</th><th class="num">holdout EM ↑</th>
+    <th class="num">holdout NLL ↓</th><th class="num"><code>open</code> dist ↓</th>
+    <th class="num">Δ holdout EM</th><th>H1 gate</th>
+  </tr></thead>
+  <tbody><tr><th><code>lam0</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.012 <span class='range'>±0.001</span></td><td class='num'>0.132 <span class='range'>±0.002</span></td><td class='num'>+0.0000</td><td>clean</td></tr><tr><th><code>op1-labels</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.014 <span class='range'>±0.002</span></td><td class='num'>0.135 <span class='range'>±0.007</span></td><td class='num'>+0.0000</td><td>clean</td></tr><tr><th><code>either-t100</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.995 <span class='range'>±0.014</span></td><td class='num'>0.029 <span class='range'>±0.036</span></td><td class='num'>0.136 <span class='range'>±0.006</span></td><td class='num'>-0.0052</td><td>clean</td></tr><tr><th><code>either-t500</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.993 <span class='range'>±0.002</span></td><td class='num'>0.033 <span class='range'>±0.009</span></td><td class='num'>0.134 <span class='range'>±0.001</span></td><td class='num'>-0.0065</td><td>clean</td></tr><tr><th><code>either-t2500</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.996 <span class='range'>±0.004</span></td><td class='num'>0.021 <span class='range'>±0.007</span></td><td class='num'>0.134 <span class='range'>±0.001</span></td><td class='num'>-0.0039</td><td>clean</td></tr><tr><th><code>slot-oracle</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.995 <span class='range'>±0.002</span></td><td class='num'>0.027 <span class='range'>±0.009</span></td><td class='num'>0.132 <span class='range'>±0.001</span></td><td class='num'>-0.0052</td><td>clean</td></tr></tbody>
+</table><figcaption><p>Behavior by condition. Each value is the seed mean, with half the seed range beside it. EM is exact match on the answer token, NLL its surprise in nats, and <code>open</code> dist the RGB distance from the guessed color to the true mix on pairs with no named answer. Δ holdout EM is the signed gap to the in-experiment control, which the H1 gate scores at 0.02.</p></figcaption></figure>
+
+<p><strong>H1 holds.</strong> The largest gap from the control is 0.0065, at <code>either-t500</code>, against a gate of 0.02, so H2–H4 are all scored. Labels that no longer say which operand drew change nothing the task loss can see, as with every anchored condition on this testbed so far.</p>
+<h2 id="where-the-weight-went-by-label-group-h2">Where the weight went, by label group (H2)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#where-the-weight-went-by-label-group-h2" title="Link to this heading">&para;</a></h2>
+<p>The <code>op1-labels</code> arm re-runs <code>pool-t100</code> from ex-2.1.9 verbatim (same labels, same seeds, same draws) through the widened sampler, so any drift from the new labelling code path is visible before we read an either-slot condition.</p>
+<figure class="report-figure"><table class="report-table">
+  <thead><tr><th>condition</th><th class='num'>m<sub>span</sub></th><th class='num'>ex-2.1.9</th><th class='num'>Δ</th><th class='num'>ᾱ<sub>span</sub></th><th class='num'>ex-2.1.9</th><th class='num'>Δ</th><th class='num'>m<sub>op1</sub></th><th class='num'>ex-2.1.9</th><th class='num'>Δ</th><th class='num'>ᾱ (op1)</th><th class='num'>ex-2.1.9</th><th class='num'>Δ</th></tr></thead>
+  <tbody><tr><th><code>op1-labels</code></th><td class='num'>0.704 <span class='range'>±0.017</span></td><td class='num'>0.704</td><td class='num'>-0.000</td><td class='num'>0.242 <span class='range'>±0.018</span></td><td class='num'>0.242</td><td class='num'>+0.000</td><td class='num'>0.704 <span class='range'>±0.017</span></td><td class='num'>0.704</td><td class='num'>-0.000</td><td class='num'>0.075 <span class='range'>±0.012</span></td><td class='num'>0.075</td><td class='num'>+0.000</td></tr><tr><th><code>lam0</code></th><td class='num'>0.028 <span class='range'>±0.036</span></td><td class='num'>0.023</td><td class='num'>+0.005</td><td class='num'>0.033 <span class='range'>±0.019</span></td><td class='num'>0.018</td><td class='num'>+0.015</td><td class='num'>-0.018 <span class='range'>±0.025</span></td><td class='num'>-0.029</td><td class='num'>+0.011</td><td class='num'>-0.041 <span class='range'>±0.046</span></td><td class='num'>-0.012</td><td class='num'>-0.029</td></tr></tbody>
+</table><figcaption><p>The reproduction check. Each statistic is this experiment's seed mean (± seed standard deviation) beside the same statistic recomputed from ex-2.1.9's published arrays under the same per-run convention, and the difference. <code>op1-labels</code> re-runs <code>pool-t100</code> through the widened labelling code; <code>lam0</code> runs the either-slot labeller, so it is a new draw of the control rather than a re-run.</p></figcaption></figure>
+
+<p>The reproduction is as close as the rounding in the store allows: every carried statistic lands within ±0.001 of its target, and the embedding lead weight (0.77) matches the 0.77 of ex-2.1.9. The op1-keyed draw consumes the rng as the old sampler did, so this is the same training trajectory replayed, and the either-slot conditions can be read against <code>op1-labels</code> as a like-for-like baseline.</p>
+<p>The gaps in the control are the size of the seed spread, a reminder that it consumes <em>different</em> draws (two per line from the either-slot labeller), so that comparison carries corpus-draw noise, as the method warned.</p>
+<p>Both groups weight the same 5832 probe lines by the one-slot-only probabilities of the labeller itself, G1 by P(only op1 drew) and G2 by P(only op2 drew). The profiles below are the group-weighted mean softmin weights, per slice and role. Under a global winner the two columns of each pair would be identical; under per-line localization they mirror each other.</p>
+<figure aria-label="Per-group softmin weight profiles, one sub-figure per either-slot condition">
+<style>
+.mini-themed-figure-abe8d2a75691 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-abe8d2a75691 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-abe8d2a75691 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-abe8d2a75691 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-abe8d2a75691">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/group-profiles-either-t100-light.png" alt="Ten small panels in two columns labeled G1, op1 drew, and G2, op2 drew: five residual slices per column with the embedding at the bottom, each spanning the roles op1, plus, op2 and equals. In the G1 column every slice shows a tall block at op1 — 0.77 at the embedding, near 0.9 at depth — with a small step at equals only at the embedding. The G2 column is the mirror image: the block sits at op2 at every slice, 0.77 at the embedding rising to 0.95 at depth. Nine per-seed hairlines hug the mean everywhere. A dashed readability line in the G1 column is high at op1 on every slice; at the embedding it falls to near zero at the other three roles, while at depth it dips at plus and rises again at equals." width="308" height="392" style="max-width: 100%; height: auto;" data-asset-name="group-profiles-either-t100" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/group-profiles-either-t100-dark.png" alt="Ten small panels in two columns labeled G1, op1 drew, and G2, op2 drew: five residual slices per column with the embedding at the bottom, each spanning the roles op1, plus, op2 and equals. In the G1 column every slice shows a tall block at op1 — 0.77 at the embedding, near 0.9 at depth — with a small step at equals only at the embedding. The G2 column is the mirror image: the block sits at op2 at every slice, 0.77 at the embedding rising to 0.95 at depth. Nine per-seed hairlines hug the mean everywhere. A dashed readability line in the G1 column is high at op1 on every slice; at the embedding it falls to near zero at the other three roles, while at depth it dips at plus and rises again at equals." width="308" height="392" style="max-width: 100%; height: auto;" data-asset-name="group-profiles-either-t100" />
+<figcaption><p><strong>The primary</strong> — τ = 0.1; deep-slice op2 contrast +0.85
+<span class='range'>±0.01</span>.</p></figcaption></figure>
+<style>
+.mini-themed-figure-092525edf15c {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-092525edf15c {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-092525edf15c {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-092525edf15c > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-092525edf15c">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/group-profiles-either-t500-light.png" alt="The same ten-panel layout for tau 0.5. Both columns are nearly flat around 0.25 at the embedding with a slight op1 tilt in G1 and op2 tilt in G2; at depth the G2 column&#x27;s op2 weight grows to about 0.44 while the G1 column stays diffuse. Hairlines stay close to the mean." width="308" height="392" style="max-width: 100%; height: auto;" data-asset-name="group-profiles-either-t500" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/group-profiles-either-t500-dark.png" alt="The same ten-panel layout for tau 0.5. Both columns are nearly flat around 0.25 at the embedding with a slight op1 tilt in G1 and op2 tilt in G2; at depth the G2 column&#x27;s op2 weight grows to about 0.44 while the G1 column stays diffuse. Hairlines stay close to the mean." width="308" height="392" style="max-width: 100%; height: auto;" data-asset-name="group-profiles-either-t500" />
+<figcaption><p><strong>Softer</strong> — τ = 0.5; deep-slice op2 contrast +0.17
+<span class='range'>±0.01</span>.</p></figcaption></figure>
+<style>
+.mini-themed-figure-3db4b83c5a2d {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-3db4b83c5a2d {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-3db4b83c5a2d {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-3db4b83c5a2d > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-3db4b83c5a2d">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/group-profiles-either-t2500-light.png" alt="The same ten-panel layout for tau 2.5. Every panel in both columns is flat at about 0.25 with tilts of a few hundredths, the span mean in all but name." width="308" height="392" style="max-width: 100%; height: auto;" data-asset-name="group-profiles-either-t2500" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/group-profiles-either-t2500-dark.png" alt="The same ten-panel layout for tau 2.5. Every panel in both columns is flat at about 0.25 with tilts of a few hundredths, the span mean in all but name." width="308" height="392" style="max-width: 100%; height: auto;" data-asset-name="group-profiles-either-t2500" />
+<figcaption><p><strong>Near the span mean</strong> — τ = 2.5; deep-slice op2 contrast +0.03
+<span class='range'>±0.00</span>.</p></figcaption></figure><figcaption><p><strong>Per-group weight profiles under the either-slot labeller.</strong> Within each sub-figure: columns are the label groups (G1 weights probe lines by P(only op1 drew), G2 by P(only op2 drew)); rows are residual slices with the embedding at the bottom; the shaded smooth-step is the seed-mean softmin weight <span class="arithmatex">\(\bar\pi_G(\ell, t)\)</span> over the span roles, with per-seed hairlines (nine on the primary). The dashed line behind the G1 columns is the un-anchored control's readability profile <span class="arithmatex">\(R^2(\ell, t)\)</span> for op1's redness. At the embedding, the caret on each column's outer axis marks the H2(a) gate level (0.4; uniform is 0.25), and the number above each group's own operand is the seed-mean weight there. Each sub-caption quotes the H2(b) deep-slice op2 contrast (gate ≥ 0.2, scored on the primary only).</p></figcaption></figure>
+
+<p><strong>H2 holds, and the profiles mirror each other.</strong> (a) At the embedding the leading role in each group is its own operand, at weight 0.77 (gate ≥ 0.4), in all nine runs individually. The two groups take equal values there by construction, since at the embedding the state of a token cannot depend on its line.<sup id="fnref:emb-sym"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#fn:emb-sym">4</a></sup></p>
+<p>(b) The between-group op2 contrast over the post-attention slices is +0.85
+<span class='range'>±0.01</span> against the
+0.2 gate. The op2 weight of G2 at the last slice is
+0.94, so on the lines where op2 was the evidence the pull
+puts nearly everything there. The winner-take-all behavior of ex-2.1.9
+is still in force, and the winner now varies line by line: the columns
+are far from identical, and they do not collapse to uniform at the τ of
+the primary.</p>
+<p>The unscored arms behave as the τ ladder predicted. At τ = 0.5 the embedding is nearly flat (lead 0.32) and the deep contrast reaches only +0.17; at τ = 2.5 the profile is the span mean in all but name (contrast +0.03). A pull that cannot concentrate cannot localize, however good the labels are.</p>
+<p>The op1-keyed reference arm has a <em>measured</em> contrast of +0.69, worth holding onto for M3. The shared lexicon aligns red op2 tokens for free, so a softmin read at τ = 0.1 finds them even though the pull never targeted op2. But that free contrast decays with depth: the op2 weight of G2 falls from 0.83 at slice 1 to 0.55 at slice 4, where the primary holds (0.92 → 0.94). Training on the wider labels is what keeps the localization alive where the states are contextual.</p>
+<h2 id="the-operating-point-under-the-wider-labeller-h3">The operating point under the wider labeller (H3)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#the-operating-point-under-the-wider-labeller-h3" title="Link to this heading">&para;</a></h2>
+<p>The endpoint numbers say where each run finished; the trajectories show how it got there. In particular, whether a pull that has to localize per line attains its margin later, or holds it less firmly once the repulsion anneals away, than the op1-keyed reference.</p>
+<style>
+.mini-themed-figure-f2b202672903 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-f2b202672903 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-f2b202672903 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-f2b202672903 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-f2b202672903">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/trajectories-light.png" alt="Five trajectory panels and one schedule panel in a two-by-three grid sharing the epoch axis from 0 to 100. Each trajectory panel plots mean alignment at op1 as a solid line staying below 0.1, and the line margin as a dashed line climbing to about 0.6 by epoch 30 and on to roughly 0.7 by the end, over a flat grey control pair near zero. The dashed line dips slightly after epoch 90 in every panel, and every panel&#x27;s retention annotation reads 0.96 or higher. Faint ghost lines repeat the other conditions&#x27; margin curves in each panel and lie almost on top of the panel&#x27;s own: the five trajectory panels are near copies of one another. The schedule panel, bottom right, shows the anchor weight ramping to a plateau and annealing after epoch 90, and the repulsion weight starting high, crossing below the anchor around epoch 60 and settling at about a third of it." width="731" height="444" style="max-width: 100%; height: auto;" data-asset-name="trajectories" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/trajectories-dark.png" alt="Five trajectory panels and one schedule panel in a two-by-three grid sharing the epoch axis from 0 to 100. Each trajectory panel plots mean alignment at op1 as a solid line staying below 0.1, and the line margin as a dashed line climbing to about 0.6 by epoch 30 and on to roughly 0.7 by the end, over a flat grey control pair near zero. The dashed line dips slightly after epoch 90 in every panel, and every panel&#x27;s retention annotation reads 0.96 or higher. Faint ghost lines repeat the other conditions&#x27; margin curves in each panel and lie almost on top of the panel&#x27;s own: the five trajectory panels are near copies of one another. The schedule panel, bottom right, shows the anchor weight ramping to a plateau and annealing after epoch 90, and the repulsion weight starting high, crossing below the anchor around epoch 60 and settling at about a third of it." width="731" height="444" style="max-width: 100%; height: auto;" data-asset-name="trajectories" />
+<figcaption><p><strong>Training dynamics by condition.</strong> Seed means of the two cosines on the anchor axis, on one shared scale: solid is <span class="arithmatex">\(\bar\alpha\)</span> at op1 (contained at the filled caret ▶, 0.1); dashed is m_line (its retention floor of 0.2 at the open caret ◁). The grey pair is the un-anchored control; the faint lines behind each panel are the m_line trajectories of the other four anchored conditions, for comparison in place. The number in each panel is that condition's retention (final over peak m_line, minimum across seeds; gate ≥ 0.8, scored on the primary). The trajectory instrument reads one line per color, so its level sits above the endpoint statistic's, which averages all 27 partners; retention compares within the curve, where the instrument is constant. Bottom right: the weight schedule every anchored condition trained under — anchor <span class="arithmatex">\(\lambda_\mathrm{a}\)</span> in red, repulsion <span class="arithmatex">\(\lambda_{\bar{\mathrm{s}}}\)</span> in blue, log scale — shared because the anti-subspace term is fixed at the operating point.</p></figcaption></figure>
+
+<p><strong>H3(a) and (b) hold.</strong> On the primary, <span class="arithmatex">\(\bar\alpha\)</span> at op1 ends at 0.050 <span class='range'>±0.021</span> against the 0.1 gate. That is <em>below</em> the 0.075 of the op1-keyed reference, so the contamination a global latch would leave (non-red op1 states dragged onto the axis on op2-triggered lines) is absent, which agrees with the H2 profiles. Op1 now hosts less of the drift, perhaps because half the pull budget now goes to op2.</p>
+<p>Retention is 0.98 against 0.8, taken as the minimum over nine seeds, a stricter read than for the three-seed conditions; the worst retention anywhere in the sweep is 0.96. The five anchored panels above are near copies, so localizing per line neither delays the margin nor loosens its hold.</p>
+<style>
+.mini-themed-figure-6160ea07e610 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-6160ea07e610 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-6160ea07e610 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-6160ea07e610 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-6160ea07e610">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/grading-light.png" alt="Six panels in a two-by-three grid sharing both axes: per-color alignment at the first operand, from about -0.2 to 1.2, against the redness of that color from 0 to 1. Panels are the control, op1-labels, the primary either-t100, the two softer arms and the slot oracle. The control panel is flat near zero. The op1-labels, either-t100 and slot-oracle panels each scatter 216 marks drawn in the color they stand for, forming a flat cluster at low redness and a rising tail of oranges and reds that tracks the dashed reference curve closely. In the either-t500 and either-t2500 panels the low-redness cluster scatters much more widely, from about -0.2 to 0.5, and the conditional-mean line wanders around a slightly raised level before rising, hugging the reference less tightly." width="727" height="491" style="max-width: 100%; height: auto;" data-asset-name="grading" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/grading-dark.png" alt="Six panels in a two-by-three grid sharing both axes: per-color alignment at the first operand, from about -0.2 to 1.2, against the redness of that color from 0 to 1. Panels are the control, op1-labels, the primary either-t100, the two softer arms and the slot oracle. The control panel is flat near zero. The op1-labels, either-t100 and slot-oracle panels each scatter 216 marks drawn in the color they stand for, forming a flat cluster at low redness and a rising tail of oranges and reds that tracks the dashed reference curve closely. In the either-t500 and either-t2500 panels the low-redness cluster scatters much more widely, from about -0.2 to 0.5, and the conditional-mean line wanders around a slightly raised level before rising, hugging the reference less tightly." width="727" height="491" style="max-width: 100%; height: auto;" data-asset-name="grading" />
+<figcaption><p><strong>Grading: alignment at op1, per color.</strong> <span class="arithmatex">\(\alpha_c\)</span>, the mean over slices of <span class="arithmatex">\(\cos(h, \hat v_{\text{red}})\)</span> at op1, seed mean, against the redness of the color. One mark per color, drawn in that color; the thin dark line is the mean response at each of the 29 distinct redness levels, the flat grey band the same line for the control, and the dashed line <code>sim¹·⁵</code> rescaled onto the response by least squares — the shape the <span class="arithmatex">\(r^2\)</span> statistic scores against. <span class="arithmatex">\(r^2\)</span> is computed per color, with no binning, so scatter about the conditional-mean line counts against it even where that line tracks the reference; the exploratory section separates the two. H3(c) gates the primary's <span class="arithmatex">\(r^2\)</span> at no more than 0.1 below <code>op1-labels</code>'s, whose own <span class="arithmatex">\(r^2\)</span> (0.83) reproduces ex-2.1.9's <code>pool-t100</code> (0.83).</p></figcaption></figure>
+
+<p><strong>H3(c) holds.</strong> The primary grades at <span class="arithmatex">\(r^2\)</span> = 0.82 against 0.83 for the reference arm, a drop of 0.008 against the 0.1 tolerated. So widening the labels cost the response shape essentially nothing at the τ of the primary.</p>
+<p>The softer arms fare worse: 0.67 at τ = 0.5 and 0.60 at τ = 2.5. The grading panels show where it goes; the low-redness response turns noisy and drifts off zero, since a diffuse pull drags every span position of every labeled line, red op1 or not. The slot oracle grades best of all (0.85), as the analogue in ex-2.1.9 did.</p>
+<h2 id="selectivity-against-the-slot-oracle-h4">Selectivity against the slot oracle (H4)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#selectivity-against-the-slot-oracle-h4" title="Link to this heading">&para;</a></h2>
+<p>m_line is the selectivity delivered to the lines the labeller flags, and the slot oracle — trained on the same label draws, told which operand drew — is the reference for what the withheld information is worth.</p>
+<style>
+.mini-themed-figure-30c371f693be {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-30c371f693be {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-30c371f693be {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-30c371f693be > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-30c371f693be">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h4-dots-light.png" alt="A dot plot with five condition rows against control-subtracted line margin from 0 to about 0.5. From top: op1-labels at 0.36, either-t100 with nine tightly clustered dots at 0.40, either-t500 and either-t2500 both near 0.46, and slot-oracle at 0.39. Small dots are individual runs and a vertical tick marks each mean; the seed spread within any row is a few thousandths. A dashed gate line at 0.29 and a dotted partial line at 0.19 sit well left of every row." width="702" height="222" style="max-width: 100%; height: auto;" data-asset-name="h4-dots" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h4-dots-dark.png" alt="A dot plot with five condition rows against control-subtracted line margin from 0 to about 0.5. From top: op1-labels at 0.36, either-t100 with nine tightly clustered dots at 0.40, either-t500 and either-t2500 both near 0.46, and slot-oracle at 0.39. Small dots are individual runs and a vertical tick marks each mean; the seed spread within any row is a few thousandths. A dashed gate line at 0.29 and a dotted partial line at 0.19 sit well left of every row." width="702" height="222" style="max-width: 100%; height: auto;" data-asset-name="h4-dots" />
+<figcaption><p><strong>Control-subtracted m_line by condition.</strong> Small dots are runs (nine on the primary), the tick their mean; the reference arms are greyed. Dashed caret: the H4 gate, 75% of the slot oracle's control-subtracted mean (0.389); dotted, the 50% partial. The latch account — a pull stuck on op1 serving only the op1-triggered half of the label mass — predicts landing near the partial line.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table">
+  <thead><tr>
+    <th>condition</th><th class="num">m<sub>line</sub> ↑</th>
+    <th class="num">− control</th><th class="num">oracle frac</th>
+    <th class="num">m<sub>span</sub></th><th class="num">m<sub>op1</sub></th>
+    <th class="num">ᾱ<sub>span</sub> ↓</th><th class="num">ᾱ (op1) ↓</th>
+    <th class="num">r²</th>
+  </tr></thead>
+  <tbody><tr><th><code>op1-labels</code></th><td class='num'>0.387 <span class='range'>±0.014</span></td><td class='num'>0.363</td><td class='num'>93%</td><td class='num'>0.704</td><td class='num'>0.704</td><td class='num'>0.242</td><td class='num'>0.075</td><td class='num'>0.83</td></tr><tr><th><code>either-t100</code> (primary)</th><td class='num'>0.420 <span class='range'>±0.009</span></td><td class='num'>0.396</td><td class='num'>102%</td><td class='num'>0.738</td><td class='num'>0.738</td><td class='num'>0.239</td><td class='num'>0.050</td><td class='num'>0.82</td></tr><tr><th><code>either-t500</code></th><td class='num'>0.488 <span class='range'>±0.012</span></td><td class='num'>0.464</td><td class='num'>119%</td><td class='num'>0.686</td><td class='num'>0.685</td><td class='num'>0.424</td><td class='num'>0.067</td><td class='num'>0.67</td></tr><tr><th><code>either-t2500</code></th><td class='num'>0.489 <span class='range'>±0.015</span></td><td class='num'>0.465</td><td class='num'>120%</td><td class='num'>0.656</td><td class='num'>0.656</td><td class='num'>0.432</td><td class='num'>0.077</td><td class='num'>0.60</td></tr><tr><th><code>slot-oracle</code></th><td class='num'>0.413 <span class='range'>±0.004</span></td><td class='num'>0.389</td><td class='num'>—</td><td class='num'>0.751</td><td class='num'>0.751</td><td class='num'>0.167</td><td class='num'>0.054</td><td class='num'>0.85</td></tr></tbody>
+</table><figcaption><p>The anchored conditions, seed means (± seed standard deviation on the scored statistic). Only the primary (so marked) is gated; "oracle frac" is control-subtracted m<sub>line</sub> as a fraction of the slot oracle's 0.389. m<sub>span</sub> and m<sub>op1</sub> are carried for continuity with ex-2.1.9 (both key their line weights on op1 alone), ᾱ<sub>span</sub> and ᾱ (op1) are the drift statistics, and r² repeats the grading track scored under H3.</p></figcaption></figure>
+
+<p><strong>H4 holds.</strong> The primary delivers 102% of the control-subtracted m_line of the oracle, against the 75% gate. That is level with the oracle, within seed noise (spreads of 0.009 and 0.004 on conditions sharing the same label draws). The latch account predicted roughly the op1-triggered half plus the lexicon give-away, and it is ruled out twice over: by this fraction, and by the H2 profiles.</p>
+<p>The prereg allowed for landing at or above the oracle in principle, since the oracle is bound to the operand that drew even where the concept has migrated at depth. At this margin the defensible reading is parity: knowing which slot triggered is worth nothing here that the pool cannot recover on its own.</p>
+<p>The op1-keyed arm reaches only 93% of the oracle on the same statistic, because its pull never serves the op2-triggered half of the label mass. Widening the labels is what closed the gap.</p>
+<p>The soft-τ arms <em>exceed</em> everything on m_line (0.49 at τ = 0.5) while failing every other instrument: contrast near zero (H2), grading down by ~0.2 (H3(c)), and span drift ᾱ_span at 0.42 against 0.24 for the primary. A diffuse pull aligns the whole span of labeled-ish lines, and a margin that takes the best role per slice rewards that spread. The number is real, but what it measures there is a smeared, poorly graded alignment rather than a localized one. The exploratory section returns to this trade.</p>
+<h2 id="exploratory-analyses">Exploratory analyses<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#exploratory-analyses" title="Link to this heading">&para;</a></h2>
+<p>Nothing here is preregistered; everything in this section is post hoc. The four questions below are the candidates the preregistration queued, in its order.</p>
+<style>
+.mini-themed-figure-91467578fc5b {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-91467578fc5b {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-91467578fc5b {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-91467578fc5b > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-91467578fc5b">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/role-drift-light.png" alt="Two panels sharing an epoch axis from 0 to 100 and an alignment axis from about -0.1 to 0.45, with the repulsion schedule shaded faintly behind each. Left panel, the embedding slice: the equals and plus curves rise to about 0.13 by epoch 15, hold flat to epoch 35, then climb to 0.40 and 0.28 respectively by epoch 90; op1 and op2 dip to about -0.12 near epoch 8 and return to within a few hundredths of zero. Right panel, the last slice: op1 and op2 rise gently to 0.15 and 0.12 while plus and equals stay near zero." width="702" height="260" style="max-width: 100%; height: auto;" data-asset-name="role-drift" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/role-drift-dark.png" alt="Two panels sharing an epoch axis from 0 to 100 and an alignment axis from about -0.1 to 0.45, with the repulsion schedule shaded faintly behind each. Left panel, the embedding slice: the equals and plus curves rise to about 0.13 by epoch 15, hold flat to epoch 35, then climb to 0.40 and 0.28 respectively by epoch 90; op1 and op2 dip to about -0.12 near epoch 8 and return to within a few hundredths of zero. Right panel, the last slice: op1 and op2 rise gently to 0.15 and 0.12 while plus and equals stay near zero." width="702" height="260" style="max-width: 100%; height: auto;" data-asset-name="role-drift" />
+<figcaption><p><strong>Unweighted drift by role, over training (primary, seed mean).</strong> <span class="arithmatex">\(\bar\alpha(\ell, t)\)</span> over all 216 colors at the embedding slice (<strong>left</strong>) and the last slice (<strong>right</strong>), one curve per span role; the shaded band is the repulsion weight <span class="arithmatex">\(\lambda_{\bar{\mathrm{s}}}\)</span> on its own scale, for timing. The trajectory instrument reads one line per color, as in the dynamics figure.</p></figcaption></figure>
+
+<p><strong>When the syntax embeddings drift (queued by ex-2.1.9).</strong> Ex-2.1.9 could see that the <code>+</code> embedding ended near 0.30 alignment, but not when. The per-role trajectory shows the drift occurs late. At epoch 30 the two syntax embeddings sit at 0.13 (<code>+</code>) and 0.13 (<code>=</code>). The drift accrues through epochs 30–90 as the repulsion anneals toward the hold ratio, reaching 0.28 and 0.40, and the end-of-training anneal of the anchor recovers none of it. So the syntax drift is bought against the <em>weakening</em> repulsion, and in this experiment <code>=</code> is the larger of the two; <code>=</code> sits outside the labelled operands but inside the pulled span.</p>
+<p>At depth the picture inverts. The operand roles carry the residual drift (0.15 at op1, 0.12 at op2) and the syntax roles carry none, and that is where the containment gate of H3(a) reads and passes.</p>
+<p><strong>Is the deep choice still one-hot? (per-line weight entropy.)</strong> Yes, per line. On the label-weighted probe mass, the leading role at the last slice holds over 0.9 of the weight of a line on 81% of the mass (seed range 79%–83%). The un-labelled bulk stays near uniform, since a flat alignment profile gives the softmin nothing to concentrate on. The winner-take-all behavior of ex-2.1.9 survives the wider labels in the form H2 requires: committed within a line, varying across lines.</p>
+<p><strong>The both-red lines.</strong> Where both operands are red, either answer is defensible, and the pool declines to choose: at the embedding the both-draw-weighted profile splits 0.49/0.49 between the operands (forced by the shared lexicon), and at the last slice it still spreads: op1 0.20, op2 0.47, <code>=</code> 0.33, with 37% of the both-draw mass within 0.2 of an even operand split. These lines are 0.1% of the label mass, so nothing above turns on them. They preview the M3 case where a document holds the concept in several places at once.</p>
+<p><strong>The soft-τ trade.</strong> Across the ladder, localization and grading fall together while m_line rises: contrast 0.85 → 0.17 → 0.03 and <span class="arithmatex">\(r^2\)</span> 0.82 → 0.67 → 0.60 as τ goes 0.1 → 0.5 → 2.5, with m_line highest at the diffuse end (the H4 table). A nearly-mean pull does still buy line-keyed <em>margin</em>, in that the spans of labeled lines align more than the bulk. But it localizes barely at all once the label stops pointing, and what it aligns is poorly graded. For M3, a margin statistic alone cannot distinguish localized selectivity from smeared selectivity, so it needs the group contrast and the grading track beside it. The rungs are far apart, though: everything between the first two is unmeasured, so where the trade turns, and how sharply, is open. A finer ladder near τ = 0.1 is queued in the science backlog.</p>
+<p><strong>Does the per-color <span class="arithmatex">\(r^2\)</span> score the soft arms down only because the reference zig-zags? (queued by the review round.)</strong> No — what separates them is per-color scatter, though the conditional-mean reading does fit them best: smoothing both curves over a sliding window of two redness levels and correlating puts the soft arms ahead, at <span class="arithmatex">\(r^2\)</span> 0.94 and 0.94 against 0.92 for the primary and 0.94 for the oracle, matching the conditional-mean lines in the grading figure. The zig-zag itself is unrelated to the frozen statistic, which is computed per color with no binning, and no condition recovers it: every response tracks the reference's within-level variation at <span class="arithmatex">\(r^2\)</span> ≤ 0.04.</p>
+<p>What separates the soft arms is scatter, not the zig-zag: within-level scatter carries 70% and 71% of their residual variance about the affine <code>sim¹·⁵</code> fit, against 33% for the primary. Seed noise accounts for only 7% of that residual, so the deviations are stable properties of the pull at that τ, reproducing across seeds.</p>
+<p>The two readings disagree because they measure different things: a soft pull grades the population of colors as a whole while giving individual colors alignments their redness does not predict. For intervention the per-color reading is the one that matters — a mis-scored color would respond to a later intervention as if it were redder than it is — so M3 should carry both; only the pair separates graded-on-average from graded color by color.</p>
+<p><strong>Why every curve flattens near the pole (queued by the review round).</strong> <code>sim¹·⁵</code> steepens toward redness 1, but the responses compress instead. The primary's per-slice profiles show where: at the embedding the response is <em>steeper</em> than the reference (three reddest colors 1.8× above the next nine, against 1.45× for <code>sim¹·⁵</code>); in mid-stack the top of the scale runs out of cosine (pure red reaches ≈ 0.97, next tier only 1.16× below it where the reference calls for 1.45×); and at the last slice the red state rotates partly away (0.75) as it comes to encode the mix.</p>
+<p>Averaged over layers — steep start, saturated middle, rotated end — that is a curve with a compressed top (1.29× overall): the flattening is the readout saturating. Near the pole there is no headroom, so colors pulled often enough land at the same ceiling, and whatever keeps them distinguishable for the task lives in directions orthogonal to the axis — which in <span class="arithmatex">\(d = 64\)</span> costs almost no cosine. That is the shape to expect of a strongly anchored top of the scale, and the graded part of the response lives below it.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#discussion" title="Link to this heading">&para;</a></h2>
+<p>The doubt ex-2.1.9 could not settle — that the pooled pull's clean localization was inherited from labels that always pointed at op1 — is settled: removing the pointer changed nothing an oracle could improve on (H4). So for M3, where document-level labels do not point, the burden of localization can sit on the loss side: label-side help — EM-style responsibilities, attention-derived position weights — drops from "probably needed" to a contingency for harder settings.</p>
+<p>The qualification is how easy this testbed makes the per-line problem: two candidate positions, a lexicon shared by both, each operand's color legible at its own position (the scope limit in the introduction), and multi-site lines rare enough that nothing gated turns on them. Parity with the oracle therefore reads as: pooling suffices when the concept is findable line by line. That is the default M3 should start from; the queued grammar extensions are what would stress it as documents get longer and sites more numerous.</p>
+<p>The remaining risk lives in the operating point, τ. A margin-guided search over τ would walk to the smeared end and report success (the soft-τ trade, in Exploratory), so selectivity in M3 needs reading as a triple of margin, group contrast, and per-color grading — with both grading readings in the instrument set, since only the per-color one feels the failure an intervention would. A finer τ ladder near the primary is queued; everything between the first two rungs is unmeasured.</p>
+<p>For D2.1 the chain is now complete: a span pull broadcasts (ex-2.1.6), the repulsion schedule sets a workable operating point (ex-2.1.8), mellowmax pooling localizes the pull within a labeled span (ex-2.1.9), and the localization does not depend on the labels saying where (this experiment). The close-out claim this leaves D2.1 with: in the residual stream of a small transformer, anchoring works under labels that say only <em>that</em> a concept occurs, at no measurable task cost, with containment, retention and grading at the level of the op1-keyed reference, and at selectivity parity with an oracle told where the concept sits. The bounds of the claim are those of the testbed: one synthetic task, one concept, one architecture size, and labels drawn fresh at every visit. The fixed-label variant and the document-shaped pull, a span that includes the answer, are the D2.1 items still open ahead of D2.2.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:tau-geo">
+<p>τ is a temperature (the weight ratio between two positions is
+<span class="arithmatex">\(e^{\Delta x/\tau}\)</span>), so the rungs step geometrically, ×5. At τ = 2.5
+the ratios on realistic alignment spreads are ~1.2: a pull with only a
+tiny bias toward its best-aligned position, nearly the span mean that
+ex-2.1.9's τ = ∞ arm pinned, which is why no span-mean arm runs here.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#fnref:tau-geo" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:data-volume">
+<p>The volume stays small: 5 slices × 5832 lines × ~6 positions
+in float32 is ≈ 0.7 MB per array, two arrays per run, so ≈ 35 MB across
+all 24 runs. That is an order of magnitude over ex-2.1.9's
+per-color arrays but nowhere near needing different processing, and
+the per-role trajectory adds well under a megabyte per run.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#fnref:data-volume" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:m_span">
+<p>To recap m_span (from ex-2.1.9): on the per-color maps, take the
+affinity-weighted mean alignment minus the plain mean, giving a margin
+per (slice, role) saying how much closer red-ish material is to the axis
+than average. Keep the best span role per slice, and average over
+slices. m_line is the same recipe on the per-line maps: weight <em>lines</em>
+instead of colors, using the labeller's own P(labeled) per line,
+normalized. m_span keyed on op1 alone, whereas m_line keys on both
+operands.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#fnref:m_span" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:emb-sym">
+<p>The probe set contains both orders of every pair, and the span positions share token embeddings, so the G1 and G2 profiles are exact mirrors at the embedding slice. What the gate tests there is concentration: that the pool has moved away from uniform, and that the concentration sits on operands rather than syntax. Depth is where the groups can differ, which is why H2(b) reads only the post-attention slices.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-190/m2/ex-2.1.10/#fnref:emb-sym" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

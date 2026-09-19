@@ -1,0 +1,2057 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/8556dd1712321514d613adf7f1309a34805f1f5d/exports/m2/ex-2.2.9/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/ex-2.2.9/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.2.9: the grammar handover</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The page style for a woven document. Base typography follows scripts/md.css (the site's
+ * Markdown pages), figure and table rules follow docs/report.css. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 50rem;
+  --gutter: 1.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Lora", serif;
+  font-weight: 400;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 { margin-top: 0; font-size: 2.25em; }
+p { margin-block: 1em; }
+
+code, pre, kbd {
+  font-family: "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+}
+code { background-color: var(--code-bg); padding: 0.1em 0.3em; border-radius: 3px; }
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code { background: none; padding: 0; border-radius: 0; font-size: 1em; }
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Anchor links on headings. */
+a.anchor-link { opacity: 0; color: var(--fg-muted); transition: opacity 0.2s ease; }
+a.anchor-link::after { content: '#'; font-size: 0.8em; margin-inline: 0.4em; }
+:hover > a.anchor-link { opacity: 1; }
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. */
+table { border-collapse: collapse; margin-block: 1.5em; margin-inline: auto; }
+th, td { padding: 0.35em 0.8em; border: 0; text-align: left; vertical-align: top; }
+th { font-weight: 600; }
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) { border-top: 2px solid var(--rule); }
+thead > tr:last-child > :is(th, td) { border-bottom: 1px solid var(--rule); padding-bottom: 0.5em; }
+tbody > tr:first-child > :is(th, td) { padding-top: 0.5em; }
+tbody > tr:last-child > :is(th, td) { border-bottom: 2px solid var(--rule); }
+
+img, video { max-width: 100%; height: auto; }
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure { margin-inline: 0; text-align: center; }
+figure img { margin-inline: auto; display: block; }
+figure:has(> figure) { text-wrap: balance; }
+figure:has(> figure) > figure { display: inline-block; vertical-align: top; margin: 0 0.5em; }
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { font-size: 11pt; display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  pre, figure, table { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1.5rem -1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.9/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/ex-2.2.9/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.2.3</strong> · <code>5680915</code> · run 2026-09-09<div>via reports/m2/ex-2.2.3/geometry, reports/m2/ex-2.2.3/metrics</div></div><div><strong>ex-2.2.7</strong> · <code>d8f3ebf</code> · run 2026-09-11<div>via reports/m2/ex-2.2.7/metrics</div></div><div><strong>ex-2.2.8</strong> · <code>f4b0497</code> · run 2026-09-14<div>via reports/m2/ex-2.2.8/metrics</div></div><div><strong>ex-2.2.9</strong> · <code>09f0ce4</code> · run 2026-09-16<div>via reports/m2/ex-2.2.9/arrays, reports/m2/ex-2.2.9/geometry, reports/m2/ex-2.2.9/metrics</div></div></details>
+<main class="lit">
+<h1 id="ex-229-the-grammar-handover">Ex 2.2.9: the grammar handover<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#ex-229-the-grammar-handover" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>The last four experiments each changed one thing about the setup we anchor <em>red</em> in: more operations, answers drawn stochastically rather than rounded, a label that covers the whole line, and a readout table separate from the embeddings. Each looked fine on its own. This experiment turns all four on at once and asks whether <em>red</em> still lands where we put it and still comes out cleanly, with two reference conditions that each switch one change back.</p>
+<p><em>Red</em> lands. Removal is clean on eight of the eleven ops and misses the gate on the three that take one HSV attribute from their second operand, so the handover is not adopted as it stands. The whole-line label and the separate readout cost nothing the gates can resolve. One seed in twenty holds the anchor a little less well by the end of training, which the anneal schedule may explain.</p>
+</div>
+<h2 id="findings">Findings<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#findings" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#does-the-model-still-learn-the-task-h1">Does the model still learn the task? (H1)</a> — <strong>gate cleared.</strong> On every op the <code>handover</code> seed mean is within 0.02 of the control's. The largest shortfall is <code>hsvmix</code> at -0.006 (band 0.008).</li>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#does-red-still-land-where-we-put-it-h2">Does <em>red</em> still land where we put it? (H2)</a> — <strong>gate missed.</strong> <code>handover</code> clears margin m_line, grading r², contrast, lead at embedding, latch, and misses retention. 1 of 20 qualifying seeds ends below 0.8 of its peak (the lowest at 0.77); the seed mean is 0.88 against ex-2.2.3's 0.99. The paired ᾱ prediction holds: ᾱ at op1 is 0.28, above the 0.1 the earlier experiments gated, as expected with the readout untied (the output loss no longer holds the non-red embedding rows off the axis; see the H2 results), and the non-red deficit it was paired with is 0.004, inside H3's 0.05 gate.</li>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#can-we-still-take-red-out-cleanly-h3">Can we still take <em>red</em> out cleanly? (H3)</a> — <strong>gate missed.</strong> Removal: on <code>hue-hsv</code>, <code>sat-hsv</code>, <code>value-hsv</code> <code>handover</code> still answers more than 20% of its removal lines with the axis taken out (the most on <code>value-hsv</code>, at 38% of its clean expected exact match), where the gate asks for 20% or less. Selectivity holds: the non-red <code>mix</code> deficit is 0.004 against the 0.05 gate (band 0.013).</li>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#does-the-separate-readout-keep-the-axis-off-the-syntax-tokens-h4">Does the separate readout keep the axis off the syntax tokens? (H4)</a> — <strong>held in part.</strong> The first prediction holds except on <code>=</code>. The syntax embeddings carry less of the axis on <code>handover</code> (0.033) than on <code>handover-tied</code> (0.169), a gap well over the band (0.006). <code>=</code> is the one word that did not reach the ceiling: <code>handover</code> reads 0.025 there, against ex-2.2.7's hard-zeroed 0.000 (band 0.008), and its readout row for <code>=</code> carries 0.145, so the component moved to the readout. The second does not hold: the non-red <code>mix</code> deficit is not lower on <code>handover</code>, 0.004 against 0.012 on <code>handover-tied</code> (band 0.017).</li>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#what-does-the-whole-line-label-cost-h5">What does the whole-line label cost? (H5)</a> — <strong>held.</strong> Both predictions hold: the seed-mean deficits are 0.004 (<code>handover</code>) and 0.006 (<code>handover-slot</code>), band 0.013; 0 <code>handover</code> seeds and 0 <code>handover-slot</code> seeds sit above 0.07.</li>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#decision">Whether the handover is adopted</a> — <strong>not adopted.</strong></li>
+</ul>
+<div class="admonition">
+<p class="admonition-title">How to read this draft</p>
+<p>This is a preregistration. The conditions, the gates, and the decision rule below were written before any run and frozen at commit <code>7aabc72</code>; everything after that commit is either the results filled into the frozen sections or exploratory. Each hypothesis section opens with the background, then gives the prediction we will be scored on. Results go into each section in place once they exist. Anything we think of after seeing the data goes under <a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#exploratory-analyses">Exploratory analyses</a>, marked as post hoc. Every count in the method is computed from <code>experiment.py</code> at render time.</p>
+</div>
+<h2 id="why-this-experiment">Why this experiment<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#why-this-experiment" title="Link to this heading">&para;</a></h2>
+<p>Ex-2.2.3 anchored <em>red</em> on a grammar of six operations and then tried to remove it. Removal was partial on four ops, and the ops themselves were confounding. On <code>lighten</code>, say, most lines with a red operand have an answer that stays the same when the operand is a little less red, so a model that has lost <em>red</em> can still answer them.</p>
+<p>Our investigations suggest:</p>
+<ol>
+<li><strong>A wider table of operations</strong> (<a href="https://z0u.github.io/sca2/m2/ex-2.2.4/">ex-2.2.4</a>). Drop <code>add</code>, add three ops whose answers spread through the color cube, and add three more that take one attribute from one operand and the rest from the other. Those last three are the first ops where the order of the operands matters.</li>
+<li><strong>Stochastic answers instead of rounded ones</strong> (<a href="https://z0u.github.io/sca2/m2/ex-2.2.5/">ex-2.2.5</a>). When an answer lands between two grid colors, the corpus picks one of them at random, rather than rounding deterministically. The model then learns a spread of possible answers rather than one biased token.</li>
+<li><strong>A label that covers the whole line</strong> (<a href="https://z0u.github.io/sca2/m2/ex-2.2.6/">ex-2.2.6</a>). Previously, only the two operands could draw a label, and the pull covered the prompt. Now the anchor is told "this line is about red", and it pulls wherever in the line it finds the most red, answer included. That is the shape a document-level label will have in M3. The first pilot found it costs nothing; a later one saw a few seeds lose selectivity under it, so it goes in with a check.</li>
+<li><strong>A separate, untied readout table</strong> (<a href="https://z0u.github.io/sca2/m2/ex-2.2.7/">ex-2.2.7</a>). The output layer of the model was sharing a table with the input embeddings, and that put part of the <em>red</em> axis onto the tokens <code>=</code> and <code>mix</code>. Giving the output its own table keeps the axis off those tokens.</li>
+</ol>
+<p>In <a href="https://z0u.github.io/sca2/m2/ex-2.2.8/">ex-2.2.8</a>, we found that the removal operator to score is the plain projection, which takes the axis out everywhere, with the operand-only edit beside it as the selective reference.</p>
+<p>Here the four are tried together, at the same number of seeds as the reference, to inform the grammar and recipe the anchored-op experiments will use. We call that the <em>grammar of record</em>: the one setup every later D2.2 experiment is built on. It is a handover because the grammar of record changes hands here: until this runs it is the one from ex-2.2.3; after it, if the gates hold, it is this one.</p>
+<h2 id="conditions">Conditions<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#conditions" title="Link to this heading">&para;</a></h2>
+<p>Every condition trains fresh models on the new grammar: table A+, 300,000 lines drawn uniformly over the 11 ops, answers drawn stochastically, one fifth of the pairs of each op held out. That is about 27,272 lines per op, drawn with replacement from the op's 37,325 trainable lines, so a model sees about 52% of them at least once (77% of the unordered pairs), against 36% (59%) at six ops. The recipe is the point adopted in ex-2.2.3 (<code>recipe-short</code>), unchanged: λ_a = 0.1, annealed over the last tenth of training as ex-2.1.10 did, τ = 0.1, the anti-subspace weight from 2.5× the anchor weight down to 0.3× by 90% of training, 50 epochs (4,950 steps). <em>Red</em> is anchored to e₁ at every slice, the embedding included.</p>
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th>anchor</th>
+<th>labeller</th>
+<th>readout</th>
+<th style="text-align: right;">lines per op</th>
+<th style="text-align: right;">epochs (steps)</th>
+<th style="text-align: right;">seeds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>control</strong>, reference: un-anchored</td>
+<td>none</td>
+<td>—</td>
+<td>untied</td>
+<td style="text-align: right;">27,272</td>
+<td style="text-align: right;">50 (4,950)</td>
+<td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td><strong>handover</strong>, candidate: the recipe, untied readout, whole-line labeller</td>
+<td>λ_a = 0.1, τ = 0.1</td>
+<td>whole line</td>
+<td>untied</td>
+<td style="text-align: right;">27,272</td>
+<td style="text-align: right;">50 (4,950)</td>
+<td style="text-align: right;">20</td>
+</tr>
+<tr>
+<td><strong>handover-slot</strong>, reference: as handover, with ex-2.2.3's either-slot labeller</td>
+<td>λ_a = 0.1, τ = 0.1</td>
+<td>either slot, prompt span</td>
+<td>untied</td>
+<td style="text-align: right;">27,272</td>
+<td style="text-align: right;">50 (4,950)</td>
+<td style="text-align: right;">20</td>
+</tr>
+<tr>
+<td><strong>handover-tied</strong>, reference: as handover, with the tied readout</td>
+<td>λ_a = 0.1, τ = 0.1</td>
+<td>whole line</td>
+<td>tied</td>
+<td style="text-align: right;">27,272</td>
+<td style="text-align: right;">50 (4,950)</td>
+<td style="text-align: right;">9</td>
+</tr>
+<tr>
+<td><strong>handover-narrow</strong>, exploratory: as handover, lines per op held at ex-2.2.3's count</td>
+<td>λ_a = 0.1, τ = 0.1</td>
+<td>whole line</td>
+<td>untied</td>
+<td style="text-align: right;">16,666</td>
+<td style="text-align: right;">82 (5,002)</td>
+<td style="text-align: right;">5</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>handover</code></strong> has everything enabled. It is the one candidate for the grammar of record, at the same twenty seeds as the reference, and the gates are read on it alone.</p>
+<p><strong><code>handover-slot</code></strong> switches the label back to the one from ex-2.2.3: only the two operands can draw a label, and the pull covers the prompt. Beside <code>handover</code> it is the selectivity check ex-2.2.7 asked for, at twenty seeds so that the comparison has the resolution of the gates. It is not a fallback: that labeller needs to know which tokens are the operands, and M3 will not have that.</p>
+<p><strong><code>handover-tied</code></strong> switches the readout back to the shared table. Beside <code>handover</code> it shows what untying does on this grammar. Nine seeds, as the pilot had.</p>
+<p><strong><code>control</code></strong> has no anchor at all. It sets the task bar for H1 and the calibration bar for the drawn answers.</p>
+<p><strong><code>handover-narrow</code></strong> is exploratory. E4 in ex-2.2.3 found the operand cube less decodable at six ops than at three, and could not tell whether the op count or the lines per op was responsible. The main corpus gives each of the eleven ops about 27,272 lines, more than the 16,666 each op had at six. This condition holds lines per op at that six-op count, using a smaller corpus for more epochs so that the step count matches.<sup id="fnref:wide"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#fn:wide">1</a></sup></p>
+<p>The reference is not retrained. It is <code>recipe-short</code> from ex-2.2.3, at twenty seeds on the six-op grammar, and its stored statistics are printed beside every placement read.</p>
+<h3 id="the-removal-operators">The removal operators<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#the-removal-operators" title="Link to this heading">&para;</a></h3>
+<p>We score every anchored checkpoint through the eval contract in <a href="https://github.com/z0u/sca2/blob/main/src/sca/intervention.py"><code>sca.intervention</code></a>, on each op's probe lines.</p>
+<ul>
+<li><strong><code>projection</code></strong>: the axis projected out at every slice and every position, at full strength. This is the gated operator, as ex-2.2.8 proposed.</li>
+<li><strong><code>operands</code></strong>: the same edit at the two operand positions only. It is the selective reference, since it never touches the syntax tokens and so cannot cost anything there.</li>
+<li><strong><code>shaped-a0.4-p0</code></strong>: a thresholded projection that leaves any state below alignment 0.4 alone. Ex-2.2.8 found it removes less than the projection at no cost on the six-op grammar; what we learn here is whether that smaller removal clears the removal gate on a table built to need <em>red</em>. Scoring it is one more pass over the same checkpoints.</li>
+</ul>
+<h2 id="glossary">Glossary<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#glossary" title="Link to this heading">&para;</a></h2>
+<dl>
+<dt>Red line, non-red line</dt>
+<dd>A line is <em>red</em> when its redder operand has redness at least 0.8, and <em>non-red</em> when neither operand is above 0.2. Redness is r·(1 − g/2 − b/2) on the unit scale. The redness of the redder operand is the line's <em>dose</em>.</dd>
+<dt>Removal lines</dt>
+<dd>The red lines on which the true answer would move a long way if the red operand had no red in it (its R channel set to zero). These are the lines where losing <em>red</em> has to show; on the others the op does not need it. On <code>mix</code> every red line is a removal line; on the other ops at least 62% of them are, and the count per op is in the method.</dd>
+<dt>Red-answer lines</dt>
+<dd>Non-red lines whose true answer is red (white minus cyan, under <code>difference</code>). Projecting the axis out at <code>=</code> takes <em>red</em> from the state that has to produce the answer, so a miss there is removal on the output side. They stay in the non-red deficit and are also counted on their own, and the deficit is reported with and without them. <code>mix</code> has none, so the gated read is the same either way.</dd>
+<dt>Expected exact match</dt>
+<dd>The task score we measure. With drawn answers, the correct answer to a line is spread over two or more colors, so a single exact-match check would penalise a model for a right answer. Instead we take the chance that an answer drawn from the model agrees with one drawn from the true distribution. Its ceiling is that same chance for the true distribution against itself (Σq²), which is below 1 on the ops that round.</dd>
+<dt>m_line</dt>
+<dd>How far <em>red</em> is pushed onto the axis: at the reddest position in the span, the label-weighted mean alignment minus the unweighted mean, averaged over slices. Ex-2.1.10's margin, read on the <code>mix</code> lines.</dd>
+<dt>ᾱ (containment)</dt>
+<dd>The mean alignment with the axis over all 216 colors at op1. High when colors that are not red drift onto the axis at that position.</dd>
+<dt>Lead</dt>
+<dd>On the red lines, the largest share of the pull that any one position receives at the embedding slice. High when the pull is concentrated on one token rather than spread over the span.</dd>
+<dt>Contrast</dt>
+<dd>How much more the pull lands on op2 when op2 is the red operand than when it is not, averaged over the post-attention slices. It says the pull follows the red operand rather than a fixed position.</dd>
+<dt>Grading r²</dt>
+<dd>How well alignment with the axis tracks redness across colors, fit against the sim^1.5 target of ex-2.1.11.</dd>
+<dt>Retention</dt>
+<dd>Whether the placement holds to the end of training, after the anchor weight's anneal: the final m_line as a share of the run's peak.</dd>
+<dt>Latch</dt>
+<dd>A run in which the non-red group puts more than half of its softmin weight on one position: the pull has found a position rather than a concept. The position read is op1, the slot the earlier experiments saw it latch to.</dd>
+<dt>Deficit</dt>
+<dd>How much expected exact match a model loses on the non-red lines when the axis is projected out. This is a measure of the selectivity; a clean removal would cost nothing.</dd>
+<dt>Band</dt>
+<dd>Our measurement precision. Two seed means are told apart only when they differ by more than 2σ√(1/n_a + 1/n_b), with σ the per-run spread and n the seed counts. Smaller differences are reported as unresolved.</dd>
+</dl>
+
+<h2 id="does-the-model-still-learn-the-task-h1">Does the model still learn the task? (H1)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#does-the-model-still-learn-the-task-h1" title="Link to this heading">&para;</a></h2>
+<p><strong>Background.</strong> Eleven ops in the same number of lines, with drawn answers, is a harder corpus than six ops with rounded ones. Before we read anything about the anchor we need to know that the anchored model learns the task as well as an un-anchored model does on this corpus.</p>
+<p><strong>Prediction.</strong> For each of the 11 ops, the <code>handover</code> seed-mean expected exact match on held-out lines is within 0.02 of the control. Partial: every op within 0.05. Contrary: more than 0.05 below the control on some op. A comparison that misses by less than a band is reported as unresolved rather than as a miss; the band on this read is computed from the runs and printed beside the gate. The reference conditions are read on the same table without a gate, and a reference that does not learn the task has its later comparisons read with that caveat.</p>
+<p>We expect this to hold: ex-2.2.5 saw no task cost from the drawn answers, ex-2.2.7 none from the untied readout. Whether the control itself learns the grammar is checked before the freeze, on one seed, rather than gated here. The number to watch is the order-sensitive subset, since an op that reads operand order asks the model for something the six-op grammar never did.</p>
+<p><strong>Results.</strong> The anchored model learns the task about as well as the un-anchored one. Across the 11 ops the <code>handover</code> seed mean sits between -0.006 (<code>hsvmix</code>) and +0.003 (<code>multiply</code>) of the control's. On the order-sensitive subset the differences are +0.000, -0.001, -0.003, so reading operand order costs the anchored model nothing extra. <code>handover-narrow</code>, with lines per op held at the six-op count, sits between -0.010 (<code>value-hsv</code>) and +0.002 of the control. One op sits well under its ceiling on every condition: <code>hsvmix</code>, at 0.05 below on the control. That is the gap the calibration look found before the freeze (<a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#before-the-freeze">Before the freeze</a>): more passes over the corpus widened it rather than closing it, and it is the same on the anchored conditions, so it is a property of the op and the corpus rather than of the anchor.</p>
+<style>
+.mini-themed-figure-3cc7679c7687 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-3cc7679c7687 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-3cc7679c7687 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-3cc7679c7687 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-3cc7679c7687">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h1-eem-per-op-light.png" alt="A dot chart with the eleven ops along the bottom and expected exact match up the side. At each op, five columns of small dots, one per condition, sit close together at the same height, with a grey strip just below the control&#x27;s mean marking the gate and a bar above marking the ceiling the drawn answers allow. The handover dots sit inside the strip on every op." width="818" height="356" style="max-width: 100%; height: auto;" data-asset-name="h1-eem-per-op" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h1-eem-per-op-dark.png" alt="A dot chart with the eleven ops along the bottom and expected exact match up the side. At each op, five columns of small dots, one per condition, sit close together at the same height, with a grey strip just below the control&#x27;s mean marking the gate and a bar above marking the ceiling the drawn answers allow. The handover dots sit inside the strip on every op." width="818" height="356" style="max-width: 100%; height: auto;" data-asset-name="h1-eem-per-op" />
+<figcaption><p><strong>Expected exact match on held-out lines, per op and condition.</strong> Each small dot is one seed, the larger mark the seed mean, and the thin bar behind them the seed range. The grey strip under each op runs from the control's mean down to 0.02 below it: a <code>handover</code> mean inside the strip passes H1 on that op. The bar above each op is the ceiling the drawn answers allow (Σq²), which is 1 on the ops that never round.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>op</th><th class=num>ceiling</th><th class=num>control</th><th class=num><code>handover</code> (Δ) ↑</th><th class=num><code>handover-slot</code> (Δ) ↑</th><th class=num><code>handover-tied</code> (Δ) ↑</th><th class=num><code>handover-narrow</code> (Δ) ↑</th><th class=num>band</th></tr></thead><tbody><tr><td><code>mix</code></td><td class=num>0.44</td><td class=num>0.427</td><td class=num><b>0.429 (+0.001)</b></td><td class=num>0.427 (-0.000)</td><td class=num>0.429 (+0.002)</td><td class=num>0.430 (+0.002)</td><td class=num>0.002</td></tr><tr><td><code>screen</code></td><td class=num>0.55</td><td class=num>0.546</td><td class=num><b>0.547 (+0.001)</b></td><td class=num>0.546 (+0.001)</td><td class=num>0.545 (-0.001)</td><td class=num>0.544 (-0.001)</td><td class=num>0.005</td></tr><tr><td><code>multiply</code></td><td class=num>0.54</td><td class=num>0.531</td><td class=num><b>0.534 (+0.003)</b></td><td class=num>0.535 (+0.004)</td><td class=num>0.536 (+0.004)</td><td class=num>0.532 (+0.001)</td><td class=num>0.005</td></tr><tr><td><code>lighten</code></td><td class=num>1.00</td><td class=num>0.994</td><td class=num><b>0.993 (-0.001)</b></td><td class=num>0.992 (-0.002)</td><td class=num>0.993 (-0.001)</td><td class=num>0.991 (-0.003)</td><td class=num>0.002</td></tr><tr><td><code>darken</code></td><td class=num>1.00</td><td class=num>0.995</td><td class=num><b>0.993 (-0.001)</b></td><td class=num>0.993 (-0.001)</td><td class=num>0.993 (-0.001)</td><td class=num>0.993 (-0.002)</td><td class=num>0.002</td></tr><tr><td><code>difference</code></td><td class=num>1.00</td><td class=num>0.978</td><td class=num><b>0.977 (-0.001)</b></td><td class=num>0.974 (-0.005)</td><td class=num>0.974 (-0.004)</td><td class=num>0.969 (-0.009)</td><td class=num>0.007</td></tr><tr><td><code>exclusion</code></td><td class=num>0.57</td><td class=num>0.563</td><td class=num><b>0.563 (-0.000)</b></td><td class=num>0.560 (-0.003)</td><td class=num>0.561 (-0.002)</td><td class=num>0.565 (+0.002)</td><td class=num>0.004</td></tr><tr><td><code>hsvmix</code></td><td class=num>0.39</td><td class=num>0.340</td><td class=num><b>0.333 (-0.006)</b></td><td class=num>0.331 (-0.008)</td><td class=num>0.326 (-0.014)</td><td class=num>0.330 (-0.009)</td><td class=num>0.008</td></tr><tr><td><code>hue-hsv</code></td><td class=num>0.82</td><td class=num>0.819</td><td class=num><b>0.819 (+0.000)</b></td><td class=num>0.819 (+0.001)</td><td class=num>0.815 (-0.003)</td><td class=num>0.815 (-0.003)</td><td class=num>0.003</td></tr><tr><td><code>sat-hsv</code></td><td class=num>0.69</td><td class=num>0.689</td><td class=num><b>0.688 (-0.001)</b></td><td class=num>0.687 (-0.001)</td><td class=num>0.684 (-0.005)</td><td class=num>0.683 (-0.006)</td><td class=num>0.003</td></tr><tr><td><code>value-hsv</code></td><td class=num>0.72</td><td class=num>0.712</td><td class=num><b>0.710 (-0.003)</b></td><td class=num>0.709 (-0.004)</td><td class=num>0.707 (-0.006)</td><td class=num>0.703 (-0.010)</td><td class=num>0.003</td></tr></tbody></table><figcaption><p><strong>Seed-mean expected exact match on held-out lines, per op.</strong> Each condition's column gives its mean and, in brackets, the difference from the control. A bold <code>handover</code> entry is within 0.02 of the control, which is the H1 gate. The band is the smallest difference from the control the read resolves on that op, from the per-run spread of the two conditions.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>op</th><th class=num>P(mode) control</th><th class=num>P(mode) handover</th><th class=num>KL control ↓</th><th class=num>KL handover ↓</th></tr></thead><tbody><tr><td><code>mix</code></td><td class=num>0.44</td><td class=num>0.44</td><td class=num>0.13</td><td class=num>0.13</td></tr><tr><td><code>screen</code></td><td class=num>0.64</td><td class=num>0.64</td><td class=num>0.08</td><td class=num>0.08</td></tr><tr><td><code>multiply</code></td><td class=num>0.63</td><td class=num>0.64</td><td class=num>0.09</td><td class=num>0.09</td></tr><tr><td><code>lighten</code></td><td class=num>0.99</td><td class=num>0.99</td><td class=num>0.01</td><td class=num>0.01</td></tr><tr><td><code>darken</code></td><td class=num>0.99</td><td class=num>0.99</td><td class=num>0.01</td><td class=num>0.01</td></tr><tr><td><code>difference</code></td><td class=num>0.98</td><td class=num>0.98</td><td class=num>0.03</td><td class=num>0.02</td></tr><tr><td><code>exclusion</code></td><td class=num>0.65</td><td class=num>0.66</td><td class=num>0.08</td><td class=num>0.08</td></tr><tr><td><code>hsvmix</code></td><td class=num>0.39</td><td class=num>0.38</td><td class=num>0.35</td><td class=num>0.38</td></tr><tr><td><code>hue-hsv</code></td><td class=num>0.86</td><td class=num>0.86</td><td class=num>0.05</td><td class=num>0.06</td></tr><tr><td><code>sat-hsv</code></td><td class=num>0.75</td><td class=num>0.76</td><td class=num>0.08</td><td class=num>0.08</td></tr><tr><td><code>value-hsv</code></td><td class=num>0.77</td><td class=num>0.77</td><td class=num>0.05</td><td class=num>0.06</td></tr></tbody></table><figcaption><p><strong>How the answer mass is spread, per op.</strong> P(mode) is the mass the model puts on the most likely true answer; KL is the divergence from the true answer distribution to the model's, in nats, averaged over held-out lines. Both are seed means. On the ops that never round, the true distribution is one color, so P(mode) is the expected exact match and KL the negative log-likelihood.</p></figcaption></figure>
+
+<div class="admonition success">
+<p class="admonition-title">Pass</p>
+<p>On every op the <code>handover</code> seed mean is within 0.02 of the control's. The largest shortfall is <code>hsvmix</code> at -0.006 (band 0.008).</p>
+</div>
+<h2 id="does-red-still-land-where-we-put-it-h2">Does <em>red</em> still land where we put it? (H2)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#does-red-still-land-where-we-put-it-h2" title="Link to this heading">&para;</a></h2>
+<p><strong>Background.</strong> The recipe was tuned on the six-op grammar, but here the corpus, the labeller, and the readout all change. We read the same placement statistics on the same <code>mix</code> lines, so the numbers are comparable to ex-2.2.3. The question is whether they are still inside the gates set there.</p>
+<p><strong>Prediction.</strong> On the <code>mix</code> lines, for <code>handover</code>, under its own labeller (as ex-2.2.6 read it):</p>
+<ul>
+<li><em>Margin:</em> seed-mean m_line at least 80% of the reference's 0.4202, so 0.336; partial from 60%.</li>
+<li><em>Grading:</em> grading r² at least 90% of the reference's 0.782, so 0.704.</li>
+<li><em>Concentration, attribution, retention, latch:</em> lead at the embedding at least 0.4; contrast at least 0.2 (partial from 0.1); every run that reaches m_line 0.2 ends at 0.8 of its peak; no run latched, which the reference held at twenty seeds.</li>
+</ul>
+<p><strong>Containment is a prediction here, not a gate.</strong> Every experiment since ex-2.1.8 has gated ᾱ at op1 at 0.1. At nine seeds, ex-2.2.7 read 0.13 on its untied condition and 0.23 on its untied whole-line condition, against 0.08 on the reference, so we expect <code>handover</code> above 0.1, and <code>handover-slot</code> nearer to it. We do not know why untying raises it. What we do know is that the pull still lands on the red operand in those runs (lead, contrast, and latch all sat at the reference's values), so this is other colors drifting a little onto the axis at op1 rather than the pull finding a position. What that drift costs, if anything, is what H3's selectivity read measures. So the prediction is the pair: ᾱ above 0.1 on <code>handover</code>, and a non-red deficit inside H3's gate all the same. If both hold, the drift is recorded for the anchored-op prereg to watch; if the deficit fails too, containment is the first place to look for why.</p>
+<p><code>handover-tied</code> is read on the same statistics, so that we can attribute the containment read. If the tied condition sits with the reference (more contained) and both untied conditions sit higher, the untied readout is what moved it.</p>
+<p><strong>Results.</strong> The anchor does land where we put it, holding the spot only a little less well than the references do. On the <code>mix</code> lines <code>handover</code> reaches a margin of 0.426 against the reference's 0.392 (the gate is 0.336), a grading r² of 0.89, a lead at the embedding of 0.91, and a contrast of 0.84.</p>
+<p>ᾱ at op1 reads 0.28 on <code>handover</code>, 0.18 on <code>handover-slot</code>, and 0.16 on <code>handover-tied</code>, against 0.08 at the reference. So the untied readout is what raises ᾱ, as ex-2.2.7 saw, and the tied condition sits with the reference. That runs against the first intuition, which is that a separate readout should leave the embedding cleaner, and we have one mechanism to offer for it. ᾱ at op1 is read on the first token, whose state at every slice is a function of that color's embedding row alone (nothing precedes it to attend to), so it is close to the mean axis component of the 216 color embeddings. With a tied table those rows are also the readout rows, so any axis component on a non-red color's row raises that color's logit whenever the state at <code>=</code> carries <em>red</em>, and the task loss pushes it back off. Untying removes that pressure: the embedding rows are then free to carry a small common component along e₁, which costs the task nothing because the readout no longer reads it. The same release is what H4 sees on the syntax words, from the other side: there the tied table had put axis onto <code>=</code> because it helped the output, and untying let it come off. Both are the output loss letting go of the embedding. The check, for the next round, is the mean axis component of the non-red embedding rows on <code>handover</code> against <code>handover-tied</code>, which the stored tables can give without a run.</p>
+<p>Retention is where the hypothesis misses: the seed mean is 0.88 on <code>handover</code> against 0.96 on <code>handover-slot</code>, 0.96 on <code>handover-tied</code>, and 0.99 at ex-2.2.3, and 1 of 20 qualifying seeds ends at 0.77, under the 0.8 gate. One caveat on every ratio against the reference: those runs trained for 1,650 steps and ours for 4,950, so a margin or an ᾱ that sits above the reference could be the longer training as much as the grammar. The same difference bears on retention. The anchor weight anneals over the last tenth of training, which here is 495 steps against 165 at the reference, so the margin has three times as many steps to drift after the weight comes down, and the seed spread on ᾱ and retention looks like the spread we saw before the schedules were tuned in D2.1, which a later anneal settled. A schedule read on this grammar (a later or shorter anneal, or one set in steps rather than as a share of training) is the first thing to try on this miss.</p>
+<style>
+.mini-themed-figure-d3229499db51 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-d3229499db51 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-d3229499db51 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-d3229499db51 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-d3229499db51">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h2-placement-light.png" alt="Six small dot panels, one per placement statistic, each with the five conditions and the six-op reference along the bottom. On the margin, grading, lead, and contrast panels the anchored conditions sit close together and near the reference, above the dashed gate line, while the control sits at zero. On the retention panel the anchored conditions sit a little under the reference and one whole-line seed falls below the gate line. On the alignment panel every anchored condition sits above the dashed line, the two untied conditions well above the tied one; here above the line is the drift the prediction expected." width="818" height="491" style="max-width: 100%; height: auto;" data-asset-name="h2-placement" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h2-placement-dark.png" alt="Six small dot panels, one per placement statistic, each with the five conditions and the six-op reference along the bottom. On the margin, grading, lead, and contrast panels the anchored conditions sit close together and near the reference, above the dashed gate line, while the control sits at zero. On the retention panel the anchored conditions sit a little under the reference and one whole-line seed falls below the gate line. On the alignment panel every anchored condition sits above the dashed line, the two untied conditions well above the tied one; here above the line is the drift the prediction expected." width="818" height="491" style="max-width: 100%; height: auto;" data-asset-name="h2-placement" />
+<figcaption><p><strong>Placement of <em>red</em> on the <code>mix</code> lines, per condition, beside the six-op reference.</strong> The read is on <code>mix</code> because the gates were set on <code>mix</code> at ex-2.2.3, so these numbers compare with the reference's. One panel per statistic; each small dot is one seed, the larger mark the seed mean, and the thin bar the seed range, with ex-2.2.3's twenty reference seeds at the right. The dashed line is the gate (margin 0.336, grading r² 0.704, lead 0.4, contrast 0.2, retention 0.8), the hatched region the side that misses it, and the dotted line the partial level where there is one. The retention column for <code>control</code> is empty because there is no anchor for it to hold. On the ᾱ panel the dashed line is the 0.1 the earlier experiments gated, which here is a prediction: we expected the untied conditions above it.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>margin m_line ↑</th><th class=num>grading r² ↑</th><th class=num>lead at embedding ↑</th><th class=num>contrast ↑</th><th class=num>ᾱ at op1 ↓</th><th class=num>retention ↑</th><th class=num>latch (max) ↓</th></tr></thead><tbody><tr><td><code>control</code></td><td class=num>0.031 (-0.00–0.07)</td><td class=num>0.073 (0.01–0.23)</td><td class=num>0.330 (0.10–0.62)</td><td class=num>0.088 (-0.05–0.22)</td><td class=num>0.016 (-0.03–0.10)</td><td class=num>—</td><td class=num>0.40</td></tr><tr><td><code>handover</code></td><td class=num><b>0.426 (0.39–0.45)</b></td><td class=num><b>0.887 (0.84–0.91)</b></td><td class=num><b>0.909 (0.89–0.92)</b></td><td class=num><b>0.838 (0.81–0.86)</b></td><td class=num>0.276 (0.19–0.38)</td><td class=num>0.88 (0.8–1.0)</td><td class=num><b>0.00</b></td></tr><tr><td><code>handover-slot</code></td><td class=num>0.392 (0.34–0.42)</td><td class=num>0.871 (0.84–0.90)</td><td class=num>0.888 (0.87–0.91)</td><td class=num>0.864 (0.85–0.87)</td><td class=num>0.184 (0.14–0.26)</td><td class=num>0.96 (0.9–1.0)</td><td class=num>0.01</td></tr><tr><td><code>handover-tied</code></td><td class=num>0.423 (0.41–0.45)</td><td class=num>0.894 (0.87–0.91)</td><td class=num>0.894 (0.89–0.90)</td><td class=num>0.855 (0.85–0.87)</td><td class=num>0.162 (0.13–0.19)</td><td class=num>0.96 (0.9–1.0)</td><td class=num>0.01</td></tr><tr><td><code>handover-narrow</code></td><td class=num>0.411 (0.39–0.43)</td><td class=num>0.856 (0.85–0.87)</td><td class=num>0.912 (0.91–0.92)</td><td class=num>0.837 (0.82–0.84)</td><td class=num>0.303 (0.27–0.32)</td><td class=num>0.85 (0.8–0.9)</td><td class=num>0.00</td></tr><tr class=ref><td>reference (ex-2.2.3)</td><td class=num>0.392 (0.37–0.41)</td><td class=num>0.886 (0.84–0.93)</td><td class=num>0.826 (0.78–0.86)</td><td class=num>0.868 (0.84–0.88)</td><td class=num>0.083 (0.04–0.15)</td><td class=num>0.99 (1.0–1.0)</td><td class=num>0.02</td></tr></tbody></table><figcaption><p><strong>Placement statistics on the <code>mix</code> lines, per condition.</strong> Seed mean with the seed range in brackets; retention is read on the runs whose peak m_line reached 0.2, and latch is the largest non-red softmin weight at op1 over the seeds, against 0.5. Bold <code>handover</code> entries clear their gate. The bands against the reference, from the per-run σ frozen at ex-2.2.3: margin m_line 0.006, ᾱ at op1 0.013, grading r² 0.015, contrast 0.004.</p></figcaption></figure>
+
+<style>
+.mini-themed-figure-14da512a5bc1 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-14da512a5bc1 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-14da512a5bc1 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-14da512a5bc1 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-14da512a5bc1">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h2-softmin-profile-light.png" alt="A stepped chart with the six token roles along the bottom and softmin weight up the side, one series per anchored condition drawn as level marks joined by faint risers. Every series peaks at op1 and op2 and is near zero at the op word and the equals sign; the whole-line conditions put a little weight on the answer and the newline, the operand-only condition none." width="626" height="298" style="max-width: 100%; height: auto;" data-asset-name="h2-softmin-profile" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h2-softmin-profile-dark.png" alt="A stepped chart with the six token roles along the bottom and softmin weight up the side, one series per anchored condition drawn as level marks joined by faint risers. Every series peaks at op1 and op2 and is near zero at the op word and the equals sign; the whole-line conditions put a little weight on the answer and the newline, the operand-only condition none." width="626" height="298" style="max-width: 100%; height: auto;" data-asset-name="h2-softmin-profile" />
+<figcaption><p><strong>Where the label's weight lands, by token role.</strong> The red group's softmin weight at each of the six positions, averaged over the four post-attention slices and the seeds, one series per anchored condition, with the seed range as a band. The whole-line labeller (every condition but <code>handover-slot</code>) may place weight on the answer and the newline; the either-slot labeller only on the operands.</p></figcaption></figure>
+
+<div class="admonition danger">
+<p class="admonition-title">Miss</p>
+<p><code>handover</code> clears margin m_line, grading r², contrast, lead at embedding, latch, and misses retention. 1 of 20 qualifying seeds ends below 0.8 of its peak (the lowest at 0.77); the seed mean is 0.88 against ex-2.2.3's 0.99. The paired ᾱ prediction holds: ᾱ at op1 is 0.28, above the 0.1 the earlier experiments gated, as expected with the readout untied (the output loss no longer holds the non-red embedding rows off the axis; see the H2 results), and the non-red deficit it was paired with is 0.004, inside H3's 0.05 gate.</p>
+</div>
+<h2 id="can-we-still-take-red-out-cleanly-h3">Can we still take <em>red</em> out cleanly? (H3)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#can-we-still-take-red-out-cleanly-h3" title="Link to this heading">&para;</a></h2>
+<p><strong>Background.</strong> Take the <em>red</em> axis (e₁) out of every state. On the lines that need <em>red</em>, does the model fail? On the lines that never had any, does it still answer? The first is removal, the second selectivity. Ex-2.2.3 could only show removal on two of six ops, because the other four mostly did not need <em>red</em>. Table A+ was chosen so that every op has lines that do, and the removal read is scored on those lines only.</p>
+<p><strong>Prediction.</strong> Under <code>projection</code>, for <code>handover</code>:</p>
+<ul>
+<li><em>Removal:</em> on the removal lines of every op, the model keeps at most 20% of its clean expected exact match, seed mean. This is the red-accuracy gate of ex-2.2.3, read as a ratio, because with drawn answers the clean value sits below 1 on the ops that round.</li>
+<li><em>Selectivity:</em> the seed-mean deficit on the non-red <code>mix</code> lines is at most 0.05; partial to 0.1. The partial band is a reporting level, as it was in ex-2.2.3: the decision rule asks for the gate. The read stays on <code>mix</code> so that it means what it meant at the reference; <code>hsvmix</code> and every other op are reported beside it; what a switch to <code>hsvmix</code> would change is set out in the method (<a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#the-reference-op">The reference op</a>). On the reference, ex-2.2.8 read 0.040 on <code>mix</code>, which is inside the gate by less than a band. With the readout untied we expect the deficit to fall toward the <code>operands</code> row, which read 0.012. Bands on the deficit use the per-run spread ex-2.2.8 measured under <code>projection</code> at the reference's twenty seeds, per op (ex-2.2.8, <code>projection</code> on <code>recipe-short</code>, twenty seeds, per op), frozen so that the candidate's own spread does not move its verdict. Non-red lines whose true answer is red are in the deficit and also counted on their own (see the glossary); <code>mix</code> has none.</li>
+</ul>
+<p>Two further reads have an expected direction and no gate.</p>
+<p><em>How far the answer moves.</em> On the removal lines, we measure the distance in the unit cube between the answer the model decodes under <code>projection</code> and the true answer. Beside it we put the distance the true answer itself moves when the red operand loses its red. Ranking the ops by each distance should give the same order, with <code>value-hsv</code>, <code>hue-hsv</code>, and <code>sat-hsv</code> at the top of both.</p>
+<p><em>The operand-only edit.</em> On the ops whose answer is computed at <code>=</code> from both operands together, <code>operands</code> should remove less than <code>projection</code>, since the <code>=</code> state keeps its axis component. Elsewhere the two should remove the same amount.</p>
+<p><strong>Results.</strong> Taking the axis out removes <em>red</em> on 8 of the 11 ops: on their removal lines <code>handover</code> keeps between 2% (<code>mix</code>) and 15% (<code>darken</code>) of its clean expected exact match under <code>projection</code>. On <code>hue-hsv</code>, <code>sat-hsv</code>, <code>value-hsv</code> it keeps 26%, 25%, 38%, above the 20% gate; the slot split under <a href="https://z0u.github.io/sca2/m2/ex-2.2.9/#the-order-sensitive-subset-by-slot">The order-sensitive subset, by slot</a> says which lines those are. On the non-red <code>mix</code> lines the deficit is 0.004 (seeds from -0.003 to 0.012), against 0.040 at the reference; the <code>operands</code> edit, which leaves the syntax positions alone, reads 0.004. No op's non-red deficit exceeds 0.004.</p>
+<p>Of the two reads with a direction and no gate, neither went the predicted way. The rank correlation between how far the true answer moves and how far the model's answer moves under <code>projection</code> is 0.05: the largest true moves are on <code>value-hsv</code>, <code>sat-hsv</code>, <code>hue-hsv</code> and the largest model moves on <code>difference</code>, <code>hsvmix</code>, <code>exclusion</code>. And <code>operands</code> removes as much as <code>projection</code> on every op (the widest gap is -0.019, on <code>sat-hsv</code>), where the prediction had it removing less on the ops computed at <code>=</code>.</p>
+<style>
+.mini-themed-figure-17b6f7d1297f {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-17b6f7d1297f {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-17b6f7d1297f {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-17b6f7d1297f > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-17b6f7d1297f">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h3-removal-selectivity-light.png" alt="Two dot panels stacked, with the eleven ops along the bottom of each. The top panel, the share of clean accuracy kept on the removal lines, has every anchored condition&#x27;s dots under the dashed gate line at one fifth on eight ops, and above it on the three ops that take one HSV attribute from their second operand, where the whole-line conditions sit highest. The bottom panel, the deficit on the non-red lines, has the dots near zero on every op, well under the dashed gate line; a few seeds of the tied condition sit higher on one or two ops." width="818" height="548" style="max-width: 100%; height: auto;" data-asset-name="h3-removal-selectivity" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h3-removal-selectivity-dark.png" alt="Two dot panels stacked, with the eleven ops along the bottom of each. The top panel, the share of clean accuracy kept on the removal lines, has every anchored condition&#x27;s dots under the dashed gate line at one fifth on eight ops, and above it on the three ops that take one HSV attribute from their second operand, where the whole-line conditions sit highest. The bottom panel, the deficit on the non-red lines, has the dots near zero on every op, well under the dashed gate line; a few seeds of the tied condition sit higher on one or two ops." width="818" height="548" style="max-width: 100%; height: auto;" data-asset-name="h3-removal-selectivity" />
+<figcaption><p><strong>Removal and selectivity under <code>projection</code>, per op and anchored condition.</strong> Top: the share of the clean expected exact match the model keeps on each op's removal lines (red lines whose answer moves by at least 0.4 when the red operand loses its red); the dashed line is the 20% gate, and the hatched region above it is the miss. Bottom: the deficit in expected exact match on each op's non-red lines; dashed at the 0.05 gate, hatched above it, and dotted at the 0.1 partial level. The gate on the deficit is read on <code>mix</code> only. Each small dot is one seed, the larger mark the seed mean, and the thin bar the seed range.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>op</th><th class=num><code>handover</code> ↓</th><th class=num><code>handover-slot</code> ↓</th><th class=num><code>handover-tied</code> ↓</th><th class=num><code>handover-narrow</code> ↓</th><th class=num><code>operands</code> ↓</th><th class=num><code>shaped</code> ↓</th></tr></thead><tbody><tr><td><code>mix</code></td><td class=num><b>0.02</b></td><td class=num>0.03</td><td class=num>0.09</td><td class=num>0.01</td><td class=num>0.02</td><td class=num>0.04</td></tr><tr><td><code>screen</code></td><td class=num><b>0.11</b></td><td class=num>0.15</td><td class=num>0.27</td><td class=num>0.11</td><td class=num>0.11</td><td class=num>0.12</td></tr><tr><td><code>multiply</code></td><td class=num><b>0.09</b></td><td class=num>0.13</td><td class=num>0.13</td><td class=num>0.08</td><td class=num>0.09</td><td class=num>0.12</td></tr><tr><td><code>lighten</code></td><td class=num><b>0.11</b></td><td class=num>0.15</td><td class=num>0.20</td><td class=num>0.12</td><td class=num>0.11</td><td class=num>0.13</td></tr><tr><td><code>darken</code></td><td class=num><b>0.15</b></td><td class=num>0.23</td><td class=num>0.21</td><td class=num>0.12</td><td class=num>0.16</td><td class=num>0.18</td></tr><tr><td><code>difference</code></td><td class=num><b>0.05</b></td><td class=num>0.09</td><td class=num>0.21</td><td class=num>0.04</td><td class=num>0.06</td><td class=num>0.07</td></tr><tr><td><code>exclusion</code></td><td class=num><b>0.09</b></td><td class=num>0.13</td><td class=num>0.27</td><td class=num>0.07</td><td class=num>0.09</td><td class=num>0.11</td></tr><tr><td><code>hsvmix</code></td><td class=num><b>0.06</b></td><td class=num>0.08</td><td class=num>0.09</td><td class=num>0.05</td><td class=num>0.06</td><td class=num>0.08</td></tr><tr><td><code>hue-hsv</code></td><td class=num>0.26</td><td class=num>0.37</td><td class=num>0.29</td><td class=num>0.20</td><td class=num>0.28</td><td class=num>0.33</td></tr><tr><td><code>sat-hsv</code></td><td class=num>0.25</td><td class=num>0.33</td><td class=num>0.24</td><td class=num>0.23</td><td class=num>0.26</td><td class=num>0.29</td></tr><tr><td><code>value-hsv</code></td><td class=num>0.38</td><td class=num>0.43</td><td class=num>0.33</td><td class=num>0.37</td><td class=num>0.40</td><td class=num>0.43</td></tr></tbody></table><figcaption><p><strong>Removal, per op: the share of clean expected exact match kept on the removal lines.</strong> Seed means under <code>projection</code>, one column per anchored condition, then <code>handover</code> under the <code>operands</code> and <code>shaped-a0.4-p0</code> operators. Bold entries are inside the 20% gate, which is read on <code>handover</code>.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>op</th><th class=num><code>handover</code> ↓</th><th class=num><code>handover-slot</code> ↓</th><th class=num><code>handover-tied</code> ↓</th><th class=num><code>handover-narrow</code> ↓</th><th class=num>band</th></tr></thead><tbody><tr><td><code>mix</code></td><td class=num><b>0.004</b></td><td class=num>0.006</td><td class=num>0.012</td><td class=num>0.006</td><td class=num>0.013</td></tr><tr><td><code>screen</code></td><td class=num>0.001</td><td class=num>0.002</td><td class=num>0.006</td><td class=num>0.001</td><td class=num>0.006</td></tr><tr><td><code>multiply</code></td><td class=num>0.001</td><td class=num>0.001</td><td class=num>0.007</td><td class=num>0.001</td><td class=num>0.007</td></tr><tr><td><code>lighten</code></td><td class=num>0.001</td><td class=num>0.001</td><td class=num>0.003</td><td class=num>0.000</td><td class=num>0.003</td></tr><tr><td><code>darken</code></td><td class=num>0.001</td><td class=num>0.001</td><td class=num>0.003</td><td class=num>0.000</td><td class=num>0.004</td></tr><tr><td><code>difference</code></td><td class=num>0.004</td><td class=num>0.007</td><td class=num>0.031</td><td class=num>0.004</td><td class=num>—</td></tr><tr><td><code>exclusion</code></td><td class=num>-0.000</td><td class=num>0.000</td><td class=num>0.009</td><td class=num>-0.001</td><td class=num>—</td></tr><tr><td><code>hsvmix</code></td><td class=num>0.003</td><td class=num>0.005</td><td class=num>0.009</td><td class=num>0.003</td><td class=num>—</td></tr><tr><td><code>hue-hsv</code></td><td class=num>0.002</td><td class=num>0.002</td><td class=num>0.024</td><td class=num>0.001</td><td class=num>—</td></tr><tr><td><code>sat-hsv</code></td><td class=num>0.002</td><td class=num>0.002</td><td class=num>0.020</td><td class=num>0.002</td><td class=num>—</td></tr><tr><td><code>value-hsv</code></td><td class=num>0.001</td><td class=num>0.006</td><td class=num>0.014</td><td class=num>0.000</td><td class=num>—</td></tr></tbody></table><figcaption><p><strong>Selectivity, per op: the drop in expected exact match on the non-red lines.</strong> Seed means under <code>projection</code>, one column per anchored condition. The gate (0.05) is read on <code>mix</code> only, where the bold entry is inside it. The band is the smallest difference from the reference the read resolves, from the per-run σ ex-2.2.8 measured at the reference's twenty seeds (ex-2.2.8, <code>projection</code> on <code>recipe-short</code>, twenty seeds, per op); the ops the six-op grammar did not have carry none.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>op</th><th class=num>true answer moves</th><th class=num>floor</th><th class=num>clean</th><th class=num><code>projection</code></th><th class=num><code>operands</code></th></tr></thead><tbody><tr><td><code>mix</code></td><td class=num>0.51</td><td class=num>0.00</td><td class=num>0.01</td><td class=num>0.37</td><td class=num>0.37</td></tr><tr><td><code>screen</code></td><td class=num>0.69</td><td class=num>0.04</td><td class=num>0.05</td><td class=num>0.45</td><td class=num>0.45</td></tr><tr><td><code>multiply</code></td><td class=num>0.66</td><td class=num>0.04</td><td class=num>0.05</td><td class=num>0.48</td><td class=num>0.47</td></tr><tr><td><code>lighten</code></td><td class=num>0.70</td><td class=num>0.00</td><td class=num>0.00</td><td class=num>0.49</td><td class=num>0.49</td></tr><tr><td><code>darken</code></td><td class=num>0.67</td><td class=num>0.00</td><td class=num>0.00</td><td class=num>0.47</td><td class=num>0.47</td></tr><tr><td><code>difference</code></td><td class=num>0.76</td><td class=num>0.00</td><td class=num>0.01</td><td class=num>0.61</td><td class=num>0.61</td></tr><tr><td><code>exclusion</code></td><td class=num>0.77</td><td class=num>0.04</td><td class=num>0.04</td><td class=num>0.53</td><td class=num>0.52</td></tr><tr><td><code>hsvmix</code></td><td class=num>0.65</td><td class=num>0.11</td><td class=num>0.13</td><td class=num>0.53</td><td class=num>0.53</td></tr><tr><td><code>hue-hsv</code></td><td class=num>0.89</td><td class=num>0.03</td><td class=num>0.03</td><td class=num>0.37</td><td class=num>0.36</td></tr><tr><td><code>sat-hsv</code></td><td class=num>1.00</td><td class=num>0.04</td><td class=num>0.04</td><td class=num>0.52</td><td class=num>0.50</td></tr><tr><td><code>value-hsv</code></td><td class=num>1.01</td><td class=num>0.04</td><td class=num>0.04</td><td class=num>0.40</td><td class=num>0.39</td></tr></tbody></table><figcaption><p><strong>How far the answer moves on the removal lines, per op.</strong> Distances in the unit RGB cube, <code>handover</code> seed means. <em>True answer moves</em> is how far the true answer moves when the red operand loses its red (the to-zero move, from the corpus): the distance a model that had lost <em>red</em> would be expected to miss by. The last three columns are the expected distance from the model's answer distribution to the line's answer: on the clean pass, and under the two projection operators. <em>Floor</em> is that same distance for the true answer distribution itself, which is above zero on the ops that round because the drawn answer can land on either neighbour; the clean column is read against it.</p></figcaption></figure>
+
+<div class="admonition danger">
+<p class="admonition-title">Miss</p>
+<p>Removal: on <code>hue-hsv</code>, <code>sat-hsv</code>, <code>value-hsv</code> <code>handover</code> still answers more than 20% of its removal lines with the axis taken out (the most on <code>value-hsv</code>, at 38% of its clean expected exact match), where the gate asks for 20% or less. Selectivity holds: the non-red <code>mix</code> deficit is 0.004 against the 0.05 gate (band 0.013).</p>
+</div>
+<h2 id="does-the-separate-readout-keep-the-axis-off-the-syntax-tokens-h4">Does the separate readout keep the axis off the syntax tokens? (H4)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#does-the-separate-readout-keep-the-axis-off-the-syntax-tokens-h4" title="Link to this heading">&para;</a></h2>
+<p><strong>Background.</strong> In ex-2.2.7 the readout row for <code>=</code> picked up a component along the <em>red</em> axis: after a red operand, whose state sits on the axis, that is a cheap way to raise the <code>=</code> logit. With a shared table that row is also the input embedding of <code>=</code>, so the <code>=</code> token entered the residual stream carrying some <em>red</em>, and projecting the axis out at that position took away something the model was using. Giving the output its own table moved the component onto the readout row and left the input embedding mostly clean.</p>
+<p>That was on the six-op grammar at nine seeds. Does it carry to eleven ops, and does it give the cleaner full-line removal?</p>
+<p><strong>Prediction.</strong> On <code>handover</code> against <code>handover-tied</code>, same labeller, twenty seeds against nine (the band formula takes both counts, so it is wider than between two twenty-seed conditions):</p>
+<ul>
+<li>The axis component on the syntax embeddings (<code>=</code>, the op words, and <code>⏎</code>), read from the embedding-component table of ex-2.2.7, is lower on <code>handover</code> than on <code>handover-tied</code> by more than a band (pooled within-condition, over the two conditions compared, since ex-2.2.7 published seed means and ranges rather than a per-run spread; the σ is reported beside the comparison). On <code>=</code>, <code>handover</code> sits within a band of the hard-zeroed ceiling from ex-2.2.7 (<code>rows-clean</code>, where the component is zero by construction). The component appears on the readout table of <code>handover</code> instead.</li>
+<li>The non-red <code>mix</code> deficit under <code>projection</code> is lower on <code>handover</code> than on <code>handover-tied</code>, by more than a band.</li>
+</ul>
+<p>Neither prediction is a gate. Ex-2.2.7 already took the readout decision, and this section either confirms it or reports that it did not carry. If the second prediction fails while the first holds, then on this grammar the syntax embeddings were not where the cost came from.</p>
+<p><strong>Results.</strong> The separate readout keeps the axis off the syntax embeddings on this grammar too. Averaged over the op words, <code>=</code>, and <code>⏎</code>, the e₁ component of the embedding rows is 0.033 on <code>handover</code> and 0.169 on <code>handover-tied</code>. On <code>=</code> alone, <code>handover</code> reads 0.025, outside a band (0.008) of ex-2.2.7's hard-zeroed 0.000, while its readout row for <code>=</code> carries 0.145: the component moved to the readout, as it did in the pilot. Under <code>projection</code> the non-red <code>mix</code> deficit is 0.004 on <code>handover</code> against 0.012 on <code>handover-tied</code>, with a band of 0.017; both sit under the reference's 0.040, so the cost the pilot saw on the shared table is small here on either table. One word the untied table did not clean: <code>⏎</code>, whose embedding row reads 0.174 on <code>handover</code> where every other syntax word is under 0.04.</p>
+<style>
+.mini-themed-figure-c4c6dff0eeb5 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-c4c6dff0eeb5 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-c4c6dff0eeb5 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-c4c6dff0eeb5 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-c4c6dff0eeb5">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h4-syntax-component-light.png" alt="Two panels. Left, a dot chart of the axis component on each syntax word&#x27;s row, with the tied condition&#x27;s embedding rows sitting higher than the untied condition&#x27;s on the equals sign and the newline, and the untied condition&#x27;s readout rows sitting where the tied embedding rows do. Right, the non-red deficit under projection for the two conditions, as columns of seed dots." width="818" height="336" style="max-width: 100%; height: auto;" data-asset-name="h4-syntax-component" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h4-syntax-component-dark.png" alt="Two panels. Left, a dot chart of the axis component on each syntax word&#x27;s row, with the tied condition&#x27;s embedding rows sitting higher than the untied condition&#x27;s on the equals sign and the newline, and the untied condition&#x27;s readout rows sitting where the tied embedding rows do. Right, the non-red deficit under projection for the two conditions, as columns of seed dots." width="818" height="336" style="max-width: 100%; height: auto;" data-asset-name="h4-syntax-component" />
+<figcaption><p><strong>The <em>red</em> axis on the syntax tokens, and what it costs.</strong> Left: the absolute axis component of each syntax word's row (the op words, <code>=</code>, and <code>⏎</code>), seed mean with the seed range as a bar, for <code>handover-tied</code>'s embedding rows, <code>handover</code>'s embedding rows, and <code>handover</code>'s readout rows (the open marks). The short bars are ex-2.2.7's hard-zeroed ceiling, where the embedding component is zero by construction. Right: the deficit in expected exact match on the non-red <code>mix</code> lines under <code>projection</code>, one small dot per seed and the seed mean as the larger mark.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>word</th><th class=num><code>handover-tied</code> embedding ↓</th><th class=num><code>handover</code> embedding ↓</th><th class=num><code>handover</code> readout</th><th class=num>ex-2.2.7 ceiling</th></tr></thead><tbody><tr><td><code>mix</code></td><td class=num>0.144</td><td class=num>0.018</td><td class=num>0.132</td><td class=num>0.000</td></tr><tr><td><code>screen</code></td><td class=num>0.157</td><td class=num>0.016</td><td class=num>0.133</td><td class=num>0.000</td></tr><tr><td><code>multiply</code></td><td class=num>0.152</td><td class=num>0.017</td><td class=num>0.133</td><td class=num>0.000</td></tr><tr><td><code>lighten</code></td><td class=num>0.150</td><td class=num>0.021</td><td class=num>0.132</td><td class=num>0.000</td></tr><tr><td><code>darken</code></td><td class=num>0.153</td><td class=num>0.017</td><td class=num>0.132</td><td class=num>0.000</td></tr><tr><td><code>difference</code></td><td class=num>0.151</td><td class=num>0.014</td><td class=num>0.132</td><td class=num>—</td></tr><tr><td><code>exclusion</code></td><td class=num>0.149</td><td class=num>0.021</td><td class=num>0.132</td><td class=num>—</td></tr><tr><td><code>hsvmix</code></td><td class=num>0.146</td><td class=num>0.019</td><td class=num>0.130</td><td class=num>—</td></tr><tr><td><code>hue-hsv</code></td><td class=num>0.165</td><td class=num>0.037</td><td class=num>0.132</td><td class=num>—</td></tr><tr><td><code>sat-hsv</code></td><td class=num>0.159</td><td class=num>0.029</td><td class=num>0.135</td><td class=num>—</td></tr><tr><td><code>value-hsv</code></td><td class=num>0.160</td><td class=num>0.025</td><td class=num>0.133</td><td class=num>—</td></tr><tr><td><code>=</code></td><td class=num>0.228</td><td class=num>0.025</td><td class=num>0.145</td><td class=num>0.000</td></tr><tr><td><code>⏎</code></td><td class=num>0.275</td><td class=num>0.174</td><td class=num>0.129</td><td class=num>0.000</td></tr><tr><td>all syntax words</td><td class=num>0.169</td><td class=num>0.033</td><td class=num>0.133</td><td class=num>—</td></tr></tbody></table><figcaption><p><strong>Absolute axis component per syntax word.</strong> Seed means over each condition's runs, on the embedding table and, for <code>handover</code>, on its readout table; the last column is ex-2.2.7's hard-zeroed ceiling on the embedding. The band between the two conditions on the all-words mean is 0.006 (σ 0.008, pooled within-condition, over the two conditions compared); on <code>=</code> the band against the ceiling is 0.008.</p></figcaption></figure>
+
+<div class="admonition warning">
+<p class="admonition-title">Partial</p>
+<p>The first prediction holds except on <code>=</code>. The syntax embeddings carry less of the axis on <code>handover</code> (0.033) than on <code>handover-tied</code> (0.169), a gap well over the band (0.006). <code>=</code> is the one word that did not reach the ceiling: <code>handover</code> reads 0.025 there, against ex-2.2.7's hard-zeroed 0.000 (band 0.008), and its readout row for <code>=</code> carries 0.145, so the component moved to the readout. The second does not hold: the non-red <code>mix</code> deficit is not lower on <code>handover</code>, 0.004 against 0.012 on <code>handover-tied</code> (band 0.017).</p>
+</div>
+<h2 id="what-does-the-whole-line-label-cost-h5">What does the whole-line label cost? (H5)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#what-does-the-whole-line-label-cost-h5" title="Link to this heading">&para;</a></h2>
+<p><strong>Background.</strong> A label that covers the whole line is the shape we need for natural language (M3). Ex-2.2.6 found it costs nothing at three seeds. Ex-2.2.7 then ran nine seeds of its untied whole-line condition and saw a few of them lose a lot of non-red lines under the projection, where the operand-only labeller loses almost none. Here it is read at twenty seeds against twenty.</p>
+<p><strong>Prediction.</strong> On <code>handover</code> against <code>handover-slot</code>, under <code>projection</code>:</p>
+<ul>
+<li>The seed-mean non-red <code>mix</code> deficit differs by less than a band, and</li>
+<li>the count of seeds whose deficit is above 0.07 (the level at which ex-2.2.7 read its tail) is no more than two higher on <code>handover</code> than on <code>handover-slot</code>.</li>
+</ul>
+<p>The whole-line label changes two things at once: which positions the pull can land on, and which lines get a label at all, since the answer draws at its own redness rate. So a miss here says the label as a whole costs selectivity, but not which half of it did. Neither prediction is a gate, and <code>handover-slot</code> is not a fallback: we need the whole-line label, so a cost here is something to understand and fix, and the size of the gap to <code>handover-slot</code> says how much there is to fix. We are not sure which way this goes: the tail in ex-2.2.7 was three seeds out of nine, enough to expect it and too few to be sure.</p>
+<p><strong>Results.</strong> At twenty seeds against twenty, the whole-line label costs no selectivity we can resolve. Under <code>projection</code> the deficit is 0.004 on <code>handover</code> (worst seed 0.012) and 0.006 on <code>handover-slot</code> (worst seed 0.025); 0 and 0 seeds sit above 0.07. Under the <code>operands</code> edit the two read 0.004 and 0.004.</p>
+<style>
+.mini-themed-figure-01cf548f835e {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-01cf548f835e {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-01cf548f835e {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-01cf548f835e > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-01cf548f835e">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h5-per-seed-deficit-light.png" alt="A dot chart with four columns: the whole-line and either-slot conditions under the full projection, then the same two under the operand-only edit. Each column is the per-seed non-red deficit. Every column sits well under the dashed gate line, with the hatched miss region and the dotted tail level above it; the projection columns spread more than the operand-only columns, and the two conditions&#x27; means sit close together." width="587" height="338" style="max-width: 100%; height: auto;" data-asset-name="h5-per-seed-deficit" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h5-per-seed-deficit-dark.png" alt="A dot chart with four columns: the whole-line and either-slot conditions under the full projection, then the same two under the operand-only edit. Each column is the per-seed non-red deficit. Every column sits well under the dashed gate line, with the hatched miss region and the dotted tail level above it; the projection columns spread more than the operand-only columns, and the two conditions&#x27; means sit close together." width="587" height="338" style="max-width: 100%; height: auto;" data-asset-name="h5-per-seed-deficit" />
+<figcaption><p><strong>The non-red <code>mix</code> deficit, seed by seed.</strong> Each small dot is one seed's drop in expected exact match on the non-red <code>mix</code> lines, the larger mark the seed mean, <code>handover</code> (whole-line label) in red and <code>handover-slot</code> (either-slot label) in blue; the left pair is under <code>projection</code> and the right pair under the <code>operands</code> edit. The dashed line is H3's 0.05 gate with the miss hatched above it, drawn as H3 draws it, and the dotted line inside that region is the 0.07 tail level ex-2.2.7 read.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>deficit, <code>projection</code> ↓</th><th class=num>seeds above 0.07 ↓</th><th class=num>deficit, <code>operands</code> ↓</th><th class=num>worst seed ↓</th></tr></thead><tbody><tr><td><code>handover</code></td><td class=num>0.004 (-0.00–0.01)</td><td class=num>0 of 20</td><td class=num>0.004 (-0.00–0.01)</td><td class=num>0.012</td></tr><tr><td><code>handover-slot</code></td><td class=num>0.006 (-0.00–0.03)</td><td class=num>0 of 20</td><td class=num>0.004 (0.00–0.02)</td><td class=num>0.025</td></tr><tr class=ref><td>reference (ex-2.2.8)</td><td class=num>0.040 (0.01–0.09)</td><td class=num>1 of 20</td><td class=num>—</td><td class=num>0.086</td></tr></tbody></table><figcaption><p><strong>The non-red <code>mix</code> deficit per condition.</strong> Seed mean with the seed range, the count of seeds above the 0.07 tail level, the same read under the <code>operands</code> edit, and the worst seed. The band between the two conditions is 0.013, from the per-run σ ex-2.2.8 measured at the reference (ex-2.2.8, <code>projection</code> on <code>recipe-short</code>, twenty seeds, per op).</p></figcaption></figure>
+
+<div class="admonition success">
+<p class="admonition-title">Pass</p>
+<p>Both predictions hold: the seed-mean deficits are 0.004 (<code>handover</code>) and 0.006 (<code>handover-slot</code>), band 0.013; 0 <code>handover</code> seeds and 0 <code>handover-slot</code> seeds sit above 0.07.</p>
+</div>
+<h2 id="decision">Decision<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#decision" title="Link to this heading">&para;</a></h2>
+<p>H1 to H3 carry gates because one decision hangs on them: whether the anchored-op experiments run on this grammar. H4 and H5 are predictions, written down so that the result can be read against them, and what we do about a miss there is decided after reading it.</p>
+<p>The handover is adopted, and <code>handover</code> becomes the grammar and recipe of record for the anchored-op experiments, when it clears H1, H2 (margin, grading, and contrast in full), and H3 in full; every other partial band is a reporting level. Otherwise it is not adopted, and the report says which gate was missed and what the reference conditions say about which change is responsible, because that sets what the next round tries: the labeller if <code>handover-slot</code> clears what <code>handover</code> missed, the readout if <code>handover-tied</code> does, and the table or the corpus if none of them does.</p>
+<div class="admonition danger">
+<p class="admonition-title">Miss</p>
+<p><code>handover</code> misses H3 removal (miss), so <strong>the handover is not adopted</strong> as it stands. Neither reference clears removal, which points at the table or the corpus. Retention is outside the rule and is reported: 1 of 20 qualifying <code>handover</code> seeds ends under the 0.8 line (the lowest at 0.77), and the seed mean, 0.88, is under <code>handover-slot</code> (0.96) and <code>handover-tied</code> (0.96). Both references keep every seed above the line, which points at the label and the readout together, though at 20 and 9 seeds, with no band on retention, one seed in twenty does not separate that from a one-arm effect.</p>
+</div>
+<h2 id="exploratory-analyses">Exploratory analyses<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#exploratory-analyses" title="Link to this heading">&para;</a></h2>
+<p>Read without gates, and not part of the decision. Each analysis below states what it was for, then what it found.</p>
+<h3 id="lines-per-op">Lines per op<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#lines-per-op" title="Link to this heading">&para;</a></h3>
+<p>Ex-2.2.3's E4 probed how well the two operand colors can be decoded from the residual stream, and found them less decodable at six ops than at three. Was that because there were more ops, or because each op had fewer lines? <code>handover-narrow</code> gives each op as many lines as it had at six ops, where <code>handover</code> gives each about half as many again. If the operands decode better on <code>handover</code> than on <code>handover-narrow</code>, lines per op matters. If the two conditions sit together, it was the op count.</p>
+<p>Op1 decodes at its own slot with R² 0.82 on the control and 0.80 on <code>handover</code>, against 0.85 on <code>handover-narrow</code> and 0.52 on ex-2.2.3's six-op control. So at a matched step count, fewer lines per op does not make the operands less decodable: the narrow condition is at least as decodable as <code>handover</code>. That does not settle E4's question, though. The six-op control is far below all three, and it also trained for 1,650 steps against 4,950 here, so on this read the op count is confounded with the training length, and the three eleven-op conditions are not ordered by lines per op. The clean comparison would hold the step count and vary the op count.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>target, site</th><th class=num><code>control</code> ↑</th><th class=num><code>handover</code> ↑</th><th class=num><code>handover-narrow</code> ↑</th><th class=num>ex-2.2.3 <code>control</code> (six ops) ↑</th></tr></thead><tbody><tr><td>op1 at op1</td><td class=num>0.82 (0.7–0.9)</td><td class=num>0.80 (0.7–0.8)</td><td class=num>0.85 (0.8–0.9)</td><td class=num>0.52 (0.4–0.7)</td></tr><tr><td>op2 at op2</td><td class=num>0.72 (0.7–0.8)</td><td class=num>0.76 (0.7–0.8)</td><td class=num>0.78 (0.7–0.8)</td><td class=num>0.28 (0.2–0.4)</td></tr><tr><td>answer at <code>=</code></td><td class=num>0.71 (0.6–0.8)</td><td class=num>0.66 (0.5–0.8)</td><td class=num>0.66 (0.6–0.8)</td><td class=num>0.65 (0.6–0.7)</td></tr></tbody></table><figcaption><p><strong>How decodable each color is from the residual stream, by condition.</strong> Strict held-out R² for the RGB of op1 and op2 at their own slot and of the answer at <code>=</code>, mean over the channels and the four post-attention slices (31 negative scores clipped to zero), as a seed mean with the seed range. <code>control</code> and <code>handover</code> have 27,272 lines per op; <code>handover-narrow</code> has 16,666, the six-op count, at the same step budget. The last column is ex-2.2.3's un-anchored six-op model on the same read.</p></figcaption></figure>
+
+<h3 id="the-order-sensitive-subset-by-slot">The order-sensitive subset, by slot<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#the-order-sensitive-subset-by-slot" title="Link to this heading">&para;</a></h3>
+<p>For <code>hue-hsv</code>, <code>sat-hsv</code>, and <code>value-hsv</code> the probe set walks every color in both slots, so every read in H2 and H3 can be split by whether the red operand is op1 or op2. The labeller pools both operands the same way, so we expected the same placement in both slots. Removal should show in both slots too, at the rates in the method's per-slot table: a red op1 under <code>value-hsv</code> supplies the hue and the saturation, and losing those moves the answer as far as losing the value does.</p>
+<p>We expected removal in both slots at about the rates of the method's per-slot table, and the data went the other way: on <code>sat-hsv</code> and <code>value-hsv</code> the lines with red at op1 keep 11% and 6%, and the lines with red at op2 keep 65% and 71%; <code>hue-hsv</code> keeps 31% with red at op1 and 17% at op2. Placement differs by slot too: the margin on the op1 walk is 0.364, 0.341, 0.356 against 0.303, 0.376, 0.407 on the op2 walk (<code>hue-hsv</code>, <code>sat-hsv</code>, <code>value-hsv</code>). The prediction had the labeller placing both slots the same, and in hindsight there was no reason to expect symmetry: the labeller pools both operands the same way, but the op's computation is not symmetric, so what the model needs from each slot is not either. What removal rate each slot should show, derived from the op rather than assumed, is the analysis the fast-follow owes; the discussion sketches the reading.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>op</th><th class=num>m_line, op1 walk ↑</th><th class=num>m_line, op2 walk ↑</th><th class=num>kept, red op1 ↓</th><th class=num>kept, red op2 ↓</th></tr></thead><tbody><tr><td><code>hue-hsv</code></td><td class=num>0.364 (0.34–0.39)</td><td class=num>0.303 (0.28–0.33)</td><td class=num>0.31 (406)</td><td class=num>0.17 (230)</td></tr><tr><td><code>sat-hsv</code></td><td class=num>0.341 (0.31–0.38)</td><td class=num>0.376 (0.33–0.43)</td><td class=num>0.11 (406)</td><td class=num>0.65 (116)</td></tr><tr><td><code>value-hsv</code></td><td class=num>0.356 (0.32–0.40)</td><td class=num>0.407 (0.35–0.46)</td><td class=num>0.06 (389)</td><td class=num>0.71 (404)</td></tr></tbody></table><figcaption><p><strong>The order-sensitive ops by slot, on <code>handover</code>.</strong> These ops are probed on two sets of lines: one with every palette color at op1 (the <em>op1 walk</em>) and one with every palette color at op2 (the <em>op2 walk</em>). The margin is read on each walk, and the share of clean expected exact match kept under <code>projection</code> is read on the removal lines whose red operand is op1 or op2 (line counts in brackets, pooled over both walks, so about twice the method's per-walk counts). Seed means with the seed range.</p></figcaption></figure>
+
+<h3 id="calibration-under-the-anchor">Calibration under the anchor<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#calibration-under-the-anchor" title="Link to this heading">&para;</a></h3>
+<p>P(mode) and KL from the true distribution on the rounded held-out lines, for every anchored condition against the control, as ex-2.2.5 read them. The anchor should not change them.</p>
+<p>On the 8 ops that round, <code>handover</code> sits at a KL of 0.136 nats against 0.130 on the control, with P(mode) 0.567 against 0.566: the anchor itself leaves the calibration about where the control has it. <code>handover-narrow</code> is the one condition that stands out, at 0.207, with <code>hsvmix</code> the op that moved most (+0.187): fewer lines per op costs calibration, which is the lines-per-op question again from the output side.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>P(mode) ↑</th><th class=num>KL ↓</th><th class=num>op furthest from control (ΔKL)</th></tr></thead><tbody><tr><td><code>control</code></td><td class=num>0.566</td><td class=num>0.130</td><td class=num><code>mix</code> (+0.000)</td></tr><tr><td><code>handover</code></td><td class=num>0.567</td><td class=num>0.136</td><td class=num><code>hsvmix</code> (+0.026)</td></tr><tr><td><code>handover-slot</code></td><td class=num>0.566</td><td class=num>0.138</td><td class=num><code>hsvmix</code> (+0.028)</td></tr><tr><td><code>handover-tied</code></td><td class=num>0.563</td><td class=num>0.141</td><td class=num><code>hsvmix</code> (+0.056)</td></tr><tr><td><code>handover-narrow</code></td><td class=num>0.560</td><td class=num>0.207</td><td class=num><code>hsvmix</code> (+0.187)</td></tr></tbody></table><figcaption><p><strong>Calibration under the anchor.</strong> On the held-out lines that round, the mass on the most likely answer and the KL divergence from the true answer distribution to the model's (nats), averaged over the 8 ops that round and over seeds. The last column names the op whose KL moved most from the control's, with the difference.</p></figcaption></figure>
+
+<h3 id="red-answer-lines">Red-answer lines<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#red-answer-lines" title="Link to this heading">&para;</a></h3>
+<p>On the ops that have them, the model's answer under <code>projection</code> on the non-red lines whose true answer is red. If the model can no longer produce red there, that is removal on the output side, and it says the readout row for red carries the axis as the embedding does.</p>
+<p>On the 148 red-answer lines, expected exact match under <code>projection</code> is within 0.01 of the clean pass on every op that has them (the largest drop is on <code>value-hsv</code>). The model still produces red with the axis projected out of the state at <code>=</code>, so producing red at the output does not depend on that state's axis component. The last column is the non-red deficit with these lines set aside; it differs from the gated deficit by what they contribute, which is little.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>op</th><th class=num>lines</th><th class=num>clean EEM</th><th class=num><code>projection</code> EEM ↑</th><th class=num>deficit without them ↓</th></tr></thead><tbody><tr><td><code>difference</code></td><td class=num>11</td><td class=num>0.97</td><td class=num>0.96</td><td class=num>0.004</td></tr><tr><td><code>exclusion</code></td><td class=num>3</td><td class=num>0.97</td><td class=num>0.96</td><td class=num>-0.000</td></tr><tr><td><code>hue-hsv</code></td><td class=num>53</td><td class=num>0.99</td><td class=num>0.99</td><td class=num>0.002</td></tr><tr><td><code>sat-hsv</code></td><td class=num>52</td><td class=num>0.91</td><td class=num>0.91</td><td class=num>0.001</td></tr><tr><td><code>value-hsv</code></td><td class=num>29</td><td class=num>0.99</td><td class=num>0.98</td><td class=num>0.001</td></tr></tbody></table><figcaption><p><strong>The red-answer lines, on <code>handover</code>.</strong> Non-red probe lines whose true answer is red, per op that has any: their count, the expected exact match on the clean pass and under <code>projection</code>, and the non-red deficit with these lines set aside. Seed means.</p></figcaption></figure>
+
+<h3 id="the-shaped-operator">The shaped operator<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#the-shaped-operator" title="Link to this heading">&para;</a></h3>
+<p><code>shaped-a0.4-p0</code> is reported on every op beside the two gated operators: does its smaller removal still clear the removal gate on the new table?</p>
+<p><code>shaped-a0.4-p0</code> keeps between 4% and 43% on the removal lines, outside the removal gate on <code>hue-hsv</code>, <code>sat-hsv</code>, <code>value-hsv</code>: its smaller removal does not clear the gate on the ops the projection misses either.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#discussion" title="Link to this heading">&para;</a></h2>
+<p>Most of what the handover was meant to settle, it settled, and the decision rule still says no. Eleven ops with drawn answers are learnable, and the anchored model learns them as well as the control does (H1). <em>Red</em> lands where the recipe put it at six ops, with the same margin, grading, and contrast (H2). The separate readout keeps the axis off the syntax embeddings on this grammar too (H4), and at twenty seeds against twenty the whole-line label costs no selectivity we can resolve (H5). The selectivity read itself is the cleanest we have had: a non-red <code>mix</code> deficit of 0.004, against 0.040 at the reference.</p>
+<p>Two reads missed, but both are narrower than "a miss" sounds. Retention, which the decision rule reports and does not count, missed on 1 seed of 20, at 0.77 against the 0.8 gate. The seed mean, 0.88, is under <code>handover-slot</code>'s 0.96 and <code>handover-tied</code>'s 0.96 (and ex-2.2.3's 0.99), and neither reference has a seed under the line. That is consistent with the label and the readout costing a little retention each. But the evidence is one seed in twenty, with no band on retention, and that does not separate a real cost from one seed's luck. The schedule is the other suspect: the anneal here runs over three times as many steps as at the reference, so the margin has longer to drift after its peak, and a later or shorter anneal is the first thing to try. Removal, which the rule does count, missed on the three order-sensitive ops. On <code>sat-hsv</code> and <code>value-hsv</code> the lines with red at op1 lose almost everything (11% and 6% kept), and the lines with red at op2 keep most of it (65% and 71%). Red at op2 is the slot where the red operand supplies only its saturation, or only its value. We had expected removal in both slots, so this is a reading made after the fact: the axis carries the <em>redness</em> of a color, and a red color's saturation and value are read from somewhere else. If that is right, it is what an anchored concept should look like, and the removal lines are the thing to fix: they were chosen by how far the true answer moves when the red operand loses its red, and on these two ops that counts lines where what moved was the value, which the model never needed <em>red</em> for. <code>hue-hsv</code> is the case that reading does not cover: red at op1 supplies the hue there, and still keeps 31%.</p>
+<p>So the grammar and the recipe are not adopted as they stand, but it's close. Before this handover could be adopted, the removal lines for the three order-sensitive ops would need to be the lines whose answer takes the red operand's hue, so that the gate asks the model to have lost <em>red</em> rather than the value of a red color; <code>hue-hsv</code> would have to clear that gate on its own terms; and retention would need a read that twenty seeds can resolve, or a look at why the margin drifts after its peak on this arm, which the trajectories can show. Whether those changes are made, and the handover re-run, is a question for the next round. One observation goes with the readout: the untied table cleaned every syntax word except <code>⏎</code>, whose embedding row still carries 0.17 on <code>handover</code>. Where that comes from, and whether it matters, is for that round too.</p>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#method" title="Link to this heading">&para;</a></h2>
+<h3 id="the-table">The table<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#the-table" title="Link to this heading">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>op</th>
+<th>rule (0..15 scale, snapped to the grid)</th>
+<th>commutative</th>
+<th>in A+ as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mix</code></td>
+<td>(x + y) / 2</td>
+<td>yes</td>
+<td>kept</td>
+</tr>
+<tr>
+<td><code>screen</code></td>
+<td>15 − (15 − x)(15 − y) / 15</td>
+<td>yes</td>
+<td>kept</td>
+</tr>
+<tr>
+<td><code>multiply</code></td>
+<td>x · y / 15</td>
+<td>yes</td>
+<td>kept</td>
+</tr>
+<tr>
+<td><code>lighten</code></td>
+<td>max(x, y)</td>
+<td>yes</td>
+<td>kept</td>
+</tr>
+<tr>
+<td><code>darken</code></td>
+<td>min(x, y)</td>
+<td>yes</td>
+<td>kept</td>
+</tr>
+<tr>
+<td><code>difference</code></td>
+<td>|x − y|</td>
+<td>yes</td>
+<td>added</td>
+</tr>
+<tr>
+<td><code>exclusion</code></td>
+<td>x + y − 2xy / 15</td>
+<td>yes</td>
+<td>added</td>
+</tr>
+<tr>
+<td><code>hsvmix</code></td>
+<td>mean in HSV: circular mean of H, means of S and V</td>
+<td>99%</td>
+<td>added</td>
+</tr>
+<tr>
+<td><code>hue-hsv</code></td>
+<td>op2's H at op1's S and V</td>
+<td>1%</td>
+<td>order-sensitive</td>
+</tr>
+<tr>
+<td><code>sat-hsv</code></td>
+<td>op2's S at op1's H and V</td>
+<td>1%</td>
+<td>order-sensitive</td>
+</tr>
+<tr>
+<td><code>value-hsv</code></td>
+<td>op2's V at op1's H and S</td>
+<td>1%</td>
+<td>order-sensitive</td>
+</tr>
+</tbody>
+</table>
+<p>Every rule is computed on the 0..15 scale and snapped to the grid. Where it lands between levels, the corpus draws the answer (<em>stochastic rounding</em>, ex-2.2.5). The three order-sensitive ops take one HSV attribute from op2 and the other two from op1, so each agrees with its own reverse on under 2% of pairs. Their reads are reported as a subset.</p>
+<h3 id="op-relevance-under-a">Op-relevance under A+<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#op-relevance-under-a" title="Link to this heading">&para;</a></h3>
+<p>For a line that uses the anchored op, how many other ops in the table give the same answer. This is the stimulus side of the per-line predictions in the anchored-op experiments, counted over ordered pairs. Widening the table makes <code>mix</code> less distinctive (ex-2.2.4 read 95% alone at six ops), which is good because the later predictions need more than one level to read.</p>
+<table>
+<thead>
+<tr>
+<th>anchored op</th>
+<th style="text-align: right;">alone</th>
+<th style="text-align: right;">1 other agrees</th>
+<th style="text-align: right;">2</th>
+<th style="text-align: right;">3+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mix</code></td>
+<td style="text-align: right;">63%</td>
+<td style="text-align: right;">30%</td>
+<td style="text-align: right;">4%</td>
+<td style="text-align: right;">3%</td>
+</tr>
+<tr>
+<td><code>hsvmix</code></td>
+<td style="text-align: right;">59%</td>
+<td style="text-align: right;">32%</td>
+<td style="text-align: right;">6%</td>
+<td style="text-align: right;">3%</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-removal-lines">The removal lines<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#the-removal-lines" title="Link to this heading">&para;</a></h3>
+<p>Per op, on its probe set: the red lines (dose ≥ 0.8, where dose is the redness of the redder operand) and, of those, the lines on which setting the R channel of the red operand to zero moves the true answer by at least 0.4 in the unit cube. The removal read in H3 is scored on the second column. The last column counts the non-red lines (dose ≤ 0.2) whose true answer is red; those are in the selectivity read and also counted on their own.</p>
+<table>
+<thead>
+<tr>
+<th>op</th>
+<th style="text-align: right;">red probe lines</th>
+<th style="text-align: right;">removal lines</th>
+<th style="text-align: right;">non-red lines with a red answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mix</code></td>
+<td style="text-align: right;">365</td>
+<td style="text-align: right;">365 (100%)</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td><code>screen</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">278 (69%)</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td><code>multiply</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">265 (65%)</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td><code>lighten</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">268 (66%)</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td><code>darken</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">265 (65%)</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td><code>difference</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">277 (68%)</td>
+<td style="text-align: right;">11</td>
+</tr>
+<tr>
+<td><code>exclusion</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">267 (66%)</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td><code>hsvmix</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">391 (97%)</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td><code>hue-hsv</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">312 (77%)</td>
+<td style="text-align: right;">19</td>
+</tr>
+<tr>
+<td><code>sat-hsv</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">252 (62%)</td>
+<td style="text-align: right;">27</td>
+</tr>
+<tr>
+<td><code>value-hsv</code></td>
+<td style="text-align: right;">405</td>
+<td style="text-align: right;">397 (98%)</td>
+<td style="text-align: right;">15</td>
+</tr>
+</tbody>
+</table>
+<p>Replacing the red operand with a mid-gray instead of zeroing its R channel was considered. On <code>mix</code> it counts far fewer lines (a gray partner moves the mix less than a dark one does), and elsewhere it changes the counts without changing which ops need <em>red</em>, so the to-zero rule stays.</p>
+<p>For the order-sensitive ops, the both-slot probe set splits by where the red operand sits. The one place the rule under-counts is a red op2 under <code>hue-hsv</code> or <code>sat-hsv</code>. Zeroing the R of a pure red gives black, which HSV reads as hue 0 (red) at no saturation: under <code>hue-hsv</code> the answer keeps its hue, and under <code>sat-hsv</code> op1 only loses its saturation, which moves it far only when it was saturated. Setting R to one grid level instead of zero does not help. The operand is then a very dark red at full saturation, so <code>hue-hsv</code> moves as little as before and <code>sat-hsv</code> stops moving at all (0 lines counted against 50 at zero). There is no hue a color should have once its red is gone, so the lines the rule drops are reported (in the red-at-op2 count) and not gated. The red-at-op2 lines that do move far stay in the gate: the removal read pools both slots, and the exploratory section splits it.</p>
+<table>
+<thead>
+<tr>
+<th>op</th>
+<th style="text-align: right;">red at op1</th>
+<th style="text-align: right;">removal</th>
+<th style="text-align: right;">red at op2</th>
+<th style="text-align: right;">removal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hue-hsv</code></td>
+<td style="text-align: right;">186</td>
+<td style="text-align: right;">186 (100%)</td>
+<td style="text-align: right;">185</td>
+<td style="text-align: right;">104 (56%)</td>
+</tr>
+<tr>
+<td><code>sat-hsv</code></td>
+<td style="text-align: right;">186</td>
+<td style="text-align: right;">186 (100%)</td>
+<td style="text-align: right;">185</td>
+<td style="text-align: right;">50 (27%)</td>
+</tr>
+<tr>
+<td><code>value-hsv</code></td>
+<td style="text-align: right;">186</td>
+<td style="text-align: right;">178 (96%)</td>
+<td style="text-align: right;">185</td>
+<td style="text-align: right;">185 (100%)</td>
+</tr>
+</tbody>
+</table>
+<p>Each slot is counted on the walk that puts the palette color in it. The scored probe set pools both walks, so the per-slot counts in the exploratory table are about twice these.</p>
+<h3 id="the-reference-op">The reference op<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#the-reference-op" title="Link to this heading">&para;</a></h3>
+<p>Every gated read is on <code>mix</code>, and <code>hsvmix</code> is reported beside it as the op a later experiment might promote. This is what the switch would change, on each op's probe set as ex-2.2.3 draws it.</p>
+<table>
+<thead>
+<tr>
+<th>op</th>
+<th style="text-align: right;">probe lines on the grid</th>
+<th style="text-align: right;">expected exact match ceiling</th>
+<th style="text-align: right;">red lines that are removal lines</th>
+<th style="text-align: right;">mean to-zero move</th>
+<th style="text-align: right;">red-answer lines</th>
+<th style="text-align: right;">alone</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mix</code></td>
+<td style="text-align: right;">100%</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">100%</td>
+<td style="text-align: right;">0.51</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">63%</td>
+</tr>
+<tr>
+<td><code>hsvmix</code></td>
+<td style="text-align: right;">2%</td>
+<td style="text-align: right;">0.39</td>
+<td style="text-align: right;">97%</td>
+<td style="text-align: right;">0.64</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">59%</td>
+</tr>
+</tbody>
+</table>
+<p><code>hsvmix</code> is the better op for the removal read: nearly every red line is a removal line, and the answer moves further when the red operand loses its red, since a hue mean loses the red hue outright where a channel mean halves it. It is also a little less distinctive, which the anchored-op predictions want. Its placement reads (H2) would look much like <code>mix</code>'s, since the label reads the colors in the line rather than the op word.</p>
+<p>What it costs is the probe set. <code>mix</code> has 27 partners per color on which its answer lands on the grid without rounding, its probe lines are those, and so a clean model can match every answer and a deficit is a count of lines lost. <code>hsvmix</code> lands on the grid on 2% of pairs, about 5 partners per color, so its probe set is the shared random draw, and the best any model can do on it is an expected exact match of about 0.39. On that base the removal gate reads on a clean value near 0.4 rather than 1, and the 0.05 selectivity gate is an eighth of the clean value rather than a twentieth; both would need re-setting, and neither could be read against the reference's numbers. Had the program used <code>hsvmix</code> from the start, every exact-match read before ex-2.2.5 would have been on answers that round on 98% of lines, which is the bias that experiment found and fixed; D2.1 and ex-2.2.3 could read removal and selectivity as counts because <code>mix</code>'s probe set never rounds. The switch is open now that answers are drawn, at the price of a noisier deficit, and it is a later experiment's call, made with this experiment's <code>hsvmix</code> rows in hand.</p>
+<h3 id="the-corpus-the-probes-the-labellers">The corpus, the probes, the labellers<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#the-corpus-the-probes-the-labellers" title="Link to this heading">&para;</a></h3>
+<p>300,000 lines at seed 0, ops drawn uniformly, with 20% of the distinct unordered pairs of each op held out. A held-out pair is out in both orders, for every op, so the held-out share of an op's lines is the same 20% whether or not the op reads operand order. Probe sets follow ex-2.2.3: <code>mix</code> on its 27 on-grid partners per color, and every other op on 27 partners per color drawn once at seed 0 and shared across ops. The order-sensitive subset also walks every color as op2.</p>
+<p>The two labellers are <em>either slot, prompt span</em> (each operand draws at redness⁸ × 0.04, and the pull covers op1, op, op2, <code>=</code>) and <em>whole line</em> (the answer draws at its redness rate too, and the pull covers all six positions). The anchor term is the per-line mellowmax over the pulled span with a conserved per-line budget, so a wider span changes where the pull can land but not how strong it is.</p>
+<h3 id="before-the-freeze">Before the freeze<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#before-the-freeze" title="Link to this heading">&para;</a></h3>
+<p>One seed of <code>control</code> trains first, and its expected exact match per op is recorded here, so that the gate in H1 is read against a control that learned the grammar. The bar: on every kept and added op, expected exact match within 0.05 of the ceiling the drawn answers allow on that op (ex-2.2.5 saw the six-op control within 0.04 on the ops that round). A lower value on the order-sensitive subset is recorded and does not stop the run, since it says something about the grammar rather than about the anchor; a miss on a commutative op does stop it, and sends the corpus size and epoch count back for a look. Two pieces of code land with the DAG: the holdout draw, now keyed on the position of the op in this table rather than in the table of ex-2.2.3 (<code>sca.data.ops.holdout</code>), and a probe draw that walks both slots for the order-sensitive subset (<code>probe_partners</code>). Neither changes a number in the design.</p>
+<p><strong>What the look found.</strong> The first control seed, at the draft's point (100k lines, 50 epochs, 1,650 steps), missed the bar on six of the eight commutative ops, with <code>difference</code> 0.29 from its ceiling. Seen and held-out lines scored alike on every op, so this was under-training rather than a coverage problem. More epochs over the same lines fixed all but two: at 100 and 150 epochs <code>difference</code> stayed 0.07 to 0.09 short and <code>hsvmix</code> 0.07 to 0.09 short, and the <code>hsvmix</code> NLL rose with every extra pass, which says the model was memorising the drawn labels rather than learning the distribution behind them. Deeper models (six and eight layers, at 100 epochs) moved neither op. A larger corpus did: at 300k lines and 50 epochs (4,950 steps) every kept and added op is within the bar, with <code>hsvmix</code> 0.04 short and <code>difference</code> 0.03; more epochs over the same 300k lines pushed <code>hsvmix</code> back out. So the frozen point is 300k lines at 50 epochs: three times the reference's steps, from three times the lines rather than more passes. Every point looked at is in the table below, and the frozen one is in bold.</p>
+<table>
+<thead>
+<tr>
+<th>op</th>
+<th>group</th>
+<th style="text-align: right;">ceiling</th>
+<th style="text-align: right;">100k × 50 ep, L4: EEM (gap ↓)</th>
+<th style="text-align: right;">200k × 33 ep, L4: EEM (gap ↓)</th>
+<th style="text-align: right;">300k × 33 ep, L4: EEM (gap ↓)</th>
+<th style="text-align: right;">200k × 50 ep, L4: EEM (gap ↓)</th>
+<th style="text-align: right;">100k × 100 ep, L4: EEM (gap ↓)</th>
+<th style="text-align: right;">100k × 100 ep, L6: EEM (gap ↓)</th>
+<th style="text-align: right;">100k × 100 ep, L8: EEM (gap ↓)</th>
+<th style="text-align: right;">100k × 150 ep, L4: EEM (gap ↓)</th>
+<th style="text-align: right;"><strong>300k × 50 ep, L4</strong>: EEM (gap ↓)</th>
+<th style="text-align: right;">200k × 100 ep, L4: EEM (gap ↓)</th>
+<th style="text-align: right;">300k × 100 ep, L4: EEM (gap ↓)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mix</code></td>
+<td>kept</td>
+<td style="text-align: right;">0.443</td>
+<td style="text-align: right;">0.415 (<strong>0.028</strong>)</td>
+<td style="text-align: right;">0.422 (<strong>0.022</strong>)</td>
+<td style="text-align: right;">0.426 (<strong>0.017</strong>)</td>
+<td style="text-align: right;">0.424 (<strong>0.019</strong>)</td>
+<td style="text-align: right;">0.423 (<strong>0.020</strong>)</td>
+<td style="text-align: right;">0.425 (<strong>0.018</strong>)</td>
+<td style="text-align: right;">0.420 (<strong>0.024</strong>)</td>
+<td style="text-align: right;">0.428 (<strong>0.016</strong>)</td>
+<td style="text-align: right;">0.426 (<strong>0.017</strong>)</td>
+<td style="text-align: right;">0.431 (<strong>0.012</strong>)</td>
+<td style="text-align: right;">0.438 (<strong>0.006</strong>)</td>
+</tr>
+<tr>
+<td><code>screen</code></td>
+<td>kept</td>
+<td style="text-align: right;">0.552</td>
+<td style="text-align: right;">0.535 (<strong>0.017</strong>)</td>
+<td style="text-align: right;">0.544 (<strong>0.008</strong>)</td>
+<td style="text-align: right;">0.553 (<strong>-0.001</strong>)</td>
+<td style="text-align: right;">0.555 (<strong>-0.004</strong>)</td>
+<td style="text-align: right;">0.552 (<strong>-0.001</strong>)</td>
+<td style="text-align: right;">0.536 (<strong>0.016</strong>)</td>
+<td style="text-align: right;">0.546 (<strong>0.006</strong>)</td>
+<td style="text-align: right;">0.546 (<strong>0.006</strong>)</td>
+<td style="text-align: right;">0.543 (<strong>0.008</strong>)</td>
+<td style="text-align: right;">0.554 (<strong>-0.002</strong>)</td>
+<td style="text-align: right;">0.543 (<strong>0.008</strong>)</td>
+</tr>
+<tr>
+<td><code>multiply</code></td>
+<td>kept</td>
+<td style="text-align: right;">0.538</td>
+<td style="text-align: right;">0.504 (<strong>0.034</strong>)</td>
+<td style="text-align: right;">0.526 (<strong>0.011</strong>)</td>
+<td style="text-align: right;">0.535 (<strong>0.003</strong>)</td>
+<td style="text-align: right;">0.532 (<strong>0.006</strong>)</td>
+<td style="text-align: right;">0.525 (<strong>0.013</strong>)</td>
+<td style="text-align: right;">0.528 (<strong>0.009</strong>)</td>
+<td style="text-align: right;">0.525 (<strong>0.013</strong>)</td>
+<td style="text-align: right;">0.526 (<strong>0.012</strong>)</td>
+<td style="text-align: right;">0.533 (<strong>0.004</strong>)</td>
+<td style="text-align: right;">0.531 (<strong>0.006</strong>)</td>
+<td style="text-align: right;">0.534 (<strong>0.004</strong>)</td>
+</tr>
+<tr>
+<td><code>lighten</code></td>
+<td>kept</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">0.938 (0.062)</td>
+<td style="text-align: right;">0.967 (<strong>0.033</strong>)</td>
+<td style="text-align: right;">0.990 (<strong>0.010</strong>)</td>
+<td style="text-align: right;">0.986 (<strong>0.014</strong>)</td>
+<td style="text-align: right;">0.977 (<strong>0.023</strong>)</td>
+<td style="text-align: right;">0.982 (<strong>0.018</strong>)</td>
+<td style="text-align: right;">0.979 (<strong>0.021</strong>)</td>
+<td style="text-align: right;">0.984 (<strong>0.016</strong>)</td>
+<td style="text-align: right;">0.994 (<strong>0.006</strong>)</td>
+<td style="text-align: right;">0.995 (<strong>0.005</strong>)</td>
+<td style="text-align: right;">0.996 (<strong>0.004</strong>)</td>
+</tr>
+<tr>
+<td><code>darken</code></td>
+<td>kept</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">0.918 (0.082)</td>
+<td style="text-align: right;">0.966 (<strong>0.034</strong>)</td>
+<td style="text-align: right;">0.991 (<strong>0.009</strong>)</td>
+<td style="text-align: right;">0.989 (<strong>0.011</strong>)</td>
+<td style="text-align: right;">0.983 (<strong>0.017</strong>)</td>
+<td style="text-align: right;">0.976 (<strong>0.024</strong>)</td>
+<td style="text-align: right;">0.983 (<strong>0.017</strong>)</td>
+<td style="text-align: right;">0.985 (<strong>0.015</strong>)</td>
+<td style="text-align: right;">0.993 (<strong>0.007</strong>)</td>
+<td style="text-align: right;">0.995 (<strong>0.005</strong>)</td>
+<td style="text-align: right;">0.998 (<strong>0.002</strong>)</td>
+</tr>
+<tr>
+<td><code>difference</code></td>
+<td>added</td>
+<td style="text-align: right;">1.000</td>
+<td style="text-align: right;">0.714 (0.286)</td>
+<td style="text-align: right;">0.853 (0.147)</td>
+<td style="text-align: right;">0.962 (<strong>0.038</strong>)</td>
+<td style="text-align: right;">0.963 (<strong>0.037</strong>)</td>
+<td style="text-align: right;">0.913 (0.087)</td>
+<td style="text-align: right;">0.898 (0.102)</td>
+<td style="text-align: right;">0.915 (0.085)</td>
+<td style="text-align: right;">0.929 (0.071)</td>
+<td style="text-align: right;">0.972 (<strong>0.028</strong>)</td>
+<td style="text-align: right;">0.985 (<strong>0.015</strong>)</td>
+<td style="text-align: right;">0.989 (<strong>0.011</strong>)</td>
+</tr>
+<tr>
+<td><code>exclusion</code></td>
+<td>added</td>
+<td style="text-align: right;">0.568</td>
+<td style="text-align: right;">0.518 (0.051)</td>
+<td style="text-align: right;">0.551 (<strong>0.018</strong>)</td>
+<td style="text-align: right;">0.556 (<strong>0.012</strong>)</td>
+<td style="text-align: right;">0.557 (<strong>0.011</strong>)</td>
+<td style="text-align: right;">0.553 (<strong>0.016</strong>)</td>
+<td style="text-align: right;">0.550 (<strong>0.018</strong>)</td>
+<td style="text-align: right;">0.547 (<strong>0.022</strong>)</td>
+<td style="text-align: right;">0.562 (<strong>0.007</strong>)</td>
+<td style="text-align: right;">0.559 (<strong>0.009</strong>)</td>
+<td style="text-align: right;">0.573 (<strong>-0.005</strong>)</td>
+<td style="text-align: right;">0.558 (<strong>0.010</strong>)</td>
+</tr>
+<tr>
+<td><code>hsvmix</code></td>
+<td>added</td>
+<td style="text-align: right;">0.390</td>
+<td style="text-align: right;">0.309 (0.081)</td>
+<td style="text-align: right;">0.331 (0.059)</td>
+<td style="text-align: right;">0.336 (0.054)</td>
+<td style="text-align: right;">0.328 (0.062)</td>
+<td style="text-align: right;">0.318 (0.072)</td>
+<td style="text-align: right;">0.313 (0.077)</td>
+<td style="text-align: right;">0.331 (0.058)</td>
+<td style="text-align: right;">0.303 (0.087)</td>
+<td style="text-align: right;">0.351 (<strong>0.039</strong>)</td>
+<td style="text-align: right;">0.334 (0.055)</td>
+<td style="text-align: right;">0.340 (<strong>0.050</strong>)</td>
+</tr>
+<tr>
+<td><code>hue-hsv</code></td>
+<td>order-sensitive</td>
+<td style="text-align: right;">0.825</td>
+<td style="text-align: right;">0.806 (0.019)</td>
+<td style="text-align: right;">0.805 (0.020)</td>
+<td style="text-align: right;">0.821 (0.004)</td>
+<td style="text-align: right;">0.821 (0.004)</td>
+<td style="text-align: right;">0.807 (0.017)</td>
+<td style="text-align: right;">0.804 (0.020)</td>
+<td style="text-align: right;">0.809 (0.015)</td>
+<td style="text-align: right;">0.806 (0.019)</td>
+<td style="text-align: right;">0.818 (0.007)</td>
+<td style="text-align: right;">0.820 (0.005)</td>
+<td style="text-align: right;">0.822 (0.002)</td>
+</tr>
+<tr>
+<td><code>sat-hsv</code></td>
+<td>order-sensitive</td>
+<td style="text-align: right;">0.693</td>
+<td style="text-align: right;">0.676 (0.017)</td>
+<td style="text-align: right;">0.673 (0.021)</td>
+<td style="text-align: right;">0.691 (0.002)</td>
+<td style="text-align: right;">0.695 (-0.002)</td>
+<td style="text-align: right;">0.680 (0.014)</td>
+<td style="text-align: right;">0.690 (0.003)</td>
+<td style="text-align: right;">0.685 (0.009)</td>
+<td style="text-align: right;">0.681 (0.012)</td>
+<td style="text-align: right;">0.693 (-0.000)</td>
+<td style="text-align: right;">0.696 (-0.002)</td>
+<td style="text-align: right;">0.689 (0.005)</td>
+</tr>
+<tr>
+<td><code>value-hsv</code></td>
+<td>order-sensitive</td>
+<td style="text-align: right;">0.716</td>
+<td style="text-align: right;">0.694 (0.022)</td>
+<td style="text-align: right;">0.690 (0.026)</td>
+<td style="text-align: right;">0.712 (0.004)</td>
+<td style="text-align: right;">0.711 (0.005)</td>
+<td style="text-align: right;">0.707 (0.009)</td>
+<td style="text-align: right;">0.705 (0.011)</td>
+<td style="text-align: right;">0.706 (0.011)</td>
+<td style="text-align: right;">0.707 (0.010)</td>
+<td style="text-align: right;">0.716 (0.001)</td>
+<td style="text-align: right;">0.713 (0.003)</td>
+<td style="text-align: right;">0.710 (0.006)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Clears the bar</strong> (every kept and added op within 0.05 of its ceiling): 300k × 50 ep, L4 (4,950 steps, the frozen point), widest gap <code>hsvmix</code> at 0.039; 300k × 100 ep, L4 (9,900 steps), widest gap <code>hsvmix</code> at 0.050.</li>
+<li><strong>Misses</strong>: 100k × 50 ep, L4 (1,650 steps) on <code>lighten</code>, <code>darken</code>, <code>difference</code>, <code>exclusion</code>, <code>hsvmix</code>; 200k × 33 ep, L4 (2,178 steps) on <code>difference</code>, <code>hsvmix</code>; 300k × 33 ep, L4 (3,267 steps) on <code>hsvmix</code>; 200k × 50 ep, L4 (3,300 steps) on <code>hsvmix</code>; 100k × 100 ep, L4 (3,300 steps) on <code>difference</code>, <code>hsvmix</code>; 100k × 100 ep, L6 (3,300 steps) on <code>difference</code>, <code>hsvmix</code>; 100k × 100 ep, L8 (3,300 steps) on <code>difference</code>, <code>hsvmix</code>; 100k × 150 ep, L4 (4,950 steps) on <code>difference</code>, <code>hsvmix</code>; 200k × 100 ep, L4 (6,600 steps) on <code>hsvmix</code>.</li>
+<li>The order-sensitive ops are within 0.03 of their ceiling at every point.</li>
+</ul>
+<h3 id="budget">Budget<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#budget" title="Link to this heading">&para;</a></h3>
+<p>59 runs of 4,950 steps at d64-L4, plus scoring under three operators on 11 probe sets. That is three times the steps per run of ex-2.2.3's short runs, at about the same run count; on an L4 a run takes about three minutes.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:wide">
+<p>The prereg draft called it <code>handover-wide</code>: at the draft's 100k lines, holding lines per op at the six-op count meant a larger corpus. The calibration look below made the main corpus the larger one.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.2.9/#fnref:wide" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

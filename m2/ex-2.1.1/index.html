@@ -1,0 +1,1671 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/084f6624e494d038224f7ced7ab57b168fa5fef2/exports/m2/ex-2.1.1/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/ex-2.1.1/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.1.1: un-anchored color-mixing transformer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The page style for a woven document. Base typography follows scripts/md.css (the site's
+ * Markdown pages), figure and table rules follow docs/report.css. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 50rem;
+  --gutter: 1.5rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+}
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Lora", serif;
+  font-weight: 400;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 { margin-top: 0; font-size: 2.25em; }
+p { margin-block: 1em; }
+
+code, pre, kbd {
+  font-family: "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+}
+code { background-color: var(--code-bg); padding: 0.1em 0.3em; border-radius: 3px; }
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code { background: none; padding: 0; border-radius: 0; font-size: 1em; }
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Anchor links on headings. */
+a.anchor-link { opacity: 0; color: var(--fg-muted); transition: opacity 0.2s ease; }
+a.anchor-link::after { content: '#'; font-size: 0.8em; margin-inline: 0.4em; }
+:hover > a.anchor-link { opacity: 1; }
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. */
+table { border-collapse: collapse; margin-block: 1.5em; margin-inline: auto; }
+th, td { padding: 0.35em 0.8em; border: 0; text-align: left; vertical-align: top; }
+th { font-weight: 600; }
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) { border-top: 2px solid var(--rule); }
+thead > tr:last-child > :is(th, td) { border-bottom: 1px solid var(--rule); padding-bottom: 0.5em; }
+tbody > tr:first-child > :is(th, td) { padding-top: 0.5em; }
+tbody > tr:last-child > :is(th, td) { border-bottom: 2px solid var(--rule); }
+
+img, video { max-width: 100%; height: auto; }
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure { margin-inline: 0; text-align: center; }
+figure img { margin-inline: auto; display: block; }
+figure:has(> figure) { text-wrap: balance; }
+figure:has(> figure) > figure { display: inline-block; vertical-align: top; margin: 0 0.5em; }
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { font-size: 11pt; display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  pre, figure, table { break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1.5rem -1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish. Applied two ways
+ * (see eng/ and mini.reports.set_report_styles):
+ *   - baked into each export by the exporter, before it prints the PDF, so it ships
+ *     in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheet
+ * (`main.lit` is a literate script's content column; that sheet already covers
+ * figures, captions, tables, admonitions and footnotes on screen, so the rules here
+ * are the report-specific pieces and the print ones). */
+
+/* Captions on authored figures — a table / other HTML-SVG body wrapped by
+ * mini.vis.figure_html with class="report-figure" — get the same muted italic look
+ * `themed` bakes into image captions, so every report caption reads alike. */
+figure.report-figure > figcaption {
+  margin-top: 0.6em;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+}
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * CSS in mini.vis.figures: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. */
+  html {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure CSS (mini.vis.figures) picks
+   * the pair by the page theme; paper has one. */
+  figure[class*="mini-themed-figure"] .mini-themed-img-light {
+    display: block !important;
+  }
+  figure[class*="mini-themed-figure"] .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.1.1/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/ex-2.1.1/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.1.1</strong> · <code>5eadc57-dirty</code> (dirty) · run 2026-07-14<div>via reports/m2/ex-2.1.1/checkpoints/d64-L4-s0, reports/m2/ex-2.1.1/checkpoints/d64-L4-s1, reports/m2/ex-2.1.1/checkpoints/d64-L4-s2, reports/m2/ex-2.1.1/metrics, reports/m2/ex-2.1.1/probe-weights</div></div></details>
+<main class="lit">
+<h1 id="ex-211-un-anchored-color-mixing-transformer">Ex 2.1.1: un-anchored color-mixing transformer<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#ex-211-un-anchored-color-mixing-transformer" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>A small transformer learns a character-level language of color-mixing equations, solving the forms it saw in training and unseen hex pairs. Color turns out to be linearly decodable from its residual stream, with each seed putting <em>redness</em> in a different place. Held-out <em>named</em> pairs sit at zero accuracy.</p>
+</div>
+<p>In M2, we want to see whether Sparse Concept Anchoring carries over from autoencoders to transformers. Before we anchor anything we need a baseline, so this experiment trains a small transformer on a well-defined task.</p>
+<p>The model must learn a character-level language of color mixing equations on a 16-level RGB grid. Here are the sample types, which we will refer to throughout:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Named pairs</td>
+<td><code>red + blue = purple</code></td>
+</tr>
+<tr>
+<td>Hex pairs</td>
+<td><code>#f00 + #00f = #808</code></td>
+</tr>
+<tr>
+<td>Cross-form</td>
+<td><code>red + #00f = #808</code></td>
+</tr>
+<tr>
+<td>Alias</td>
+<td><code>red = #f00</code></td>
+</tr>
+</tbody>
+</table>
+<p>Every operand spans several tokens in both of its spellings, to force the model to perform two tasks simultaneously: it must mix the colors and spell the result.</p>
+<p>Mixing (<code>+</code>) is the channel-wise round-half-up mean, so each prompt has one correct completion.</p>
+<p>We sweep width {16, 32, 64} × depth {2, 4} × 3 seeds (<a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.1.1/experiment.py">experiment definition</a>), and for each condition we measure:</p>
+<ul>
+<li>
+<p>Completion accuracy: greedy decoding, scored as an exact string match, over four evaluation sets. Those are named pairs seen in training; held-out named pairs, which never appear as named equations, so the model has to combine the alias dictionary with hex arithmetic to answer them; hex-only equations; and cross-form operand pairs that were never shown together.</p>
+</li>
+<li>
+<p>Probe alignment <sup id="fnref:probes"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#fn:probes">1</a></sup>: ridge regression from the residual stream at each depth out to the operand color, the result color, and the <em>redness</em> of the result.</p>
+</li>
+</ul>
+<h2 id="hypotheses">Hypotheses<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#hypotheses" title="Link to this heading">&para;</a></h2>
+<p><strong>H1.</strong> A small nGPT should learn the task, with near-perfect accuracy on seen forms and on unseen <em>hex</em> pairs; that leaves the anchored runs room to show any degradation later.</p>
+<p><strong>H2.</strong> Color should be linearly readable from the residual stream, more so as depth increases.</p>
+<p><strong>H3.</strong> The <em>redness</em> probe directions should vary from seed to seed. This is part of the motivation for this work: searching for a concept after training turns up a different geometry every time, whereas SCA should let us fix the location in advance.</p>
+<h2 id="training-data">Training data<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#training-data" title="Link to this heading">&para;</a></h2>
+<p>The corpus sampler is deterministic. Regenerating it here with the constants defined in the experiment gives back the same training data the model saw, and these are its first lines:</p>
+<figure class="report-figure"><div class="highlight"><pre><span></span><code>chartreuse + violet = gray
+#076 + #c0b = #649
+#1bc + #196 = #1a9
+#0c1 + #33a = #286
+lavender + #fc8 = #cac
+mint = #8f8
+white + white = white
+yellow + cyan = mint
+#4f7 + #be3 = #8f5
+lavender = #88f
+</code></pre></div><figcaption><p>40,000 lines in total: 23,924 hex, 6,078 named, 6,101 cross, 3,897 alias.</p></figcaption></figure>
+
+<p>Between them they cover 29,875 distinct operand pairs, <strong>0.36%</strong> of the 8.4M in the grid. So the unseen-pair eval sets, sampled to steer clear of all of them, test the mixing rule rather than recall.</p>
+<h3 id="the-color-space">The color space<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#the-color-space" title="Link to this heading">&para;</a></h3>
+<p>Every color is a point on an RGB grid with 16 levels per channel, so 16³ = 4096 points in all. If we rotate the cube so its black-to-white diagonal stands vertical, <em>value</em> runs up the page and hue wraps around it. That is the figure below, seen front-on toward the <em>red</em> corner. Hex and cross equations draw their operands from anywhere in this cube.</p>
+<style>
+.mini-themed-figure-aed08b988bc0 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-aed08b988bc0 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-aed08b988bc0 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-aed08b988bc0 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-aed08b988bc0">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/color-space-cube-light.png" alt="An orthographic front view of the RGB grid, rotated so the black-to-white diagonal is vertical: black at the bottom, white at the top, hues fanned around the middle, showing the red, green, and magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a smooth solid." width="434" height="434" style="max-width: 100%; height: auto;" data-asset-name="color-space-cube" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/color-space-cube-dark.png" alt="An orthographic front view of the RGB grid, rotated so the black-to-white diagonal is vertical: black at the bottom, white at the top, hues fanned around the middle, showing the red, green, and magenta faces. Each of the 4096 grid colors is a filled dot, packed densely enough to read as a smooth solid." width="434" height="434" style="max-width: 100%; height: auto;" data-asset-name="color-space-cube" />
+<figcaption><p>The 16³ hex grid</p></figcaption></figure>
+
+<p>The 27 named colors sit only on the {0, 8, 15}³ sub-lattice, the corners and edge midpoints of the cube. Note that no <em>color</em> is held out: every point shows up in training, since hex operands are sampled over the whole grid and each name appears in an alias line. What we hold out is operand pairs, both named and hex.</p>
+<figure>
+<style>
+.mini-themed-figure-3941e2307981 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-3941e2307981 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-3941e2307981 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-3941e2307981 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-3941e2307981">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/named-pair-lattice-train-light.png" alt="An orthographic front view of the 27 named colors as a lattice in the rotated RGB cube, value vertical with black at the bottom and white at the top. Each named color is a small dot in its true color. The pairs used as named equations in training are bold and colored by the color their two operands mix to; the held-out pairs are drawn faint for context. One training edge is picked out on the cube silhouette with italic letters a and b at its endpoints (white and magenta), the worked example a + b = orchid. The panel has no background fill or axes; front-facing edges are heavier than back and interior ones, so the lattice reads three-dimensionally. Titled &#x27;train&#x27;." width="414" height="416" style="max-width: 100%; height: auto;" data-asset-name="named-pair-lattice-train" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/named-pair-lattice-train-dark.png" alt="An orthographic front view of the 27 named colors as a lattice in the rotated RGB cube, value vertical with black at the bottom and white at the top. Each named color is a small dot in its true color. The pairs used as named equations in training are bold and colored by the color their two operands mix to; the held-out pairs are drawn faint for context. One training edge is picked out on the cube silhouette with italic letters a and b at its endpoints (white and magenta), the worked example a + b = orchid. The panel has no background fill or axes; front-facing edges are heavier than back and interior ones, so the lattice reads three-dimensionally. Titled &#x27;train&#x27;." width="414" height="416" style="max-width: 100%; height: auto;" data-asset-name="named-pair-lattice-train" />
+<figcaption><p>Train</p></figcaption></figure>
+<style>
+.mini-themed-figure-6954f82d4dc9 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-6954f82d4dc9 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-6954f82d4dc9 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-6954f82d4dc9 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-6954f82d4dc9">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/named-pair-lattice-holdout-light.png" alt="The same orthographic front view of the 27 named colors in the rotated RGB cube, same orientation and styling as the train panel. Here the pairs held out for the named-holdout evaluation are bold and colored by their mixed result, with the training pairs drawn faint for context. One held-out edge is picked out on the cube silhouette with italic letters c and d at its endpoints (magenta and blue), the worked example c + d = violet. Titled &#x27;held out for eval&#x27;." width="414" height="414" style="max-width: 100%; height: auto;" data-asset-name="named-pair-lattice-holdout" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/named-pair-lattice-holdout-dark.png" alt="The same orthographic front view of the 27 named colors in the rotated RGB cube, same orientation and styling as the train panel. Here the pairs held out for the named-holdout evaluation are bold and colored by their mixed result, with the training pairs drawn faint for context. One held-out edge is picked out on the cube silhouette with italic letters c and d at its endpoints (magenta and blue), the worked example c + d = violet. Titled &#x27;held out for eval&#x27;." width="414" height="414" style="max-width: 100%; height: auto;" data-asset-name="named-pair-lattice-holdout" />
+<figcaption><p>Held out for eval</p></figcaption></figure><figcaption><p>Named pairs on the cube.
+<b>a-b</b>: white + magenta = orchid.
+<b>c-d</b>: magenta + blue = violet.</p></figcaption></figure>
+
+<p>Both figures show the same lattice from the front. The vertices are the named colors, and each edge joins the two operands of a named pair. The midpoint of an edge is the answer that equation should produce.</p>
+<p>Two edges are labeled as worked examples:</p>
+<ul>
+<li><span class="arithmatex">\(\overline{ab}\)</span>: <span class="sw" style="--sw: #fff;" aria-hidden="true"></span>&nbsp;white + <span class="sw" style="--sw: #f0f;" aria-hidden="true"></span>&nbsp;magenta = <span class="sw" style="--sw: #f8f;" aria-hidden="true"></span>&nbsp;orchid (train)</li>
+<li><span class="arithmatex">\(\overline{cd}\)</span>: <span class="sw" style="--sw: #f0f;" aria-hidden="true"></span>&nbsp;magenta + <span class="sw" style="--sw: #00f;" aria-hidden="true"></span>&nbsp;blue = <span class="sw" style="--sw: #80f;" aria-hidden="true"></span>&nbsp;violet (held out)</li>
+</ul>
+<p>Only the connected pairs ever appear as named equations <em>with a named answer</em>. Every other operand pair the model sees is written in hex or cross form, and those draw their operands from the full 16³ grid.</p>
+<p>A held-out edge like <code>magenta + blue = violet</code> can be answered two ways. One is recall, which is ruled out here, since that named rendering never appears in training. The other is composition: recognize both names as colors, mix them as if they had been written in hex, and translate the result back into a name. Composition is what the <code>named_holdout</code> eval set measures.</p>
+<p>The <code>hex_unseen</code> and <code>cross_unseen</code> sets are sampled at evaluation time from the full grid, steering clear of every operand pair the corpus used.</p>
+<p>Results: Accuracy on unseen hex pairs spans <strong>0.18–1.00</strong> across the sweep, while held-out named pairs, the compositional test, span <strong>0.00–0.00</strong>. The figures below break this down by condition and eval set.</p>
+<h2 id="completion-accuracy-across-the-sweep">Completion accuracy across the sweep<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#completion-accuracy-across-the-sweep" title="Link to this heading">&para;</a></h2>
+<p>The figure below shows accuracy vs. model width, with one panel per eval set. Each panel has one line per model depth (the mean over seeds). Individual seeds are shown as faint points.</p>
+<p>The named-holdout panel is interesting. It can only be solved by combining the alias dictionary with the mixing arithmetic, and we find that the model never learns to do that.</p>
+<style>
+.mini-themed-figure-3329d44d18d5 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-3329d44d18d5 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-3329d44d18d5 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-3329d44d18d5 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-3329d44d18d5">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/accuracy-sweep-light.png" alt="Four line charts of completion accuracy (0 to 1) against model width (16, 32, 64), one panel per eval set: named seen, named holdout, hex unseen, and cross unseen. Each panel has one line per depth (2 and 4 layers, darker is deeper), averaged over three seeds, with individual seeds as faint points." width="1115" height="318" style="max-width: 100%; height: auto;" data-asset-name="accuracy-sweep" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/accuracy-sweep-dark.png" alt="Four line charts of completion accuracy (0 to 1) against model width (16, 32, 64), one panel per eval set: named seen, named holdout, hex unseen, and cross unseen. Each panel has one line per depth (2 and 4 layers, darker is deeper), averaged over three seeds, with individual seeds as faint points." width="1115" height="318" style="max-width: 100%; height: auto;" data-asset-name="accuracy-sweep" />
+</figure>
+
+<h2 id="watching-it-answer-character-by-character">Watching it answer, character by character<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#watching-it-answer-character-by-character" title="Link to this heading">&para;</a></h2>
+<p>Let's see where in each sequence the model was unsure.</p>
+<p>For the d64-L4 model (seed 0), we plot one example per eval set and draw two series beneath the text, both as fractions of <span class="arithmatex">\(\log |V|\)</span>, the value a uniform guess over the vocabulary would give. The first is the surprisal of the model at each character: how "surprised" it is by the character that actually comes next. The second is the entropy of its predictive distribution, the surprisal it expected on average before seeing that character.</p>
+<p>Operands are unpredictable, so both series should spike at the first characters of each operand and settle as the prefix pins down the rest. Everything after <code>=</code> can be computed from the operands, so a model that has learnt color mixing should coast through the answer at near-zero surprisal, even on operand pairs it has never seen. If instead it guesses the answer, surprisal should spike across the answer characters.</p>
+<figure data-mini-asset="_assets/sublines-surprisal.html" aria-label="Four short mixing equations, one per eval set, each with a sparkline of per-character surprisal (solid) and predictive entropy (dashed) drawn under the text, on a shared 0-to-log-V scale. The two series track each other, spiking at operand starts and staying near zero across the answers — except named holdout, where surprisal rises well above entropy on the answer characters."><figure style="display: inline-block; margin: 0 .5em"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 196.4px; max-width: 100%; display: inline-block;" viewBox="0 0 196.4 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">b</tspan><tspan x="12.6">l</tspan><tspan x="21">a</tspan><tspan x="29.4">c</tspan><tspan x="37.8">k</tspan><tspan x="46.2"> </tspan><tspan x="54.6">+</tspan><tspan x="63"> </tspan><tspan x="71.4">b</tspan><tspan x="79.8">l</tspan><tspan x="88.2">a</tspan><tspan x="96.6">c</tspan><tspan x="105">k</tspan><tspan x="113.4"> </tspan><tspan x="121.8">=</tspan><tspan x="130.2"> </tspan><tspan x="138.6">b</tspan><tspan x="147">l</tspan><tspan x="155.4">a</tspan><tspan x="163.8">c</tspan><tspan x="172.2">k</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-0"><rect x="0" y="-20" width="176.4" height="40" /></clipPath><path d="M 12.6,8.5 S 16.8,15.1 21.0,15.1 S 25.2,20.0 29.4,20.0 S 33.6,20.0 37.8,20.0 S 42.0,19.5 46.2,19.5 S 50.4,15.3 54.6,15.3 S 58.8,20.0 63.0,20.0 S 67.2,15.0 71.4,15.0 S 75.6,20.0 79.8,20.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,20.0 130.2,20.0 S 134.4,20.0 138.6,20.0 S 142.8,20.0 147.0,20.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0 S 168.0,20.0 172.2,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-0)" /><path d="M 12.6,5.1 S 16.8,16.2 21.0,16.2 S 25.2,20.0 29.4,20.0 S 33.6,20.0 37.8,20.0 S 42.0,18.4 46.2,18.4 S 50.4,16.2 54.6,16.2 S 58.8,20.0 63.0,20.0 S 67.2,11.3 71.4,11.3 S 75.6,20.0 79.8,20.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,20.0 130.2,20.0 S 134.4,19.9 138.6,19.9 S 142.8,20.0 147.0,20.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0 S 168.0,20.0 172.2,20.0" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-0)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0 M155.2,20.0 L155.6,20.0 M163.6,20.0 L164.0,20.0 M172.0,20.0 L172.4,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">surprisal</text><line x1="85" y1="0" x2="105" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="110" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">entropy</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">named_seen</span></p></figcaption></figure><figure style="display: inline-block; margin: 0 .5em"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 196.4px; max-width: 100%; display: inline-block;" viewBox="0 0 196.4 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">l</tspan><tspan x="12.6">i</tspan><tspan x="21">m</tspan><tspan x="29.4">e</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">b</tspan><tspan x="71.4">l</tspan><tspan x="79.8">a</tspan><tspan x="88.2">c</tspan><tspan x="96.6">k</tspan><tspan x="105"> </tspan><tspan x="113.4">=</tspan><tspan x="121.8"> </tspan><tspan x="130.2">g</tspan><tspan x="138.6">r</tspan><tspan x="147">e</tspan><tspan x="155.4">e</tspan><tspan x="163.8">n</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-1"><rect x="0" y="-20" width="168" height="40" /></clipPath><path d="M 12.6,10.0 S 16.8,16.4 21.0,16.4 S 25.2,20.0 29.4,20.0 S 33.6,19.3 37.8,19.3 S 42.0,15.4 46.2,15.4 S 50.4,20.0 54.6,20.0 S 58.8,10.2 63.0,10.2 S 67.2,20.0 71.4,20.0 S 75.6,0.0 79.8,0.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,8.8 130.2,8.8 S 134.4,20.0 138.6,20.0 S 142.8,0.0 147.0,0.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-1)" /><path d="M 12.6,8.2 S 16.8,15.8 21.0,15.8 S 25.2,20.0 29.4,20.0 S 33.6,18.0 37.8,18.0 S 42.0,16.2 46.2,16.2 S 50.4,20.0 54.6,20.0 S 58.8,9.7 63.0,9.7 S 67.2,20.0 71.4,20.0 S 75.6,20.0 79.8,20.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,16.9 130.2,16.9 S 134.4,20.0 138.6,20.0 S 142.8,20.0 147.0,20.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-1)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0 M155.2,20.0 L155.6,20.0 M163.6,20.0 L164.0,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">surprisal</text><line x1="85" y1="0" x2="105" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="110" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">entropy</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">named_holdout</span></p></figcaption></figure><figure style="display: inline-block; margin: 0 .5em"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 196.4px; max-width: 100%; display: inline-block;" viewBox="0 0 196.4 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">#</tspan><tspan x="12.6">c</tspan><tspan x="21">1</tspan><tspan x="29.4">2</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">#</tspan><tspan x="71.4">3</tspan><tspan x="79.8">2</tspan><tspan x="88.2">c</tspan><tspan x="96.6"> </tspan><tspan x="105">=</tspan><tspan x="113.4"> </tspan><tspan x="121.8">#</tspan><tspan x="130.2">8</tspan><tspan x="138.6">2</tspan><tspan x="147">7</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-2"><rect x="0" y="-20" width="151.2" height="40" /></clipPath><path d="M 12.6,4.4 S 16.8,2.8 21.0,2.8 S 25.2,4.7 29.4,4.7 S 33.6,19.4 37.8,19.4 S 42.0,16.2 46.2,16.2 S 50.4,20.0 54.6,20.0 S 58.8,19.3 63.0,19.3 S 67.2,4.5 71.4,4.5 S 75.6,5.1 79.8,5.1 S 84.0,4.4 88.2,4.4 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,20.0 130.2,20.0 S 134.4,20.0 138.6,20.0 S 142.8,20.0 147.0,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-2)" /><path d="M 12.6,4.8 S 16.8,4.8 21.0,4.8 S 25.2,4.8 29.4,4.8 S 33.6,18.1 37.8,18.1 S 42.0,16.2 46.2,16.2 S 50.4,20.0 54.6,20.0 S 58.8,16.3 63.0,16.3 S 67.2,4.8 71.4,4.8 S 75.6,4.8 79.8,4.8 S 84.0,4.8 88.2,4.8 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,19.9 130.2,19.9 S 134.4,19.7 138.6,19.7 S 142.8,19.8 147.0,19.8" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-2)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">surprisal</text><line x1="85" y1="0" x2="105" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="110" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">entropy</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">hex_unseen</span></p></figcaption></figure><figure style="display: inline-block; margin: 0 .5em"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 196.4px; max-width: 100%; display: inline-block;" viewBox="0 0 196.4 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">r</tspan><tspan x="12.6">o</tspan><tspan x="21">s</tspan><tspan x="29.4">e</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">#</tspan><tspan x="71.4">f</tspan><tspan x="79.8">e</tspan><tspan x="88.2">8</tspan><tspan x="96.6"> </tspan><tspan x="105">=</tspan><tspan x="113.4"> </tspan><tspan x="121.8">#</tspan><tspan x="130.2">f</tspan><tspan x="138.6">7</tspan><tspan x="147">8</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-3"><rect x="0" y="-20" width="151.2" height="40" /></clipPath><path d="M 12.6,8.5 S 16.8,15.9 21.0,15.9 S 25.2,20.0 29.4,20.0 S 33.6,19.2 37.8,19.2 S 42.0,14.1 46.2,14.1 S 50.4,20.0 54.6,20.0 S 58.8,14.3 63.0,14.3 S 67.2,4.0 71.4,4.0 S 75.6,5.3 79.8,5.3 S 84.0,3.9 88.2,3.9 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,20.0 130.2,20.0 S 134.4,19.9 138.6,19.9 S 142.8,20.0 147.0,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-3)" /><path d="M 12.6,9.1 S 16.8,16.1 21.0,16.1 S 25.2,19.9 29.4,19.9 S 33.6,17.8 37.8,17.8 S 42.0,16.5 46.2,16.5 S 50.4,20.0 54.6,20.0 S 58.8,13.1 63.0,13.1 S 67.2,4.8 71.4,4.8 S 75.6,4.9 79.8,4.9 S 84.0,4.8 88.2,4.8 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,19.9 130.2,19.9 S 134.4,19.5 138.6,19.5 S 142.8,19.8 147.0,19.8" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-3)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">surprisal</text><line x1="85" y1="0" x2="105" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="110" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">entropy</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">cross_unseen</span></p></figcaption></figure></figure>
+
+<p>The gap between those two series is <a href="https://www.lesswrong.com/posts/Kjo64rSWkFfc3sre5/detecting-out-of-distribution-text-with-surprisal-and#5__Surprise_surprise__A_new_metric">the surprisal beyond what the model expected</a>,</p>
+<div class="arithmatex">\[s_2 = \frac{i - h}{\log |V|}\]</div>
+<p>where <span class="arithmatex">\(i\)</span> is the surprisal and <span class="arithmatex">\(h\)</span> the entropy. This sits near zero when the model confidence matched the outcome, whether it was confident and right or unsure and appropriately surprised. It goes positive when the model was confidently wrong, and negative when the character was more predictable than its distribution suggested. The sparkline clips at zero, so we draw the negative values as a second, flipped series, <span class="arithmatex">\(-s_2\)</span>.</p>
+<figure data-mini-asset="_assets/sublines-surprise-surprise.html" aria-label="The same four equations, now with sparklines of surprise-surprise: surprisal minus entropy as a fraction of log V. The solid series shows the positive part (more surprised than expected); the dashed series shows the negative part flipped above zero (less surprised than expected). Three sets stay close to the baseline; named holdout shows tall positive spikes across its answer characters."><figure style="display: inline-block; margin: 0 .5em"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 196.4px; max-width: 100%; display: inline-block;" viewBox="0 0 196.4 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">b</tspan><tspan x="12.6">l</tspan><tspan x="21">a</tspan><tspan x="29.4">c</tspan><tspan x="37.8">k</tspan><tspan x="46.2"> </tspan><tspan x="54.6">+</tspan><tspan x="63"> </tspan><tspan x="71.4">b</tspan><tspan x="79.8">l</tspan><tspan x="88.2">a</tspan><tspan x="96.6">c</tspan><tspan x="105">k</tspan><tspan x="113.4"> </tspan><tspan x="121.8">=</tspan><tspan x="130.2"> </tspan><tspan x="138.6">b</tspan><tspan x="147">l</tspan><tspan x="155.4">a</tspan><tspan x="163.8">c</tspan><tspan x="172.2">k</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-4"><rect x="0" y="-20" width="176.4" height="40" /></clipPath><path d="M 12.6,23.5 S 16.8,18.9 21.0,18.9 S 25.2,20.0 29.4,20.0 S 33.6,20.0 37.8,20.0 S 42.0,21.1 46.2,21.1 S 50.4,19.1 54.6,19.1 S 58.8,20.0 63.0,20.0 S 67.2,23.7 71.4,23.7 S 75.6,20.0 79.8,20.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,20.0 130.2,20.0 S 134.4,20.1 138.6,20.1 S 142.8,20.0 147.0,20.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0 S 168.0,20.0 172.2,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-4)" /><path d="M 12.6,16.5 S 16.8,21.1 21.0,21.1 S 25.2,20.0 29.4,20.0 S 33.6,20.0 37.8,20.0 S 42.0,18.9 46.2,18.9 S 50.4,20.9 54.6,20.9 S 58.8,20.0 63.0,20.0 S 67.2,16.3 71.4,16.3 S 75.6,20.0 79.8,20.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,20.0 130.2,20.0 S 134.4,19.9 138.6,19.9 S 142.8,20.0 147.0,20.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0 S 168.0,20.0 172.2,20.0" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-4)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0 M155.2,20.0 L155.6,20.0 M163.6,20.0 L164.0,20.0 M172.0,20.0 L172.4,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">s₂</text><line x1="50" y1="0" x2="70" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="75" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">−s₂</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">named_seen</span></p></figcaption></figure><figure style="display: inline-block; margin: 0 .5em"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 196.4px; max-width: 100%; display: inline-block;" viewBox="0 0 196.4 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">l</tspan><tspan x="12.6">i</tspan><tspan x="21">m</tspan><tspan x="29.4">e</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">b</tspan><tspan x="71.4">l</tspan><tspan x="79.8">a</tspan><tspan x="88.2">c</tspan><tspan x="96.6">k</tspan><tspan x="105"> </tspan><tspan x="113.4">=</tspan><tspan x="121.8"> </tspan><tspan x="130.2">g</tspan><tspan x="138.6">r</tspan><tspan x="147">e</tspan><tspan x="155.4">e</tspan><tspan x="163.8">n</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-5"><rect x="0" y="-20" width="168" height="40" /></clipPath><path d="M 12.6,21.8 S 16.8,20.6 21.0,20.6 S 25.2,20.0 29.4,20.0 S 33.6,21.3 37.8,21.3 S 42.0,19.2 46.2,19.2 S 50.4,20.0 54.6,20.0 S 58.8,20.5 63.0,20.5 S 67.2,20.0 71.4,20.0 S 75.6,0.0 79.8,0.0 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,11.9 130.2,11.9 S 134.4,20.0 138.6,20.0 S 142.8,0.0 147.0,0.0 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-5)" /><path d="M 12.6,18.2 S 16.8,19.4 21.0,19.4 S 25.2,20.0 29.4,20.0 S 33.6,18.7 37.8,18.7 S 42.0,20.8 46.2,20.8 S 50.4,20.0 54.6,20.0 S 58.8,19.5 63.0,19.5 S 67.2,20.0 71.4,20.0 S 75.6,66.2 79.8,66.2 S 84.0,20.0 88.2,20.0 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,28.1 130.2,28.1 S 134.4,20.0 138.6,20.0 S 142.8,81.9 147.0,81.9 S 151.2,20.0 155.4,20.0 S 159.6,20.0 163.8,20.0" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-5)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0 M155.2,20.0 L155.6,20.0 M163.6,20.0 L164.0,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">s₂</text><line x1="50" y1="0" x2="70" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="75" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">−s₂</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">named_holdout</span></p></figcaption></figure><figure style="display: inline-block; margin: 0 .5em"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 196.4px; max-width: 100%; display: inline-block;" viewBox="0 0 196.4 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">#</tspan><tspan x="12.6">c</tspan><tspan x="21">1</tspan><tspan x="29.4">2</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">#</tspan><tspan x="71.4">3</tspan><tspan x="79.8">2</tspan><tspan x="88.2">c</tspan><tspan x="96.6"> </tspan><tspan x="105">=</tspan><tspan x="113.4"> </tspan><tspan x="121.8">#</tspan><tspan x="130.2">8</tspan><tspan x="138.6">2</tspan><tspan x="147">7</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-6"><rect x="0" y="-20" width="151.2" height="40" /></clipPath><path d="M 12.6,19.6 S 16.8,18.0 21.0,18.0 S 25.2,19.9 29.4,19.9 S 33.6,21.3 37.8,21.3 S 42.0,20.0 46.2,20.0 S 50.4,20.0 54.6,20.0 S 58.8,23.0 63.0,23.0 S 67.2,19.8 71.4,19.8 S 75.6,20.3 79.8,20.3 S 84.0,19.6 88.2,19.6 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,20.1 130.2,20.1 S 134.4,20.2 138.6,20.2 S 142.8,20.1 147.0,20.1" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-6)" /><path d="M 12.6,20.4 S 16.8,22.0 21.0,22.0 S 25.2,20.1 29.4,20.1 S 33.6,18.7 37.8,18.7 S 42.0,20.0 46.2,20.0 S 50.4,20.0 54.6,20.0 S 58.8,17.0 63.0,17.0 S 67.2,20.2 71.4,20.2 S 75.6,19.7 79.8,19.7 S 84.0,20.4 88.2,20.4 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,19.9 130.2,19.9 S 134.4,19.8 138.6,19.8 S 142.8,19.9 147.0,19.9" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-6)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">s₂</text><line x1="50" y1="0" x2="70" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="75" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">−s₂</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">hex_unseen</span></p></figcaption></figure><figure style="display: inline-block; margin: 0 .5em"><svg xmlns="http://www.w3.org/2000/svg" style="color-scheme: light dark; background-color: var(--bg-color); box-shadow: 0 0 0 10px var(--bg-color);width: 196.4px; max-width: 100%; display: inline-block;" viewBox="0 0 196.4 96"><style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@100..900&amp;family=Source+Code+Pro&amp;display=swap');
+text {
+    font-family: "Source Code Pro", "Noto Sans Mono", monospace !important;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    white-space: pre;
+}
+svg {
+    color-scheme: light dark;
+    --col-series-1: light-dark(#ef4444, #ff7878);
+    --col-series-2: light-dark(#3b82f6, #3b82f6);
+    --col-series-3: light-dark(#22c55e, #45e881);
+    --col-series-4: light-dark(#f97316, #ffa261);
+    --col-series-5: light-dark(#a855f7, #d9b1ff);
+    --col-text: light-dark(#666666, #dddddd);
+    --col-baseline: light-dark(#cccccc, #666666);
+    --bg-color: light-dark(#fff, #2a2a2a);
+    --blend-mode: multiply;
+}
+@media (prefers-color-scheme: dark) {
+    svg { --blend-mode: screen; }
+}
+rect, circle, line, path, text { transition: fill 0.3s, stroke 0.3s; }
+svg { transition: background-color 0.3s; }
+svg { --bg-color: light-dark(#fff, #181c1a); }
+</style><g transform="translate(10, 25)"><text font-size="14" y="-2.8" text-anchor="middle" fill="var(--col-text)"><tspan x="4.2">r</tspan><tspan x="12.6">o</tspan><tspan x="21">s</tspan><tspan x="29.4">e</tspan><tspan x="37.8"> </tspan><tspan x="46.2">+</tspan><tspan x="54.6"> </tspan><tspan x="63">#</tspan><tspan x="71.4">f</tspan><tspan x="79.8">e</tspan><tspan x="88.2">8</tspan><tspan x="96.6"> </tspan><tspan x="105">=</tspan><tspan x="113.4"> </tspan><tspan x="121.8">#</tspan><tspan x="130.2">f</tspan><tspan x="138.6">7</tspan><tspan x="147">8</tspan></text></g><g transform="translate(10, 26)"><clipPath id="clip-2c91c0a1-7"><rect x="0" y="-20" width="151.2" height="40" /></clipPath><path d="M 12.6,19.4 S 16.8,19.8 21.0,19.8 S 25.2,20.1 29.4,20.1 S 33.6,21.4 37.8,21.4 S 42.0,17.6 46.2,17.6 S 50.4,20.0 54.6,20.0 S 58.8,21.2 63.0,21.2 S 67.2,19.2 71.4,19.2 S 75.6,20.3 79.8,20.3 S 84.0,19.1 88.2,19.1 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,20.1 130.2,20.1 S 134.4,20.4 138.6,20.4 S 142.8,20.1 147.0,20.1" fill="none" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-7)" /><path d="M 12.6,20.6 S 16.8,20.2 21.0,20.2 S 25.2,19.9 29.4,19.9 S 33.6,18.6 37.8,18.6 S 42.0,22.4 46.2,22.4 S 50.4,20.0 54.6,20.0 S 58.8,18.8 63.0,18.8 S 67.2,20.8 71.4,20.8 S 75.6,19.7 79.8,19.7 S 84.0,20.9 88.2,20.9 S 92.4,20.0 96.6,20.0 S 100.8,20.0 105.0,20.0 S 109.2,20.0 113.4,20.0 S 117.6,20.0 121.8,20.0 S 126.0,19.9 130.2,19.9 S 134.4,19.6 138.6,19.6 S 142.8,19.9 147.0,19.9" fill="none" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" style="mix-blend-mode: var(--blend-mode);" clip-path="url(#clip-2c91c0a1-7)" /><path d="M4.0,20.0 L4.4,20.0 M12.4,20.0 L12.8,20.0 M20.8,20.0 L21.2,20.0 M29.2,20.0 L29.6,20.0 M37.6,20.0 L38.0,20.0 M46.0,20.0 L46.4,20.0 M54.4,20.0 L54.8,20.0 M62.8,20.0 L63.2,20.0 M71.2,20.0 L71.6,20.0 M79.6,20.0 L80.0,20.0 M88.0,20.0 L88.4,20.0 M96.4,20.0 L96.8,20.0 M104.8,20.0 L105.2,20.0 M113.2,20.0 L113.6,20.0 M121.6,20.0 L122.0,20.0 M130.0,20.0 L130.4,20.0 M138.4,20.0 L138.8,20.0 M146.8,20.0 L147.2,20.0" fill="none" stroke="var(--col-baseline)" stroke-width="3" stroke-linecap="round" style="mix-blend-mode: var(--blend-mode);" /></g><g transform="translate(10, 69.0)"><line x1="0" y1="0" x2="20" y2="0" stroke="var(--col-series-1)" stroke-width="1" stroke-dasharray="" shape-rendering="crispEdges" /><text x="25" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">s₂</text><line x1="50" y1="0" x2="70" y2="0" stroke="var(--col-series-2)" stroke-width="1" stroke-dasharray="3 2" shape-rendering="crispEdges" /><text x="75" y="4" font-family="system-ui" font-size="10" fill="var(--col-text)">−s₂</text></g></svg><figcaption><p><span style="font-size: 11px; font-family: monospace; opacity: 0.65">cross_unseen</span></p></figcaption></figure></figure>
+
+<p>None spike except <code>named_holdout</code>, the one set this sweep never solves (accuracy 0 above). The model is confident even on those wrong answers: entropy stays low while the true characters arrive as a surprise. What is the model so sure of?</p>
+<h2 id="why-the-named-answers-fail">Why the named answers fail<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#why-the-named-answers-fail" title="Link to this heading">&para;</a></h2>
+<p>The sparklines above are teacher-forced: the model is shown the true answer from the validation set, and we watch how much each one surprises it. <code>lime + black = green</code> is an interesting case.</p>
+<p>Left to choose, this seed opens <code>lime + black</code> with <code>t</code>, for <em>teal</em>, so the true <code>g</code> is mildly surprising. Once it is forced onto <code>g</code>, the model guesses <code>r</code> correctly, since <em>gray</em> and <em>green</em> share the prefix <code>gr</code>. Then the true <code>e</code> is very surprising: on the <code>gr…</code> branch the model is all but sure the word is <em>gray</em>, but <code>e</code> rules that out. The spike is the model fluently spelling a different palette name, then being surprised when the truth arrives.</p>
+<p><em>Teal</em> is a one-channel neighbor of the true mix, and the tall spike on the <code>a</code> of <code>black</code> hints at why. After <code>lime + bl</code> the model puts 100.0% on <code>u</code>, so it is all but certain the second operand is <em>blue</em>, and <code>lime + blue = teal</code> is an equation it trained on.</p>
+<p>When it sees that the operand is different, the correction barely reaches the answer. Going from the <code>lime + blue =</code> prompt to <code>lime + black =</code> lifts <em>gray</em> by a factor of 74, from 0.2% to 13%. The true answer <em>green</em> moves by a similar factor and stays negligible, from 2e-08 to 2e-06, while the trained <em>teal</em> keeps the top spot at 84%. So the operand correction redistributes mass among wrong names rather than finding the arithmetic. The model does learn the result-form rule, which says a named answer appears iff both operands are named. The difficulty is choosing which name, and a trained neighbor seems to overrule.</p>
+<p>Below is every held-out pair, prompted exactly as in the <code>named_holdout</code> eval set, with one column per seed of the chosen architecture.</p>
+<figure class="report-figure"><table class="report-table" style="font-size: 0.9em"><tr><th>prompt</th><th><span class="sw sw-ghost" aria-hidden="true"></span> expected</th><th><span class="sw sw-ghost" aria-hidden="true"></span> seed 0</th><th><span class="sw sw-ghost" aria-hidden="true"></span> seed 1</th><th><span class="sw sw-ghost" aria-hidden="true"></span> seed 2</th></tr><tr><td><code>blue + black = </code></td><td><span class="sw" style="--sw: #008;" aria-hidden="true"></span>&nbsp;navy</td><td><span class="sw" style="--sw: #000;" aria-hidden="true"></span>&nbsp;black</td><td><span class="sw" style="--sw: #000;" aria-hidden="true"></span>&nbsp;black</td><td><span class="sw" style="--sw: #000;" aria-hidden="true"></span>&nbsp;black</td></tr><tr><td><code>lime + black = </code></td><td><span class="sw" style="--sw: #080;" aria-hidden="true"></span>&nbsp;green</td><td><span class="sw" style="--sw: #088;" aria-hidden="true"></span>&nbsp;teal</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #088;" aria-hidden="true"></span>&nbsp;teal</td></tr><tr><td><code>black + red = </code></td><td><span class="sw" style="--sw: #800;" aria-hidden="true"></span>&nbsp;maroon</td><td><span class="sw" style="--sw: #808;" aria-hidden="true"></span>&nbsp;purple</td><td><span class="sw" style="--sw: #880;" aria-hidden="true"></span>&nbsp;olive</td><td><span class="sw" style="--sw: #808;" aria-hidden="true"></span>&nbsp;purple</td></tr><tr><td><code>rose + navy = </code></td><td><span class="sw" style="--sw: #808;" aria-hidden="true"></span>&nbsp;purple</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td></tr><tr><td><code>blue + cyan = </code></td><td><span class="sw" style="--sw: #08f;" aria-hidden="true"></span>&nbsp;azure</td><td><span class="sw" style="--sw: #088;" aria-hidden="true"></span>&nbsp;teal</td><td><span class="sw" style="--sw: #000;" aria-hidden="true"></span>&nbsp;black</td><td><span class="sw" style="--sw: #000;" aria-hidden="true"></span>&nbsp;black</td></tr><tr><td><code>blue + magenta = </code></td><td><span class="sw" style="--sw: #80f;" aria-hidden="true"></span>&nbsp;violet</td><td><span class="sw" style="--sw: #88f;" aria-hidden="true"></span>&nbsp;lavender</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #88f;" aria-hidden="true"></span>&nbsp;lavender</td></tr><tr><td><code>orchid + azure = </code></td><td><span class="sw" style="--sw: #88f;" aria-hidden="true"></span>&nbsp;lavender</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td></tr><tr><td><code>white + lime = </code></td><td><span class="sw" style="--sw: #8f8;" aria-hidden="true"></span>&nbsp;mint</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #8f0;" aria-hidden="true"></span>&nbsp;chartreuse</td><td><span class="sw" style="--sw: #0f0;" aria-hidden="true"></span>&nbsp;lime</td></tr><tr><td><code>chartreuse + maroon = </code></td><td><span class="sw" style="--sw: #880;" aria-hidden="true"></span>&nbsp;olive</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #800;" aria-hidden="true"></span>&nbsp;maroon</td></tr><tr><td><code>olive + lavender = </code></td><td><span class="sw" style="--sw: #888;" aria-hidden="true"></span>&nbsp;gray</td><td><span class="sw" style="--sw: #88f;" aria-hidden="true"></span>&nbsp;lavender</td><td><span class="sw" style="--sw: #88f;" aria-hidden="true"></span>&nbsp;lavender</td><td><span class="sw" style="--sw: #88f;" aria-hidden="true"></span>&nbsp;lavender</td></tr></table><figcaption><p>Greedy completions of the <code>named_holdout</code> prompts, d64-L4, all seeds.</p></figcaption></figure>
+
+<p>The model never answers these in hex. It always reaches for a name, and usually one adjacent to the true mix: 25 of 30 guesses land in the one-step neighborhood of the mix, against 17% for a name drawn uniformly from the palette. Sometimes the name is an echo of one operand (<code>olive + lavender = lavender</code>), though on this palette an operand is often a neighbor anyway, so that part is weaker evidence than it looks.</p>
+<p>The seeds mostly agree: 4 of the 10 pairs draw the same wrong answer from all three. Independent guessing inside the neighborhood would produce well under one such pair, so the bias is systematic; perhaps retrieval of the nearest memorized named equation.</p>
+<p>The mixing arithmetic itself is fine. Prompted with the same held-out value pairs, seed 0 solves <strong>10/10</strong> in hex form and <strong>10/10</strong> in cross form, against <strong>0/10</strong> as named equations.</p>
+<p>The corpus may make this hard for the model. Possible causes:</p>
+<ul>
+<li>Named equations draw on only 66 distinct pairs, so each one is seen about 91 times in training. A lookup table is enough, and the model may build one (<code>named_seen</code> ≈ 1). Once the loss on that slice reaches zero, nothing nudges the model toward the compositional route.</li>
+<li>The alias dictionary runs one way. Alias lines are always <code>name = hex</code>. This may be an instance of the <em>reversal curse</em>, where training on <code>A = B</code> doesn't teach <code>B = A</code>.</li>
+<li>A hex answer can be computed channel-by-channel, whereas the first character of a name depends on all three channels and the inverted dictionary at the same time. The probe section below looks at this more.</li>
+</ul>
+<p>A few corpus changes might help: reverse some alias lines (<code>#f00 = red</code>); add named operands whose off-palette mix forces a hex answer (<code>red + navy = #804</code>), so that <code>name + name</code> prompts have to engage the arithmetic instead of the lookup table; and use a denser named palette, so memorization is harder.</p>
+<h2 id="where-color-is-represented">Where color is represented<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#where-color-is-represented" title="Link to this heading">&para;</a></h2>
+<p>Here we fit the probes at each residual-stream depth (depth 0 is the embedding) and plot their R² against depth<sup id="fnref:rsquare"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#fn:rsquare">2</a></sup>. The figure has one panel per probe target and one line per width. We test only the deepest models (L4) and show the mean over seeds.</p>
+<style>
+.mini-themed-figure-e514ea57a23d {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-e514ea57a23d {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-e514ea57a23d {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-e514ea57a23d > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-e514ea57a23d">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/probe-r2-light.png" alt="Three line charts of probe R-squared against residual-stream depth for the four-layer models, one panel per probe target: operand RGB, result RGB, and result redness. One line per width (16, 32, 64; darker is wider), averaged over seeds. R-squared for the operand rises within the first layers; the result targets rise later in depth." width="952" height="318" style="max-width: 100%; height: auto;" data-asset-name="probe-r2" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/probe-r2-dark.png" alt="Three line charts of probe R-squared against residual-stream depth for the four-layer models, one panel per probe target: operand RGB, result RGB, and result redness. One line per width (16, 32, 64; darker is wider), averaged over seeds. R-squared for the operand rises within the first layers; the result targets rise later in depth." width="952" height="318" style="max-width: 100%; height: auto;" data-asset-name="probe-r2" />
+</figure>
+
+<p>Rising R² for the <em>result</em> means the mix becomes partly readable before the answer starts. It plateaus well below the operand R², though, even in conditions whose hex accuracy is perfect. Probing every answer position, per channel, would map that spread-out schedule (to do).</p>
+<p>The probes read the residual stream at two positions, marked below. The first is the last character of the first operand, where the whole operand has been read in, so its value can be represented. The second is the space after <code>=</code>, the last position before the answer begins, where the result has to be ready.</p>
+<figure class="report-figure"><pre style="line-height: 2.2; font-size: 1.05em">re<span style="background: #e4572e66; border-radius: 2px" title="operand read-out">d</span> + blue =<span style="background: #4d9de066; border-radius: 2px" title="result read-out">␣</span><span style="opacity: 0.55">purple</span><br>orang<span style="background: #e4572e66; border-radius: 2px" title="operand read-out">e</span> + #2c7 =<span style="background: #4d9de066; border-radius: 2px" title="result read-out">␣</span><span style="opacity: 0.55">#9a4</span></pre><figcaption><p><span style="background: #e4572e66; border-radius: 2px">&nbsp;operand&nbsp;</span>
+probes read the color of the first operand at this character;
+<span style="background: #4d9de066; border-radius: 2px">&nbsp;result&nbsp;</span>
+probes read the result color and redness at the space just before the answer (shown as ␣).
+The dimmed answer is never probed.</p></figcaption></figure>
+
+<h2 id="do-seeds-agree-on-where-redness-points">Do seeds agree on where <em>redness</em> points?<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#do-seeds-agree-on-where-redness-points" title="Link to this heading">&para;</a></h2>
+<p>For each pair of seeds trained with the same architecture, we take their fitted redness-probe directions and measure the absolute cosine similarity between them, layer by layer. Two random directions in n dimensions should have |cos| ≈ 0.8/√n, drawn here as the dashed line.</p>
+<p>If this geometry were stable across seeds, there would be little point in anchoring. The spread we see is part of why we want to pin the direction down at training time.</p>
+<style>
+.mini-themed-figure-96e09bd1d264 {
+    .mini-themed-img-dark {
+        display: none;
+    }
+
+    .mini-themed-img-light {
+        display: block;
+    }
+}
+
+body[data-theme='dark'],
+body.dark,
+body.dark-theme {
+    .mini-themed-figure-96e09bd1d264 {
+        .mini-themed-img-dark {
+            display: block;
+        }
+
+        .mini-themed-img-light {
+            display: none;
+        }
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme) {
+        .mini-themed-figure-96e09bd1d264 {
+            .mini-themed-img-dark {
+                display: block;
+            }
+
+            .mini-themed-img-light {
+                display: none;
+            }
+        }
+    }
+}
+
+.mini-themed-figure-96e09bd1d264 > figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.75;
+    text-wrap: balance;
+}
+</style>
+<figure class="mini-themed-figure-96e09bd1d264">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/probe-direction-agreement-light.png" alt="Line chart of the absolute cosine similarity between redness probe directions fitted on different seeds, against residual-stream depth, one line per width for the four-layer models. A dashed horizontal line marks the expected similarity of random directions for each width." width="606" height="356" style="max-width: 100%; height: auto;" data-asset-name="probe-direction-agreement" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/probe-direction-agreement-dark.png" alt="Line chart of the absolute cosine similarity between redness probe directions fitted on different seeds, against residual-stream depth, one line per width for the four-layer models. A dashed horizontal line marks the expected similarity of random directions for each width." width="606" height="356" style="max-width: 100%; height: auto;" data-asset-name="probe-direction-agreement" />
+</figure>
+
+<h2 id="findings">Findings<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#findings" title="Link to this heading">&para;</a></h2>
+<p>The smallest condition that saturates the unseen-pair eval sets is <strong>width 64, 4 layers</strong>. For D2.1, we can take that architecture as the baseline and add the anchor, which pulls sequences labeled <em>red-ish</em> (supplied as sparse, noisy labels) toward a chosen direction at chosen layers. Then we can re-run these measurements and compare the anchored and baseline versions.</p>
+<p>The held-out named pairs sit at zero validation accuracy, so that set gives the anchored runs no headroom and probably can't help us spot any unintended degradation.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:probes">
+<p>A probe is a small linear model we fit on the internal
+activations of the model to read out what those activations carry. Ridge regression is linear regression with a penalty on large weights, which keeps the fit stable.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#fnref:probes" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:rsquare">
+<p>This R² is the fraction of target variance the probe
+recovers, so 1 means the color is fully readable from the stream and 0 means it is not there linearly.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.1/#fnref:rsquare" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>
