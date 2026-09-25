@@ -75,8 +75,8 @@ SRC_CHECKPOINT_REF = ex2211.CHECKPOINT_REF
 METRICS_REF = "reports/m2/answer-distance/metrics"
 ARRAYS_REF = "reports/m2/answer-distance/arrays"
 """The run table (JSON) and the arrays (npz): per run `{label}/summary`, `{label}/split`, and `{label}/hist`;
-per op the line constants under `lines/{op}/…`; and for `LINE_OPS` on `LINE_CONDS` the per-line guess and mean
-under `{label}/{op}/{pass}/…`."""
+per op the line constants under `lines/{op}/…`; and for the runs of `LINE_CONDS` the per-line greedy guess on
+every op, and the mean on `LINE_OPS`, under `{label}/{op}/{pass}/…` (see `publish_line`)."""
 
 
 def label_for(c: Condition, seed: int) -> str:
@@ -130,8 +130,9 @@ N_BINS = 10
 
 LINE_OPS: tuple[str, ...] = ("hue-hsv", "darken")
 LINE_CONDS: tuple[str, ...] = ("control", "handover")
-"""The ops and conditions whose per-line guess and mean are published, for the cube figures: `hue-hsv`, the op
-whose removal lines keep the most exact match, and `darken`, the near miss of ex-2.2.11."""
+"""The conditions whose per-line greedy guesses are published for every op (the counterfactual check), and the
+ops whose per-line mean is published beside them for the cube figures: `hue-hsv`, the op whose removal lines
+keep the most exact match, and `darken`, the near miss of ex-2.2.11."""
 
 BATCH = 2048
 """Lines per forward pass. The last batch is padded to this size so each pass compiles once per checkpoint."""
@@ -233,6 +234,8 @@ def line_table(probes, ckpt) -> dict:
             f"{op}/on_grid": f["q_p"].max(axis=1) >= 1.0 - 1e-9,
         }
         arrays |= {f"{op}/group/{g}": read.groups[g] for g in GROUPS}
+        # The two operand colors in grid steps, for the counterfactual answers the report computes.
+        arrays[f"{op}/operands"] = ad.GRID[tok2color[f["tokens"][:, [0, 2]]]].astype(np.int8)
         counts[op] = {g: int(read.groups[g].sum()) for g in GROUPS}
     return {"n_lines": counts, "arrays": put(npz_bytes(arrays), name="answer-distance-lines.npz")}
 
@@ -365,6 +368,14 @@ def score_chunk(ckpts: list, probes, labels: list[str]) -> list[dict]:
     return results
 
 
+def publish_line(key: str) -> bool:
+    """Which per-line arrays of a run on `LINE_CONDS` are published: the greedy guess on every op under the clean
+    pass and `projection`, and the mean beside it on `LINE_OPS`.
+    """
+    op, pass_, name = key.split("/")
+    return pass_ in ("clean", "projection") and (name == "guess" or (name == "mean" and op in LINE_OPS))
+
+
 def publish_results(lines: dict, scored: list[dict]) -> dict:
     """Every run's summary arrays, the line constants, and the per-line arrays of `LINE_OPS` on `LINE_CONDS`,
     under `ARRAYS_REF`; the run table and every axis name under `METRICS_REF`.
@@ -387,7 +398,7 @@ def publish_results(lines: dict, scored: list[dict]) -> dict:
     paths = get_many([(r["lines"], workdir / f"{r['label']}-lines.npz") for r in keep])
     for r, p in zip(keep, paths, strict=True):
         with np.load(p) as z:
-            merged |= {f"{r['label']}/{k}": z[k] for k in z.files if k.split("/")[0] in LINE_OPS}
+            merged |= {f"{r['label']}/{k}": z[k] for k in z.files if publish_line(k)}
     set_ref(ARRAYS_REF, put(npz_bytes(merged), name="answer-distance-arrays.npz"))
 
     metrics: dict[str, Any] = {
