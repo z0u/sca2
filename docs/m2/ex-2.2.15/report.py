@@ -1074,20 +1074,27 @@ res = Results(metrics=metrics_loaded, traj=traj_loaded)
 
 
 def traj_summary(res: Results) -> dict:
-    """What the trajectories say about H1's descriptive prediction: where `all`'s lean peaks, and how far
-    `whole`'s strays from the control's end-of-training value along the way.
+    """What the trajectories say about H1's descriptive prediction, over the plateau of the anchor weight (from
+    the end of its ramp to the start of its anneal), so the warm-up every arm shares stays out of it: `all`'s
+    lean over each half of the plateau and at the end, and how far `whole`'s strays from the control's
+    end-of-training value from the plateau on.
     """
     epochs, lean_all = res.lean_traj("all")
+    w = np.asarray(res.trajectories("all")[0]["weight"])
+    on = np.flatnonzero(w >= w.max())
+    start, stop_ = int(on[0]), int(on[-1])
+    mid = (start + stop_) // 2
     m = lean_all.mean(0)
     _, lean_whole = res.lean_traj("whole")
-    w = lean_whole.mean(0) - res.control_lean()
-    i = int(np.argmax(np.abs(w)))
+    ex_whole = lean_whole.mean(0)[start:] - res.control_lean()
+    k = int(np.argmax(np.abs(ex_whole)))
     return {
-        "all_peak": float(m.max()),
-        "all_peak_epoch": float(epochs[int(np.argmax(m))]),
+        "plateau": (float(epochs[start]), float(epochs[stop_])),
+        "all_first": float(m[start:mid].mean()),
+        "all_second": float(m[mid : stop_ + 1].mean()),
         "all_end": float(m[-1]),
-        "whole_max_excess": float(w[i]),
-        "whole_max_epoch": float(epochs[i]),
+        "whole_max_excess": float(ex_whole[k]),
+        "whole_max_epoch": float(epochs[start + k]),
     }
 
 
@@ -1149,11 +1156,22 @@ def h1_line() -> str:
 
 def h2_line() -> str:
     q = N["h2"]
-    head = "every arm clears both gates" if not q["failed"] else f"{', '.join(f'`{c}`' for c in q['failed'])} miss"
+
+    def why(c: str) -> str:
+        a = q["arms"][c]
+        gates = [f"margin {a['share']:.2f} of `all`'s"] if a["share"] < ex.MARGIN_KEEP else []
+        gates += [f"task gap {a['gap']:+.4f} on `{a['op']}`"] if abs(a["gap"]) > ex.TASK_GATE else []
+        return f"`{c}` ({', '.join(gates)})"
+
+    head = (
+        "every arm clears both gates"
+        if not q["failed"]
+        else f"{len(q['failed'])} of {len(q['arms'])} arms miss: " + "; ".join(why(c) for c in q["failed"])
+    )
     return (
-        f"{head}: the lowest margin is {N['min_share']:.2f} of `all`'s (`{N['min_share_arm']}`, gate "
-        f"{ex.MARGIN_KEEP:g}), and the largest task gap is {N['worst_gap']:+.4f} (`{N['worst_gap_arm']}` on "
-        f"`{N['worst_gap_op']}`, gate {ex.TASK_GATE:g})."
+        f"{head}. The gates are a margin of at least {ex.MARGIN_KEEP:g} of `all`'s and a task gap within "
+        f"{ex.TASK_GATE:g}; over every arm, the lowest margin is {N['min_share']:.2f} (`{N['min_share_arm']}`) and "
+        f"the largest gap {N['worst_gap']:+.4f} (`{N['worst_gap_arm']}` on `{N['worst_gap_op']}`)."
     )
 
 
@@ -1294,7 +1312,7 @@ If the lean of `all` is less than {ex.READABLE_LEAN:g} above the control's, it d
 
 {slices_figure(res)}
 
-Through training, the lean of `all` peaked at {N["traj"]["all_peak"]:.3f} around epoch {N["traj"]["all_peak_epoch"]:.0f} and ended at {N["traj"]["all_end"]:.3f} on the trajectory probe. The lean of `whole` came furthest from the control's end value at epoch {N["traj"]["whole_max_epoch"]:.0f}, at {N["traj"]["whole_max_excess"]:+.3f}.
+The anchor weight holds at its peak from epoch {N["traj"]["plateau"][0]:.0f} to epoch {N["traj"]["plateau"][1]:.0f}. Over the first half of that plateau, the lean of `all` averaged {N["traj"]["all_first"]:.3f} on the trajectory probe; over the second half, {N["traj"]["all_second"]:.3f}; and it ended at {N["traj"]["all_end"]:.3f}. From the start of the plateau on, the lean of `whole` came furthest from the control's end value at epoch {N["traj"]["whole_max_epoch"]:.0f}, at {N["traj"]["whole_max_excess"]:+.3f}.
 
 {traj_figure(res)}
 
