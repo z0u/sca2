@@ -218,6 +218,13 @@ main.lit details:not(:open) {
   main.lit a:visited {
     color: #1d3f78;
   }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
   /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
    * redraws, and the left rule marks the block on its own. */
   .admonition,

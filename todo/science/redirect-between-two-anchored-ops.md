@@ -14,3 +14,7 @@ The D2.2 [design](/docs/m2/d2.2/design.md)'s fallback discussion adds a third: t
 The angle question it raises: a redirect from $v_{add}$ to $v_{multiply}$ needs to know where multiply's state is, and with only one op anchored that is the natural geometry, unknown before training. Anchoring both dissolves the question — the angle is placed rather than discovered — at the risk of fighting the geometry the ops would prefer (they plausibly share a common *this-is-an-operation* component), which the task gate and alignment margins measure.
 
 Sits beside "several ops on separate axes", already a D2.3 candidate for the subspace bound; the swap is the intervention that pair of axes makes possible, so the two probably land as one experiment.
+
+## Notes
+
+**2026-09-25, D2.2 pivot** — With the [adopted pivot](/docs/m2/d2.2/pivot.md#concept-swap) the ops are inferred from solved examples, so the swap becomes "make the model act as if the examples showed op Y". The posterior over ops still gives per-context ground truth.

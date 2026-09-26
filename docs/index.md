@@ -174,11 +174,11 @@ These experiments were preparation for the main work: exercising the infrastruct
 
 - [D2.2 design](./m2/d2.2/design.md)
 
-    The plan: the claims D2.2 exists to make, the experiments in order with the engineering that precedes them, the risk each retires, and what is out of scope.
+    The plan: the claims D2.2 exists to make, a quick route through the experiments that keeps the rounds of review few, the engineering that precedes them, the risk each retires, and what is out of scope.
 
-- [D2.2 pivot: an operation the model has to infer](./m2/d2.2/pivot.md) (draft)
+- [D2.2 pivot: an operation the model has to infer](./m2/d2.2/pivot.md)
 
-    A proposal after ex-2.2.14: the op anchor went to the op word, so D2.2 would anchor an op the model infers from solved examples in its context, with no word to name it. Covers what M3 needs from D2.2, the sequence, and how D2.3 changes.
+    Adopted after ex-2.2.14: the op anchor went to the op word, so D2.2 anchors an op the model infers from solved examples in its context, with no word to name it. Covers what M3 needs from D2.2, the new grammar and its failure modes, and how D2.3 changes.
 
 - [2.2.1. Suppressing _red_ in the anchored transformer](./m2/ex-2.2.1/report.py)
 
@@ -306,5 +306,13 @@ These experiments were preparation for the main work: exercising the infrastruct
     <span class="tags">`reanalysis` `probes` `methodology` `intervention`</span>
 
     <!-- mini:figures ./m2/answer-distance/report.py -->
+
+- [Where the op1 lean sits: a reanalysis of ex-2.2.11's stored runs](./m2/op1-lean/report.py)
+
+    A reanalysis, no training and no gates: ex-2.2.11's 54 stored runs, asking where the containment rise (ᾱ at op1) comes from. The lean is near zero at the embedding and grows block by block, and at the last block it sits at op1, op2, and the answer, the positions whose next token is a syntax word. With a readout of its own the model sets the readout vectors for the colors at −e₁ and those for the syntax words at +e₁, so the e₁ coordinate of a state votes *a syntax word comes next*, more than half of the margin at op1; the tied readout can move only the syntax embeddings and gets little of that. The whole-line labeller reaches op1 through answer-labelled lines only on lines a training crop cuts short, a few percent of their pull, and the per-color test of that route is weak. Proposes a readout-side cleaning, a span-narrowing arm, and skipping the pull on cut lines.
+
+    <span class="tags">`scouting` `anchoring` `containment` `readout`</span>
+
+    <!-- mini:figures ./m2/op1-lean/report.py -->
 
 </details>

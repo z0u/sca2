@@ -18,11 +18,11 @@ Anchor a concept such as _red_ across the residual stream in the color-mixing ta
 
 ### D2.2: Anchor operations
 
-Anchor an abstract _operation_ (e.g. _addition_, rather than a concrete attribute like _redness_); sweep over layers; confirm task performance is intact and that suppression scales as it did in the autoencoders.
+Anchor an abstract _operation_ that the model infers from solved examples in its context (e.g. _difference_, rather than a concrete attribute like _redness_); sweep over layers; confirm task performance is intact and that suppression scales as it did in the autoencoders.
 
 ### D2.3: Asymmetry
 
-Add a verification task (`red + blue = purple TRUE/FALSE`) and test whether suppression can degrade _completion_ while preserving _verification_: the experimental analog for letting a model recognize a behavior without being able to produce it.
+Add a verification task (does the candidate in `red ? cyan = white, yellow ? red = lime | TRUE` follow the examples before it?) and test whether suppression can degrade _completion_ while preserving _verification_: the experimental analog for letting a model recognize a behavior without being able to produce it.
 
 ### D2.4: Consolidation
 
