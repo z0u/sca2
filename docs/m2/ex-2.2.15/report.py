@@ -61,6 +61,7 @@ CUT = 1 - LONG[(0, 5)]
 CUT_SHORT = 1 - SHORT[(0, 5)]
 BLIND = sum(v for (first, last), v in LONG.items() if not first <= ex.OP_ROLE <= last)
 OP1_ONLY = LONG[(0, 0)]
+SMOKE = ex.SMOKE_RED_LEAN
 
 
 rf"""
@@ -90,17 +91,21 @@ Each result section opens with what we expect, then a placeholder for what we sa
 
 ## Why this experiment
 
-Picture the training corpus as one long tape of many six-token lines. Each training step cuts a {ex.BLOCK}-token window out of that tape at a random place. Most lines in the window are whole, but the two edges of the window usually slice through a line at each end.
+The training corpus is one long tape of six-token lines. Each training step cuts a {ex.BLOCK}-token window from it at a random place. Most lines in the window are whole, but the two edges usually slice through a line.
 
 The anchor does not know about the edges. It asks each labelled line to align with the axis wherever that comes most easily in the visible part, and so asks that part to carry the whole label.
 
-If all that is visible of a `{ex.ANCHORED_OP}` line is its first operand, the anchor asks a color token to say "this line is `{ex.ANCHORED_OP}`" before the op word has appeared. That token cannot know: the only way the model can give the anchor what it wants there is to lean every first operand a little toward the axis, on every line.
+If a `{ex.ANCHORED_OP}` line shows only its first operand, the anchor asks a color token to say "this line is `{ex.ANCHORED_OP}`" before the op word has appeared. That token cannot know, so the only way the model can satisfy the anchor there is to lean every first operand a little toward the axis.
 
-That is what [ex-2.2.14](../ex-2.2.14/report.py) saw, after the fact. At the last block, the first operand leaned toward e₁ at {ex.REFERENCE_OP1_LEAN:.2f} on the primary arm, against {ex.REFERENCE_OP1_LEAN_CONTROL:.2f} on the control. The arm that pulls only the op word had no lean. The [op1-lean reanalysis](../op1-lean/report.py) found the same route on the *red* runs, and proposed skipping the pull on cut lines as a test.
+That is what [ex-2.2.14](../ex-2.2.14/report.py) saw, after the fact. At the last block, the first operand leaned toward e₁ at {ex.REFERENCE_OP1_LEAN:.2f} on the primary arm, against {ex.REFERENCE_OP1_LEAN_CONTROL:.2f} on the control, and the arm that pulls only the op word had no lean. The [op1-lean reanalysis](../op1-lean/report.py) found the same route on the *red* runs, and proposed skipping the pull on cut lines as a test.
 
-How common are cut lines? At {ex.BLOCK} tokens, {CUT:.0%} of line visits are cut short. On {BLIND:.1%} the op word is out of sight, and on {OP1_ONLY:.1%} only the first operand is visible. Those are small shares. But the term is normalized per labelled line, so each of those visits gets the pull of a full line.
+Before fixing the predictions, we ran that test as a smoke test on *red*: two seeds each of `all`, `whole`, and `cut-only`. `whole` took the lean from {SMOKE["all"]:.2f} to {SMOKE["whole"]:.2f}, and `cut-only` kept {SMOKE["cut-only"]:.2f}, against {SMOKE["control"]:.2f} for the control. So on *red*, cut lines carry about a third of the lean and whole lines the rest. The validation loss was the same under every policy, to three decimals.
 
-This matters more after the [D2.2 pivot](../d2.2/pivot.md). There, a line is a context of solved examples about 20 tokens long, and the op is inferred from the examples. A window that cuts the start of a context can remove the examples that name the op. There are fewer lines per window, so the share of cut visits roughly doubles. And a cut context has lost evidence, not just one token. The current grammar is the cheap place to see what each policy does, with a clear sign (the lean) to watch.
+Red is a weaker test than the op, though. On a *red* line the first operand can be red itself, which is evidence the anchor can pull on; on a `{ex.ANCHORED_OP}` line the first operand says nothing about the op.
+
+At {ex.BLOCK} tokens, {CUT:.0%} of line visits are cut short. On {BLIND:.1%} the op word is out of sight, and on {OP1_ONLY:.1%} only the first operand is visible. The shares are small, but the term is normalized per labelled line, so each of those visits gets the pull of a full line.
+
+This matters more after the [D2.2 pivot](../d2.2/pivot.md). There, a line is a context of solved examples about 20 tokens long, and the op is inferred from the examples, so a window that cuts the start of a context can remove the examples that name the op. With fewer lines per window, the share of cut visits roughly doubles, and a cut context has lost evidence, not just one token. The current grammar is the cheap place to see what each policy does, with a clear sign (the lean) to watch.
 
 ## Glossary
 
@@ -137,13 +142,17 @@ The cost of our choice is that the policies differ a little in total pull, so th
 
 ## The first operand lean is due to cut lines (H1)
 
-**What we expect.** `all` reproduces the lean from ex-2.2.14. `whole` removes it: its lean is within {ex.LEAN_BAND:g} of the lean of the control, on the seed mean. And `cut-only` keeps at least {ex.CUT_ONLY_SHARE:.0%} of the excess of `all` over the control, although it has only {ex.pull_share("cut-only"):.0%} of the pull.
+**What we expect.** `all` reproduces the lean from ex-2.2.14. `whole` removes it: its seed-mean lean is within {ex.LEAN_BAND:g} of the control's. And `cut-only` keeps at least {ex.CUT_ONLY_SHARE:.0%} of the excess of `all` over the control, although it has only {ex.pull_share("cut-only"):.0%} of the pull.
 
-Why: the pool needs only one position of a line to align, and on a whole line the op word does so far more easily than the first operand, so the first operand gets almost no pull. The only visits that force pull onto the first operand are the ones that show nothing else. `half` and `knowable` drop those visits too, so we expect them to remove the lean; `scaled` keeps a sixth of their pull, so we expect it to remove most of it.
+Why: the pool needs only one position of a line to align. On a whole line the op word aligns far more easily than the first operand, so the first operand gets almost no pull; only visits that show nothing else force pull onto it. `half` and `knowable` also drop those visits, so we expect them to remove the lean. `scaled` keeps a sixth of their pull, so we expect it to remove most of it.
 
-Through training, we expect the lean of `all` to build while the anchor weight is high and to persist through the anneal. We expect the lean of `whole` to stay near the control throughout. This prediction is descriptive and has no gate. Suppose `whole` shows a lean early and sheds it later, or `all` builds its lean only late. Either would mean the cut lines matter at a particular stage of training, which a reading taken only at the end would miss.
+Through training, we expect the lean of `all` to build while the anchor weight is high and persist through the anneal, and the lean of `whole` to stay near the control throughout. This prediction is descriptive, with no gate. If `whole` shows a lean early and sheds it later, or `all` builds its lean only late, that would mean the cut lines matter at a particular stage of training, which a reading taken only at the end would miss.
 
-If `whole` keeps most of the lean, the lean comes from whole lines, perhaps through the readout as the op1-lean reanalysis found for *red*, and cropping is a side issue on this grammar. If the lean of `all` is less than {ex.READABLE_LEAN:g} above the lean of the control, it did not reproduce at these seeds, and H1 is unresolved.
+If `whole` keeps most of the lean, the lean comes from whole lines (perhaps through the readout, as the op1-lean reanalysis found for *red*), and cropping is a side issue on this grammar. If `whole` removes part of the lean but stays outside the band, as on *red* in the smoke test, the cut lines are one route among others, and `cut-only` says how large a share they carry.
+
+If the lean of `all` is less than {ex.READABLE_LEAN:g} above the control's, it did not reproduce at these seeds, and H1 is unresolved.
+
+<!-- REVIEW: the smoke test on red (two seeds) found `whole` removing about 30% of the lean and `cut-only` keeping about a third, so on red H1 as written would miss. The gate and CUT_ONLY_SHARE stay as they were, because on a red line the first operand can itself carry the label's evidence, and on a `difference` line it cannot; the middle case above was added so a partial result has a reading. Verify: a reader who takes red as a fair proxy for the op could argue for a partial band on H1, or a lower CUT_ONLY_SHARE. -->
 
 /// admonition | TODO
 Three figures. (1) The lean at the last block for each arm, one dot per seed with the seed mean, beside the band of the control and the value from ex-2.2.14. (2) The lean at each slice, one line per arm. (3) The lean at the last block through training, one line per arm (the seed mean, with each seed as a hairline), with the schedule of the anchor weight behind it. Table: the seed-mean lean and its excess over the control per arm, with the pull kept beside it.
@@ -163,12 +172,13 @@ Figure: two panels, each arm on the horizontal axis: the op margin as a share of
 
 **What we expect.** Under `all`, trailing fragments lean toward e₁, and under `whole` and `knowable` they lean less. The number is the mean cosine with e₁ over every position of every trailing fragment and every op, at the last block, against the control. This is a prediction of direction, with no gate.
 
-Why: a line cut before its op word leaves a trailing fragment like `op2 = answer ⏎`. Under `all`, the anchor asks that fragment to align with nothing to go on. The pool puts the pull where alignment comes most easily, which in a trailing fragment is likely the syntax tokens `=` and `⏎`, since they carry no color. So we expect most of the lean to sit there. The model can respond in one of two ways:
+Why: under `all`, the anchor asks a trailing fragment like `op2 = answer ⏎` to align with nothing to go on. The pool puts the pull where alignment comes most easily, which here is likely the syntax tokens `=` and `⏎`, since they carry no color. So we expect most of the lean to sit there.
 
-1. with a general lean, as at the first operand, or
-2. by guessing the op from what it can see, since some pairs of second operand and answer fit `{ex.ANCHORED_OP}` better than others.
+On *red*, the smoke test points to the second operand as well: on whole probe lines, the lean there came mostly from cut lines. `whole` took it from {ex.SMOKE_RED_OP2["all"]:.2f} to {ex.SMOKE_RED_OP2["whole"]:.2f}, and `cut-only` kept {ex.SMOKE_RED_OP2["cut-only"]:.2f}. But on *red* the second operand can itself be red, so that may not carry over to the op.
 
-So we also report the contrast between the `{ex.ANCHORED_OP}` trailing fragments and the rest, with no prediction. A positive contrast would mean the model is learning a surface cue for the op. That is the shortcut the pivot names as a [failure mode](../d2.2/pivot.md#the-anchor-picks-up-a-shortcut), seen here in miniature.
+The model can respond with a general lean, as at the first operand, or by guessing the op from what it can see, since some pairs of second operand and answer fit `{ex.ANCHORED_OP}` better than others. So we also report the contrast between the `{ex.ANCHORED_OP}` trailing fragments and the rest, with no prediction.
+
+A positive contrast would mean the model is learning a surface cue for the op: the shortcut the pivot names as a [failure mode](../d2.2/pivot.md#the-anchor-picks-up-a-shortcut), here in miniature.
 
 /// admonition | TODO
 Figure: two panels, each arm on the horizontal axis: the mean lean of the trailing fragments, and the contrast between `{ex.ANCHORED_OP}` trailing fragments and the rest, with one dot per seed and the band of the control. A small multiple below: the lean at each position of a trailing fragment, by the role it starts at, with the syntax tokens marked. Table: the two numbers per arm.
@@ -200,11 +210,11 @@ The table of the three candidate policies against the tests of the rule: the lea
 
 ## Exploratory analyses
 
-Anything we think of after seeing the data goes here, marked as post hoc. Two reads are planned as descriptions, with no gate.
+Anything we think of after seeing the data goes here, marked as post hoc. Two descriptive reads are planned, with no gate.
 
-**Where the pull lands.** For each arm, the share of the pull of each labelled line that goes to each role, averaged over the ways a window shows a line (E7 in op1-lean, per arm and slice). It shows what each policy changes about where the anchor is asked to act.
+**Where the pull lands.** For each arm and slice, the share of the pull on a labelled line that goes to each role, averaged over the ways a window shows a line (as in E7 of op1-lean). This shows what each policy changes about where the anchor is asked to act.
 
-**The answer and the newline on whole lines.** The mean cosine with e₁ at the answer and at the newline over every op's probe lines, per arm. A line cut before its op word puts its pull on these positions, so they may lean the way the first operand does, on whole lines as well as on trailing fragments.
+**Each role on whole lines.** The mean cosine with e₁ at each role over every op's probe lines, per arm and slice. A line cut before its op word puts its pull on the roles after it, so those roles may lean the way the first operand does, on whole lines as well as on trailing fragments.
 
 ## Discussion
 

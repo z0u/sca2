@@ -33,6 +33,14 @@ REFERENCE_OP1_LEAN_CONTROL = -0.01
 op's probe lines, on the primary and on the control. The op-word arm, which never pulls the first operand,
 sat at -0.04. Quoted from the published report; the report here reads its own `all` arm."""
 
+SMOKE_RED_LEAN = {"all": 0.23, "whole": 0.17, "cut-only": 0.08, "control": 0.00}
+SMOKE_RED_OP2 = {"all": 0.12, "whole": 0.04, "cut-only": 0.13}
+"""A smoke test run before the freeze, on ex-2.2.11's *red* handover (red on e₁, labelled by color over the
+whole line) at its first two seeds (model seeds 100 and 101), under `all`, `whole`, and `cut-only`: the
+seed-mean lean at the final slice, and the same mean cosine at the second operand. `all` matched ex-2.2.11's
+stored runs at every trajectory point, which checks the new code path. The control is ex-2.2.11's at the same
+seeds. The prototype is not committed; it ran on production storage as `ex-2.2.15-smoke`."""
+
 CONTROL_EXPERIMENT = "m2/ex-2.2.11"
 CONTROL = "control"
 CONTROL_SEEDS = 5
