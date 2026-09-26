@@ -68,10 +68,10 @@ rf"""
 
 /// tip |
 <!-- tl;dr -->
-The anchor pulls whole lines. But training shows the model windows onto the corpus, and each window cuts the lines at its edges. On a cut line, the anchor asks the visible part to carry the whole label, even when that part cannot see the op word. We try a few policies for which cut lines to pull. We do this on the current grammar, before the in-context grammar makes the problem larger.
+The anchor pulls on whole lines. But in training, the model sees the corpus through a window, and each window cuts off the lines at its edges. On a cut line, the anchor asks the visible part to carry the whole label, even when that part cannot see the op word. We retrain the anchored model under a few policies for which cut lines to pull, and track what each one does over the course of training. We do this on the current grammar, before the in-context grammar makes the problem larger.
 ///
 
-This is a scouting run with a few predictions and one rule: it proposes the crop policy the [in-context grammar pilot](../d2.2/design.md#the-pilot) starts from.
+This is a scouting run of {ex.N_RUNS} fresh training runs, with a few predictions and one rule: it proposes the crop policy the [in-context grammar pilot](../d2.2/design.md#the-pilot) starts from. Cut lines are a small share of any one batch, but the anchor meets them at every step, so the question is what they add up to over training. Each run records the lean and the fragments' lean through training, as well as at the end.
 
 ## Findings
 
@@ -141,10 +141,12 @@ The cost of our choice is that the policies differ a little in total pull, so th
 
 Why: the pool puts almost no pull on the first operand of a whole line, because the op word is right beside it and aligns far more easily. The only visits that force pull onto the first operand are the ones that show nothing else. `half` and `knowable` drop those visits too, so we expect them to remove the lean; `scaled` keeps a sixth of their pull, so we expect it to remove part of it.
 
+Through training, we expect the lean of `all` to build while the anchor weight is high and to persist through the anneal. We expect the lean of `whole` to stay near the control throughout. This prediction is descriptive and has no gate. Suppose `whole` shows a lean early and sheds it later, or `all` builds its lean only late. Either would mean the cut lines matter at a particular stage of training, which a reading taken only at the end would miss.
+
 If `whole` keeps most of the lean, the lean comes from whole lines, perhaps through the readout as the op1-lean reanalysis found for *red*, and cropping is a side issue on this grammar. If `all`'s lean is less than {ex.READABLE_LEAN:g} above the control's, it did not reproduce at these seeds, and H1 is unresolved.
 
 /// admonition | TODO
-Figure: the lean at the last block for each arm, one dot per seed with the seed mean, beside the control's band and ex-2.2.14's value; a second panel with the lean at each slice. Table: the seed-mean lean and its excess over the control per arm, with the pull kept beside it.
+Figure: the lean at the last block for each arm, one dot per seed with the seed mean, beside the control's band and ex-2.2.14's value; a second panel with the lean at each slice; a third with the lean at the last block through training, one line per arm (seed mean, seed range as a band), with the anchor weight's schedule behind it. Table: the seed-mean lean and its excess over the control per arm, with the pull kept beside it.
 ///
 
 ## The anchor and the task hold under every policy (H2)
@@ -196,11 +198,9 @@ The table of the three candidate policies against the rule's tests: the lean wit
 
 ## Exploratory analyses
 
-Anything we think of after seeing the data goes here, marked as post hoc. Three reads are planned as descriptions, with no gate.
+Anything we think of after seeing the data goes here, marked as post hoc. Two reads are planned as descriptions, with no gate.
 
 **Where the pull lands.** For each arm, the share of each labelled line's pull that goes to each role, averaged over the ways a window shows a line (op1-lean's E7, per arm and slice). It shows what each policy changes about where the anchor is asked to act.
-
-**The lean over training.** The lean at the last block through training, per arm, from the trajectories. It says whether the lean builds early, with the ramp, or late.
 
 **The answer and the newline.** The mean cosine with e₁ at the answer and at the newline over every op's probe lines, per arm. A line cut before its op word puts its pull on these positions, so they may lean the way the first operand does.
 

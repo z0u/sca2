@@ -171,6 +171,12 @@ assert N_RUNS == 40
 FINAL_SLICE = 4
 """Slice 4 is the output of the last block, where ex-2.2.14 read the lean."""
 
+TRAJ_READS = ("op_margin", "lean", "fragment_lean")
+"""Recorded at every trajectory point (ex-2.2.14's stride and probe lines), at every slice: the op margin as
+ex-2.2.14 recorded it, plus the lean and the fragments' lean. The end-of-training reads say where each policy
+lands; these say how it got there, since a cut line is a small share of any one batch and the question is what
+the anchor's repeated pull on them adds up to."""
+
 READABLE_LEAN = 0.10
 """H1 is readable only if `all`'s lean exceeds the control's by at least this much, half of ex-2.2.14's
 excess. Below it the lean did not reproduce at these seeds, and H1 is unresolved."""
