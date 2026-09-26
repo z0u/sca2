@@ -108,7 +108,7 @@ In these runs the anchor targets the op `{ex.ANCHORED_OP}`, as in the primary ar
 
 That is what [ex-2.2.14](../ex-2.2.14/report.py) saw, after the fact. At the last block, the first operand leaned toward e₁ at {ex.REFERENCE_OP1_LEAN:.2f} on the primary arm, against {ex.REFERENCE_OP1_LEAN_CONTROL:.2f} on the control, and the arm that pulls only the op word had no lean. The [op1-lean reanalysis](../op1-lean/report.py) found the same route on the *red* runs, and proposed skipping the pull on cut lines as a test.
 
-Before fixing the predictions, we ran that test as a smoke test on *red*: two seeds each of the conditions `all`, `whole`, and `cut-only`. `whole` took the lean from {SMOKE["all"]:.2f} to {SMOKE["whole"]:.2f}, and `cut-only` kept {SMOKE["cut-only"]:.2f}, against {SMOKE["control"]:.2f} for the control. So on *red*, cut lines carry about a third of the lean and whole lines the rest. The validation loss was the same under every policy, to three decimals.
+Before fixing the predictions, we ran that test as a smoke test on *red*: two seeds each of the conditions `all`, `whole`, and `cut-only`. `whole` took the lean from {SMOKE["all"]:.2f} to {SMOKE["whole"]:.2f}, and `cut-only` kept {SMOKE["cut-only"]:.2f}, against about zero for the control. So on *red*, cut lines carry about a third of the lean and whole lines the rest. The validation loss was the same under every policy, to three decimals.
 
 Where the rest comes from is a question of its own. So two more arms keep `whole` and change the model. One stops attention at each newline; the other ties the readout to the embedding table (the output layer reuses the input embedding weights).
 
