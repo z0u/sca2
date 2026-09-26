@@ -219,6 +219,31 @@ class LabelSpec:
     pull: Literal["span", "slot"] = "span"
 
 
+Crop = Literal["all", "whole", "half", "scaled", "cut-only"]
+"""Which labeled lines the pooled term pulls, given how much of each a training window shows. A window is a
+random crop of the packed corpus, so the lines at its edges are usually cut short, and under `all` a cut line
+gets the pull of a whole one on whatever part is visible. The others weight each line's pooled term by its
+visible run: only whole lines (`whole`), only lines with more than half their tokens in view (`half`), every
+line by the share in view (`scaled`), or only the cut lines (`cut-only`, the complement of `whole`)."""
+
+
+def crop_weight(crop: Crop, first: np.ndarray, last: np.ndarray) -> np.ndarray:
+    """The weight *crop* puts on a line visit that shows roles *first* to *last* (inclusive, elementwise)."""
+    n = last - first + 1
+    match crop:
+        case "all":
+            return np.ones(n.shape, np.float32)
+        case "whole":
+            return (n == LINE_TOKENS).astype(np.float32)
+        case "half":
+            return (n > LINE_TOKENS / 2).astype(np.float32)
+        case "scaled":
+            return (n / LINE_TOKENS).astype(np.float32)
+        case "cut-only":
+            return (n < LINE_TOKENS).astype(np.float32)
+    raise ValueError(f"unknown crop policy {crop!r}")
+
+
 def anchor_term(
     states: Float[Array, "L1 B T C"], mask: Float[Array, "B T"], axes: tuple[int, ...] = ANCHOR_AXES
 ) -> Float[Array, ""]:
@@ -250,12 +275,15 @@ def pooled_anchor_term(
     n_lines: int,
     tau: float,
     axes: tuple[int, ...] = ANCHOR_AXES,
+    line_w: Float[Array, "B N"] | None = None,
 ) -> Float[Array, ""]:
     """Mean over labeled lines and slices of the mellowmax of (1 − cos) over each line's span.
 
     The mellowmax −τ·log(mean exp(−x/τ)) (Asadi & Littman, 2017) interpolates from the hard minimum (τ → 0) to the mean (τ = ∞), so the term asks each labeled line to align *somewhere* in its visible span, concentrating the pull wherever alignment is cheapest. Its gradient per line is the softmin weights, non-negative and summing to 1, so the pull budget of each line is conserved and the anchor weight means the same thing at every τ.
 
     *mask* marks the pulled positions as in `anchor_term`; *line_id* groups them into lines (any per-batch-row local index below *n_lines*). The pool runs within each residual-stream slice, so the pull can choose different positions at different depths. Lines with no visible pulled position contribute nothing, as does an unlabeled batch.
+
+    *line_w* weights each line's pooled term (a `Crop` policy's weights). It leaves the denominator alone, so it only ever takes pull away: a line at weight zero still counts as labeled, and a line at weight one keeps the pull it would have had without the weights.
     """
     sel = (line_id[..., None] == jnp.arange(n_lines)) & (mask[..., None] > 0)  # (B, T, N)
     count = sel.sum(axis=1)  # (B, N) pulled positions per line
@@ -271,7 +299,8 @@ def pooled_anchor_term(
         z = jnp.exp(jnp.where(sel[None], -(x[..., None] - lmin[:, :, None, :]) / tau, -jnp.inf))
         mean_z = z.sum(axis=2) / jnp.maximum(count, 1)
         pooled = lmin - tau * jnp.log(jnp.where(labeled, mean_z, 1.0))
-    return jnp.sum(pooled * labeled) / (states.shape[0] * (jnp.sum(labeled) + 1e-8))
+    kept = labeled if line_w is None else labeled * line_w
+    return jnp.sum(pooled * kept) / (states.shape[0] * (jnp.sum(labeled) + 1e-8))
 
 
 def anti_subspace_term(
@@ -316,6 +345,7 @@ def make_anchored_train_step(
         line_id: Int[Array, "B T"],
         weight: Float[Array, ""],
         anti_weight: Float[Array, ""],
+        line_w: Float[Array, "B N"] | None = None,
     ) -> tuple[LanguageModel, PyTree, Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
         def loss_fn(model: LanguageModel):
             states, logits = model.stream_and_logits(x)
@@ -326,7 +356,7 @@ def make_anchored_train_step(
             anchor = (
                 anchor_term(states, mask, axes)
                 if tau is None
-                else pooled_anchor_term(states, mask, line_id, n_lines, tau, axes)
+                else pooled_anchor_term(states, mask, line_id, n_lines, tau, axes, line_w)
             )
             anti = anti_subspace_term(states, live, axes)
             return task + weight * anchor + anti_weight * anti, (task, anchor, anti)
@@ -362,12 +392,15 @@ def sample_anchored_batches(
     label_p: Float[np.ndarray, " V"] | LabelSpec,
     span: int = PROMPT_SPAN,
     lines: bool = False,
+    crop: Crop | None = None,
 ) -> Iterator[tuple]:
     """Yield *n_batches* of (inputs, targets, anchor mask).
 
     The crops are `sca.data.batches.sample_batches`, repeated here rather than wrapped because the mask needs the crop offsets and that generator does not yield them. *label_p* is a `LabelSpec`, or a bare per-token array meaning op1 keying: the probability that a line draws a label, redrawn per visit as in M1 — so the same line is labeled on one epoch and not the next, and the draws are consumed whatever the anchor weight is, which keeps every condition sharing a labeller on identical batches and label draws for a given seed. (Labellers with different keying consume the stream differently, so *those* comparisons carry corpus-draw noise.)
 
     With `lines=True` each batch carries a fourth element: the (B, T) local line index (0 .. `block_size // LINE_TOKENS + 1`) that groups positions into lines for `pooled_anchor_term`. The draws are identical either way.
+
+    With a *crop* policy (and `lines=True`) each batch carries a fifth element: the (B, N) weight of each local line under that policy (`crop_weight`), read off the roles the window shows of it after padding. It consumes no randomness, so the batches and labels are those of `crop=None` at the same seed.
     """
     spec = label_p if isinstance(label_p, LabelSpec) else LabelSpec(np.asarray(label_p))
     block_size = model_config.block_size
@@ -397,10 +430,26 @@ def sample_anchored_batches(
         draw_mask = _op_mask if spec.keying == "op" else _color_mask
         # Padded positions are not shown to the model, so they are not pulled either.
         mask = draw_mask(data, spec, rng, line, local, role, span, n_lines) & (x != 0)
-        if lines:
+        if lines and crop is not None:
+            yield x, y, mask.astype(np.float32), local.astype(np.int32), _line_weights(crop, x, local, role, n_lines)
+        elif lines:
             yield x, y, mask.astype(np.float32), local.astype(np.int32)
         else:
             yield x, y, mask.astype(np.float32)
+
+
+def _line_weights(crop: Crop, x, local, role, n_lines: int) -> np.ndarray:
+    """The (B, N) weight of each local line under *crop*, from the first and last role in view of it. A line
+    with nothing in view gets whatever the policy gives an empty run; it has no pulled position, so the pooled
+    term never reads it.
+    """
+    rows = np.broadcast_to(np.arange(x.shape[0])[:, None], x.shape)
+    seen = x != 0
+    first = np.full((x.shape[0], n_lines), LINE_TOKENS, np.int64)
+    last = np.full((x.shape[0], n_lines), -1, np.int64)
+    np.minimum.at(first, (rows[seen], local[seen]), role[seen])
+    np.maximum.at(last, (rows[seen], local[seen]), role[seen])
+    return crop_weight(crop, first, last)
 
 
 def _color_mask(

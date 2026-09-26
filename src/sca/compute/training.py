@@ -12,6 +12,7 @@ from sca.anchoring import (
     PROMPT_SPAN,
     AnchorSpec,
     AntiSpec,
+    Crop,
     LabelSpec,
     alignment,
     make_anchored_train_step,
@@ -172,6 +173,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     anti_anchor_weight: float = 0.0,
     anchor_slices: tuple[int, ...] | None = None,
     clean_rows: tuple[int, ...] | None = None,
+    crop: Crop | None = None,
     checkpoint_dir: Path,
     checkpoint_every: int | None = None,
     traj_stride: int = 50,
@@ -219,6 +221,9 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
         clean_rows: embeddings held off the anchor axis by a hard
             constraint after every step (`sca.anchoring.clean_embedding_rows`),
             or None for no constraint. Neither option combines with a fallback spec.
+        crop: which labeled lines the pooled term pulls, given how much of each
+            the window shows (`sca.anchoring.Crop`), or None for every line, as
+            `all` would. Needs a pooled anchor (`anchor.tau` set) and no fallback.
         checkpoint_dir: Where to write checkpoints; sweep cells sharing a volume
             must each pass their own.
         checkpoint_every: Save a checkpoint every N epochs. None = about 50 in all.
@@ -230,6 +235,8 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             every trajectory point (a training-dynamics read needs the model
             through the plateau, where the end checkpoint says nothing).
     """
+    if crop is not None and (anchor.tau is None or fallback is not None):
+        raise ValueError("a crop policy needs a pooled anchor (tau set) and no fallback spec")
     data, metadata = load_data(data_dir)
     assert metadata.tokenizer_config.vocab_size <= config.model.vocab_size, "Vocab size mismatch"
 
@@ -308,14 +315,14 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     expect_metrics(**expected)
     for epoch in range(config.scheduler.epochs):
         train_losses, anchor_losses, anti_losses = [], [], []
-        for x, y, mask, line_id in sample_anchored_batches(
-            train_data, config.data, config.model, epoch_length, rng, label_p, anchor.span, lines=True
+        for x, y, mask, line_id, *line_w in sample_anchored_batches(
+            train_data, config.data, config.model, epoch_length, rng, label_p, anchor.span, lines=True, crop=crop
         ):
             at = epoch + len(train_losses) / epoch_length
             weight = float(anchor(at))
             anti_weight = float(anti(at)) if anti is not None else 0.0
             model, opt_state, loss, anchor_loss, anti_loss, fb_loss, aa_loss, fb_lines = train_step(
-                model, opt_state, x, y, mask, line_id, jnp.asarray(weight), jnp.asarray(anti_weight)
+                model, opt_state, x, y, mask, line_id, jnp.asarray(weight), jnp.asarray(anti_weight), *line_w
             )
             train_losses.append(float(loss))
             anchor_losses.append(float(anchor_loss))
