@@ -4,7 +4,7 @@ Training windows are random crops of the packed corpus, so a line at either end 
 short, and the pooled anchor term puts the whole of a labelled line's pull on whatever part of it is visible.
 On a line cut before its op word, that part cannot know the op. This run trains ex-2.2.14's primary (anchored
 `difference`, whole-line pull, label rate 0.02) under a few policies for which cut lines the anchor pulls, and
-reads what each one does to the first operand's lean, to fragments seen without their op word, to the anchor,
+measures what each one does to the first operand's lean, to fragments seen without their op word, to the anchor,
 and to the task. It proposes a default crop policy for the in-context grammar pilot.
 
 Design constants only while the preregistration is in review; the DAG lands when the hypotheses freeze.
@@ -29,9 +29,9 @@ handover recipe (table A+, the stochastic corpus at 300k lines, the untied reado
 REFERENCE_CONDITION = "anchor-diff"
 REFERENCE_OP1_LEAN = 0.19
 REFERENCE_OP1_LEAN_CONTROL = -0.01
-"""Ex-2.2.14's post hoc read, at the final slice: the mean cosine with e₁ at the first operand over every
+"""Ex-2.2.14's post hoc measurement, at the final slice: the mean cosine with e₁ at the first operand over every
 op's probe lines, on the primary and on the control. The op-word arm, which never pulls the first operand,
-sat at -0.04. Quoted from the published report; the report here reads its own `all` arm."""
+sat at -0.04. Quoted from the published report; the report here measures its own `all` arm."""
 
 SMOKE_RED_LEAN = {"all": 0.23, "whole": 0.17, "cut-only": 0.08, "control": 0.00}
 SMOKE_RED_OP2 = {"all": 0.12, "whole": 0.04, "cut-only": 0.13}
@@ -148,10 +148,19 @@ def pull_share(policy: Policy, block: int = BLOCK) -> float:
 
 @dataclass(frozen=True)
 class Arm:
+    """One training arm. `tie` ties the readout to the embedding table. `line_mask` stops attention at each
+    newline, so a position attends to earlier positions of its own line only, and the state at the first
+    operand of a whole line is a function of that token alone. The model has no such mask yet: the DAG adds it
+    as a model config flag, with a test, and every measurement on that arm runs with it on, since it is part of
+    the model.
+    """
+
     name: str
     policy: Policy
     block: int = BLOCK
     batch: int = BATCH
+    tie: bool = False
+    line_mask: bool = False
 
 
 ARMS: tuple[Arm, ...] = (
@@ -163,11 +172,20 @@ ARMS: tuple[Arm, ...] = (
     Arm("cut-only", "cut-only"),
     Arm("all-short", "all", SHORT_BLOCK, SHORT_BATCH),
     Arm("whole-short", "whole", SHORT_BLOCK, SHORT_BATCH),
+    Arm("whole-mask", "whole", line_mask=True),
+    Arm("whole-tied", "whole", tie=True),
 )
 """`all` is today's behaviour and should reproduce ex-2.2.14's primary. `whole`, `half`, and `scaled` are the
 grammar-agnostic policies; `knowable` needs to know where the evidence is, which the in-context grammar can
 only approximate through the posterior. `cut-only` pulls the cut lines alone, so that `whole` and `cut-only`
-split `all`'s pull in two. The short pair repeats `all` against `whole` where cut lines are twice as common."""
+split `all`'s pull in two. The short pair repeats `all` against `whole` where cut lines are twice as common.
+The last two are `whole` with one change to the model each, to test two routes for whatever lean `whole`
+leaves: `whole-mask` stops attention at each newline, so a position sees only its own line; `whole-tied` ties
+the readout to the embedding table, as ex-2.2.9's `handover-tied`."""
+# REVIEW: `whole-mask` and `whole-tied` were added after Sandy's review of 2543d1b. They sit outside the rule:
+# the rule chooses a crop policy, and these change the model. Verify: a reader who wants the pilot's optional
+# newline mask decided here could argue for a branch of the rule that adopts it.
+
 
 MITIGATIONS = ("scaled", "half", "whole")
 """The policies the rule chooses among, in the order it prefers them: by how far each carries to a labelled
@@ -182,17 +200,17 @@ at 300, so every seed here is fresh. Five seeds because the lean is a difference
 gate needs ex-2.2.14's resolution."""
 
 N_RUNS = SEEDS * len(ARMS)
-assert N_RUNS == 40
+assert N_RUNS == 50
 
 # --- What is scored ------------------------------------------------------------------------------------
 
 FINAL_SLICE = 4
-"""Slice 4 is the output of the last block, where ex-2.2.14 read the lean."""
+"""Slice 4 is the output of the last block, where ex-2.2.14 measured the lean."""
 
 TRAJ_STRIDE = 50
-TRAJ_READS = ("op_margin", "lean", "fragment_lean")
+TRAJ_MEASUREMENTS = ("op_margin", "lean", "fragment_lean")
 """Recorded at every trajectory point (every `TRAJ_STRIDE` training steps, on ex-2.2.14's probe lines), at
-every slice: the op margin as ex-2.2.14 recorded it, plus the lean and the trailing-fragment lean. The reads
+every slice: the op margin as ex-2.2.14 recorded it, plus the lean and the trailing-fragment lean. The measurements
 at the end of training say where each policy lands; these say how it got there, since a cut line is a small
 share of any one batch and the question is what the repeated pull on them adds up to. The stride is ex-2.2.14's
 (inherited from ex-2.2.3), about a hundred points over a run; no checkpoint is kept along the way."""
@@ -205,13 +223,24 @@ LEAN_BAND = 0.05
 """A policy removes the lean when its seed-mean lean at the final slice is within this of the control's.
 A quarter of ex-2.2.14's excess."""
 
-SCALED_BAND = 0.10
-"""The looser band `scaled` goes forward under: half of ex-2.2.14's excess, the same margin as
-`READABLE_LEAN`. `scaled` keeps a sixth of the pull on a visit that shows only the first operand, so some lean
-may stay, and the rule accepts part of it for a policy that carries to longer spans."""
-
 CUT_ONLY_SHARE = 0.5
 """H1's second half: `cut-only` keeps at least this share of `all`'s excess lean."""
+
+PARTIAL_SHARE = 0.3
+"""H1 is partial when `whole` removes at least this share of `all`'s excess lean, and `cut-only` keeps at
+least this share of it: the cut lines are one route for the lean, carrying a real part of it, among others.
+On *red* the smoke test sat just under it (`whole` removed 29%, `cut-only` kept 36%)."""
+# REVIEW: the partial band follows Sandy's review of 2543d1b ("e.g. 30% attribution to cut lines"), so that
+# H1 keeps its strong prediction and the rule can still adopt a policy that only improves on `all`. It was set
+# after the red smoke test, which lands at 29%. Verify: a reader who takes the smoke as a pilot for the gate
+# could argue it was set with the red result in view; the op is the stronger test, since its first operand
+# carries no evidence.
+
+SCALED_SHARE = 0.5
+"""`scaled` goes forward if it removes at least this share of the excess lean that `whole` removes. It keeps a
+sixth of the pull on a visit that shows only the first operand, so some lean may stay, and the rule accepts
+part of it for a policy that carries to longer spans. Stated against `whole`, it loosens with H1: if `whole`
+removes nearly all of the excess, `scaled` must remove about half, as the fixed band of 0.1 asked before."""
 
 MARGIN_KEEP = 0.9
 """H2: every policy's seed-mean op margin is at least this share of `all`'s."""
@@ -226,18 +255,20 @@ its own, so the op word is out of sight. These are the start-cut runs a training
 op word."""
 
 ADOPTION = (
-    "The pilot's default crop policy is `scaled` if its lean is within the looser band of the control's and "
-    "it passes H2. Otherwise it is whichever of `half` and `whole` keeps more of the pull while it removes the "
-    "lean (within the band of the control) and passes H2. If none does, the pilot keeps `all`, and leans on "
-    "label variant (c) for the evidence question. If H1 is unresolved, the choice falls to the short pair: "
+    "If H1 passes or is partial, the pilot's default crop policy is `scaled` if it removes at least half the "
+    "share of the excess lean (H1) that `whole` removes, and it passes H2. Otherwise it is whichever of `half` "
+    "and `whole` keeps more of the pull while it removes as much of the lean as H1 asks of `whole` (to within "
+    "the band of the control if H1 passed, at least the partial share if it was partial) and passes H2. If H1 "
+    "missed, or no policy qualifies, the pilot keeps `all`, and leans on label variant (c) for the evidence "
+    "question. If H1 is unresolved, the choice falls to the short pair: "
     "`whole` goes forward if the lean of `all-short` exceeds the control's by the readable margin, the lean of "
     "`whole-short` is within the band of it, and `whole` passes H2; `all` stays otherwise."
 )
 # REVIEW: the fallback branch carries the same gates as the main one (a readable lean on `all-short`, the band
 # on `whole-short`, H2 on `whole`). Verify: a reader who wants the short pair's own task gap in place of
 # `whole`'s H2 can argue it.
-# REVIEW: `scaled` now comes first under a looser band (SCALED_BAND), after Sandy's review of f2f8e41: `whole`
-# may give the cleanest result, but it never pulls a span longer than the window, which natural-language
-# documents often are. Before, all three candidates shared LEAN_BAND and the rule took the largest pull kept,
-# which already put `scaled` first whenever it passed. Verify: a `scaled` lean near the looser band's edge
-# carries about half the reference lean into the pilot.
+# REVIEW: `scaled` comes first under a looser test, after Sandy's review of f2f8e41: `whole` may give the
+# cleanest result, but it never pulls a span longer than the window, which natural-language documents often
+# are. After the review of 2543d1b the test is relative to `whole` (SCALED_SHARE) in place of a fixed band of
+# 0.1, so it loosens when H1 is partial, as Sandy asked. Verify: under a partial H1 `scaled` may go forward
+# removing 15% of the excess, about 0.03 in cosine, which five paired seeds may not resolve from zero.
