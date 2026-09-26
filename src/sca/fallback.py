@@ -105,6 +105,7 @@ def reflected_logits(model: NGPT, h: Float[Array, "B T C"], slice_: int) -> Floa
 
     The detach is the term's whole design: the reflected states carry no gradient back to the embedding or to the blocks before the edit, so the term trains a readout of the antipode and never moves the concept toward it.
     """
+    assert model.line_mask_token is None, "the line mask needs the token ids, which this path does not carry"
     h = jax.lax.stop_gradient(reflect(h))
     enc = model.transformer.rotary_enc
     run_block = eqx.filter_checkpoint(lambda block, h: block(h, enc))

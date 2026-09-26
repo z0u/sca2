@@ -411,7 +411,7 @@ def test_line_weights_take_pull_away_without_moving_the_denominator():
     assert np.all(got[2:] == 0.0) and np.all(got[:2] < 0.0)  # the dropped line gets no pull, the kept one keeps its
 
 
-@pytest.mark.parametrize("crop", ["all", "whole", "half", "scaled", "cut-only"])
+@pytest.mark.parametrize("crop", ["all", "whole", "half", "scaled", "cut-only"])  # `knowable` reads the roles
 def test_crop_weights_follow_the_run_in_view_without_changing_the_draws(corpus, crop):
     mc, dc = model_config(), data_config(0.5)
     plain = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(3), np.ones(64), lines=True))
@@ -428,6 +428,40 @@ def test_crop_weights_follow_the_run_in_view_without_changing_the_draws(corpus, 
     assert (n[shown] < LINE_TOKENS).any() and (n[shown] == LINE_TOKENS).any()  # the crops cut some lines
     expected = crop_weight(crop, np.zeros_like(n), n - 1)
     np.testing.assert_allclose(w[shown], expected[shown], rtol=0, atol=1e-7)
+
+
+def test_a_pool_narrows_the_pull_without_moving_the_denominator():
+    states, mask, line_id = pooled_setup()
+    # x = [0.8, 0.4 | 0.0, 1.0]. Dropping the first position leaves line means [0.4, 0.5] → 0.45.
+    np.testing.assert_allclose(
+        pooled_anchor_term(states, mask, line_id, 2, np.inf, pool=jnp.asarray([[0.0, 1.0, 1.0, 1.0]])), 0.45, rtol=1e-6
+    )
+    # A labeled line with nothing left in its pool still counts: 0.6 over two lines, not over one.
+    empty_second = jnp.asarray([[1.0, 1.0, 0.0, 0.0]])
+    np.testing.assert_allclose(pooled_anchor_term(states, mask, line_id, 2, np.inf, pool=empty_second), 0.3, rtol=1e-6)
+    alone = pooled_anchor_term(states, jnp.asarray([[1.0, 1.0, 0.0, 0.0]]), line_id, 2, 0.1)  # the first line's own
+    np.testing.assert_allclose(
+        pooled_anchor_term(states, mask, line_id, 2, 0.1, pool=empty_second), alone / 2, rtol=1e-6
+    )
+    grad = jax.grad(lambda s: pooled_anchor_term(s, mask, line_id, 2, 0.1, pool=empty_second))(states)
+    assert np.all(np.asarray(grad)[0, 0, 2:, 0] == 0.0)
+
+
+def test_knowable_keeps_lines_with_the_op_word_in_view_and_pools_from_it(corpus):
+    mc, dc = model_config(), data_config(0.0)
+    plain = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(3), np.ones(64), lines=True))
+    x, _, mask, local, w, pool = next(
+        sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(3), np.ones(64), lines=True, crop="knowable")
+    )
+    np.testing.assert_array_equal(x, plain[0])
+    np.testing.assert_array_equal(mask, plain[2])
+    role = (_crop_starts(corpus, x)[:, None] + np.arange(x.shape[1])) % LINE_TOKENS
+    np.testing.assert_array_equal(pool, (role >= 1).astype(np.float32))
+    for row in range(len(x)):
+        for line in np.unique(local[row]):
+            roles = role[row][local[row] == line]
+            assert w[row, line] == float(roles.min() <= 1 <= roles.max())
+    assert (w == 0).any() and (w == 1).any()  # windows cut some lines before and after the op word
 
 
 def test_whole_and_cut_only_split_every_visit():

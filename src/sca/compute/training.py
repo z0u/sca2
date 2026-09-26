@@ -315,14 +315,14 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     expect_metrics(**expected)
     for epoch in range(config.scheduler.epochs):
         train_losses, anchor_losses, anti_losses = [], [], []
-        for x, y, mask, line_id, *line_w in sample_anchored_batches(
+        for x, y, mask, line_id, *crop_args in sample_anchored_batches(
             train_data, config.data, config.model, epoch_length, rng, label_p, anchor.span, lines=True, crop=crop
         ):
             at = epoch + len(train_losses) / epoch_length
             weight = float(anchor(at))
             anti_weight = float(anti(at)) if anti is not None else 0.0
             model, opt_state, loss, anchor_loss, anti_loss, fb_loss, aa_loss, fb_lines = train_step(
-                model, opt_state, x, y, mask, line_id, jnp.asarray(weight), jnp.asarray(anti_weight), *line_w
+                model, opt_state, x, y, mask, line_id, jnp.asarray(weight), jnp.asarray(anti_weight), *crop_args
             )
             train_losses.append(float(loss))
             anchor_losses.append(float(anchor_loss))

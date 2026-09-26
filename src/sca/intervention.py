@@ -205,8 +205,9 @@ def _forward(
     x = normalize(model.transformer.wte[idx])
     pre, post = [x], [edit(x) if 0 in slices else x]
     x = post[-1]
+    allowed = model.attention_mask(idx)
     for i, block in enumerate(model.transformer.blocks, start=1):
-        x = block(x, model.transformer.rotary_enc)
+        x = block(x, model.transformer.rotary_enc, allowed)
         pre.append(x)
         post.append(edit(x) if i in slices else x)
         x = post[-1]

@@ -219,12 +219,18 @@ class LabelSpec:
     pull: Literal["span", "slot"] = "span"
 
 
-Crop = Literal["all", "whole", "half", "scaled", "cut-only"]
+Crop = Literal["all", "whole", "half", "scaled", "cut-only", "knowable"]
 """Which labeled lines the pooled term pulls, given how much of each a training window shows. A window is a
 random crop of the packed corpus, so the lines at its edges are usually cut short, and under `all` a cut line
 gets the pull of a whole one on whatever part is visible. The others weight each line's pooled term by its
 visible run: only whole lines (`whole`), only lines with more than half their tokens in view (`half`), every
-line by the share in view (`scaled`), or only the cut lines (`cut-only`, the complement of `whole`)."""
+line by the share in view (`scaled`), or only the cut lines (`cut-only`, the complement of `whole`).
+`knowable` keeps the lines whose op word is in view and narrows each one's pool to the positions at or after
+it (`KNOWABLE_ROLE`), so no position is asked for the op before its evidence has appeared; the sampler yields
+that narrowing as a pool mask beside the weights."""
+
+KNOWABLE_ROLE = 1
+"""The op word's role: under `knowable` a line's pool starts here."""
 
 
 def crop_weight(crop: Crop, first: np.ndarray, last: np.ndarray) -> np.ndarray:
@@ -241,6 +247,8 @@ def crop_weight(crop: Crop, first: np.ndarray, last: np.ndarray) -> np.ndarray:
             return (n / LINE_TOKENS).astype(np.float32)
         case "cut-only":
             return (n < LINE_TOKENS).astype(np.float32)
+        case "knowable":
+            return ((first <= KNOWABLE_ROLE) & (last >= KNOWABLE_ROLE)).astype(np.float32)
     raise ValueError(f"unknown crop policy {crop!r}")
 
 
@@ -276,6 +284,7 @@ def pooled_anchor_term(
     tau: float,
     axes: tuple[int, ...] = ANCHOR_AXES,
     line_w: Float[Array, "B N"] | None = None,
+    pool: Float[Array, "B T"] | None = None,
 ) -> Float[Array, ""]:
     """Mean over labeled lines and slices of the mellowmax of (1 − cos) over each line's span.
 
@@ -284,9 +293,13 @@ def pooled_anchor_term(
     *mask* marks the pulled positions as in `anchor_term`; *line_id* groups them into lines (any per-batch-row local index below *n_lines*). The pool runs within each residual-stream slice, so the pull can choose different positions at different depths. Lines with no visible pulled position contribute nothing, as does an unlabeled batch.
 
     *line_w* weights each line's pooled term (a `Crop` policy's weights). It leaves the denominator alone, so it only ever takes pull away: a line at weight zero still counts as labeled, and a line at weight one keeps the pull it would have had without the weights.
+
+    *pool* narrows the positions each line pools over (`knowable`'s positions from the op word on) without narrowing the denominator: a line is counted as labeled by *mask*, and a labeled line with nothing left in its pool contributes zero.
     """
-    sel = (line_id[..., None] == jnp.arange(n_lines)) & (mask[..., None] > 0)  # (B, T, N)
-    count = sel.sum(axis=1)  # (B, N) pulled positions per line
+    member = (line_id[..., None] == jnp.arange(n_lines)) & (mask[..., None] > 0)  # (B, T, N)
+    n_labeled = jnp.sum(member.sum(axis=1) > 0)
+    sel = member if pool is None else member & (pool[..., None] > 0)
+    count = sel.sum(axis=1)  # (B, N) pooled positions per line
     labeled = count > 0
     x = 1.0 - axes_alignment(states, axes)  # (L1, B, T)
     if np.isinf(tau):
@@ -300,7 +313,7 @@ def pooled_anchor_term(
         mean_z = z.sum(axis=2) / jnp.maximum(count, 1)
         pooled = lmin - tau * jnp.log(jnp.where(labeled, mean_z, 1.0))
     kept = labeled if line_w is None else labeled * line_w
-    return jnp.sum(pooled * kept) / (states.shape[0] * (jnp.sum(labeled) + 1e-8))
+    return jnp.sum(pooled * kept) / (states.shape[0] * (n_labeled + 1e-8))
 
 
 def anti_subspace_term(
@@ -346,6 +359,7 @@ def make_anchored_train_step(
         weight: Float[Array, ""],
         anti_weight: Float[Array, ""],
         line_w: Float[Array, "B N"] | None = None,
+        pool: Float[Array, "B T"] | None = None,
     ) -> tuple[LanguageModel, PyTree, Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
         def loss_fn(model: LanguageModel):
             states, logits = model.stream_and_logits(x)
@@ -356,7 +370,7 @@ def make_anchored_train_step(
             anchor = (
                 anchor_term(states, mask, axes)
                 if tau is None
-                else pooled_anchor_term(states, mask, line_id, n_lines, tau, axes, line_w)
+                else pooled_anchor_term(states, mask, line_id, n_lines, tau, axes, line_w, pool)
             )
             anti = anti_subspace_term(states, live, axes)
             return task + weight * anchor + anti_weight * anti, (task, anchor, anti)
@@ -400,7 +414,7 @@ def sample_anchored_batches(
 
     With `lines=True` each batch carries a fourth element: the (B, T) local line index (0 .. `block_size // LINE_TOKENS + 1`) that groups positions into lines for `pooled_anchor_term`. The draws are identical either way.
 
-    With a *crop* policy (and `lines=True`) each batch carries a fifth element: the (B, N) weight of each local line under that policy (`crop_weight`), read off the roles the window shows of it after padding. It consumes no randomness, so the batches and labels are those of `crop=None` at the same seed.
+    With a *crop* policy (and `lines=True`) each batch carries a fifth element: the (B, N) weight of each local line under that policy (`crop_weight`), read off the roles the window shows of it after padding. Under `knowable` a sixth follows, the (B, T) pool mask (see `pooled_anchor_term`). Neither consumes randomness, so the batches and labels are those of `crop=None` at the same seed.
     """
     spec = label_p if isinstance(label_p, LabelSpec) else LabelSpec(np.asarray(label_p))
     block_size = model_config.block_size
@@ -430,7 +444,17 @@ def sample_anchored_batches(
         draw_mask = _op_mask if spec.keying == "op" else _color_mask
         # Padded positions are not shown to the model, so they are not pulled either.
         mask = draw_mask(data, spec, rng, line, local, role, span, n_lines) & (x != 0)
-        if lines and crop is not None:
+        if lines and crop == "knowable":
+            pool = (role >= KNOWABLE_ROLE).astype(np.float32)
+            yield (
+                x,
+                y,
+                mask.astype(np.float32),
+                local.astype(np.int32),
+                _line_weights(crop, x, local, role, n_lines),
+                pool,
+            )
+        elif lines and crop is not None:
             yield x, y, mask.astype(np.float32), local.astype(np.int32), _line_weights(crop, x, local, role, n_lines)
         elif lines:
             yield x, y, mask.astype(np.float32), local.astype(np.int32)
