@@ -5,7 +5,7 @@
 import experiment as ex
 
 POLICY_TEXT = {
-    "all": "every labelled line, whatever is visible (today's behaviour)",
+    "all": "every labelled line, whatever is visible (the current behaviour)",
     "whole": "only lines wholly inside the window",
     "half": "only lines with more than half their tokens inside the window",
     "scaled": "every labelled line, its pull scaled by the share of it that is visible",
@@ -26,7 +26,7 @@ def conditions_html() -> str:
         for a in ex.ARMS
     ]
     rows.append(
-        f"<tr><td><code>{ex.CONTROL}</code></td><td>none: ex-2.2.11's un-anchored control, served from the store</td>"
+        f"<tr><td><code>{ex.CONTROL}</code></td><td>none: the un-anchored control from ex-2.2.11, served from the store</td>"
         f"<td class=num>{ex.BLOCK}</td><td class=num>–</td><td class=num>{ex.CONTROL_SEEDS}</td></tr>"
     )
     return f'<table class="report-table dense"><thead>{head}</thead><tbody>{"".join(rows)}</tbody></table>'
@@ -71,14 +71,14 @@ rf"""
 The anchor pulls on whole lines. But in training, the model sees the corpus through a window, and each window cuts off the lines at its edges. On a cut line, the anchor asks the visible part to carry the whole label, even when that part cannot see the op word. We retrain the anchored model under a few policies for which cut lines to pull, and track what each one does over the course of training. We do this on the current grammar, before the in-context grammar makes the problem larger.
 ///
 
-This is a scouting run of {ex.N_RUNS} fresh training runs, with a few predictions and one rule: it proposes the crop policy the [in-context grammar pilot](../d2.2/design.md#the-pilot) starts from. Cut lines are a small share of any one batch, but the anchor meets them at every step, so the question is what they add up to over training. Each run records the lean and the fragments' lean through training, as well as at the end.
+This is a scouting run of {ex.N_RUNS} fresh training runs, with a few predictions and one rule: it proposes the crop policy the [in-context grammar pilot](../d2.2/design.md#the-pilot) starts from. Cut lines are a small share of any one batch, but the anchor meets them at every step, so the question is what they add up to over training. Each run records the lean and the trailing-fragment lean at every trajectory point (every {ex.TRAJ_STRIDE} training steps), as well as at the end.
 
 ## Findings
 
-- [The first operand's lean comes from cut lines (H1)](#the-first-operands-lean-comes-from-cut-lines-h1) —
+- [The first operand lean is due to cut lines (H1)](#the-first-operand-lean-is-due-to-cut-lines-h1) —
 - [The anchor and the task hold under every policy (H2)](#the-anchor-and-the-task-hold-under-every-policy-h2) —
-- [Fragments without their op word (H3)](#fragments-without-their-op-word-h3) —
-- [Shorter windows, more cut lines (H4)](#shorter-windows-more-cut-lines-h4) —
+- [Trailing fragments without their op word (H3)](#trailing-fragments-without-their-op-word-h3) —
+- [Halved windows, more cut lines (H4)](#halved-windows-more-cut-lines-h4) —
 
 [The rule for the pilot](#the-rule-for-the-pilot): —
 
@@ -90,7 +90,7 @@ Each result section opens with what we expect, then a placeholder for what we sa
 
 ## Why this experiment
 
-Picture the training corpus as one long tape of six-token lines. Each training step cuts a {ex.BLOCK}-token window out of that tape at a random place. Most lines in the window are whole, but the two edges of the window usually slice through a line at each end.
+Picture the training corpus as one long tape of many six-token lines. Each training step cuts a {ex.BLOCK}-token window out of that tape at a random place. Most lines in the window are whole, but the two edges of the window usually slice through a line at each end.
 
 The anchor does not know about the edges. It asks each labelled line to align with the axis wherever that comes most easily in the visible part, and so asks that part to carry the whole label.
 
@@ -110,10 +110,10 @@ This matters more after the [D2.2 pivot](../d2.2/pivot.md). There, a line is a c
 <dt>Crop policy</dt>
 <dd>Which labelled lines the anchor pulls, given what the window shows of them. The label draws are the same under every policy; only the pull changes.</dd>
 <dt>Pull kept</dt>
-<dd>The share of today's total pull a policy keeps, averaged over every way a window shows a line. It is computed from the sampler, not measured.</dd>
+<dd>The share of the current total pull a policy keeps, averaged over every way a window shows a line. It is computed from the sampler, not measured.</dd>
 <dt>The lean</dt>
 <dd>The mean cosine with e₁ at the first operand, over every op's probe lines, at the last block. The first operand comes before the op word, so any lean there is shared by every line, whatever its op.</dd>
-<dt>Fragment</dt>
+<dt>Trailing fragment</dt>
 <dd>A probe line shown from its second operand, <code>=</code>, answer, or newline on, as a sequence of its own: what a window leaves of a line when it cuts off the op word.</dd>
 <dt>Op margin</dt>
 <dd>As in ex-2.2.14: how much closer the <code>{ex.ANCHORED_OP}</code> lines sit to e₁ than the pool of all eleven ops, at the role where the gap is largest, averaged over slices. It checks that the anchor landed.</dd>
@@ -123,86 +123,88 @@ This matters more after the [D2.2 pivot](../d2.2/pivot.md). There, a line is a c
 
 {conditions_html()}
 
-Every arm is ex-2.2.14's primary: `{ex.ANCHORED_OP}` on e₁, labelled at a rate of {ex.LABEL_RATE:g} per line, the pull over the whole line, and the handover recipe. Only the crop policy and, for the last two, the window change.
+Every arm is the primary from ex-2.2.14: `{ex.ANCHORED_OP}` on e₁, labelled at a rate of {ex.LABEL_RATE:g} per line, the pull over the whole line, and the handover recipe. Only the crop policy and, for the last two, the window change.
 
-**Same batches, same labels.** A policy is a weight on each labelled line's pull, applied after the labels are drawn. So at one seed every {ex.BLOCK}-token arm trains on the same windows with the same labels, and differences between arms at a seed are the policy's. The short-window arms draw differently and are compared with each other.
+**Same batches, same labels.** A policy is a weight on the pull of each labelled line, applied after the labels are drawn. So at one seed every {ex.BLOCK}-token arm trains on the same windows with the same labels, and differences between arms at a seed come from the policy. The short-window arms draw differently and are compared with each other.
 
 **A policy only takes pull away.** A line that a policy keeps gets the same pull it had under `all`, because the term still divides by the number of labelled lines with anything visible. We could instead divide by the number of lines the policy keeps, but then every kept pull would grow stronger as the policy drops more, which is the side effect ex-2.1.7 warned about.
 
 The cost of our choice is that the policies differ a little in total pull, so the table gives the share each keeps. `cut-only` keeps only {ex.pull_share("cut-only"):.0%}, and that is intended: `whole` and `cut-only` split the pull of `all` in two, so if the lean follows `cut-only`, it follows the cut lines and not the total.
 
-**The policies.** `whole`, `half`, and `scaled` need nothing but the window, so each would carry over to any grammar. `knowable` needs to know where the evidence is: here, that is the op word; in the in-context grammar, it is the posterior over ops given the tokens so far (label variant (c) in the pivot). `knowable` also drops the first operand from the pull on whole lines, as the note in ex-2.2.14 suggested, and serves as a reference for what knowing the evidence buys.
+**The policies.** `whole`, `half`, and `scaled` need nothing but the window, so each would carry over to any grammar. They differ on spans longer than the window, as a natural-language document often is: `whole` never pulls one, `half` stops at twice the window, and `scaled` pulls every span by the share in view. `knowable` needs to know where the evidence is: here, that is the op word; in the in-context grammar, it is the posterior over ops given the tokens so far (label variant (c) in the pivot). `knowable` also drops the first operand from the pull on whole lines, as the note in ex-2.2.14 suggested, and is a reference for what knowing the evidence buys.
 
-**The short windows.** At {ex.SHORT_BLOCK} tokens, {CUT_SHORT:.0%} of line visits are cut, about the share the in-context grammar would have. `all-short` against `whole-short` asks whether the effect grows with the share of cut lines, and whether `whole` still removes it.
+**The halved windows.** At {ex.SHORT_BLOCK} tokens, {CUT_SHORT:.0%} of line visits are cut, about the share the in-context grammar would have. The batch doubles to {ex.SHORT_BATCH} windows, so a step sees the same number of tokens and the runs take the same steps. `all-short` against `whole-short` asks whether the effect grows with the share of cut lines, and whether `whole` still removes it.
 
-## The first operand's lean comes from cut lines (H1)
+## The first operand lean is due to cut lines (H1)
 
-**What we expect.** `all` reproduces ex-2.2.14's lean. `whole` removes it: its lean is within {ex.LEAN_BAND:g} of the control's, on the seed mean. And `cut-only` keeps at least {ex.CUT_ONLY_SHARE:.0%} of `all`'s excess over the control, although it has only {ex.pull_share("cut-only"):.0%} of the pull.
+**What we expect.** `all` reproduces the lean from ex-2.2.14. `whole` removes it: its lean is within {ex.LEAN_BAND:g} of the lean of the control, on the seed mean. And `cut-only` keeps at least {ex.CUT_ONLY_SHARE:.0%} of the excess of `all` over the control, although it has only {ex.pull_share("cut-only"):.0%} of the pull.
 
-Why: the pool puts almost no pull on the first operand of a whole line, because the op word is right beside it and aligns far more easily. The only visits that force pull onto the first operand are the ones that show nothing else. `half` and `knowable` drop those visits too, so we expect them to remove the lean; `scaled` keeps a sixth of their pull, so we expect it to remove part of it.
+Why: the pool needs only one position of a line to align, and on a whole line the op word does so far more easily than the first operand, so the first operand gets almost no pull. The only visits that force pull onto the first operand are the ones that show nothing else. `half` and `knowable` drop those visits too, so we expect them to remove the lean; `scaled` keeps a sixth of their pull, so we expect it to remove most of it.
 
 Through training, we expect the lean of `all` to build while the anchor weight is high and to persist through the anneal. We expect the lean of `whole` to stay near the control throughout. This prediction is descriptive and has no gate. Suppose `whole` shows a lean early and sheds it later, or `all` builds its lean only late. Either would mean the cut lines matter at a particular stage of training, which a reading taken only at the end would miss.
 
-If `whole` keeps most of the lean, the lean comes from whole lines, perhaps through the readout as the op1-lean reanalysis found for *red*, and cropping is a side issue on this grammar. If `all`'s lean is less than {ex.READABLE_LEAN:g} above the control's, it did not reproduce at these seeds, and H1 is unresolved.
+If `whole` keeps most of the lean, the lean comes from whole lines, perhaps through the readout as the op1-lean reanalysis found for *red*, and cropping is a side issue on this grammar. If the lean of `all` is less than {ex.READABLE_LEAN:g} above the lean of the control, it did not reproduce at these seeds, and H1 is unresolved.
 
 /// admonition | TODO
-Figure: the lean at the last block for each arm, one dot per seed with the seed mean, beside the control's band and ex-2.2.14's value; a second panel with the lean at each slice; a third with the lean at the last block through training, one line per arm (seed mean, seed range as a band), with the anchor weight's schedule behind it. Table: the seed-mean lean and its excess over the control per arm, with the pull kept beside it.
+Three figures. (1) The lean at the last block for each arm, one dot per seed with the seed mean, beside the band of the control and the value from ex-2.2.14. (2) The lean at each slice, one line per arm. (3) The lean at the last block through training, one line per arm (the seed mean, with each seed as a hairline), with the schedule of the anchor weight behind it. Table: the seed-mean lean and its excess over the control per arm, with the pull kept beside it.
 ///
 
 ## The anchor and the task hold under every policy (H2)
 
-**What we expect.** No policy costs the anchor or the task. Every arm's op margin is at least {ex.MARGIN_KEEP:.0%} of `all`'s, and every op's held-out expected exact match is within {ex.TASK_GATE:g} of the control's (ex-2.2.11's gate), on the seed means.
+**What we expect.** No policy costs the anchor or the task. The op margin of every arm is at least {ex.MARGIN_KEEP:.0%} of the margin under `all`, and every op's held-out expected exact match is within {ex.TASK_GATE:g} of the control (the gate from ex-2.2.11), on the seed means.
 
-In ex-2.2.14 the margin sat at the op word and saturated early, and whole lines carry the op word, so dropping cut lines should leave it where it was. A margin that falls under `whole` would mean the cut lines were doing part of the anchor's work, and that the policy has a price. The rule reads this gate, since a policy that moves the anchor or the task would not go forward.
+In ex-2.2.14 the margin sat at the op word and saturated early, and whole lines carry the op word, so dropping cut lines should leave it where it was. A margin that falls under `whole` could mean the cut lines were doing part of the work of the anchor. It could also mean only that the policy removed some of the total pull, and λ_a would need scaling up to make up for it. The pull kept tells the two apart roughly: a fall about the size of the pull removed points to λ_a, and a larger one to the cut lines. Either way the rule reads this gate, since a policy that moves the anchor or the task would not go forward as it stands.
 
 /// admonition | TODO
-Figure: two panels, each arm on the horizontal axis: the op margin as a share of `all`'s, with the {ex.MARGIN_KEEP:.0%} line; and the largest task gap from the control over the eleven ops, with the gate. Table: the same, with the op of the largest gap.
+Figure: two panels, each arm on the horizontal axis: the op margin as a share of the margin under `all`, with the {ex.MARGIN_KEEP:.0%} line and the failing region hatched; and the largest task gap from the control over the eleven ops, with the gate and the failing region hatched. Table: the same, with the op of the largest gap and the pull kept.
 ///
 
-## Fragments without their op word (H3)
+## Trailing fragments without their op word (H3)
 
-**What we expect.** Under `all`, fragments lean toward e₁, and under `whole` and `knowable` they lean less. The number is the mean cosine with e₁ over every position of every fragment and every op, at the last block, against the control's. This is a prediction of direction, with no gate.
+**What we expect.** Under `all`, trailing fragments lean toward e₁, and under `whole` and `knowable` they lean less. The number is the mean cosine with e₁ over every position of every trailing fragment and every op, at the last block, against the control. This is a prediction of direction, with no gate.
 
-Why: a line cut before its op word leaves a fragment like `op2 = answer ⏎`. Under `all`, the anchor asks that fragment to align with nothing to go on. The model can respond in one of two ways:
+Why: a line cut before its op word leaves a trailing fragment like `op2 = answer ⏎`. Under `all`, the anchor asks that fragment to align with nothing to go on. The pool puts the pull where alignment comes most easily, which in a trailing fragment is likely the syntax tokens `=` and `⏎`, since they carry no color. So we expect most of the lean to sit there. The model can respond in one of two ways:
 
 1. with a general lean, as at the first operand, or
 2. by guessing the op from what it can see, since some pairs of second operand and answer fit `{ex.ANCHORED_OP}` better than others.
 
-So we also report the contrast between the `{ex.ANCHORED_OP}` fragments and the rest, with no prediction. A positive contrast would mean the model is learning a surface cue for the op. That is the shortcut the pivot names as a [failure mode](../d2.2/pivot.md#the-anchor-picks-up-a-shortcut), seen here in miniature.
+So we also report the contrast between the `{ex.ANCHORED_OP}` trailing fragments and the rest, with no prediction. A positive contrast would mean the model is learning a surface cue for the op. That is the shortcut the pivot names as a [failure mode](../d2.2/pivot.md#the-anchor-picks-up-a-shortcut), seen here in miniature.
 
 /// admonition | TODO
-Figure: two panels, each arm on the horizontal axis: the fragments' mean lean, and the contrast between `{ex.ANCHORED_OP}` fragments and the rest, with one dot per seed and the control's band. A small multiple below: the lean at each position of a fragment, by the role it starts at. Table: the two numbers per arm.
+Figure: two panels, each arm on the horizontal axis: the mean lean of the trailing fragments, and the contrast between `{ex.ANCHORED_OP}` trailing fragments and the rest, with one dot per seed and the band of the control. A small multiple below: the lean at each position of a trailing fragment, by the role it starts at, with the syntax tokens marked. Table: the two numbers per arm.
 ///
 
-## Shorter windows, more cut lines (H4)
+## Halved windows, more cut lines (H4)
 
-**What we expect.** Short windows give twice as many cut visits, so we expect the lean caused by cut lines to grow. That is, the gap between `all-short` and `whole-short` should be larger than the gap between `all` and `whole`. We also expect `whole-short` to remove the lean, bringing it to within {ex.LEAN_BAND:g} of the control. This prediction has no gate of its own; the rule falls back on it if H1 is unresolved.
+**What we expect.** Halved windows give twice as many cut visits, so we expect the lean caused by cut lines to grow. That is, the gap between `all-short` and `whole-short` should be larger than the gap between `all` and `whole`. We also expect `whole-short` to remove the lean, bringing it to within {ex.LEAN_BAND:g} of the control. This prediction has no gate of its own; the rule falls back on it if H1 is unresolved.
 
-We compare the gaps within each pair rather than comparing `all-short` with `all` directly. The short windows take twice as many steps per epoch, and the term is normalized per labelled line. So at the same weight, the anchor gets about twice as many updates over training. That alone could make `all-short` lean more than `all`, and `whole-short` has the same extra updates.
+We compare the gaps within each pair rather than comparing `all-short` with `all` directly. The doubled batch matches the steps and the anchor updates, but a model trained on {ex.SHORT_BLOCK}-token windows has seen less context per line, and the gap within a pair holds that fixed.
 
-<!-- REVIEW: H4's statistic changed from "all-short leans more than all" to the within-pair gap (all-short − whole-short against all − whole). The short arms double the anchor updates per epoch, so the raw comparison confounds the share of cut visits with total anchor exposure. Verify: if the DAG rescales λ_a or the step count for the short arms, the raw comparison becomes clean again. -->
+<!-- REVIEW: H4's statistic is the within-pair gap (all-short − whole-short against all − whole). The short arms now double the batch, so the steps and anchor updates match the long arms (Sandy's review of f2f8e41); the within-pair gap stays because the window still changes the context the model learns from. Verify: with the steps matched, a reader could argue for the raw all-short vs all comparison as a second read. -->
 
-Suppose the gap for the short pair is no larger than the gap for the long pair. Then the lean does not depend on how often the first operand is pulled alone, and the extrapolation to the in-context grammar becomes weaker. For the same reason as above (the short windows change the number of steps per epoch), we compare task performance between the two short arms only.
+Suppose the gap for the halved pair is no larger than the gap for the long pair. Then the lean does not depend on how often the first operand is pulled alone, and the extrapolation to the in-context grammar becomes weaker.
 
 /// admonition | TODO
-Figure: the lean at the last block for `all`, `whole`, `all-short`, and `whole-short`, with the share of cut visits on the horizontal axis. Table: the lean, the op margin, and the largest task gap for the short pair.
+Figure: the lean at the last block for `all`, `whole`, `all-short`, and `whole-short`, with the share of cut visits on the horizontal axis. Table: the lean, the op margin, and the largest task gap for the halved pair.
 ///
 
 ## The rule for the pilot
 
 > {ex.ADOPTION}
 
+The looser band for `scaled` is {ex.SCALED_BAND:g}, against {ex.LEAN_BAND:g} for the others. `whole` may give the cleanest result, but `scaled` is the one that carries to labelled spans of any length, so the rule accepts a little of the lean to get it.
+
 /// admonition | TODO
-The table of the three candidate policies against the rule's tests: the lean within the band, the H2 gates, and the pull kept.
+The table of the three candidate policies against the tests of the rule: the lean within its band, the H2 gates, and the pull kept.
 ///
 
 ## Exploratory analyses
 
 Anything we think of after seeing the data goes here, marked as post hoc. Two reads are planned as descriptions, with no gate.
 
-**Where the pull lands.** For each arm, the share of each labelled line's pull that goes to each role, averaged over the ways a window shows a line (op1-lean's E7, per arm and slice). It shows what each policy changes about where the anchor is asked to act.
+**Where the pull lands.** For each arm, the share of the pull of each labelled line that goes to each role, averaged over the ways a window shows a line (E7 in op1-lean, per arm and slice). It shows what each policy changes about where the anchor is asked to act.
 
-**The answer and the newline.** The mean cosine with e₁ at the answer and at the newline over every op's probe lines, per arm. A line cut before its op word puts its pull on these positions, so they may lean the way the first operand does.
+**The answer and the newline on whole lines.** The mean cosine with e₁ at the answer and at the newline over every op's probe lines, per arm. A line cut before its op word puts its pull on these positions, so they may lean the way the first operand does, on whole lines as well as on trailing fragments.
 
 ## Discussion
 
@@ -214,7 +216,7 @@ After the results. What we would take to the pilot: which policy, what it costs 
 
 ### The policies
 
-The sampler already knows each labelled line's visible run: the window's offset fixes the role of every position, and padding hides a prefix. Each policy turns that run into a weight in [0, 1] on the line's pooled term (`line_weight` in `experiment.py`).
+The sampler already knows the visible run of each labelled line: the offset of the window fixes the role of every position, and padding hides a prefix. Each policy turns that run into a weight in [0, 1] on the pooled term of the line (`line_weight` in `experiment.py`).
 
 The denominator stays the count of labelled lines with any visible position, as under `all`, and the label draws are unchanged, so the random stream is consumed identically under every policy. `knowable` also removes the positions before the op word from the pool, so a whole line is pooled over roles 1 to 5.
 
@@ -224,17 +226,19 @@ How often a window shows each run of a line, at each window size, enumerated ove
 
 ### The measurements
 
-The lean is the mean cosine with e₁ at role 0 over every op's probe lines, at slice {ex.FINAL_SLICE}, as ex-2.2.14 read it; its excess is against the control's seed mean. The op margin is ex-2.2.14's, on the same probe sets. The task is held-out expected exact match per op, against ex-2.2.11's control.
+The lean is the mean cosine with e₁ at role 0 over every op's probe lines, at slice {ex.FINAL_SLICE}, as ex-2.2.14 read it; its excess is against the seed mean of the control. The op margin is the one from ex-2.2.14, on the same probe sets. The task is held-out expected exact match per op, against the control from ex-2.2.11.
 
-The fragments are the probe lines of every op, cut to start at roles {", ".join(str(r) for r in ex.FRAGMENT_START_ROLES)} and fed as sequences of their own; the fragment lean is the mean cosine over every position of every fragment, and the contrast is the mean over `{ex.ANCHORED_OP}` fragments less the mean over the rest.
+The trailing fragments are the probe lines of every op, cut to start at roles {", ".join(str(r) for r in ex.FRAGMENT_START_ROLES)} and fed as sequences of their own; the trailing-fragment lean is the mean cosine over every position of every trailing fragment, and the contrast is the mean over `{ex.ANCHORED_OP}` trailing fragments less the mean over the rest.
+
+The op margin, the lean, and the trailing-fragment lean are also read during training, every {ex.TRAJ_STRIDE} steps, on the same probe lines. These reads run inside the training loop; no checkpoint is kept along the way.
 
 ### Budget
 
-{ex.N_RUNS} runs at d64-L4, each as long as a run in ex-2.2.14 except the short-window pair, which take twice the steps at half the tokens per step. Ex-2.2.13 trained 160 runs of this size for about fourteen dollars on Modal. Eval adds the fragment probe to ex-2.2.14's reads; no intervention is scored.
+{ex.N_RUNS} runs at d64-L4, each as long as a run in ex-2.2.14; the halved pair takes the same steps at twice the windows per step. Ex-2.2.13 trained 160 runs of this size for about fourteen dollars on Modal. Eval adds the trailing-fragment probe to the reads from ex-2.2.14; no intervention is scored.
 
 ### What this experiment does not do
 
-It does not change what the model sees. Two such changes are on the table for the in-context grammar: windows that start at a line boundary, which would remove the cuts at the start of a window but keep those at its end, and an attention mask that resets at each newline, which the pivot proposes for its own reasons and which leaves cut lines cut. Both change the task data as well as the pull, so they would need a control of their own.
+It does not change what the model sees. The in-context grammar could remove cut lines altogether with windows that hold whole lines only: each window starts at a line boundary and is padded after the last line that fits, with a longer block so the padding is a small share. Windows that start at a line boundary but are not padded would still cut the last line. An attention mask that resets at each newline, which the pivot proposes for its own reasons, leaves cut lines cut. Each of these changes the task data as well as the pull, so it would need a control of its own. A policy from this experiment still matters with padded windows wherever a labelled span can be longer than the window, as a natural-language document can.
 
 It also does not test label variant (c) on the in-context grammar; `knowable` is its version on this grammar.
 """

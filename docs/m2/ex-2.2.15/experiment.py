@@ -53,16 +53,22 @@ OP_ROLE = 1
 # --- The windows ----------------------------------------------------------------------------------------
 
 BLOCK = 64
+BATCH = 64
 PADDING_CHANCE = 0.1
-"""Ex-2.1.3's data config, unchanged since: 64-token windows at a uniform offset, a tenth of them with a
-zeroed prefix of 1 to `block // 3 - 1` tokens."""
+"""Ex-2.1.3's data config, unchanged since: 64 windows of 64 tokens at a uniform offset, a tenth of them with
+a zeroed prefix of 1 to `block // 3 - 1` tokens."""
 
 SHORT_BLOCK = 32
+SHORT_BATCH = 2 * BATCH
 """The stress windows. At 32 tokens a window holds about five and a third lines, which is about the ratio of
 window to line the in-context grammar would have with ~20-token contexts in 128-token windows, so the share
-of line visits cut short roughly doubles (see `visit_shares`). Half the tokens per step means twice the steps
-per epoch at the same number of tokens seen, so the short arms are compared with each other, and with the
-control only loosely."""
+of line visits cut short roughly doubles (see `visit_shares`). The batch doubles so a step sees the same
+number of tokens, and so about the same number of labelled lines: the steps per epoch, the schedules, and the
+anchor's updates then match the long arms."""
+# REVIEW: the short arms used to keep the batch at 64, which doubled their steps per epoch and so the anchor's
+# updates, and confined their comparisons to each other. Sandy suggested doubling the batch instead (review
+# of f2f8e41). Verify: a doubled batch holds a few more line visits per step than a long batch (a window has
+# a visit at each edge whatever its size), so the labelled lines per step run about 7% higher.
 
 
 def visit_shares(block: int, padding_chance: float = PADDING_CHANCE) -> dict[tuple[int, int], float]:
@@ -137,6 +143,7 @@ class Arm:
     name: str
     policy: Policy
     block: int = BLOCK
+    batch: int = BATCH
 
 
 ARMS: tuple[Arm, ...] = (
@@ -146,16 +153,19 @@ ARMS: tuple[Arm, ...] = (
     Arm("scaled", "scaled"),
     Arm("knowable", "knowable"),
     Arm("cut-only", "cut-only"),
-    Arm("all-short", "all", SHORT_BLOCK),
-    Arm("whole-short", "whole", SHORT_BLOCK),
+    Arm("all-short", "all", SHORT_BLOCK, SHORT_BATCH),
+    Arm("whole-short", "whole", SHORT_BLOCK, SHORT_BATCH),
 )
 """`all` is today's behaviour and should reproduce ex-2.2.14's primary. `whole`, `half`, and `scaled` are the
 grammar-agnostic policies; `knowable` needs to know where the evidence is, which the in-context grammar can
 only approximate through the posterior. `cut-only` pulls the cut lines alone, so that `whole` and `cut-only`
 split `all`'s pull in two. The short pair repeats `all` against `whole` where cut lines are twice as common."""
 
-MITIGATIONS = ("whole", "half", "scaled")
-"""The policies the rule chooses among. `knowable` is the reference for what knowing the evidence buys."""
+MITIGATIONS = ("scaled", "half", "whole")
+"""The policies the rule chooses among, in the order it prefers them: by how far each carries to a labelled
+span longer than the window, as a natural-language document often is. `whole` never pulls such a span, `half`
+stops at twice the window, and `scaled` pulls every span by the share in view. `knowable` is the reference
+for what knowing the evidence buys."""
 
 SEEDS = 5
 SEED_OFFSET = 400
@@ -171,11 +181,13 @@ assert N_RUNS == 40
 FINAL_SLICE = 4
 """Slice 4 is the output of the last block, where ex-2.2.14 read the lean."""
 
+TRAJ_STRIDE = 50
 TRAJ_READS = ("op_margin", "lean", "fragment_lean")
-"""Recorded at every trajectory point (ex-2.2.14's stride and probe lines), at every slice: the op margin as
-ex-2.2.14 recorded it, plus the lean and the fragments' lean. The end-of-training reads say where each policy
-lands; these say how it got there, since a cut line is a small share of any one batch and the question is what
-the anchor's repeated pull on them adds up to."""
+"""Recorded at every trajectory point (every `TRAJ_STRIDE` training steps, on ex-2.2.14's probe lines), at
+every slice: the op margin as ex-2.2.14 recorded it, plus the lean and the trailing-fragment lean. The reads
+at the end of training say where each policy lands; these say how it got there, since a cut line is a small
+share of any one batch and the question is what the repeated pull on them adds up to. The stride is ex-2.2.14's
+(inherited from ex-2.2.3), about a hundred points over a run; no checkpoint is kept along the way."""
 
 READABLE_LEAN = 0.10
 """H1 is readable only if `all`'s lean exceeds the control's by at least this much, half of ex-2.2.14's
@@ -184,6 +196,11 @@ excess. Below it the lean did not reproduce at these seeds, and H1 is unresolved
 LEAN_BAND = 0.05
 """A policy removes the lean when its seed-mean lean at the final slice is within this of the control's.
 A quarter of ex-2.2.14's excess."""
+
+SCALED_BAND = 0.10
+"""The looser band `scaled` goes forward under: half of ex-2.2.14's excess, the same margin as
+`READABLE_LEAN`. `scaled` keeps a sixth of the pull on a visit that shows only the first operand, so some lean
+may stay, and the rule accepts part of it for a policy that carries to longer spans."""
 
 CUT_ONLY_SHARE = 0.5
 """H1's second half: `cut-only` keeps at least this share of `all`'s excess lean."""
@@ -196,19 +213,23 @@ TASK_GATE = 0.02
 gate, unchanged."""
 
 FRAGMENT_START_ROLES = (2, 3, 4, 5)
-"""The fragment probe: each probe line shown from op2, `=`, the answer, or the newline on, as a sequence of
+"""The trailing-fragment probe: each probe line shown from op2, `=`, the answer, or the newline on, as a sequence of
 its own, so the op word is out of sight. These are the start-cut runs a training window leaves without their
 op word."""
 
 ADOPTION = (
-    "The pilot's default crop policy is the one among `whole`, `half`, and `scaled` that keeps the largest "
-    "share of the pull while it removes the lean (within the band of the control) and passes H2. If none "
-    "does, the pilot keeps `all`, and leans on label variant (c) for the evidence question. If H1 is "
-    "unresolved, the choice falls to the short pair: `whole` goes forward if `all-short`'s lean exceeds the "
-    "control's by the readable margin, `whole-short`'s is within the band of it, and `whole` passes H2; "
-    "`all` stays otherwise."
+    "The pilot's default crop policy is `scaled` if its lean is within the looser band of the control's and "
+    "it passes H2. Otherwise it is whichever of `half` and `whole` keeps more of the pull while it removes the "
+    "lean (within the band of the control) and passes H2. If none does, the pilot keeps `all`, and leans on "
+    "label variant (c) for the evidence question. If H1 is unresolved, the choice falls to the short pair: "
+    "`whole` goes forward if the lean of `all-short` exceeds the control's by the readable margin, the lean of "
+    "`whole-short` is within the band of it, and `whole` passes H2; `all` stays otherwise."
 )
-# REVIEW: the fallback branch now carries the same gates as the main one (a readable lean on `all-short`,
-# the band on `whole-short`, H2 on `whole`); before, "shows a lean" had no threshold and the branch could
-# adopt `whole` without checking H2. Verify: a reader who wants the short pair's own task gap in place of
-# `whole`'s H2 can argue it, since the short arms are compared with the control only loosely.
+# REVIEW: the fallback branch carries the same gates as the main one (a readable lean on `all-short`, the band
+# on `whole-short`, H2 on `whole`). Verify: a reader who wants the short pair's own task gap in place of
+# `whole`'s H2 can argue it.
+# REVIEW: `scaled` now comes first under a looser band (SCALED_BAND), after Sandy's review of f2f8e41: `whole`
+# may give the cleanest result, but it never pulls a span longer than the window, which natural-language
+# documents often are. Before, all three candidates shared LEAN_BAND and the rule took the largest pull kept,
+# which already put `scaled` first whenever it passed. Verify: a `scaled` lean near the looser band's edge
+# carries about half the reference lean into the pilot.
