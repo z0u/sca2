@@ -299,6 +299,12 @@ These experiments were preparation for the main work: exercising the infrastruct
     <span class="tags">`anchoring` `operation` `smoke-test` `preregistration`</span>
 
     <!-- mini:figures ./m2/ex-2.2.14/report.py -->
+
+- [2.2.15. Lines cut short by the training window](./m2/ex-2.2.15/report.py) (preregistration draft)
+
+    A scouting run before the in-context grammar. Training windows cut the lines at their edges, and the anchor asks whatever is visible of a labelled line to carry its whole label, even when the op word is out of sight. Ex-2.2.14's primary is trained under six policies for which cut lines to pull (all of them, whole lines only, lines more than half visible, a pull scaled by the visible share, positions after a visible op word, and cut lines only), and at a shorter window where cut lines are twice as common. The sign to watch is the first operand's lean toward the axis, which ex-2.2.14 saw after the fact. Proposes the crop policy the pilot starts from.
+
+    <span class="tags">`scouting` `anchoring` `labelling` `preregistration`</span>
 - [How far the answer moves: an RGB-distance readout beside expected exact match](./m2/answer-distance/report.py) (done)
 
     A re-score of ex-2.2.11's 54 checkpoints with a distance on the color grid beside expected exact match, in grid steps from the line's raw answer, with a floor and a chance level beside each. On `handover` the answers the operator removes move 44% to 77% of the way from a perfect answer to chance; on `mix` nine in ten sit one or two steps off. The non-red lines move under 0.03 steps, less than the control's own lines do under the same operator. The distances vary between seeds a tenth as much as the kept share of exact match. Adopts the distance, with a set direction, for D2.2's next removal and selectivity gates.
