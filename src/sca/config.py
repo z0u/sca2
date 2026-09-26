@@ -8,8 +8,8 @@ class ModelConfig(BaseModel, validate_assignment=True):
     vocab_size: IntX64
     """Vocabulary size"""
 
-    block_size: IntX64
-    """Maximum sequence length"""
+    block_size: IntX32
+    """Maximum sequence length. A multiple of 32, so ex-2.2.15 can halve the usual 64."""
 
     n_embd: IntX8
     """Embedding dimension"""
@@ -41,6 +41,11 @@ class ModelConfig(BaseModel, validate_assignment=True):
     """Share one table between the token embedding and the LM head (nGPT's default). With
     `False` the model carries a second `[V, C]` table for the readout, initialized as a copy
     of the embedding and trained separately from it."""
+
+    line_mask_token: NonNegativeInt | None = None
+    """Stop attention at this token (the newline, for the line grammars): a position attends
+    only to earlier positions of its own line, the token itself counting as the end of the
+    line it closes. `None` leaves attention plainly causal."""
 
 
 class DataConfig(BaseModel, validate_assignment=True):

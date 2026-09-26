@@ -9,7 +9,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jaxtyping import Array, Float, Int, PRNGKeyArray
+from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray
 
 from sca.config import ModelConfig
 from sca.model._shared import (
@@ -49,7 +49,7 @@ class CausalSelfAttention(eqx.Module):
         # scalar temperature, initialized to √d_k.
         self.s_qk = Scale(1, init=config.n_head_dim**0.5, scale=config.n_embd**-0.5)
 
-    def __call__(self, x: Float[Array, "B T C"], enc: RotaryEncoding):
+    def __call__(self, x: Float[Array, "B T C"], enc: RotaryEncoding, allowed: Bool[Array, "B T T"] | None = None):
         _B, T, _C = x.shape
         q, k, v = jnp.split(self.qkv(x), [self.n_kq_tot, 2 * self.n_kq_tot], axis=-1)
         q = split_heads(q, self.n_head)
@@ -64,7 +64,9 @@ class CausalSelfAttention(eqx.Module):
         k = normalize(k)
 
         att = (q @ k.swapaxes(-2, -1)) * self.s_qk()
-        att = jnp.where(jnp.tril(jnp.ones((T, T), bool)), att, -jnp.inf)
+        # `allowed` defaults to plain causal attention; see `NGPT.attention_mask`.
+        allowed = jnp.tril(jnp.ones((T, T), bool))[None] if allowed is None else allowed
+        att = jnp.where(allowed[:, None], att, -jnp.inf)
         att = jax.nn.softmax(att, axis=-1)
         y = att @ v
 
@@ -127,9 +129,9 @@ class Block(eqx.Module):
         alpha = self.alpha if s is None else s()
         return normalize(h + alpha * (normalize(sublayer_out) - h))
 
-    def __call__(self, h, enc: RotaryEncoding):
+    def __call__(self, h, enc: RotaryEncoding, allowed: Bool[Array, "B T T"] | None = None):
         # h is on the unit hypersphere; each sub-module consumes it directly.
-        h = self._step(h, self.attn(h, enc), self.s_attn)
+        h = self._step(h, self.attn(h, enc, allowed), self.s_attn)
         h = self._step(h, self.mlp(h), self.s_mlp)
         return h
 
@@ -161,11 +163,13 @@ class Transformer(eqx.Module):
 class NGPT(LanguageModel):
     transformer: Transformer
     s_z: Scale
+    line_mask_token: int | None = eqx.field(static=True)
 
     def __init__(self, config: ModelConfig, *, key: PRNGKeyArray):
         log.info("Initializing nGPT model with config: %s", config)
         self.block_size = config.block_size
         self.vocab_size = config.vocab_size
+        self.line_mask_token = config.line_mask_token
         self.transformer = Transformer(config, key=key)
         # Learnable scalar logit temperature (the hidden state is unit-norm, so
         # raw logits would be cosines in [−1, 1]).
@@ -177,6 +181,19 @@ class NGPT(LanguageModel):
 
         log.info("number of parameters: %.2fM", self.get_num_params() / 1e6)
 
+    def attention_mask(self, idx: Int[Array, "B T"]) -> Bool[Array, "B T T"]:
+        """Which positions each position may attend to: every earlier one, or with `line_mask_token` set, every earlier one on its own line.
+
+        A line runs up to and including its closing token, so the segment of position t is the count of closing tokens strictly before it. A window that starts mid-line gives that fragment its own segment.
+        """
+        B, T = idx.shape
+        causal = jnp.broadcast_to(jnp.tril(jnp.ones((T, T), bool)), (B, T, T))
+        if self.line_mask_token is None:
+            return causal
+        closes = (idx == self.line_mask_token).astype(jnp.int32)
+        seg = jnp.cumsum(closes, axis=-1) - closes
+        return causal & (seg[:, :, None] == seg[:, None, :])
+
     def __call__(self, idx: Int[Array, "B T"], *, key: PRNGKeyArray | None = None):
         # Token embeddings, projected onto the unit hypersphere. (The key is
         # unused: nGPT is dropout-free — the hypersphere constraint regularizes.)
@@ -185,7 +202,8 @@ class NGPT(LanguageModel):
         # Gradient-checkpoint each block: the backward pass recomputes
         # activations instead of storing every layer's O(T²) attention maps.
         enc = self.transformer.rotary_enc
-        run_block = eqx.filter_checkpoint(lambda block, h: block(h, enc))
+        allowed = self.attention_mask(idx)
+        run_block = eqx.filter_checkpoint(lambda block, h: block(h, enc, allowed))
         for block in self.transformer.blocks:
             x = run_block(block, x)
 
@@ -200,8 +218,9 @@ class NGPT(LanguageModel):
         """
         x = normalize(self.transformer.wte[idx])
         states = [x]
+        allowed = self.attention_mask(idx)
         for block in self.transformer.blocks:
-            x = block(x, self.transformer.rotary_enc)
+            x = block(x, self.transformer.rotary_enc, allowed)
             states.append(x)
         return jnp.stack(states)
 
@@ -213,7 +232,8 @@ class NGPT(LanguageModel):
         x = normalize(self.transformer.wte[idx])
         states = [x]
         enc = self.transformer.rotary_enc
-        run_block = eqx.filter_checkpoint(lambda block, h: block(h, enc))
+        allowed = self.attention_mask(idx)
+        run_block = eqx.filter_checkpoint(lambda block, h: block(h, enc, allowed))
         for block in self.transformer.blocks:
             x = run_block(block, x)
             states.append(x)

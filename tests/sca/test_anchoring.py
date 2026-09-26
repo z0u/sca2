@@ -20,6 +20,7 @@ from sca.anchoring import (
     alignment,
     anchor_term,
     anti_subspace_term,
+    crop_weight,
     margin,
     pooled_anchor_term,
     sample_anchored_batches,
@@ -393,6 +394,83 @@ def test_sampled_line_ids_group_the_mask_without_changing_the_draws(corpus):
     assert all(np.bincount(row).max() <= LINE_TOKENS for row in local)
 
 
+def test_line_weights_take_pull_away_without_moving_the_denominator():
+    states, mask, line_id = pooled_setup()
+    # Per-line means [0.6, 0.5]. Dropping the second line halves the first's share of a two-line
+    # denominator (0.3); renormalizing over the kept line would have said 0.6.
+    keep_first = jnp.asarray(np.array([[1.0, 0.0]], dtype=np.float32))
+    np.testing.assert_allclose(pooled_anchor_term(states, mask, line_id, 2, np.inf, line_w=keep_first), 0.3, rtol=1e-6)
+    ones = jnp.ones((1, 2), dtype=jnp.float32)
+    np.testing.assert_allclose(
+        pooled_anchor_term(states, mask, line_id, 2, 0.1, line_w=ones),
+        pooled_anchor_term(states, mask, line_id, 2, 0.1),
+        rtol=1e-6,
+    )
+    grad = jax.grad(lambda s: pooled_anchor_term(s, mask, line_id, 2, 0.1, line_w=keep_first))(states)
+    got = np.asarray(grad)[0, 0, :, 0]
+    assert np.all(got[2:] == 0.0) and np.all(got[:2] < 0.0)  # the dropped line gets no pull, the kept one keeps its
+
+
+@pytest.mark.parametrize("crop", ["all", "whole", "half", "scaled", "cut-only"])  # `knowable` reads the roles
+def test_crop_weights_follow_the_run_in_view_without_changing_the_draws(corpus, crop):
+    mc, dc = model_config(), data_config(0.5)
+    plain = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(3), np.ones(64), lines=True))
+    x, _, mask, local, w = next(
+        sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(3), np.ones(64), lines=True, crop=crop)
+    )
+    np.testing.assert_array_equal(x, plain[0])
+    np.testing.assert_array_equal(mask, plain[2])
+    n_lines = mc.block_size // LINE_TOKENS + 2
+    assert w.shape == (dc.batch_size, n_lines)
+    # Positions in view per local line; the padding (token 0) hides a prefix.
+    n = np.stack([np.bincount(row[seen], minlength=n_lines) for row, seen in zip(local, x != 0, strict=True)])
+    shown = n > 0
+    assert (n[shown] < LINE_TOKENS).any() and (n[shown] == LINE_TOKENS).any()  # the crops cut some lines
+    expected = crop_weight(crop, np.zeros_like(n), n - 1)
+    np.testing.assert_allclose(w[shown], expected[shown], rtol=0, atol=1e-7)
+
+
+def test_a_pool_narrows_the_pull_without_moving_the_denominator():
+    states, mask, line_id = pooled_setup()
+    # x = [0.8, 0.4 | 0.0, 1.0]. Dropping the first position leaves line means [0.4, 0.5] → 0.45.
+    np.testing.assert_allclose(
+        pooled_anchor_term(states, mask, line_id, 2, np.inf, pool=jnp.asarray([[0.0, 1.0, 1.0, 1.0]])), 0.45, rtol=1e-6
+    )
+    # A labeled line with nothing left in its pool still counts: 0.6 over two lines, not over one.
+    empty_second = jnp.asarray([[1.0, 1.0, 0.0, 0.0]])
+    np.testing.assert_allclose(pooled_anchor_term(states, mask, line_id, 2, np.inf, pool=empty_second), 0.3, rtol=1e-6)
+    alone = pooled_anchor_term(states, jnp.asarray([[1.0, 1.0, 0.0, 0.0]]), line_id, 2, 0.1)  # the first line's own
+    np.testing.assert_allclose(
+        pooled_anchor_term(states, mask, line_id, 2, 0.1, pool=empty_second), alone / 2, rtol=1e-6
+    )
+    grad = jax.grad(lambda s: pooled_anchor_term(s, mask, line_id, 2, 0.1, pool=empty_second))(states)
+    assert np.all(np.asarray(grad)[0, 0, 2:, 0] == 0.0)
+
+
+def test_knowable_keeps_lines_with_the_op_word_in_view_and_pools_from_it(corpus):
+    mc, dc = model_config(), data_config(0.0)
+    plain = next(sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(3), np.ones(64), lines=True))
+    x, _, mask, local, w, pool = next(
+        sample_anchored_batches(corpus, dc, mc, 1, np.random.default_rng(3), np.ones(64), lines=True, crop="knowable")
+    )
+    np.testing.assert_array_equal(x, plain[0])
+    np.testing.assert_array_equal(mask, plain[2])
+    role = (_crop_starts(corpus, x)[:, None] + np.arange(x.shape[1])) % LINE_TOKENS
+    np.testing.assert_array_equal(pool, (role >= 1).astype(np.float32))
+    for row in range(len(x)):
+        for line in np.unique(local[row]):
+            roles = role[row][local[row] == line]
+            assert w[row, line] == float(roles.min() <= 1 <= roles.max())
+    assert (w == 0).any() and (w == 1).any()  # windows cut some lines before and after the op word
+
+
+def test_whole_and_cut_only_split_every_visit():
+    first, last = np.meshgrid(np.arange(LINE_TOKENS), np.arange(LINE_TOKENS), indexing="ij")
+    ok = first <= last
+    np.testing.assert_array_equal((crop_weight("whole", first, last) + crop_weight("cut-only", first, last))[ok], 1.0)
+    assert crop_weight("whole", first, last)[ok].sum() == 1.0  # one run of the six is the whole line
+
+
 def test_anti_subspace_term_reads_the_mean_square_alignment_of_live_positions():
     # Half the positions on the axis, half orthogonal to it: mean cos² = 1/2.
     states = np.zeros((3, 2, 4, 8), dtype=np.float32)
@@ -682,6 +760,39 @@ def test_train_anchored_threads_slices_and_clean_rows(data_dir, tmp_path):
     wte = np.asarray(model.transformer.wte)
     np.testing.assert_allclose(wte[list(rows), ANCHOR_AXIS], 0.0, rtol=0, atol=0)
     assert traj["anchor"][-1] < traj["anchor"][0]
+
+
+def test_train_anchored_takes_a_crop_policy(data_dir, tmp_path):
+    """A pooled run under a crop policy trains; a flat anchor refuses one, since it has no lines to weight."""
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    tokens, weights = probe_set()
+    config = training_config().model_copy(
+        update={"scheduler": SchedulerConfig(epochs=2, warmup_epochs=1, min_lr_factor=0.01)}
+    )
+    _, metrics, traj = train_anchored(
+        config,
+        data_dir,
+        anchor=AnchorSpec(peak=1.0, warmup_epochs=1, anneal_start=1, anneal_end=2, tau=0.1),
+        label_p=label_p,
+        probe_tokens=tokens,
+        probe_weights=weights,
+        crop="whole",
+        checkpoint_dir=tmp_path / "ckpt",
+        traj_stride=5,
+    )
+    assert len(metrics) == 2 and np.isfinite(traj["anchor"]).all()
+    with pytest.raises(ValueError, match="crop policy"):
+        train_anchored(
+            config,
+            data_dir,
+            anchor=AnchorSpec(peak=1.0, warmup_epochs=1, anneal_start=1, anneal_end=2),
+            label_p=label_p,
+            probe_tokens=tokens,
+            probe_weights=weights,
+            crop="whole",
+            checkpoint_dir=tmp_path / "flat",
+        )
 
 
 # --- Several axes: the plane -------------------------------------------------------------------------

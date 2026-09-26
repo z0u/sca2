@@ -175,3 +175,24 @@ def test_untied_checkpoint_round_trips(tmp_path):
     )
     idx = jr.randint(jr.key(1), (2, 16), 0, 64)
     np.testing.assert_allclose(loaded(idx), model(idx), rtol=0, atol=0)
+
+
+def test_line_mask_stops_attention_at_the_closing_token():
+    """With `line_mask_token` set, a position sees only its own line: changing an earlier line leaves a later one's logits alone, and without the mask it does not."""
+    NL = 5
+    idx = jnp.array([[7, 8, NL, 9, 10, 11, NL, 12, 13]])
+    # Change only the first line, closing token kept.
+    edited = idx.at[0, :2].set(jnp.array([20, 21]))
+
+    masked = build_model(make_config(line_mask_token=NL), key=jr.key(0))
+    plain = build_model(make_config(), key=jr.key(0))
+    later = slice(3, None)
+    np.testing.assert_allclose(masked(idx)[0, later], masked(edited)[0, later], rtol=0, atol=1e-6)
+    assert np.abs(plain(idx)[0, later] - plain(edited)[0, later]).max() > 1e-4
+
+    # The closing token belongs to the line it ends: it still sees that line.
+    assert np.abs(masked(idx)[0, 2] - masked(edited)[0, 2]).max() > 1e-4
+    # The stream and the intervention path carry the same mask.
+    s, logits = masked.stream_and_logits(idx)
+    np.testing.assert_allclose(s, masked.residual_stream(idx), rtol=0, atol=1e-5)
+    np.testing.assert_allclose(logits, masked(idx), rtol=0, atol=1e-5)
