@@ -218,9 +218,8 @@ FINAL_SLICE = 4
 """Slice 4 is the output of the last block, where ex-2.2.14 measured the lean."""
 
 TRAJ_STRIDE = 50
-TRAJ_MEASUREMENTS = ("op_margin", "lean", "fragment_lean")
-"""Recorded at every trajectory point (every `TRAJ_STRIDE` training steps, on ex-2.2.14's probe lines), at
-every slice: the op margin as ex-2.2.14 recorded it, plus the lean and the trailing-fragment lean. The measurements
+"""Recorded at every trajectory point (every `TRAJ_STRIDE` training steps, on ex-2.2.14's probe lines), at every
+slice: the op margin as ex-2.2.14 recorded it, plus the lean and the trailing-fragment lean. The measurements
 at the end of training say where each policy lands; these say how it got there, since a cut line is a small
 share of any one batch and the question is what the repeated pull on them adds up to. The stride is ex-2.2.14's
 (inherited from ex-2.2.3), about a hundred points over a run; no checkpoint is kept along the way."""

@@ -112,8 +112,8 @@ ARM = {a.name: a for a in ex.ARMS}
 POLICY_ARMS = ("all", "whole", "half", "scaled", "knowable", "cut-only")
 SHORT_ARMS = ("all-short", "whole-short")
 MODEL_ARMS = ("whole-mask", "whole-tied", "all-tied")
+# The roles that carry no color: the op word, `=`, and the newline.
 SYNTAX_ROLES = (1, 3, 5)
-"""The roles that carry no color: the op word, `=`, and the newline."""
 
 
 @dataclass(frozen=True)
@@ -385,14 +385,14 @@ def rule(res: Results) -> dict:
         bar = ex.SCALED_SHARE * removed(res, "whole")
         cand["scaled"] = {"removed": removed(res, "scaled"), "bar": bar, "h2": v2["scaled"]["ok"]}
         cand["scaled"]["ok"] = cand["scaled"]["removed"] >= bar and cand["scaled"]["h2"]
-        for p in ("half", "whole"):
+        for p in ex.MITIGATIONS[1:]:
             lean_ok = in_band(res, p) if v1 == "pass" else removed(res, p) >= ex.PARTIAL_SHARE
             cand[p] = {"removed": removed(res, p), "lean_ok": lean_ok, "h2": v2[p]["ok"], "ok": lean_ok and v2[p]["ok"]}
         if cand["scaled"]["ok"]:
             chosen = "scaled"
         else:
             # Of the two, the one that keeps more of the pull.
-            ok = [p for p in ("half", "whole") if cand[p]["ok"]]
+            ok = [p for p in ex.MITIGATIONS[1:] if cand[p]["ok"]]
             if ok:
                 chosen = max(ok, key=lambda p: ex.pull_share(ARM[p].policy, ARM[p].block))
     elif v1 == "unresolved":
@@ -403,8 +403,8 @@ def rule(res: Results) -> dict:
 
 # --- H1: the lean -------------------------------------------------------------------------------
 
+# The dot-plot order: the control, the policies, the halved pair, and the model arms, in groups.
 LEAN_ORDER = (ex.CONTROL, *POLICY_ARMS, *SHORT_ARMS, *MODEL_ARMS)
-"""The dot-plot order: the control, the policies, the halved pair, and the model arms, in groups."""
 
 
 def lean_figure(res: Results) -> str:
@@ -729,7 +729,7 @@ def roles_draw(prof: dict, alt_text: str) -> str:
         for ax, s in zip(axes, starts, strict=True):
             roles = ex.ROLES[int(s) :]
             for j, r in enumerate(roles):
-                if ex.ROLES.index(r) in (3, 5):
+                if ex.ROLES.index(r) in SYNTAX_ROLES:
                     ax.axvspan(j - 0.4, j + 0.4, color=light_dark("#000", "#fff"), alpha=0.06, lw=0)
             for c, p in prof.items():
                 ls = "--" if c == ex.CONTROL else "-"
@@ -918,7 +918,7 @@ def rule_table(res: Results) -> str:
     r = rule(res)
     head = ["policy", "share of the excess removed", "the lean test", "H2", "pull kept", "qualifies"]
     rows = []
-    for p in ("scaled", "half", "whole"):
+    for p in ex.MITIGATIONS:
         q = r["candidates"].get(p)
         a = ARM[p]
         if q is None:
