@@ -5,7 +5,7 @@ r"""
 
 /// tip |
 <!-- tl;dr -->
-We re-scored ex-2.2.11's 54 checkpoints with a distance on the color grid beside expected exact match, to see where the answers go when the anchored direction is removed. On `handover` the removed answers are near misses, two to three grid steps from the right color and well short of a random guess, and the non-red lines move less than the control's own lines do under the same operator.
+We re-scored ex-2.2.11's 54 checkpoints with a distance on the color grid beside expected exact match, to see where the answers go when the anchored direction is removed. On `handover` the removed answers move 44% to 77% of the way from a perfect answer to a random guess, and the non-red lines move less than the control's own lines do under the same operator.
 ///
 
 ## Observations
@@ -249,7 +249,7 @@ assert res is not None
 r"""
 ## The removal lines, by distance
 
-On the removal lines under `projection`, the answers behind the exact match that `handover` keeps are mostly near misses, rather than right answers among wrong ones. The figure puts the distance beside the kept share, per op.
+On the removal lines under `projection`, the greedy guess on `handover` moves about halfway from the floor to chance on six ops (44% to 51% of the way), and further on `difference`, `exclusion`, and the three HSV ops (61% to 77%). The figure puts the distance beside the kept share, per op.
 
 The clean pass sits at the floor on every op and condition (the table below the figure gives it), so any distance above the floor under `projection` is caused by the operator.
 """
@@ -304,6 +304,8 @@ def removal_draw(kept: dict, greedy: dict, mean: dict, refs: dict) -> str:
 removal_figure(res)
 
 """
+A sampled answer lands about as far as the greedy one. Sampling at temperature 1 draws from the model's distribution, so the expected distance is what it scores: 0.03 to 0.18 steps above the greedy distance on every op (the table gives it). The greedy guess is the limit as the temperature goes to zero. The mean of the distribution describes no single sample; it is the summary that moves when mass leans toward a neighbor while the guess stays put, and it sits a little below the greedy distance.
+
 The table gives the same measurements on `handover`, adds the clean and `operands` passes, and adds the hit rate (the share of lines whose greedy guess is one of the line's possible answers).
 """
 
@@ -318,6 +320,7 @@ def removal_table(res: Results) -> str:
         "greedy distance, clean",
         "greedy distance, `projection`",
         "greedy distance, `operands`",
+        "expected distance, `projection`",
         "floor",
         "chance",
     ]
@@ -333,6 +336,7 @@ def removal_table(res: Results) -> str:
                 span2(res.stat("handover", op, "clean", "removal", "greedy")),
                 span2(res.stat("handover", op, "projection", "removal", "greedy")),
                 span2(res.stat("handover", op, "operands", "removal", "greedy")),
+                span2(res.stat("handover", op, "projection", "removal", "expected")),
                 f"{res.reference(op, 'removal', 'floor_mode'):.2f}",
                 f"{res.reference(op, 'removal', 'chance'):.2f}",
             ]
@@ -340,7 +344,7 @@ def removal_table(res: Results) -> str:
     return table_html(
         head,
         rows,
-        "**The removal lines on `handover`, per op: seed mean (seed range).** Distances in grid steps from the raw answer. The floor is the best grid answer's distance and chance a uniform draw's, both averaged over the op's removal lines.",
+        "**The removal lines on `handover`, per op: seed mean (seed range).** Distances in grid steps from the raw answer; the expected distance is what a sample at temperature 1 scores. The floor is the best grid answer's distance and chance a uniform draw's, both averaged over the op's removal lines.",
     )
 
 
@@ -374,7 +378,7 @@ def lost_draw(share: dict, lost: dict, kept: dict, refs: dict) -> str:
     @themed(
         name="lost-lines",
         alt_text="""
-            Most of handover's removal lines are lost under projection; the lost lines sit two to three steps from the answer, short of chance on every op but value-hsv, while the kept lines stay at the floor.
+            Most of handover's removal lines are lost under projection; the lost lines sit 1.8 to 3.7 steps from the answer, short of chance on every op but value-hsv, while the kept lines stay at the floor.
         """,
         caption="""
             **The removal lines under `projection`, split by whether the greedy guess survives.** Top: the share of each op's removal lines that are lost (answered on the clean pass, not under the operator). Middle: the greedy distance of the lost lines from the raw answer, in grid steps, with chance dashed. Bottom: the greedy distance of the kept lines, with the floor dotted. Each small dot is one seed, the larger mark the seed mean, and the thin bar the seed range; a condition with no lost line on a seed draws nothing for it.
@@ -519,7 +523,7 @@ cube_figure(res)
 r"""
 ## A counterfactual answer
 
-This is a post hoc check on the near misses. If the operator took the redness out of the red operand and left the op intact, the guess would be the op applied to a de-reddened operand. We try two versions of that operand:
+This is a post hoc check on where the lost answers go. If the operator took the redness out of the red operand and left the op intact, the guess would be the op applied to a de-reddened operand. We try two versions of that operand:
 (a) red channel set to zero, and
 (b) red channel lowered to the larger of its green and blue, which keeps the other two channels and drops the saturation.
 """
@@ -574,7 +578,7 @@ Neither substitute is where the guesses go. The zero-red answer is farther from 
 So the lost answers sit between the answer and its de-reddened version, and no single substitute operand describes them.
 """
 
-r"""
+rf"""
 ## The non-red lines
 
 The non-red lines are the other side of selectivity: the operator should leave them alone. Ex-2.2.11 gates the exact match deficit on `mix` at {ex.ex2211.NONRED_DEFICIT_GATE:g}, and finds it near zero on every op. The distance shows whether the mass moves at all on those lines.
@@ -670,7 +674,7 @@ spread_table(res)
 r"""
 ## What we make of it
 
-The kept exact match on the removal lines is not a quarter of the lines answered and the rest sent anywhere. It is closer to the other reading: nearly every line moves, and moves a short way. On `mix`, the op the D2.2 gates are scored on, the guess ends one or two steps from the answer nine times in ten.
+Under `projection`, nearly every removal line moves, and moves part of the way: the greedy guess ends about halfway from a perfect answer to a random guess on six of the eleven ops, and further on the rest. On `mix`, the op the D2.2 gates are scored on, the guess ends one or two steps from the answer nine times in ten.
 
 The answers move toward what the line would give without its red, but not all the way: the counterfactual check says the model is not computing the op on a de-reddened operand.
 
@@ -684,10 +688,10 @@ The distance also separates ops that exact match does not: `mix` and `value-hsv`
 
 On the non-red lines, the mean of the distribution is the sensitive measurement, since it moves while the guess stays put. On `handover` every such move is under 0.03 steps, and the control's lines move as much or more, so the operator's cost on the lines it should leave alone is about what removing any direction costs.
 
-For use in a gate, the backlog item asks for a preregistered direction before the measurement is adopted. This re-score supports two measurements:
+We adopt the distance for D2.2's removal and selectivity gates, from the next experiment that scores them, with this direction:
 (a) removal, as the normalized distance of the mean of the distribution on the removal lines, (distance − floor) / (chance − floor), rising under the operator, with the greedy distance beside it as the number a user of exact match would expect; and
 (b) selectivity, as the non-red rise of the same mean staying at or under the rise of the control under the same operator.
-The next experiment should set the thresholds from its own control runs. Until one of the distances has been used in a gate, the greedy and mean distances should be quoted together.
+The thresholds are the one thing a re-score cannot supply, since it has no gate to calibrate against, so that experiment sets them from its own control runs. Until one of the distances has been used in a gate, the greedy and mean distances are quoted together.
 
 The distance does not say whether an answer is right, except at the floor, so a gate that wants "answered" should keep the hit rate or exact match beside it.
 
