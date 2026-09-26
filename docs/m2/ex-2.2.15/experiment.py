@@ -7,16 +7,23 @@ On a line cut before its op word, that part cannot know the op. This run trains 
 measures what each one does to the first operand's lean, to fragments seen without their op word, to the anchor,
 and to the task. It proposes a default crop policy for the in-context grammar pilot.
 
-Design constants only while the preregistration is in review; the DAG lands when the hypotheses freeze.
+The design constants come first; the DAG follows, binding what it does not change from ex-2.2.14's module.
+
+    bin/mini run docs/m2/ex-2.2.15/experiment.py --app modal --max-containers 12 --budget 4h
+    bin/mini status ex-2.2.15
 """
 
 from __future__ import annotations
 
+import importlib.util
+import sys
 from collections import defaultdict
-from dataclasses import dataclass
-from typing import Literal
+from dataclasses import asdict, dataclass
+from typing import Any, Literal
 
-DESIGN_ONLY = True
+import numpy as np
+
+from mini import Ctx, Experiment, get_data_dir
 
 # --- What is inherited ---------------------------------------------------------------------------------
 
@@ -275,3 +282,420 @@ ADOPTION = (
 # are. After the review of 2543d1b the test is relative to `whole` (SCALED_SHARE) in place of a fixed band of
 # 0.1, so it loosens when H1 is partial, as Sandy asked. Verify: under a partial H1 `scaled` may go forward
 # removing 15% of the excess, about 0.03 in cosine, which five paired seeds may not resolve from zero.
+
+
+# =============================================================================================
+# The DAG
+# =============================================================================================
+
+
+def _load_ex2214():
+    """Ex-2.2.14's module (which loads ex-2.2.11's, and so on down), by path and left out of `sys.modules`, so
+    the task bodies here still cloudpickle by value for a remote worker.
+    """
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent.parent / "ex-2.2.14" / "experiment.py"
+    spec = importlib.util.spec_from_file_location("ex2214", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        del sys.modules[spec.name]
+    return module
+
+
+ex2214 = _load_ex2214()
+
+# --- What stays as ex-2.2.14 had it -------------------------------------------------------------
+# Bound by name so a task body never references the module objects themselves.
+
+OP_NAMES: tuple[str, ...] = ex2214.OP_NAMES
+EPOCHS = ex2214.EPOCHS
+LAM = ex2214.LAM
+TAU = ex2214.TAU
+N_LINES = ex2214.N_LINES
+N_EMBD = ex2214.N_EMBD
+N_LAYER = ex2214.N_LAYER
+ANNEAL_WEIGHT_RATIO = ex2214.ANNEAL_WEIGHT_RATIO
+PROBE_RIDGE = ex2214.PROBE_RIDGE
+N_SCAN = ex2214.N_SCAN
+SCAN_SEED = ex2214.SCAN_SEED
+SCAN_HOLDOUT = ex2214.SCAN_HOLDOUT
+CORPUS_ARGS = (
+    ex2214.OP_NAMES,
+    ex2214.N_LINES,
+    ex2214.CORPUS_SEED,
+    ex2214.HOLDOUT_FRAC,
+    ex2214.ROUNDING,
+    ex2214.N_PROBE,
+    ex2214.PROBE_SEED,
+    ex2214.PROBE_BOTH_SLOTS,
+    ex2214.PER_SLOT_RATE,
+    ex2214.RED_RATE,
+    ex2214.RED_DOSE,
+    ex2214.NONRED_DOSE,
+    ex2214.FAR_MOVE,
+)
+"""The grammar, the corpus, the probe sets, and the recipe: as ex-2.2.14 had them."""
+
+assert ex2214.ANCHORED_OP == ANCHORED_OP and ex2214.LABEL_RATE == LABEL_RATE and ex2214.KEYING == "op"
+assert ex2214.TASK_GATE == TASK_GATE and ex2214.TRAJ_STRIDE == TRAJ_STRIDE
+assert ex2214.CONTROL_EXPERIMENT == CONTROL_EXPERIMENT and ex2214.CONTROL == CONTROL
+assert ex2214.PRIMARY == REFERENCE_CONDITION and ex2214.WHOLE_SPAN == LINE_TOKENS
+assert ex2214.ANCHOR_AXIS == 0 and ex2214.OP_POSITION == OP_ROLE
+
+prepare_corpus = ex2214.prepare_corpus
+traj_probe = ex2214.traj_probe
+probe_walk = ex2214.probe_walk
+line_margin = ex2214.line_margin
+op_scan = ex2214.op_scan
+anneal_retention = ex2214.anneal_retention
+resolve_control = ex2214.resolve_control
+_behavior = ex2214._behavior
+_load = ex2214._load
+_slim = ex2214._slim
+_make_config = ex2214._make_config
+schedules = ex2214.schedules
+Condition229 = ex2214.Condition229
+EX2211_CHECKPOINT_REF = ex2214.EX2211_CHECKPOINT_REF
+
+# --- Refs -----------------------------------------------------------------------------------------
+
+METRICS_REF = "reports/m2/ex-2.2.15/metrics"
+TRAJ_REF = "reports/m2/ex-2.2.15/trajectories"
+CHECKPOINT_REF = "reports/m2/ex-2.2.15/checkpoints/{label}"
+
+PULL_START_ROLES = (1, *FRAGMENT_START_ROLES)
+"""The start-cut runs a window can leave: the trailing fragments, and the run that starts at the op word, which
+the pull landing needs too (a crop at role 1 keeps its op word, so it is not a trailing fragment)."""
+
+
+def cells(arms: tuple[Arm, ...], prep: dict, epochs: int = EPOCHS, seeds: int = SEEDS) -> list[dict]:
+    """One row per run: ex-2.2.14's primary row with the arm's crop policy, window, readout, and mask."""
+    from sca.config import ModelConfig
+    from sca.data.named_colors import WordTokenizer
+    from sca.utils import align
+
+    tc = prep["meta"].tokenizer_config
+    newline = WordTokenizer(tc).stoi["\n"]
+    rates = {o: (LABEL_RATE if o == ANCHORED_OP else 0.0) for o in OP_NAMES}
+    rows = []
+    for a in arms:
+        base = Condition229(a.name, seeds, a.name, lam=LAM, tau=TAU, epochs=epochs, ops=OP_NAMES, n_lines=N_LINES)
+        anchor, anti = schedules(base)
+        anchor = anchor | {"span": LINE_TOKENS}
+        for seed in range(seeds):
+            config = _make_config(align(tc.vocab_size, 64), SEED_OFFSET + seed, epochs, N_EMBD, N_LAYER)
+            config.tokenizer = tc.model_copy()
+            config.model = ModelConfig.model_validate(
+                config.model.model_dump()
+                | {
+                    "block_size": a.block,
+                    "tie_embeddings": a.tie,
+                    "line_mask_token": newline if a.line_mask else None,
+                }
+            )
+            assert config.data.batch_size == BATCH and config.data.padding_chance == PADDING_CHANCE
+            config.data = config.data.model_copy(update={"batch_size": a.batch})
+            rows.append(
+                {
+                    "config": config,
+                    "anchor": anchor,
+                    "anti": anti,
+                    "rates": rates,
+                    "crop": a.policy,
+                    "condition": a.name,
+                    "seed": seed,
+                    "model_seed": SEED_OFFSET + seed,
+                    "label": f"{a.name}-s{seed}",
+                }
+            )
+    return rows
+
+
+def fragments(tokens: np.ndarray, start: int) -> np.ndarray:
+    """The probe lines shown from role *start* on, as sequences of their own: what a window that opens at that
+    role sees of the line. Under causal attention the states of a window's first run depend on that run alone,
+    so these are the states training saw on a start-cut line.
+    """
+    assert tokens.shape[1] == LINE_TOKENS, f"probe lines are {tokens.shape[1]} tokens, not {LINE_TOKENS}"
+    return np.ascontiguousarray(tokens[:, start:])
+
+
+def fragment_sums(model, tokens: np.ndarray, starts=FRAGMENT_START_ROLES) -> tuple[np.ndarray, int]:
+    """The summed cosine with e₁ over every position of every fragment of *tokens*, per slice; and the count of
+    positions it sums over. Sums, so a caller can pool ops and start roles weighted by position.
+    """
+    from sca.anchoring import alignment
+
+    total, count = 0.0, 0
+    for r in starts:
+        cos = alignment(model, fragments(tokens, r))  # (L1, N, T - r)
+        total = total + cos.sum(axis=(1, 2))
+        count += cos.shape[1] * cos.shape[2]
+    return np.asarray(total), count
+
+
+def train_one(config, anchor: dict, anti: dict, corpus, traj_stride: int, probes, rates, crop: Policy, label: str):
+    """Train one run under the op labeller and the crop policy, recording at every trajectory point the op
+    margin (`m_line`), the cosine with e₁ per slice and role (`alpha_roles`, over every op's trajectory lines, so
+    role 0 is the lean), and the trailing-fragment cosine per slice and op (`fragment`).
+    """
+    from sca.anchoring import AnchorSpec, AntiSpec, LabelSpec
+    from sca.compute.training import train_anchored
+    from sca.data.named_colors import WordTokenizer
+    from mini.store import get, put
+
+    workdir = get_data_dir() / "cells" / label
+    corpus_dir = get(corpus, workdir / "corpus")
+    tokenizer = WordTokenizer(config.tokenizer)
+    p = np.zeros(config.model.vocab_size)
+    for o, r in rates.items():
+        p[tokenizer.stoi[o]] = r
+    with np.load(get(probes, workdir / "probes.npz")) as z:
+        tokens, line_w = traj_probe(z, ANCHORED_OP)
+    per_op = len(tokens) // len(OP_NAMES)
+    by_op = [tokens[i * per_op : (i + 1) * per_op] for i in range(len(OP_NAMES))]
+
+    fragment: list[np.ndarray] = []
+
+    def on_record(_index: int, model) -> None:
+        sums = [fragment_sums(model, t) for t in by_op]
+        fragment.append(np.stack([s / n for s, n in sums], axis=1))  # (L1, op)
+
+    _, metrics, traj = train_anchored(
+        config,
+        corpus_dir,
+        anchor=AnchorSpec(**anchor),
+        anti=AntiSpec(**anti),
+        label_p=LabelSpec(p=p, keying="op", pull="span"),
+        probe_tokens=tokens,
+        probe_weights=line_w,
+        probe_line_w=line_w,
+        crop=crop,
+        checkpoint_dir=workdir,
+        traj_stride=traj_stride,
+        on_record=on_record,
+    )
+    keys = ("epoch", "m_line", "alpha_op1", "alpha_roles", "val_loss", "weight", "anti_weight")
+    return {
+        "label": label,
+        "val_loss": [m.val_loss for m in metrics],
+        "train_loss": [m.train_loss for m in metrics],
+        "traj": {k: np.asarray(traj[k]).tolist() for k in keys if k in traj}
+        | {"fragment": np.stack(fragment).tolist()},
+        "checkpoint": put(workdir / "model", name=f"ex-2.2.15-{label}-ckpt"),
+    }
+
+
+def pull_landing(model, tokens: np.ndarray, policy: Policy, block: int) -> np.ndarray:
+    """(slice, role): where the pull on a labelled line lands, averaged over the ways a window shows the line.
+
+    Each visit that shows roles `first..last` is weighted by how often it occurs (`visit_shares`) and by the
+    weight *policy* puts on it; its pull is shared over the visible roles by the softmin weights at τ (from
+    the op word on, under `knowable`). A visit's states are those of the fragment starting at `first`, since
+    under causal attention a window's first run depends on that run alone and a later run's prefix is the
+    whole line's. The arm's mask, if any, is part of the model and so part of those states.
+    """
+    from sca.anchoring import alignment, softmin_weights
+
+    cos = {0: alignment(model, tokens)} | {r: alignment(model, fragments(tokens, r)) for r in PULL_START_ROLES}
+    land = np.zeros((cos[0].shape[0], LINE_TOKENS))
+    total = 0.0
+    for (first, last), share in visit_shares(block).items():
+        w = share * line_weight(policy, first, last)
+        lo = max(first, KNOWABLE_FIRST_ROLE) if policy == "knowable" else first
+        if w == 0 or lo > last:
+            continue
+        run = cos[first][:, :, lo - first : last - first + 1]  # (L1, N, roles lo..last)
+        land[:, lo : last + 1] += w * softmin_weights(1.0 - run, TAU, axis=-1).mean(axis=1)
+        total += w
+    return land / total
+
+
+def readout(model, tokenizer, tokens: np.ndarray) -> dict:
+    """The tied-readout measurements, at the first operand of the probe lines at the final slice: the
+    syntax-against-color log-odds of the next token, and the part the e₁ coordinate carries (op1-lean's
+    readout gap); and the e₁ column of the embedding and readout tables, in vocabulary order.
+    """
+    import equinox as eqx
+    import jax.numpy as jnp
+    from scipy.special import logsumexp
+
+    from sca.data.ops import PALETTE
+
+    vocab = [tokenizer.itos[i] for i in range(tokenizer.vocab_size)]
+    colors = np.array([i for i, w in enumerate(vocab) if w in PALETTE])
+    syntax = np.array([i for i, w in enumerate(vocab) if w and w not in PALETTE])
+
+    def logodds(lg):
+        return logsumexp(lg[..., syntax], axis=-1) - logsumexp(lg[..., colors], axis=-1)
+
+    fwd = eqx.filter_jit(model.stream_and_logits)
+    h, lg = [], []
+    for i in range(0, len(tokens), 2048):
+        s, logits = fwd(jnp.asarray(tokens[i : i + 2048]))
+        h.append(np.asarray(s[FINAL_SLICE][:, 0], np.float64))
+        lg.append(np.asarray(logits[:, 0], np.float64))
+    h1, lg = np.concatenate(h)[:, 0], np.concatenate(lg)
+    table = np.asarray(model.transformer.readout, np.float64)
+    wte = np.asarray(model.transformer.wte, np.float64)
+    wte /= np.linalg.norm(wte, axis=1, keepdims=True)
+    s_z = float(np.asarray(model.s_z()).reshape(-1)[0])
+    without = lg - s_z * h1[:, None] * table[:, 0]
+    return {
+        "vocab": vocab,
+        "logodds_op1": float(logodds(lg).mean()),
+        "logodds_op1_e1": float((logodds(lg) - logodds(without)).mean()),
+        "readout_e1": table[:, 0].tolist(),
+        "embedding_e1": wte[:, 0].tolist(),
+    }
+
+
+def eval_one(
+    trained: dict, evals, probes, condition: str, policy: Policy | None, block: int, seed: int, label: str
+) -> dict:
+    """Ex-2.2.14's eval (behavior per op, the alignment per op's probe lines, the op margin, retention, and
+    the op-identity scan), plus the trailing fragments per op and start role, where the pull lands under the
+    arm's own policy and window, and the readout measurements.
+    """
+    from sca.anchoring import alignment
+    from sca.data import ops as grammar
+    from mini.store import get
+
+    workdir = get_data_dir() / "eval" / label
+    model, tokenizer, _, _ = _load(trained, workdir)
+    sets = _behavior(model, tokenizer, grammar.load_lines(get(evals, workdir / "evals.json").read_bytes()))
+
+    with np.load(get(probes, workdir / "probes.npz")) as z:
+        lines = {o: probe_walk(z, o) for o in OP_NAMES}
+    cos = {o: alignment(model, t) for o, t in lines.items()}  # each (L1, N, T)
+    pooled = np.concatenate([cos[o] for o in OP_NAMES], axis=1)
+    counts = [cos[o].shape[1] for o in OP_NAMES]
+    assert len(set(counts)) == 1, f"probe walks differ in size: {counts}"
+    w = np.concatenate([np.full(n, 1.0 if o == ANCHORED_OP else 0.0) for o, n in zip(OP_NAMES, counts, strict=True)])
+    rng = np.random.default_rng(SCAN_SEED)
+    scan_lines = {o: t[np.sort(rng.choice(len(t), N_SCAN, replace=False))] for o, t in lines.items()}
+    fragment = {
+        o: {str(r): alignment(model, fragments(t, r)).mean(axis=1).tolist() for r in FRAGMENT_START_ROLES}
+        for o, t in lines.items()
+    }  # per op and start role, (L1, T - r)
+    out = {
+        "label": label,
+        "condition": condition,
+        "seed": seed,
+        "sets": sets,
+        "holdout_eem": {o: s["holdout"]["eem"] for o, s in sets.items()},
+        "cos_mean": {o: cos[o].mean(axis=1).tolist() for o in OP_NAMES},  # (L1, T) per op
+        "op_margin": line_margin(pooled, w / w.sum()),
+        "fragment": fragment,
+        "readout": readout(model, tokenizer, np.concatenate(list(lines.values()))),
+        "probe_r2": op_scan(model, scan_lines, PROBE_RIDGE, SCAN_SEED, SCAN_HOLDOUT).tolist(),
+        "n_probe_lines": counts[0],
+    }
+    if policy is not None:
+        out["pull_landing"] = pull_landing(model, lines[ANCHORED_OP], policy, block).tolist()
+    if "traj" in trained:
+        out |= anneal_retention(trained["traj"], ANNEAL_WEIGHT_RATIO)
+    return out
+
+
+# --- Publishing ------------------------------------------------------------------------------
+
+
+def design() -> dict[str, Any]:
+    """The design constants the report reads beside the results."""
+    return {
+        "experiment": "ex-2.2.15",
+        "reference": REFERENCE_EXPERIMENT,
+        "control": {"experiment": CONTROL_EXPERIMENT, "condition": CONTROL, "seeds": CONTROL_SEEDS},
+        "anchored_op": ANCHORED_OP,
+        "label_rate": LABEL_RATE,
+        "arms": [asdict(a) for a in ARMS],
+        "pull_share": {a.name: pull_share(a.policy, a.block) for a in ARMS},
+        "seed_offset": SEED_OFFSET,
+        "n_runs": N_RUNS,
+        "ops": list(OP_NAMES),
+        "final_slice": FINAL_SLICE,
+        "fragment_start_roles": list(FRAGMENT_START_ROLES),
+        "adoption": ADOPTION,
+    }
+
+
+def publish_results(trained: list[dict], evaled: list[dict], corpus_stats: dict) -> dict:
+    """Metrics (JSON), trajectories (JSON), and every end checkpoint, each under its ref."""
+    import json
+
+    from mini.store import put, set_ref
+
+    metrics = {"runs": [_slim(r) for r in evaled], "corpus": corpus_stats, "design": design()}
+    set_ref(METRICS_REF, put(json.dumps(metrics).encode(), name="ex-2.2.15-metrics.json"))
+    traj = {t["label"]: {k: t[k] for k in ("traj", "val_loss", "train_loss")} for t in trained}
+    set_ref(TRAJ_REF, put(json.dumps(traj).encode(), name="ex-2.2.15-trajectories.json"))
+    for t in trained:
+        set_ref(CHECKPOINT_REF.format(label=t["label"]), t["checkpoint"])
+    return {"n_runs": len(trained), "n_evaled": len(evaled)}
+
+
+# --- Orchestration ----------------------------------------------------------------------------
+
+
+def run(
+    ctx: Ctx, arms: tuple[Arm, ...], epochs: int, seeds: int, control_seeds: int
+) -> tuple[list[dict], list[dict], dict]:
+    """Train *arms*, then evaluate them beside the served control: the whole DAG, with the grid, the length,
+    and the seeds as arguments so a short prototype runs the same code.
+    """
+    control_labels = [f"{CONTROL}-s{s}" for s in range(control_seeds)]
+    control = ctx.run(resolve_control, control_labels, EX2211_CHECKPOINT_REF, role="prep")
+    prep = ctx.run(prepare_corpus, *CORPUS_ARGS, role="prep")
+    rows = cells(arms, prep, epochs, seeds)
+    n = len(rows)
+    trained = ctx.map(
+        train_one,
+        [r["config"] for r in rows],
+        [r["anchor"] for r in rows],
+        [r["anti"] for r in rows],
+        [prep["corpus"]] * n,
+        [TRAJ_STRIDE] * n,
+        [prep["probes"]] * n,
+        [r["rates"] for r in rows],
+        [r["crop"] for r in rows],
+        [r["label"] for r in rows],
+        role="train",
+    )
+    ctrl = [{"checkpoint": control[lb], "label": lb} for lb in control_labels]
+    m = n + len(ctrl)
+    evaled = ctx.map(
+        eval_one,
+        trained + ctrl,
+        [prep["evals"]] * m,
+        [prep["probes"]] * m,
+        [r["condition"] for r in rows] + [CONTROL] * len(ctrl),
+        [r["crop"] for r in rows] + [None] * len(ctrl),
+        [r["config"].model.block_size for r in rows] + [BLOCK] * len(ctrl),
+        [r["seed"] for r in rows] + list(range(len(ctrl))),
+        [r["label"] for r in rows] + control_labels,
+        role="eval",
+    )
+    return trained, evaled, prep
+
+
+def main(ctx: Ctx) -> dict:
+    trained, evaled, prep = run(ctx, ARMS, EPOCHS, SEEDS, CONTROL_SEEDS)
+    return ctx.run(publish_results, trained, evaled, prep["stats"], role="prep")
+
+
+COMPUTE = {
+    # Ex-2.2.9's corpus build, and the fan-in that writes the refs of fifty-five runs.
+    "prep": dict(cpu=2, timeout=1800),
+    # 4,950 steps at L4, with the trailing fragments measured at every trajectory point; the watchdog covers
+    # the checkpoint upload.
+    "train": dict(gpu="L4", timeout=3600, watchdog=900, watchdog_grace=900),
+    "eval": dict(gpu="L4", timeout=1800),
+}
+
+experiment = Experiment(name="ex-2.2.15", main=main, roles=COMPUTE)
