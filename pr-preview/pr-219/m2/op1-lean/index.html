@@ -1,0 +1,1405 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/6afd45dadcb400d74a5ff2e38b69240b04c8c5a2/exports/m2/op1-lean/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where the op1 lean sits: a reanalysis of ex-2.2.11&#x27;s stored runs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md.css into the md.css the site serves; and VS Code's
+ * Markdown preview lists both files (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
+ *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-219/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/op1-lean/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>op1-lean</strong> · <code>010deff</code> · run 2026-09-26<div>via reports/m2/op1-lean/arrays, reports/m2/op1-lean/metrics</div></div></details>
+<main class="lit">
+<h1 id="where-the-op1-lean-sits-a-reanalysis-of-ex-2211s-stored-runs">Where the op1 lean sits: a reanalysis of ex-2.2.11's stored runs<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#where-the-op1-lean-sits-a-reanalysis-of-ex-2211s-stored-runs" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>The op1 lean under the handover recipe is built by the blocks and read by the readout: an untied readout sets the readout vectors of the colors at −e₁ and those of the syntax words at +e₁, so the e₁ coordinate of a state votes <em>a syntax word comes next</em>, and at op1 that vote is more than half of the margin. What the whole-line labeller adds reaches op1 by a small route at most, and the measurements here cannot confirm or rule it out.</p>
+</div>
+<p>This is a reanalysis of ex-2.2.11's 54 stored runs, asking where the containment rise (ᾱ at op1) comes from. The lean is absent from the embedding table. It grows block by block, and at the last block it sits at the three positions whose next token is a syntax word, and nowhere else. The tied readout cannot move the color embeddings, and gets a smaller lean through the syntax embeddings alone. Whether the readout recruits the axis or adapts to states that already lean, these measurements cannot say. For the whole-line labeller we looked for the pull landing on op1 through lines labelled by their answer. On whole lines it does not, and on lines that a training crop cuts short it does, at a rate too small to show in the per-color comparison.</p>
+<p>The readout vector for a token is the one that scores that token as the <em>next</em> token: the readout vector for a color is dotted with the state at position <em>i</em> when the model predicts the token at <em>i</em> + 1.</p>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#observations" title="Link to this heading">&para;</a></h2>
+<p>Each line is a measurement on stored runs, with no gate. None is a result; the <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#what-we-make-of-it">closing section</a> says what a preregistered follow-up would test.</p>
+<ul>
+<li><strong>E1</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#where-in-the-stream-e1">Where in the stream</a>: ᾱ at op1 is near zero at the embedding on every condition and grows with depth. Every anchored condition leans at op1 by the last block, and their seed ranges overlap.</li>
+<li><strong>E2</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#which-positions-e2">Which positions</a>: at the last block the lean sits at op1, op2, and the answer, the positions whose next token is a syntax word (the op word, <code>=</code>, <code>⏎</code>). At the op word, <code>=</code>, and <code>⏎</code> it is near zero on every condition.</li>
+<li><strong>E3</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#the-readout-table-e3">The readout table</a>: with a readout of its own, the model sets the readout vector for every color at about −0.2 on e₁ and the readout vectors for the syntax words at +0.1 to +0.2, red and non-red colors alike. The tied readout moves only the syntax embeddings. The embeddings of the non-red colors are flat on every condition.</li>
+<li><strong>E4</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#what-e₁-contributes-to-the-next-token-e4">What e₁ contributes</a>: removing the e₁ coordinate from the state's contribution to the logits lowers the syntax-against-color log-odds at op1 by more than half on <code>handover</code>, by about a third on <code>handover-slot</code>, and by a fraction of a nat on <code>handover-tied</code> and on the control.</li>
+<li><strong>E5</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#between-seeds-e5">Between seeds</a>: within <code>handover</code> and within <code>handover-slot</code>, the seeds with a wider readout gap lean more at op1. The two conditions have overlapping gaps and different leans, so the gap does not account for what the whole-line labeller adds.</li>
+<li><strong>E6</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#per-color-e6">Per color</a>: every color leans. A straight-line fit of each color's lean against its redness has a positive intercept (the lean of a color with no red in it) and a positive slope. The rise from the slot labeller to the whole-line one is about the same on every color, and the embedding of a color predicts its lean better than its exposure to answer-earned labels does.</li>
+<li><strong>E7</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#the-whole-line-labeller-e7">The whole-line labeller</a>: on whole lines with two non-red operands and a red answer, the pull puts almost none of its weight on op1. Training crops cut about one line visit in seven short, and on a line cut before its answer the pull can only land on the prompt, so over the crops op1 takes a few percent of such a line's pull. The per-color exposure check is the test of that route, and it is weak.</li>
+</ul>
+<h2 id="scope">Scope<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#scope" title="Link to this heading">&para;</a></h2>
+<p>This is a reanalysis of stored artifacts, planned in the <a href="https://github.com/z0u/sca2/blob/main/todo/science/containment-rises-under-the-untied-readout.md">backlog item</a>: no training, no gates, no verdicts. ᾱ at op1 is the mean over all 216 grid colors of the cosine between the state of a color at the first operand and e₁, the axis that <em>red</em> is anchored to. As ex-2.2.9 defined it, the mean over all five slices, it is 0.02 on the un-anchored control of ex-2.2.11, 0.28 on <code>handover</code>, and about half of that when either of the two changes the handover made is undone: 0.18 with the slot labeller back (<code>handover-slot</code>), 0.16 with the readout tied again (<code>handover-tied</code>). This report reads the same alignment slice by slice, and its figures are at the last block unless they say otherwise, where every anchored condition sits higher. Every experiment since ex-2.1.8 gated the statistic at 0.1, except the handover experiments, which report it without a gate because nobody has said what produces it.</p>
+<p>Two mechanisms have been proposed, and each has been checked once before. For the readout: the untied readout frees the embedding table from the logit pressure that kept non-red colors off e₁. Ex-2.2.10 measured the non-red embeddings and found them flat on every condition, untied included. For the labeller: a line labelled through its answer has its pull land on op1. Ex-2.2.12 tried the per-line split on <code>mix</code>, where a mean is red only when an operand is, so the answer-labelled group was empty.</p>
+<p>The second check cannot be run as a per-line split of the op1 state. The <em>probe lines</em> are the fixed lines every run was scored on after training, each fed to the model as its own six-token sequence, so with causal attention the state above op1 is a function of that token alone: two probe lines with the same op1 color have the same op1 state, whatever their answers. (In training the lines are packed, and op1 also sees the lines before it.) What can be measured is where the pull lands on those lines, which the stored alignment maps give, and whether the colors that are exposed to answer-earned labels lean more than those that are not.</p>
+<h2 id="why">Why<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#why" title="Link to this heading">&para;</a></h2>
+<p>Every handover experiment reports the containment statistic without a mechanism for it, and the review asked twice for the why. A drift that costs nothing on the non-red lines is a nuisance; a drift with a mechanism says which change to the recipe would remove it and whether the D2.3 experiments should expect it under their grammars. The stored runs hold the embedding and readout tables, the alignment at every slice and position on every probe line, and the checkpoints, which is enough to say where the lean sits and what the readout does with the axis.</p>
+<h2 id="the-runs">The runs<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#the-runs" title="Link to this heading">&para;</a></h2>
+<p>Every run is one of ex-2.2.11's final checkpoints, with the eval arrays and the run-table entry the experiment published beside it.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th>readout</th><th>span</th><th class=num>seeds</th><th>what it is</th></tr></thead><tbody><tr><td><code>control</code></td><td>untied</td><td>whole line</td><td class=num>5</td><td>un-anchored</td></tr><tr><td><code>handover</code></td><td>untied</td><td>whole line</td><td class=num>20</td><td>untied readout, whole-line labeller</td></tr><tr><td><code>handover-slot</code></td><td>untied</td><td>prompt</td><td class=num>20</td><td>untied readout, slot labeller</td></tr><tr><td><code>handover-tied</code></td><td>tied</td><td>whole line</td><td class=num>9</td><td>tied readout, whole-line labeller</td></tr></tbody></table><figcaption><p><strong>The runs.</strong> Every seed of each of ex-2.2.11's four conditions. The span is the set of positions the anchor term pools over on a labelled line: the four prompt roles under the slot labeller, and the whole line, answer and <code>⏎</code> included, under the whole-line labeller. Under the whole-line labeller a line can also earn its label through its answer.</p></figcaption></figure>
+
+<h2 id="the-measurements">The measurements<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#the-measurements" title="Link to this heading">&para;</a></h2>
+<p>Three kinds of stored artifact are read.</p>
+<ul>
+<li>The <strong>run table</strong> that ex-2.2.11 published holds, per run, the mean alignment with e₁ at every slice and position over the <code>mix</code> probe lines, and the e₁ component of the embedding and the readout vector for every token (one and the same vector when the readout is tied).</li>
+<li>The <strong>eval arrays</strong> hold the alignment of each color at op1 at every slice, and the alignment of every position of every probe line of each op, from which the softmin weights that the anchor term would assign are recomputed.</li>
+<li>The <strong>checkpoints</strong> give the logits on the <code>mix</code> probe lines. nGPT's logits are <span class="arithmatex">\(s_z \, h R^\top\)</span>, linear in the state <span class="arithmatex">\(h\)</span>, so the part every logit owes to the e₁ coordinate is <span class="arithmatex">\(s_z \, h_1 R_{\cdot 1}\)</span> and can be taken out and the log-odds recomputed.</li>
+</ul>
+<p>Each figure shows a column of seed dots per condition: one small dot per run, the larger mark the seed mean, and the bar the seed range.<sup id="fnref:figkey"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#fn:figkey">1</a></sup> The conditions keep ex-2.2.9's inks and markers.</p>
+<h2 id="where-in-the-stream-e1">Where in the stream (E1)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#where-in-the-stream-e1" title="Link to this heading">&para;</a></h2>
+<p><strong>What the candidates predict.</strong> If the untied readout released the embedding table, the lean would already be there at the embedding and the blocks would carry it along. If the blocks build it, the embedding is flat and the lean grows with depth.</p>
+<p><strong>What we saw.</strong> The second. At the embedding every condition is within a few hundredths of zero, the control included. The anchored conditions rise from the first block on, and every one of them leans at op1 by the last block. They separate a little with depth, but the seed ranges of neighbouring conditions overlap at every slice.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/stream-light.png" alt="Dot chart of ᾱ at op1 per residual slice: every condition starts near zero at the embedding, the control stays there, and the three anchored conditions rise block by block, handover highest." width="626" height="318" style="max-width: 100%; height: auto;" data-asset-name="stream" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/stream-dark.png" alt="Dot chart of ᾱ at op1 per residual slice: every condition starts near zero at the embedding, the control stays there, and the three anchored conditions rise block by block, handover highest." width="626" height="318" style="max-width: 100%; height: auto;" data-asset-name="stream" />
+<figcaption><p><strong>ᾱ at op1 per slice.</strong> Each column is the seeds of one condition at one slice: the mean over the 216 grid colors of the cosine between the state of the color at the first operand and e₁, on the <code>mix</code> probe lines. The lines join the seed means.</p></figcaption></figure>
+
+<p>At the last block the seed means are +0.51 on <code>handover</code>, +0.35 on <code>handover-slot</code>, +0.23 on <code>handover-tied</code>, and -0.01 on the control. The ordering is the one ex-2.2.10 and ex-2.2.11 reported, and it is built by the blocks, since the embedding table starts flat. The gaps between the anchored conditions are smaller than the lean they share: each of them leans at op1 far more than the control does.</p>
+<h2 id="which-positions-e2">Which positions (E2)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#which-positions-e2" title="Link to this heading">&para;</a></h2>
+<p><strong>What the candidates predict.</strong> A pull that lands on every position of a labelled line would leave a lean at every position, largest where the pull is cheapest. A lean that the readout recruits would sit where the readout has a use for it.</p>
+<p><strong>What we saw.</strong> At the last block the lean sits at three positions and is near zero at the other three, on every anchored condition. The three are op1, op2, and the answer, whose next token is a syntax word: the op word after op1, <code>=</code> after op2, <code>⏎</code> after the answer. At the op word, <code>=</code>, and <code>⏎</code> (whose next token is a color) the lean is within a few hundredths of zero. The pattern is the same on the three anchored conditions and only its size differs. The answer position under the whole-line labeller is the one place the conditions part company, since under the slot labeller the answer is outside the span.</p>
+<p>The three leaning positions are also the three color tokens, so this grammar cannot say whether a state leans because its token is a color or because a syntax word comes next: the two go together at every position of every line. The anchor pulls at color positions and the readout reads e₁ as <em>syntax next</em>, and both accounts predict this figure. A grammar in which some color is followed by another color would separate them.</p>
+<p>The control leans the other way at the answer, and all five of its seeds do, which five coin flips would give one time in sixteen. No term in the control singles out e₁, so we do not build on it.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/roles-light.png" alt="Dot chart of the last-block alignment with e₁ at each of a line&#x27;s six positions: the anchored conditions lean at op1, op2 and the answer and sit at zero at the op word, the equals sign and the newline; the control is flat except a negative answer position." width="626" height="318" style="max-width: 100%; height: auto;" data-asset-name="roles" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/roles-dark.png" alt="Dot chart of the last-block alignment with e₁ at each of a line&#x27;s six positions: the anchored conditions lean at op1, op2 and the answer and sit at zero at the op word, the equals sign and the newline; the control is flat except a negative answer position." width="626" height="318" style="max-width: 100%; height: auto;" data-asset-name="roles" />
+<figcaption><p><strong>Alignment with e₁ by position, at the last block.</strong> The mean over <code>mix</code>'s probe lines of the cosine between the state at each position and e₁. The positions alternate between predicting a syntax word (op1, op2, answer) and predicting a color (op, <code>=</code>, <code>⏎</code>).</p></figcaption></figure>
+
+<p>On <code>handover</code> the answer position leans at +0.19 against +0.04 on <code>handover-slot</code>; op2 leans at +0.27. The three color-predicting positions average +0.015 on <code>handover</code>.</p>
+<h2 id="the-readout-table-e3">The readout table (E3)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#the-readout-table-e3" title="Link to this heading">&para;</a></h2>
+<p><strong>What the candidates predict.</strong> Ex-2.2.10 found the non-red embeddings flat on every condition, so if the untied readout is doing something with e₁ it is doing it in the readout table.</p>
+<p><strong>What we saw.</strong> It is. With a readout of its own, the model sets the readout vector for every color at about −0.2 on e₁, red and non-red colors alike, and the readout vectors for the syntax words at +0.1 to +0.2. The tied condition cannot do the first: in <code>handover-tied</code> the readout vectors are the embeddings, and the anchor holds the color embeddings (red at the top, non-red near zero), so only the syntax embeddings move, and they move by about the same amount as under the untied readout. The readout of the control is flat on e₁ for every group, so the split is a response to the anchor rather than a habit of the untied readout. The embeddings of the non-red colors are flat on every condition, as ex-2.2.10 found.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/tables-light.png" alt="Two dot charts of the e₁ component of token vectors by group, embedding table left and readout table right: in the readout table the untied anchored conditions put the colors below zero and the syntax words above it, the tied condition moves only the syntax words, and the control is flat; in the embedding table only the red colors stand out." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="tables" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/tables-dark.png" alt="Two dot charts of the e₁ component of token vectors by group, embedding table left and readout table right: in the readout table the untied anchored conditions put the colors below zero and the syntax words above it, the tied condition moves only the syntax words, and the control is flat; in the embedding table only the red colors stand out." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="tables" />
+<figcaption><p><strong>The e₁ component of the tables, by token group.</strong> Left: the embedding table. Right: the readout table, which on <code>handover-tied</code> is the embedding table again. <em>colors</em> is the mean over all 216 grid colors, <em>red</em> and <em>non-red</em> over the colors at or over the red dose and at or under the non-red dose.</p></figcaption></figure>
+
+<p>The readout gap (the mean e₁ of the readout vectors for the syntax words, less that of the colors) is +0.34 on <code>handover</code>, +0.31 on <code>handover-slot</code>, +0.22 on <code>handover-tied</code>, and +0.03 on the control. The non-red embeddings sit at -0.05 on <code>handover</code> and -0.02 on the control.</p>
+<h2 id="what-e₁-contributes-to-the-next-token-e4">What e₁ contributes to the next token (E4)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#what-e₁-contributes-to-the-next-token-e4" title="Link to this heading">&para;</a></h2>
+<p><strong>What the candidates predict.</strong> A readout that puts colors at −e₁ and syntax at +e₁ turns the e₁ coordinate of a state into a vote for <em>a syntax word comes next</em>. If the model uses that vote, taking the e₁ coordinate out of the logits should lower the syntax-against-color log-odds at the positions that predict syntax, and the more so the wider the gap.</p>
+<p><strong>What we saw.</strong> That is what it does. The logits are linear in the state, so the part of every logit that comes from the e₁ coordinate can be removed and the log-odds recomputed from the other 63 coordinates. At op1 the removal lowers the syntax log-odds by 4.9 nats on <code>handover</code>, 2.7 on <code>handover-slot</code>, and 0.1 on the control. On <code>handover-tied</code> the contribution at op1 is a fraction of a nat, about the control's, and at op2 and the answer it goes the other way: the tied table has the red colors at +e₁ and the rest of the colors near zero, so the e₁ coordinate of a state there votes for <em>red</em> as much as for syntax, and removing it raises the syntax log-odds a little at those positions.</p>
+<p>The margin that e₁ contributes to is not the same size everywhere. At op1 the log-odds are +8.3 nats on <code>handover</code>, so e₁ supplies more than half of the margin there, and the readout does lean on the axis at that position. At op2 and the answer the log-odds are +13 and +15 nats, of which e₁ supplies +2.7 and +1.8, so there the model is in no doubt about which kind of token comes next whether or not the axis is read. What the measurement says is what the readout has recruited the axis for; that it needs the axis holds at op1 alone.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/delta-light.png" alt="Two dot charts by position: left, the syntax-against-color log-odds of the next token, alternating between large positive and large negative; right, what the e₁ coordinate contributes to it, positive at op1, op2 and the answer on the untied anchored conditions, near zero at op1 and slightly negative at op2 on the tied one, and zero on the control." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="delta" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/delta-dark.png" alt="Two dot charts by position: left, the syntax-against-color log-odds of the next token, alternating between large positive and large negative; right, what the e₁ coordinate contributes to it, positive at op1, op2 and the answer on the untied anchored conditions, near zero at op1 and slightly negative at op2 on the tied one, and zero on the control." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="delta" />
+<figcaption><p><strong>The next-token log-odds and the part e₁ contributes, by position, at the last block.</strong> Left: log P(syntax word next) − log P(color next), mean over the <code>mix</code> probe lines. Right: the change in that log-odds when the part of every logit that comes from the e₁ coordinate is removed, so a positive value means e₁ argued for a syntax word.</p></figcaption></figure>
+
+<p>At op1, e₁ contributes +4.88 nats on <code>handover</code>, +2.68 on <code>handover-slot</code>, +0.32 on <code>handover-tied</code>, and +0.11 on the control, to a log-odds of about +8 nats.</p>
+<h2 id="between-seeds-e5">Between seeds (E5)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#between-seeds-e5" title="Link to this heading">&para;</a></h2>
+<p><strong>What the candidates predict.</strong> If the readout gap is what pulls the non-red colors onto the axis, the seeds of one condition that open a wider gap should lean more at op1.</p>
+<p><strong>What we saw.</strong> They do, within each untied condition. The correlation is moderate: r = +0.42 on <code>handover</code> and +0.46 on <code>handover-slot</code>, and it is weaker on <code>handover-tied</code> (+0.19), whose gap is only in the syntax embeddings. The scatter shows that the two untied conditions occupy overlapping ranges of gap and different ranges of lean: the seeds of <code>handover</code> sit a little to the right, and at a given gap they lean more. So the gap tracks what the untied readout adds, and what the whole-line labeller adds is something else.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/seeds-light.png" alt="Scatter of the readout gap against ᾱ at op1 at the last block, one point per seed: handover and handover-slot share the same range of gaps but handover sits higher, and within each the lean rises with the gap; handover-tied has a narrower gap and a lower lean." width="510" height="356" style="max-width: 100%; height: auto;" data-asset-name="seeds" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/seeds-dark.png" alt="Scatter of the readout gap against ᾱ at op1 at the last block, one point per seed: handover and handover-slot share the same range of gaps but handover sits higher, and within each the lean rises with the gap; handover-tied has a narrower gap and a lower lean." width="510" height="356" style="max-width: 100%; height: auto;" data-asset-name="seeds" />
+<figcaption><p><strong>The readout gap against ᾱ at op1, per seed.</strong> Each mark is one run: on the x axis the syntax words' mean e₁ in the readout table less the colors', and on the y axis ᾱ at op1 at the last block. The legend gives the Pearson r within each condition.</p></figcaption></figure>
+
+<h2 id="per-color-e6">Per color (E6)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#per-color-e6" title="Link to this heading">&para;</a></h2>
+<p><strong>What the candidates predict.</strong> A lean recruited by the readout as a vote for <em>syntax next</em> has no reason to prefer one color over another, so it should be a shift shared by every color, with the grading of the anchor on top of it. A lean that comes from answer-earned labels should be largest on the colors whose lines most often have a red answer.</p>
+<p><strong>What we saw.</strong> Every color leans, and the lean is a shift plus a grade: the non-red colors sit above zero by a nearly constant amount, and the grade with redness is the one the anchor asks for. The rise from <code>handover-slot</code> to <code>handover</code> is close to the same on every color, so whatever the whole-line labeller adds, it adds to every color alike. The embedding of a color on e₁ predicts its lean well. Its exposure to answer-earned labels predicts the rise less well: the colors form a flat band, and the correlation that remains rests on a few colors at the highest exposure, which are also the ones that rose most.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/colors-light.png" alt="Four scatter panels, one per condition, of the op1 alignment of each grid color at the last block against its redness, marks in the color itself: the control is flat at zero, and the anchored conditions rise with redness from a positive intercept, highest on handover." width="1010" height="299" style="max-width: 100%; height: auto;" data-asset-name="colors" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/colors-dark.png" alt="Four scatter panels, one per condition, of the op1 alignment of each grid color at the last block against its redness, marks in the color itself: the control is flat at zero, and the anchored conditions rise with redness from a positive intercept, highest on handover." width="1010" height="299" style="max-width: 100%; height: auto;" data-asset-name="colors" />
+<figcaption><p><strong>The alignment of each color at op1 against its redness, at the last block.</strong> One mark per grid color in the color itself, the seed mean per condition. Redness is r(1 − g/2 − b/2) on the unit cube, the grading target.</p></figcaption></figure>
+
+<p>A straight line fitted to the last-block lean against redness has an intercept (its value at zero redness) of +0.31 on <code>handover</code>, +0.16 on <code>handover-slot</code>, and +0.06 on <code>handover-tied</code>, with slopes of 0.78, 0.72, and 0.67. The intercept of the control is -0.01.</p>
+<p>On <code>handover</code> that is a large lean for a color with no red in it, and <code>handover</code> is the recipe that ex-2.2.13 replicated and ex-2.2.14 anchored <code>difference</code> on. It cost the task nothing measurable (ex-2.2.11 found the paired non-red deficit at 0.004), so the place to expect a cost is intervention: an edit along e₁ at op1 would reach every color by about this much.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/rise-light.png" alt="Two scatter panels over the non-red colors, marks in the color itself: left, the embedding of the color on e₁ against its op1 lean on handover, a clear upward trend; right, its exposure to answer-earned labels against the rise from the slot labeller to the whole-line one, a flat band, with the few highest-exposure colors also the highest." width="854" height="318" style="max-width: 100%; height: auto;" data-asset-name="rise" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/rise-dark.png" alt="Two scatter panels over the non-red colors, marks in the color itself: left, the embedding of the color on e₁ against its op1 lean on handover, a clear upward trend; right, its exposure to answer-earned labels against the rise from the slot labeller to the whole-line one, a flat band, with the few highest-exposure colors also the highest." width="854" height="318" style="max-width: 100%; height: auto;" data-asset-name="rise" />
+<figcaption><p><strong>What predicts the lean of a non-red color, on <code>handover</code>.</strong> Left: the embedding of the color on e₁ against its last-block alignment at op1 (r = +0.84). Right: the exposure of the color to labels earned through the answer (its per-line probability as op1, mean over the eleven ops and every partner) against the rise in its lean from <code>handover-slot</code> to <code>handover</code> (r = +0.42; the rise has a spread of 0.04 over colors). Non-red colors only, seed means.</p></figcaption></figure>
+
+<p>The left panel is the embedding table doing what a table does: a color whose embedding has a little e₁ arrives at the first block with it, and the blocks amplify it. It says where the lean enters the stream, and says nothing of what sets it, since the embedding and the state are trained together. The right panel is the test of the labeller mechanism as a per-color prediction, and it is weak either way: the exposure varies ten-fold across the non-red colors, most of the band is flat, and the correlation that remains rests on a few colors at the highest exposure. Every route by which an answer-earned label reaches op1 scales with this exposure, the cut-short lines of the next section included, so this panel is the test of all of them, and it neither shows the mechanism nor rules it out.</p>
+<h2 id="the-whole-line-labeller-e7">The whole-line labeller (E7)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#the-whole-line-labeller-e7" title="Link to this heading">&para;</a></h2>
+<p><strong>What the candidates predict.</strong> Under the whole-line labeller a line with two non-red operands can earn its label through a red answer, and the pull then pools over the whole line, op1 included. Each labelled line has a pull budget of one, which the softmin weights split over its positions. If the pull lands on op1, op1 should take a fair share of that budget on such lines.</p>
+<p><strong>What we saw.</strong> On whole lines op1 takes almost none of it, and that is close to built in. The lines are from <code>difference</code> and <code>hue-hsv</code>, the two ops with the most red answers from two non-red operands (<code>mix</code> has none). Both groups have both operands at or under the non-red dose and differ only in the answer. On the answer-labelled lines the answer is aligned with e₁ almost perfectly, and a soft minimum at τ = 0.1 then puts nearly all of the weight there, so the share of op1 follows from how the group was chosen.</p>
+<p>Training does not always show a whole line. The training crops are 64-token windows at a random offset into the packed corpus, so 15% of line visits are cut short, and the anchor term pools a labelled line over its visible positions alone. On a line cut before its answer (6% of visits) the pull has to land on the prompt, and a line cut right after op1 puts all of it there. Averaged over the ways a crop shows a line, op1 takes 6.4% of the pull on the answer-labelled <code>difference</code> lines at the last block on <code>handover</code> (5.4% on <code>hue-hsv</code>), against 1.1% on whole lines.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/labeller-light.png" alt="Four line charts over the five residual slices, one row per op (difference, hue-hsv), solid for answer-labelled lines and dashed for unlabelled ones: left, the share op1 takes of the pull on whole lines, near zero on the answer-labelled lines; right, the same share averaged over the ways a training crop cuts a line, a few percent on the answer-labelled lines and rising with depth." width="818" height="528" style="max-width: 100%; height: auto;" data-asset-name="labeller" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/labeller-dark.png" alt="Four line charts over the five residual slices, one row per op (difference, hue-hsv), solid for answer-labelled lines and dashed for unlabelled ones: left, the share op1 takes of the pull on whole lines, near zero on the answer-labelled lines; right, the same share averaged over the ways a training crop cuts a line, a few percent on the answer-labelled lines and rising with depth." width="818" height="528" style="max-width: 100%; height: auto;" data-asset-name="labeller" />
+<figcaption><p><strong>The share of the pull that lands on op1, on lines that can earn a label only through their answer.</strong> Probe lines with both operands non-red, split by a red answer (solid) or a non-red one (dashed), on the two conditions with the whole-line labeller. Top row <code>difference</code>, bottom row <code>hue-hsv</code>; the line counts are in the panel titles. Left: the softmin weight the anchor term assigns op1 on the whole line. Right: the same weight averaged over the ways a training crop shows the line, where a crop that cuts the line before the answer leaves the pull to the prompt. The shares are read from the final checkpoint; the unlabelled lines receive no pull, so theirs is the share the term would assign if they did. Lines are seed means and bands the seed range.</p></figcaption></figure>
+
+<p>So the pull through the answer does reach op1, by one route: lines cut short. The route is small. It is a few percent of the pull on lines that are themselves rare for a non-red op1 (the exposure in the previous figure is of order 10⁻³ per line), and it scales with that exposure, which predicts the rise only weakly. Three caveats. The shares are read from the final checkpoint, and during training they may have been different. The states of a cut line are taken from the probe lines, which assumes that the lines before it in a crop do not change them. And the answer-labelled groups are small, 11 and 19 lines. The alignment at op1 is the same on the two groups by construction (as the <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#scope">Scope</a> section says), so it is not plotted.</p>
+<p>What the labeller does visibly change is the answer position, which under the whole-line span the pull <em>does</em> land on, and the readout vector for <code>⏎</code>, the token that position predicts. On <code>handover</code> the answer state leans and the <code>⏎</code> readout vector sits further up e₁ than on <code>handover-slot</code>; on <code>handover-slot</code> the answer is outside the span, its state stays near zero, and the <code>⏎</code> readout vector barely moves. That is one more position at which the readout is asked to read e₁ as <em>syntax next</em>, and it may be most of what the labeller adds: an axis the readout uses at three syntax-predicting positions rather than two is a stronger feature, and op1, the position with the least context, inherits more of it. This report does not test that; the closing section says what could.</p>
+<h2 id="what-we-make-of-it">What we make of it<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#what-we-make-of-it" title="Link to this heading">&para;</a></h2>
+<p>The rise in ᾱ at op1 looks like the readout recruiting the anchor axis. The anchor puts <em>red</em> on e₁ at the operand positions. With a readout of its own, the model finds that a component along e₁ separates the colors from the syntax words in the readout table, and since every color state already has some e₁ on the red lines, it sets the readout vectors for the colors to −e₁ and those for the syntax words to +e₁. From then on, the e₁ coordinate of a state is read as <em>a syntax word comes next</em>, and the positions where that is the prediction (op1, op2, the answer) drift up the axis, every color alike, on top of the grading the anchor asks for. The tied readout cannot set the readout vectors for the colors, because they are the color embeddings and the anchor holds them, so it gets a smaller version of the same thing through the syntax embeddings alone. The whole-line labeller adds the answer position to the set the pull lands on and the readout vector for <code>⏎</code> to the set the readout moves, and the lean at op1 grows with it. It also reaches op1 directly on training lines that a crop cuts short, at a few percent of the pull on answer-labelled lines.</p>
+<p>Three things this report does not say. It does not say the lean costs the task anything: ex-2.2.11 found the paired non-red deficit at 0.004. It does not say the readout needs e₁ for the syntax prediction everywhere: at op1 on <code>handover</code> e₁ supplies more than half of the margin, and at op2 and the answer a small part of a much larger one. And it does not say what the whole-line labeller adds is the answer position; that is the candidate with the most support, and it is untested.</p>
+<p><strong>What could be tested.</strong> The readout is cheap to test, because it is a table. A pilot on the <code>handover</code> recipe that holds the readout vectors for every non-red color and every syntax word off e₁ (the readout-side analogue of <code>clean_embedding_rows</code>, applied on the same schedule) should bring ᾱ at op1 down toward the level of <code>handover-tied</code> without touching <em>red</em>, and it should take the e₁ contribution to the syntax log-odds with it. The labeller wants the span narrowed by one position: a <code>handover</code> arm whose whole-line labeller keeps the keying but pools over every role except the answer (op1, the op word, op2, <code>=</code>, and <code>⏎</code>), or over the prompt roles alone, would say whether the answer position is what the whole-line span adds. That is a different arm from the one the note on ex-2.2.14 proposed, which drops op1 from the span instead; the two answer different questions. A third arm would close the route through cut lines: skip the pull on a line the crop cuts before its answer, or pool with a bias toward later positions. Each is one condition on the existing setup, and each reads ᾱ at op1 beside the two arms this report has already characterised.</p>
+<p>An attention mask that resets at <code>⏎</code> would isolate the lines in training as the probe lines are isolated at eval. It would also free <code>⏎</code> from predicting the first color of an unrelated line, which may change how the readout uses e₁ at the answer. The D2.2 pivot proposes that mask for its own reasons.</p>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#method" title="Link to this heading">&para;</a></h2>
+<p><strong>Sources.</strong> Ex-2.2.11's four conditions at every stored seed: the checkpoint, the eval arrays, and the run-table entry per run, and the probe lines every run was scored on. The report reads this pass's outputs through <code>project_store()</code>.</p>
+<p><strong>Alignment by position.</strong> From the run table: the mean over the <code>mix</code> probe lines of the cosine between the state at each position and e₁, at each of the five slices, as ex-2.2.9's eval pass computes it. At op1 the mean over lines is the mean over the 216 colors, since each color is op1 on the same number of lines.</p>
+<p><strong>Tables.</strong> The e₁ component of the embedding and the readout vector for every token, from the run table, summarized by token group: the 216 colors, those at or over the red dose (0.8) and at or under the non-red dose (0.2), the eleven op words, <code>=</code>, and <code>⏎</code>. The readout gap is the mean over the three syntax groups less the mean over the colors.</p>
+<p><strong>Contribution of e₁.</strong> On the <code>mix</code> probe lines, from the checkpoint: the logits <span class="arithmatex">\(s_z \, h R^\top\)</span> at every position, and the log-odds <span class="arithmatex">\(\log \sum_{\text{syntax}} p - \log \sum_{\text{colors}} p\)</span>. The contribution is that log-odds less the log-odds of <span class="arithmatex">\(s_z \, h R^\top - s_z \, h_1 R_{\cdot 1}\)</span>, the logits with the part from the e₁ coordinate removed. Nothing is renormalized between the two, so the difference is what that coordinate contributed.</p>
+<p><strong>Per color.</strong> From the eval arrays: the alignment of each grid color at op1 at each slice, on <code>mix</code>. The fit against redness is ordinary least squares over the 216 colors of the seed mean.</p>
+<p><strong>Exposure.</strong> From the grammar and the model of the labeller (each slot draws a label at redness⁸ × 0.04): for each color as op1, the mean over the eleven ops and every partner of the probability that the line is labelled through op1, through op2 when op1 did not draw, and through the answer alone, with the answer's redness taken in expectation over the stochastic rounding.</p>
+<p><strong>The labeller's lines.</strong> Probe lines of <code>difference</code> and <code>hue-hsv</code> from walk 0, the part of the probe set that walks every grid color through op1 (the order-sensitive ops also have a walk 1 with the color as op2). The lines kept have both operands at or under the non-red dose, and are split by an answer at or over the red dose or at or under the non-red dose. The share on whole lines is <code>softmin_weights(1 − α, τ = 0.1)</code> over the condition's span (the four prompt roles or the whole line), read at op1.</p>
+<p><strong>Training crops.</strong> The share over training crops follows the batch sampler of ex-2.2.11: 64-token windows onto the packed corpus at a uniform offset, a tenth of them with a zeroed prefix of 1 to 20 tokens. Enumerating every offset and prefix gives how often a line is seen whole or as each run of roles (85.3% whole, 1.5% for each of the ten cut runs). For each run that includes a pulled position, op1 takes the softmin weight over the visible pulled roles if the run starts at op1, and nothing otherwise; the share is the average over runs, weighted by how often each occurs. A run that starts at op1 is a prefix of the line, so under causal attention its states are the probe line's own, lines earlier in the crop aside.</p>
+<p><strong>Where the data is.</strong> The run table is under the <code>metrics</code> ref of <code>reports/m2/op1-lean</code> and every array under <code>arrays</code>, keyed by run label and name, with the exposure model's arrays under <code>grammar/</code>.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:figkey">
+<p><code>control</code> has five seeds, <code>handover-tied</code> nine, and the other two twenty, so a control column's range is a rougher measurement of its spread than the others'.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/#fnref:figkey" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

@@ -1,0 +1,1455 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/b106796e9a5efc8a3808352d796a42768c83e964/exports/m2/ex-2.1.6/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/ex-2.1.6/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.1.6: anchoring red in a transformer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md.css into the md.css the site serves; and VS Code's
+ * Markdown preview lists both files (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
+ *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.1.6/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/ex-2.1.6/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.1.6</strong> · <code>3fa206e-dirty</code> (dirty) · run 2026-07-29<div>via reports/m2/ex-2.1.6/arrays, reports/m2/ex-2.1.6/geometry, reports/m2/ex-2.1.6/metrics</div></div></details>
+<main class="lit">
+<h1 id="ex-216-anchoring-red-in-a-transformer">Ex 2.1.6: anchoring <em>red</em> in a transformer<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#ex-216-anchoring-red-in-a-transformer" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>Our first anchored transformer, with a single attractive term. The anchor moved the activations to the chosen direction, and cost the task nothing measurable. But it moved the whole color cube, rather than <em>red</em> in particular.</p>
+</div>
+<p>This is the first anchored transformer. During training we add one regularizer term that pulls the residual stream activations of <em>red-labeled</em> equations toward a fixed direction <span class="arithmatex">\(\hat v_{\text{red}}\)</span>. Then we ask two questions: did the concept land where we put it, and what did that cost the task?</p>
+<details>
+<summary>Notation</summary>
+<p>Equations are <code>a + b = mix(a, b)</code> throughout M2, so <span class="arithmatex">\(a\)</span> and <span class="arithmatex">\(b\)</span> stay reserved for the operands, as in ex-2.1.3 and ex-2.1.4. The anchor direction takes M1's symbol for it, <span class="arithmatex">\(\hat{v}_c\)</span> for concept <span class="arithmatex">\(c\)</span>, written here as <span class="arithmatex">\(\hat v_{\text{red}}\)</span> since <em>red</em> is the only concept in play. The regularizer weight is <span class="arithmatex">\(\lambda\)</span>, also from M1. One symbol changes meaning: M1 wrote the label indicator <span class="arithmatex">\(\ell^{(i)}_{c}\)</span>, but layer subscripts are everywhere in transformer work, so from here <span class="arithmatex">\(\ell\)</span> indexes layers. If a later experiment needs a label indicator (say, for multiple concepts or per-token labels), it is <span class="arithmatex">\(y^{(i)}_{c}\)</span>. New here: <span class="arithmatex">\(m\)</span> is reserved for the alignment margin defined under Measurements, so a counter alongside <span class="arithmatex">\(n\)</span> should be spelled some other way.</p>
+<p>For the sweep, the three-tiered vocabulary of ex-2.1.5 carries over. A <strong>condition</strong> is one setting of the swept hyperparameter, aggregated over seeds; a <strong>run</strong> is a condition crossed with a seed, one training run, which is what the legacy stored key <code>metrics["cells"]</code> holds; an <strong>arm</strong> is a named extra condition off the ladder, answering one question of its own. Since <span class="arithmatex">\(\lambda\)</span> here is a ladder, its conditions are also called <strong>rungs</strong>.</p>
+</details>
+<p>As the first anchored experiment, it opens D2.1 proper. M1 established anchoring in autoencoders, and everything since M2/Ex-2.1.1 has been un-anchored groundwork: finding a testbed where the task is solved and the concept geometry is legible, so that the effects of an anchor can be attributed to it.</p>
+<p>The testbed is the word-level <code>v216</code> condition from Ex-2.1.3: 216 grid colors, <strong>one token</strong> each, <code>name + name = name</code> equations, d64-L4. Held-out baseline accuracy is ≈ 1.0 and the color cube is linearly decodable from the embeddings, so there is headroom to lose and a known un-anchored geometry to compare against.</p>
+<p>The labels are sparse, noisy, and binary, following M1/Ex-1.7 via M1/Ex-2.9.1. Each line is labeled <em>red</em> with probability <code>redness(op1)⁸ × 0.08</code>. Only strongly red first operands are ever labeled, and even they usually aren't.</p>
+<p>Samples were atomic in the autoencoder experiments, but now that each sample is a sequence, we need to decide <em>what</em> to label. Here, labels attach to equations, and the anchor term pulls every position of a labeled equation's prompt equally, at every layer. That matches the shape of natural language, where a span of text is labeled rather than a token. It also leaves a question for the training dynamics to answer: the pull is undifferentiated but the task loss resists it unevenly, so does the concept condense at the position that computes it, or smear into a broadcast "this line mentions red" feature?</p>
+<p>The schedule comes from <a href="https://github.com/z0u/sca2/issues/10">issue #10</a> and M1/Ex-2.9.3: regularizer protection has to outlive the heat of the optimizer. So the <em>anchor</em> weight holds at peak until the LR decay is essentially done, then anneals to a floor above zero.</p>
+<p>The architecture helps too. Our simplified nGPT keeps every residual-stream state on the unit hypersphere, so the cosine-geometry anchor term from M1 transfers unmodified. In an unnormalized residual stream a cosine term constrains direction and leaves magnitude free, so it would need a companion term with its own weight to keep activation scale in hand — one more coefficient to tune. Norms pinned at 1 remove that question.</p>
+<p>We leave out the <em>anti-anchor</em>, <em>anti-subspace</em>, and <em>separate</em> terms, and any intervention (suppression, ablation, or redirect): one anchor term only. Nothing reserves the axis, so this experiment asks whether it <em>happens</em> to carry red alone. The repulsive terms matter once we intervene, when a stray concept sharing the axis would show up as a side-effect.</p>
+<div class="admonition">
+<p class="admonition-title">How to read this report</p>
+<p>This was a preregistered skeleton. The method, hypotheses, and decision thresholds below were written and frozen before the experiment ran, and the results replaced the placeholders in place, so reading it is a prediction → observation diff. Anything conceived after seeing the data is under <em>Exploratory analyses</em>, marked post hoc.</p>
+<p>Two amendments were made after the freeze and before the run, neither touching a threshold. The noise floors quoted under H2(b) and H4 were corrected — the first draft divided the per-cosine spread by the 27 probe lines of a color as well as the 5 layers, which the measurement cannot do; the passage under H2(b) says what the correction changes. And the mean alignment over colors was added beside the margin as a recorded diagnostic, on the reasoning that a margin is a contrast and so cannot distinguish "nothing moved" from "everything moved". It carries no gate, but it turned out to be what the results are about.</p>
+</div>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#method" title="Link to this heading">&para;</a></h2>
+<h3 id="task-and-corpus">Task and corpus<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#task-and-corpus" title="Link to this heading">&para;</a></h3>
+<p>Identical to the <code>v216</code> condition of ex-2.1.3: the six-level sub-grid <code>(0, 3, 6, 9, 12, 15)</code> of the 16-level cube (216 colors, one opaque token each), equations <code>name + name = name</code> with exact integer mixing, 100 k lines, 20% of distinct closed pairs held out. The eval sets are the same three: <code>named_seen</code>, <code>named_holdout</code>, and <code>open</code> (pairs whose mix has no name).</p>
+<p>We add one thing: an alignment probe set. For each of the 216 colors, it builds one probe line per closed partner of that color, meaning the 27 pairs whose mix has a name, with the color as the first operand. Closed pairs guarantee every probe line has a named answer, so the measured answer position corresponds to a real token. Using all 27 makes the probe set exhaustive: no sampling, no seed, and every run measured on identical lines, drawn from seen and held-out pairs alike. Per-color alignment statistics average over op2 rather than conditioning on it.</p>
+<p>At op1 that average is over identical values, and deliberately so: a causal model's first position attends to itself alone, so a color's op1 alignment is the same on all 27 of its lines. The statistic H2 and H4 score is therefore a property of the token, measured without sampling error from the partner — but also without any averaging to quiet the measurement, which is what sets the noise floor quoted under H2(b) and H4. Averaging over partners does its usual work at the later positions, which H3 reads.</p>
+<h3 id="labels">Labels<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#labels" title="Link to this heading">&para;</a></h3>
+<p>A line is labeled <em>red</em> by a coin flip weighted by the redness of its first operand: <code>p = redness(op1)⁸ × 0.08</code>, where <code>redness = r·(1 − g/2 − b/2)</code>, one independent draw per line.<sup id="fnref:bern"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fn:bern">1</a></sup> This is the <code>RED_PROB</code> of M1, applied to the color of the first operand only. A red op2 or a red answer never triggers a label, which keeps the ground truth unambiguous for the question of <em>where</em> the concept should condense. An either-slot labeling scheme is queued as a follow-up.</p>
+<p>Labels are redrawn per visit, as in M1, so they differ from epoch to epoch, and the expected pull on a color is proportional to its label affinity. The graded response of H2 is a further claim on top of that. The affinity spans four orders of magnitude, so a response that stayed proportional to it would be measurable on only the reddest few dozen colors. The grading H2(b) predicts comes instead from generalization: colors partway red moving partway. M1 is the precedent. With labels drawn from this same affinity, the damage it measured under intervention graded as low powers of its HSV similarity-to-red — <code>sim³</code> for ablation, <code>sim²</code> for suppression — far flatter than <code>redness⁸</code>. The ceilings under the hypotheses make this quantitative.</p>
+<h3 id="batch-composition">Batch composition<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#batch-composition" title="Link to this heading">&para;</a></h3>
+<p>Samples are packed sequences, not single equations. An equation is 6 tokens at word level and a sequence is 64 tokens, so a batch of 64 sequences carries about 683 equations. The corpus-mean label rate is 0.12%, which works out to 0.81 labeled lines per batch, with 56% of batches carrying at least one. That is denser supervision than M1 ran with, where the term fired on roughly 6% of batches.</p>
+<p>At that density we skip the label balancing that issue #10 recommends. Labels are plain independent draws, one per line. The anchor term is normalized by however many labels a batch happens to hold; that normalization is inherited from M1. Both the original implementation and our reproduction (<code>sca.colorcube.loss_terms</code>) take a label-weighted mean with a small ε in the denominator. So the 44% of batches holding no label contribute nothing rather than a 0/0. The gradient of the term is therefore noisy between batches, but that noise is inherent to sparse labels. If the H4 trajectories show the term failing to take hold, balancing is still available as a variance-reduction step.</p>
+<p>Skipping it also keeps the comparison clean. Balanced batching over-represents red first operands, so the anchored conditions would train on a different corpus from the control, and every accuracy difference in H1 would carry an alternative explanation. As it stands, the control and the anchored conditions see identical batches in identical order for a given seed; the only difference between them is <span class="arithmatex">\(\lambda\)</span>.</p>
+<details>
+<summary>A more realistic labeling variant</summary>
+<p>Labels could instead be drawn once when the corpus is built, making them a fixed property of a line, much like labeled internet text. That variant is queued beside either-slot labeling. Both replace the expected pull with whatever the model can infer from sparse fixed evidence, so both would be easier to read once the baseline mechanism is understood.</p>
+</details>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/labels-light.png" alt="The labels concentrate hard on the red corner: on the color cube only a handful of marks near pure red are large, and label probability climbs four orders of magnitude between redness 0.3 and 1." width="736" height="338" style="max-width: 100%; height: auto;" data-asset-name="labels" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/labels-dark.png" alt="The labels concentrate hard on the red corner: on the color cube only a handful of marks near pure red are large, and label probability climbs four orders of magnitude between redness 0.3 and 1." width="736" height="338" style="max-width: 100%; height: auto;" data-asset-name="labels" />
+<figcaption><p>The label distribution over the 216 colors. Left: the cube with mark area proportional to a color's share of all labeled lines, floored so that never-labeled colors still show. Right: per-color label probability against redness (log scale, the eighth-power curve behind it), with the dashed line at the corpus mean and the grey area giving the cumulative share of labels below each redness.</p></figcaption></figure>
+
+<p>The eighth power is what makes this a <em>concept</em> label rather than a redness readout. Pure red alone takes 31% of all labeled lines, the ten reddest colors take 85% between them, and 129 of the 216 colors are labeled less than once in a million lines. Averaged over the cube the rate is 0.12% of lines, which is where the empty-batch problem above comes from.</p>
+<p>The right panel also bounds what the pull alone can produce. 129 colors are labeled less than once in a million lines, so a response that tracked label affinity would sit under any achievable measurement floor across most of the cube. It would read as a step, and it clears neither gate of H2(b). So the curve H2(b) predicts is a claim about generalization: the anchor catching <em>red</em> rather than the labeled tokens, with colors partway red moving partway whether or not they were ever labeled. The model only ever sees Bernoulli draws from this distribution, and nothing stops it from treating "red enough to be labeled sometimes" as a threshold. That outcome is what (b) scores against.</p>
+<div class="admonition">
+<p class="admonition-title">The concentration is a risk we are choosing to accept</p>
+<p>The weights behave like about 12 distinct colors rather than 216, and pure red alone takes 31% of the labels. So the anchor's evidence is a dozen or so first operands, repeated for 100 epochs. An axis could learn <em>this token</em> instead of <em>red</em> and still clear H2(a) and (c).</p>
+<p>We keep M1's exponent anyway. Ex-2.1.6 asks whether the M1 result transfers to a transformer, and moving the label distribution at the same time as the architecture would leave nothing to attribute a difference to. It is also the closer analogue of a document-level label in natural language, which fires on a small and unrepresentative slice of the corpus. H2(b), the grading test, separates a memorized exemplar from a generalized concept, which is a good part of why it is a gate rather than a diagnostic. A flatter exponent is queued in <code>todo-science.md</code> as the follow-up that would settle it.</p>
+</div>
+<h3 id="model-and-anchor-term">Model and anchor term<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#model-and-anchor-term" title="Link to this heading">&para;</a></h3>
+<p>The d64-L4 simplified nGPT as used from ex-2.1.1 onward, unchanged. The anchor direction is <span class="arithmatex">\(\hat v_{\text{red}} = e_1\)</span>, the first basis vector of the 64-dimensional residual stream — the vector <span class="arithmatex">\((1, 0, 0, \ldots)\)</span>, matching M1. The residual operations of this architecture (LERP toward normalized sub-module output, scalar gains) are rotation-equivariant, so choosing a basis vector is a convenience rather than a hint to the model.</p>
+<p>For labeled lines, the anchor term is</p>
+<div class="arithmatex">\[\mathcal{L}_{\text{anchor}} = \frac{1}{|\mathcal{P}|\,(L{+}1)} \sum_{t \in \mathcal{P}} \sum_{\ell=0}^{L} \bigl(1 - \cos(h_{\ell,t},\, \hat v_{\text{red}})\bigr)\]</div>
+<p>where <span class="arithmatex">\(h_{\ell,t}\)</span> is the residual-stream state at layer <span class="arithmatex">\(\ell\)</span>, position <span class="arithmatex">\(t\)</span>, averaged over all <span class="arithmatex">\(L{+}1 = 5\)</span> layers (the token embedding plus the four block outputs) and over <span class="arithmatex">\(\mathcal{P}\)</span>, the positions of the labeled equation's <strong>prompt</strong>: <code>op1</code>, <code>+</code>, <code>op2</code>, <code>=</code>. Unlabeled lines contribute nothing, and no other term is added.</p>
+<p>The answer token and the newline are inside the labeled equation but outside <span class="arithmatex">\(\mathcal{P}\)</span>. We exclude them because of a confound: the answer of a red-labeled line is itself reddish, since a red op1 drags the mix. An anchored answer position would therefore align for two reasons at once, and we could not tell them apart. The exclusion costs nothing that we are measuring: the four pulled positions still receive an identical, undifferentiated pull, so the condensation question of H3 stands, and the answer position becomes a clean read of how far alignment spreads on its own.</p>
+<p>What the exclusion does not do is spare the state that emits the answer. The model is causal, so the answer token is predicted from the state at <code>=</code>, a position inside <span class="arithmatex">\(\mathcal{P}\)</span> that is pulled at every layer, including the final one the logits are read from. The task cost H1 measures therefore includes pressure on the answer logits themselves, alongside the cost of carrying an anchored concept through the rest of the prompt. Any pull that covers the prompt has this property; we state it here so H1 is read as measuring both together.</p>
+<p>In a full language model, the analogue of this label would pull the whole span between document boundaries, answer-like positions included, since nothing there marks a position as safe to exclude. So the prompt-only pull is a measurement instrument for this testbed, where the answer has a known confound; it is not a claim that the exclusion is needed. The unpulled answer position doubles as a first read on what a whole-span pull would change, and a whole-span variant is queued with the other labeling follow-ups.</p>
+<h3 id="schedule-and-conditions">Schedule and conditions<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#schedule-and-conditions" title="Link to this heading">&para;</a></h3>
+<p>The LR schedule is the one from ex-2.1.3: 100 epochs, 10 warmup, cosine to 1%. The anchor weight ramps to its peak alongside the LR warmup, holds at peak through epoch 90 (by which point the LR has decayed to a few percent of peak), then anneals to a 10% floor at epoch 100. It never reaches zero, which is the lesson of ex-2.9.3 applied as issue #10 prescribes.</p>
+<p>Both moves are minimum-jerk — the quintic that starts and ends at rest — rather than linear. That is what M1 used: the ex-2.9.x dopesheets take mini's default interpolator, which is <code>minjerk</code>, so every regularizer ramp and anneal in those experiments had this shape.</p>
+<p>Whether the smoothness earns anything is untested; M1 never compared linear against smooth. It did test a <em>stepped</em> anneal, which worked only when the LR warmup restarted from zero at each step, so the one discontinuity anyone measured needed an accommodation to survive. A kink is the milder version of the same event (a jump in the derivative of <span class="arithmatex">\(\lambda\)</span> rather than in <span class="arithmatex">\(\lambda\)</span> itself) and may well cost nothing. We take the M1 default because this experiment has no budget to find out, and record the assumption here rather than in the code.</p>
+<p>The sweep conditions are peak anchor weight <span class="arithmatex">\(\lambda \in \{0,\ 0.03,\ 0.1,\ 0.3\}\)</span> crossed with seeds <span class="arithmatex">\(\{0, 1, 2\}\)</span>, so 12 runs. (<span class="arithmatex">\(\lambda\)</span> is M1's symbol for a regularizer weight, <span class="arithmatex">\(\Omega\)</span> being the regularizer itself.) The <span class="arithmatex">\(\lambda{=}0\)</span> condition is the in-experiment control: same corpus, labels ignored. The other rungs chart the dose–response.</p>
+<p>One <strong>star arm</strong> joins them: <span class="arithmatex">\(\lambda{=}0.1^{*}\)</span>, identical except that the anneal starts at epoch 50 rather than 90, still reaching the floor at 100. Star arm is our shorthand, borrowed from the <em>star points</em> of a central composite design: it moves one factor off the scoring rung instead of crossing the whole grid, so it costs 3 runs rather than 12 and answers a single question. The question here is whether the long hold at peak buys alignment or just leaks: the anchor keeps pulling every labeled line for 90 epochs, and leakage is the secondary measurement we most expect to be sensitive to that. Against it stands the lesson of ex-2.9.3, that withdrawing protection while the optimizer is still hot lets the task loss reclaim the axis, and epoch 50 is a good deal hotter than epoch 90 (see the figure below). Spreading the withdrawal over the remaining 50 epochs, and stopping at a floor rather than zero, is what makes it worth trying. It is an unscored diagnostic; if it shows lower leakage at equal alignment, the anneal window becomes a design question for a later experiment.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/schedules-light.png" alt="The anchor weight holds at peak until epoch 90, by which point the learning rate has decayed to 4% of peak; the star arm starts down at epoch 50, while the learning rate is still around 60%, and takes the rest of training to reach the same floor." width="740" height="318" style="max-width: 100%; height: auto;" data-asset-name="schedules" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/schedules-dark.png" alt="The anchor weight holds at peak until epoch 90, by which point the learning rate has decayed to 4% of peak; the star arm starts down at epoch 50, while the learning rate is still around 60%, and takes the rest of training to reach the same floor." width="740" height="318" style="max-width: 100%; height: auto;" data-asset-name="schedules" />
+<figcaption><p>Learning rate and anchor weight over training, each as a fraction of its own peak — the LR peak is fixed at 1e-2, the anchor weight's is the swept <span class="arithmatex">\(\lambda\)</span>. The anchor weight's ramp and anneal are minimum-jerk; both anneals end at epoch 100 on a floor of 10% rather than zero, so the star arm's is the longer and gentler of the two. Dots mark the learning rate at the moment each anneal begins.</p></figcaption></figure>
+
+<p>Drawing the two together settles something the prose was vague about, and not in the direction we assumed. A cosine decay spends most of its range late, so at epoch 50, where the star arm begins coming down, the LR is still 59% of peak — over half of it. By epoch 90, where the default begins, it is 4%. The two conditions are therefore not withdrawing protection into comparable optimizers, and that is the thing to keep in view when reading the star-arm result.</p>
+<p>It is also why the anneal stretches rather than slides. Both conditions reach the floor at epoch 100, so the star-arm anneal takes 50 epochs against the default's 10, and λ comes off roughly in step with the cooling LR instead of dropping away underneath a hot one. The alternative — a fixed 10-epoch window sliding to 50–60 — reaches the floor while the LR is still around 42% of peak, which is close to the setting that produced M1/Ex-2.9.3's late collapses. That would be a fine stress test of the mechanism and a poor candidate for a schedule we might adopt, and the star arm is here to propose a schedule.</p>
+<p>The moved factor is the <em>start</em> of the anneal, with the endpoint pinned to the end of training. The rate follows from those two, so the design has one knob.</p>
+<h3 id="scoring">Scoring<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#scoring" title="Link to this heading">&para;</a></h3>
+<p>Hypotheses resolve on the middle rung, <span class="arithmatex">\(\lambda{=}0.1\)</span>; the numbers in the results sections come from that rung. Call a rung <strong>task-clean</strong> if its <code>named_holdout</code> exact match is within 0.02 (absolute) of the seed mean of the <span class="arithmatex">\(\lambda{=}0\)</span> control. H1 asks whether <em>every</em> anchored rung is task-clean.</p>
+<p>H2 claims that anchoring works, and that claim shouldn't fail just because we guessed a coefficient wrong. So its gates ask whether <em>some</em> task-clean rung clears the threshold: a rung can carry H2 even if H1 fails because a different rung broke the task. The task-clean requirement keeps this from being cherry-picking: a rung earns nothing by reaching alignment if it broke the task getting there. And the ladder has only four rungs, so the multiple-comparisons cost of reading across it is small. If the rung H2 resolves on is not <span class="arithmatex">\(\lambda{=}0.1\)</span>, we say so and report both. If more than one other task-clean rung clears the gates, H2 resolves on the one with the highest <span class="arithmatex">\(m_{\text{op1}}\)</span>; the choice is mechanical rather than ours. If no rung is task-clean, H2 fails on the gate it is scored against, and we report the alignment numbers anyway. The star arm is not a rung: it is reported alongside the ladder, but it takes no part in the "every anchored rung" test of H1 or in the search for a rung for H2 to resolve on.</p>
+<p>Every hypothesis except H4 is scored on the final checkpoint of each run; H4 is the one that reads the trajectory, and its end-of-training value is that same final checkpoint.</p>
+<p>H3 is scored on the same rung H2 resolves on, and only if H2(a) passed there. That restriction matters because the H3 gate is a ratio of margins. If both margins are at noise level, a 2× ratio between them would look like condensation where nothing condensed. H4 applies to every anchored run whose alignment ever clears a floor of 0.2. Where the anchor never took, the running maximum is itself at noise level, and a ratio of noise-level margins says nothing about stability. Runs below the floor are reported but not scored.</p>
+<h3 id="measurements">Measurements<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#measurements" title="Link to this heading">&para;</a></h3>
+<p>Behavioral: exact match, NLL,<sup id="fnref:nll"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fn:nll">2</a></sup> and the distance metrics of ex-2.1.3 on all eval sets, with the usual nulls from <code>sca.baselines</code>.<sup id="fnref:nulls"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fn:nulls">3</a></sup> Exact match is the coarser scoring of the two: it only counts the argmax. So a run can hold accuracy while NLL drifts, and that drift is the earlier warning that capacity is being spent elsewhere.</p>
+<p>Alignment maps: <span class="arithmatex">\(\cos(h_{\ell,t}, \hat v_{\text{red}})\)</span> on the alignment probe set, per layer × position. Write <span class="arithmatex">\(\alpha_c(\ell, t)\)</span> for the mean of that cosine over probe lines whose first operand is color <span class="arithmatex">\(c\)</span>. H2, H3, and H4 all read one statistic off this map, the alignment margin</p>
+<div class="arithmatex">\[m(\ell, t) = \sum_c u_c\,\alpha_c(\ell, t) \;-\; \frac{1}{216}\sum_c \alpha_c(\ell, t), \qquad u_c \propto \texttt{redness}(c)^8,\ \ \textstyle\sum_c u_c = 1\]</div>
+<p>In words: take the mean alignment weighted by label affinity, and subtract the plain mean over all colors. The margin measures how much closer a color sits to the anchor for being the kind of color the anchor pulls. The weights <span class="arithmatex">\(u_c\)</span> are the label probabilities themselves, normalized, so the statistic asks about precisely the lines that felt the anchor term. A margin of 0 means the anchor axis is indifferent to redness. Since <span class="arithmatex">\(m\)</span> is a difference of cosines, it runs from <span class="arithmatex">\(-2\)</span> to <span class="arithmatex">\(2\)</span>, but the ends are out of reach: <span class="arithmatex">\(2\)</span> would need the red-weighted colors to sit exactly on the anchor while the cube average sits at the exact opposite direction. In a 64-dimensional stream, unrelated directions sit near <span class="arithmatex">\(\cos = 0\)</span>, so the unweighted mean should stay close to zero, and complete success looks like <span class="arithmatex">\(m \approx 1\)</span>.</p>
+<details>
+<summary>Why weight by redness rather than group colors</summary>
+<p>We considered an alternative: group colors into red (<code>SIM3 &gt; 0.5</code>) and other (<code>SIM3 &lt; 0.01</code>, both from <code>sca.colorcube</code>), and score a red-minus-other contrast. We weight by <code>redness</code> instead, for one reason: <code>redness</code> is what generates the labels, so weighting by it means the measurement and the supervision use the same notion of red. The grouped version uses two different notions, and a disagreement between them would show up as a weak result with no way to tell which notion was responsible. Weighting also sets no threshold and discards no color. The grouped version throws away the ambiguous middle (pinks, oranges, dark reds), which is exactly the range where a graded response would be visible. Both notions of red do appear in the H2(b) grading gate, but as separate, named tracks; there, a disagreement between them can be traced to one notion or the other, which it couldn't inside a single blended statistic.</p>
+</details>
+<p>H2 scores the layer mean at op1,</p>
+<div class="arithmatex">\[m_{\text{op1}} = \frac{1}{L+1}\sum_{\ell=0}^{L} m(\ell, \text{op1})\]</div>
+<p>We average over anchored sites because the anchor applies to all of them equally, so there is no site selection to make. Alongside the mean we report the min and max over layers as unscored diagnostics; a wide min–max gap tells us which depths resist the anchor. H3 compares the same layer mean across positions, and H4 tracks <span class="arithmatex">\(m_{\text{op1}}\)</span> over training.</p>
+<p>Grading: for each op1 color, we take the layer mean of <span class="arithmatex">\(\alpha_c\)</span> at the op1 position and plot it against the redness of that color. This is the same quantity that <span class="arithmatex">\(m_{\text{op1}}\)</span> summarizes, shown per color instead of contracted to a number. We read two statistics off this plot: Spearman ρ against <code>redness</code>, and Pearson R² against <code>sim¹·⁵</code>. Here <code>sim</code> is the angular similarity-to-red used by the intervention scoring in M1 (<code>sca.colorcube.sim_to_red</code>, restricted to this grid). The exponent comes from mapping the M1 ablation result from damage to alignment: damage graded as <code>sim³</code> and is quadratic in alignment, so alignment should grade as <code>sim¹·⁵</code>. H2(b) reads both statistics.</p>
+<p>Leakage (secondary, no threshold): we fit a ridge probe for redness on the residual stream at op1, one probe per layer, after projecting out the <span class="arithmatex">\(\hat v_{\text{red}}\)</span> component. A high R² here would mean red is also encoded somewhere other than the anchor axis; we expect it to be low. R² is read on held-out colors, using a 5-fold split over the 216 op1 colors, so no color is scored by a probe that saw it. The ridge penalty is chosen within each training fold by an inner cross-validation, so no setting is picked by looking at the number we report.</p>
+<p>Trajectories: every ~50 steps we record <span class="arithmatex">\(m_{\text{op1}}\)</span> and validation loss, along with the LR and anchor-weight schedules. This is the apparatus from ex-2.9.3, carried over as the first queue item of issue #10. A flat loss curve does not mean learning is done, so the alignment trajectory is the evidence to consult before any decision to shorten the schedule.</p>
+<h2 id="hypotheses">Hypotheses<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#hypotheses" title="Link to this heading">&para;</a></h2>
+<p>Unless stated otherwise, results are reported on the <span class="arithmatex">\(\lambda{=}0.1\)</span> condition (seed-averaged); the other rungs are context. Per the scoring rule above, the H2 gates read <em>some task-clean rung</em>, and H3 follows H2.</p>
+<p><strong>H1.</strong> Anchoring does not harm the task. Every anchored rung is task-clean: <code>named_holdout</code> exact match within 0.02 (absolute) of the seed mean of the <span class="arithmatex">\(\lambda{=}0\)</span> control. Partial: the gate passes at <span class="arithmatex">\(\lambda \le 0.1\)</span> but fails at <span class="arithmatex">\(0.3\)</span>. The star arm is reported in the same table but scored only descriptively, per the scoring rule.</p>
+<p><strong>H2.</strong> The concept lands on the anchor, and does so in a graded way, at some task-clean rung. (a) <span class="arithmatex">\(m_{\text{op1}} \ge 0.5\)</span>.
+(b) Redder colors sit closer to the anchor, on either of two pre-named notions of <em>redder</em>. The grading statistic for a color <span class="arithmatex">\(c\)</span> is the layer mean of <span class="arithmatex">\(\alpha_c\)</span> at op1, averaged over seeds before anything is ranked or correlated; over the 216 colors, it clears at least one of Spearman <span class="arithmatex">\(\rho \ge 0.8\)</span> against <code>redness</code>,<sup id="fnref:spearman"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fn:spearman">4</a></sup> or Pearson <span class="arithmatex">\(R^2 \ge 0.8\)</span> against <code>sim¹·⁵</code>.<sup id="fnref:pearson"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fn:pearson">5</a></sup> (c) The control condition shows <span class="arithmatex">\(|m_{\text{op1}}| \le 0.1\)</span>.</p>
+<p>Partial: (a) and (c) hold but (b) fails on both tracks, with the grading figure showing a step rather than a grade. In a step, the reds all sit at one alignment, the non-reds at another, and there is no ordering within either group.</p>
+<div class="admonition">
+<p class="admonition-title">Why (b) is two tracks, and how the gates were placed</p>
+<p>This gate went through several review rounds before freezing, so the reasoning is recorded here in full, with the response shapes we checked and what each scores.</p>
+<p><em>The shape of the pull itself fails both tracks, and that is the intended reading.</em> The direct pull is proportional to <code>redness⁸</code>, and a response that stayed proportional to it cannot clear a rank gate. Unrelated directions in a 64-dimensional stream put a floor of about 0.056 on the measured <span class="arithmatex">\(\alpha_c\)</span> (a spread of <span class="arithmatex">\(1/\sqrt{64}\)</span> per cosine, averaged over the 5 layers), or ≈0.032 after the three-seed mean the gate is scored on, and 129 colors have expected pull below <span class="arithmatex">\(10^{-6}\)</span>. So most of the cube ranks at random; simulation at that floor puts ρ near 0.21, and its R² against <code>sim¹·⁵</code> is 0.44, far under the gate on both tracks. A response confined to the pull means the anchor caught the labeled tokens rather than <em>red</em>, which is the memorized-exemplar outcome (b) exists to catch. M1 sets the expectation for success: with labels drawn from this same affinity, its measured damage graded as low powers of <code>sim</code>.</p>
+<p><em>The two tracks name two families a generalized response could take</em>, one from each side of the milestone. Track 1 is ρ against <code>redness</code>. It accepts a response rising with the label-generating variable itself: a linear <code>redness</code> response scores ≈0.98 at the seed-mean noise floor. Track 2 is R² against <code>sim¹·⁵</code>, M1's ablation result mapped from damage to alignment (damage ∝ <code>sim³</code> and damage quadratic in alignment give alignment ∝ <code>sim¹·⁵</code>; the suppression result maps to <code>sim¹</code> the same way). The 3/2 power also maximizes coverage of the family: R² ≥ 0.86 against every power of <code>sim</code> from 1 to 3, and <code>redness³</code> scores 0.91 noise-free, ≈0.86 at the floor. Each track is robust where the other is marginal. <code>sim</code> orders the cube by hue rather than by the <code>redness</code> formula, and it takes only 23 distinct values on this grid, so a sim-family response of any power scores ρ ≈ 0.76 on track 1 at the seed-mean floor, under the gate; its noise-free ceiling of 0.82 sits just over it, because midranks credit the ties. In the other direction, a linear <code>redness</code> response scores R² = 0.81 on track 2, right at the gate, while clearing track 1 with room to spare. Passing on either track accepts every graded shape above; requiring both tracks would fail most of them.</p>
+<p><em>The floor is looser than the first draft of this gate assumed</em>, and the numbers above are the corrected ones. The earlier estimate divided the per-cosine spread by 27 probe lines as well as 5 layers, which the measurement cannot do: at op1 the 27 lines of a color share a state, as the method notes. Correcting it (0.011 → 0.056 per seed) leaves both thresholds where they were frozen and changes what each track covers. Track 2 now carries the graded shapes that are not linear in <code>redness</code>: <code>redness³</code> scores ρ ≈ 0.70 on track 1 against R² ≈ 0.86 on track 2, and the <code>sim</code> family likewise. Track 1 carries the <code>redness</code>-linear family. A response at half amplitude — roughly the least H2(a) accepts — clears neither track unless it is close to linear in <code>redness</code>, so the gate is stricter than we first estimated rather than looser.</p>
+<p><em>A pure step clears neither gate.</em> The measured alignment is continuous, so a step orders the colors within each of its two levels arbitrarily. Its expected ρ is at most 0.75 over all placements (a step at redness 0.5, the memorized-exemplar shape, scores 0.34), and its R² against <code>sim¹·⁵</code> is at most 0.73 over placements in either variable. The margins between those ceilings and the 0.8 gates are a few hundredths, which is one more reason the figure stays in charge. What would carry a steppy response over a gate is residual ordering within the levels, which is some grading after all; for shapes in between, the arbiter is the windowed mean drawn through the scatter.</p>
+</div>
+<p><strong>H3.</strong> The concept condenses at the position that carries it: that is, <span class="arithmatex">\(m_{\text{op1}}\)</span> is at least 2× the same layer mean at each of <code>+</code>, op2, and <code>=</code>. If the margin at a comparison position is zero or negative, the 2× test has no content, so we treat it as met. (H3 is scored only when H2(a) has already put <span class="arithmatex">\(m_{\text{op1}}\)</span> above 0.5, so a comparison site at or below zero is dominated outright.) The anchor pulls those four positions identically, so the comparison is between sites that differ only in what the task does with them. The answer and newline positions are outside the pull; they are reported but not scored. Per the scoring rule, H3 resolves on the rung H2 does, and only if H2(a) passed there.</p>
+<p>We also anticipate a specific alternative outcome: broadcast, where all positions of a labeled line move toward <span class="arithmatex">\(\hat v_{\text{red}}\)</span> roughly equally. That would fail H3 while H2 passes. It would tell us something about sequence-level labeling rather than about anchoring itself; a logsumexp position-pooling variant is the queued response.</p>
+<p><strong>H4.</strong> The late-instability mechanism of ex-2.9.3 does not reappear under the anneal-to-floor schedule. Concretely: for every anchored run whose running maximum of <span class="arithmatex">\(m_{\text{op1}}\)</span> reaches 0.2, the end-of-training value is at least 0.8× that maximum. The 0.2 floor keeps the gate from resolving on noise. In a simulation of unrelated 64-d states, the per-checkpoint noise in the margin is near 0.021, the maximum of a noise-only trajectory is near 0.06, and a ratio of noise-level margins fails the 0.8× gate about as often as not. The floor is therefore about 3× a noise-only trajectory's peak, and well under H2(a)'s 0.5. Runs below the floor are reported but not scored. Partial: violations confined to the <span class="arithmatex">\(\lambda{=}0.3\)</span> condition.</p>
+<h2 id="task-cost-h1">Task cost (H1)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#task-cost-h1" title="Link to this heading">&para;</a></h2>
+<figure class="report-figure"><table class="report-table">
+  <thead><tr>
+    <th>condition</th><th class="num">seen EM</th><th class="num">holdout EM</th>
+    <th class="num">holdout NLL</th><th class="num"><code>open</code> dist</th>
+    <th class="num">Δ holdout EM</th><th>H1 gate</th>
+  </tr></thead>
+  <tbody><tr class='ref'><th>ex-2.1.3 <code>v216</code></th><td class='num'>1.000</td><td class='num'>0.995</td><td class='num'>0.025</td><td class='num'>0.141</td><td class='num'>—</td><td>reference</td></tr><tr><th>λ = 0</th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.999 <span class='range'>±0.002</span></td><td class='num'>0.019 <span class='range'>±0.009</span></td><td class='num'>0.133 <span class='range'>±0.002</span></td><td class='num'>+0.000</td><td>clean</td></tr><tr><th>λ = 0.03</th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.997 <span class='range'>±0.004</span></td><td class='num'>0.023 <span class='range'>±0.012</span></td><td class='num'>0.137 <span class='range'>±0.010</span></td><td class='num'>-0.001</td><td>clean</td></tr><tr><th>λ = 0.1</th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.997 <span class='range'>±0.004</span></td><td class='num'>0.017 <span class='range'>±0.004</span></td><td class='num'>0.130 <span class='range'>±0.003</span></td><td class='num'>-0.001</td><td>clean</td></tr><tr><th>λ = 0.3</th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.996 <span class='range'>±0.004</span></td><td class='num'>0.024 <span class='range'>±0.013</span></td><td class='num'>0.136 <span class='range'>±0.004</span></td><td class='num'>-0.003</td><td>clean</td></tr><tr><th>λ = 0.1*</th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.997 <span class='range'>±0.002</span></td><td class='num'>0.021 <span class='range'>±0.005</span></td><td class='num'>0.135 <span class='range'>±0.003</span></td><td class='num'>-0.001</td><td>clean</td></tr></tbody>
+</table><figcaption><p>Behavior by condition. Each cell is the seed mean, with half the seed range beside it. EM is exact match on the answer token. NLL is the surprise of that token in nats. <code>open</code> dist is the RGB distance from the guessed color to the true mix, on pairs with no named answer. Δ holdout EM is the signed gap to the λ = 0 control, and the last column reports the H1 gate, which passes when that gap is within 0.02. The first row is the published ex-2.1.3 <code>v216</code> condition; it is an external reference, not part of this sweep.</p></figcaption></figure>
+
+<p><strong>H1 holds, with room to spare.</strong> Every anchored rung is task-clean. The largest gap to the control on <code>named_holdout</code> exact match is 0.0026, against a gate of 0.02, and that includes <span class="arithmatex">\(\lambda{=}0.3\)</span>. Seen pairs are at 1.000 everywhere.</p>
+<p>The finer scoring agrees. Answer NLL stays between 0.017 and 0.024 nats with no trend in <span class="arithmatex">\(\lambda\)</span>. So there is no sign that the anchor is quietly consuming capacity while the argmax stays correct.</p>
+<p>The <code>open</code>-pair distances sit together near 0.134. That is above the floor of 0.086, and also above the 0.115 expected of a guesser that flips a coin between the two names bracketing the true mix — so on this metric the models do not quite reach that null, though they are far under the 0.426 of a guesser that ignores the prompt. The shortfall is in the last step of resolving between two adjacent names, and it is a property of this testbed rather than of the anchor: the control sits with the rest, and this is the same picture ex-2.1.3 reported for this condition.</p>
+<p>So at these weights, the dose–response curve has no cost side. The next section looks at what the anchor buys.</p>
+<h2 id="alignment-and-grading-h2">Alignment and grading (H2)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#alignment-and-grading-h2" title="Link to this heading">&para;</a></h2>
+<p>The concept moved onto the anchor, but so did everything else. The figure below shows the per-color response at op1. The whole cube lifts off the control baseline together, and the reddest colors sit only a little above the rest.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/grading-light.png" alt="Three panels, one per anchored rung. In each, the 216 colors sit in a broad band well above the flat control at zero, and the band rises gently with redness — from roughly 0.4–0.5 at the grey end to 0.7–0.9 at the red end — rather than separating the reds from the rest." width="818" height="299" style="max-width: 100%; height: auto;" data-asset-name="grading" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/grading-dark.png" alt="Three panels, one per anchored rung. In each, the 216 colors sit in a broad band well above the flat control at zero, and the band rises gently with redness — from roughly 0.4–0.5 at the grey end to 0.7–0.9 at the red end — rather than separating the reds from the rest." width="818" height="299" style="max-width: 100%; height: auto;" data-asset-name="grading" />
+<figcaption><p>Alignment at op1, per color: <span class="arithmatex">\(\alpha_c\)</span>, the layer mean of <span class="arithmatex">\(\cos(h, \hat v_{\text{red}})\)</span> averaged over seeds, against the redness of the color. One mark per color, drawn in that color; the heavy line is a 25-color sliding mean over the redness ordering, and the flat grey band underneath is the sliding mean of the <span class="arithmatex">\(\lambda{=}0\)</span> control. The grading statistics and <span class="arithmatex">\(m_{\text{op1}}\)</span> are quoted per panel; both H2(b) gates sit at 0.8.</p></figcaption></figure>
+
+<p><strong>H2 fails on (a) and (b); (c) holds.</strong> No rung reaches the 0.5 margin: <span class="arithmatex">\(m_{\text{op1}}\)</span> is 0.28, 0.27, and 0.26 at <span class="arithmatex">\(\lambda = 0.03\)</span>, <span class="arithmatex">\(0.1\)</span>, and <span class="arithmatex">\(0.3\)</span>, and the seeds agree to within 0.019. The hypothesis only needed <em>some</em> task-clean rung to clear the gate, and since every rung is task-clean, the search had the whole ladder to work with; none of it clears the gate. The grading statistics land in the same place: the best of them is R² = 0.64 at <span class="arithmatex">\(\lambda{=}0.1\)</span> against a gate of 0.8, with ρ ≈ 0.51 on the rank track. The control clears (c) comfortably: <span class="arithmatex">\(|m_{\text{op1}}| = 0.027\)</span>, well inside 0.1 and about the size of the per-checkpoint noise (0.021). So without the anchor, redness does not sit preferentially on this axis. Note the margin asks a narrower question than decodability: a probe can still read redness off the untouched stream, as the leakage measurement below shows. The margin only asks whether this one direction singles red out.</p>
+<p>Why does the margin stay low? The figure shows it directly: the whole cube moved. Mean alignment at op1 goes from 0.008 in the control to 0.42, 0.53, and 0.62 up the ladder. That is a color-independent shift that climbs with <span class="arithmatex">\(\lambda\)</span> while the margin does not. The margin is a contrast between red and non-red colors, so a shift shared by all colors does not count toward it. The anchor term, though, is satisfied by exactly that shift. This is how the term can be well optimized while the hypothesis is unsupported.</p>
+<p>Why is a shared shift available to the model at all? Because of what the pull can see. Whether a line is labeled is a coin flip the model cannot observe: nothing in the input distinguishes a labeled line from an unlabeled one. So the model can only respond to the <em>expected</em> pull. At op1 that expectation is proportional to the label affinity of the color at op1, which is red-specific. But at <code>+</code>, op2, and <code>=</code>, it is still proportional to the label affinity of <em>op1</em>, which says nothing about the token actually sitting at those positions; op2, for instance, is uniform over the cube. So three of the four pulled positions ask for a move that does not depend on their own token, and the model supplies one.</p>
+<p>Alternatively, the whole cube moved because nothing prevents it. We saw this in M1, too: without other regularization terms to repel colors from each other or from a subspace, the model can satisfy the anchor signal by rotating everything in that direction.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/margin-by-layer-light.png" alt="The margin at op1 falls with depth at every anchored weight. At the largest weight it starts near 0.56 in the embedding and decays to below 0.1 by the last layer; at the smallest it starts near 0.35, peaks in the first block, and decays less thereafter. The control is flat and slightly negative." width="683" height="318" style="max-width: 100%; height: auto;" data-asset-name="margin-by-layer" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/margin-by-layer-dark.png" alt="The margin at op1 falls with depth at every anchored weight. At the largest weight it starts near 0.56 in the embedding and decays to below 0.1 by the last layer; at the smallest it starts near 0.35, peaks in the first block, and decays less thereafter. The control is flat and slightly negative." width="683" height="318" style="max-width: 100%; height: auto;" data-asset-name="margin-by-layer" />
+<figcaption><p>Where the margin lives in the stack: the alignment margin at op1 by layer — the per-depth terms whose mean is <span class="arithmatex">\(m_{\text{op1}}\)</span>. Depth 0 is the token embedding, depth 4 the last block's output. Lines are seed means; the shaded band around the control is its seed min–max, as the scale of a null. The anchor pulls all five layers equally, so the slope comes from the network, not from the pull schedule.</p></figcaption></figure>
+
+<p>The per-depth view shows where what little selectivity exists is located, and it is not a sag in the last layer. At every weight, the margin peaks in the embedding or the first block and falls away with depth. Raising <span class="arithmatex">\(\lambda\)</span> steepens that decay rather than lifting the curve: at <span class="arithmatex">\(\lambda{=}0.3\)</span> it runs 0.56 → 0.08 from embedding to last layer, against 0.35 → 0.13 at <span class="arithmatex">\(\lambda{=}0.03\)</span>. So a heavier pull buys selectivity in the token embedding, then loses it again through the stack. That fits the idea that the deeper layers are where the shared, color-independent shift is cheapest to produce: the embedding is shared across positions, so moving it moves op2 too, while a block's output can depend on position and context.</p>
+<p>A second reading is that the deeper layers are committed to next-token prediction. By the last block, the state at op1 has to emit <code>+</code>, and this model is probably deeper than the task needs. The character-level testbeds of ex-2.1.5 did put their concept readout deeper in the stack, but there it peaked at the pre-answer position, after the color had been named. That precedent does not transfer to op1, where the color has only just arrived.</p>
+<h2 id="condensation-vs-broadcast-h3">Condensation vs broadcast (H3)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#condensation-vs-broadcast-h3" title="Link to this heading">&para;</a></h2>
+<p>H3 is not scored. The scoring rule says it resolves on the same rung as H2, and only if H2(a) passed there. H2(a) did not pass at any rung. We still report the map below: the condensation question was about the position profile, and even a low margin has a shape worth looking at.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/positions-light.png" alt="Six panels stacked by depth. op1 dominates in the embedding and the first block, but by the last two blocks the plus and equals positions overtake it; op2 stays the smallest of the pulled positions, and the newline is near zero throughout." width="683" height="440" style="max-width: 100%; height: auto;" data-asset-name="positions" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/positions-dark.png" alt="Six panels stacked by depth. op1 dominates in the embedding and the first block, but by the last two blocks the plus and equals positions overtake it; op2 stays the smallest of the pulled positions, and the newline is near zero throughout." width="683" height="440" style="max-width: 100%; height: auto;" data-asset-name="positions" />
+<figcaption><p>Margin by position and depth: <span class="arithmatex">\(m(\ell, t)\)</span> across the six positions of a line, on <span class="arithmatex">\(\lambda{=}0.1\)</span>, seed mean. One panel per layer, and the seed mean over layers in the bottom panel, drawn heavier. The shaded area runs from zero to the seed mean; the hairlines are the seed minimum and maximum. Positions are ordinal, so the risers are sloped, but nothing is measured between them. The four pulled positions sit left of the dashed rule; the answer and newline are measured only.</p></figcaption></figure>
+
+<p>op1 does lead, but not by the factor H3 named: 1.8× against <code>+</code>, 1.7× against <code>=</code>, and 4.6× against op2. Had the gate been live, the op2 comparison would have passed and the other two would not. So the outcome sits between condensation and broadcast rather than at either. The ordering itself is informative. op2 is the position where the expected pull carries no information about the token actually there, and it has the least margin. <code>+</code> and <code>=</code> are constant tokens, so their states are free to encode the context of the line; they carry 56% and 58% of the margin at op1.</p>
+<p>The layer mean also hides an inversion that the panels above it show plainly. In the embedding and the first block, op1 is the only position with much margin at all (0.45, against 0.00 at <code>+</code>). By the last block the ordering has reversed: op1 sits at 0.10, while <code>+</code> and <code>=</code> carry 0.30 and 0.33. So <em>red</em> enters at the token that denotes it, and with depth it moves to the positions that follow it in the line. That is what a model with attention would do with a fact about the line, and it is not a distinction the condensation/broadcast pair anticipated. Whether that pattern is worth reserving an axis for is an intervention question, which this experiment does not answer.</p>
+<p>The answer position, which the pull never touches, still shows 0.11, about 39% of the margin at op1. That is the confounded quantity the method set aside: a red op1 drags the mixed color toward red, so part of this margin is spillover from an anchored operand, and part is the redness of the answer itself finding the axis. The newline sits at 0.01. A position that neither carries a color nor feels the pull should sit near zero, so this is a useful check that the map is not simply warm everywhere.</p>
+<p>The method also asked us to check the last layer at <code>=</code>. The margin there does not dip relative to the earlier layers: it is 0.33, against 0.07 at layer 1. So we see no sign of the answer logits pushing back on the pull at that position. With the task cost of H1 at zero, that is the consistent reading.</p>
+<h2 id="training-stability-h4">Training stability (H4)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#training-stability-h4" title="Link to this heading">&para;</a></h2>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/trajectories-light.png" alt="Four panels of alignment against epoch. In every anchored condition the margin rises through the learning-rate warmup to a peak between epochs 9 and 17, then slides back to about 0.27 and stays there; the slide happens while the anchor weight is still at its peak, not at the anneal. The control stays flat at zero." width="875" height="299" style="max-width: 100%; height: auto;" data-asset-name="trajectories" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/trajectories-dark.png" alt="Four panels of alignment against epoch. In every anchored condition the margin rises through the learning-rate warmup to a peak between epochs 9 and 17, then slides back to about 0.27 and stays there; the slide happens while the anchor weight is still at its peak, not at the anneal. The control stays flat at zero." width="875" height="299" style="max-width: 100%; height: auto;" data-asset-name="trajectories" />
+<figcaption><p>Alignment over training: <span class="arithmatex">\(m_{\text{op1}}\)</span> measured every 50 steps. One panel per condition, one line per seed. The pale band behind is the anchor weight as a fraction of its peak, so its descent marks the anneal window; the dotted line is the learning rate. Both use the right-hand scale, numbered on the last panel. The dashed horizontal rule is the 0.2 floor of H4; a run below it is reported but not scored. Ratios are the end-of-training value of each seed over its running maximum.</p></figcaption></figure>
+
+<p><strong>H4 fails, but not in the way it was written to catch.</strong> All 12 anchored runs clear the 0.2 floor, so all of them are scored. 7 of them end below 0.8× their running maximum, spread across 3 of the four anchored conditions, including <span class="arithmatex">\(\lambda{=}0.1\)</span>. The partial outcome (violations confined to <span class="arithmatex">\(\lambda{=}0.3\)</span>) does not apply. The control runs peak at 0.064. That is under the floor and in line with the 0.06 a noise-only trajectory reaches, so they are reported but not scored, as designed.</p>
+<p>The trajectories show a slide rather than a collapse. Every anchored run rises through the LR warmup to a peak between epochs 9 and 17, then loses about a quarter of that over the following forty or so epochs and holds flat from there. The anneal is not the trigger. The loss of margin is complete long before epoch 90; the earlier anneal in the <span class="arithmatex">\(\lambda{=}0.1^{*}\)</span> arm does not move it; and the end value is the same (0.26–0.28) across a tenfold range of <span class="arithmatex">\(\lambda\)</span>. So we are not seeing the ex-2.9.3 mechanism, where protection is withdrawn while the optimizer is still hot and the task loss reclaims the axis. The schedule did the job it was designed for; the margin settles at a level the pull does not set.</p>
+<p>Read together with the growing mean alignment of H2, the slide looks like the drift catching up. The peak reflects early selectivity, and what probably erodes it is the rest of the cube arriving on the axis afterwards.</p>
+<h2 id="secondary-measurements">Secondary measurements<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#secondary-measurements" title="Link to this heading">&para;</a></h2>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/leakage-light.png" alt="Two panels. On the left, the off-axis redness probe scores about 0.8 at every depth in every condition including the control, dipping slightly at depth with the anchor on. On the right, the redness variance carried by the anchor axis alone rises from near zero in the control to between 0.2 and 0.5 with the anchor on." width="779" height="299" style="max-width: 100%; height: auto;" data-asset-name="leakage" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/leakage-dark.png" alt="Two panels. On the left, the off-axis redness probe scores about 0.8 at every depth in every condition including the control, dipping slightly at depth with the anchor on. On the right, the redness variance carried by the anchor axis alone rises from near zero in the control to between 0.2 and 0.5 with the anchor on." width="779" height="299" style="max-width: 100%; height: auto;" data-asset-name="leakage" />
+<figcaption><p>Where redness is readable at op1. Left: held-out R² for a ridge probe that predicts redness from the residual stream at op1, with the <span class="arithmatex">\(\hat v_{\text{red}}\)</span> component removed first. This measures how well <em>red</em> can still be read from the other 63 directions. Right: the same target predicted from the anchor component alone, as squared correlation. Both panels show per-layer seed means. The sample is the 216 op1 colors, with a 5-fold split so no color is scored by a probe that saw it during fitting. Neither measurement has a pass/fail threshold.</p></figcaption></figure>
+
+<p><strong>Leakage is essentially undiminished.</strong> Project out the anchor direction, and redness is still readable from the remaining 63 directions: R² ≈ 0.83 on <span class="arithmatex">\(\lambda{=}0.1\)</span>, against 0.85 for the control. The difference is a few hundredths, concentrated in the deeper layers. Meanwhile the anchor axis itself goes from carrying 0.02 of the redness variance to 0.35. So the axis became readable for redness, but redness did not leave anywhere else. Calling that a second copy of the concept would be too strong; the exploratory section below shows why.</p>
+<p>Does this leakage bound what an intervention on the axis can do? That question is narrower than it looks, and the exploratory section takes it up. Redness is a function of color, and a model that answers <code>red + blue = purple</code> has to represent color; so a high off-axis score may reflect the color cube rather than a second copy of the concept. What the number does establish is that anchoring did not <em>concentrate</em> redness onto the axis at the expense of elsewhere. An anti-subspace term would constrain exactly this quantity, by pushing the unlabeled cube <em>off</em> the axis. Without it, nothing holds either the leakage or the undifferentiated drift of H2 in check.</p>
+<p><strong>The star arm changes nothing measurable.</strong> The <span class="arithmatex">\(\lambda{=}0.1^{*}\)</span> arm tracks <span class="arithmatex">\(\lambda{=}0.1\)</span> on every measurement: <span class="arithmatex">\(m_{\text{op1}}\)</span> of 0.264 against 0.273, off-axis R² of 0.82 against 0.83, and holdout accuracy identical to three decimals. The hypothesis behind this arm was that a long hold at peak anchor strength is what leaks. Cutting forty epochs from the hold leaves the same leakage, so on this evidence the hold length is not the knob. Also, the two arms are the same run up to epoch 50, and their trajectories are still together at epoch 100; that doubles as a check that the pipeline is deterministic where it should be.</p>
+<h2 id="exploratory-analyses">Exploratory analyses<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#exploratory-analyses" title="Link to this heading">&para;</a></h2>
+<p>Everything below is post hoc: we conceived it after seeing the results, in response to two questions about the primary reading. It reads the published checkpoints rather than the preregistered measurements, and it scores no hypothesis.</p>
+<h3 id="did-the-cube-collapse-or-did-it-swing-post-hoc">Did the cube collapse, or did it swing? (post hoc)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#did-the-cube-collapse-or-did-it-swing-post-hoc" title="Link to this heading">&para;</a></h3>
+<p>The first question: M1 used two repulsive terms that this experiment left out, <code>separate</code> and <code>anti-subspace</code>. Which one are we missing? In M1, without <code>separate</code> to keep near-duplicates apart, the latent cube ended up in a small region of the sphere. The two terms predict different shapes here. If the anchor squeezed the 216 colors together, <code>separate</code> is the missing term; if it moved them as a body onto the axis while they kept their extent, <code>anti-subspace</code> is.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/cloud-light.png" alt="Two panels. On the left, the extent of the 216-color cloud falls steeply with depth in every condition, control included, from about 0.92 at the embedding to near 0.1 at the last layer; mid-stack the anchored conditions sit clearly below the control, at roughly 70% of it at λ=0.1 and 50% at λ=0.3. On the right, the direction of the cloud&#x27;s centre is unrelated to the anchor in the control and almost parallel to it from the first block onward once the anchor is on." width="779" height="299" style="max-width: 100%; height: auto;" data-asset-name="cloud" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/cloud-dark.png" alt="Two panels. On the left, the extent of the 216-color cloud falls steeply with depth in every condition, control included, from about 0.92 at the embedding to near 0.1 at the last layer; mid-stack the anchored conditions sit clearly below the control, at roughly 70% of it at λ=0.1 and 50% at λ=0.3. On the right, the direction of the cloud&#x27;s centre is unrelated to the anchor in the control and almost parallel to it from the first block onward once the anchor is on." width="779" height="299" style="max-width: 100%; height: auto;" data-asset-name="cloud" />
+<figcaption><p>Where the color cloud is, and how big: the shape of the 216 op1 states, seed means, per layer. Left: the extent of the cloud, the mean squared distance of a color from the centre (states are unit-norm, so this runs from 0 for a collapsed cloud to 1 for a spread one). Right: the cosine between that centre and the anchor direction — where the cloud sits, as opposed to how big it is. In the control that value is the scale of an unrelated direction in 64 dimensions.</p></figcaption></figure>
+
+<p>The answer is mostly <em>swing</em>, and the surprise is in the control. Even un-anchored, this model concentrates the color cloud sharply with depth: its extent falls from 0.91 at the embedding to 0.13 at the last layer, so by the top of the stack the 216 colors already sit within a small cap. The task itself causes this: the state at op1 is being turned into a prediction, and the prediction is the same token (<code>+</code>) for every color. So whatever <code>separate</code> would protect against here, the network arrives at without help.</p>
+<p>Against that baseline, the anchor changes position far more than size. In the control, the centre of the cloud sits 0.02 of the way onto the anchor, which is the scale of an unrelated direction. With the anchor on, it reaches 0.90 at <span class="arithmatex">\(\lambda{=}0.1\)</span> and 0.93 at <span class="arithmatex">\(\lambda{=}0.3\)</span>. Meanwhile the extent at the same layer only goes 0.64 → 0.43 → 0.32. So at the scoring rung the cube kept about 68% of its extent and swung as a body onto the axis. That is the shape a missing anti-subspace term predicts: nothing was constraining the <em>common</em> component of the colors, and the common component is what moved.</p>
+<p>There is real compression at the top of the ladder, though. At <span class="arithmatex">\(\lambda{=}0.3\)</span> the mid-stack extent is down to 50% of control, and the trend across rungs is monotone. So a <code>separate</code>-style term would start to matter at a weight beyond what this experiment tried. On the present evidence, <code>anti-subspace</code> is the term to reach for first, with <code>separate</code> second; and by pushing unlabeled colors off the axis, the anti-subspace term would relieve some of the same pressure.</p>
+<h3 id="is-the-off-axis-leakage-about-red-post-hoc">Is the off-axis leakage about <em>red</em>? (post hoc)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#is-the-off-axis-leakage-about-red-post-hoc" title="Link to this heading">&para;</a></h3>
+<p>The second question: is "an intervention would leave a copy behind" the only reading of the leakage number? It is not, and the check is cheap: run the same off-axis probe for colors the anchor never touched. Redness is a function of color, and a model that answers <code>red + blue = purple</code> must represent color. So redness might be recoverable off the axis for a reason that has nothing to do with anchoring.</p>
+<figure><table class="report-table">
+  <thead>
+    <tr><th></th><th class="num" colspan="2">off the anchor axis</th>
+        <th class="num" colspan="2">on the anchor axis</th></tr>
+    <tr><th>target</th><th class="num">λ = 0</th><th class="num">λ = 0.1</th>
+        <th class="num">λ = 0</th><th class="num">λ = 0.1</th></tr>
+  </thead>
+  <tbody><tr><th>redness</th><td class='num'>0.846 <span class='range'>±0.059</span></td><td class='num'>0.827 <span class='range'>±0.078</span></td><td class='num'>0.015 <span class='range'>±0.031</span></td><td class='num'>0.351 <span class='range'>±0.184</span></td></tr><tr><th>greenness</th><td class='num'>0.818 <span class='range'>±0.032</span></td><td class='num'>0.836 <span class='range'>±0.033</span></td><td class='num'>0.016 <span class='range'>±0.037</span></td><td class='num'>0.067 <span class='range'>±0.082</span></td></tr><tr><th>blueness</th><td class='num'>0.823 <span class='range'>±0.051</span></td><td class='num'>0.836 <span class='range'>±0.037</span></td><td class='num'>0.005 <span class='range'>±0.008</span></td><td class='num'>0.057 <span class='range'>±0.062</span></td></tr><tr><th>R</th><td class='num'>0.975 <span class='range'>±0.008</span></td><td class='num'>0.938 <span class='range'>±0.052</span></td><td class='num'>0.076 <span class='range'>±0.072</span></td><td class='num'>0.146 <span class='range'>±0.143</span></td></tr><tr><th>G</th><td class='num'>0.951 <span class='range'>±0.046</span></td><td class='num'>0.939 <span class='range'>±0.031</span></td><td class='num'>0.058 <span class='range'>±0.088</span></td><td class='num'>0.083 <span class='range'>±0.121</span></td></tr><tr><th>B</th><td class='num'>0.961 <span class='range'>±0.017</span></td><td class='num'>0.947 <span class='range'>±0.034</span></td><td class='num'>0.034 <span class='range'>±0.048</span></td><td class='num'>0.074 <span class='range'>±0.063</span></td></tr><tr><th>sim¹·⁵</th><td class='num'>0.685 <span class='range'>±0.116</span></td><td class='num'>0.751 <span class='range'>±0.130</span></td><td class='num'>0.010 <span class='range'>±0.026</span></td><td class='num'>0.481 <span class='range'>±0.194</span></td></tr></tbody>
+</table><figcaption><p>What is recoverable from the op1 residual stream, per target. Each cell is the seed mean, with half the seed range beside it. Rows are the property being predicted: redness; the same formula rotated onto the green and blue corners; the raw channels; and the sim¹·⁵ shape that H2(b) scores against. The left pair of columns is held-out ridge R² with the anchor direction removed, averaged over layers. The right pair is squared correlation with the anchor component alone. Reading down a column compares redness against targets the anchor never pulled.</p></figcaption></figure>
+
+<p>Off the axis, redness is not special. On the anchored model, greenness scores 0.84 and blueness 0.84, against 0.83 for redness, and the raw channels score around 0.94. The control looks the same. So the off-axis number reflects the color cube: every corner of it is recoverable, because the task needs it to be, and redness is just one function of the colors among many. It is not evidence of a second, red-specific encoding.</p>
+<p>On the axis, redness <em>is</em> special; this part of the primary reading survives. The anchor component carries 0.35 of redness variance, against 0.07 for greenness and 0.06 for blueness, up from 0.02 in the control. The anchor put red where we asked for it (and rather more of <code>sim¹·⁵</code>, at 0.48), and nothing else came with it.</p>
+<p>What this costs the primary reading is the sentence about intervention. The leakage measurement says a linear probe can still recover redness after the axis is removed. It does not say the <em>model</em> would still behave red-ly; those are different claims. The induced error in M1 was measured on the model's own output under an edit, not on a probe. So the surviving claim is narrower: anchoring here added a red-selective direction without concentrating red onto it. What an edit to that direction would do to behavior is a question this experiment cannot answer; it is the reason to run the intervention, not a prediction of its result.</p>
+<details>
+<summary>The candidates the skeleton anticipated</summary>
+<p>Candidates have either been answered or are moot. Seed variability is small everywhere (the H4 panels show three lines converging to the same value, and <span class="arithmatex">\(m_{\text{op1}}\)</span> varies by under 0.02 across seeds). Spill into the unpulled positions is in the H3 map. The batch-to-batch noise from skipping label balancing left no visible mark on the trajectories, which are smooth after the first ten epochs. Alignment on <code>open</code>-pair lines is the one we did not look at, and it is a question about the answer position rather than about anchoring, so it can wait for the experiment that pulls the whole span.</p>
+</details>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#discussion" title="Link to this heading">&para;</a></h2>
+<p><strong>Summary of results.</strong> H1 passed; H2 and H4 failed. H3 was not scored, because its frozen precondition, H2(a), did not hold at any rung. The anchor is free: no rung cost measurable accuracy, NLL, or open-pair distance. And it does move the residual stream a long way onto the chosen direction. What it did not do is move <em>red</em> there selectively. The margin settles near 0.27 against a gate of 0.5, and the best of the grading statistics reaches 0.64 against 0.8. Both are flat across a tenfold range of <span class="arithmatex">\(\lambda\)</span>, while the color-independent part of the response climbs with it.</p>
+<p><strong>A mechanism that fits.</strong> The term is selective about which <em>lines</em> it fires on, but says nothing about <em>positions</em>. It fires only when op1 is red enough to draw a label, so the pull a color receives really is red-specific; that part of the design worked. But on a labeled line, the term asks all four prompt positions to move the same way, and three of those positions hold tokens whose own color the label says nothing about. op2 is the clear case: on labeled lines its color is uniform over the cube, just as on any other line, so no function of the token sitting there can satisfy the pull. What can satisfy it, at every position at once, is a shift that ignores the token entirely. That shift costs the task nothing measurable here, and it is what we observe. Several results fit this reading: the margin stays flat in <span class="arithmatex">\(\lambda\)</span> while the mean does not; the margin is largest in the shared embedding and decays through the position-aware blocks; and the trajectory peaks early and then slides. One interpretation of the slide is that the selective response arrives first and the rest of the cube then follows it onto the axis. The trajectories are consistent with that, but a single design cannot separate it from the alternatives.</p>
+<p><strong>Implications for the M1 → M2 transfer.</strong> The M1 loss carried an anti-subspace term alongside the anchor, at a weight two orders of magnitude below it. This experiment deliberately left that term out, to ask whether one attractive term suffices. On this evidence it does not, and we come away with a candidate reason rather than a bare null: the anti-subspace term constrains exactly the quantity that ran away here. The exploratory section supports that reading over the alternative. The cube swung bodily onto the axis at the scoring rung while keeping most of its extent, which is a common-component problem, not the near-duplicate collapse that <code>separate</code> guards against. That section also shows the cloud concentrating strongly with depth on its own, anchor or no anchor. It would be too quick to read that as the task doing the work of <code>separate</code>, though: the last layer only has to tell the colors apart well enough to predict <code>+</code>, which it could manage from a compact cloud. Adding the anti-subspace term is queued as the direct test.</p>
+<p>What we should <em>not</em> conclude is that an intervention would find a spare copy of red waiting. The leakage number says a linear probe can still recover redness with the axis removed, and the exploratory check shows that greenness and blueness score the same. So what survives removal is the color cube the task needs, not a red-specific second encoding. What an edit to the anchored direction would do to the model's behavior is a separate measurement. And projecting the whole axis out is only the crudest edit available; a suppression shaped to act on the red-selective part of the response might succeed where that one fails. Either way, the effect of an intervention is something to measure, not something to predict from here.</p>
+<p><strong>Open questions.</strong> We cannot yet separate "the bare term is insufficient" from "the <em>span</em> pull is what dilutes it", because this run changed both at once relative to M1. M1 labeled atomic samples, so every pulled position there carried the labeled thing. The queued position-pooling variant (logsumexp instead of a mean over positions) is the direct test. Pulling op1 alone would be cleaner still: it would make every pulled position label-informative while leaving the term itself unchanged. A smaller question the results raise is whether the drift is bounded by the task, or would keep climbing at larger <span class="arithmatex">\(\lambda\)</span>.</p>
+<p>Under H3 we saw a depth inversion: the concept enters at its own token and migrates to the positions downstream of it. This is most likely a transformer behaving as transformers do. For an intervention on <em>red</em> across the board it may not matter, since we would want the edit to apply at every (layer, position) site anyway. It becomes a live question at D2.3, which asks for suppression that degrades completion while leaving verification intact. That calls for the concept to be localized somewhere in the stream, and this run offers no evidence either way on whether an anchor can be confined to a chosen region of it.</p>
+<p>A note on the schedule work: the star arm found nothing, and the H4 failure was a slide rather than the collapse seen in ex-2.9.3. So the anneal design carried over from M1 looks sound on this testbed. Two things the trajectories do raise are queued in <code>todo-science.md</code>. The first is the alignment decay itself, which is the H4 result read as a phenomenon rather than as a gate. The second is the length of the schedule: the margin is flat from roughly epoch 50, so a shorter run may cost nothing. That is a budget question, not a way to keep the early peak; the peak never cleared H2(a) either, and choosing a stopping point from this data would be selecting on noise.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:bern">
+<p>A Bernoulli draw: one biased coin flip per line, independent of
+every other line.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fnref:bern" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:nll">
+<p>Negative log-likelihood: the surprise, in nats, of the probability
+the model assigns to the correct answer token, with 0 meaning certain and correct.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fnref:nll" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:nulls">
+<p>Reference scores for degenerate predictors (the corpus-mean
+color, a uniform draw, the identity of op1), which make a distance number readable as good or bad.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fnref:nulls" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:spearman">
+<p>Spearman ρ is a correlation coefficient computed on ranks
+rather than values, so it measures whether the ordering agrees and doesn't care about the shape of the curve.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fnref:spearman" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:pearson">
+<p>The squared Pearson correlation: the share of variance in the
+response explained by a linear function of <code>sim¹·⁵</code>. It is scale- and offset-invariant, so it tests proportionality to the shape M1 implies for alignment with no tuned constant.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.6/#fnref:pearson" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

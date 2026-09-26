@@ -1,0 +1,1761 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/1eeb21fe6ec2f82bde40c2bcd7dc5d56cb835bb8/exports/m2/ex-2.1.8/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/ex-2.1.8/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.1.8: Repulsion tuning</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md.css into the md.css the site serves; and VS Code's
+ * Markdown preview lists both files (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
+ *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.1.8/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/ex-2.1.8/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.1.8</strong> · <code>87755d7</code> · run 2026-08-04<div>via reports/m2/ex-2.1.8/arrays, reports/m2/ex-2.1.8/geometry, reports/m2/ex-2.1.8/metrics</div></div></details>
+<main class="lit">
+<h1 id="ex-218-repulsion-tuning">Ex 2.1.8: Repulsion tuning<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#ex-218-repulsion-tuning" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>We tested anti-subspace schedules (trailing timing and strength) to find an operating point that contains the cube-wide drift without reducing selectivity. Holding the repulsion high for longer contains the drift and keeps the margin, which nothing before this did. It's unclear if the response is well-graded.</p>
+</div>
+<p>In ex-2.1.6 we aligned <em>red</em> with a direction in the residual stream, but it dragged the whole color space with it.
+Then in ex-2.1.7 we added a repulsive <em>anti-subspace</em> term that pushed everything away from the <em>red</em> axis <span class="arithmatex">\(\hat v_{\text{red}}\)</span>. It helped, but not enough: the mean <em>red</em>-alignment over all colors fell from <span class="arithmatex">\(\bar\alpha\)</span> = 0.53 to 0.33, and the target was &lt; 0.1.</p>
+<p>The training trajectories show what happens over the course of a run. While the repulsion outweighs the pull, <span class="arithmatex">\(\bar\alpha\)</span> stays near the control, which is what we want. Then the anneal<sup id="fnref:anneal"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fn:anneal">1</a></sup> brings <span class="arithmatex">\(\lambda_{\bar{\text{s}}}\)</span> down to about a tenth of <span class="arithmatex">\(\lambda_\text{a}\)</span>, and <span class="arithmatex">\(\bar\alpha\)</span> starts to climb again. Each condition turned at its own point in the schedule: around epoch 40 on the M1 schedule, and epoch 75 on <code>span-anti-late</code>, the arm that stretched it.</p>
+<p>The M1 keyframes came from a 5-dimensional autoencoder bottleneck, mapped onto our 100 epochs by fraction of training. So we never had much reason to expect them to suit a 64-dimensional residual stream.</p>
+<p>All that <code>span-anti-late</code> did was push the end of the anneal from epoch 50 to epoch 90. That improved every statistic the H2 and H4 hypotheses scored: margin 0.46 → 0.60, <span class="arithmatex">\(\bar\alpha\)</span> 0.33 → 0.13, retention across the anneal, and grading. For future experiments, then, should we stretch the anneal, or end it at a higher weight? Each option is a reading of the ex-2.1.7 result, and the rest of this report refers to them by name:</p>
+<ul>
+<li>The timing account: the repulsion has to still be there while the pull is strong enough to move the cube, and a later anneal keeps it there. Stretch the anneal.</li>
+<li>The level account: containment is lost when <span class="arithmatex">\(\lambda_{\bar{\text{s}}}/\lambda_\text{a}\)</span> falls past the threshold ex-2.1.7 observed, and a later anneal helps only by postponing that. End the anneal at a higher weight.</li>
+</ul>
+<p>We test both. The two separate cleanly, because only the level account predicts an interaction: a floor that stays above the threshold never crosses it, so at that floor the timing of the endpoint should stop mattering.</p>
+<details>
+<summary>Notation and glossary</summary>
+<p>Carried from ex-2.1.7.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">term</th>
+<th style="text-align: left;">meaning</th>
+<th style="text-align: center;">target</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(\hat v_{\text{red}}\)</span></td>
+<td style="text-align: left;">the anchor direction</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(\lambda_\text{a}\)</span></td>
+<td style="text-align: left;">anchor weight, fixed at 0.1 throughout</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(\lambda_{\bar{\text{s}}}\)</span></td>
+<td style="text-align: left;">anti-subspace weight, always given as the ratio <span class="arithmatex">\(\lambda_{\bar{\text{s}}}/\lambda_\text{a}\)</span></td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td style="text-align: center;">condition</td>
+<td style="text-align: left;">one combination of the sweep factors, aggregated over seeds unless stated</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td style="text-align: center;">run</td>
+<td style="text-align: left;">a condition crossed with a seed: one training run</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(\alpha_c\)</span>, <span class="arithmatex">\(\bar\alpha\)</span></td>
+<td style="text-align: left;">the alignment (cosine) of color <span class="arithmatex">\(c\)</span> with <span class="arithmatex">\(\hat v_{\text{red}}\)</span> at op1, averaged over layers; and the mean of that over all 216 colors</td>
+<td style="text-align: center;">↓</td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(m\)</span>, <span class="arithmatex">\(m_{\text{op1}}\)</span></td>
+<td style="text-align: left;">alignment margin <span class="arithmatex">\(\sum_c w_c \alpha_c - \bar\alpha\)</span>, where <span class="arithmatex">\(w_c\)</span> are the <em>red</em>-label affinities normalized to sum to 1; <span class="arithmatex">\(m_{\text{op1}}\)</span> is the layer mean of <span class="arithmatex">\(m\)</span> at op1</td>
+<td style="text-align: center;">↑</td>
+</tr>
+<tr>
+<td style="text-align: center;">contained</td>
+<td style="text-align: left;">of a condition: <span class="arithmatex">\(\bar\alpha \le 0.1\)</span>, so the drift is held near the control rather than just weakened</td>
+<td style="text-align: center;"></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(\rho\)</span></td>
+<td style="text-align: left;"><em>rank</em> grading: the Spearman correlation between the per-color <span class="arithmatex">\(\alpha_c\)</span> and <code>redness</code>. Asks whether the response puts the colors in the same order redness does, ignoring how large it is</td>
+<td style="text-align: center;">≥ 0.8</td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(R^2\)</span></td>
+<td style="text-align: left;"><em>proportionality</em> grading: the squared Pearson correlation between <span class="arithmatex">\(\alpha_c\)</span> and <code>sim¹·⁵</code>, each color's cosine similarity to <em>red</em> raised to 1.5. Asks whether the response has that shape, ignoring its scale</td>
+<td style="text-align: center;">≥ 0.8</td>
+</tr>
+<tr>
+<td style="text-align: center;">retention</td>
+<td style="text-align: left;">per run, the final <span class="arithmatex">\(m_{\text{op1}}\)</span> divided by its running peak (scored once the peak reaches 0.2); reported as the minimum across seeds</td>
+<td style="text-align: center;">↑</td>
+</tr>
+<tr>
+<td style="text-align: center;">leak</td>
+<td style="text-align: left;"><span class="arithmatex">\(R^2\)</span> of redness decoded from the 63 non-anchor directions at op1; unscored, and cannot fall below the RGB-geometry floor of 0.863</td>
+<td style="text-align: center;">—</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">measurement</th>
+<th style="text-align: left;">interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(m \rightarrow 1\)</span></td>
+<td style="text-align: left;"><em>red</em> colors are aligned with the anchor, and other colors are not</td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(m \rightarrow 0\)</span></td>
+<td style="text-align: left;"><em>red</em> colors are unaligned, or they are but so is every other color</td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(\bar\alpha \rightarrow 1\)</span></td>
+<td style="text-align: left;">the whole cube is anchored, not just <em>red</em></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="arithmatex">\(\bar\alpha \rightarrow 0\)</span></td>
+<td style="text-align: left;">most colors are orthogonal to the anchor</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h2 id="findings">Findings<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#findings" title="Link to this heading">&para;</a></h2>
+<p><strong>H1 (task cost) — holds.</strong> Largest <code>named_holdout</code> exact-match gap from the control, across all 8 conditions: 0.0065. Gate: 0.02.</p>
+<p><strong>H2 (an operating point exists) — fails, on grading.</strong> <code>end90-hold30</code>, the preregistered primary condition, meets containment (<span class="arithmatex">\(\bar\alpha = 0.087\)</span>, gate 0.1), margin (0.611, gate 0.5) and retention (0.97, gate 0.8). No condition in the grid reaches the grading gate of 0.8 on either track; the best R² is 0.78. Neither named partial applies.</p>
+<p><strong>H3 (a sustained floor makes the anneal endpoint redundant) — holds.</strong> Hold-ratio main effect on <span class="arithmatex">\(\bar\alpha\)</span>: +0.126, gate 0.067. Interaction: +0.142, gate 0.133 — a pass by 6%. Both gates are the preregistered values rescaled by this experiment's own seed spread, as the H3 footnote directs.</p>
+<p><strong>Containment is now newly reachable.</strong> <code>end90-hold30</code> is the first condition in M2 to hold <span class="arithmatex">\(\bar\alpha\)</span> near the control while keeping the margin. The best in ex-2.1.7 was 0.13 and its gate went unmet everywhere.</p>
+<div class="admonition">
+<p class="admonition-title">How to read this report</p>
+<p>The method, hypotheses and decision thresholds were written and frozen in Git before the experiment ran, and the results below replace the placeholders that stood in for them. Anything conceived after seeing the data goes under <em>Exploratory analyses</em>.</p>
+</div>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#method" title="Link to this heading">&para;</a></h2>
+<p>Like ex-2.1.7: the word-level <code>v216</code> corpus from ex-2.1.3 (216 colors, one token each, d64-L4), and the same corpus, seeds, sequence-level labels, and measurements.</p>
+<p>We use the same <em>anchor</em> schedule, but vary the <em>anti-subspace</em> schedule.</p>
+<p>Since we're using sequence-level labels, this experiment is like the <code>span-*</code> conditions in ex-2.1.7. The op1-only pull in ex-2.1.7 scored higher, but that option exists only because this synthetic language has a known position carrying the concept. Once we retire that position oracle we have to pull on a span.</p>
+<p>The anchor weight stays at <span class="arithmatex">\(\lambda_\text{a} = 0.1\)</span>. The ceiling arm in ex-2.1.7 showed selectivity falling at ten times this weight, with no task cost even there. So the previous scoring rung is still the right place to tune the repulsion against.</p>
+<h3 id="the-sweep-grid">The sweep grid<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#the-sweep-grid" title="Link to this heading">&para;</a></h3>
+<p>Factors:</p>
+<ul>
+<li>
+<p><strong>A.</strong> Anneal endpoint</p>
+<p>The epoch at which <span class="arithmatex">\(\lambda_{\bar{\text{s}}}/\lambda_\text{a}\)</span> reaches its hold ratio.
+Levels: 50, 70 and 90.
+Endpoint 50 is the M1 keyframe mapped by fraction of training, and
+90 is the timing arm from ex-2.1.7. So two conditions repeat settings
+we have already measured.</p>
+</li>
+<li>
+<p><strong>B.</strong> Hold ratio</p>
+<p>The level it settles at. Levels: 0.03 and 0.30.
+Ratio 0.03 is the M1 level. Ratio 0.30 is three times the level at
+which ex-2.1.7 saw containment give way, so on the level account it
+should never cross the threshold at all.</p>
+</li>
+</ul>
+<p>We leave out endpoint 100: the anneal would run to the end of training,
+leaving no hold window for the ratio to act on, so that row would cross one
+factor against nothing and dilute its main effect.</p>
+<p>An un-anchored control (<span class="arithmatex">\(\lambda_\text{a} = 0\)</span>) runs through the same code,
+giving 8 conditions and 24 runs in total.</p>
+<h3 id="a-confound-and-its-mitigation">A confound, and its mitigation<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#a-confound-and-its-mitigation" title="Link to this heading">&para;</a></h3>
+<p>The two factors are not symmetric. Changing the hold ratio barely changes the total repulsion delivered. Changing the endpoint does, because a later anneal spends longer at a high weight. So along factor A, <em>when</em> the repulsion acts and <em>how much</em> of it there is move together.</p>
+<p>We call that total the <em>dose</em>, and measure it as <span class="arithmatex">\(\int \lambda_{\bar{\text{s}}}(e)\cdot\text{lr}(e)\,de\)</span> over training. The learning rate belongs inside the integral because it multiplies the gradient of every term, and it is itself warming up and annealing across the same window. A weight-only integral would call two schedules equal even when they deliver visibly different pushes.</p>
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th style="text-align: right;"><code>anneal_end</code></th>
+<th style="text-align: right;"><code>hold_ratio</code></th>
+<th style="text-align: right;"><code>peak_ratio</code></th>
+<th style="text-align: right;">dose</th>
+<th style="text-align: right;">÷ <code>end50-hold03</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>end50-hold03</code></td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">0.03</td>
+<td style="text-align: right;">2.500</td>
+<td style="text-align: right;">0.04936</td>
+<td style="text-align: right;">1.00</td>
+</tr>
+<tr>
+<td><code>end50-hold30</code></td>
+<td style="text-align: right;">50</td>
+<td style="text-align: right;">0.30</td>
+<td style="text-align: right;">2.500</td>
+<td style="text-align: right;">0.05774</td>
+<td style="text-align: right;">1.17</td>
+</tr>
+<tr>
+<td><code>end70-hold03</code></td>
+<td style="text-align: right;">70</td>
+<td style="text-align: right;">0.03</td>
+<td style="text-align: right;">2.500</td>
+<td style="text-align: right;">0.06929</td>
+<td style="text-align: right;">1.40</td>
+</tr>
+<tr>
+<td><code>end70-hold30</code></td>
+<td style="text-align: right;">70</td>
+<td style="text-align: right;">0.30</td>
+<td style="text-align: right;">2.500</td>
+<td style="text-align: right;">0.07550</td>
+<td style="text-align: right;">1.53</td>
+</tr>
+<tr>
+<td><code>end90-hold03</code></td>
+<td style="text-align: right;">90</td>
+<td style="text-align: right;">0.03</td>
+<td style="text-align: right;">2.500</td>
+<td style="text-align: right;">0.08515</td>
+<td style="text-align: right;">1.73</td>
+</tr>
+<tr>
+<td><code>end90-hold30</code></td>
+<td style="text-align: right;">90</td>
+<td style="text-align: right;">0.30</td>
+<td style="text-align: right;">2.500</td>
+<td style="text-align: right;">0.08963</td>
+<td style="text-align: right;">1.82</td>
+</tr>
+<tr>
+<td><code>end90-hold03-dose</code></td>
+<td style="text-align: right;">90</td>
+<td style="text-align: right;">0.03</td>
+<td style="text-align: right;">1.443</td>
+<td style="text-align: right;">0.04936</td>
+<td style="text-align: right;">1.00</td>
+</tr>
+</tbody>
+</table>
+<p>Across the hold ratio, dose moves by at most a sixth; across the endpoint it rises by about three quarters. So we don't need to dose-match the two levels of factor B. And we can't dose-match the three levels of factor A with the hold ratio without extending past the tested range of ex-2.1.7.<sup id="fnref:cant"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fn:cant">2</a></sup></p>
+<p>Instead, we add an arm: <code>end90-hold03-dose</code> is <code>end90-hold03</code> with the opening ratio scaled 2.5 → 1.443, so it delivers the dose of <code>end50-hold03</code> on the late schedule. That's still asymmetrical: this arm has less repulsion through the epochs where the anchor is first ramping in. If it tracks <code>end50-hold03</code> rather than <code>end90-hold03</code>, weak early repulsion may be the cause. This should be visible in the trajectory figure.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/schedules-light.png" alt="Two line charts against epoch, 0 to 100, side by side. Left: six regularizer weight curves, all starting near 0.25 and descending, separating into a lower group that settles near 0.003 and an upper group that settles near 0.03, with the descent finishing at three different epochs. A seventh curve starts lower, near 0.14, crosses the others around epoch 25, and joins the lower group. Right: the same weight schedule, but with the dose shown as shaded areas. Two humps that rise from zero, peak in the first third of training and decay to zero by about epoch 80. The two crescents where they differ are hatched — grey where the dose arm falls short early, purple where it runs higher late. The two crescents are about the same size. Faint reference curves show the anchor weight in both panels, and the unscaled late schedule on the right." width="702" height="270" style="max-width: 100%; height: auto;" data-asset-name="schedules" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/schedules-dark.png" alt="Two line charts against epoch, 0 to 100, side by side. Left: six regularizer weight curves, all starting near 0.25 and descending, separating into a lower group that settles near 0.003 and an upper group that settles near 0.03, with the descent finishing at three different epochs. A seventh curve starts lower, near 0.14, crosses the others around epoch 25, and joins the lower group. Right: the same weight schedule, but with the dose shown as shaded areas. Two humps that rise from zero, peak in the first third of training and decay to zero by about epoch 80. The two crescents where they differ are hatched — grey where the dose arm falls short early, purple where it runs higher late. The two crescents are about the same size. Faint reference curves show the anchor weight in both panels, and the unscaled late schedule on the right." width="702" height="270" style="max-width: 100%; height: auto;" data-asset-name="schedules" />
+<figcaption><p><strong>The schedules under test.</strong> <strong>Left:</strong> anti-subspace weight <span class="arithmatex">\(\lambda_{\bar{\mathrm{s}}}\)</span> over training, for the six factorial conditions and the dose arm. <strong>Right:</strong> the dose itself, as its integrand <span class="arithmatex">\(\lambda_{\bar{\mathrm{s}}}\cdot\)</span>lr, so area on the page is repulsion delivered. Hatching shows where the dose arm falls short of the reference early and where it makes that back late. Ghost ink in both panels: the anchor weight <span class="arithmatex">\(\lambda_\mathrm{a}\)</span>; on the right, also <code>end90-hold03</code>, the schedule the arm was scaled down from.</p></figcaption></figure>
+
+<h3 id="measurements">Measurements<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#measurements" title="Link to this heading">&para;</a></h3>
+<p>Like ex-2.1.7:</p>
+<ul>
+<li><code>named_holdout</code> exact match, against the in-experiment control (H1).</li>
+<li><span class="arithmatex">\(m_{\text{op1}}\)</span>: the label-affinity-weighted alignment at op1 minus the cube mean, averaged over layers (H2, H3).</li>
+<li><span class="arithmatex">\(\bar\alpha\)</span>: mean alignment over all 216 colors at op1, layer-averaged (H2, H3). This is the quantity the repulsive term is defined on.</li>
+<li>Grading: Spearman <span class="arithmatex">\(\rho\)</span> against <code>redness</code> and Pearson <span class="arithmatex">\(R^2\)</span> against <code>sim¹·⁵</code> over the 216 colors (H2).</li>
+<li>Per-run margin trajectories, for retention (H2).</li>
+</ul>
+<p>Ex-2.1.7 quoted <em>retention</em> two ways under one name: the minimum
+final-over-peak margin across seeds in its Findings, and the mean across
+seeds in its Arms section. This report uses the <strong>min</strong>, and every
+later report should. The gate of H4(b) is worded per run ("for every
+anchored run…"), so the minimum is what it needs.</p>
+<h2 id="hypotheses">Hypotheses<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#hypotheses" title="Link to this heading">&para;</a></h2>
+<p>Gates and noise floors carry over from ex-2.1.7 with their thresholds and rationale, since we have the same architecture, the same measurement, and the same statistics.</p>
+<p><strong>H1: Task cost.</strong> Every condition is task-clean, meaning <code>named_holdout</code>
+exact match within 0.02 (absolute) of the seed mean of the in-experiment
+control.<sup id="fnref:h1-standing"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fn:h1-standing">3</a></sup> Partial: the <code>hold03</code> conditions and the dose arm
+are clean and a <code>hold30</code> condition is not.</p>
+<p><strong>H2: An operating point exists.</strong> Some task-clean factorial condition
+meets all four of the selectivity and containment criteria from ex-2.1.7
+at once, which no condition in that experiment did:
+(a) containment, <span class="arithmatex">\(\bar\alpha \le 0.1\)</span>;
+(b) margin, <span class="arithmatex">\(m_{\text{op1}} \ge 0.5\)</span>;
+(c) grading, Spearman <span class="arithmatex">\(\rho \ge 0.8\)</span> against <code>redness</code> or Pearson
+<span class="arithmatex">\(R^2 \ge 0.8\)</span> against <code>sim¹·⁵</code>;
+(d) retention, every run whose running maximum of <span class="arithmatex">\(m_{\text{op1}}\)</span> reaches
+0.2 ending at <span class="arithmatex">\(\ge 0.8\times\)</span> that maximum.
+Partial, in decreasing strength: (a) is met at the looser 0.25 (the
+halving level from ex-2.1.7) while (b)–(d) all hold; or (a) is met at
+0.1 but the margin falls between the ex-2.1.7 value of 0.46 and the
+gate.</p>
+<p><strong>H3: A sustained floor makes the anneal endpoint redundant.</strong> This is
+the prediction that sets the level account apart. If containment is lost at
+a threshold, then the endpoint only has leverage in the row whose floor
+crosses that threshold. We score H3 on <span class="arithmatex">\(\bar\alpha\)</span> with two criteria,
+each a difference of means reported with its sign.
+(a) The hold-ratio main effect,<sup id="fnref:main"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fn:main">5</a></sup> the nine runs at 0.03 minus the nine
+at 0.30, is at least 0.05. That says the floor does something at all.
+(b) The interaction is at least 0.1: the end50 − end90 difference
+within the 0.03 row, minus the same difference within the 0.30
+row.<sup id="fnref:effect"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fn:effect">6</a></sup>
+Criterion (a) keeps (b) from passing without any containment behind it: a
+<em>negative</em> endpoint effect in the 0.30 row would inflate the interaction on
+its own.</p>
+<p>Two outcomes would fail H3.
+<strong>1.</strong> The endpoint effect within a row is the three runs at endpoint 50
+minus the three at endpoint 90. If it clears 0.05 in both rows while the
+interaction stays under 0.1, that is the timing account: the repulsion
+has to be present while the pull is strong, and no floor stands in for it.
+<strong>2.</strong> If <code>end90-hold30</code> alone contains the drift while (a) fails, then each
+factor is blocked by the other.<sup id="fnref:h3-fail-2"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fn:h3-fail-2">4</a></sup></p>
+<p>We also report, without scoring it, whether the hold-ratio effect is at
+least as large as the endpoint effect. In the clean outcomes this ordering
+agrees with the interaction. In the partial ones it can disagree, because a
+floor that slows the climb without preventing it can come out ahead on the
+ordering while the interaction stays small. Where they disagree, we trust
+the interaction.</p>
+<h2 id="reproduction-check">Reproduction check<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#reproduction-check" title="Link to this heading">&para;</a></h2>
+<figure class="report-figure">
+<table class="report-table">
+  <thead><tr>
+    <th>condition</th>
+    <th class="num">m<sub>op1</sub> here</th><th class="num">ex-2.1.7</th><th class="num">Δ</th>
+    <th class="num">ᾱ here</th><th class="num">ex-2.1.7</th><th class="num">Δ</th>
+    <th class="num">ᾱ tolerance</th>
+  </tr></thead>
+  <tbody><tr><th><code>end50-hold03</code></th><td class='num'>0.456</td><td class='num'>0.46</td><td class='num'>-0.004</td><td class='num'>0.326</td><td class='num'>0.33</td><td class='num'>-0.004</td><td class='num'>±0.017</td></tr><tr><th><code>end90-hold03</code></th><td class='num'>0.598</td><td class='num'>0.60</td><td class='num'>-0.002</td><td class='num'>0.132</td><td class='num'>0.13</td><td class='num'>+0.002</td><td class='num'>±0.012</td></tr></tbody>
+</table>
+<figcaption><p>The two conditions this grid shares with ex-2.1.7, against that report's published seed means. <code>end50-hold03</code> repeats its <code>span-anti</code> and
+<code>end90-hold03</code> its <code>span-anti-late</code>. The margin
+tolerance is the carried seed-mean noise floor, 0.032; the
+ᾱ tolerance is two seed-mean spreads from this experiment's own seeds, in
+the last column.</p></figcaption></figure>
+
+<p>Both conditions reproduce. The margins land 0.004 from the published values against a floor of 0.032, and ᾱ within 0.004, inside the tolerance in either row. Grading agrees as well: <code>end90-hold03</code> scores R² = 0.78 here, the value ex-2.1.7 published for the same condition.</p>
+<p>So the two experiments measure the same thing, and this grid can be read against the ex-2.1.7 numbers — which the H2 partials and the H3 power argument both rely on.</p>
+<h2 id="task-cost-h1">Task cost (H1)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#task-cost-h1" title="Link to this heading">&para;</a></h2>
+<figure class="report-figure">
+<table class="report-table">
+  <thead><tr>
+    <th>condition</th><th class="num">seen EM ↑</th><th class="num">holdout EM ↑</th>
+    <th class="num">holdout NLL ↓</th><th class="num"><code>open</code> dist ↓</th>
+    <th class="num">Δ holdout EM</th><th>H1 gate</th>
+  </tr></thead>
+  <tbody><tr><th><code>lam0</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.999 <span class='range'>±0.002</span></td><td class='num'>0.019 <span class='range'>±0.009</span></td><td class='num'>0.133 <span class='range'>±0.002</span></td><td class='num'>+0.0000</td><td>clean</td></tr><tr><th><code>end50-hold03</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.997 <span class='range'>±0.004</span></td><td class='num'>0.020 <span class='range'>±0.010</span></td><td class='num'>0.135 <span class='range'>±0.006</span></td><td class='num'>-0.0013</td><td>clean</td></tr><tr><th><code>end50-hold30</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.015 <span class='range'>±0.000</span></td><td class='num'>0.139 <span class='range'>±0.002</span></td><td class='num'>+0.0013</td><td>clean</td></tr><tr><th><code>end70-hold03</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.992 <span class='range'>±0.004</span></td><td class='num'>0.030 <span class='range'>±0.010</span></td><td class='num'>0.138 <span class='range'>±0.004</span></td><td class='num'>-0.0065</td><td>clean</td></tr><tr><th><code>end70-hold30</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.993 <span class='range'>±0.006</span></td><td class='num'>0.035 <span class='range'>±0.017</span></td><td class='num'>0.143 <span class='range'>±0.006</span></td><td class='num'>-0.0052</td><td>clean</td></tr><tr><th><code>end90-hold03</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.999 <span class='range'>±0.002</span></td><td class='num'>0.021 <span class='range'>±0.002</span></td><td class='num'>0.137 <span class='range'>±0.002</span></td><td class='num'>+0.0000</td><td>clean</td></tr><tr><th><code>end90-hold30</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.992 <span class='range'>±0.004</span></td><td class='num'>0.030 <span class='range'>±0.006</span></td><td class='num'>0.134 <span class='range'>±0.003</span></td><td class='num'>-0.0065</td><td>clean</td></tr><tr><th><code>end90-hold03-dose</code></th><td class='num'>1.000 <span class='range'>±0.000</span></td><td class='num'>0.996 <span class='range'>±0.004</span></td><td class='num'>0.023 <span class='range'>±0.007</span></td><td class='num'>0.136 <span class='range'>±0.004</span></td><td class='num'>-0.0026</td><td>clean</td></tr></tbody>
+</table>
+<figcaption><p>Behavior by condition. Each cell is the seed mean, with half the seed range beside it. EM is exact match on the answer token, NLL its surprise in nats, and <code>open</code> dist the RGB distance from the guessed color to the true mix on pairs with no named answer. Δ holdout EM is the signed gap to the in-experiment control, which the H1 gate scores at 0.02.</p></figcaption></figure>
+
+<p><strong>H1 holds.</strong> The largest gap from the control is 0.0065, at <code>end70-hold03</code>, against a gate of 0.02. Every condition solves the task.</p>
+<p>The preregistration named the <code>hold30</code> row as the place a task cost would show up, since it sustains a repulsive weight no earlier experiment held. It does not: the worst condition in that row is <code>end90-hold30</code> at 0.0065, the same size as the gaps elsewhere. Holding the repulsion an order of magnitude above the M1 floor for the rest of training costs nothing the task loss can see.</p>
+<h2 id="an-operating-point-h2">An operating point (H2)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#an-operating-point-h2" title="Link to this heading">&para;</a></h2>
+<p>Four criteria have to hold at once. The table below scores them together, with values that pass their gate in bold.</p>
+<figure class="report-figure">
+<table class="report-table">
+  <thead><tr>
+    <th>condition</th><th class="num">end</th><th class="num">hold</th>
+    <th class="num">ᾱ ↓</th><th class="num">m<sub>op1</sub> ↑</th>
+    <th class="num">ρ ↑</th><th class="num">R² ↑</th><th class="num">retention ↑</th>
+    <th>H2</th>
+  </tr></thead>
+  <tbody><tr><th><code>end50-hold03</code></th><td class='num'>50</td><td class='num'>0.03</td><td class='num'>0.326 <span class='range'>±0.015</span></td><td class='num'>0.456 <span class='range'>±0.027</span></td><td class='num'>0.61</td><td class='num'>0.62</td><td class='num'>0.72</td><td>containment, margin, grading, retention</td></tr><tr><th><code>end50-hold30</code></th><td class='num'>50</td><td class='num'>0.30</td><td class='num'>0.139 <span class='range'>±0.050</span></td><td class='num'><strong>0.597</strong> <span class='range'>±0.061</span></td><td class='num'>0.62</td><td class='num'>0.76</td><td class='num'><strong>0.90</strong></td><td>containment, grading</td></tr><tr><th><code>end70-hold03</code></th><td class='num'>70</td><td class='num'>0.03</td><td class='num'>0.249 <span class='range'>±0.027</span></td><td class='num'><strong>0.514</strong> <span class='range'>±0.033</span></td><td class='num'>0.57</td><td class='num'>0.66</td><td class='num'>0.75</td><td>containment, grading, retention</td></tr><tr><th><code>end70-hold30</code></th><td class='num'>70</td><td class='num'>0.30</td><td class='num'>0.104 <span class='range'>±0.027</span></td><td class='num'><strong>0.615</strong> <span class='range'>±0.037</span></td><td class='num'>0.56</td><td class='num'>0.75</td><td class='num'><strong>0.95</strong></td><td>containment, grading</td></tr><tr><th><code>end90-hold03</code></th><td class='num'>90</td><td class='num'>0.03</td><td class='num'>0.132 <span class='range'>±0.011</span></td><td class='num'><strong>0.598</strong> <span class='range'>±0.014</span></td><td class='num'>0.64</td><td class='num'>0.78</td><td class='num'><strong>0.92</strong></td><td>containment, grading</td></tr><tr><th><code>end90-hold30</code></th><td class='num'>90</td><td class='num'>0.30</td><td class='num'><strong>0.087</strong> <span class='range'>±0.006</span></td><td class='num'><strong>0.611</strong> <span class='range'>±0.025</span></td><td class='num'>0.56</td><td class='num'>0.77</td><td class='num'><strong>0.97</strong></td><td>grading</td></tr></tbody>
+</table>
+<figcaption><p>The H2 scoring table, one row per factorial condition. <strong>Bold</strong> marks a value that passes its gate: ᾱ ≤ 0.1, m<sub>op1</sub> ≥ 0.5, ρ ≥ 0.8 or R² ≥ 0.8, retention ≥ 0.8. ᾱ and m<sub>op1</sub> carry the seed standard deviation; grading is read off the seed-mean response, and retention is the minimum across seeds. The last column names every criterion a condition misses, or reports that it meets all four.
+<code>end50-hold03</code> and <code>end90-hold03</code> are ex-2.1.7's
+<code>span-anti</code> and <code>span-anti-late</code>.</p></figcaption></figure>
+
+<p><strong>H2 fails, on grading.</strong> The condition the preregistration named, <code>end90-hold30</code>, meets three of the four criteria: it contains the drift at ᾱ = 0.087 against a gate of 0.1, holds the margin at 0.611 against 0.5, and retains 0.97× its peak against 0.8. But its response is graded at ρ = 0.56 and R² = 0.77, and the gate is 0.8 on either track.</p>
+<p>Every condition misses on grading. The best R² in the grid is 0.78 (<code>end90-hold03</code>) and the best ρ is 0.64 (<code>end90-hold03</code>), so no condition comes within 0.02 of passing. Neither named partial applies, since both assume grading holds and vary the containment or margin around it.</p>
+<p>The contrary result the preregistration named — containment bought by flattening the response — is not what happened. As the anneal is stretched, ᾱ falls and the margin rises together: <code>end50-hold03</code> sits at ᾱ 0.326 with margin 0.456, and <code>end90-hold03</code> at 0.132 with 0.598. Grading rises with them, from 0.62 to 0.78. So stretching the anneal buys selectivity, and just stops short of the level H2 asked for.</p>
+<p>Containment on its own is now reachable, which it was not in ex-2.1.7. One condition of the six falls to ᾱ ≤ 0.1 (<code>end90-hold30</code>), and a second comes within 0.004 of it. That experiment's best was 0.13, and its gate went unmet everywhere. Both of the near conditions are in the <code>hold30</code> row.</p>
+<p>The endpoint table says where each run finished. The trajectories say how it got there, which separates the two accounts H3 is built on.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/trajectories-light.png" alt="Six pairs of panels in a three-by-two grid, sharing the epoch axis from 0 to 100. Columns are anneal endpoints 50, 70 and 90; the upper row of pairs is hold ratio 0.03 and the lower is 0.30. In each pair the upper panel plots mean alignment as a solid line and margin as a dashed line, over a flat grey control pair near zero; the shorter log-scale panel beneath plots that condition&#x27;s two weight schedules, anchor in red and repulsion in blue. In the upper row of pairs, the solid line stays low while the blue repulsion curve is above the red anchor curve, then climbs steeply once the blue curve drops below it — later in each successive column, and reaching a lower final height. In the lower row the blue curve settles only a little below the red one rather than far below it, and the solid line rises gently in all three columns without ever climbing steeply. The dashed margin line climbs early and stays up in every panel." width="731" height="618" style="max-width: 100%; height: auto;" data-asset-name="trajectories" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/trajectories-dark.png" alt="Six pairs of panels in a three-by-two grid, sharing the epoch axis from 0 to 100. Columns are anneal endpoints 50, 70 and 90; the upper row of pairs is hold ratio 0.03 and the lower is 0.30. In each pair the upper panel plots mean alignment as a solid line and margin as a dashed line, over a flat grey control pair near zero; the shorter log-scale panel beneath plots that condition&#x27;s two weight schedules, anchor in red and repulsion in blue. In the upper row of pairs, the solid line stays low while the blue repulsion curve is above the red anchor curve, then climbs steeply once the blue curve drops below it — later in each successive column, and reaching a lower final height. In the lower row the blue curve settles only a little below the red one rather than far below it, and the solid line rises gently in all three columns without ever climbing steeply. The dashed margin line climbs early and stays up in every panel." width="731" height="618" style="max-width: 100%; height: auto;" data-asset-name="trajectories" />
+<figcaption><p><strong>Training dynamics across the grid.</strong> Columns are the anneal endpoint, rows the hold ratio. Above each pair: seed means of the two cosines on the anchor axis, on one shared scale. Solid is <span class="arithmatex">\(\bar\alpha\)</span>, the mean alignment over all 216 colors at op1; dashed is the margin <span class="arithmatex">\(m_{\text{op1}}\)</span>; the grey pair is the un-anchored control. The caret on the left spine is the containment gate, the one on the right the margin floor that retention is scored from. Below each: the weight schedule that condition trained under, anchor <span class="arithmatex">\(\lambda_\mathrm{a}\)</span> in red and repulsion <span class="arithmatex">\(\lambda_{\bar{\mathrm{s}}}\)</span> in blue, on a log scale shared by all six so schedules compare across the grid as well as down a pair.</p></figcaption></figure>
+
+<figure class="report-figure">
+<table class="report-table">
+  <thead><tr>
+    <th>condition</th><th class="num">crossing</th><th class="num">departure</th>
+    <th class="num">lag</th><th class="num">runway</th><th class="num">final ᾱ</th>
+  </tr></thead>
+  <tbody><tr><th><code>end50-hold03</code></th><td class='num'>28</td><td class='num'>32</td><td class='num'>+4</td><td class='num'>68</td><td class='num'>0.326</td></tr><tr><th><code>end70-hold03</code></th><td class='num'>39</td><td class='num'>48</td><td class='num'>+9</td><td class='num'>52</td><td class='num'>0.249</td></tr><tr><th><code>end90-hold03</code></th><td class='num'>50</td><td class='num'>61</td><td class='num'>+10</td><td class='num'>39</td><td class='num'>0.132</td></tr><tr><th><code>end50-hold30</code></th><td class='num'>30</td><td class='num'>39</td><td class='num'>+9</td><td class='num'>61</td><td class='num'>0.139</td></tr><tr><th><code>end70-hold30</code></th><td class='num'>42</td><td class='num'>59</td><td class='num'>+17</td><td class='num'>41</td><td class='num'>0.104</td></tr><tr><th><code>end90-hold30</code></th><td class='num'>54</td><td class='num'>71</td><td class='num'>+17</td><td class='num'>29</td><td class='num'>0.087</td></tr></tbody>
+</table>
+<figcaption><p>Two epochs read off each condition. Crossing is the first epoch at which the repulsion falls below the pull, computed from the schedules. Departure is the last epoch at which ᾱ is still within 0.05 of the control, read off the recorded trajectory. Runway is the training left after departure.</p></figcaption></figure>
+
+<p>Every condition departs, including the three at the sustained floor. So the strong form of the level account — a floor high enough that the crossing never happens — is not what the trajectories show. All six cross, and all six climb afterwards.</p>
+<p>What the floor does is move the crossing later and flatten what follows. Departure tracks the crossing in every condition, and raising the hold ratio pushes both later, the departure by more than the crossing. That is the delay. The flattening shows up when the departure epoch is held roughly fixed and the row changes: <code>end70-hold30</code> and <code>end90-hold03</code> leave the control within two epochs of each other, and finish at ᾱ = 0.104 against 0.132. Same runway, different climb rate.</p>
+<p>Both effects run the same way, which is why the endpoint and the floor look interchangeable in the endpoint table and are not. The margin, dashed in every panel, climbs early while the repulsion is strong and then holds across the whole anneal; nothing in the grid costs it.</p>
+<h2 id="attribution-h3">Attribution (H3)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#attribution-h3" title="Link to this heading">&para;</a></h2>
+<p>H3 has a footnote that asks for the seed spread before either statistic is used, and allows the gates to move with it. Pooled over the six factorial conditions, the seed spread of ᾱ is 0.0266, against the ex-2.1.6 control value of 0.02 the gates were sized on. The anchored conditions do not hold it, so the gates move by 1.33×: the main effect is scored at 0.067 and the interaction at 0.133. Those are the numbers used below.</p>
+<p>One condition accounts for most of that spread. The rest sit between 0.006 and 0.027, so the rescaling is driven by a single condition rather than by the grid being noisy throughout.</p>
+<figure class="report-figure">
+<table class="report-table">
+  <thead><tr><th>ᾱ ↓</th><th class='num'>end 50</th><th class='num'>end 70</th><th class='num'>end 90</th><th class="num">row mean</th></tr></thead>
+  <tbody><tr><th>hold 0.03</th><td class='num'>0.326</td><td class='num'>0.249</td><td class='num'>0.132</td><td class='num'>0.235</td></tr><tr><th>hold 0.30</th><td class='num'>0.139</td><td class='num'>0.104</td><td class='num'>0.087</td><td class='num'>0.110</td></tr></tbody>
+  <thead><tr><th>m<sub>op1</sub> ↑</th><th class='num'>end 50</th><th class='num'>end 70</th><th class='num'>end 90</th><th class="num">row mean</th></tr></thead>
+  <tbody><tr><th>hold 0.03</th><td class='num'>0.456</td><td class='num'>0.514</td><td class='num'>0.598</td><td class='num'>0.523</td></tr><tr><th>hold 0.30</th><td class='num'>0.597</td><td class='num'>0.615</td><td class='num'>0.611</td><td class='num'>0.607</td></tr></tbody>
+</table>
+<figcaption><p>The factorial, as condition means on both statistics. Above: ᾱ, which H3 is scored on. Below: the margin, repeated because a factor that contains the drift while losing the margin does not give an operating point.</p></figcaption></figure>
+
+<p><strong>H3 holds, on both conditions.</strong> The hold-ratio main effect is +0.126 against a gate of 0.067, so the floor does something. The interaction is +0.142 against 0.133: the end50 − end90 difference is +0.194 in the <code>hold03</code> row and +0.053 in the <code>hold30</code> row, so the endpoint has about 3.7 times as much leverage at the low floor as at the high one.</p>
+<p>Neither named miss occurred. Miss 1 needed the endpoint effect to clear 0.067 in both rows with the interaction under its gate; the interaction is over it. Miss 2 needed the main effect to fail, and it passes by a factor of 1.9.</p>
+<p>However, the interaction only clears its gate by 0.008, about 6% — on a gate that moved because of this experiment's own seed spread. And the level account predicted about +0.20, with the whole endpoint effect inside the low row; the observed +0.142 is below that, because the endpoint still moves ᾱ by +0.053 in the high row, where that account expects nothing.</p>
+<p>So the endpoint keeps some leverage even at the sustained floor. The trajectories show that the floor postpones the crossing and slows the climb after it, but it still crosses. The statistic H3 was built on separates the accounts in the direction it was meant to, and the mechanism behind it is milder than the account it favors.</p>
+<p>We also said we would report the ordering of the main effects without scoring it. The hold-ratio effect (+0.126) is larger than the endpoint effect averaged over the two rows (+0.124), which agrees with the interaction.</p>
+<h2 id="the-dose-arm">The dose arm<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#the-dose-arm" title="Link to this heading">&para;</a></h2>
+<figure class="report-figure">
+<table class="report-table">
+  <thead><tr>
+    <th>condition</th><th class="num">end</th><th class="num">peak ratio</th>
+    <th class="num">dose</th><th class="num">ᾱ ↓</th><th class="num">m<sub>op1</sub> ↑</th>
+    <th class="num">R² ↑</th><th class="num">retention ↑</th>
+  </tr></thead>
+  <tbody><tr><th><code>end50-hold03</code></th><td class='num'>50</td><td class='num'>2.500</td><td class='num'>1.00</td><td class='num'>0.326 <span class='range'>±0.015</span></td><td class='num'>0.456</td><td class='num'>0.62</td><td class='num'>0.72</td></tr><tr><th><code>end90-hold03</code></th><td class='num'>90</td><td class='num'>2.500</td><td class='num'>1.73</td><td class='num'>0.132 <span class='range'>±0.011</span></td><td class='num'>0.598</td><td class='num'>0.78</td><td class='num'>0.92</td></tr><tr><th><code>end90-hold03-dose</code></th><td class='num'>90</td><td class='num'>1.443</td><td class='num'>1.00</td><td class='num'>0.185 <span class='range'>±0.019</span></td><td class='num'>0.565</td><td class='num'>0.72</td><td class='num'>0.88</td></tr></tbody>
+</table>
+<figcaption><p>The dose arm against the two conditions it is built from. Dose is relative to
+<code>end50-hold03</code>, as in the Method table. The arm has
+that condition's dose and the <code>end90-hold03</code> timing, so its position
+between them is the comparison.</p></figcaption></figure>
+
+<p>The arm lands at ᾱ = 0.185, between <code>end50-hold03</code> (0.326) and <code>end90-hold03</code> (0.132), and about 73% of the way across. So most of what the endpoint buys is timing, and some of it is dose.</p>
+<p>That should be taken loosely: this is one condition on three seeds, it scores nothing, and scaling the opening ratio to 1.443 weakens the repulsion through the epochs where the anchor first ramps in, which the Method section named as a confound of its own. The reading it does support is that the endpoint effect is not <em>merely</em> a dose effect, because holding the dose fixed leaves most of the gap intact.</p>
+<h2 id="secondary-measurements">Secondary measurements<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#secondary-measurements" title="Link to this heading">&para;</a></h2>
+<p>Carried from ex-2.1.7 without a gate. Two probes read redness from complementary parts of the residual stream at op1: one from the anchor coordinate alone, and one from the other 63 directions. The first starts empty and measures how much redness anchoring put there. The second has an RGB floor it cannot go far below, since redness is a function of color and the task needs the color cube, so it reports whether the cube survived rather than whether the concept moved.</p>
+<figure class="report-figure">
+<table class="report-table">
+  <thead><tr>
+    <th>condition</th><th class="num">on-axis R²</th>
+    <th class="num">off-axis, embed</th><th class="num">off-axis, last</th>
+    <th class="num">vs floor</th><th class="num">cube spread</th>
+  </tr></thead>
+  <tbody><tr><th><code>lam0</code></th><td class='num'>0.015</td><td class='num'>0.842</td><td class='num'>0.848</td><td class='num'>-0.014</td><td class='num'>0.125</td></tr><tr><th><code>end50-hold03</code></th><td class='num'>0.483</td><td class='num'>0.882</td><td class='num'>0.866</td><td class='num'>+0.004</td><td class='num'>0.131</td></tr><tr><th><code>end50-hold30</code></th><td class='num'>0.543</td><td class='num'>0.876</td><td class='num'>0.887</td><td class='num'>+0.024</td><td class='num'>0.117</td></tr><tr><th><code>end70-hold03</code></th><td class='num'>0.477</td><td class='num'>0.894</td><td class='num'>0.892</td><td class='num'>+0.029</td><td class='num'>0.121</td></tr><tr><th><code>end70-hold30</code></th><td class='num'>0.504</td><td class='num'>0.887</td><td class='num'>0.899</td><td class='num'>+0.036</td><td class='num'>0.130</td></tr><tr><th><code>end90-hold03</code></th><td class='num'>0.561</td><td class='num'>0.891</td><td class='num'>0.904</td><td class='num'>+0.041</td><td class='num'>0.147</td></tr><tr><th><code>end90-hold30</code></th><td class='num'>0.512</td><td class='num'>0.892</td><td class='num'>0.906</td><td class='num'>+0.043</td><td class='num'>0.132</td></tr><tr><th><code>end90-hold03-dose</code></th><td class='num'>0.528</td><td class='num'>0.910</td><td class='num'>0.921</td><td class='num'>+0.058</td><td class='num'>0.146</td></tr></tbody>
+</table>
+<figcaption><p>Where redness is readable at op1, and what the color cloud looks like there. On-axis R² is redness read from the anchor coordinate alone, averaged over layers. The two off-axis columns are the ridge probe on the other 63 directions, at the token embedding and at the last layer, and the next column is the last-layer value against the RGB floor of 0.863. Cube spread is the mean squared distance of the 216 op1 states from their centroid at the last layer: how much extent the cloud keeps. All are seed means, and none is scored.</p></figcaption></figure>
+
+<p>The anchor coordinate carries redness in every anchored condition, from R² = 0.48 to 0.56 (<code>end90-hold03</code>), against 0.02 in the control. The spread across the grid is narrow, and it does not order the conditions the way ᾱ does, so this is not a second containment measurement.</p>
+<p>Off the axis, every condition sits within 0.06 of the RGB floor at the last layer, and the anchored conditions all sit slightly above it (0.87–0.92) where the control sits just below (0.85). Above the floor is reachable because the residual stream encodes color nonlinearly and redness is quadratic in RGB, so a linear probe does better there than on raw channels. Nothing here reads as a second copy of the concept living off the axis, and nothing reads as the cube being lost: spread at the last layer runs 0.117–0.147, with the control at 0.125 in the middle of that range.</p>
+<p>This is the point ex-2.1.7 made and this grid does not change: containment is not exclusivity. Holding ᾱ near the control keeps the cube off the anchor direction; it does not stop redness being readable from everywhere else, because the task needs the color cube either way.</p>
+<h2 id="exploratory-analyses">Exploratory analyses<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#exploratory-analyses" title="Link to this heading">&para;</a></h2>
+<p>Post hoc, and scoring nothing. H2 failed on grading in every condition, so the
+question is what the response actually looks like.</p>
+<h3 id="the-grading-metrics-disagree">The grading metrics disagree<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#the-grading-metrics-disagree" title="Link to this heading">&para;</a></h3>
+<p>The grading metrics are meant to rule out a <em>step</em>, in which very <em>red</em> colors would be aligned but everything else orthogonal. Both metrics cap out on a step, at the best it can score over all step locations: ρ can reach
+0.75 and R² 0.73, both under the 0.8 gates, so no step passes.</p>
+<p>Considering those ceilings, the two tracks say opposite things.</p>
+<ul>
+<li><strong>ρ</strong> ranks colors by <code>redness</code>. Every condition scores below what a step would: the best ρ in the grid is 0.64 against a step ceiling of 0.75.</li>
+<li><strong>R²</strong> fits values against <code>sim¹·⁵</code> (proportionality). 4 of the six score above the ceiling, up to R² = 0.78 against 0.73.</li>
+</ul>
+<p>Neither actually says whether the response is a grade or a step, so we visualize it below.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/grading-light.png" alt="Six panels in a three-by-two grid sharing both axes: per-color alignment at the first operand, from about -0.1 to 1, against the redness of that color, from 0 to 1. Columns are anneal endpoints 50, 70 and 90; the upper row is hold ratio 0.03 and the lower 0.30. Each panel scatters 216 marks drawn in the color each stands for, with a heavy sliding-mean line through them, a flat grey control band near zero, and a dashed straight reference line. In every panel the marks form a dense flat cluster of greys, greens and blues at low redness, then a sparse rising tail of oranges and reds. The flat cluster sits higher in the upper row than the lower. The sliding mean is close to flat across the left two-thirds of every panel and rises steeply only in the right third, staying below the dashed line at low redness and crossing it near the top." width="727" height="491" style="max-width: 100%; height: auto;" data-asset-name="grading" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/grading-dark.png" alt="Six panels in a three-by-two grid sharing both axes: per-color alignment at the first operand, from about -0.1 to 1, against the redness of that color, from 0 to 1. Columns are anneal endpoints 50, 70 and 90; the upper row is hold ratio 0.03 and the lower 0.30. Each panel scatters 216 marks drawn in the color each stands for, with a heavy sliding-mean line through them, a flat grey control band near zero, and a dashed straight reference line. In every panel the marks form a dense flat cluster of greys, greens and blues at low redness, then a sparse rising tail of oranges and reds. The flat cluster sits higher in the upper row than the lower. The sliding mean is close to flat across the left two-thirds of every panel and rises steeply only in the right third, staying below the dashed line at low redness and crossing it near the top." width="727" height="491" style="max-width: 100%; height: auto;" data-asset-name="grading" />
+<figcaption><p><strong>Alignment at op1, per color.</strong> <span class="arithmatex">\(\alpha_c\)</span>, the layer mean of <span class="arithmatex">\(\cos(h, \hat v_{\text{red}})\)</span> averaged over seeds, against the redness of the color. Columns are the anneal endpoint, rows the hold ratio, as in the trajectory figure. One mark per color, drawn in that color; the heavy line is a 25-color sliding mean over the redness ordering, and the flat grey band is the same sliding mean for the un-anchored control. The dashed line is <code>sim¹·⁵</code> rescaled onto the response by least squares — the shape the <span class="arithmatex">\(R^2\)</span> track scores against, so the marks' distance from it is what that statistic measures. Per-panel statistics: both grading gates sit at 0.8, and a pure step response can reach at most ρ = 0.75 or <span class="arithmatex">\(R^2\)</span> = 0.73.</p></figcaption></figure>
+
+<p>The response is not a step. It has a knee: flat from the control level up to
+a redness of about 0.4, then a clean rise that tracks the dashed target
+closely. Raising the hold ratio lowers the flat part toward the control
+without changing the rise, which is containment doing what it is meant to.</p>
+<p>But most of the color cube lives in that flat part. 161 of the 216 colors
+fall below redness 0.4, and inside a flat band their alignments carry no
+ordering. A rank statistic over all 216 colors is therefore dominated by them.</p>
+<figure class="report-figure">
+<table class="report-table">
+  <thead>
+    <tr><th>condition</th><th class="num">all 216</th><th class='num'>≥ 0.2 <span class='range'>(108)</span></th><th class='num'>≥ 0.3 <span class='range'>(81)</span></th><th class='num'>≥ 0.4 <span class='range'>(55)</span></th><th class='num'>≥ 0.5 <span class='range'>(33)</span></th></tr></thead>
+  <tbody><tr><th><code>end50-hold03</code></th><td class='num'>0.607</td><td class='num'>0.744</td><td class='num'>0.766</td><td class='num'>0.865</td><td class='num'>0.826</td></tr><tr><th><code>end50-hold30</code></th><td class='num'>0.621</td><td class='num'>0.729</td><td class='num'>0.775</td><td class='num'>0.922</td><td class='num'>0.905</td></tr><tr><th><code>end70-hold03</code></th><td class='num'>0.574</td><td class='num'>0.718</td><td class='num'>0.744</td><td class='num'>0.868</td><td class='num'>0.823</td></tr><tr><th><code>end70-hold30</code></th><td class='num'>0.559</td><td class='num'>0.715</td><td class='num'>0.783</td><td class='num'>0.909</td><td class='num'>0.918</td></tr><tr><th><code>end90-hold03</code></th><td class='num'>0.640</td><td class='num'>0.770</td><td class='num'>0.800</td><td class='num'>0.901</td><td class='num'>0.881</td></tr><tr><th><code>end90-hold30</code></th><td class='num'>0.564</td><td class='num'>0.738</td><td class='num'>0.785</td><td class='num'>0.895</td><td class='num'>0.904</td></tr></tbody>
+</table>
+<figcaption><p>Spearman ρ against <code>redness</code>, computed over all 216 colors and then over the colors above each redness cut, with the number of colors remaining in each header. The gate is 0.8.</p></figcaption></figure>
+
+<p>Above the knee the ordering is good in every condition — ρ runs 0.87 to 0.92 on the 55 colors with redness ≥ 0.4, against a gate of 0.8 — and it climbs monotonically as the flat colors are excluded. So the graded part of the response is graded, but the full-set statistic is dominated by the flat part.</p>
+<p>Whether the figure shows <em>good</em> grading depends on the shape we ask for,
+and the two statistics ask for different shapes. ρ names no shape at all:
+it asks that all 216 colors be ordered by <code>redness</code>, with every pair
+weighted equally, so no part of the cube should sit flat. It reads the flat
+block as 161 failures of ordering, however clean the rise above the knee
+is.</p>
+<p>R² names one shape. <code>sim¹·⁵</code> is itself below 0.05 for three quarters of the
+colors, so most of the cube should sit flat; where the response does rise,
+it should follow the similarity curve, which sits between linear and
+quadratic in the cosine similarity to <em>red</em>. Grading has no answer without a
+target. R² makes that choice explicit, and the knee in the figure is roughly
+the shape it asks for.</p>
+<h3 id="what-a-contained-response-can-score">What a contained response can score<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#what-a-contained-response-can-score" title="Link to this heading">&para;</a></h3>
+<p>That raises a question about the gate. If containment collapses the low-redness colors together, and the grading statistic reads their ordering, then they must be in tension. How high could the statistic be, under those constraints?</p>
+<p>We build the best response either statistic could hope for: the target shape exactly, above a knee, and contained to near zero below it. This is a property of the two statistics and the 216-color grid, not a measurement of any run.</p>
+<figure class="report-figure">
+<table class="report-table">
+  <thead><tr>
+    <th>knee</th><th class="num">colors contained</th>
+    <th class="num">best ρ</th><th class="num">best R²</th><th class="num">ᾱ</th>
+  </tr></thead>
+  <tbody><tr><th>0</th><td class='num'>0</td><td class='num'>0.82</td><td class='num'>1.00</td><td class='num'>0.126</td></tr><tr><th>0.2</th><td class='num'>108</td><td class='num'>0.84</td><td class='num'>0.98</td><td class='num'>0.111</td></tr><tr><th>0.3</th><td class='num'>135</td><td class='num'>0.75</td><td class='num'>0.98</td><td class='num'>0.105</td></tr><tr><th>0.4</th><td class='num'>161</td><td class='num'>0.58</td><td class='num'>0.94</td><td class='num'>0.092</td></tr><tr><th>0.5</th><td class='num'>183</td><td class='num'>0.39</td><td class='num'>0.86</td><td class='num'>0.072</td></tr></tbody>
+</table>
+<figcaption><p>The best either grading track can score, for a response that reproduces
+<code>sim¹·⁵</code> exactly above the knee and sits at the control below it,
+with the ᾱ that response implies. A knee of 0 is no containment at all.
+Both grading gates are 0.8 and the containment gate is
+ᾱ ≤ 0.1. Expectations over the contained block's
+arbitrary ordering; a pure step reaches ρ = 0.75 and
+R² = 0.73 for comparison.</p></figcaption></figure>
+
+<p>The two tracks come apart. Even with no containment at all, the best ρ a perfect <code>sim¹·⁵</code> response reaches is 0.82, barely over the gate, because <code>sim¹·⁵</code> is not a monotone function of <code>redness</code> (they correlate at 0.90, not 1). With the 161 colors below <code>redness</code> 0.4 contained, the ceiling falls to 0.58, under the observed values. So past a light knee the ρ track penalizes containment, and at the containment this grid achieves it cannot reach 0.8 however well the response is graded.</p>
+<p>R² behaves the other way. Its target is near zero for the colors containment collapses, so containment moves the response toward the target rather than away: the ceiling is 0.94 at a knee of 0.4 and 0.86 even at 0.5. That track is reachable, and the best condition in this grid gets 0.78 of it.<sup id="fnref:m1r2"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fn:m1r2">7</a></sup></p>
+<p>Within that family — <code>sim¹·⁵</code> at full amplitude — the ρ gate and the containment H2 also asks for cannot both be met. ᾱ crosses under 0.1 somewhere between a knee of 0.3 and 0.4, and by there ρ has fallen from 0.75 to 0.58.</p>
+<p>That family is narrow, though. ρ ranks colors, so it is blind to the amplitude the ᾱ gate measures: scale the above-knee response to half of <code>sim¹·⁵</code> at a knee of 0.2, and both gates clear at once, at ρ = 0.81 and ᾱ = 0.055. What the two gates jointly exclude is a response that is both steeply graded and full-amplitude on the reds, which is narrower than the gates being incompatible. Either way the ρ gate is doing something the preregistration did not say it was doing, and a future design should settle the amplitude question before reusing it.</p>
+<p>The R² shortfall is in the response itself: against an achievable 0.94, 0.78 is a real gap. Setting a realistic R² gate for future work would take more than this one grid.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#discussion" title="Link to this heading">&para;</a></h2>
+<p>The operating point to carry forward is <code>end90-hold30</code>: ᾱ = 0.087, margin 0.61, retention 0.97, task-clean. <code>end90-hold03</code> grades slightly better, but ᾱ decides it: ᾱ predicts how much of the color cube an edit along the anchor axis would drag with it, and the two conditions differ by 1.5× on it, against a 0.01 difference on the reachable grading track. Anything that pulls without a position oracle, and any intervention experiment, wants the smaller spread of side-effects.</p>
+<p>The M1 keyframes were fractions of training, and those did not transfer. The trajectories suggest carrying something dimensionless instead: ᾱ departs the control shortly after the repulsion falls below the pull, and the floor sets how fast it climbs after that crossing. If that mechanism holds elsewhere, the design variables are the crossing epoch and the ratio of the floor to the containment threshold. This grid measures one architecture on one task, so that is a reading to test; the reproduction check here shows the kind of evidence that would count.</p>
+<p>Three things this experiment does not settle. Containment is not exclusivity: redness stays as readable off the anchor axis as it is in the control, down at the floor the RGB task itself sets. So an edit to the axis moves less of the cube, but the axis is not the only place <em>red</em> lives.</p>
+<p>The grading gate needs a decision before the next report scores it: the ρ track cannot reach its gate alongside full-amplitude containment, and one grid is not enough to say where a realistic R² gate sits.</p>
+<p>And the best floor here is also the highest floor tested, so whether a higher or flat-held repulsion does better, or starts to cost the margin, is outside the range this grid measured.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:anneal">
+<p>An anneal here is a schedule that ramps a loss weight down gradually over training.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fnref:anneal" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:cant">
+<p>Reaching the endpoint-90 dose from endpoint 50 would need <span class="arithmatex">\(\\lambda_{\\bar{\\text{s}}}/\\lambda_\\text{a} \\approx 1.18\)</span>, which would hold the repulsion above the anchor weight for half of training. We could do that, but that's a different experiment.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fnref:cant" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:h1-standing">
+<p>Ex-2.1.7 found no task cost anywhere, including at ten times this
+anchor weight, so this is a standing gate rather than an open question. We
+state it because a sustained repulsive floor is the one thing in this grid
+that has not been tried.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fnref:h1-standing" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:h3-fail-2">
+<p>Suppose the <code>hold03</code> row repeats its ex-2.1.7 span of 0.33
+to 0.13. Then (a) can only fail if the mean of the 0.30 row is nearly
+as high, and with <code>end90-hold30</code> contained that in turn requires a
+wide endpoint spread inside the 0.30 row itself, of the same sign as
+the spread in the 0.03 row. Such a spread pulls the interaction toward
+zero, so this miss would take (b) down with (a).&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fnref:h3-fail-2" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:main">
+<p>A main effect is the average change from moving one factor,
+averaged over the levels of the other.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fnref:main" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:effect">
+<p>Start from the ex-2.1.6 control spread of about 0.02 for
+<span class="arithmatex">\(\bar\alpha\)</span>. The hold-ratio effect compares nine-run means, so its
+noise is near <span class="arithmatex">\(0.02\sqrt{2}/\sqrt{9} \approx 0.009\)</span>, and 0.05 is
+about five times that. The interaction is a difference of two
+differences of three-run condition means, with noise near
+<span class="arithmatex">\(0.02 \cdot 2/\sqrt{3} \approx 0.023\)</span>, so 0.1 is about four times
+that. The endpoint effect within one row is a difference of three-run
+means, with noise near <span class="arithmatex">\(0.02\sqrt{2}/\sqrt{3} \approx 0.016\)</span>, so
+0.05 is about three times that where named miss 1 reads it.
+What the level account expects for the interaction is about 0.20,
+twice the gate: the full 0.33 to 0.13 span in the 0.03 row and none
+of it in the 0.30 row. Before reading either statistic, we compute the
+spread from the seeds of this experiment and check that the anchored
+conditions hold it. If they do not, the observed spread replaces the
+control spread and the gates move with it. They are the only
+thresholds in this report allowed to move.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fnref:effect" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:m1r2">
+<p>M1 scored proportionality with a Pearson R² as well, but of a
+different quantity: reconstruction error under intervention against <span class="arithmatex">\(\cos^2\)</span> similarity to <em>red</em> (D1.3), where the square is what the projection predicts. Here it is training-time alignment against <code>sim¹·⁵</code>, an exponent chosen as a shape between linear and quadratic rather than derived. Same statistic, different response variable and target, so M1's values are not a benchmark for this gate.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.1.8/#fnref:m1r2" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

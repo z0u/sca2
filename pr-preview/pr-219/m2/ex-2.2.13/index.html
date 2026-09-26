@@ -1,0 +1,1492 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/906560fc8b4b02a4b83707e80c1d2d69a0dd586b/exports/m2/ex-2.2.13/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.2.13: does a heavier anchor make the leftover predictable?</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md.css into the md.css the site serves; and VS Code's
+ * Markdown preview lists both files (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
+ *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap; a small outlined
+ * pill, outlined rather than filled since it also prints, in ink, where the glyph and the
+ * word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0 0.65em 0.05em;
+  border: 1.5px solid currentColor;
+  border-radius: 1em;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* A design table (conditions, factor levels): reference material rather than a result, so
+ * it sits a step smaller than the prose. */
+.report-table.dense {
+  font-size: 0.85em;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-219/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.13/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.2.11</strong> · <code>37f5443</code> · run 2026-09-21<div>via reports/m2/ex-2.2.11/metrics</div></div><div><strong>ex-2.2.12</strong> · <code>4550418</code> · run 2026-09-22<div>via reports/m2/ex-2.2.12/metrics</div></div><div><strong>ex-2.2.13</strong> · <code>a4c154d-dirty</code> (dirty) · run 2026-09-22<div>via reports/m2/ex-2.2.13/metrics</div></div></details>
+<main class="lit">
+<h1 id="ex-2213-does-a-heavier-anchor-make-the-leftover-predictable">Ex 2.2.13: does a heavier anchor make the leftover predictable?<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#ex-2213-does-a-heavier-anchor-make-the-leftover-predictable" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>The recipe from ex-2.2.11 leaves some <em>red</em> behind on one op of eleven, and how much swings widely from seed to seed. We climb a ladder of anchor weights, on an axis and on a plane, and ask whether a heavier anchor gives us a leftover we can predict. It does not.</p>
+</div>
+<p>Making the anchor 2.8× heavier raises the line margin, the quantity the anchor term optimizes, by about three percent. It does not narrow the seed-to-seed spread of the leftover on either subspace; the tight condition ex-2.2.12 saw was five lucky seeds. What does move the leftover is where <em>red</em> lives. On the plane the leftover is smaller at every rung, and the plane at the weight used by the recipe is the lowest in the experiment. Read as the adoption rule intended, that condition qualifies. We keep the recipe at <code>axis-0.1</code> all the same: the gain is small and it costs a second coordinate. The plane is now a validated alternative for a concept that needs more room. The anchored-op experiments inherit the leftover as a bounded confound rather than a fixed one.</p>
+<h2 id="findings">Findings<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#findings" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-leftover-gets-more-predictable-h1">The leftover gets more predictable (H1)</a> — did not hold. On the axis the spread falls a little as the weight rises, to 0.77 of the spread at the reference, against a gate of 0.5. On the plane it widens. The tight plane condition from ex-2.2.12 does not replicate at twenty seeds.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-leftover-does-not-get-smaller-h2">The leftover does not get smaller (H2)</a> — held on the axis. The plane lowers the mean at every rung, <code>plane-0.1</code> by 0.10, with an interval clear of zero. The weight moves the mean in no consistent direction.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-worst-op-improves-h3">The worst op improves (H3)</a> — held on the axis, where the worst other op falls by 0.062 at the top rung. It missed on the plane, where the worst other op turns back up at the top rung.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#what-the-weight-spends-h4">What the weight spends (H4)</a> — held. Every cost statistic is inside its gate at every condition. The line margin rises by about three percent across the ladder, so the treatment does reach the model, and it is close to saturated at the weight used by the recipe.</li>
+</ul>
+<p><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-adoption-rule">The adoption rule</a>: <code>plane-0.1</code> clears every clause about the leftover and the costs, and fails the ᾱ clause only on that clause's arithmetic, a fault in the rule as written. Read as intended, it is the one condition that qualifies. The recipe stays at <code>axis-0.1</code> by a decision made after the data: the gain is about 0.10 on the leftover's mean, and it costs a second coordinate of the stream.</p>
+<h2 id="how-to-read-this-draft">How to read this draft<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#how-to-read-this-draft" title="Link to this heading">&para;</a></h2>
+<p>The ladder, the four predictions, and the adoption rule were fixed before any run, at commit <code>c533700</code>. Everything after that commit is either results filled into their sections or exploratory work, marked as post hoc.</p>
+<p>Every anchored run is new. The seeds that produced the observation this experiment follows up are not reused, so the reference is trained again here beside the ladder. The un-anchored control is borrowed from ex-2.2.11. The adoption rule summarizes a leftover by an upper confidence bound rather than by the fixed band ex-2.2.12 used; the <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-adoption-rule">adoption rule</a> section gives both verdicts.</p>
+<h2 id="why-this-experiment">Why this experiment<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#why-this-experiment" title="Link to this heading">&para;</a></h2>
+<p><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.11/">Ex-2.2.11</a> put <em>red</em> on one axis of the residual stream of a small transformer,<sup id="fnref:rs"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#fn:rs">1</a></sup> taught it eleven color operations, and projected the axis out. On ten ops the model lost <em>red</em>. On <code>hue-hsv</code> it kept about a quarter of the answers that need the red operand, which is over the gate.</p>
+<p><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.12/">Ex-2.2.12</a> asked why and got a clean negative result. The story about which part of a hue an axis can hold was wrong, no change to the recipe brought the leftover under the gate, and the survival turned out to come from two of the seven red colors.</p>
+<p>It also left something unexplained. The leftover swings from seed to seed: the reference keeps anywhere from 0.06 to 0.41 of those answers, depending on which seed trained the model. One condition of the sweep, the plane at twice the anchor weight, kept 0.14 to 0.22 across its five seeds instead. A range over five draws is narrower than a range over twenty at the same spread, so the two ranges are not directly comparable; the standard deviations behind them, 0.036 against 0.125, are what H1 is built on. A standard deviation from five seeds is itself a loose estimate, which is why the gate below asks for less than that ratio.</p>
+<p>That is the observation this experiment is built on, and it is not the one the sweep was scored on. A leftover we cannot remove is a confound for every anchored-op experiment that follows.</p>
+<p>If it is the same size every time, we can measure it once and subtract it. If it varies three-fold across seeds, every experiment that meets it has to measure it again. So how wide the seed spread is counts as a result in its own right. Read more broadly, the spread of the leftover is one face of how reproducible training is under the recipe on this grammar, and the ladder is a test of whether a heavier anchor makes training more reproducible.</p>
+<p>A second reason to expect something from the weight: we run at λ_a = 0.1 because <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.1.6/">ex-2.1.6</a> chose a rung safely inside the region where the task is unhurt. The survey in <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.1.11/">ex-2.1.11</a> later mapped the weight on the six-op grammar, putting the plateau of the margin at λ_a 0.28–0.94, with the task gate biting only from about 0.38. On that map we have been running near the bottom of the useful range the whole time, and nothing has tested the region in between.</p>
+<h2 id="conditions">Conditions<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#conditions" title="Link to this heading">&para;</a></h2>
+<p>One ladder, crossed with the home of <em>red</em>, and the un-anchored control beside it.</p>
+<table class="report-table dense"><thead><tr><th>condition</th><th class=num>λ_a</th><th>home of <em>red</em></th><th class=num>seeds</th><th>seen before</th></tr></thead><tbody><tr><td><code>axis-0.1</code></td><td class=num>0.1</td><td>axis</td><td class=num>20</td><td>ex-2.2.11's recipe, the reference; 20 seeds there</td></tr><tr><td><code>axis-0.14</code></td><td class=num>0.14</td><td>axis</td><td class=num>20</td><td></td></tr><tr><td><code>axis-0.2</code></td><td class=num>0.2</td><td>axis</td><td class=num>20</td><td>ex-2.2.12's <code>lam-0.2</code>, 5 seeds: loose on the kept share, the tightest line margin and ᾱ in the sweep</td></tr><tr><td><code>axis-0.28</code></td><td class=num>0.28</td><td>axis</td><td class=num>20</td><td></td></tr><tr><td><code>plane-0.1</code></td><td class=num>0.1</td><td>plane</td><td class=num>20</td><td>ex-2.2.12's <code>plane</code>, 5 seeds</td></tr><tr><td><code>plane-0.14</code></td><td class=num>0.14</td><td>plane</td><td class=num>20</td><td></td></tr><tr><td><code>plane-0.2</code></td><td class=num>0.2</td><td>plane</td><td class=num>20</td><td>ex-2.2.12's <code>plane-lam-0.2</code>, 5 seeds: the tight kept share</td></tr><tr><td><code>plane-0.28</code></td><td class=num>0.28</td><td>plane</td><td class=num>20</td><td></td></tr><tr><td><code>control</code></td><td class=num>0</td><td>none; scored on the axis</td><td class=num>5</td><td>ex-2.2.11's <code>control</code>, served from the store at seeds 100–104; the task reference</td></tr><tr><td><code>control-plane</code></td><td class=num>0</td><td>none; scored on the plane</td><td class=num>—</td><td>the same checkpoints, a scoring pass; the ᾱ baseline for the plane</td></tr></tbody></table>
+
+<p><strong>The weight.</strong> λ_a takes four levels, 0.1, 0.14, 0.2, 0.28, each a factor of √2 above the last. We read a weight on a log scale, so a constant ratio puts the levels evenly apart and makes the shape of any trend across them easy to see. The lowest rung is the recipe from ex-2.2.11, and 0.2 is the one step ex-2.2.12 took. The top rung is where the margin plateau ex-2.1.11 mapped begins, and it stops short of the level where that survey saw its first task failures (about 0.38, on the six-op grammar at a warmer pooling temperature than ours). Where the useful range ends is left open here; the ladder tests the region between the recipe and that point.</p>
+<p><strong>What else the weight moves.</strong> The anti-subspace term is specified as a ratio to λ_a, peaking at 2.5× λ_a and holding at 0.3× λ_a, so a rung of the ladder raises the repulsion by the same factor as the pull. The ladder is a joint anchor-and-repulsion ladder rather than a pure anchor ladder, and a result along it belongs to the pair. Ex-2.2.12 moved the two separately, one step each (<code>lam-0.2</code> and <code>anti-5</code>), and neither moved any measurement on its own, so we do not spend runs here separating them; if the ladder moves something, an arm that holds the repulsion fixed at one rung is the follow-up.</p>
+<p><strong>The home of <em>red</em>.</strong> <em>Red</em> lives either on the first axis e₁ or on the plane spanned by e₁ and e₂. Where the plane is the home, the anchor term, the anti-subspace term, the alignment measurements, and the removal all take the pair of axes instead of the single axis, as ex-2.2.12 defined them.</p>
+<p>The recipe has two anchoring terms and no anti-anchor term. The pull is one minus the alignment of a labelled state with the home; on the axis that alignment is the signed cosine, so the pull is toward +e₁ and a state at −e₁ is as far from home as it can be. On the plane it is the unsigned length of the projection, so the pull is toward the plane with no preferred direction within it, and −e₁ is home. The anti-subspace term is the squared alignment averaged over every live position, labelled or not, and it has no sign in either home. An anti-anchor term, the one-sided hinge that kept every state out of the hemisphere opposite the anchor so a fallback could live there, belonged to M1's fallback and last ran in M2 in ex-2.2.2's fallback arm; the recipe line from ex-2.1.6 onward has never carried it, and on the plane there is no hemisphere for it to name.</p>
+<p>Ex-2.2.12 settled against the plane's first rationale, that a single axis is too small a home for a hue. Two things keep it here. The tight condition that prompted this experiment was a plane <em>and</em> a heavier weight, while the heavier weight on the axis was among the loosest on the kept share in that sweep even as its line margin and ᾱ were the tightest, so a ladder on the axis alone could not say whether the narrowing comes from the weight, from the subspace, or from the two together. And the plane at the recipe's own weight has been seen at five seeds only; at twenty, <code>plane-0.1</code> against <code>axis-0.1</code> is a test of the subspace on its own, at a resolution ex-2.2.12 did not have.</p>
+<p><strong>The control.</strong> The un-anchored control is ex-2.2.11's, served from the store at its seeds rather than retrained. It is the reference for the task gate, which asks for a seed mean within a band of the control's, and the ᾱ baseline for the axis conditions. Neither role touches the observation this experiment follows up, which was read off anchored checkpoints, so the borrow spends nothing the design needs; comparisons against it are unpaired across seed sets, which a comparison of seed means absorbs. Every plane condition is compared against the same checkpoints scored on the plane (<code>control-plane</code>): for every state, anchored or not, an unsigned two-dimensional alignment sits higher than a signed one-dimensional one, so the control has to be scored the same way.</p>
+<p><strong>The seeds.</strong> 20 per condition, all fresh: condition seed <em>i</em> trains at model seed 200 + <em>i</em>, where ex-2.2.11 and ex-2.2.12 used an offset of 100. Every condition pairs with every other one seed for seed within this experiment, and the reference is retrained rather than borrowed, which makes it a replication of ex-2.2.11's <code>handover</code> at seeds it never saw.</p>
+<p>The spread question sets the count. A one-sided F-test on the ratio of variances between the top and the bottom of the ladder resolves a halved standard deviation with power 0.90 at twenty seeds a group, 0.81 at fifteen, and 0.63 at ten; a difference in means of the size we care about would be settled by half as many. 160 runs in all.</p>
+<p>Everything else is unchanged from ex-2.2.11: <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.4/#the-op-set">table A+</a>, the stochastic corpus, the whole-line labeller, the untied readout, the removal lines chosen by hue, τ = 0.1, the shape of the anti-subspace schedule, and 50 epochs at d64-L4.</p>
+<h2 id="glossary">Glossary<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#glossary" title="Link to this heading">&para;</a></h2>
+<dl>
+<dt>Kept share</dt>
+<dd>How much of its clean accuracy on an op's removal lines a model keeps after the projection. One means the projection did nothing; zero means every one of those answers changed, which is what the gate takes
+<em>red</em> being gone to mean.</dd>
+<dt>Removal lines</dt>
+<dd>The red lines whose answer needs the hue of the red operand: some permutation of the channels of that operand moves the true answer far. The rule from ex-2.2.11, unchanged.</dd>
+<dt>Seed spread</dt>
+<dd>The standard deviation of a statistic across the seeds of one condition. This is the quantity H1 is about.</dd>
+<dt>Upper bound</dt>
+<dd>The one-sided 95% upper confidence bound on the seed mean of a condition. One condition can have a low mean and a wide spread, and another a higher mean and a narrow spread, and the two can still have the same upper bound. That is the point of using it.</dd>
+<dt>Line margin</dt>
+<dd>How far the anchored states on the labelled lines sit above the rest along the home of <em>red</em>. This is the quantity the anchor term optimizes, so it is a check that the treatment landed rather than a result.</dd>
+<dt>ᾱ at op1</dt>
+<dd>The mean alignment with the anchored subspace over every color at the first operand position. How much the colors that are not red have drifted toward the home of <em>red</em>.</dd>
+</dl>
+
+<h2 id="the-leftover-gets-more-predictable-h1"><span class="heading-words">The leftover gets more predictable (H1)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-leftover-gets-more-predictable-h1" title="Link to this heading">&para;</a></span> <mark class="verdict miss">✗ Miss</mark></h2>
+<p><strong>What we expect.</strong> Across the ladder, the seed spread of the kept share on the <code>hue-hsv</code> removal lines narrows as λ_a rises. The number we score is the ratio of the standard deviation at the top of the ladder to the one at the lowest rung, within a subspace. H1 holds when that ratio falls to 0.5 or below in both subspaces, and the spread falls monotonically enough that a trend contrast across the four levels has a negative slope at 0.05.<sup id="fnref:trend"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#fn:trend">2</a></sup></p>
+<p>It holds in part when one subspace does that and the other does not. On the plane alone, that would say the narrowing needs the plane, and the comparison of <code>plane-0.1</code> with the reference then says whether the plane narrows the spread by itself or only once the weight rises. A flat or rising spread in both would mean the tight condition in ex-2.2.12 was five lucky seeds, and that nothing on this ladder buys predictability.</p>
+<p>One reading of a narrowing has to be ruled out before it counts. The kept share is a proportion over a fixed set of lines, so its spread is bounded below by sampling noise that depends on where the mean sits: a condition whose mean is near zero or near one cannot vary much. H1 is therefore read together with H2. A narrowing that arrives with a mean the ladder also moved is a narrowing we get for free, and the report says so rather than claiming the recipe bought it.</p>
+<p>The kept share is a fair thing to score here. The anchor term acts during training on how well a state aligns with the home of <em>red</em>; the kept share is taken afterwards, on held-out lines, through a projection the term never sees. Nothing in the treatment is set up to reduce its spread, so a narrowing would be telling us something.</p>
+<p>The quantities the two terms do act on — the line margin and ᾱ at op1 — are reported under H4 as manipulation checks rather than with gates on them.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h1-kept-spread-light.png" alt="Two dot panels side by side, the axis on the left and the plane on the right, with the four anchor weights spaced evenly along the bottom on a log scale. Each column is twenty seed dots with a thick standard-deviation bar and the seed mean on top. On the axis the spread narrows from the lowest rung to the top, by a factor of 0.77; on the plane it widens, by a factor of 1.83. A dashed line marks the gate at one fifth, hatched above." width="818" height="338" style="max-width: 100%; height: auto;" data-asset-name="h1-kept-spread" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h1-kept-spread-dark.png" alt="Two dot panels side by side, the axis on the left and the plane on the right, with the four anchor weights spaced evenly along the bottom on a log scale. Each column is twenty seed dots with a thick standard-deviation bar and the seed mean on top. On the axis the spread narrows from the lowest rung to the top, by a factor of 0.77; on the plane it widens, by a factor of 1.83. A dashed line marks the gate at one fifth, hatched above." width="818" height="338" style="max-width: 100%; height: auto;" data-asset-name="h1-kept-spread" />
+<figcaption><p><strong>Kept share on the <code>hue-hsv</code> removal lines along the ladder.</strong> Left, <em>red</em> on the first
+axis; right, <em>red</em> on the plane. Each column is one condition: 20 faint seed dots, a thin
+bar spanning the seed range, a thick bar spanning one standard deviation either side of the mean,
+and the seed mean as the large mark. H1 is about the height of the thick bar rather than where the
+mark sits. The dashed line is the 20% gate, hatched above.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>seed mean ↓</th><th class=num>SD ↓</th><th class=num>range</th><th class=num>n</th><th class=num>seen before (mean, SD, n)</th></tr></thead><tbody><tr class=ref><td><code>axis-0.1</code></td><td class=num>0.268</td><td class=num>0.116</td><td class=num>0.09–0.43</td><td class=num>20</td><td class=num>ex-2.2.11 0.239, 0.105, 20</td></tr><tr><td><code>axis-0.14</code></td><td class=num>0.215</td><td class=num>0.106</td><td class=num>0.04–0.51</td><td class=num>20</td><td class=num>—</td></tr><tr><td><code>axis-0.2</code></td><td class=num>0.292</td><td class=num>0.107</td><td class=num>0.11–0.54</td><td class=num>20</td><td class=num>ex-2.2.12 0.276, 0.118, 5</td></tr><tr><td><code>axis-0.28</code></td><td class=num>0.229</td><td class=num>0.090</td><td class=num>0.03–0.38</td><td class=num>20</td><td class=num>—</td></tr><tr><td><code>plane-0.1</code></td><td class=num>0.170</td><td class=num>0.075</td><td class=num>0.05–0.35</td><td class=num>20</td><td class=num>ex-2.2.12 0.256, 0.125, 5</td></tr><tr><td><code>plane-0.14</code></td><td class=num>0.198</td><td class=num>0.097</td><td class=num>0.02–0.39</td><td class=num>20</td><td class=num>—</td></tr><tr><td><code>plane-0.2</code></td><td class=num>0.191</td><td class=num>0.096</td><td class=num>0.04–0.36</td><td class=num>20</td><td class=num>ex-2.2.12 0.192, 0.036, 5</td></tr><tr><td><code>plane-0.28</code></td><td class=num>0.219</td><td class=num>0.137</td><td class=num>0.03–0.52</td><td class=num>20</td><td class=num>—</td></tr></tbody></table><figcaption><p>Kept share on the <code>hue-hsv</code> removal lines per condition, at 20 seeds. The last column is the same measurement as the experiment that saw that rung took it, at its own seed count, as a replication rather than as data. axis: SD ratio top/bottom 0.77 against a gate of 0.5, Levene W = 1.59 (p = 0.198), trend slope -0.0330 per log unit of λ_a (one-sided p = 0.032); plane: SD ratio top/bottom 1.83 against a gate of 0.5, Levene W = 1.97 (p = 0.126), trend slope +0.0435 per log unit of λ_a (one-sided p = 0.988).</p></figcaption></figure>
+
+<p><strong>What we saw.</strong> H1 did not hold. On the axis the spread falls a little with the weight: the standard deviation at the top rung is 0.77 of the reference's, against a gate of 0.5, and the trend contrast has a negative slope at one-sided p = 0.032. The trend clause passes and the ratio clause does not, so the narrowing is there and it is small. On the plane the spread widens: the ratio is 1.83 and the slope is positive.</p>
+<p>The observation this experiment followed up did not replicate. Ex-2.2.12's <code>plane-0.2</code> had a standard deviation of 0.036 over five seeds; the same condition at twenty fresh seeds has 0.096, in line with every other rung. Its mean did replicate (0.192 then, 0.191 now), and so did the reference's (0.239 at ex-2.2.11's seeds, 0.268 here). A standard deviation from five draws has the wide interval the prereg noted, and this is what the low end of that interval looks like when it comes up.</p>
+<p>The sampling-noise reading H1 asked us to rule out does not arise: no mean moved close enough to zero or one to bound its spread. The means themselves are H2.</p>
+<div class="admonition danger">
+<p class="admonition-title">Miss</p>
+<p>The spread narrows a little on the axis and widens on the plane; neither reaches the gate, and the tight condition from ex-2.2.12 does not replicate.</p>
+</div>
+<h2 id="the-leftover-does-not-get-smaller-h2"><span class="heading-words">The leftover does not get smaller (H2)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-leftover-does-not-get-smaller-h2" title="Link to this heading">&para;</a></span> <mark class="verdict partial">~ Partial</mark></h2>
+<p><strong>What we expect.</strong> The seed-mean kept share on <code>hue-hsv</code> is flat across the ladder: no level differs from the reference by more than 0.05, which is about what twenty paired seeds can resolve at the spread of the reference. H2 is a statement about what we can see at this resolution rather than a claim that the mean is unmoved, and a reviewer reading it as an equivalence test with a wide band is reading it right.</p>
+<p>The evidence for it: the one step ex-2.2.12 took moved the mean up on the axis and down on the plane, and its tight plane condition sits almost exactly on the mean of the five reference seeds it pairs with. A level that does move the mean down by more than 0.05 would be a better result than we expect, and the adoption rule is written to take it.</p>
+<p>Together, H1 and H2 give the shape of the claim: climbing the ladder leaves a leftover that is no smaller and that comes out the same size every time.</p>
+<p>The means themselves are the large marks of the H1 figure, read along the λ_a axis; the table below pairs them seed for seed with the reference.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>seed mean ↓</th><th class=num>paired Δ from <code>axis-0.1</code></th><th class=num>95% interval</th><th class=num>|Δ| ≤ 0.05</th></tr></thead><tbody><tr class=ref><td><code>axis-0.1</code></td><td class=num>0.268</td><td class=num>—</td><td class=num>—</td><td class=num>—</td></tr><tr><td><code>axis-0.14</code></td><td class=num>0.215</td><td class=num>-0.053</td><td class=num>-0.117 to +0.011</td><td class=num>no</td></tr><tr><td><code>axis-0.2</code></td><td class=num>0.292</td><td class=num>+0.024</td><td class=num>-0.049 to +0.096</td><td class=num><b>yes</b></td></tr><tr><td><code>axis-0.28</code></td><td class=num>0.229</td><td class=num>-0.039</td><td class=num>-0.093 to +0.015</td><td class=num><b>yes</b></td></tr><tr><td><code>plane-0.1</code></td><td class=num>0.170</td><td class=num>-0.098</td><td class=num>-0.170 to -0.026</td><td class=num>no</td></tr><tr><td><code>plane-0.14</code></td><td class=num>0.198</td><td class=num>-0.070</td><td class=num>-0.134 to -0.005</td><td class=num>no</td></tr><tr><td><code>plane-0.2</code></td><td class=num>0.191</td><td class=num>-0.077</td><td class=num>-0.153 to -0.000</td><td class=num>no</td></tr><tr><td><code>plane-0.28</code></td><td class=num>0.219</td><td class=num>-0.048</td><td class=num>-0.132 to +0.035</td><td class=num><b>yes</b></td></tr></tbody></table><figcaption><p>The seed-mean kept share on <code>hue-hsv</code> and its paired difference from the reference. Every condition trains at the same 20 seeds, so each difference is paired seed for seed; the interval is Student's t at 19 degrees of freedom. H2's band is 0.05.</p></figcaption></figure>
+
+<p><strong>What we saw.</strong> H2 held on the axis and not on the plane. On the axis, two of the three rungs sit inside the band and <code>axis-0.14</code> just outside it, with no trend in the weight: the mean goes down, up, and down again along the ladder. On the plane every rung is below the reference, three of the four by more than the band, and <code>plane-0.1</code> by 0.098 with a 95% interval of 0.026 to 0.170 below it. That is the comparison ex-2.2.12 could not resolve at five seeds, and at twenty it says the subspace lowers the leftover on its own. Adding weight on top of the plane moves the mean back up a little rather than further down.</p>
+<p>So the shape of the claim in the prereg, no smaller and the same size every time, came out the other way round: the plane makes the leftover somewhat smaller, and nothing on the ladder makes it more predictable.</p>
+<div class="admonition warning">
+<p class="admonition-title">Partial</p>
+<p>Flat within the band on the axis; lower than the reference at every rung on the plane.</p>
+</div>
+<h2 id="the-worst-op-improves-h3"><span class="heading-words">The worst op improves (H3)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-worst-op-improves-h3" title="Link to this heading">&para;</a></span> <mark class="verdict partial">~ Partial</mark></h2>
+<p><strong>What we expect.</strong> On the ten ops other than <code>hue-hsv</code>, the highest per-op seed-mean kept share falls as λ_a rises. The number we score is that highest value at the top of the ladder against the same quantity at the reference, both at twenty seeds; H3 holds when it falls by at least 0.03.</p>
+<p>Any claim that a recipe removes <em>red</em> cleanly is limited by whichever op does worst, and that is not the same op in every condition, so a mean over the ten would hide it.</p>
+<p>The margin is the 0.03 in the statement above, and it is there because a kept share is a proportion over some 330–400 removal lines per op, so on one checkpoint it carries a sampling error of about 0.02 at the values the worst op sits at, and the seed spread of the other ops in ex-2.2.12 was about 0.03. A drop smaller than that is one we could not tell from no drop. In ex-2.2.12 the worst other op was <code>darken</code> at the reference, <code>darken</code> again one step up the axis, and <code>lighten</code> on the plane at twice the weight — the only condition in that sweep with no op over the gate at all — and the spacing between those three values is close to the margin, which is why H3 asks for a margin rather than for a difference. H3 fails if the worst op is flat or rises, which would mean the ladder buys nothing on the ops that already remove <em>red</em>.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h3-per-op-light.png" alt="A strip chart with one row per condition and the kept share along the bottom. Each row carries eleven marks, one per operation, coloured by the condition. The ten ops other than hue-hsv sit in a cluster at the low end and hue-hsv sits far to the right of them. The worst of the ten is ringed and named on each row; it reads 0.19 at the reference and 0.13 at the top of the axis ladder. A dashed line marks the gate at one fifth, hatched to the right." width="818" height="395" style="max-width: 100%; height: auto;" data-asset-name="h3-per-op" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h3-per-op-dark.png" alt="A strip chart with one row per condition and the kept share along the bottom. Each row carries eleven marks, one per operation, coloured by the condition. The ten ops other than hue-hsv sit in a cluster at the low end and hue-hsv sits far to the right of them. The worst of the ten is ringed and named on each row; it reads 0.19 at the reference and 0.13 at the top of the axis ladder. A dashed line marks the gate at one fifth, hatched to the right." width="818" height="395" style="max-width: 100%; height: auto;" data-asset-name="h3-per-op" />
+<figcaption><p><strong>Per-op seed-mean kept share, per condition.</strong> One row per condition; each small mark is one op's
+kept share on its own removal lines, averaged over the 20 seeds. The hollow ring is the
+worst of the ten ops other than <code>hue-hsv</code>, named beside it; the large mark is
+<code>hue-hsv</code> itself. The dashed line is the 20% gate, hatched to the right.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>worst other op</th><th class=num>its seed mean ↓</th><th class=num>Δ from <code>axis-0.1</code></th><th class=num>ten-op mean ↓</th></tr></thead><tbody><tr class=ref><td><code>axis-0.1</code></td><td class=num><code>darken</code></td><td class=num><b>0.194</b></td><td class=num>—</td><td class=num>0.112</td></tr><tr><td><code>axis-0.14</code></td><td class=num><code>lighten</code></td><td class=num><b>0.162</b></td><td class=num><b>-0.033</b></td><td class=num>0.100</td></tr><tr><td><code>axis-0.2</code></td><td class=num><code>lighten</code></td><td class=num><b>0.150</b></td><td class=num><b>-0.045</b></td><td class=num>0.094</td></tr><tr><td><code>axis-0.28</code></td><td class=num><code>lighten</code></td><td class=num><b>0.132</b></td><td class=num><b>-0.062</b></td><td class=num>0.083</td></tr><tr><td><code>plane-0.1</code></td><td class=num><code>lighten</code></td><td class=num><b>0.158</b></td><td class=num><b>-0.036</b></td><td class=num>0.094</td></tr><tr><td><code>plane-0.14</code></td><td class=num><code>lighten</code></td><td class=num><b>0.151</b></td><td class=num><b>-0.043</b></td><td class=num>0.090</td></tr><tr><td><code>plane-0.2</code></td><td class=num><code>lighten</code></td><td class=num><b>0.147</b></td><td class=num><b>-0.047</b></td><td class=num>0.087</td></tr><tr><td><code>plane-0.28</code></td><td class=num><code>lighten</code></td><td class=num><b>0.170</b></td><td class=num>-0.024</td><td class=num>0.095</td></tr></tbody></table><figcaption><p>The worst of the ten ops other than <code>hue-hsv</code> per condition, and the mean over those ten. H3 asks for a fall of at least 0.03 from the reference at the top of the ladder; bold in the last column marks a fall that large. The worst op is not the same op in every condition.</p></figcaption></figure>
+
+<p><strong>What we saw.</strong> H3 held on the axis and missed on the plane. The frozen wording does not split the top of the ladder by subspace, so we read it with H1's convention and call it partial. On the axis the worst other op falls at every rung, and by 0.062 at <code>axis-0.28</code>, twice the margin. On the plane it falls by the margin or more at the two middle rungs and turns back up at <code>plane-0.28</code>, to 0.024 under the reference, short of the margin. The worst op is <code>darken</code> at the reference and <code>lighten</code> everywhere else, as the spacing in ex-2.2.12 suggested, and every condition's worst other op is under the gate. The ten ops that already remove <em>red</em> have some room to spare, and a heavier anchor on the axis uses a little of it.</p>
+<div class="admonition warning">
+<p class="admonition-title">Partial</p>
+<p>The worst other op falls by twice the margin at the top of the axis ladder, and turns back up at the top of the plane's.</p>
+</div>
+<h2 id="what-the-weight-spends-h4"><span class="heading-words">What the weight spends (H4)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#what-the-weight-spends-h4" title="Link to this heading">&para;</a></span> <mark class="verdict pass">✓ Pass</mark></h2>
+<p><strong>What we expect.</strong> Every cost statistic stays inside its gate from ex-2.2.11 on the seed mean through the whole ladder: the task, the line margin, the lead at the embedding, the contrast between red and non-red, the grading r², and the deficit on the non-red lines. The ladder stops under the level where the six-op survey saw the task give way, so we expect every cost to hold; the one we name as most likely to leave its gate first is the non-red deficit on the plane conditions, which ex-2.2.12 measured four times higher on the plane than on the axis.</p>
+<p>If a statistic leaves its gate at or below λ_a = 0.28, the useful range of the recipe on this grammar is narrower than the map in ex-2.1.11 suggested, which is worth knowing on its own. If none does, the range is at least this wide, and where it ends stays open.</p>
+<p>We report the line margin here as the manipulation check. It is the quantity the anchor term optimizes, and a heavier pull should raise it along the ladder — one direction, with no argument available for the other. If it stays flat, the weight is not reaching the model, and the other three sections have no treatment to interpret. ᾱ at op1 goes in the same figure without a direction attached to it: it is what the anti-subspace term acts on, and that term is climbing the ladder alongside the pull.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h4-costs-light.png" alt="Six dot panels in two columns, one per cost statistic, with the four anchor weights along the bottom of each on a log scale and the two subspaces as paired columns at each weight. Each column is twenty seed dots with a standard-deviation bar and the seed mean. Each panel carries a dashed gate with the failing side hatched: every column sits on the passing side of its gate." width="818" height="779" style="max-width: 100%; height: auto;" data-asset-name="h4-costs" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h4-costs-dark.png" alt="Six dot panels in two columns, one per cost statistic, with the four anchor weights along the bottom of each on a log scale and the two subspaces as paired columns at each weight. Each column is twenty seed dots with a standard-deviation bar and the seed mean. Each panel carries a dashed gate with the failing side hatched: every column sits on the passing side of its gate." width="818" height="779" style="max-width: 100%; height: auto;" data-asset-name="h4-costs" />
+<figcaption><p><strong>The cost side along the ladder.</strong> One panel per statistic H4 names, each against its gate from
+ex-2.2.11 (dashed, failing side hatched): the held-out expected exact match less the control's on
+whichever op the condition is worst on; the line margin on the <code>mix</code> lines; the lead at
+the embedding; the contrast between the red and non-red groups; the grading r²; and the non-red
+deficit under the projection. At each weight the left column is the axis and the right the plane;
+each is 20 seed dots with a standard-deviation bar and the seed mean.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>the task</th><th class=num>the line margin</th><th class=num>the lead at the embedding</th><th class=num>the contrast between red and non-red</th><th class=num>the grading r²</th><th class=num>the deficit on the non-red lines</th></tr></thead><tbody><tr class=ref><td><code>axis-0.1</code></td><td class=num><b>-0.008 (<code>hsvmix</code>)</b></td><td class=num><b>0.432</b></td><td class=num><b>0.910</b></td><td class=num><b>0.841</b></td><td class=num><b>0.883</b></td><td class=num><b>0.004</b></td></tr><tr><td><code>axis-0.14</code></td><td class=num><b>-0.008 (<code>value-hsv</code>)</b></td><td class=num><b>0.432</b></td><td class=num><b>0.902</b></td><td class=num><b>0.838</b></td><td class=num><b>0.888</b></td><td class=num><b>0.005</b></td></tr><tr><td><code>axis-0.2</code></td><td class=num><b>-0.009 (<code>value-hsv</code>)</b></td><td class=num><b>0.438</b></td><td class=num><b>0.892</b></td><td class=num><b>0.834</b></td><td class=num><b>0.883</b></td><td class=num><b>0.004</b></td></tr><tr><td><code>axis-0.28</code></td><td class=num><b>-0.011 (<code>value-hsv</code>)</b></td><td class=num><b>0.445</b></td><td class=num><b>0.883</b></td><td class=num><b>0.841</b></td><td class=num><b>0.882</b></td><td class=num><b>0.002</b></td></tr><tr><td><code>plane-0.1</code></td><td class=num><b>-0.009 (<code>value-hsv</code>)</b></td><td class=num><b>0.405</b></td><td class=num><b>0.909</b></td><td class=num><b>0.841</b></td><td class=num><b>0.897</b></td><td class=num><b>0.016</b></td></tr><tr><td><code>plane-0.14</code></td><td class=num><b>-0.008 (<code>value-hsv</code>)</b></td><td class=num><b>0.407</b></td><td class=num><b>0.904</b></td><td class=num><b>0.834</b></td><td class=num><b>0.898</b></td><td class=num><b>0.011</b></td></tr><tr><td><code>plane-0.2</code></td><td class=num><b>-0.010 (<code>hsvmix</code>)</b></td><td class=num><b>0.415</b></td><td class=num><b>0.899</b></td><td class=num><b>0.833</b></td><td class=num><b>0.889</b></td><td class=num><b>0.009</b></td></tr><tr><td><code>plane-0.28</code></td><td class=num><b>-0.010 (<code>hsvmix</code>)</b></td><td class=num><b>0.415</b></td><td class=num><b>0.896</b></td><td class=num><b>0.836</b></td><td class=num><b>0.884</b></td><td class=num><b>0.008</b></td></tr></tbody></table><figcaption><p>Every cost statistic per condition, on the seed mean, with a value inside its ex-2.2.11 gate in bold. The gates: task ≥ −0.02, margin ≥ 0.336, lead ≥ 0.4, contrast ≥ 0.2, r² ≥ 0.704, deficit ≤ 0.05. The task column names the op the condition is worst on.</p></figcaption></figure>
+
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h4-checks-light.png" alt="Two dot panels. Left, the line margin against the anchor weight on a log scale: on the axis it rises from 0.43 at the lowest rung to 0.44 at the top, with the plane below it, and a tinted box under each column marks the un-anchored control. Right, ᾱ at op1 on the same axis, with the control box under each axis column scored on the axis and the one under each plane column scored on the plane, the plane boxes sitting higher." width="818" height="336" style="max-width: 100%; height: auto;" data-asset-name="h4-checks" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h4-checks-dark.png" alt="Two dot panels. Left, the line margin against the anchor weight on a log scale: on the axis it rises from 0.43 at the lowest rung to 0.44 at the top, with the plane below it, and a tinted box under each column marks the un-anchored control. Right, ᾱ at op1 on the same axis, with the control box under each axis column scored on the axis and the one under each plane column scored on the plane, the plane boxes sitting higher." width="818" height="336" style="max-width: 100%; height: auto;" data-asset-name="h4-checks" />
+<figcaption><p><strong>The two quantities the treatment acts on.</strong> Left, the line margin, which the anchor term
+optimizes: the manipulation check, with a heavier pull expected to raise it. Right, ᾱ at op1, which
+the anti-subspace term acts on, with no direction attached to it. The tinted box under each
+column is the un-anchored control's seed range, scored on that column's subspace: on the axis for
+the axis conditions and on the plane (<code>control-plane</code>) for the plane ones. An unsigned
+two-dimensional alignment sits higher than a signed one-dimensional one for every state, so the
+two subspaces compare against different boxes.</p></figcaption></figure>
+
+<p><strong>What we saw.</strong> H4 held: every statistic is inside its gate at every condition, and none comes near one. The non-red deficit on the plane is two to eight times the axis's, in the direction predicted, and still a factor of three under its gate; it falls with the weight rather than rising. So the useful range of the recipe on this grammar reaches at least λ_a = 0.28, and where it ends is still open.</p>
+<p>The manipulation check is the finding of this section. The line margin rises with the weight on both subspaces, but by very little: from 0.432 to 0.445 on the axis and from 0.405 to 0.415 on the plane, about three percent for an anchor 2.8 times heavier. The weight reaches the model, and the quantity it optimizes is close to saturated at the recipe's weight already. That is the likely reason H1 and H2 had so little to respond to: between 0.1 and 0.28 the recipe sits on a plateau of the thing it trains. ᾱ at op1 falls with the weight on the axis, from 0.277 to 0.216, which is the anti-subspace term climbing beside the pull, and barely moves on the plane.</p>
+<div class="admonition success">
+<p class="admonition-title">Pass</p>
+<p>Every cost statistic is inside its gate at every rung, and the line margin rises with the weight, by about three percent.</p>
+</div>
+<h2 id="the-adoption-rule">The adoption rule<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-adoption-rule" title="Link to this heading">&para;</a></h2>
+<p>The rule, frozen before the run:</p>
+<blockquote>
+<p>A condition qualifies when the one-sided 95% upper confidence bound on its seed-mean kept share sits under the 0.2 gate on <code>hue-hsv</code> and on each of the ten other ops, the task, the line margin, the lead at the embedding, the contrast between red and non-red, the grading r², and the deficit on the non-red lines are inside ex-2.2.11's gates on the seed mean, and its ᾱ at op1 stands in no higher ratio to the un-anchored baseline for its own subspace than the reference stands to the axis one. Among those that qualify, the one with the lowest upper bound on <code>hue-hsv</code> is adopted, and the smaller λ_a breaks a tie. The rule sees the measurements it names; if a qualifying condition looks harmful on something it does not name, the report says what and keeps the reference, and that override is marked as a decision made after the data. As in ex-2.2.12, this experiment proposes: the adopted recipe is confirmed at fresh seeds by the anchored-op experiment that inherits it, and no number quoted here for it is free of the selection. If none qualifies, the recipe stays at <code>axis-0.1</code> and the report carries the ladder's best characterization of the leftover — its level, its spread, and which lines it is made of — for the anchored-op preregistration to treat as a bounded confound.</p>
+</blockquote>
+<p>What changed from the rule in ex-2.2.12, and why. Ex-2.2.12 asked instead for a seed mean under the gate by at least a fixed band of 0.06, the spread its reference showed at twenty seeds. That band is a statement about one condition's resolution, and applying it to a condition three times tighter charges it for a spread it does not have. The upper bound above asks the same question — is this condition's leftover under the gate, or does the seed spread leave that unsettled — of each condition at its own precision. It is the stricter rule on a wide condition and the looser one on a tight one, and it is fixed here before the runs exist. Both verdicts are reported.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>upper bound, <code>hue-hsv</code> ↓</th><th class=num>upper bound, worst other op ↓</th><th class=num>cost gates</th><th class=num>ᾱ at op1</th><th class=num>ᾱ ratio ↓</th><th class=num>qualifies</th><th class=num>under ex-2.2.12's band (0.14)</th><th class=num>ᾱ excess ↓</th><th class=num>qualifies, as intended</th></tr></thead><tbody><tr class=ref><td><code>axis-0.1</code></td><td class=num>0.313</td><td class=num>0.218 (<code>darken</code>)</td><td class=num>all pass</td><td class=num>0.277</td><td class=num><b>-10.27</b></td><td class=num>no</td><td class=num>no</td><td class=num><b>0.30</b></td><td class=num>no</td></tr><tr><td><code>axis-0.14</code></td><td class=num>0.256</td><td class=num><b>0.184 (<code>lighten</code>)</b></td><td class=num>all pass</td><td class=num>0.258</td><td class=num>-9.56</td><td class=num>no</td><td class=num>no</td><td class=num><b>0.28</b></td><td class=num>no</td></tr><tr><td><code>axis-0.2</code></td><td class=num>0.333</td><td class=num><b>0.170 (<code>lighten</code>)</b></td><td class=num>all pass</td><td class=num>0.263</td><td class=num>-9.76</td><td class=num>no</td><td class=num>no</td><td class=num><b>0.29</b></td><td class=num>no</td></tr><tr><td><code>axis-0.28</code></td><td class=num>0.263</td><td class=num><b>0.151 (<code>lighten</code>)</b></td><td class=num>all pass</td><td class=num>0.216</td><td class=num>-8.02</td><td class=num>no</td><td class=num>no</td><td class=num><b>0.24</b></td><td class=num>no</td></tr><tr><td><code>plane-0.1</code></td><td class=num><b>0.199</b></td><td class=num><b>0.192 (<code>lighten</code>)</b></td><td class=num>all pass</td><td class=num>0.300</td><td class=num>2.66</td><td class=num>no</td><td class=num>no</td><td class=num><b>0.19</b></td><td class=num><b>yes</b></td></tr><tr><td><code>plane-0.14</code></td><td class=num>0.236</td><td class=num><b>0.167 (<code>lighten</code>)</b></td><td class=num>all pass</td><td class=num>0.314</td><td class=num>2.77</td><td class=num>no</td><td class=num>no</td><td class=num><b>0.20</b></td><td class=num>no</td></tr><tr><td><code>plane-0.2</code></td><td class=num>0.228</td><td class=num><b>0.171 (<code>lighten</code>)</b></td><td class=num>all pass</td><td class=num>0.300</td><td class=num>2.65</td><td class=num>no</td><td class=num>no</td><td class=num><b>0.19</b></td><td class=num>no</td></tr><tr><td><code>plane-0.28</code></td><td class=num>0.272</td><td class=num>0.203 (<code>lighten</code>)</td><td class=num>all pass</td><td class=num>0.287</td><td class=num>2.54</td><td class=num>no</td><td class=num>no</td><td class=num><b>0.17</b></td><td class=num>no</td></tr></tbody></table><figcaption><p>The adoption rule clause by clause. The upper bound is the one-sided 95% bound on the seed mean, and the gate it is read against is 0.2. The ᾱ ratio is ᾱ at op1 over the un-anchored baseline for the condition's own subspace, and it passes when it is no higher than the reference's -10.27. Those two baselines are -0.027 on the axis, where the alignment is signed and the control's five seeds straddle zero, and +0.113 on the plane, where it is unsigned. The last column applies ex-2.2.12's fixed band to the seed mean instead of the upper bound, with the same cost and ᾱ clauses. The last two columns read the ᾱ clause as intended, as an excess over the condition's own baseline, passing when it is no higher than the reference's 0.30; that reading was adopted at review, after the data.</p></figcaption></figure>
+
+<p>To the letter, no condition qualifies under either rule. Under the fixed band from ex-2.2.12 nothing comes close: the lowest seed mean is <code>plane-0.1</code> at 0.170, against a band that asks for 0.14.</p>
+<p>Under the rule frozen here, <code>plane-0.1</code> clears every clause about the leftover and the costs. Its upper bound on <code>hue-hsv</code> is 0.199 and the upper bound on its worst other op is 0.192. Both are under the 0.2 gate, and every cost statistic passes. The one clause it fails is the ᾱ clause, and it fails on the arithmetic of that clause. The clause takes the ᾱ of each condition as a ratio to the un-anchored baseline of its own subspace, then compares that with the ratio of the reference to the axis baseline. The axis baseline is a signed cosine, and it averages -0.027 over the five control seeds, so the ratio for the reference is -10.3. The plane baseline is an unsigned length, 0.113, so every plane ratio is a small positive number, and no positive number is below a negative one. In raw terms the ᾱ of the plane conditions runs about 0.29 to 0.30, against 0.22 to 0.28 on the axis. The difference is modest, and the ratio turns it into an impossible one.</p>
+<p>The clause was written badly, so we read it as it was meant. Its purpose was to catch a condition that pulls the other colors toward the home of <em>red</em> more than the reference does, and the ratio was an attempt in the prereg to put the two subspaces on one scale. The comparison ex-2.2.12 made across subspaces, and the one the clause was reaching for, is the excess over the baseline of each subspace. On that reading <code>plane-0.1</code> sits 0.19 above its own baseline where the reference sits 0.30 above the axis one, so it passes. The last column of the table applies that reading to every condition, and <code>plane-0.1</code> is the one condition that qualifies. Reading a frozen rule by its intent is a decision made after the data, so the table keeps the literal column beside it and a reader can weigh the two.</p>
+<p>We keep the recipe at <code>axis-0.1</code> all the same. That is a second decision made after the data, on grounds the rule does not name. The plane lowers the mean of the leftover by about 0.10. In return the concept takes two coordinates of the stream instead of one, the non-red deficit is a few times the one on the axis, and every anchored-op experiment that follows inherits a two-dimensional home for a hue that one dimension holds well enough on ten ops of eleven. That is a small gain at a standing cost. What the ladder has settled is that the plane works, and by how much, so it is a validated alternative for a concept that turns out to need more room than an axis. If it is preregistered, the ᾱ clause should be stated as an excess.</p>
+<h2 id="exploratory-analyses">Exploratory analyses<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#exploratory-analyses" title="Link to this heading">&para;</a></h2>
+<p>Four measurements are planned as descriptions rather than tests: they carry no gate, and no finding rests on them. Anything we think of after seeing the data goes here too, marked as post hoc.</p>
+<p><strong>The spread of everything else.</strong> H1 scores the spread of one statistic. The same seed-spread table for every cost statistic, the line margin, and the task, per condition, says whether a heavier anchor makes training as a whole more reproducible on this grammar or only settles the leftover. It carries no gate because we have no prediction for the direction of most of them: a heavier pull could hold the margin to a tighter value across seeds, or could amplify whatever differs between initializations. Ex-2.2.12 gives a hint that the two spreads can move apart: one step up the axis, the line margin and ᾱ at op1 were the tightest in the sweep while the kept share stayed as wide as the reference, and on the plane at the same step it was the other way round.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>kept share, hue-hsv</th><th class=num>the task</th><th class=num>the line margin</th><th class=num>the lead at the embedding</th><th class=num>the contrast between red and non-red</th><th class=num>the grading r²</th><th class=num>the deficit on the non-red lines</th></tr></thead><tbody><tr class=ref><td><code>axis-0.1</code></td><td class=num>0.1164 <span class=range>×1.00</span></td><td class=num>0.0034 <span class=range>×1.00</span></td><td class=num>0.0207 <span class=range>×1.00</span></td><td class=num>0.0078 <span class=range>×1.00</span></td><td class=num>0.0088 <span class=range>×1.00</span></td><td class=num>0.0225 <span class=range>×1.00</span></td><td class=num>0.0025 <span class=range>×1.00</span></td></tr><tr><td><code>axis-0.14</code></td><td class=num>0.1056 <span class=range>×0.91</span></td><td class=num>0.0030 <span class=range>×0.87</span></td><td class=num>0.0214 <span class=range>×1.03</span></td><td class=num>0.0078 <span class=range>×1.00</span></td><td class=num>0.0115 <span class=range>×1.31</span></td><td class=num>0.0212 <span class=range>×0.94</span></td><td class=num>0.0045 <span class=range>×1.84</span></td></tr><tr><td><code>axis-0.2</code></td><td class=num>0.1069 <span class=range>×0.92</span></td><td class=num>0.0030 <span class=range>×0.87</span></td><td class=num>0.0164 <span class=range>×0.79</span></td><td class=num>0.0106 <span class=range>×1.36</span></td><td class=num>0.0176 <span class=range>×2.00</span></td><td class=num>0.0458 <span class=range>×2.03</span></td><td class=num>0.0023 <span class=range>×0.95</span></td></tr><tr><td><code>axis-0.28</code></td><td class=num>0.0901 <span class=range>×0.77</span></td><td class=num>0.0061 <span class=range>×1.78</span></td><td class=num>0.0238 <span class=range>×1.15</span></td><td class=num>0.0097 <span class=range>×1.24</span></td><td class=num>0.0094 <span class=range>×1.07</span></td><td class=num>0.0189 <span class=range>×0.84</span></td><td class=num>0.0022 <span class=range>×0.91</span></td></tr><tr><td><code>plane-0.1</code></td><td class=num>0.0745 <span class=range>×0.64</span></td><td class=num>0.0067 <span class=range>×1.94</span></td><td class=num>0.0109 <span class=range>×0.52</span></td><td class=num>0.0075 <span class=range>×0.97</span></td><td class=num>0.0106 <span class=range>×1.21</span></td><td class=num>0.0194 <span class=range>×0.86</span></td><td class=num>0.0089 <span class=range>×3.59</span></td></tr><tr><td><code>plane-0.14</code></td><td class=num>0.0972 <span class=range>×0.84</span></td><td class=num>0.0033 <span class=range>×0.95</span></td><td class=num>0.0125 <span class=range>×0.60</span></td><td class=num>0.0058 <span class=range>×0.75</span></td><td class=num>0.0128 <span class=range>×1.46</span></td><td class=num>0.0184 <span class=range>×0.82</span></td><td class=num>0.0050 <span class=range>×2.03</span></td></tr><tr><td><code>plane-0.2</code></td><td class=num>0.0961 <span class=range>×0.83</span></td><td class=num>0.0043 <span class=range>×1.25</span></td><td class=num>0.0141 <span class=range>×0.68</span></td><td class=num>0.0068 <span class=range>×0.87</span></td><td class=num>0.0199 <span class=range>×2.27</span></td><td class=num>0.0320 <span class=range>×1.42</span></td><td class=num>0.0040 <span class=range>×1.62</span></td></tr><tr><td><code>plane-0.28</code></td><td class=num>0.1367 <span class=range>×1.17</span></td><td class=num>0.0038 <span class=range>×1.09</span></td><td class=num>0.0155 <span class=range>×0.75</span></td><td class=num>0.0053 <span class=range>×0.69</span></td><td class=num>0.0126 <span class=range>×1.44</span></td><td class=num>0.0298 <span class=range>×1.32</span></td><td class=num>0.0049 <span class=range>×1.98</span></td></tr></tbody></table><figcaption><p>Seed standard deviation of every statistic, per condition, with its ratio to the reference's beside it. H1 scores the first column only; the rest are here to say whether a heavier anchor settles training as a whole or only the leftover. No gate is read off this table.</p></figcaption></figure>
+
+<p>A heavier anchor does not settle training as a whole. Relative to the reference, the line margin's spread tightens on the plane and not on the axis, the contrast and the grading r² widen at λ_a = 0.2 on both subspaces, and the task's spread roughly doubles at <code>axis-0.28</code> and <code>plane-0.1</code>. The hint from ex-2.2.12, that the spread of the kept share and the spread of the margin move independently, holds up here.</p>
+<p><strong>Which lines are left.</strong> Ex-2.2.12 found that nearly all of the <code>hue-hsv</code> survival comes from two of the seven red colors, but it scored conditions rather than individual lines. Scoring per line across the ladder tells us whether a narrow seed spread means the same lines survive every time, which would let us characterize the leftover, or a shifting set of lines that happens to be the same size.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/exp-line-survival-light.png" alt="Eight small histograms, one per condition, of how often each of the 333 removal lines of hue-hsv survives the projection, as a share of the twenty seeds. Mass piles up at both ends: at the reference 34% of the lines survive in no seed and 0% survive in every seed, with the rest spread between. The mean correlation between two seeds&#x27; per-line vectors is 0.50 at the reference." width="818" height="414" style="max-width: 100%; height: auto;" data-asset-name="exp-line-survival" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/exp-line-survival-dark.png" alt="Eight small histograms, one per condition, of how often each of the 333 removal lines of hue-hsv survives the projection, as a share of the twenty seeds. Mass piles up at both ends: at the reference 34% of the lines survive in no seed and 0% survive in every seed, with the rest spread between. The mean correlation between two seeds&#x27; per-line vectors is 0.50 at the reference." width="818" height="414" style="max-width: 100%; height: auto;" data-asset-name="exp-line-survival" />
+<figcaption><p><strong>How often each <code>hue-hsv</code> removal line survives, per condition.</strong> One histogram per
+condition over the removal lines: a line at 0 is answered differently in every seed after the
+projection, and a line at 1 keeps its answer in all 20. A leftover made of the same lines
+each time piles up at the two ends; a leftover of a shifting set fills the middle. Post hoc, no
+gate.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>lines scored</th><th class=num>never survives</th><th class=num>survives in every seed</th><th class=num>mean seed-to-seed r</th><th class=num>share from the two reddest op2 colors</th></tr></thead><tbody><tr class=ref><td><code>axis-0.1</code></td><td class=num>333</td><td class=num>34%</td><td class=num>0%</td><td class=num>0.50</td><td class=num>11%</td></tr><tr><td><code>axis-0.14</code></td><td class=num>333</td><td class=num>33%</td><td class=num>0%</td><td class=num>0.31</td><td class=num>17%</td></tr><tr><td><code>axis-0.2</code></td><td class=num>333</td><td class=num>31%</td><td class=num>0%</td><td class=num>0.50</td><td class=num>13%</td></tr><tr><td><code>axis-0.28</code></td><td class=num>333</td><td class=num>41%</td><td class=num>0%</td><td class=num>0.44</td><td class=num>11%</td></tr><tr><td><code>plane-0.1</code></td><td class=num>333</td><td class=num>20%</td><td class=num>0%</td><td class=num>0.13</td><td class=num>13%</td></tr><tr><td><code>plane-0.14</code></td><td class=num>333</td><td class=num>16%</td><td class=num>0%</td><td class=num>0.21</td><td class=num>21%</td></tr><tr><td><code>plane-0.2</code></td><td class=num>333</td><td class=num>22%</td><td class=num>0%</td><td class=num>0.21</td><td class=num>10%</td></tr><tr><td><code>plane-0.28</code></td><td class=num>333</td><td class=num>10%</td><td class=num>0%</td><td class=num>0.11</td><td class=num>25%</td></tr></tbody></table><figcaption><p>The <code>hue-hsv</code> leftover line by line. A line counts as surviving in a seed when it keeps more than half of its clean expected exact match. The correlation is the mean over every pair of seeds of the correlation between their per-line kept vectors: near one means the same lines survive every time. The last column is the share of all surviving weight carried by lines whose second operand is one of the two reddest palette colors, which is where ex-2.2.12 found the survival. Post hoc.</p></figcaption></figure>
+
+<p>The leftover is a partly shifting set of lines, and the subspace changes its character. On the axis the per-line survival is bimodal: about a third of the lines survive in no seed, and a second hump survives in most seeds, with seed-to-seed correlations of 0.3 to 0.5. On the plane the histogram is a single hump near zero with correlations of 0.1 to 0.2, which is a thinner leftover spread over more lines. No line survives in all twenty seeds in any condition. Ex-2.2.12's finding that two of the seven red colors carry nearly all of the survival does not hold at this resolution: those two carry between a tenth and a quarter of it.</p>
+<p><strong>The achromatic candidate.</strong> The exploratory section of ex-2.2.12 proposed that the surviving lines are answered from how gray the second operand looks. The axis does not hold that information, and the blocks can read it off the other channels. To test it, we project at the blocks with the second operand replaced by a gray of the same value. That is a scoring pass on checkpoints this experiment trains anyway.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/exp-achromatic-light.png" alt="Three dot panels, one per edit, with the four anchor weights along the bottom on a log scale and the two subspaces as paired columns. Left, the projection at the blocks alone; middle, the second operand replaced by a gray of the same value; right, the two together. At the reference the two together read 0.68, above the 0.27 of the projection alone." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="exp-achromatic" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/exp-achromatic-dark.png" alt="Three dot panels, one per edit, with the four anchor weights along the bottom on a log scale and the two subspaces as paired columns. Left, the projection at the blocks alone; middle, the second operand replaced by a gray of the same value; right, the two together. At the reference the two together read 0.68, above the 0.27 of the projection alone." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="exp-achromatic" />
+<figcaption><p><strong>The achromatic edit on the <code>hue-hsv</code> removal lines.</strong> Each panel is a kept share against
+the unedited line's own answer: the projection at the blocks, the gray substitution on its own,
+and the two together. If the surviving answers are read off how achromatic the second operand
+looks, graying it leaves them in place; if they need that operand's own hue, it does not. Post
+hoc, no gate.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table"><thead><tr><th>condition</th><th class=num>projection at the blocks</th><th class=num>op2 grayed</th><th class=num>both</th><th class=num>both − blocks</th><th class=num>both − grayed</th></tr></thead><tbody><tr class=ref><td><code>axis-0.1</code></td><td class=num>0.271</td><td class=num>0.696</td><td class=num>0.680</td><td class=num>+0.409</td><td class=num>-0.016</td></tr><tr><td><code>axis-0.14</code></td><td class=num>0.214</td><td class=num>0.706</td><td class=num>0.689</td><td class=num>+0.475</td><td class=num>-0.017</td></tr><tr><td><code>axis-0.2</code></td><td class=num>0.328</td><td class=num>0.702</td><td class=num>0.694</td><td class=num>+0.365</td><td class=num>-0.008</td></tr><tr><td><code>axis-0.28</code></td><td class=num>0.329</td><td class=num>0.703</td><td class=num>0.693</td><td class=num>+0.364</td><td class=num>-0.010</td></tr><tr><td><code>plane-0.1</code></td><td class=num>0.294</td><td class=num>0.700</td><td class=num>0.677</td><td class=num>+0.383</td><td class=num>-0.022</td></tr><tr><td><code>plane-0.14</code></td><td class=num>0.208</td><td class=num>0.698</td><td class=num>0.680</td><td class=num>+0.472</td><td class=num>-0.017</td></tr><tr><td><code>plane-0.2</code></td><td class=num>0.326</td><td class=num>0.704</td><td class=num>0.693</td><td class=num>+0.367</td><td class=num>-0.011</td></tr><tr><td><code>plane-0.28</code></td><td class=num>0.255</td><td class=num>0.702</td><td class=num>0.690</td><td class=num>+0.435</td><td class=num>-0.012</td></tr></tbody></table><figcaption><p>Seed-mean kept share under each edit, over the missed op's removal lines, all read against the unedited line's own answer. Graying the second operand moves about three answers in ten on its own, so the two difference columns say different things: the first is what graying adds to the projection, and the second is what the projection still costs once the operand is already gray. Post hoc.</p></figcaption></figure>
+
+<p>Graying the second operand is a large edit on its own, moving about thirty percent of the answers with no projection at all. Against that, projecting at the blocks costs almost nothing once the operand is gray, where the same projection with the operand intact costs most of the answers. So on these lines the whole effect of the removal runs through the second operand's hue, and once that hue is gone there is nothing left for the projection to take. The achromatic candidate as ex-2.2.12 phrased it, an answer read from how gray the operand looks, is not what this shows; the hue of the second operand is doing the work, through channels the anchored subspace does not hold.</p>
+<p><strong>What the response looks like.</strong> A grading cloud of the α response at op1 against how red the first operand is, one per level of the ladder. The grading r² in ex-2.2.12 barely moved across its whole sweep, so this is here as a picture of what a near three-fold change in the recipe does to the response. It carries no gate.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/exp-alpha-clouds-light.png" alt="Eight grading clouds in two rows, the axis conditions above and the plane conditions below, one column per anchor weight. Within each cloud redness runs left to right and the height is ᾱ at the first operand, with the twenty seeds lofted together so the cloud&#x27;s thickness is the seed spread. The response rises with redness in every panel. Its mean over all colors goes from 0.28 at the lowest rung of the axis ladder to 0.22 at the top." width="818" height="434" style="max-width: 100%; height: auto;" data-asset-name="exp-alpha-clouds" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/exp-alpha-clouds-dark.png" alt="Eight grading clouds in two rows, the axis conditions above and the plane conditions below, one column per anchor weight. Within each cloud redness runs left to right and the height is ᾱ at the first operand, with the twenty seeds lofted together so the cloud&#x27;s thickness is the seed spread. The response rises with redness in every panel. Its mean over all colors goes from 0.28 at the lowest rung of the axis ladder to 0.22 at the top." width="818" height="434" style="max-width: 100%; height: auto;" data-asset-name="exp-alpha-clouds" />
+<figcaption><p><strong>The α response at the first operand, per rung.</strong> One cloud per condition, drawn in the colors of
+the grid: within each panel redness runs left to right, and the height is the alignment of that
+color's state with the home of <em>red</em>, averaged over slices. The 20 seeds are lofted into
+one cloud, so its thickness at a given redness is the spread across seeds rather than a mean. Post
+hoc, no gate.</p></figcaption></figure>
+
+<p>The curve is a sigmoid in redness at every rung, and the clouds differ in texture. At λ_a = 0.1 the cloud is smooth on both subspaces. At 0.2 it is noisier, with more low-alignment strays through the middle of the redness range. At 0.28 it is stepped, and the middle of the curve separates into bands. The rung used by the recipe, <code>axis-0.1</code>, has the cleanest response of the eight. This is the plateau in the line margin seen from the other side: the mean curve barely moves as the weight rises, and what the weight changes is the texture across seeds.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#discussion" title="Link to this heading">&para;</a></h2>
+<p>The ladder was built on the premise that we had been running near the bottom of the useful range, so a heavier anchor would give the downstream measurements something to respond to. What it shows instead is a plateau. Between λ_a 0.1 and 0.28 the line margin moves by about three percent, every cost stays well inside its gate, and the leftover on <code>hue-hsv</code> neither shrinks nor settles. On this grammar the weight is not the lever we thought it was, so the recipe can stay where it is, with some confidence that the choice does not matter much.</p>
+<p>The subspace <em>is</em> a lever, but a small one. At the weight used by the recipe, the plane lowers the leftover by about 0.10. It costs a non-red deficit a few times the one on the axis, still far under the gate. It qualifies under the adoption rule read as intended, and the anchored-op experiments inherit <code>axis-0.1</code> anyway, for the reasons the adoption section gives. The plane will most likely stay on the shelf. What this ladder adds is that it is a validated shelf: if a concept turns up that a single axis cannot hold, we know the plane works and we know what it costs.</p>
+<p>For those experiments the leftover is a bounded confound rather than a fixed one. On the axis the kept share is near a quarter, with a standard deviation of about 0.12 across seeds, and it comes from no fixed set of lines: about a third of the lines never survive, a second group survives in most seeds, and none survives in every seed. Any experiment that meets it will have to measure it at its own seeds, which at twenty seeds resolves a shift of about 0.05. Two questions stay open: where the useful range of the weight ends, and whether τ trades against it the way the survey in ex-2.1.11 found. Neither is needed before the anchored-op work goes ahead.</p>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#method" title="Link to this heading">&para;</a></h2>
+<h3 id="fresh-seeds">Fresh seeds<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#fresh-seeds" title="Link to this heading">&para;</a></h3>
+<p>Ex-2.2.11 and ex-2.2.12 trained at model seeds 100–119. The observation this experiment follows up was read off those checkpoints, and a rule written in advance does not make data we have already seen unseen, so no anchored checkpoint here is served from the store: every anchored condition, the reference included, trains at seeds 200–219. The four conditions that earlier experiments saw appear in the H1 table beside their earlier values, as a replication rather than as data.</p>
+<p>We do not hold seeds back to quote the adopted condition from. The search is eight conditions, so the selection bias on the winner is small, and ex-2.2.12 set the pattern this experiment follows: the ladder proposes, and the anchored-op experiment that inherits the recipe confirms it at seeds of its own. Deciding the rule on half the seeds would halve the precision of the upper bound it rests on, for a correction the next experiment pays anyway.</p>
+<h3 id="the-plane">The plane<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#the-plane" title="Link to this heading">&para;</a></h3>
+<p>As ex-2.2.12 defined it. The home of <em>red</em> is the first two axes of the stream together. Alignment is the length of the projection of a state onto that pair, and the anchor term pulls that length toward one on the labelled lines. The anti-subspace term is the square of that length over every live position, and the removal projects the whole plane out.</p>
+<p>So the concept holds two coordinates of sixty-four rather than one, and its share of the variance counts both.</p>
+<h3 id="budget">Budget<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#budget" title="Link to this heading">&para;</a></h3>
+<p>160 runs at d64-L4, each as long as a run in ex-2.2.11, at about three minutes a run on an L4. Scoring adds the eleven ops under the operators from ex-2.2.11, the per-line pass, and the achromatic edit. That is about three and a half times the sweep in ex-2.2.12, which cost six dollars on Modal.</p>
+<h3 id="what-this-experiment-does-not-vary">What this experiment does not vary<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#what-this-experiment-does-not-vary" title="Link to this heading">&para;</a></h3>
+<p>Depth, the pooling temperature τ, and the anti-subspace ratios stay at the values from ex-2.2.11, which means the anti-subspace weight itself climbs with the ladder. Ex-2.2.12 moved each of them one step and resolved nothing on any measurement, so a third factor here would cost runs without a prediction behind it. The weight above 0.28 is also left alone: the ladder tests the region ex-2.1.11's map calls useful, and finding its edge on this grammar is a different experiment.</p>
+<p>The survey in ex-2.1.11 found that the weight and τ trade against each other, so a λ_a × τ factorial would be the natural follow-up if this ladder finds a level worth having.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:rs">
+<p>The <em>residual stream</em> is the running vector of activations that each layer of a transformer reads from and writes back to.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#fnref:rs" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:trend">
+<p>The <em>trend contrast</em> regresses each run's absolute distance from the median of its own condition on log λ_a. Working from the median rather than the mean keeps a couple of extreme seeds from deciding it, and asking for a slope rather than for any difference between the levels means a spread that rose and then fell does not count as a pass.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.13/#fnref:trend" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

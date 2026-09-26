@@ -1,0 +1,1509 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/b7ff6088e809d5b16e5dbbaea058bd3c05c4db16/exports/m2/ex-2.2.15/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.2.15: lines cut short by the training window</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md.css into the md.css the site serves; and VS Code's
+ * Markdown preview lists both files (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
+ *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-219/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.15/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.2.15</strong> · <code>cd6bd98</code> · run 2026-09-26<div>via reports/m2/ex-2.2.15/metrics, reports/m2/ex-2.2.15/trajectories</div></div></details>
+<main class="lit">
+<h1 id="ex-2215-lines-cut-short-by-the-training-window">Ex 2.2.15: lines cut short by the training window<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#ex-2215-lines-cut-short-by-the-training-window" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>The anchor pulls on whole lines. But in training, the model sees the corpus through a window, and each window cuts off the lines at its edges. On a cut line, the anchor asks the visible part to carry the whole label, even when that part cannot see the op word. We retrain the anchored model under a few policies for which cut lines to pull, and track what each one does over the course of training. We do this on the current grammar, before the in-context grammar makes the problem larger.</p>
+</div>
+<p>This is a scouting run of 55 fresh training runs, with a few predictions and one rule: it proposes the crop policy the <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/d2.2/design.html#the-pilot">in-context grammar pilot</a> starts from. Cut lines are a small share of any one batch, but the anchor meets them at every step, so the question is what they add up to over training. Each run records the lean and the trailing-fragment lean at every trajectory point (every 50 training steps), as well as at the end.</p>
+<h2 id="findings">Findings<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#findings" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#the-first-operand-lean-is-due-to-cut-lines-h1">The first operand lean is due to cut lines (H1)</a> — <strong>held</strong>: <code>whole</code> removes 116% of the excess lean of <code>all</code> (-0.019 from the control, band ±0.05), and <code>cut-only</code> keeps 170% of it (pass at 50%; partial at 30% each).</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#the-anchor-and-the-task-hold-under-every-policy-h2">The anchor and the task hold under every policy (H2)</a> — <strong>did not hold</strong>: 3 of 11 arms miss: <code>cut-only</code> (margin 0.84 of <code>all</code>'s); <code>all-short</code> (task gap -0.0639 on <code>difference</code>); <code>whole-short</code> (task gap -0.0481 on <code>difference</code>). The gates are a margin of at least 0.9 of <code>all</code>'s and a task gap within 0.02; over every arm, the lowest margin is 0.84 (<code>cut-only</code>) and the largest gap -0.0639 (<code>all-short</code> on <code>difference</code>).</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#trailing-fragments-without-their-op-word-h3">Trailing fragments without their op word (H3)</a> — <strong>held</strong>: the trailing-fragment lean is 0.439 under <code>all</code>, against 0.003 under <code>whole</code>, -0.006 under <code>knowable</code>, and -0.031 on the control.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#halved-windows-more-cut-lines-h4">Halved windows, more cut lines (H4)</a> — <strong>partly held</strong>: the gap between <code>all</code> and <code>whole</code> is +0.024 at 32 tokens against +0.134 at 64, and <code>whole-short</code> is -0.000 from the control (band ±0.05).</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#where-the-rest-of-the-lean-comes-from-h5">Where the rest of the lean comes from (H5)</a> — <strong>held</strong>: <code>whole-tied</code> leans -0.032 against <code>whole</code>, paired by seed, and <code>whole-mask</code> -0.009.</li>
+</ul>
+<p><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#the-rule-for-the-pilot">The rule for the pilot</a>: the pilot starts from <strong><code>half</code></strong>.</p>
+<h2 id="how-to-read-this-draft">How to read this draft<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#how-to-read-this-draft" title="Link to this heading">&para;</a></h2>
+<p>The policies, the five predictions, and the rule were fixed before any run, at commit <code>5334cb9</code>. Everything after that commit is either results filled into their sections or exploratory work, marked as post hoc.</p>
+<p>Each result section opens with what we expect, then what we saw. The interpretation and the discussion are still to come.</p>
+<h2 id="why-this-experiment">Why this experiment<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#why-this-experiment" title="Link to this heading">&para;</a></h2>
+<p>The training corpus is one long tape of six-token lines. Each training step cuts a batch of 64 windows of 64 tokens from it, each at a random place. Most lines in a window are whole, but its two edges usually slice through a line.</p>
+<p>The anchor does not know about the edges. It asks each labelled line to align with the axis at whichever visible position aligns most easily. So when a line is cut, the visible part alone has to carry the whole label.</p>
+<p>In these runs the anchor targets the op <code>difference</code>, as in the primary arm of ex-2.2.14. If a <code>difference</code> line shows only its first operand, the anchor asks a color token to say "this line is <code>difference</code>" before the op word has appeared. That token cannot know, so the only way the model can satisfy the anchor there is to lean every first operand a little toward the axis.</p>
+<p>That is what <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.14/">ex-2.2.14</a> saw, after the fact. At the last block, the first operand leaned toward e₁ at 0.19 on the primary arm, against -0.01 on the control, and the arm that pulls only the op word had no lean. The <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/">op1-lean reanalysis</a> found the same route on the <em>red</em> runs, and proposed skipping the pull on cut lines as a test.</p>
+<p>Before fixing the predictions, we ran that test as a smoke test on <em>red</em>: two seeds each of the conditions <code>all</code>, <code>whole</code>, and <code>cut-only</code>. <code>whole</code> took the lean from 0.23 to 0.17, and <code>cut-only</code> kept 0.08, against about zero for the control. So on <em>red</em>, cut lines carry about a third of the lean and whole lines the rest. The validation loss was the same under every policy, to three decimals.</p>
+<p>Where the rest comes from is a question of its own. So two more arms keep <code>whole</code> and change the model. One stops attention at each newline; the other ties the readout to the embedding table (the output layer reuses the input embedding weights).</p>
+<p>Red is a weaker test than the op, though. On a <em>red</em> line the first operand can be red itself, which is evidence the anchor can pull on; on a <code>difference</code> line the first operand says nothing about the op.</p>
+<p>At 64 tokens, 15% of line visits are cut short. On 7.4% the op word is out of sight, and on 1.5% only the first operand is visible. The shares are small, but the term is normalized per labelled line, so each of those visits gets the pull of a full line.</p>
+<p>This matters more after the <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/d2.2/pivot.html">D2.2 pivot</a>. There, a line is a context of solved examples about 20 tokens long, and the op is inferred from the examples, so a window that cuts the start of a context can remove the examples that name the op. With fewer lines per window, the share of cut visits roughly doubles, and a cut context has lost evidence, not just one token. The current grammar is the cheap place to see what each policy does, with a clear sign (the lean) to watch.</p>
+<h2 id="glossary">Glossary<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#glossary" title="Link to this heading">&para;</a></h2>
+<dl>
+<dt>Cut line</dt>
+<dd>A line visit that the training window shows only part of. A line cut at its start has lost its first tokens, so its states differ from those of the whole line. A line cut at its end shows a prefix. Under causal attention (each position sees only earlier positions), those prefix states are the same as in the whole line.</dd>
+<dt>Crop policy</dt>
+<dd>Which labelled lines the anchor pulls, given what the window shows of them. The label draws are the same under every policy; only the pull changes.</dd>
+<dt>Pull kept</dt>
+<dd>The share of the current total pull a policy keeps, averaged over every way a window shows a line. It is computed from the sampler, not measured.</dd>
+<dt>The lean</dt>
+<dd>The mean cosine with e₁ at the first operand, over every op's probe lines, at the last block. The first operand comes before the op word, so any lean there is shared by every line, whatever its op.</dd>
+<dt>Trailing fragment</dt>
+<dd>A probe line shown from its second operand, <code>=</code>, answer, or newline on, as a sequence of its own: what a window leaves of a line when it cuts off the op word.</dd>
+<dt>Op margin</dt>
+<dd>As in ex-2.2.14: how much closer the <code>difference</code> lines sit to e₁ than the pool of all eleven ops, at the role where the gap is largest, averaged over slices. It checks that the anchor landed.</dd>
+</dl>
+
+<h2 id="conditions">Conditions<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#conditions" title="Link to this heading">&para;</a></h2>
+<table class="report-table dense"><thead><tr><th>condition</th><th>which labelled lines the anchor pulls</th><th>model</th><th class=num>window</th><th class=num>pull kept</th><th class=num>seeds</th></tr></thead><tbody><tr><td><code>all</code></td><td>every labelled line, whatever is visible (the current behaviour)</td><td>untied readout</td><td class=num>64</td><td class=num>100%</td><td class=num>5</td></tr><tr><td><code>whole</code></td><td>only lines wholly inside the window</td><td>untied readout</td><td class=num>64</td><td class=num>85%</td><td class=num>5</td></tr><tr><td><code>half</code></td><td>only lines with more than half their tokens inside the window</td><td>untied readout</td><td class=num>64</td><td class=num>91%</td><td class=num>5</td></tr><tr><td><code>scaled</code></td><td>every labelled line, its pull scaled by the share of it that is visible</td><td>untied readout</td><td class=num>64</td><td class=num>93%</td><td class=num>5</td></tr><tr><td><code>knowable</code></td><td>only positions at or after a visible op word</td><td>untied readout</td><td class=num>64</td><td class=num>93%</td><td class=num>5</td></tr><tr><td><code>cut-only</code></td><td>only lines the window cuts short</td><td>untied readout</td><td class=num>64</td><td class=num>15%</td><td class=num>5</td></tr><tr><td><code>all-short</code></td><td>every labelled line, whatever is visible (the current behaviour)</td><td>untied readout</td><td class=num>32</td><td class=num>100%</td><td class=num>5</td></tr><tr><td><code>whole-short</code></td><td>only lines wholly inside the window</td><td>untied readout</td><td class=num>32</td><td class=num>73%</td><td class=num>5</td></tr><tr><td><code>whole-mask</code></td><td>only lines wholly inside the window</td><td>attention stops at each newline</td><td class=num>64</td><td class=num>85%</td><td class=num>5</td></tr><tr><td><code>whole-tied</code></td><td>only lines wholly inside the window</td><td>tied readout</td><td class=num>64</td><td class=num>85%</td><td class=num>5</td></tr><tr><td><code>all-tied</code></td><td>every labelled line, whatever is visible (the current behaviour)</td><td>tied readout</td><td class=num>64</td><td class=num>100%</td><td class=num>5</td></tr><tr><td><code>control</code></td><td>none: the un-anchored control from ex-2.2.11, served from the store</td><td>untied readout</td><td class=num>64</td><td class=num>–</td><td class=num>5</td></tr></tbody></table>
+
+<p>Every arm is the primary from ex-2.2.14: <code>difference</code> on e₁, labelled at a rate of 0.02 per line, the pull over the whole line, and the handover recipe. Only the crop policy changes, plus the window for the short pair and the model for the last three.</p>
+<p><strong>Same batches, same labels.</strong> A policy is a weight on the pull of each labelled line, applied after the labels are drawn. So at one seed every 64-token arm trains on the same windows with the same labels, and differences between arms at a seed come from the policy. The model arms, <code>whole-mask</code>, <code>whole-tied</code>, and <code>all-tied</code>, share those windows and labels too, so each pairs with <code>whole</code> or <code>all</code> at a seed. The short-window arms draw differently and are compared with each other.</p>
+<p><strong>A policy only takes pull away.</strong> A line that a policy keeps gets the same pull it had under <code>all</code>, because the term still divides by the number of labelled lines with anything visible. We could instead divide by the number of lines the policy keeps, but then every kept pull would grow stronger as the policy drops more, which is the side effect ex-2.1.7 warned about.</p>
+<p>The cost of our choice is that the policies differ a little in total pull, so the table gives the share each keeps. <code>cut-only</code> keeps only 15%, and that is intended: <code>whole</code> and <code>cut-only</code> split the pull of <code>all</code> in two, so if the lean follows <code>cut-only</code>, it follows the cut lines and not the total.</p>
+<p><strong>The policies.</strong> <code>whole</code>, <code>half</code>, and <code>scaled</code> need nothing but the window, so each would carry over to any grammar. They differ on spans longer than the window, as a natural-language document often is: <code>whole</code> never pulls one, <code>half</code> stops at twice the window, and <code>scaled</code> pulls every span by the share in view.</p>
+<p><code>knowable</code> needs to know where the evidence is. Here, that is the op word; in the in-context grammar, it would be the posterior over ops given the tokens so far (label variant (c) in the pivot). It also drops the first operand from the pull on whole lines, as the note in ex-2.2.14 suggested, and is a reference for what knowing the evidence buys.</p>
+<p><strong>The halved windows.</strong> At 32 tokens, 27% of line visits are cut, about the share the in-context grammar would have. The batch doubles to 128 windows, so a step sees the same number of tokens and the runs take the same steps. <code>all-short</code> against <code>whole-short</code> asks whether the effect grows with the share of cut lines, and whether <code>whole</code> still removes it.</p>
+<p><strong>The model arms.</strong> <code>whole-mask</code> and <code>whole-tied</code> each keep <code>whole</code> and change one thing about the model, to test a route for any lean that <code>whole</code> leaves on whole lines. <code>whole-mask</code> stops attention at each newline, so a position sees only its own line; on a whole line the first operand then sees nothing but itself. The <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/d2.2/pivot.html#the-proposal">pivot</a> names this mask as optional for the in-context grammar. <code>whole-tied</code> ties the readout to the embedding table, as <code>handover-tied</code> did in ex-2.2.9. The untied readout arrived with the handover recipe, and the <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/op1-lean/">op1-lean reanalysis</a> found the lean on <em>red</em> running through it. <code>all-tied</code> pairs with <code>whole-tied</code>, so the share of the lean that cut lines carry can be measured under the tied readout as well.</p>
+<h2 id="the-first-operand-lean-is-due-to-cut-lines-h1"><span class="heading-words">The first operand lean is due to cut lines (H1)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#the-first-operand-lean-is-due-to-cut-lines-h1" title="Link to this heading">&para;</a></span> <mark class="verdict pass">✓ Pass</mark></h2>
+<p><strong>What we expect.</strong> <code>all</code> reproduces the lean from ex-2.2.14. <code>whole</code> removes it: its seed-mean lean is within 0.05 of the control's. And <code>cut-only</code> keeps at least 50% of the excess of <code>all</code> over the control, although it has only 15% of the pull.</p>
+<p>H1 is partial if <code>whole</code> removes at least 30% of that excess and <code>cut-only</code> keeps at least 30% of it. Then the cut lines carry a real share of the lean, though not all of it, and the rule can still adopt a policy that improves on <code>all</code>.</p>
+<p>Why: the pool needs only one position of a line to align. On a whole line the op word aligns far more easily than the first operand, so the first operand gets almost no pull; only visits that show nothing else force pull onto it. <code>half</code> and <code>knowable</code> also drop those visits, so we expect them to remove the lean. <code>scaled</code> keeps a sixth of their pull, so we expect it to remove most of it.</p>
+<p>Through training, we expect the lean of <code>all</code> to build while the anchor weight is high and persist through the anneal, and the lean of <code>whole</code> to stay near the control throughout. This prediction is descriptive, with no gate. If <code>whole</code> shows a lean early and sheds it later, or <code>all</code> builds its lean only late, that would mean the cut lines matter at a particular stage of training, which a reading taken only at the end would miss.</p>
+<p>If <code>whole</code> keeps most of the lean, the lean comes from whole lines (perhaps through the readout, as the op1-lean reanalysis found for <em>red</em>), and cropping is a side issue on this grammar. If <code>whole</code> removes part of the lean but stays outside the band, the cut lines are one route among others, and <code>cut-only</code> says how large a share they carry. On <em>red</em> the smoke test landed here: <code>whole</code> removed 29% of the excess, just short of partial. The model arms (H5) test two routes for the rest.</p>
+<p>If the lean of <code>all</code> is less than 0.1 above the control's, it did not reproduce at these seeds, and H1 is unresolved.</p>
+<!-- REVIEW: the smoke test on red (two seeds) found `whole` removing 29% of the excess lean and `cut-only` keeping about a third, so on red H1 would miss its pass. The pass gate and CUT_ONLY_SHARE stay as they were, because on a red line the first operand can itself carry the label's evidence, and on a `difference` line it cannot. After Sandy's review of 2543d1b, a partial band (PARTIAL_SHARE) gives a middle result a verdict, and lets the rule adopt a policy that only improves on `all`. Verify: red lands at 29%, just under the partial share, and the share was set with that in view. -->
+
+<p><strong>What we saw.</strong> <code>all</code> leaned 0.101 at the last block, against the control's -0.014: an excess of 0.115, where ex-2.2.14 had 0.20. <code>whole</code> removed 116% of that excess, leaving -0.019, inside the band of ±0.05. <code>cut-only</code>, with 15% of the pull, kept 170% of it. Of the other policies, <code>half</code> removed 99%, <code>scaled</code> 11%, and <code>knowable</code> 124%.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h1-lean-light.png" alt="A dot plot of the lean at the last block, one column per condition in the order control, all, whole, half, scaled, knowable, cut-only, all-short, whole-short, whole-mask, whole-tied, all-tied, with one small dot per seed and the seed mean as a larger mark. A grey band 0.05 either side of the control&#x27;s mean -0.014 runs across the plot, and a dotted line marks ex-2.2.14&#x27;s value of 0.19. The seed means are control -0.014, all 0.101, whole -0.033, half -0.013, scaled 0.088, knowable -0.041, cut-only 0.181, all-short 0.009, whole-short -0.015, whole-mask -0.042, whole-tied -0.065, all-tied -0.046." width="818" height="338" style="max-width: 100%; height: auto;" data-asset-name="h1-lean" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h1-lean-dark.png" alt="A dot plot of the lean at the last block, one column per condition in the order control, all, whole, half, scaled, knowable, cut-only, all-short, whole-short, whole-mask, whole-tied, all-tied, with one small dot per seed and the seed mean as a larger mark. A grey band 0.05 either side of the control&#x27;s mean -0.014 runs across the plot, and a dotted line marks ex-2.2.14&#x27;s value of 0.19. The seed means are control -0.014, all 0.101, whole -0.033, half -0.013, scaled 0.088, knowable -0.041, cut-only 0.181, all-short 0.009, whole-short -0.015, whole-mask -0.042, whole-tied -0.065, all-tied -0.046." width="818" height="338" style="max-width: 100%; height: auto;" data-asset-name="h1-lean" />
+<figcaption><p><strong>The lean at the last block, per condition.</strong> The mean cosine with e₁ at the first operand, over
+every op's probe lines, one small dot per seed and the seed mean as the large mark. The grey band
+is the control's seed mean ± 0.05, the band <code>whole</code> has to land in for H1 to pass; the
+dotted line is the primary of ex-2.2.14 (0.19). The groups are the
+policies, the halved windows, and the model arms.</p></figcaption></figure>
+
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h1-slices-light.png" alt="A line chart of the lean at each slice, from the embedding (slice 0) to the last block (slice 4), one line per condition: control, all, whole, half, scaled, knowable, cut-only. At the last block the lines end at control -0.014, all 0.101, whole -0.033, half -0.013, scaled 0.088, knowable -0.041, cut-only 0.181." width="548" height="318" style="max-width: 100%; height: auto;" data-asset-name="h1-slices" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h1-slices-dark.png" alt="A line chart of the lean at each slice, from the embedding (slice 0) to the last block (slice 4), one line per condition: control, all, whole, half, scaled, knowable, cut-only. At the last block the lines end at control -0.014, all 0.101, whole -0.033, half -0.013, scaled 0.088, knowable -0.041, cut-only 0.181." width="548" height="318" style="max-width: 100%; height: auto;" data-asset-name="h1-slices" />
+<figcaption><p><strong>The lean at each slice.</strong> The seed mean of the cosine with e₁ at the first operand, over every
+op's probe lines, from the embedding (slice 0) to the last block, for the control and each policy.</p></figcaption></figure>
+
+<p>The anchor weight holds at its peak from epoch 5 to epoch 45. Over the first half of that plateau, the lean of <code>all</code> averaged 0.012 on the trajectory probe; over the second half, 0.068; and it ended at 0.101. From the start of the plateau on, the lean of <code>whole</code> came furthest from the control's end value at epoch 5, at +0.040.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h1-trajectory-light.png" alt="Two stacked line charts sharing an epoch axis from 0 to 50. Top: the lean at the last block through training, one thick line per policy (all, whole, half, scaled, knowable, cut-only) for the seed mean and a hairline per seed, over a grey silhouette of the anchor weight&#x27;s schedule, with a dashed line at the control&#x27;s end-of-training lean -0.014. Bottom: the same for the trailing-fragment lean, against the control&#x27;s -0.031. At the end the seed-mean lean is all 0.101, whole -0.033, half -0.013, scaled 0.088, knowable -0.041, cut-only 0.181." width="702" height="491" style="max-width: 100%; height: auto;" data-asset-name="h1-trajectory" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h1-trajectory-dark.png" alt="Two stacked line charts sharing an epoch axis from 0 to 50. Top: the lean at the last block through training, one thick line per policy (all, whole, half, scaled, knowable, cut-only) for the seed mean and a hairline per seed, over a grey silhouette of the anchor weight&#x27;s schedule, with a dashed line at the control&#x27;s end-of-training lean -0.014. Bottom: the same for the trailing-fragment lean, against the control&#x27;s -0.031. At the end the seed-mean lean is all 0.101, whole -0.033, half -0.013, scaled 0.088, knowable -0.041, cut-only 0.181." width="702" height="491" style="max-width: 100%; height: auto;" data-asset-name="h1-trajectory" />
+<figcaption><p><strong>The lean through training.</strong> Top: the lean at the last block on the trajectory probe lines,
+recorded every 50 steps; the thick line is the seed mean and the hairlines are the
+seeds. The grey silhouette is the anchor weight's schedule (right-hand scale, relative to its
+peak). Bottom: the trailing-fragment lean (H3), pooled over ops. The dashed lines are the
+control's values at the end of training; the control records no trajectory.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>lean</th><th class=num>± sd</th><th class=num>excess over control</th><th class=num>share of <code>all</code>'s excess</th><th class=num>pull kept</th></tr></thead><tbody><tr class=ref><td><code>control</code></td><td class=num>-0.014</td><td class=num>0.073</td><td class=num>–</td><td class=num>–</td><td class=num>–</td></tr><tr><td><code>all</code></td><td class=num>0.101</td><td class=num>0.195</td><td class=num>+0.115</td><td class=num>100%</td><td class=num>100%</td></tr><tr><td><code>whole</code></td><td class=num>-0.033</td><td class=num>0.083</td><td class=num><b>-0.019</b></td><td class=num>-16%</td><td class=num>85%</td></tr><tr><td><code>half</code></td><td class=num>-0.013</td><td class=num>0.117</td><td class=num><b>+0.001</b></td><td class=num>1%</td><td class=num>91%</td></tr><tr><td><code>scaled</code></td><td class=num>0.088</td><td class=num>0.115</td><td class=num>+0.102</td><td class=num>89%</td><td class=num>93%</td></tr><tr><td><code>knowable</code></td><td class=num>-0.041</td><td class=num>0.023</td><td class=num><b>-0.027</b></td><td class=num>-24%</td><td class=num>93%</td></tr><tr><td><code>cut-only</code></td><td class=num>0.181</td><td class=num>0.132</td><td class=num>+0.196</td><td class=num>170%</td><td class=num>15%</td></tr><tr><td><code>all-short</code></td><td class=num>0.009</td><td class=num>0.033</td><td class=num><b>+0.023</b></td><td class=num>20%</td><td class=num>100%</td></tr><tr><td><code>whole-short</code></td><td class=num>-0.015</td><td class=num>0.054</td><td class=num><b>-0.000</b></td><td class=num>-0%</td><td class=num>73%</td></tr><tr><td><code>whole-mask</code></td><td class=num>-0.042</td><td class=num>0.021</td><td class=num><b>-0.028</b></td><td class=num>-25%</td><td class=num>85%</td></tr><tr><td><code>whole-tied</code></td><td class=num>-0.065</td><td class=num>0.040</td><td class=num>-0.050</td><td class=num>-44%</td><td class=num>85%</td></tr><tr><td><code>all-tied</code></td><td class=num>-0.046</td><td class=num>0.027</td><td class=num><b>-0.032</b></td><td class=num>-28%</td><td class=num>100%</td></tr></tbody></table><figcaption><p>The lean at the last block per condition: the seed mean and its seed-to-seed spread, its excess over the control (bold within the band of ±0.05), that excess as a share of <code>all</code>'s, and the share of the pull the policy keeps. The halved pair's shares are against <code>all</code>, at the long window.</p></figcaption></figure>
+
+<div class="admonition success">
+<p class="admonition-title">Pass</p>
+<p><code>whole</code> removes 116% of the excess lean of <code>all</code> (-0.019 from the control, band ±0.05), and <code>cut-only</code> keeps 170% of it (pass at 50%; partial at 30% each).</p>
+</div>
+<h2 id="the-anchor-and-the-task-hold-under-every-policy-h2"><span class="heading-words">The anchor and the task hold under every policy (H2)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#the-anchor-and-the-task-hold-under-every-policy-h2" title="Link to this heading">&para;</a></span> <mark class="verdict miss">✗ Miss</mark></h2>
+<p><strong>What we expect.</strong> No policy costs the anchor or the task, and neither do the model arms. The op margin of every arm is at least 90% of the margin under <code>all</code>, and every op's held-out expected exact match is within 0.02 of the control (the gate from ex-2.2.11), on the seed means.</p>
+<p>In ex-2.2.14 the margin sat at the op word and saturated early, and whole lines carry the op word, so dropping cut lines should leave it where it was. If the margin falls under <code>whole</code>, there are two possible causes. The cut lines may have been doing part of the work of the anchor. Or the policy removed some of the total pull, and λ_a would need scaling up to make up for it. The pull kept roughly tells the two apart: a fall about the size of the pull removed points to λ_a, and a larger one points to the cut lines. Either way the rule checks this gate, since a policy that moves the anchor or the task would not go forward as it stands.</p>
+<p><strong>What we saw.</strong> The lowest op margin was 0.84 of the margin under <code>all</code>, on <code>cut-only</code>. The largest task gap from the control was -0.0639, on <code>difference</code> under <code>all-short</code>.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h2-gates-light.png" alt="Two panels, each with the 11 arms along the bottom. Left: the op margin as a share of the seed-mean margin under `all`, one dot per seed and the seed mean as the large mark, with a dashed line at 90% and the region below it hatched. The seed means are all 1.00, whole 1.01, half 1.02, scaled 1.01, knowable 1.02, cut-only 0.84, all-short 1.01, whole-short 1.02, whole-mask 1.03, whole-tied 0.90, all-tied 0.93. Right: the largest gap in held-out expected exact match from the control over the eleven ops, one bar per arm, with dashed lines at ±0.02 and the regions beyond them hatched. The gaps are all -0.008, whole -0.013, half -0.010, scaled -0.004, knowable -0.005, cut-only -0.005, all-short -0.064, whole-short -0.048, whole-mask +0.015, whole-tied -0.009, all-tied -0.016." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="h2-gates" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h2-gates-dark.png" alt="Two panels, each with the 11 arms along the bottom. Left: the op margin as a share of the seed-mean margin under `all`, one dot per seed and the seed mean as the large mark, with a dashed line at 90% and the region below it hatched. The seed means are all 1.00, whole 1.01, half 1.02, scaled 1.01, knowable 1.02, cut-only 0.84, all-short 1.01, whole-short 1.02, whole-mask 1.03, whole-tied 0.90, all-tied 0.93. Right: the largest gap in held-out expected exact match from the control over the eleven ops, one bar per arm, with dashed lines at ±0.02 and the regions beyond them hatched. The gaps are all -0.008, whole -0.013, half -0.010, scaled -0.004, knowable -0.005, cut-only -0.005, all-short -0.064, whole-short -0.048, whole-mask +0.015, whole-tied -0.009, all-tied -0.016." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="h2-gates" />
+<figcaption><p><strong>The anchor and the task, per arm.</strong> Left: the op margin as a share of the seed-mean margin
+under <code>all</code>, one small dot per seed and the seed mean as the large mark; H2 asks for at least
+90% (dashed; hatched below). Right: the gap in held-out expected exact match from
+the control, for the op furthest from it; H2 asks for at most 0.02 either way
+(dashed; hatched beyond).</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>op margin</th><th class=num>share of <code>all</code>'s</th><th class=num>op of largest gap</th><th class=num>gap</th><th class=num>pull kept</th><th class=num>H2</th></tr></thead><tbody><tr><td><code>all</code></td><td class=num>0.874</td><td class=num><b>1.00</b></td><td class=num><code>difference</code></td><td class=num><b>-0.0077</b></td><td class=num>100%</td><td class=num>pass</td></tr><tr><td><code>whole</code></td><td class=num>0.880</td><td class=num><b>1.01</b></td><td class=num><code>difference</code></td><td class=num><b>-0.0126</b></td><td class=num>85%</td><td class=num>pass</td></tr><tr><td><code>half</code></td><td class=num>0.890</td><td class=num><b>1.02</b></td><td class=num><code>difference</code></td><td class=num><b>-0.0104</b></td><td class=num>91%</td><td class=num>pass</td></tr><tr><td><code>scaled</code></td><td class=num>0.885</td><td class=num><b>1.01</b></td><td class=num><code>difference</code></td><td class=num><b>-0.0038</b></td><td class=num>93%</td><td class=num>pass</td></tr><tr><td><code>knowable</code></td><td class=num>0.887</td><td class=num><b>1.02</b></td><td class=num><code>difference</code></td><td class=num><b>-0.0045</b></td><td class=num>93%</td><td class=num>pass</td></tr><tr><td><code>cut-only</code></td><td class=num>0.730</td><td class=num>0.84</td><td class=num><code>value-hsv</code></td><td class=num><b>-0.0049</b></td><td class=num>15%</td><td class=num>miss</td></tr><tr><td><code>all-short</code></td><td class=num>0.884</td><td class=num><b>1.01</b></td><td class=num><code>difference</code></td><td class=num>-0.0639</td><td class=num>100%</td><td class=num>miss</td></tr><tr><td><code>whole-short</code></td><td class=num>0.890</td><td class=num><b>1.02</b></td><td class=num><code>difference</code></td><td class=num>-0.0481</td><td class=num>73%</td><td class=num>miss</td></tr><tr><td><code>whole-mask</code></td><td class=num>0.897</td><td class=num><b>1.03</b></td><td class=num><code>difference</code></td><td class=num><b>+0.0150</b></td><td class=num>85%</td><td class=num>pass</td></tr><tr><td><code>whole-tied</code></td><td class=num>0.787</td><td class=num><b>0.90</b></td><td class=num><code>hsvmix</code></td><td class=num><b>-0.0094</b></td><td class=num>85%</td><td class=num>pass</td></tr><tr><td><code>all-tied</code></td><td class=num>0.815</td><td class=num><b>0.93</b></td><td class=num><code>difference</code></td><td class=num><b>-0.0162</b></td><td class=num>100%</td><td class=num>pass</td></tr></tbody></table><figcaption><p>The two gates of H2 per arm, on the seed means: the op margin and its share of the margin under <code>all</code> (bold at or above 90%), and the op whose held-out expected exact match is furthest from the control, with its gap (bold within 0.02).</p></figcaption></figure>
+
+<div class="admonition danger">
+<p class="admonition-title">Miss</p>
+<p>3 of 11 arms miss: <code>cut-only</code> (margin 0.84 of <code>all</code>'s); <code>all-short</code> (task gap -0.0639 on <code>difference</code>); <code>whole-short</code> (task gap -0.0481 on <code>difference</code>). The gates are a margin of at least 0.9 of <code>all</code>'s and a task gap within 0.02; over every arm, the lowest margin is 0.84 (<code>cut-only</code>) and the largest gap -0.0639 (<code>all-short</code> on <code>difference</code>).</p>
+</div>
+<h2 id="trailing-fragments-without-their-op-word-h3"><span class="heading-words">Trailing fragments without their op word (H3)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#trailing-fragments-without-their-op-word-h3" title="Link to this heading">&para;</a></span> <mark class="verdict pass">✓ Pass</mark></h2>
+<p><strong>What we expect.</strong> Under <code>all</code>, trailing fragments lean toward e₁, and under <code>whole</code> and <code>knowable</code> they lean less. The number is the mean cosine with e₁ over every position of every trailing fragment and every op, at the last block, against the control. This is a prediction of direction, with no gate.</p>
+<p>Why: under <code>all</code>, the anchor asks a trailing fragment like <code>op2 = answer ⏎</code> to align with nothing to go on. The pool puts the pull where alignment comes most easily, which here is likely the syntax tokens <code>=</code> and <code>⏎</code>, since they carry no color. So we expect most of the lean to sit there.</p>
+<p>On <em>red</em>, the smoke test points to the second operand as well: on whole probe lines, the lean there came mostly from cut lines. <code>whole</code> took it from 0.12 to 0.04, and <code>cut-only</code> kept 0.13. But on <em>red</em> the second operand can itself be red, so that may not carry over to the op.</p>
+<p>The model can respond with a general lean, as at the first operand, or by guessing the op from what it can see, since some pairs of second operand and answer fit <code>difference</code> better than others. So we also report the contrast between the <code>difference</code> trailing fragments and the rest, with no prediction.</p>
+<p>A positive contrast would mean the model is learning a surface cue for the op: the shortcut the pivot names as a <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/d2.2/pivot.html#the-anchor-picks-up-a-shortcut">failure mode</a>, here in miniature.</p>
+<p><strong>What we saw.</strong> Under <code>all</code> the trailing fragments leaned 0.439, against -0.031 on the control. Under <code>whole</code> they leaned 0.003, and under <code>knowable</code> -0.006. The largest lean under <code>all</code> sat at <code>⏎</code> in the fragments starting at <code>⏎</code> (0.954). The contrast between the <code>difference</code> fragments and the rest was +0.012 under <code>all</code> and -0.001 on the control.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h3-fragments-light.png" alt="Two panels, each with the control and the 11 arms along the bottom, one small dot per seed and the seed mean as a larger mark, with a grey band around the control&#x27;s mean. Left: the trailing-fragment lean; the seed means are control -0.031, all 0.439, whole 0.003, half 0.107, scaled 0.204, knowable -0.006, cut-only 0.348, all-short 0.428, whole-short 0.004, whole-mask -0.003, whole-tied 0.001, all-tied 0.295. Right: the contrast between the `difference` trailing fragments and the rest; the seed means are control -0.001, all +0.012, whole +0.000, half +0.005, scaled +0.009, knowable -0.000, cut-only +0.009, all-short +0.016, whole-short +0.000, whole-mask -0.000, whole-tied +0.000, all-tied +0.012." width="818" height="328" style="max-width: 100%; height: auto;" data-asset-name="h3-fragments" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h3-fragments-dark.png" alt="Two panels, each with the control and the 11 arms along the bottom, one small dot per seed and the seed mean as a larger mark, with a grey band around the control&#x27;s mean. Left: the trailing-fragment lean; the seed means are control -0.031, all 0.439, whole 0.003, half 0.107, scaled 0.204, knowable -0.006, cut-only 0.348, all-short 0.428, whole-short 0.004, whole-mask -0.003, whole-tied 0.001, all-tied 0.295. Right: the contrast between the `difference` trailing fragments and the rest; the seed means are control -0.001, all +0.012, whole +0.000, half +0.005, scaled +0.009, knowable -0.000, cut-only +0.009, all-short +0.016, whole-short +0.000, whole-mask -0.000, whole-tied +0.000, all-tied +0.012." width="818" height="328" style="max-width: 100%; height: auto;" data-asset-name="h3-fragments" />
+<figcaption><p><strong>Trailing fragments at the last block.</strong> Left: the mean cosine with e₁ over every position of
+every trailing fragment of every op. Right: the same over the <code>difference</code> fragments less the mean over
+the rest. One small dot per seed, the seed mean as the large mark; the grey band is the control's
+seed mean ± 0.05, for scale.</p></figcaption></figure>
+
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h3-fragment-roles-light.png" alt="4 small line charts side by side, one per trailing fragment, starting at op2, =, answer, ⏎. Each has the fragment&#x27;s positions along the bottom and the seed-mean cosine with e₁ at the last block up the side, one line per condition: control, all, whole, knowable. The syntax tokens `=` and ⏎ are shaded." width="818" height="260" style="max-width: 100%; height: auto;" data-asset-name="h3-fragment-roles" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h3-fragment-roles-dark.png" alt="4 small line charts side by side, one per trailing fragment, starting at op2, =, answer, ⏎. Each has the fragment&#x27;s positions along the bottom and the seed-mean cosine with e₁ at the last block up the side, one line per condition: control, all, whole, knowable. The syntax tokens `=` and ⏎ are shaded." width="818" height="260" style="max-width: 100%; height: auto;" data-asset-name="h3-fragment-roles" />
+<figcaption><p><strong>Where a trailing fragment leans.</strong> The seed-mean cosine with e₁ at the last block at each
+position of a trailing fragment, pooled over ops, one panel per role the fragment starts at. The
+shaded columns are the syntax tokens <code>=</code> and ⏎, which carry no color.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>trailing-fragment lean</th><th class=num>± sd</th><th class=num><code>difference</code> less the rest</th><th class=num>± sd</th></tr></thead><tbody><tr class=ref><td><code>control</code></td><td class=num>-0.031</td><td class=num>0.030</td><td class=num>-0.001</td><td class=num>0.003</td></tr><tr><td><code>all</code></td><td class=num>0.439</td><td class=num>0.046</td><td class=num>+0.012</td><td class=num>0.007</td></tr><tr><td><code>whole</code></td><td class=num>0.003</td><td class=num>0.020</td><td class=num>+0.000</td><td class=num>0.001</td></tr><tr><td><code>half</code></td><td class=num>0.107</td><td class=num>0.043</td><td class=num>+0.005</td><td class=num>0.003</td></tr><tr><td><code>scaled</code></td><td class=num>0.204</td><td class=num>0.026</td><td class=num>+0.009</td><td class=num>0.004</td></tr><tr><td><code>knowable</code></td><td class=num>-0.006</td><td class=num>0.010</td><td class=num>-0.000</td><td class=num>0.001</td></tr><tr><td><code>cut-only</code></td><td class=num>0.348</td><td class=num>0.055</td><td class=num>+0.009</td><td class=num>0.003</td></tr><tr><td><code>all-short</code></td><td class=num>0.428</td><td class=num>0.050</td><td class=num>+0.016</td><td class=num>0.008</td></tr><tr><td><code>whole-short</code></td><td class=num>0.004</td><td class=num>0.019</td><td class=num>+0.000</td><td class=num>0.001</td></tr><tr><td><code>whole-mask</code></td><td class=num>-0.003</td><td class=num>0.005</td><td class=num>-0.000</td><td class=num>0.001</td></tr><tr><td><code>whole-tied</code></td><td class=num>0.001</td><td class=num>0.006</td><td class=num>+0.000</td><td class=num>0.000</td></tr><tr><td><code>all-tied</code></td><td class=num>0.295</td><td class=num>0.046</td><td class=num>+0.012</td><td class=num>0.010</td></tr></tbody></table><figcaption><p>The trailing fragments at the last block per condition: the lean pooled over every op, and the contrast of the <code>difference</code> fragments with the rest, each as a seed mean with its seed-to-seed spread.</p></figcaption></figure>
+
+<div class="admonition success">
+<p class="admonition-title">Pass</p>
+<p>The trailing-fragment lean is 0.439 under <code>all</code>, against 0.003 under <code>whole</code>, -0.006 under <code>knowable</code>, and -0.031 on the control.</p>
+</div>
+<h2 id="halved-windows-more-cut-lines-h4"><span class="heading-words">Halved windows, more cut lines (H4)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#halved-windows-more-cut-lines-h4" title="Link to this heading">&para;</a></span> <mark class="verdict partial">~ Partial</mark></h2>
+<p><strong>What we expect.</strong> Halved windows give twice as many cut visits, so we expect the lean caused by cut lines to grow. That is, the gap between <code>all-short</code> and <code>whole-short</code> should be larger than the gap between <code>all</code> and <code>whole</code>. We also expect <code>whole-short</code> to remove the lean, bringing it to within 0.05 of the control. This prediction has no gate of its own; the rule falls back on it if H1 is unresolved.</p>
+<p>We compare the gaps within each pair rather than comparing <code>all-short</code> with <code>all</code>. The doubled batch matches the steps and the anchor updates, but a model trained on 32-token windows has seen less context per line, and the gap within a pair holds that fixed.</p>
+<!-- REVIEW: H4's statistic is the within-pair gap (all-short − whole-short against all − whole). The short arms now double the batch, so the steps and anchor updates match the long arms (Sandy's review of f2f8e41); the within-pair gap stays because the window still changes the context the model learns from. Verify: with the steps matched, a reader could argue for the raw all-short vs all comparison as a second read. -->
+
+<p>Suppose the gap for the halved pair is no larger than the gap for the long pair. Then the lean does not depend on how often the first operand is pulled alone, and the extrapolation to the in-context grammar becomes weaker.</p>
+<p><strong>What we saw.</strong> At 32 tokens the gap between <code>all</code> and <code>whole</code> was +0.024, against +0.134 at 64 tokens, so it did not grow. <code>whole-short</code> sat -0.000 from the control, inside the band.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h4-halved-light.png" alt="A dot plot with the share of cut line visits along the bottom, 15% for the 64-token window and 27% for the 32-token one, and the lean at the last block up the side. At each window size, `all` and `whole` sit side by side with a line joining their seed means; one small dot per seed. A grey band marks the control&#x27;s -0.014 ± 0.05. The seed means are all 0.101, whole -0.033, all-short 0.009, whole-short -0.015." width="510" height="338" style="max-width: 100%; height: auto;" data-asset-name="h4-halved" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h4-halved-dark.png" alt="A dot plot with the share of cut line visits along the bottom, 15% for the 64-token window and 27% for the 32-token one, and the lean at the last block up the side. At each window size, `all` and `whole` sit side by side with a line joining their seed means; one small dot per seed. A grey band marks the control&#x27;s -0.014 ± 0.05. The seed means are all 0.101, whole -0.033, all-short 0.009, whole-short -0.015." width="510" height="338" style="max-width: 100%; height: auto;" data-asset-name="h4-halved" />
+<figcaption><p><strong>The lean against the share of cut line visits.</strong> At each window size, <code>all</code> (left) and
+<code>whole</code> (right), one small dot per seed and the seed mean as the large mark, with a line joining
+the two means: its drop is the lean the cut lines carry. The grey band is the control's seed mean
+± 0.05; the control trains at 64 tokens only.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>window</th><th class=num>lean</th><th class=num>excess over control</th><th class=num>gap within the pair</th><th class=num>op margin</th><th class=num>largest task gap</th></tr></thead><tbody><tr><td><code>all</code></td><td class=num>64</td><td class=num>0.101</td><td class=num>+0.115</td><td class=num>+0.134</td><td class=num>0.874</td><td class=num><b>-0.0077 (<code>difference</code>)</b></td></tr><tr><td><code>whole</code></td><td class=num>64</td><td class=num>-0.033</td><td class=num><b>-0.019</b></td><td class=num></td><td class=num>0.880</td><td class=num><b>-0.0126 (<code>difference</code>)</b></td></tr><tr><td><code>all-short</code></td><td class=num>32</td><td class=num>0.009</td><td class=num><b>+0.023</b></td><td class=num>+0.024</td><td class=num>0.884</td><td class=num>-0.0639 (<code>difference</code>)</td></tr><tr><td><code>whole-short</code></td><td class=num>32</td><td class=num>-0.015</td><td class=num><b>-0.000</b></td><td class=num></td><td class=num>0.890</td><td class=num>-0.0481 (<code>difference</code>)</td></tr></tbody></table><figcaption><p>The two pairs, on the seed means: the lean and its excess over the control (bold within ±0.05), the gap between <code>all</code> and <code>whole</code> at each window size, the op margin, and the largest task gap from the control (bold within 0.02).</p></figcaption></figure>
+
+<div class="admonition warning">
+<p class="admonition-title">Partial</p>
+<p>The gap between <code>all</code> and <code>whole</code> is +0.024 at 32 tokens against +0.134 at 64, and <code>whole-short</code> is -0.000 from the control (band ±0.05).</p>
+</div>
+<h2 id="where-the-rest-of-the-lean-comes-from-h5"><span class="heading-words">Where the rest of the lean comes from (H5)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#where-the-rest-of-the-lean-comes-from-h5" title="Link to this heading">&para;</a></span> <mark class="verdict pass">✓ Pass</mark></h2>
+<p><strong>What we expect.</strong> Whatever lean <code>whole</code> leaves sits on whole lines, and each model arm removes one route it could take. The number is the seed-mean lean of each arm against that of <code>whole</code>, paired by seed. These are predictions of direction, with no gate.</p>
+<p><code>whole-tied</code> should lean less than <code>whole</code>. The op1-lean reanalysis found that with a readout of its own, the model makes e₁ a feature meaning "a syntax word comes next", and a first operand is always followed by one (the op word). A tied readout shares its rows with the embedding table, and on <em>red</em> the reanalysis found that feature almost absent on the tied arm.</p>
+<p><code>whole-mask</code> is the weaker expectation. On a whole line the first operand follows a newline and can attend to the line before it. If the lean draws on that line, the mask removes it. If the lean is built at the first operand from its own token, the mask changes nothing. We record the direction either way.</p>
+<p><code>all-tied</code> against <code>whole-tied</code> asks H1's question under the tied readout, with no gate: whether the cut lines still add lean once the readout is tied. If the tied readout removes the lean from whole lines only, the gap between the tied pair should be about the size of the gap between <code>all</code> and <code>whole</code>.</p>
+<p>If H1 passes, <code>whole</code> leaves little lean to split, and these arms mostly say whether each change costs the anchor or the task (H2).</p>
+<p><strong>What we saw.</strong> Paired by seed, <code>whole-tied</code> leaned -0.032 against <code>whole</code> (lower at 3 of 5 seeds), and <code>whole-mask</code> -0.009 (lower at 3 of 5). Under the tied readout, <code>all</code> leaned +0.019 above <code>whole</code>, against +0.134 under the untied readout.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/h5-model-arms-light.png" alt="A dot plot of the lean at the last block for all, whole, whole-mask, whole-tied, all-tied, one dot per seed with the seed mean as a larger mark. Thin lines join each seed&#x27;s dots across the columns, since the arms share their windows and labels at a seed. A grey band marks the control&#x27;s -0.014 ± 0.05. The seed means are all 0.101, whole -0.033, whole-mask -0.042, whole-tied -0.065, all-tied -0.046." width="568" height="338" style="max-width: 100%; height: auto;" data-asset-name="h5-model-arms" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/h5-model-arms-dark.png" alt="A dot plot of the lean at the last block for all, whole, whole-mask, whole-tied, all-tied, one dot per seed with the seed mean as a larger mark. Thin lines join each seed&#x27;s dots across the columns, since the arms share their windows and labels at a seed. A grey band marks the control&#x27;s -0.014 ± 0.05. The seed means are all 0.101, whole -0.033, whole-mask -0.042, whole-tied -0.065, all-tied -0.046." width="568" height="338" style="max-width: 100%; height: auto;" data-asset-name="h5-model-arms" />
+<figcaption><p><strong>The lean under the model arms, by seed.</strong> The lean at the last block, one dot per seed and the
+seed mean as the large mark. The thin grey lines join the dots of one seed, which trains on the
+same windows and labels in every column. The grey band is the control's seed mean ±
+0.05.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>lean</th><th class=num>less <code>whole</code>'s, paired</th><th class=num>± sd</th><th class=num>op margin</th><th class=num>largest task gap</th></tr></thead><tbody><tr class=ref><td><code>whole</code></td><td class=num>-0.033</td><td class=num>–</td><td class=num>–</td><td class=num>0.880</td><td class=num><b>-0.0126 (<code>difference</code>)</b></td></tr><tr><td><code>whole-mask</code></td><td class=num>-0.042</td><td class=num>-0.009</td><td class=num>0.075</td><td class=num>0.897</td><td class=num><b>+0.0150 (<code>difference</code>)</b></td></tr><tr><td><code>whole-tied</code></td><td class=num>-0.065</td><td class=num>-0.032</td><td class=num>0.114</td><td class=num>0.787</td><td class=num><b>-0.0094 (<code>hsvmix</code>)</b></td></tr><tr><td><code>all-tied</code></td><td class=num>-0.046</td><td class=num>-0.013</td><td class=num>0.107</td><td class=num>0.815</td><td class=num><b>-0.0162 (<code>difference</code>)</b></td></tr></tbody></table><figcaption><p>The model arms against <code>whole</code>: the seed-mean lean, its difference from <code>whole</code> paired by seed (with the spread of that difference over seeds), the op margin, and the largest task gap from the control (bold within 0.02).</p></figcaption></figure>
+
+<div class="admonition success">
+<p class="admonition-title">Pass</p>
+<p><code>whole-tied</code> leans -0.032 against <code>whole</code>, paired by seed, and <code>whole-mask</code> -0.009.</p>
+</div>
+<h2 id="the-rule-for-the-pilot">The rule for the pilot<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#the-rule-for-the-pilot" title="Link to this heading">&para;</a></h2>
+<blockquote>
+<p>If H1 passes or is partial, the pilot's default crop policy is <code>scaled</code> if it removes at least half the share of the excess lean (H1) that <code>whole</code> removes, and it passes H2. Otherwise it is whichever of <code>half</code> and <code>whole</code> keeps more of the pull while it removes as much of the lean as H1 asks of <code>whole</code> (to within the band of the control if H1 passed, at least the partial share if it was partial) and passes H2. If H1 missed, or no policy qualifies, the pilot keeps <code>all</code>, and leans on label variant (c) for the evidence question. If H1 is unresolved, the choice falls to the short pair: <code>whole</code> goes forward if the lean of <code>all-short</code> exceeds the control's by the readable margin, the lean of <code>whole-short</code> is within the band of it, and <code>whole</code> passes H2; <code>all</code> stays otherwise.</p>
+</blockquote>
+<p>The test for <code>scaled</code> is looser than for the others, and stated against <code>whole</code>, so it loosens with H1. <code>whole</code> may give the cleanest result, but <code>scaled</code> is the one that carries to labelled spans of any length, so the rule accepts part of the lean to get it. The model arms do not enter the rule; what they find goes to the discussion.</p>
+<p>With H1 at <em>pass</em>, the rule goes forward with <strong><code>half</code></strong>.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>policy</th><th class=num>share of the excess removed</th><th class=num>the lean test</th><th class=num>H2</th><th class=num>pull kept</th><th class=num>qualifies</th></tr></thead><tbody><tr><td><code>scaled</code></td><td class=num>11%</td><td class=num>at least 58%: no</td><td class=num>pass</td><td class=num>93%</td><td class=num>no</td></tr><tr><td><b><code>half</code></b></td><td class=num>99%</td><td class=num>within ±0.05: yes</td><td class=num>pass</td><td class=num>91%</td><td class=num>yes</td></tr><tr><td><code>whole</code></td><td class=num>116%</td><td class=num>within ±0.05: yes</td><td class=num>pass</td><td class=num>85%</td><td class=num>yes</td></tr></tbody></table><figcaption><p>The candidates against the rule, in the order it considers them, with H1 at <em>pass</em>. The share removed is of the excess lean of <code>all</code> over the control; <code>scaled</code>'s bar is 50% of what <code>whole</code> removes. The rule goes forward with <strong><code>half</code></strong> (bold).</p></figcaption></figure>
+
+<h2 id="exploratory-analyses">Exploratory analyses<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#exploratory-analyses" title="Link to this heading">&para;</a></h2>
+<p>Anything we think of after seeing the data goes here, marked as post hoc. Three descriptive measurements are planned, with no gate.</p>
+<p><strong>Where the pull lands.</strong> For each arm and slice, the share of the pull on a labelled line that goes to each role, averaged over the ways a window shows a line (as in E7 of op1-lean). This shows what each policy changes about where the anchor is asked to act.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/x-landing-light.png" alt="A grid with the 6 policies as rows and the six roles of a line (op1, op, op2, =, answer, ⏎) as columns; each cell is shaded and labelled with the share of the pull on a labelled `difference` line that lands on that role at the last block, averaged over the ways a window shows the line. At the first operand the shares are all 0.02, whole 0.00, half 0.00, scaled 0.00, knowable 0.00, cut-only 0.12." width="568" height="290" style="max-width: 100%; height: auto;" data-asset-name="x-landing" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/x-landing-dark.png" alt="A grid with the 6 policies as rows and the six roles of a line (op1, op, op2, =, answer, ⏎) as columns; each cell is shaded and labelled with the share of the pull on a labelled `difference` line that lands on that role at the last block, averaged over the ways a window shows the line. At the first operand the shares are all 0.02, whole 0.00, half 0.00, scaled 0.00, knowable 0.00, cut-only 0.12." width="568" height="290" style="max-width: 100%; height: auto;" data-asset-name="x-landing" />
+<figcaption><p><strong>Where the pull lands (post hoc; planned, no gate).</strong> The share of the pull on a labelled <code>difference</code>
+line that goes to each role at the last block, averaged over the ways a window shows the line,
+per policy. A row sums to the pull the policy keeps, relative to a line under <code>all</code>.</p></figcaption></figure>
+
+<p><strong>Each role on whole lines.</strong> The mean cosine with e₁ at each role over every op's probe lines, per arm and slice. A line cut before its op word puts its pull on the roles after it, so those roles may lean the way the first operand does, on whole lines as well as on trailing fragments.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/x-whole-roles-light.png" alt="A line chart with the six roles of a line along the bottom and the seed-mean cosine with e₁ at the last block up the side, over every op&#x27;s whole probe lines, one line per condition: control, all, whole, cut-only, knowable." width="548" height="299" style="max-width: 100%; height: auto;" data-asset-name="x-whole-roles" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/x-whole-roles-dark.png" alt="A line chart with the six roles of a line along the bottom and the seed-mean cosine with e₁ at the last block up the side, over every op&#x27;s whole probe lines, one line per condition: control, all, whole, cut-only, knowable." width="548" height="299" style="max-width: 100%; height: auto;" data-asset-name="x-whole-roles" />
+<figcaption><p><strong>Each role on whole lines (post hoc; planned, no gate).</strong> The seed-mean cosine with e₁ at the
+last block at each role, over every op's probe lines, which are whole lines.</p></figcaption></figure>
+
+<p><strong>The tied readout.</strong> On the tied pair against <code>all</code> and <code>whole</code>, the measurements the untied readout made hard in earlier runs: the readout gap from the op1-lean reanalysis (how much of the log-odds of a syntax word against a color at the first operand rides on e₁), the component on e₁ of the ⏎ embedding row, and whether the op margin drifts down before the anneal, which ex-2.2.10 saw only with the untied readout.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>syntax-word log-odds at op1</th><th class=num>of it on e₁</th><th class=num>⏎ embedding on e₁</th><th class=num>margin drift before anneal</th></tr></thead><tbody><tr class=ref><td><code>control</code></td><td class=num>8.63</td><td class=num>+0.11</td><td class=num>-0.034</td><td class=num>–</td></tr><tr><td><code>all</code></td><td class=num>8.72</td><td class=num>-0.59</td><td class=num>+0.162</td><td class=num>-0.033</td></tr><tr><td><code>whole</code></td><td class=num>8.61</td><td class=num>+0.18</td><td class=num>-0.003</td><td class=num>-0.015</td></tr><tr><td><code>whole-tied</code></td><td class=num>9.04</td><td class=num>-0.13</td><td class=num>-0.013</td><td class=num>-0.031</td></tr><tr><td><code>all-tied</code></td><td class=num>9.14</td><td class=num>-0.12</td><td class=num>+0.160</td><td class=num>-0.017</td></tr></tbody></table><figcaption><p>The tied readout against the untied (post hoc; planned, no gate), seed means. The log-odds of a syntax word against a color at the first operand, and the part of them that rides on e₁ (the drop when e₁ is removed from the state, as in the op1-lean reanalysis); the e₁ component of the ⏎ embedding row; and the op margin at the start of the anneal less its peak before it, on the trajectory.</p></figcaption></figure>
+
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#discussion" title="Link to this heading">&para;</a></h2>
+<div class="admonition">
+<p class="admonition-title">TODO</p>
+<p>After the results. What we would take to the pilot: which policy, what it costs in labels there (the share of cut contexts is larger, and <code>whole</code> drops them all), whether the evidence question needs label variant (c) on top, and whether the newline mask or a tied readout belongs in the recipe.</p>
+</div>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#method" title="Link to this heading">&para;</a></h2>
+<h3 id="the-policies">The policies<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#the-policies" title="Link to this heading">&para;</a></h3>
+<p>The sampler already knows the visible run of each labelled line: the offset of the window fixes the role of every position, and padding hides a prefix. Each policy turns that run into a weight in [0, 1] on the pooled term of the line (<code>line_weight</code> in <code>experiment.py</code>).</p>
+<p>The denominator stays the count of labelled lines with any visible position, as under <code>all</code>, and the label draws are unchanged, so the random stream is consumed identically under every policy. <code>knowable</code> also removes the positions before the op word from the pool, so a whole line is pooled over roles 1 to 5.</p>
+<p>How often a window shows each run of a line, at each window size, enumerated over every offset and padding length:</p>
+<table class="report-table dense"><thead><tr><th>visible roles</th><th>what the anchor can see</th><th class=num>64-token window</th><th class=num>32-token window</th></tr></thead><tbody><tr><td>op1</td><td><strong>no op word</strong></td><td class=num>1.5%</td><td class=num>2.7%</td></tr><tr><td>op1 op</td><td>the op word, cut short</td><td class=num>1.5%</td><td class=num>2.7%</td></tr><tr><td>op1 op op2</td><td>the op word, cut short</td><td class=num>1.5%</td><td class=num>2.7%</td></tr><tr><td>op1 op op2 =</td><td>the op word, cut short</td><td class=num>1.5%</td><td class=num>2.7%</td></tr><tr><td>op1 op op2 = answer</td><td>the op word, cut short</td><td class=num>1.5%</td><td class=num>2.7%</td></tr><tr><td>op1 op op2 = answer ⏎</td><td>the whole line</td><td class=num>85.3%</td><td class=num>72.6%</td></tr><tr><td>op op2 = answer ⏎</td><td>the op word, cut short</td><td class=num>1.5%</td><td class=num>2.7%</td></tr><tr><td>op2 = answer ⏎</td><td><strong>no op word</strong></td><td class=num>1.5%</td><td class=num>2.7%</td></tr><tr><td>= answer ⏎</td><td><strong>no op word</strong></td><td class=num>1.5%</td><td class=num>2.7%</td></tr><tr><td>answer ⏎</td><td><strong>no op word</strong></td><td class=num>1.5%</td><td class=num>2.7%</td></tr><tr><td>⏎</td><td><strong>no op word</strong></td><td class=num>1.5%</td><td class=num>2.7%</td></tr></tbody></table>
+
+<h3 id="the-measurements">The measurements<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#the-measurements" title="Link to this heading">&para;</a></h3>
+<p>The lean is the mean cosine with e₁ at role 0 over the probe lines of every op, at slice 4, as ex-2.2.14 measured it. Its excess is measured against the seed mean of the control. The op margin is the one from ex-2.2.14, on the same probe sets. The task is held-out expected exact match per op, against the control from ex-2.2.11.</p>
+<p><code>whole-mask</code> is measured with its mask on, since the mask is part of the model; on a probe fed one line at a time it changes nothing.</p>
+<p>The trailing fragments are the probe lines of every op, cut to start at roles 2, 3, 4, 5 and fed as sequences of their own. The trailing-fragment lean is the mean cosine over every position of every trailing fragment. The contrast is the mean over <code>difference</code> trailing fragments less the mean over the rest.</p>
+<p>The op margin, the lean, and the trailing-fragment lean are also measured during training, every 50 steps, on the same probe lines. These measurements run inside the training loop; no checkpoint is kept along the way.</p>
+<h3 id="budget">Budget<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#budget" title="Link to this heading">&para;</a></h3>
+<p>55 runs at d64-L4, each as long as a run in ex-2.2.14; the halved pair takes the same steps at twice the windows per step. Ex-2.2.13 trained 160 runs of this size for about fourteen dollars on Modal. Eval adds the trailing-fragment probe to the measurements from ex-2.2.14; no intervention is scored.</p>
+<h3 id="what-this-experiment-does-not-do">What this experiment does not do<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/ex-2.2.15/#what-this-experiment-does-not-do" title="Link to this heading">&para;</a></h3>
+<p>It does not change what the model sees. The <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/d2.2/pivot.html#the-proposal">plan in the pivot</a> for the in-context grammar keeps random crops of the packed corpus, with a block large enough to fit at least two whole contexts, so the first context in a window is usually cut short. Cut lines could be removed altogether with windows that hold whole lines only: each window starts at a line boundary and is padded after the last line that fits, with a longer block so the padding is a small share. Windows that start at a line boundary but are not padded would still cut the last line. Either changes the task data as well as the pull, so it would need a control of its own. A policy from this experiment still matters with padded windows wherever a labelled span can be longer than the window, as a natural-language document can. The newline mask leaves cut lines cut, so <code>whole-mask</code> tests it beside a crop policy, and does not replace one.</p>
+<p>It also does not test label variant (c) on the in-context grammar; <code>knowable</code> is its version on this grammar.</p>
+</main>
+</body>
+</html>

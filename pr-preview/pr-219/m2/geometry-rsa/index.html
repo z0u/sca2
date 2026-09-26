@@ -1,0 +1,1349 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/7abcf6f142c94f67924b4db9192c1b9e01509754/exports/m2/geometry-rsa/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Geometry under anchoring: a whole-geometry measurement over the stored runs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md.css into the md.css the site serves; and VS Code's
+ * Markdown preview lists both files (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
+ *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-219/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/geometry-rsa/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>geometry-rsa</strong> · <code>174e55a</code> · run 2026-09-19<div>via reports/m2/geometry-rsa/arrays, reports/m2/geometry-rsa/metrics</div></div></details>
+<main class="lit">
+<h1 id="geometry-under-anchoring-a-whole-geometry-measurement-over-the-stored-runs">Geometry under anchoring: a whole-geometry measurement over the stored runs<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#geometry-under-anchoring-a-whole-geometry-measurement-over-the-stored-runs" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>A reanalysis of 131 stored checkpoints from three experiments. Past the first block, an anchored model does not arrange its colours the way an un-anchored one does. By the last block, the colour geometry of an anchored run correlates with that of a control at half the level two controls reach, in every experiment. Dropping the anchor axis brings the recipe at 50 epochs back to the control band. The heavier anchors, the longer-trained recipe, and the handover arms stay under it, and their seeds agree with each other more closely than controls do. So a light anchor seems to add an axis to a control's geometry; a heavier or longer one also moves the deep geometry to a different arrangement, one that seeds reproduce and one less like the RGB cube.</p>
+</div>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#observations" title="Link to this heading">&para;</a></h2>
+<p>Each line below is a measurement on stored checkpoints, judged against the spread between un-anchored controls. None of them is a result; the closing section says what a preregistered follow-up would test.</p>
+<ul>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#whole-geometry-per-experiment">Whole geometry</a>: at the embedding, anchored runs are about as close to a control as controls are to each other. The gap opens with depth. At the last block, the colour geometry of an anchored run correlates with that of a control at roughly half the control-against-control level. That holds for the D2.1 recipe, the six-op recipe at both lengths, the three heavier survey points, and all three handover arms.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#whole-geometry-per-experiment">The anchor axis</a>: with e₁ dropped from every run, the six-op recipe at 50 epochs comes back inside the control band at the last two blocks. The D2.1 recipe and the two mid-weight survey points come back most of the way, the 100-epoch recipe and the heaviest point about a third of the way, and the handover arms barely move. So what differs in those last cases is the geometry of the other 63 coordinates. At the embedding, dropping e₁ moves every anchored condition a little <em>under</em> the band, because it removes <em>red</em> from the anchored side only.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#agreement-among-seeds">Agreement among seeds</a>: at depth, anchored runs of one condition agree with each other more closely than controls do. With e₁ dropped, the extra agreement stays for the heavier anchors, the 100-epoch recipe, and the handover arms. It goes away for the λ=0.1 recipes at 50 epochs, which are the conditions that dropping e₁ put back in the band. So where the geometry differs beyond the axis, seeds reproduce that difference.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#dose">Dose</a>: with the geometry as it is, the drop at the last block is a step at λ=0.1, with little further change up to λ=0.557. With e₁ dropped, the heavier anchors keep less of the control's geometry than the recipe does.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#against-the-colour-cube">The colour cube</a>: at the last two blocks, anchored runs arrange the colours less like the RGB cube than controls do. The embedding and first block are alike.</li>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#a-second-statistic-procrustes">Procrustes</a> agrees with RSA on every measurement, so a rotation and a rescaling would not remove the difference.</li>
+</ul>
+<h2 id="scope">Scope<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#scope" title="Link to this heading">&para;</a></h2>
+<p>This is a reanalysis of stored checkpoints, planned in the <a href="https://github.com/z0u/sca2/blob/main/todo/science/global-structure-preserved-under-anchoring.md">backlog item</a>: no training, no gates, no verdicts. Every anchored model we have has already been scored for the axis it was given (alignment, margin, containment) and for its task. But whether the <em>rest</em> of its colour geometry matches what an un-anchored model builds has only been measured through per-channel probe R² (the H2 of ex-2.1.12), which came back unresolved. Here we ask that of the geometry as a whole.</p>
+<h2 id="why">Why<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#why" title="Link to this heading">&para;</a></h2>
+<p>The D2.1 post claims that anchoring guides one concept to a known place and leaves the rest of the representation to form as it would have. That claim rests on the task metric (an anchored model still answers as well as a control) and on probes for the other channels.</p>
+<p>Neither one looks at the geometry itself. A model can score the same while arranging its colours differently, and a linear probe can find green wherever it is put. So the claim needs a statistic that compares the <em>shape</em> of the representation between an anchored run and an un-anchored one, with the ordinary variation in that shape between un-anchored seeds as the yardstick.</p>
+<p>Representational similarity analysis (RSA) is such a statistic, and the one most of this report uses.<sup id="fnref:rsa"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#fn:rsa">1</a></sup> For each run it measures the distance in latent space between every pair of the 216 grid colours, which gives a matrix of distances. It then correlates the matrices of two runs. Two runs that place the colours the same way, up to a rotation, correlate at 1, whatever basis each of them chose; runs that arrange them differently score lower. The baseline is control against control: runs that differ only by seed set the correlation a faithful anchored run should reach. <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#a-second-statistic-procrustes">Procrustes</a>, below, is the second shape statistic. It asks the same question through the coordinates rather than the distances, so agreement between the two is a check on each. The states lie on a unit hypersphere, so the Euclidean distance between two of them is the chord, which falls as the cosine rises (see <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#method">Method</a>).</p>
+<p>Anchoring is meant to move something: <em>red</em> is asked to lie along the e₁ axis. So a second variant of every measurement drops e₁ from the states of every run before the distances are taken, anchored and control alike. That variant asks whether the geometry <em>other than the anchor axis</em> is what a control builds.</p>
+<h2 id="the-runs">The runs<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#the-runs" title="Link to this heading">&para;</a></h2>
+<p>Every run comes from a checkpoint a published experiment left in the store. Three experiments, four groups, each with its own un-anchored control seeds.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>run</th><th class=num>λ</th><th class=num>seeds</th><th class=num>what it is</th></tr></thead><tbody><tr><td><code>ex-2.1.10/lam0</code> (control)</td><td class=num>0</td><td class=num>3</td><td class=num>un-anchored</td></tr><tr><td><code>ex-2.1.10/either-t100</code></td><td class=num>0.1</td><td class=num>9</td><td class=num>the D2.1 recipe</td></tr><tr><td><code>ex-2.2.3/control-short</code> (control)</td><td class=num>0</td><td class=num>5</td><td class=num>un-anchored, 50 epochs</td></tr><tr><td><code>ex-2.2.3/recipe-short</code></td><td class=num>0.1</td><td class=num>20</td><td class=num>the recipe, 50 epochs</td></tr><tr><td><code>ex-2.2.3/t12</code></td><td class=num>0.361</td><td class=num>5</td><td class=num>survey proposal t12</td></tr><tr><td><code>ex-2.2.3/t48</code></td><td class=num>0.431</td><td class=num>5</td><td class=num>survey proposal t48</td></tr><tr><td><code>ex-2.2.3/t00</code></td><td class=num>0.557</td><td class=num>5</td><td class=num>survey proposal t00</td></tr><tr><td><code>ex-2.2.3/control</code> (control)</td><td class=num>0</td><td class=num>5</td><td class=num>un-anchored, 100 epochs</td></tr><tr><td><code>ex-2.2.3/recipe</code></td><td class=num>0.1</td><td class=num>20</td><td class=num>the recipe, 100 epochs</td></tr><tr><td><code>ex-2.2.9/control</code> (control)</td><td class=num>0</td><td class=num>5</td><td class=num>un-anchored</td></tr><tr><td><code>ex-2.2.9/handover</code></td><td class=num>0.1</td><td class=num>20</td><td class=num>untied readout, whole-line labeller</td></tr><tr><td><code>ex-2.2.9/handover-slot</code></td><td class=num>0.1</td><td class=num>20</td><td class=num>untied readout, slot labeller</td></tr><tr><td><code>ex-2.2.9/handover-tied</code></td><td class=num>0.1</td><td class=num>9</td><td class=num>tied readout, whole-line labeller</td></tr></tbody></table><figcaption><p><strong>The runs.</strong> Every seed of each condition is one checkpoint from the store. Conditions in one group share the control they are compared with, marked <em>control</em> in the table and in every legend. ex-2.2.3's <code>recipe-short</code> and <code>recipe</code> include the fifteen addendum seeds each; ex-2.2.9's <code>handover-tied</code> has nine.</p></figcaption></figure>
+
+<h2 id="the-measurement">The measurement<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#the-measurement" title="Link to this heading">&para;</a></h2>
+<p>For each run, the residual states at each site are collected into a <code>216 × 64</code> matrix, one row per grid colour. At <em>operand 1</em>, the state above the first token depends on that token alone, since attention is causal, so it is the context-free representation of the colour. At <em>operand 2</em>, the state depends on the whole prompt so far, and we average it over every first operand under the reference op (<code>mix</code>, or <code>+</code> on the D2.1 grammar). Both sites are taken at all five residual slices.</p>
+<p>Each figure below shows, per condition and slice, a column of seed dots: the mean RSA of each run to the controls of its group.<sup id="fnref:figkey"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#fn:figkey">2</a></sup> For a control run, that mean is taken over the <em>other</em> controls. The grey strip behind each slice is the range of control-against-control pairs, so an anchored condition whose dots sit in the strip is as close to a control as controls are to each other.</p>
+<p>The lower row of each figure drops e₁, the anchor axis, from the states of every run first. The <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#checks-on-the-anchor-axis">checks</a> below say how much of the variance of each run that coordinate accounts for, and whether it is where a probe finds <em>red</em>.</p>
+<h2 id="whole-geometry-per-experiment">Whole geometry, per experiment<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#whole-geometry-per-experiment" title="Link to this heading">&para;</a></h2>
+<p><strong>What we expected.</strong> If anchoring only moves <em>red</em> and leaves the rest alone, an anchored run should sit in the control band once e₁ is dropped, at every slice, and near it before.</p>
+<p><strong>What we saw.</strong> At the embedding, every anchored condition is within a few hundredths of the control band. The gap then opens block by block. At the last block, every anchored condition sits well under the band at both sites: the D2.1 recipe, the six-op recipe at either length, the three heavier survey points, and all three handover arms.</p>
+<p>Dropping e₁ closes the gap for the six-op recipe at 50 epochs, which returns to the band at the last two blocks. It closes most of the gap for the D2.1 recipe and the two mid-weight survey points, about a third of it for the 100-epoch recipe and the heaviest point, and almost none on the handover grammar, where the three arms stay far under the band even with e₁ gone.</p>
+<p>At the embedding, dropping e₁ goes the other way: every anchored condition falls a little under the band. We would expect that. For an anchored run e₁ holds <em>red</em>, and for a control it holds nothing in particular, so dropping the coordinate removes red from one side of the comparison only. A fairer variant would find the direction each control keeps red along, if it keeps one, and drop that too. We have not done that, and the omission works against the anchored side, so the deeper blocks come back in spite of it.</p>
+<p>The band itself moves. Controls agree with each other closely at the embedding, and a little less at each block after it. The drop is steeper at operand 2, where the last-block band sits at about half its embedding level in every group. The same fall shows against the <a href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#against-the-colour-cube">colour cube</a>: the geometry of a control is most cube-like at the first block and drifts from the cube after that. So the part of the geometry that seeds share seems to be the part the input imposes, and each block replaces some of it with an arrangement of its own. At operand 2 the state is on its way to an answer, and there is more to replace. Why the seeds do not settle on one deep arrangement is open, and the follow-up below could take it up.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/rsa-ex-2.1.10-main-light.png" alt="A two-by-two grid of dot charts for ex-2.1.10, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side RSA to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="rsa-ex-2.1.10-main" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/rsa-ex-2.1.10-main-dark.png" alt="A two-by-two grid of dot charts for ex-2.1.10, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side RSA to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="rsa-ex-2.1.10-main" />
+<figcaption><p><strong>RSA to controls for ex-2.1.10, per slice and site.</strong> The grey strip is the range of control-against-control pairs. Top row: the geometry as it is. Bottom row: the anchor axis e₁ dropped from every run first.</p></figcaption></figure>
+
+<p>ex-2.1.10 has three control seeds, so the band is only three pairs wide and should be taken loosely. The recipe falls under the band from the second block on. Dropping e₁ recovers most of the gap at the last two blocks, to within a few hundredths of the band.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/rsa-ex-2.2.3-main-light.png" alt="A two-by-two grid of dot charts for ex-2.2.3, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side RSA to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="rsa-ex-2.2.3-main" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/rsa-ex-2.2.3-main-dark.png" alt="A two-by-two grid of dot charts for ex-2.2.3, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side RSA to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="rsa-ex-2.2.3-main" />
+<figcaption><p><strong>RSA to controls for ex-2.2.3, per slice and site.</strong> The grey strip is the range of control-against-control pairs. Top row: the geometry as it is. Bottom row: the anchor axis e₁ dropped from every run first.</p></figcaption></figure>
+
+<p>The short conditions of ex-2.2.3 are the clearest case for the anchor axis. At the last two blocks, the recipe is back inside the band once e₁ is dropped, <code>t48</code> nearly so, and <code>t12</code> most of the way. <code>t00</code> stays well under it, which fits its weight: λ=0.557 is the heaviest point the survey proposed.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/rsa-ex-2.2.3-long-light.png" alt="A two-by-two grid of dot charts for ex-2.2.3, 100 epochs, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side RSA to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="rsa-ex-2.2.3-long" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/rsa-ex-2.2.3-long-dark.png" alt="A two-by-two grid of dot charts for ex-2.2.3, 100 epochs, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side RSA to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="rsa-ex-2.2.3-long" />
+<figcaption><p><strong>RSA to controls for ex-2.2.3, 100 epochs, per slice and site.</strong> The grey strip is the range of control-against-control pairs. Top row: the geometry as it is. Bottom row: the anchor axis e₁ dropped from every run first.</p></figcaption></figure>
+
+<p>The same recipe trained for 100 epochs sits further under its band than the 50-epoch one, and dropping e₁ recovers less of the gap. As a fraction of the width of the band, though, the e₁-dropped row is still close. So the difference may grow with training, or the band may simply be wider at 100 epochs; this measurement does not separate the two.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/rsa-ex-2.2.9-main-light.png" alt="A two-by-two grid of dot charts for ex-2.2.9, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side RSA to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="rsa-ex-2.2.9-main" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/rsa-ex-2.2.9-main-dark.png" alt="A two-by-two grid of dot charts for ex-2.2.9, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side RSA to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="rsa-ex-2.2.9-main" />
+<figcaption><p><strong>RSA to controls for ex-2.2.9, per slice and site.</strong> The grey strip is the range of control-against-control pairs. Top row: the geometry as it is. Bottom row: the anchor axis e₁ dropped from every run first.</p></figcaption></figure>
+
+<p>On the handover grammar, every arm is far under the band at the last two blocks, and dropping e₁ changes little. The tied readout (<code>handover-tied</code>) keeps the most, the slot labeller the least. The arms are compared at operand 1 under <code>mix</code>. The control shares the eleven-op grammar, stochastic rounding, and the untied readout with <code>handover</code> and <code>handover-slot</code>, so the grammar itself is not what makes the difference. The readout is where <code>handover-tied</code> differs, so it sitting closest to the control is not a like-for-like comparison.</p>
+<figure class="report-figure"><table class="report-table"><thead><tr><th>run</th><th class=num>as it is: to controls</th><th class=num>to self</th><th class=num>e₁ dropped: to controls</th><th class=num>to self</th></tr></thead><tbody><tr><td><code>ex-2.1.10/lam0</code> (control)</td><td class=num>0.57–0.66</td><td class=num>0.62</td><td class=num>0.56–0.66</td><td class=num>0.62</td></tr><tr><td><code>ex-2.1.10/either-t100</code></td><td class=num>0.45</td><td class=num>0.77</td><td class=num>0.54</td><td class=num>0.55</td></tr><tr><td><code>ex-2.2.3/control-short</code> (control)</td><td class=num>0.69–0.81</td><td class=num>0.75</td><td class=num>0.68–0.81</td><td class=num>0.75</td></tr><tr><td><code>ex-2.2.3/recipe-short</code></td><td class=num>0.55</td><td class=num>0.88</td><td class=num>0.71</td><td class=num>0.74</td></tr><tr><td><code>ex-2.2.3/t12</code></td><td class=num>0.54</td><td class=num>0.87</td><td class=num>0.63</td><td class=num>0.78</td></tr><tr><td><code>ex-2.2.3/t48</code></td><td class=num>0.59</td><td class=num>0.87</td><td class=num>0.68</td><td class=num>0.82</td></tr><tr><td><code>ex-2.2.3/t00</code></td><td class=num>0.52</td><td class=num>0.87</td><td class=num>0.56</td><td class=num>0.85</td></tr><tr><td><code>ex-2.2.3/control</code> (control)</td><td class=num>0.69–0.82</td><td class=num>0.76</td><td class=num>0.69–0.82</td><td class=num>0.76</td></tr><tr><td><code>ex-2.2.3/recipe</code></td><td class=num>0.42</td><td class=num>0.92</td><td class=num>0.52</td><td class=num>0.86</td></tr><tr><td><code>ex-2.2.9/control</code> (control)</td><td class=num>0.68–0.79</td><td class=num>0.74</td><td class=num>0.69–0.78</td><td class=num>0.74</td></tr><tr><td><code>ex-2.2.9/handover</code></td><td class=num>0.27</td><td class=num>0.89</td><td class=num>0.29</td><td class=num>0.89</td></tr><tr><td><code>ex-2.2.9/handover-slot</code></td><td class=num>0.21</td><td class=num>0.93</td><td class=num>0.24</td><td class=num>0.92</td></tr><tr><td><code>ex-2.2.9/handover-tied</code></td><td class=num>0.34</td><td class=num>0.93</td><td class=num>0.43</td><td class=num>0.88</td></tr></tbody></table><figcaption><p><strong>RSA at the last block, operand 1.</strong> Per condition, for the geometry as it is and with e₁ dropped: <em>to controls</em> is the seed mean of each run's RSA to its group's controls, and <em>to self</em> the mean over every pair of runs within the condition. On a control's row, <em>to controls</em> is instead the control band, the range of those same pairs, and <em>to self</em> their mean.</p></figcaption></figure>
+
+<h2 id="agreement-among-seeds">Agreement among seeds<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#agreement-among-seeds" title="Link to this heading">&para;</a></h2>
+<p><strong>What we expected.</strong> A run whose deep geometry is far from every control could get there two ways. Either anchoring adds seed-to-seed variation, in which case the run is far from every other run as well; or anchoring replaces one arrangement with another, in which case the run is close to the other runs of its own condition. Comparing runs within a condition tells the two apart.</p>
+<p><strong>What we saw.</strong> The second one, with the geometry as it is. Past the first block, anchored runs of one condition agree with each other more closely than controls do, in every group. The agreement among controls falls with depth, while the agreement within an anchored condition holds.</p>
+<p>With e₁ dropped, that extra agreement stays for the heavier anchors, the 100-epoch recipe, and the handover arms. It goes away for the two λ=0.1 recipes at 50 epochs; in ex-2.1.10 it falls a little under the control level. Those are the same conditions that dropping e₁ put back in the band, so the two measurements tell one story.</p>
+<p>The seeds of a light anchor share an axis and otherwise vary as controls do. The seeds of a heavier or longer anchor share an arrangement beyond the axis, and they reproduce it more closely than controls reproduce theirs.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/within-condition-light.png" alt="Two rows of four dot charts, one column per group, rows for the geometry as it is and with e₁ dropped. Along the bottom the five residual slices, up the side the RSA between pairs of runs within one condition. At each slice a grey strip spans the control pairs and columns of dots sit beside it, one per anchored condition; in the top row the anchored columns sit above the strip from the second block on; in the bottom row the λ=0.1 recipes at 50 epochs drop back to it and the rest stay above." width="1019" height="491" style="max-width: 100%; height: auto;" data-asset-name="within-condition" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/within-condition-dark.png" alt="Two rows of four dot charts, one column per group, rows for the geometry as it is and with e₁ dropped. Along the bottom the five residual slices, up the side the RSA between pairs of runs within one condition. At each slice a grey strip spans the control pairs and columns of dots sit beside it, one per anchored condition; in the top row the anchored columns sit above the strip from the second block on; in the bottom row the λ=0.1 recipes at 50 epochs drop back to it and the rest stay above." width="1019" height="491" style="max-width: 100%; height: auto;" data-asset-name="within-condition" />
+<figcaption><p><strong>RSA within each condition, at operand 1.</strong> Each small dot is one pair of runs of the same condition, the larger mark the mean over pairs, and the grey strip the range of control pairs (the same strip as in the figures above). Top row: the geometry as it is. Bottom row: e₁ dropped from every run.</p></figcaption></figure>
+
+<h2 id="dose">Dose<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#dose" title="Link to this heading">&para;</a></h2>
+<p><strong>What we expected.</strong> If the difference scales with the anchor, the three heavier survey points should sit further from the controls than the recipe, in order of λ.</p>
+<p><strong>What we saw.</strong> With the geometry as it is, the drop at the last block is a step rather than a slope. The recipe at λ=0.1 is already most of the way down, and the heavier points scatter around it. At the earlier blocks the conditions do fall in order of λ.</p>
+<p>With e₁ dropped, the last block is graded too: the recipe returns to the band, <code>t48</code> nearly reaches it, and <code>t12</code> and <code>t00</code> stay further off. So the anchor axis seems to account for a fixed part of the distance at any λ, while the rest grows with the weight.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/dose-ex-2.2.3-light.png" alt="Two rows of two line charts, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom the anchor weight from 0 to 0.56, and up the side RSA to controls. One line per residual slice joins the seed means at each weight, with the seed dots behind them; the lines for the deeper slices sit lower and fall steeply between 0 and 0.1." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="dose-ex-2.2.3" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/dose-ex-2.2.3-dark.png" alt="Two rows of two line charts, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom the anchor weight from 0 to 0.56, and up the side RSA to controls. One line per residual slice joins the seed means at each weight, with the seed dots behind them; the lines for the deeper slices sit lower and fall steeply between 0 and 0.1." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="dose-ex-2.2.3" />
+<figcaption><p><strong>RSA to controls against anchor weight, on ex-2.2.3's short conditions.</strong> Each line is one residual slice (the embedding lightest, the last block darkest), joining the seed means; the dots behind them are seeds. λ=0 is the control, compared with the other controls. Top row: the geometry as it is. Bottom row: e₁ dropped from every run.</p></figcaption></figure>
+
+<h2 id="against-the-colour-cube">Against the colour cube<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#against-the-colour-cube" title="Link to this heading">&para;</a></h2>
+<p>A control does not arrange the colours as the RGB cube does either, but it comes closer than an anchored run does. This measurement correlates each run's colour distances with the straight-line distances between the same colours in RGB.</p>
+<p>At the embedding and the first block, the conditions are alike, with the embedding of the tied readout as the one exception. From the second block on, the anchored conditions fall further. At the last block on the handover grammar, a control correlates with the cube at about a half and the handover arms at about a third. The heavier ex-2.2.3 anchors and <code>handover-tied</code> sit between.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/cube-rsa-light.png" alt="Two rows of four dot charts, one column per group and rows for operand 1 and operand 2. Along the bottom the five residual slices, up the side the RSA between each run&#x27;s geometry and the RGB cube&#x27;s own distances. Columns of seed dots per condition at each slice; the control columns sit highest at the deeper slices." width="1019" height="472" style="max-width: 100%; height: auto;" data-asset-name="cube-rsa" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/cube-rsa-dark.png" alt="Two rows of four dot charts, one column per group and rows for operand 1 and operand 2. Along the bottom the five residual slices, up the side the RSA between each run&#x27;s geometry and the RGB cube&#x27;s own distances. Columns of seed dots per condition at each slice; the control columns sit highest at the deeper slices." width="1019" height="472" style="max-width: 100%; height: auto;" data-asset-name="cube-rsa" />
+<figcaption><p><strong>RSA between each run's colour geometry and the RGB cube itself, per slice and site.</strong> The cube's distances are the Euclidean distances between the 216 grid colours in RGB. Each dot is one seed, the larger mark the seed mean. A run that arranges the colours as the cube does scores 1.</p></figcaption></figure>
+
+<h2 id="checks-on-the-anchor-axis">Checks on the anchor axis<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#checks-on-the-anchor-axis" title="Link to this heading">&para;</a></h2>
+<p>Two measurements of e₁ itself, so that the <code>e₁ dropped</code> rows above can be interpreted.</p>
+<p>The first is how much of a run's variance sits along e₁. In an anchored run it is twice the control level at the embedding, and it grows with depth, reaching ten to eighteen times the control level at the last block. For a control the share is one part in 64, the same as any other coordinate. So the axis is where anchoring put its variance, as intended.</p>
+<p>At the last block on the handover grammar, dropping e₁ removes up to a quarter of an anchored run's total variance, against under two percent for a control.</p>
+<p>The second is how closely e₁ lines up with the direction a ridge probe reads <em>red</em> from. For anchored runs the cosine between them is about a half at the embedding and the first block, and it falls with depth; for controls it is about a tenth. So the probe finds red mostly along e₁ early and less so late, which is how ex-2.1.12 saw it.</p>
+<p>Together these say what the <code>e₁ dropped</code> rows take away: a coordinate that is a large part of the deep variance of an anchored run and only part of where its <em>red</em> lives. The coordinate is largest on the handover grammar, and even there the last-block gap remains once it is gone.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/checks-light.png" alt="Two rows of four dot charts, one column per group. The top row shows the share of each run&#x27;s variance along the anchor axis; the bottom row the cosine between the anchor axis and each run&#x27;s ridge-fitted redness direction. Along the bottom the five residual slices. Columns of seed dots per condition; the anchored columns sit above the control&#x27;s in both rows." width="1019" height="472" style="max-width: 100%; height: auto;" data-asset-name="checks" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/checks-dark.png" alt="Two rows of four dot charts, one column per group. The top row shows the share of each run&#x27;s variance along the anchor axis; the bottom row the cosine between the anchor axis and each run&#x27;s ridge-fitted redness direction. Along the bottom the five residual slices. Columns of seed dots per condition; the anchored columns sit above the control&#x27;s in both rows." width="1019" height="472" style="max-width: 100%; height: auto;" data-asset-name="checks" />
+<figcaption><p><strong>The anchor axis at operand 1.</strong> Top: the share of the states' total variance along e₁. Bottom: the absolute cosine between e₁ and the direction a ridge fit (to the grading target <code>sim_to_red</code>, power 1.5) finds <em>red</em> along. Each dot is one seed, the larger mark the seed mean.</p></figcaption></figure>
+
+<h2 id="a-second-statistic-procrustes">A second statistic: Procrustes<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#a-second-statistic-procrustes" title="Link to this heading">&para;</a></h2>
+<p>RSA works from distances, so it cannot see a rotation. Procrustes disparity takes a different route to the same question. It finds the rotation, reflection, and scale that best map the states of one run onto those of another, then reports what is left over. So it also compares shape, but through the coordinates rather than the distances.</p>
+<p>It agrees with RSA on every measurement. Anchored runs sit above the control band from the second block on, which here means further from the controls. Dropping e₁ changes little on the handover grammar, and the tied readout keeps the most. The figure shows the handover grammar; the other groups are in the store.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/procrustes-ex-2.2.9-main-light.png" alt="A two-by-two grid of dot charts for ex-2.2.9, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side Procrustes disparity to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="procrustes-ex-2.2.9-main" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/procrustes-ex-2.2.9-main-dark.png" alt="A two-by-two grid of dot charts for ex-2.2.9, rows for the geometry as it is and with e₁ dropped, columns operand 1 and operand 2. Along the bottom of each panel the five residual slices, and up the side Procrustes disparity to controls. At each slice a grey strip spans the control-against-control pairs and one column of dots per condition sits beside it." width="818" height="510" style="max-width: 100%; height: auto;" data-asset-name="procrustes-ex-2.2.9-main" />
+<figcaption><p><strong>Procrustes disparity to controls for ex-2.2.9, per slice and site.</strong> The grey strip is the range of control-against-control pairs. Top row: the geometry as it is. Bottom row: the anchor axis e₁ dropped from every run first.</p></figcaption></figure>
+
+<h2 id="what-we-make-of-it">What we make of it<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#what-we-make-of-it" title="Link to this heading">&para;</a></h2>
+<p>The D2.1 post claims that anchoring leaves the rest of the representation to form as it would have. For a light anchor and a short run, that is what we see here once the axis is set aside: the ex-2.2.3 recipe at 50 epochs is a control geometry plus e₁, and the D2.1 recipe is close to that.</p>
+<p>It is not what we see for a heavier anchor, a longer run, or the handover grammar. There the colours are arranged differently beyond the axis, and the difference grows with depth, with training, and with the anchor weight. Seeds reproduce that arrangement more closely than un-anchored seeds reproduce theirs, and it is less like the RGB cube.</p>
+<p>Three things this analysis does not say. It does not say the task is affected: every one of these conditions matched its control on held-out exact match in its own report. It does not say the other channels are lost: ex-2.1.12 found green and blue as decodable as before. And it does not say where in training the two geometries part company, since we only measured final checkpoints.</p>
+<p>What it says is that the <em>arrangement</em> of the colours changes, which is what a whole-geometry statistic measures and a per-channel probe does not.</p>
+<p>Perhaps the anchor term reshapes the deep geometry around the axis it is given, so the rest of the space organises relative to <em>red</em> rather than as an un-anchored model would have it. The falling RSA against the cube and the rising agreement within a condition both fit that.</p>
+<p>Or maybe the anchored geometry is the un-anchored one, stretched along e₁ and sheared, in a way that dropping a single coordinate cannot undo. The recipe at 50 epochs fits the stretching part, since dropping e₁ puts it back in the band; whether the handover arms fit the shearing part is open. Telling the two readings apart is a preregistered question, and the statistics here are cheap enough to run at every checkpoint of a training run.</p>
+<p><strong>To do.</strong> A preregistered experiment with one hypothesis: with e₁ dropped, the last-block RSA of an anchored run to the controls is inside the control band. The stored runs already say it holds for the six-op recipe at 50 epochs and misses for the handover grammar. So the experiment should measure the handover grammar through training, at every saved checkpoint, and add an arm at a lower λ.</p>
+<p>Two exploratory measurements to carry with it: comparing each run against a <em>redness-only</em> set of distances, which would say whether the anchored arrangement organises by red; and the same figures at the answer position, where the side-effects of an intervention would land.</p>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#method" title="Link to this heading">&para;</a></h2>
+<p><strong>Prompts.</strong> Every ordered pair of the 216 grid colours runs as the three-token prompt <code>a op b</code>, with <code>op</code> the grammar's <code>mix</code> where it has one and <code>+</code> on the D2.1 grammar. The residual stream is taken at every slice above positions 0 and 2. The state above position 0 is the same for every <code>b</code> (checked to 1e-5 in every run); the state above position 2 is averaged over <code>a</code>.</p>
+<p><strong>Dissimilarity.</strong> From a <code>216 × 64</code> state matrix we take the pairwise Euclidean distances and keep the upper triangle. The states lie on the nGPT hypersphere, so this is the chord distance, which falls as the cosine rises. A cosine dissimilarity would order every pair the same way, since one is a monotone function of the other. Pearson correlation does respond to that change of scale, so the numbers would shift a little, but no ordering in this report would change. RSA is then the Pearson correlation between the upper triangles of two runs.</p>
+<p><strong>The anchor axis.</strong> The <code>e₁ dropped</code> variant deletes coordinate 0 of every run's states before the distances are taken, and the states are not renormalised. The redness direction in the checks comes from a ridge fit (<code>l2 = 1e-2</code>, on centred states) from the states of a run to the grading target <code>sim_to_red(GRID_RGB, power=1.5)</code>, normalised to a unit vector.</p>
+<p><strong>Procrustes.</strong> SciPy's <code>procrustes</code>. It centres both matrices and scales them to unit Frobenius norm, finds the best orthogonal map from one to the other, and reports the sum of squared residuals as the disparity. Two geometries that differ only by a rotation, a reflection, or a scale score 0.</p>
+<p><strong>Where the data is.</strong> The run table is under the <code>metrics</code> ref of <code>reports/m2/geometry-rsa</code>, and every pairwise matrix under the <code>arrays</code> ref. The raw states of each run are under <code>states/{experiment}/{label}</code>, so a follow-up can read them without a forward pass.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:rsa">
+<p>Those matrices of distances are <em>representational dissimilarity matrices</em>. Correlating two of them asks whether both runs find the same colours near each other and far apart, without requiring them to use the same coordinates. The measure does not change if you rotate the state space, so it is blind to <em>where</em> the anchor put red.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#fnref:rsa" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:figkey">
+<p>In every figure of this kind, each small dot is one seed's mean over the controls, the larger mark is the seed mean, and the bar is the seed range. RSA is the correlation of colour-distance matrices between one run and each of the group's control runs, so higher is more alike. Procrustes disparity is the residual after the best rotation and scale between the two, so lower is more alike.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-219/m2/geometry-rsa/#fnref:figkey" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

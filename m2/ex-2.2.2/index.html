@@ -1,0 +1,2149 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/70089bba544186c6b32363f9350c9b4b90f6910f/exports/m2/ex-2.2.2/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/ex-2.2.2/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.2.2: fallback control in the anchored transformer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md.css into the md.css the site serves; and VS Code's
+ * Markdown preview lists both files (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
+ *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* Authored report tables. Headings left-align with their columns by default; annotate
+ * numeric columns (header and cells) with class="num" to right-align on tabular figures. */
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column, and the type is a step smaller so
+   * more columns fit before they do. A swatch stays with its word (join them with a
+   * non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    font-size: 0.75em;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.2/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/ex-2.2.2/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.1.10</strong> · <code>63e613c</code> · run 2026-08-09<div>via reports/m2/ex-2.1.10/metrics, reports/m2/ex-2.1.10/probes</div></div><div><strong>ex-2.2.2</strong> · <code>82a5259</code> · run 2026-09-08<div>via reports/m2/ex-2.2.2/arrays, reports/m2/ex-2.2.2/metrics, reports/m2/ex-2.2.2/trajectories</div></div></details>
+<main class="lit">
+<h1 id="ex-222-a-designed-response-to-suppressing-red">Ex 2.2.2: a designed response to suppressing <em>red</em><a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#ex-222-a-designed-response-to-suppressing-red" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>We add fallback control: a training term that teaches the blocks what to answer once the concept is gone, aiming at a designed fallback answer, with the concept's placement kept out of its gradient. Does the fallback appear, does the intervention stay effective and selective, and does seed variability fall?
+The fallback appears in every seed, costs nothing on the task and a little margin, and reaches the plain projection at more than half strength. The reflection it was trained at is destructive on non-red lines in every anchored model, with or without the term, because the syntax token embeddings carry the axis.</p>
+</div>
+<h2 id="findings">Findings<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#findings" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.2/#the-designed-response-h1">The designed response (H1)</a> — <strong>holds.</strong> Fallback accuracy on the red lines with a clean visible operand under <code>redirect</code>: 0.999, against 0.015 without the term; gate 0.8, and the margin above the reference clears the 0.025 floor.</li>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.2/#task-and-placement-intact-h2">Task and placement intact (H2)</a> — <strong>holds.</strong> Clean accuracy gap from the no-fallback condition: 0.0002 (gate 0.02). Margin at the end of training: 0.925 of the no-fallback value (gate 0.8).</li>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.2/#selectivity-h3">Selectivity (H3)</a> — <strong>partial.</strong> Non-red deficit under <code>redirect</code>: 0.749 (gate 0.02; the no-fallback condition loses 0.774 under the same edit). Under <code>projection</code>: 0.114 against 0.024. That difference is smaller than the 0.124 resolution floor, so the second clause holds, but as an unresolved difference.</li>
+<li><a href="https://z0u.github.io/sca2/m2/ex-2.2.2/#transfer-from-the-antipode-to-zero-h4">Transfer from the antipode to zero (H4)</a> — <strong>holds.</strong> Fallback accuracy at γ = 1 is 0.63 of its value at γ = 2 (gate 0.5), and the sweep has no dip.</li>
+</ul>
+<!-- REVIEW: a seed-agreement hypothesis (then H2) was cut: at the H1 gate it is close to implied by H1, and the case that separates them (seeds agreeing on an answer other than the fallback answer) is what E1's composition shows. Seed agreement is reported under E1, ungated. The later hypotheses moved up one number. -->
+
+<div class="admonition">
+<p class="admonition-title">How to read this draft</p>
+<p>The hypotheses, their gates, and the method were frozen at commit <code>d72340e7</code>, before any run. Each hypothesis section opens with that frozen prediction, and its results follow in place.</p>
+<p>Two corrections landed after the freeze, each with a <code>REVIEW</code> note beside the text it changed. The first is the count of red lines with a clean visible operand, now 296 rather than 298, because one color sat on the 0.5 contour to roundoff. The second is the gradient paragraph in the method, which now accounts for the tied embedding.</p>
+<p>Anything conceived after seeing the data is under <a href="https://z0u.github.io/sca2/m2/ex-2.2.2/#exploratory-analyses">Exploratory analyses</a>, marked as post hoc (E7 and E8).</p>
+</div>
+<h2 id="why-this-experiment">Why this experiment<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#why-this-experiment" title="Link to this heading">&para;</a></h2>
+<p><a href="https://z0u.github.io/sca2/m2/ex-2.2.1/">Ex-2.2.1</a> showed that projecting the anchor axis out of the D2.1 checkpoints suppresses <em>red</em>. Red-line accuracy falls from 1.0 to 0.09, in proportion to how red the line is, and stays inside the bound the placed geometry set.</p>
+<p>A suppressed red line still decodes to a color, about half the time a one-step neighbor of the true mix. Which neighbor varies by seed: at least five of the nine seeds agree on 13% of red lines. Nothing in training said what a removed concept should decode to, so the answer is whatever the untrained region of the stream produces. M1 called that spoofing, and it is where the seed spread in <a href="https://z0u.github.io/sca2/m1/ex-2.9.1/">ex-2.9.1</a> came from.</p>
+<p>The remedy in M1 was fallback control (<a href="https://z0u.github.io/sca2/m1/ex-2.9.2/">ex-2.9.2</a>): one loss term, applied to the decoder only, that pins the antipode of the anchor axis to a designed null answer, mid-gray. Reflecting a state through the axis then collapsed the response to a tight cluster on the bound the null predicted, across 32 seeds. Under plain zeroing the term added little, and that report said a trained fallback should be paired with the redirect it was trained at.</p>
+<p>Here we bring the term into the transformer, keeping the D2.1 grammar and recipe. This comes before the operation work in the <a href="https://z0u.github.io/sca2/m2/d2.2/design.html">D2.2 plan</a> changes the grammar.</p>
+<p>The term is one loss, but it touches the model in three places:
+the edit at the embedding, where every position is reflected through the axis and then held fixed;
+the loss, read at the <code>=</code> position of each red line;
+the gradient, which reaches the four blocks and the readout, and stops at the reflected states, so it cannot move the placement.</p>
+<!-- REVIEW: this line said the gradient reaches "the unembedding but not the embedding"; the two are one table in nGPT, so it now says what the detach cuts. The method's "Where the term acts" paragraph carries the full note. -->
+
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/fallback-term-light.png" alt="A schematic of the residual stream as a grid: four columns for the positions of a red line (red, +, blue, =), and rows from the embedding at the bottom through blocks 1 to 4 to the unembedding, which has a logits box at the = position only. The embedding row is outlined in orange and labelled as the edit, reflecting every position; an orange dashed line above it is labelled stop-gradient. The block and unembedding rows are shaded blue. A blue arrow points down into the logits box from a label reading loss, cross-entropy at = against the fallback answer, and a second blue arrow runs down the right margin from the unembedding to the dashed line, labelled gradient reaches the blocks and unembedding." width="442" height="356" style="max-width: 100%; height: auto;" data-asset-name="fallback-term" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/fallback-term-dark.png" alt="A schematic of the residual stream as a grid: four columns for the positions of a red line (red, +, blue, =), and rows from the embedding at the bottom through blocks 1 to 4 to the unembedding, which has a logits box at the = position only. The embedding row is outlined in orange and labelled as the edit, reflecting every position; an orange dashed line above it is labelled stop-gradient. The block and unembedding rows are shaded blue. A blue arrow points down into the logits box from a label reading loss, cross-entropy at = against the fallback answer, and a second blue arrow runs down the right margin from the unembedding to the dashed line, labelled gradient reaches the blocks and unembedding." width="442" height="356" style="max-width: 100%; height: auto;" data-asset-name="fallback-term" />
+<figcaption><p><strong>Where the fallback term acts.</strong> One red line, <code>red + blue =</code>, as positions (columns) against slices (rows). The numbered annotations are the three places above; the blocks run forward from the edited embedding as usual, mixing positions through attention, and the dashed line is where the gradient stops.</p></figcaption></figure>
+
+<p>In M1 the decoder took a constant input, the antipode itself, so the term was decoder-only by construction. Here a stop-gradient<sup id="fnref:sg"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#fn:sg">1</a></sup> gives the reflected state that same role.</p>
+<p>The fallback answer for a continuous concept also has to be chosen. We use the center of the operand-averaged null, which works out to be the visible operand mixed with <em>mid-gray</em>; the <a href="https://z0u.github.io/sca2/m2/ex-2.2.2/#the-fallback-answer">method</a> derives it.</p>
+<p>This addresses the third risk in the plan, that the response to suppression is undesigned. One mismatch carries over from M1: the response is trained at the antipode, while the ex-2.2.1 projection lands the state at zero. H4 measures how far the response transfers between the two.</p>
+<p>The nearest published analogue is LUNAR (arXiv:2502.07218): one matrix edit after training, redirecting the activations of the data to forget into the model's own refusal region. LUNAR designs the response by choosing a region the model already produces; ours is trained at a state the model never otherwise visits, which is where the mismatch above comes from. E6 fits a LUNAR-style edit to the no-fallback checkpoints, so the two designs can be compared.</p>
+<p><strong>Natural language.</strong> The three parts all transfer to the natural language domain:
+the edit would be the reflection at the first anchored slice, applied at every position;
+the loss would be computed on the continuation (the tokens of the response), rather than at one <code>=</code> position;
+the gradient stops before the edit.
+The edit happens based on alignment of the states to the anchor, so it's grammar-agnostic and token labels are not needed.</p>
+<p>The fallback answer still has to be chosen; some candidates:
+<strong>(a)</strong> a template continuation, so the training data is pairs of context and designed response;
+<strong>(b)</strong> the model's own refusal region, which is the LUNAR choice (and which could be anchored separately);
+<strong>(c)</strong> a true null, the continuation a reference model gives when it has never seen the concept, matched with a KL term.<sup id="fnref:kl"><a class="footnote-ref" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#fn:kl">2</a></sup></p>
+<p>Spoofing in that setting is confabulation: a plausible answer drawn from the neighbors of the concept. The <em>mid-gray</em> answer here is a trained abstention that keeps the model on task (rather than, say, emitting a syntax token like <code>+</code> or <code>=</code> where the answer should be). A natural language version would want that same property.</p>
+<details>
+<summary>Glossary</summary>
+<ul>
+<li><strong>line</strong> — one equation, <code>c1 + c2 = answer</code>, six word-level tokens. The probe set enumerates all 5,832 closed lines of the 216-color grid: every color as op1 against each of its 27 closed partners.</li>
+<li><strong>residual stream</strong> — the running vector each token carries through the network, which every block reads from and writes to.</li>
+<li><strong>slice</strong> (<span class="arithmatex">\(\ell\)</span>) — a depth at which the residual stream is read: the embedding (0), plus the stream after each of the four blocks.</li>
+<li><strong>alignment</strong> (<span class="arithmatex">\(\alpha\)</span>) — <span class="arithmatex">\(\cos(h, e_1)\)</span>, the cosine between a state and the anchor axis. States are unit-norm, so this is just the e₁ component.</li>
+<li><strong>dose</strong> — how <em>red</em> a line is, taken as the larger of the two operand rednesses (<span class="arithmatex">\(r(1 - g/2 - b/2)\)</span> on the unit cube).</li>
+<li><strong>red lines</strong> — dose ≥ 0.8. 365 probe lines. <strong>Non-red lines</strong> — dose ≤ 0.2. 1,689 lines.</li>
+<li><strong>concept operand</strong> — the redder of the two operands in a line (ties go to op1); the <strong>visible operand</strong> is the other one, and is <em>clean</em> when its redness is below 0.5.</li>
+<li><strong>margin</strong> (<code>m_span</code>) — the pooled alignment margin of ex-2.1.10: at each slice, how much more aligned the red states are than the rest, taken at the best span role, then averaged over slices.</li>
+<li><strong>fallback answer</strong> — the designed answer for a <em>red</em> line under intervention: the visible operand mixed with <em>mid-gray</em>, rounded to the grid. This is the center of the operand-averaged null.</li>
+<li><strong>fallback accuracy</strong> — the fraction of <em>red</em> lines whose argmax at <code>=</code> is the fallback answer.</li>
+<li><strong>response</strong> — the probability the model puts on the correct answer, read from the log-softmax at the <code>=</code> position. <strong>Damage</strong> is the clean response minus the intervened response, per line. <strong>Deficit</strong> is the clean exact-match accuracy minus the intervened accuracy over a group of lines; it is the statistic ex-2.2.1 gated selectivity on.</li>
+<li><strong>seed agreement</strong> — the fraction of <em>red</em> lines on which at least five of the nine seeds decode the same answer, under a given intervention.</li>
+<li><strong>redirect</strong> — reflecting the embedding state through the axis, α → −α, at every position. The edit at a position is twice its alignment, so a state with nothing on the axis does not move. This is the state the fallback was trained at.</li>
+<li><strong>clean</strong> — the un-intervened forward pass of the same checkpoint.</li>
+</ul>
+</details>
+<h2 id="conditions">Conditions<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#conditions" title="Link to this heading">&para;</a></h2>
+<p>Two of the three conditions are ex-2.1.10 checkpoints already in the store, re-scored here through the same code path as the new runs. The third is trained here.</p>
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th>training</th>
+<th>seeds</th>
+<th>source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>un-anchored</strong></td>
+<td>the recipe with the anchor weight at zero</td>
+<td>3</td>
+<td>ex-2.1.10 <code>lam0</code></td>
+</tr>
+<tr>
+<td><strong>no-fallback</strong></td>
+<td>the D2.1 recipe: anchor + anti-subspace term</td>
+<td>9</td>
+<td>ex-2.1.10 <code>either-t100</code></td>
+</tr>
+<tr>
+<td><strong>fallback</strong></td>
+<td>the recipe + anti-anchor term (0.1) + fallback term (w_fb = 0.05)</td>
+<td>9</td>
+<td>new</td>
+</tr>
+</tbody>
+</table>
+<p>Every hypothesis scores against the fallback condition. The no-fallback condition is the reference for it under every intervention.</p>
+<p>The arms below have three seeds each. We report the same statistics for them, without gates.</p>
+<table>
+<thead>
+<tr>
+<th>arm</th>
+<th>what changes</th>
+<th>question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fb-only</code></td>
+<td>no anti-anchor term</td>
+<td>does the fallback need the antipode hemisphere cleared for it?</td>
+</tr>
+<tr>
+<td><code>anti-only</code></td>
+<td>no fallback term</td>
+<td>does the anti-anchor term alone move the response?</td>
+</tr>
+<tr>
+<td><code>fb-w0.01</code>, <code>fb-w0.25</code></td>
+<td>the fallback weight, a factor of five either side</td>
+<td>is 0.05 on a plateau?</td>
+</tr>
+<tr>
+<td><code>recipe</code></td>
+<td>both new weights at zero</td>
+<td>does the new code path reproduce the ex-2.1.10 checkpoints?</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-interventions">The interventions<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#the-interventions" title="Link to this heading">&para;</a></h3>
+<p>All of these run through the projection operator of the eval contract: it removes a fraction γ of the e₁ component, then puts the state back on the sphere. At γ = 2 the operator is a reflection, flipping the component instead of shrinking it.</p>
+<ul>
+<li><strong><code>redirect</code></strong> — γ = 2 at the embedding, at every position, with no labels. This is the same edit training applied, so H1 reads the readout the term trained. Read by H1 and the first clause of H3.</li>
+<li><strong><code>projection</code></strong> — the ex-2.2.1 intervention: γ = 1 at every slice and every position. The fallback was never trained under it. Read by the second clause of H3 and the projection row of H4.</li>
+<li><strong>The transfer sweep</strong> — γ ∈ {0.5, 1, 1.5, 2} at the embedding, every position. Its γ = 2 point is <code>redirect</code>, and its γ = 1 point is the <code>embedding</code> arm of ex-2.2.1, which differs from <code>projection</code> in leaving the later slices alone. Read by H4.</li>
+<li><strong>Ride-along rows</strong> — the <code>operands</code>, <code>shaped</code>, and <code>ablate</code> arms from ex-2.2.1, run on the fallback condition without gates. That way the intervention-tuning pass in the design has the fallback rows to hand (E5). <code>operands</code> is the one row here that needs position labels; it stays so we can compare with ex-2.2.1.</li>
+</ul>
+<!-- REVIEW: earlier drafts restricted `redirect` to operand positions, then to the concept operand of each line, to match a training term that reflected one state per line. Neither is an edit a model without labelled positions can run. Now `redirect` reflects every position at the embedding, training reflects the same, and the red lines with no defined fallback answer (a visible operand that is itself red) leave the term and the gate of H1 rather than the edit. Verify: the training paragraph in the method, and VISIBLE_RED_DOSE in experiment.py. -->
+
+<h2 id="the-designed-response-h1">The designed response (H1)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#the-designed-response-h1" title="Link to this heading">&para;</a></h2>
+<!-- REVIEW: 298 clean / 67 both → 296 / 69. The frozen count read `redness < 0.5` without roundoff slack, so one color on the 0.5 contour (cf96, whose redness evaluates to 0.49999999999999994) landed on the clean side while its five siblings at the same redness landed on the red side. The rule is unchanged ("≥ 0.5 is red"); applying it to all six moves two lines. Verify: `read_lines` in experiment.py asserts the counts. -->
+<p><strong>H1.</strong> Under <code>redirect</code>, the model's answer on red lines is the fallback answer. Seed-mean fallback accuracy over the red lines with a clean visible operand (296 of the 365) is at least 0.8; partial: between 0.5 and 0.8. The other 69 red lines have no defined fallback answer, so we report them beside the gated figure, unscored. The reference row is the no-fallback condition under the same intervention. The fallback figure has to sit above that reference by a resolved margin, meaning two pooled between-seed standard deviations. A figure that clears 0.8 without a resolved margin counts as partial. Contrary: fallback accuracy at the no-fallback level, which would mean the term did not train the readout. The fallback loss over training (see the method) says whether the term was ever active.</p>
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th>fallback acc., clean visible</th>
+<th>true-answer acc., clean visible</th>
+<th>fallback acc., red visible</th>
+<th>true-answer acc., red visible</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>un-anchored</td>
+<td>0.000 (0.000–0.000)</td>
+<td>0.992 (0.990–0.993)</td>
+<td>0.00 (0.00–0.00)</td>
+<td>1.00 (0.99–1.00)</td>
+</tr>
+<tr>
+<td>no-fallback</td>
+<td>0.015 (0.000–0.044)</td>
+<td>0.034 (0.003–0.088)</td>
+<td>0.00 (0.00–0.00)</td>
+<td>0.00 (0.00–0.00)</td>
+</tr>
+<tr>
+<td>fallback</td>
+<td>0.999 (0.997–1.000)</td>
+<td>0.000 (0.000–0.000)</td>
+<td>0.00 (0.00–0.00)</td>
+<td>0.00 (0.00–0.00)</td>
+</tr>
+<tr>
+<td>fallback, no anti-anchor</td>
+<td>0.997 (0.997–0.997)</td>
+<td>0.000 (0.000–0.000)</td>
+<td>0.00 (0.00–0.00)</td>
+<td>0.00 (0.00–0.00)</td>
+</tr>
+<tr>
+<td>anti-anchor, no fallback</td>
+<td>0.011 (0.000–0.030)</td>
+<td>0.014 (0.003–0.024)</td>
+<td>0.00 (0.00–0.00)</td>
+<td>0.01 (0.00–0.03)</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.01</td>
+<td>0.998 (0.993–1.000)</td>
+<td>0.000 (0.000–0.000)</td>
+<td>0.00 (0.00–0.00)</td>
+<td>0.00 (0.00–0.00)</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.25</td>
+<td>0.995 (0.993–1.000)</td>
+<td>0.000 (0.000–0.000)</td>
+<td>0.00 (0.00–0.00)</td>
+<td>0.00 (0.00–0.00)</td>
+</tr>
+<tr>
+<td>the recipe through the new code path</td>
+<td>0.014 (0.000–0.041)</td>
+<td>0.018 (0.000–0.034)</td>
+<td>0.00 (0.00–0.00)</td>
+<td>0.00 (0.00–0.00)</td>
+</tr>
+</tbody>
+</table>
+<p>Seed mean with the seed range, under <code>redirect</code>. The "clean visible" columns are the 296 lines H1 gates. The "red visible" columns are the other 69 red lines, which have no defined fallback answer; the scorer reads it as the visible operand mixed with gray all the same, so that column says whether the model emits that anyway.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/fallback-strip-light.png" alt="A strip chart of the probability on the fallback answer, one column per seed: nine fallback seeds on the left and nine no-fallback seeds on the right. Every fallback column is a dense band at the top of the panel, at one; every no-fallback column is a dense band at the bottom, at zero, with a scattering of dots rising up the panel, a few of them near one." width="587" height="242" style="max-width: 100%; height: auto;" data-asset-name="fallback-strip" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/fallback-strip-dark.png" alt="A strip chart of the probability on the fallback answer, one column per seed: nine fallback seeds on the left and nine no-fallback seeds on the right. Every fallback column is a dense band at the top of the panel, at one; every no-fallback column is a dense band at the bottom, at zero, with a scattering of dots rising up the panel, a few of them near one." width="587" height="242" style="max-width: 100%; height: auto;" data-asset-name="fallback-strip" />
+<figcaption><p><strong>The probability on the fallback answer, per seed.</strong> Under <code>redirect</code>, each dot is one of the 296 red lines with a clean visible operand; a column is one seed. Left, the fallback condition; right, the no-fallback condition. A split response, with some lines at the fallback answer and some elsewhere, would show as a column with dots at both ends.</p></figcaption></figure>
+
+<p>Under <code>redirect</code>, the fallback condition emits the fallback answer on 0.999 of the red lines with a clean visible operand, in every seed; the gate is 0.8. Its margin over the no-fallback condition, which emits it on 0.015, clears the 0.025 resolution floor.</p>
+<p>The probability the model puts on the fallback answer is 0.996, averaged over seeds and lines, and the strip shows no split: every seed puts nearly every line at the top. The un-anchored condition keeps its true answer under the same edit (0.992), so the reflection does its work only where a concept was placed. On the 69 red lines whose visible operand is itself red, the fallback condition emits neither the true answer nor the gray mix of the visible operand.</p>
+<p><strong>H1 holds.</strong> The term trained the readout: the fallback loss over training (next section) falls to near zero, and the reflected state decodes to the designed answer on all but a handful of qualifying lines, in every seed.</p>
+<!-- REVIEW: the verdict said the loss "reaches zero" and the answer appeared "on every qualifying line"; the loss ends at 0.0003 and fallback accuracy is 0.999, so both were slightly stronger than the numbers. Verify: the fallback-loss figure in H2, and the fallback accuracy column of the table above. -->
+
+<h2 id="task-and-placement-intact-h2">Task and placement intact (H2)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#task-and-placement-intact-h2" title="Link to this heading">&para;</a></h2>
+<p><strong>H2.</strong> The term costs nothing on the task or the placement. Clean exact-match accuracy on all probe lines is within 0.02 of the no-fallback condition, and the seed-mean alignment margin at the end of training, the <code>m_span</code> of ex-2.1.10, is at least 0.8 of the no-fallback value. Partial: exactly one of the two holds, or both hold with accuracy read at the wider 0.05 band.</p>
+<p>Contrary: the fallback term competing with the anchor for the operand states, which is what the stop-gradient is supposed to prevent.</p>
+<!-- REVIEW: H2 (then H3) gave two partial rules for the same clause ("partial: within 0.05" inline, and "one of the two holds" after), which do not decide a run whose accuracy sits between 0.02 and 0.05 with the margin intact. Merged into one rule; both bands are unchanged, and `TASK_PARTIAL` keeps its documented role. -->
+
+<!-- REVIEW: the same merge applies to H3's first clause, which quoted only the 0.02 gate although `TASK_PARTIAL`'s docstring assigns it a 0.05 partial band there too. -->
+
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th>clean acc., all</th>
+<th>red</th>
+<th>non-red</th>
+<th>margin <code>m_span</code></th>
+<th>mean α at op1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>un-anchored</td>
+<td>1.000 (0.999–1.000)</td>
+<td>0.999 (0.997–1.000)</td>
+<td>1.000 (0.999–1.000)</td>
+<td>0.028 (0.003–0.070)</td>
+<td>-0.041 (-0.072–0.011)</td>
+</tr>
+<tr>
+<td>no-fallback</td>
+<td>0.999 (0.997–1.000)</td>
+<td>0.999 (0.995–1.000)</td>
+<td>0.998 (0.996–1.000)</td>
+<td>0.738 (0.708–0.772)</td>
+<td>0.050 (0.008–0.087)</td>
+</tr>
+<tr>
+<td>fallback</td>
+<td>0.999 (0.995–1.000)</td>
+<td>0.997 (0.984–1.000)</td>
+<td>0.998 (0.992–0.999)</td>
+<td>0.682 (0.649–0.717)</td>
+<td>0.105 (0.079–0.136)</td>
+</tr>
+<tr>
+<td>fallback, no anti-anchor</td>
+<td>0.999 (0.998–0.999)</td>
+<td>1.000 (1.000–1.000)</td>
+<td>0.999 (0.998–1.000)</td>
+<td>0.736 (0.723–0.749)</td>
+<td>0.043 (0.009–0.087)</td>
+</tr>
+<tr>
+<td>anti-anchor, no fallback</td>
+<td>0.998 (0.996–1.000)</td>
+<td>0.994 (0.981–1.000)</td>
+<td>0.999 (0.996–1.000)</td>
+<td>0.697 (0.678–0.724)</td>
+<td>0.106 (0.074–0.127)</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.01</td>
+<td>0.999 (0.996–1.000)</td>
+<td>0.996 (0.992–1.000)</td>
+<td>1.000 (0.999–1.000)</td>
+<td>0.677 (0.661–0.691)</td>
+<td>0.111 (0.086–0.138)</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.25</td>
+<td>0.998 (0.994–1.000)</td>
+<td>0.995 (0.984–1.000)</td>
+<td>0.999 (0.996–1.000)</td>
+<td>0.690 (0.670–0.709)</td>
+<td>0.101 (0.076–0.138)</td>
+</tr>
+<tr>
+<td>the recipe through the new code path</td>
+<td>0.999 (0.998–1.000)</td>
+<td>0.999 (0.997–1.000)</td>
+<td>0.999 (0.998–1.000)</td>
+<td>0.738 (0.724–0.760)</td>
+<td>0.058 (0.031–0.089)</td>
+</tr>
+</tbody>
+</table>
+<p>Seed mean with the seed range on the clean pass. The margin is <code>m_span</code> from ex-2.1.10: the pooled alignment contrast between the labelled and unlabelled operand states. The last column is the mean alignment of every op1 state, which is the containment statistic of ex-2.1.10.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/training-trajectories-light.png" alt="Three line charts over 100 epochs. Left, the alignment margin: nine red lines (fallback) and nine grey lines (no-fallback) all rise from zero to a plateau within the first ten epochs; the red plateau sits a little below the grey one, near 0.68 against 0.74. Middle, the fallback loss on a log scale: the red lines start near three at epoch ten, drop two orders of magnitude by epoch twenty, and keep falling to about a thousandth by the end, while the purple lines (anti-anchor only, where the term is measured and not trained) stay near ten throughout. Right, the anti-anchor loss on a log scale: the red lines fall from about 0.04 to below 0.001; the orange lines (fallback only) fall at first and then settle near 0.01." width="818" height="242" style="max-width: 100%; height: auto;" data-asset-name="training-trajectories" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/training-trajectories-dark.png" alt="Three line charts over 100 epochs. Left, the alignment margin: nine red lines (fallback) and nine grey lines (no-fallback) all rise from zero to a plateau within the first ten epochs; the red plateau sits a little below the grey one, near 0.68 against 0.74. Middle, the fallback loss on a log scale: the red lines start near three at epoch ten, drop two orders of magnitude by epoch twenty, and keep falling to about a thousandth by the end, while the purple lines (anti-anchor only, where the term is measured and not trained) stay near ten throughout. Right, the anti-anchor loss on a log scale: the red lines fall from about 0.04 to below 0.001; the orange lines (fallback only) fall at first and then settle near 0.01." width="818" height="242" style="max-width: 100%; height: auto;" data-asset-name="training-trajectories" />
+<figcaption><p><strong>Training, seed by seed.</strong> Left, the alignment margin <code>m_span</code> over training, one thin line per seed: the fallback condition over the no-fallback condition. Middle, the fallback term's loss, in the fallback condition and in the <code>anti-only</code> arm, where it is measured on every step and never trained. Right, the anti-anchor hinge, in the fallback condition and in the <code>fb-only</code> arm, where it is measured and not trained. The losses are means over the crops between two trajectory records, and the fallback loss is a mean over the qualifying lines in those crops.</p></figcaption></figure>
+
+<p>Clean accuracy on all probe lines is 0.999 in the fallback condition against 0.999 without the term, a gap of 0.0002 against a gate of 0.02. The margin at the end of training is 0.682 against 0.738, a ratio of 0.925 against a gate of 0.8. Every fallback seed sits between 0.649 and 0.717.</p>
+<p>The margin is lost to the anti-anchor hinge: the <code>fb-only</code> arm ends at 0.736 and the <code>anti-only</code> arm at 0.697. The hinge also raises the mean alignment at op1, from 0.050 to 0.105.</p>
+<p>The fallback loss switches on once the anchor has placed the concept, inside the warm-up, and reaches 0.0003 by the end; in the <code>anti-only</code> arm, where it is measured and never trained, it stays at 9.2. The anti-anchor hinge ends at 0.0003 where it is trained and 0.0094 where it is not.</p>
+<p><strong>H2 holds.</strong> Both clauses clear their gates: the term costs nothing on the task, and the margin stays above 0.8 of the no-fallback value.</p>
+<h2 id="selectivity-h3">Selectivity (H3)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#selectivity-h3" title="Link to this heading">&para;</a></h2>
+<!-- REVIEW: the heading was "Selectivity kept", the hypothesis's short name; renamed after the results review, since the first clause failed by a wide margin and the verdict is partial. The Findings anchor follows the heading. -->
+
+<p><strong>H3.</strong> Under <code>redirect</code>, the seed-mean non-red deficit stays at or below 0.02. Under <code>projection</code>, the non-red deficit in the fallback condition is not resolved above the no-fallback figure (0.024 in ex-2.2.1, re-measured here).</p>
+<p>On a non-red line the operands have nearly nothing on the axis, so the first clause rests on the syntax embeddings. Zeroing their constant component is what cost the ex-2.2.1 projection its 0.024, and the reflection flips it instead. Training runs the reflected pass on every crop that carries a qualifying red line, so the blocks see flipped syntax states, and read them as syntax, throughout training. We predict that this transfers to the non-red lines the term never scored.</p>
+<p>Partial: the first clause holds only at the 0.05 band, or exactly one clause holds.</p>
+<p>Contrary on the first clause: a deficit at or above the ex-2.2.1 figure, which would say the flipped syntax reads as a different syntax, and would send the intervention-tuning pass toward a thresholded reflection, the <code>shaped</code> falloff at strength 2. Contrary on the second clause: the term widens the edit, which would mean the blocks now read the axis at positions or slices where they did not before.</p>
+<!-- REVIEW: H3 (then H4) was written on non-red *damage*, the probability statistic. The 0.02 width and the 0.024 reference both come from ex-2.2.1's H2, which gated the accuracy *deficit* (its H2 line: "outside the 0.02 gate but inside the 0.05 partial gate"), so the gate and its reference were being read on a statistic they were not set for. Now stated on the deficit, with the same widths, and the partial band written out. Verify: ex-2.2.1's H2 section, and the "non-red deficit" column of its arms table. Damage is still reported beside it in the table below. -->
+
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th>non-red deficit, <code>redirect</code></th>
+<th>non-red damage, <code>redirect</code></th>
+<th>non-red deficit, <code>projection</code></th>
+<th>non-red damage, <code>projection</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>un-anchored</td>
+<td>0.022 (0.001–0.046)</td>
+<td>0.033 (0.006–0.061)</td>
+<td>0.000 (-0.001–0.001)</td>
+<td>0.005 (0.003–0.008)</td>
+</tr>
+<tr>
+<td>no-fallback</td>
+<td>0.774 (0.513–0.961)</td>
+<td>0.825 (0.591–0.961)</td>
+<td>0.024 (0.001–0.127)</td>
+<td>0.034 (0.007–0.158)</td>
+</tr>
+<tr>
+<td>fallback</td>
+<td>0.749 (0.607–0.889)</td>
+<td>0.747 (0.607–0.884)</td>
+<td>0.114 (0.035–0.217)</td>
+<td>0.138 (0.053–0.246)</td>
+</tr>
+<tr>
+<td>fallback, no anti-anchor</td>
+<td>0.817 (0.789–0.869)</td>
+<td>0.812 (0.790–0.854)</td>
+<td>0.168 (0.078–0.229)</td>
+<td>0.190 (0.097–0.244)</td>
+</tr>
+<tr>
+<td>anti-anchor, no fallback</td>
+<td>0.735 (0.621–0.837)</td>
+<td>0.812 (0.719–0.901)</td>
+<td>0.016 (0.009–0.022)</td>
+<td>0.030 (0.022–0.042)</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.01</td>
+<td>0.765 (0.673–0.854)</td>
+<td>0.764 (0.679–0.845)</td>
+<td>0.047 (0.011–0.104)</td>
+<td>0.068 (0.025–0.135)</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.25</td>
+<td>0.775 (0.607–0.944)</td>
+<td>0.770 (0.610–0.926)</td>
+<td>0.243 (0.057–0.602)</td>
+<td>0.256 (0.079–0.598)</td>
+</tr>
+<tr>
+<td>the recipe through the new code path</td>
+<td>0.910 (0.866–0.992)</td>
+<td>0.943 (0.915–0.983)</td>
+<td>0.023 (0.004–0.035)</td>
+<td>0.034 (0.008–0.051)</td>
+</tr>
+</tbody>
+</table>
+<p>Seed mean with the seed range. The deficit is the drop in exact-match accuracy on the 1689 non-red lines from the clean pass; damage is the drop in probability on the true answer.</p>
+<p><strong>First clause.</strong> Under <code>redirect</code>, the fallback condition loses 0.749 of its non-red accuracy, with no seed under 0.607; the gate is 0.02 and the partial band 0.05. The reflection is no more selective without the term: the no-fallback condition loses 0.774 under it, the <code>recipe</code> arm 0.910, and the un-anchored condition 0.022.</p>
+<p>So a full reflection of every embedding state is destructive on non-red lines in every anchored model, and the training-time exposure to flipped syntax states did not transfer to them. What those lines decode to is in the post-hoc row of the exploratory section.</p>
+<p><strong>Second clause.</strong> Under <code>projection</code>, the non-red deficit in the fallback condition is 0.114 against 0.024 without the term, which is what ex-2.2.1 reported on the same checkpoints. The difference, 0.090, sits under the resolution floor of 0.124, so by the frozen rule the deficit is not resolved above the reference.</p>
+<p>The floor is wide because both conditions spread over seeds: the fallback seeds run from 0.035 to 0.217, the reference seeds from 0.001 to 0.127. Damage tells the same story (0.138 against 0.034, floor 0.133).</p>
+<p>The weight bracket is the sharper reading: the deficit under <code>projection</code> rises with the weight, from 0.047 at 0.01 through 0.114 at 0.05 to 0.243 at 0.25.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/write-map-light.png" alt="Two line charts over the six token positions, one line per slice from light to dark. Left, the clean 99th-percentile non-red alignment in the fallback condition: between about 0.1 and 0.4 at the prompt positions, smaller at the answer and newline. Right, the same alignment arriving at the projection operator: the embedding line is identical, and the four deeper lines sit at or below their clean values at every position." width="626" height="242" style="max-width: 100%; height: auto;" data-asset-name="write-map" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/write-map-dark.png" alt="Two line charts over the six token positions, one line per slice from light to dark. Left, the clean 99th-percentile non-red alignment in the fallback condition: between about 0.1 and 0.4 at the prompt positions, smaller at the answer and newline. Right, the same alignment arriving at the projection operator: the embedding line is identical, and the four deeper lines sit at or below their clean values at every position." width="626" height="242" style="max-width: 100%; height: auto;" data-asset-name="write-map" />
+<figcaption><p><strong>The bound and the write under <code>projection</code>, fallback condition.</strong> The 99th-percentile alignment over the non-red lines at each (slice, position), seed mean, on the shared 0–1 scale. Left, the clean map, whose arcsine is the bound; right, the alignment arriving at the operator under <code>projection</code>, whose arcsine is the write. Slices run from the embedding (lightest) to the last block (darkest). A deeper line above its clean value would mean a block re-writes the axis after it was removed upstream, which is what a wider edit looks like.</p></figcaption></figure>
+
+<p>The write map shows no re-writing at any site: every deeper slice arrives at the operator at or below its clean alignment. Whatever the term changed under <code>projection</code>, it did not widen where the edit acts on the axis.</p>
+<p><strong>H3 is partial</strong>, by the frozen rule that exactly one clause holds. The first clause fails, and by more than the partial band allows. That is the contrary case named above: the flipped syntax does not read as syntax. The second clause holds, but as an unresolved difference, and the weight bracket suggests the difference is real and grows with the weight.</p>
+<!-- REVIEW: the verdict follows the frozen rule ("exactly one clause holds"). The second clause holds only in the sense the rule defines, not resolved at nine seeds; the weight bracket, which the rule does not consult, shows the deficit under projection growing with the weight. Verify: the `projection` columns of the table, and the E4 row. -->
+
+<h2 id="transfer-from-the-antipode-to-zero-h4">Transfer from the antipode to zero (H4)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#transfer-from-the-antipode-to-zero-h4" title="Link to this heading">&para;</a></h2>
+<p><strong>H4.</strong> The designed response transfers (generalizes) part of the way to zero. Along the transfer sweep, γ ∈ {0.5, 1, 1.5, 2} at the embedding, seed-mean fallback accuracy on red lines is non-decreasing in γ, allowing a dip of at most 0.02 between adjacent strengths, and at γ = 1 it is at least half its value at γ = 2. Partial: either clause holds on its own — monotone with γ = 1 below half, or γ = 1 at half or more with a dip larger than the allowance.</p>
+<p>The γ = 1 point is a real removal, not an inert midpoint. It is the <code>embedding</code> arm of ex-2.2.1, where zeroing the axis at the embedding alone took red accuracy down to 0.16. The sweep adds how the fallback responds along the way from the trained state to that one. At γ = 1 the operator keeps whatever the state carries off the axis and rescales it by <span class="arithmatex">\(1/\sqrt{1-\alpha^2}\)</span>, so the landing direction is defined as long as the state is not perfectly aligned, and no state is: pure red arrives at the embedding at about α = 0.9, a gain of about 2.3.</p>
+<p>Contrary: fallback accuracy at γ = 1 sits at the no-fallback level and the rise is confined to γ &gt; 1. That would be the mismatch showing in full, with the response living at the antipode and not reaching the projected state. The <a href="https://github.com/z0u/sca2/blob/main/todo/science/redirect-between-two-anchored-ops.md">concept swap</a> filed for D2.3 would address it by targeting a state training already visits; widening the bracket here would not.</p>
+<!-- REVIEW: H4's (then H5's) partial band covered only the monotone-but-short case, leaving no verdict for a run that transfers to γ = 1 through a dip; both single-clause cases are now partial. The D2.3 sentence was in the present indicative ("the remedy is"), which reads as a scheduled follow-up; softened to the conditional, since that item is a backlog entry. -->
+
+<p>We report the <code>projection</code> row beside the sweep, without a gate: γ = 1 at every slice rather than at the embedding alone. The difference between the two says how much the projection at later slices costs the designed response.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/transfer-sweep-light.png" alt="Two line charts against the projection strength, from 0.5 to 2. Left, fallback accuracy: the red line (fallback condition) sits at zero at 0.5, rises to about 0.63 at 1 with a wide band from 0.23 to 0.97, and reaches one at 1.5 and 2; a red cross at strength 1 marks the projection row at 0.57, with a grey cross beside it near zero. The grey line (no-fallback) stays near zero throughout. Right, true-answer accuracy on red lines: both lines fall from about 0.7 or 0.8 at 0.5 to near zero at 1 and beyond." width="626" height="242" style="max-width: 100%; height: auto;" data-asset-name="transfer-sweep" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/transfer-sweep-dark.png" alt="Two line charts against the projection strength, from 0.5 to 2. Left, fallback accuracy: the red line (fallback condition) sits at zero at 0.5, rises to about 0.63 at 1 with a wide band from 0.23 to 0.97, and reaches one at 1.5 and 2; a red cross at strength 1 marks the projection row at 0.57, with a grey cross beside it near zero. The grey line (no-fallback) stays near zero throughout. Right, true-answer accuracy on red lines: both lines fall from about 0.7 or 0.8 at 0.5 to near zero at 1 and beyond." width="626" height="242" style="max-width: 100%; height: auto;" data-asset-name="transfer-sweep" />
+<figcaption><p><strong>The transfer sweep.</strong> Seed mean with the seed range as a band, for the projection operator at the embedding at strength γ, every position. Left, fallback accuracy on the red lines with a clean visible operand; right, true-answer accuracy on all red lines. γ = 2 is <code>redirect</code>; γ = 1 is the <code>embedding</code> arm of ex-2.2.1. The crosses at γ = 1 are the <code>projection</code> row of each condition, which removes the axis at every slice rather than at the embedding alone.</p></figcaption></figure>
+
+<p>Along the sweep, the seed-mean fallback accuracy in the fallback condition runs 0.001, 0.630, 0.994, 0.999 at γ = 0.5, 1, 1.5, 2. It is non-decreasing: the largest drop between adjacent strengths is 0.000, against an allowance of 0.02. At γ = 1 it stands at 0.63 of its value at γ = 2, against a gate of 0.5.</p>
+<p>The seed range at γ = 1 is wide, from 0.23 to 0.97, and at γ = 1.5 every seed is above 0.98. The no-fallback condition stays at 0.020 or below throughout. True-answer accuracy on red lines falls the same way in both conditions: the removal at γ = 1 is at least as complete with the term as without it (0.024 against 0.155).</p>
+<p>The <code>projection</code> row, γ = 1 at every slice, gives 0.572 (0.16 to 0.84), a little under the embedding-only figure at the same strength. Removing the axis at the later slices as well costs the designed response 0.057 on the seed mean.</p>
+<p><strong>H4 holds.</strong> The response reaches the projected state at more than half strength, and rises monotonically from there to the trained one. The contrary case, a rise confined to γ &gt; 1, did not occur.</p>
+<h2 id="exploratory-analyses">Exploratory analyses<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#exploratory-analyses" title="Link to this heading">&para;</a></h2>
+<p>Preregistered as exploratory, no gates, except the last two rows, which are post hoc.</p>
+<p><strong>E1 — composition.</strong> <figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/composition-light.png" alt="Two panels of stacked bars, one bar per seed, nine fallback seeds then nine no-fallback seeds. Left, under redirect: every fallback bar is entirely the fallback-answer color; the no-fallback bars are two thirds or more the shade for something else, with small neighbor, visible-operand, and true-answer segments. Right, under projection: the fallback bars are between a third and four fifths fallback answer, varying by seed, with most of the rest a neighbor; the no-fallback bars are mostly neighbor, with true-answer, visible-operand, and other segments." width="702" height="242" style="max-width: 100%; height: auto;" data-asset-name="composition" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/composition-dark.png" alt="Two panels of stacked bars, one bar per seed, nine fallback seeds then nine no-fallback seeds. Left, under redirect: every fallback bar is entirely the fallback-answer color; the no-fallback bars are two thirds or more the shade for something else, with small neighbor, visible-operand, and true-answer segments. Right, under projection: the fallback bars are between a third and four fifths fallback answer, varying by seed, with most of the rest a neighbor; the no-fallback bars are mostly neighbor, with true-answer, visible-operand, and other segments." width="702" height="242" style="max-width: 100%; height: auto;" data-asset-name="composition" /></p>
+<figcaption><p><strong>What red lines decode to.</strong> Each bar splits the 296 red lines with a clean visible operand by the decoded answer, per seed: the fallback answer, the true mix, a one-step neighbor of it, the visible operand, the red operand, or something else, tested in that order. Left, under <code>redirect</code>; right, under <code>projection</code>. The nine fallback seeds sit left of the nine no-fallback seeds in each panel.</p></figcaption>
+</figure>
+<p>Under <code>redirect</code>, the fallback condition decodes 0.999 of red lines to the fallback answer, and puts 0.000 of its mass outside the color vocabulary. The no-fallback condition puts 0.228 outside it under the same edit, with a seed range from 0.01 to 0.67. Under <code>projection</code> the fallback condition splits between the fallback answer and a one-step neighbor of the true mix, in a proportion that varies by seed.</p>
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th>agree, <code>redirect</code></th>
+<th>plurality, <code>redirect</code></th>
+<th>agree, <code>projection</code></th>
+<th>plurality, <code>projection</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>un-anchored</td>
+<td>–</td>
+<td>0.992</td>
+<td>–</td>
+<td>0.999</td>
+</tr>
+<tr>
+<td>no-fallback</td>
+<td>0.024</td>
+<td>0.260</td>
+<td>0.142</td>
+<td>0.358</td>
+</tr>
+<tr>
+<td>fallback</td>
+<td>1.000</td>
+<td>0.999</td>
+<td>0.726</td>
+<td>0.592</td>
+</tr>
+<tr>
+<td>fallback, no anti-anchor</td>
+<td>–</td>
+<td>0.997</td>
+<td>–</td>
+<td>0.541</td>
+</tr>
+<tr>
+<td>anti-anchor, no fallback</td>
+<td>–</td>
+<td>0.474</td>
+<td>–</td>
+<td>0.481</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.01</td>
+<td>–</td>
+<td>0.998</td>
+<td>–</td>
+<td>0.503</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.25</td>
+<td>–</td>
+<td>0.997</td>
+<td>–</td>
+<td>0.839</td>
+</tr>
+<tr>
+<td>the recipe through the new code path</td>
+<td>–</td>
+<td>0.439</td>
+<td>–</td>
+<td>0.468</td>
+</tr>
+</tbody>
+</table>
+<p>Seed agreement on the red lines with a clean visible operand. "Agree" is the fraction of lines on which at least 5 of the nine seeds decode the same answer, the statistic from ex-2.2.1, which put it at 13% under the projection; it is undefined for the three-seed conditions. "Plurality" is the mean over lines of the fraction of seeds decoding the line's plurality answer, defined for every condition.</p>
+<p><strong>E2 — the antipode.</strong> The fraction of clean states with negative alignment, per slice and averaged over positions:</p>
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th>emb.</th>
+<th>block 1</th>
+<th>block 2</th>
+<th>block 3</th>
+<th>block 4</th>
+<th>all</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>un-anchored</td>
+<td>0.569</td>
+<td>0.608</td>
+<td>0.632</td>
+<td>0.691</td>
+<td>0.625</td>
+<td>0.625</td>
+</tr>
+<tr>
+<td>no-fallback</td>
+<td>0.374</td>
+<td>0.281</td>
+<td>0.263</td>
+<td>0.183</td>
+<td>0.310</td>
+<td>0.282</td>
+</tr>
+<tr>
+<td>fallback</td>
+<td>0.065</td>
+<td>0.110</td>
+<td>0.065</td>
+<td>0.015</td>
+<td>0.034</td>
+<td>0.058</td>
+</tr>
+<tr>
+<td>fallback, no anti-anchor</td>
+<td>0.377</td>
+<td>0.249</td>
+<td>0.260</td>
+<td>0.224</td>
+<td>0.351</td>
+<td>0.292</td>
+</tr>
+<tr>
+<td>anti-anchor, no fallback</td>
+<td>0.051</td>
+<td>0.101</td>
+<td>0.073</td>
+<td>0.023</td>
+<td>0.044</td>
+<td>0.058</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.01</td>
+<td>0.051</td>
+<td>0.092</td>
+<td>0.046</td>
+<td>0.013</td>
+<td>0.038</td>
+<td>0.048</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.25</td>
+<td>0.065</td>
+<td>0.092</td>
+<td>0.079</td>
+<td>0.022</td>
+<td>0.042</td>
+<td>0.060</td>
+</tr>
+<tr>
+<td>the recipe through the new code path</td>
+<td>0.366</td>
+<td>0.231</td>
+<td>0.232</td>
+<td>0.156</td>
+<td>0.253</td>
+<td>0.248</td>
+</tr>
+</tbody>
+</table>
+<p>The anti-subspace term alone leaves about a quarter of clean states past the antipode plane; the hinge takes that to about 0.06, and the <code>fb-only</code> arm, without the hinge, sits where the no-fallback condition does.</p>
+<p><strong>E3 — off-axis recoverability.</strong> Held-out R² of a ridge probe for the concept operand's redness, fitted on the operand states with the axis deleted, per slice. (A ridge probe is a linear regression with a penalty on the weights; held-out R² is the share of variance it explains on lines it was not fitted to.) Fallback / no-fallback, with the resolution floor (two pooled between-seed sds) beside each:</p>
+<table>
+<thead>
+<tr>
+<th>states</th>
+<th>emb.</th>
+<th>block 1</th>
+<th>block 2</th>
+<th>block 3</th>
+<th>block 4</th>
+<th>floor: emb.</th>
+<th>b1</th>
+<th>b2</th>
+<th>b3</th>
+<th>b4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>clean</td>
+<td>0.915 / 0.896</td>
+<td>0.930 / 0.932</td>
+<td>0.929 / 0.927</td>
+<td>0.922 / 0.918</td>
+<td>0.902 / 0.896</td>
+<td>0.045</td>
+<td>0.024</td>
+<td>0.030</td>
+<td>0.034</td>
+<td>0.045</td>
+</tr>
+<tr>
+<td>redirect</td>
+<td>0.915 / 0.896</td>
+<td>0.897 / 0.866</td>
+<td>0.891 / 0.849</td>
+<td>0.879 / 0.839</td>
+<td>0.854 / 0.812</td>
+<td>0.045</td>
+<td>0.078</td>
+<td>0.054</td>
+<td>0.057</td>
+<td>0.055</td>
+</tr>
+<tr>
+<td>projection</td>
+<td>0.952 / 0.949</td>
+<td>0.940 / 0.931</td>
+<td>0.928 / 0.904</td>
+<td>0.906 / 0.872</td>
+<td>0.876 / 0.830</td>
+<td>0.020</td>
+<td>0.033</td>
+<td>0.040</td>
+<td>0.052</td>
+<td>0.075</td>
+</tr>
+</tbody>
+</table>
+<p>The floor the task itself sets, the same ridge fit to the raw RGB values, is 0.865. Every clean figure is above it; under the interventions the deeper slices dip below it, as far as 0.812 at the last block. Under <code>redirect</code> and under <code>projection</code>, the R² in the fallback condition sits above the no-fallback one at the deeper slices, by 0.03 to 0.05; that is under the floor at every slice. The <a href="https://github.com/z0u/sca2/blob/main/todo/science/off-axis-probe-r2-does-bound-intervention.md">follow-up at more seeds</a> is where that would be resolved.</p>
+<p><strong>E4 — arms.</strong> The tables under H1, H2, and H3 carry every arm. Dropping the hinge (<code>fb-only</code>) leaves the fallback under <code>redirect</code> intact and the margin at the no-fallback level, and takes the transfer to γ = 1 from 0.630 to 0.399. Dropping the fallback term (<code>anti-only</code>) leaves no designed response.</p>
+<p>Along the weight bracket, transfer to γ = 1 rises with the weight (0.354, 0.630, 0.775) and so does the non-red deficit under <code>projection</code> (see the table under H3).</p>
+<p>The <code>recipe</code> arm reproduces the stored no-fallback checkpoints through the new code path: margin 0.738 against 0.738, red accuracy under <code>projection</code> 0.120 against 0.091, non-red deficit under <code>projection</code> 0.023 against 0.024. The recomputed clean alignment maps of the stored runs match the published ones from ex-2.1.10 to 0.0011.</p>
+<p><strong>E5 — ride-along interventions.</strong></p>
+<table>
+<thead>
+<tr>
+<th>intervention</th>
+<th>condition</th>
+<th>red acc.</th>
+<th>fallback acc., clean visible</th>
+<th>non-red deficit</th>
+<th>non-red damage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>operands</code></td>
+<td>fallback</td>
+<td>0.064 (0.000–0.184)</td>
+<td>0.138 (0.017–0.270)</td>
+<td>0.000 (-0.001–0.001)</td>
+<td>0.000 (-0.001–0.001)</td>
+</tr>
+<tr>
+<td><code>operands</code></td>
+<td>no-fallback</td>
+<td>0.125 (0.000–0.263)</td>
+<td>0.030 (0.000–0.068)</td>
+<td>0.000 (-0.001–0.002)</td>
+<td>0.001 (0.000–0.005)</td>
+</tr>
+<tr>
+<td><code>shaped</code></td>
+<td>fallback</td>
+<td>0.436 (0.203–0.775)</td>
+<td>0.015 (0.000–0.051)</td>
+<td>0.000 (0.000–0.000)</td>
+<td>-0.000 (-0.000–0.000)</td>
+</tr>
+<tr>
+<td><code>shaped</code></td>
+<td>no-fallback</td>
+<td>0.600 (0.260–0.841)</td>
+<td>0.003 (0.000–0.017)</td>
+<td>0.000 (0.000–0.000)</td>
+<td>-0.000 (-0.000–0.000)</td>
+</tr>
+<tr>
+<td><code>ablate</code></td>
+<td>fallback</td>
+<td>0.019 (0.000–0.074)</td>
+<td>0.491 (0.081–0.801)</td>
+<td>0.104 (0.024–0.208)</td>
+<td>0.126 (0.044–0.233)</td>
+</tr>
+<tr>
+<td><code>ablate</code></td>
+<td>no-fallback</td>
+<td>0.119 (0.000–0.249)</td>
+<td>0.020 (0.000–0.041)</td>
+<td>0.012 (0.001–0.044)</td>
+<td>0.020 (0.003–0.065)</td>
+</tr>
+</tbody>
+</table>
+<p>Seed mean with the seed range, for the three ex-2.2.1 edits run without gates on both nine-seed conditions. Red accuracy and fallback accuracy are read on red lines, the deficit and damage on non-red lines.</p>
+<p>The <code>operands</code> edit, at the operand positions only, keeps its selectivity in the fallback condition and produces the fallback answer on 0.14 of lines. <code>ablate</code> is the one row where the fallback condition differs from the reference by a large amount: it emits the fallback answer on about half the red lines and loses 0.104 of its non-red accuracy, against 0.012 without the term.</p>
+<p><strong>E6 — a LUNAR-style redirect, fitted after training.</strong> On each frozen no-fallback checkpoint we fit one 64×64 matrix at the embedding, applied at every position, on the qualifying red lines the fallback term uses. The loss has two parts: the fallback cross-entropy at <code>=</code>, and an identity term on every other state, meaning the mean squared distance from the unedited state.</p>
+<p>This model has no refusal region of its own, so the fallback answer stands in for it. The fitted matrix runs through the eval contract like any other operator, giving fallback accuracy 0.989 (0.966–1.000) on the red lines with a clean visible operand, red-line accuracy 0.000 (0.000–0.000), a non-red deficit of 0.388 (0.144–0.852), and non-red damage of 0.408 (0.161–0.847).</p>
+<p>Beside the fallback condition under <code>redirect</code> (0.999 and a deficit of 0.749), the fitted edit reaches the same designed response at a smaller cost on non-red lines, with a wide seed spread. Its identity term was the only thing asking it to leave other positions alone, and at the weight used it did not do so.</p>
+<p><strong>E7 — non-red lines under the reflection (post hoc).</strong> What the non-red lines decode to, as a fraction of (seed, line) pairs: the true answer, the fallback answer of the visible operand, the visible operand itself, or something else.</p>
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th>true, <code>redirect</code></th>
+<th>fallback</th>
+<th>visible</th>
+<th>other</th>
+<th>true, <code>projection</code></th>
+<th>fallback</th>
+<th>visible</th>
+<th>other</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>un-anchored</td>
+<td>0.978</td>
+<td>0.003</td>
+<td>0.001</td>
+<td>0.018</td>
+<td>0.999</td>
+<td>0.000</td>
+<td>0.000</td>
+<td>0.001</td>
+</tr>
+<tr>
+<td>no-fallback</td>
+<td>0.224</td>
+<td>0.007</td>
+<td>0.021</td>
+<td>0.748</td>
+<td>0.975</td>
+<td>0.001</td>
+<td>0.000</td>
+<td>0.024</td>
+</tr>
+<tr>
+<td>fallback</td>
+<td>0.249</td>
+<td>0.226</td>
+<td>0.001</td>
+<td>0.524</td>
+<td>0.884</td>
+<td>0.028</td>
+<td>0.001</td>
+<td>0.087</td>
+</tr>
+<tr>
+<td>fallback, no anti-anchor</td>
+<td>0.182</td>
+<td>0.202</td>
+<td>0.001</td>
+<td>0.615</td>
+<td>0.831</td>
+<td>0.037</td>
+<td>0.000</td>
+<td>0.132</td>
+</tr>
+<tr>
+<td>anti-anchor, no fallback</td>
+<td>0.264</td>
+<td>0.003</td>
+<td>0.046</td>
+<td>0.687</td>
+<td>0.982</td>
+<td>0.000</td>
+<td>0.002</td>
+<td>0.015</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.01</td>
+<td>0.234</td>
+<td>0.186</td>
+<td>0.000</td>
+<td>0.579</td>
+<td>0.952</td>
+<td>0.011</td>
+<td>0.001</td>
+<td>0.036</td>
+</tr>
+<tr>
+<td>fallback at w_fb = 0.25</td>
+<td>0.224</td>
+<td>0.183</td>
+<td>0.000</td>
+<td>0.593</td>
+<td>0.756</td>
+<td>0.072</td>
+<td>0.000</td>
+<td>0.172</td>
+</tr>
+<tr>
+<td>the recipe through the new code path</td>
+<td>0.088</td>
+<td>0.009</td>
+<td>0.010</td>
+<td>0.893</td>
+<td>0.976</td>
+<td>0.001</td>
+<td>0.002</td>
+<td>0.021</td>
+</tr>
+</tbody>
+</table>
+<p>Under <code>redirect</code>, the fallback condition emits the gray mix of the visible operand on 0.23 of non-red (seed, line) pairs, so about a third of its loss on those lines is the designed response firing where no concept was removed. The rest is undesigned, as is the whole of the loss in the no-fallback condition. Under <code>projection</code> the fallback fires on 0.028 of them, which accounts for about a third of the unresolved difference in the second clause of H3.</p>
+<!-- REVIEW: this line said the projection figure "is the size of" the unresolved difference in H3's second clause; the figure is 0.028 and the difference 0.090, so it accounts for part of it rather than all. Verify: the `projection` deficit columns of the H3 table against the fallback column here. -->
+
+<!-- REVIEW: E7 is post hoc; it was added after the H3 result to say what the non-red lines decode to, using the per-line guesses the scorer already stores. The fallback answer for a non-red line is the scorer's own table (visible operand mixed with gray), with the true-answer and visible-operand coincidences removed first. Verify: the composition order in experiment.py, and the per-line `guess` arrays. -->
+
+<p><strong>E8 — the syntax embeddings on the axis (post hoc).</strong> 99th-percentile clean alignment over the non-red lines at the embedding slice, one figure per position, averaged over seeds. Operand and answer columns pool all the color tokens, so their percentile is the tail of about two hundred tokens; a syntax column has only one token, so its percentile is that token's alignment.</p>
+<table>
+<thead>
+<tr>
+<th>condition</th>
+<th><code>op1</code></th>
+<th><code>+</code></th>
+<th><code>op2</code></th>
+<th><code>=</code></th>
+<th><code>ans</code></th>
+<th><code>⏎</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>un-anchored</td>
+<td>0.31</td>
+<td>0.05</td>
+<td>0.31</td>
+<td>0.04</td>
+<td>0.31</td>
+<td>0.08</td>
+</tr>
+<tr>
+<td>no-fallback</td>
+<td>0.17</td>
+<td>0.28</td>
+<td>0.17</td>
+<td>0.40</td>
+<td>0.17</td>
+<td>0.05</td>
+</tr>
+<tr>
+<td>fallback</td>
+<td>0.09</td>
+<td>0.29</td>
+<td>0.09</td>
+<td>0.33</td>
+<td>0.08</td>
+<td>0.06</td>
+</tr>
+</tbody>
+</table>
+<p>In the un-anchored model the <code>+</code> and <code>=</code> embeddings sit where a random direction would. In every anchored model they carry 0.3 to 0.4. Meanwhile the anti-subspace term has flattened the non-red colors, and the hinge flattens them further. So the leak sits in two token embeddings at slice 0, before any block runs.</p>
+<!-- REVIEW: E8 is post hoc; it was added after the discussion round to say where the non-red cost of H3's first clause comes from, using the stored clean alignment maps (the same data as the write map's left panel, for three conditions instead of one). Verify: `alpha_q99_nonred` in the clean statistics. -->
+
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#discussion" title="Link to this heading">&para;</a></h2>
+<p>The fallback in the transformer does what it did in M1. At the edit it was trained at, every seed gives the designed answer, and the seed disagreement ex-2.2.1 found under projection is gone there.</p>
+<p>What is new is the gap between the edit the term was trained at and the edit we want to use. The clean model never visits the antipode, and the response trained there carries over to the plain projection in most seeds, but in some barely at all. That is the mismatch the design named, and the anchored-op experiments should train toward a state that training already visits; the <a href="https://github.com/z0u/sca2/blob/main/todo/science/redirect-between-two-anchored-ops.md">concept swap</a> filed for D2.3 gives one by construction.</p>
+<p>The anti-anchor hinge pays for that transfer with margin: it keeps the clean states on the anchor side of the plane. That cost comes from designing at the antipode, and the swap has no antipode, so we are not adopting the hinge into the recipe. Nor does the fallback term itself carry into the operator experiments by default. We are keeping the code, for fits like E6 and for a concept with no visited state to aim at.</p>
+<p>The selectivity cost belongs to the edit rather than to the term. Every anchored model loses most non-red lines under the reflection, because the <code>+</code> and <code>=</code> embeddings carry the axis (E8) and the reflection flips them along with the operand. We read the tied readout as what puts the axis there: the state after a red operand sits on the axis, and the cheapest way to predict the token that follows is for that token's readout to lean the same way. An <a href="https://github.com/z0u/sca2/blob/main/todo/science/syntax-embeddings-carry-the-axis-via-tied-readout.md">untied readout would test this</a>.</p>
+<p>Until those embeddings are clean, any edit applied at every position pays the cost, including a rotation to a second anchored concept. The thresholded and operand-only edits of ex-2.2.1 avoid it.</p>
+<p>On masking, the off-axis row cannot say whether the term keeps red readable elsewhere. The shift it shows is inside the floor, and the follow-up at more seeds is filed.</p>
+<p>The fitted edit of E6, which reaches the designed response at a smaller non-red cost, is the LUNAR argument in miniature: if the model already produces the destination, there is no need to train at a state it never visits. The trained term still has one thing going for it, the response living in the model rather than in a fitted map. The <a href="https://github.com/z0u/sca2/blob/main/todo/science/lunar-fit-retain-term-and-weight-sweep.md">fit of E6 could be tightened</a> before the two are compared again.</p>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#method" title="Link to this heading">&para;</a></h2>
+<h3 id="training">Training<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#training" title="Link to this heading">&para;</a></h3>
+<p>We use the primary recipe from <a href="https://z0u.github.io/sca2/m2/ex-2.1.10/">ex-2.1.10</a> unchanged: the <code>v216</code> corpus, d64-L4, 100 epochs with a 10-epoch warm-up, the pooled either-operand labeller at τ = 0.1, the anchor at λ = 0.1 with its anneal, and the anti-subspace term at the ex-2.1.8 operating point. The <a href="https://z0u.github.io/sca2/m2/ex-2.1.11/">ex-2.1.11</a> survey proposed a different point. But survey numbers are proposals until they are re-measured at fresh seeds, and the design schedules that confirmation on the multi-op grammar. Keeping the ex-2.1.10 recipe also keeps its stored checkpoints as the no-fallback condition, so nothing has to be retrained for the comparison.</p>
+<p>We also use the same seeds as the primary of that experiment, so the fallback and no-fallback conditions differ only in the two new terms. Both are weights on the existing anchored train step.</p>
+<p><strong>The fallback term.</strong> On each training crop, we reflect the embedding state of every position through the axis, <span class="arithmatex">\(h \mapsto \mathrm{normalize}(h - 2\alpha\, e_1)\)</span>, and hold the reflected states fixed with a stop-gradient. We then run the blocks forward from there and take the cross-entropy at the <code>=</code> position of each qualifying line against its fallback token. A line qualifies on three counts: its dose is at least 0.8, the redness of its visible operand is below 0.5, and the clean embedding alignment of its concept operand is at least 0.5. The reflection singles out no positions, so it is the same edit <code>redirect</code> applies at eval, and it applies unchanged to a model whose positions are not labelled.</p>
+<p><strong>Compute.</strong> The reflected pass is a second forward and backward through the blocks, so a step that carries a qualifying line costs about twice a plain step. A crop holds about ten lines, and about one line in twenty qualifies, so roughly 40% of crops carry one. Run per batch, that is nearly every step, and the budget below counts the term as a doubling. Three things should make it cheap at scale. The pass can be skipped when no position clears the alignment threshold, which the clean pass at the edit slice already reports, so it costs nothing before the anchor has placed the concept. It can run on a subsample of the qualifying sequences, or on every k-th step, since the term is a small weight on a slowly moving target. And it reruns only the part of the model after the edit, so an edit deeper than the embedding shares the earlier layers with the clean pass.</p>
+<p>The term is the mean over qualifying lines, at a constant weight of 0.05 from step 0. We take that weight from M1, as a starting point rather than a derived value: there it scaled a mean squared error on one decoder, and here it scales a cross-entropy through four blocks. Checking it is what the bracket arms are for.</p>
+<p>The alignment threshold keeps the term inert until the anchor has placed the concept, which the ex-2.1.10 trajectories put inside the warm-up. If the concept never arrived at the edit slice, the term would stay inert rather than train toward the wrong state, and the margin gate of H2 would report the anchoring failure.</p>
+<!-- REVIEW: the frozen text said the embedding table gets no gradient from the term. nGPT ties the unembedding to the embedding table, so the table does see the term through the readout. Corrected to say what the detach does and does not cut; the design (reflect once, detach, train what follows) is unchanged. Verify: `reflected_logits` in src/sca/fallback.py multiplies by `wte.T`. -->
+<p><strong>Where the term acts.</strong> The stop-gradient makes this similar to the decoder-only term from M1: the reflected embedding states are detached, so nothing flows back through them to the placement of <em>red</em> at the edit, while the four blocks and the readout do learn. The readout is the embedding table itself, since nGPT ties the two, so the table sees the term through the readout only: the answer tokens' readout vectors move toward the reflected pass's final state, and every other token's readout, <em>red</em>'s included, moves a little away from it. That is a decoder-side nudge on the readout table rather than a pull on where the concept sits, and the margin gate of H2 is where it would show. Together the blocks and the readout learn a map from a state at the antipode to the fallback answer. In ex-2.2.1 the concept was read from the operand states in the first two blocks, so those are the blocks with something to learn.</p>
+<p>We reflect once, at the first anchored slice, which in this recipe is the embedding. Reflecting at every slice, as the ex-2.2.1 projection does, would need a detach at every slice, and then only the layers after the last detach would train; reflecting everywhere and detaching only the first edit is the rehearsal the design rejected.</p>
+<p>The stop-gradient does leave one thing open. The blocks after the edit are shared with the clean pass, so the term can reshape how the concept is carried downstream of the edit, including keeping it readable off the axis. That is what the off-axis row (E3) and the margin gate watch.</p>
+<p><strong>The anti-anchor term.</strong> This is <span class="arithmatex">\(\mathrm{mean}(\max(-\alpha, 0))\)</span> over the same live positions and slices the anti-subspace term reads, on the clean forward pass only, at a constant weight of 0.1. The reflected states that the fallback term produces are not live positions of that pass, so the two terms do not pull against each other. The term is a hinge on negative alignment: zero when the alignment is positive, and growing linearly as it goes negative. So it keeps clean states out of the half of the space where the fallback lives, and because it acts on one side only, it does not oppose the anchor. The anti-subspace term already penalizes <span class="arithmatex">\(\alpha^2\)</span> there, so the arms that drop one term or the other say whether the hinge adds anything.</p>
+<h3 id="the-fallback-answer">The fallback answer<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#the-fallback-answer" title="Link to this heading">&para;</a></h3>
+<p>Removing the concept operand leaves the visible operand and an unknown partner. The least committal answer is the distribution of the mix over every partner the corpus allows, which we call the <em>operand-averaged null</em>. On this grid, each channel of the visible operand has three closed partners, and their three mixes are distinct, so the null is uniform over 27 colors and has no mode.</p>
+<p>Its per-channel median is the mix with the middle partner. That coincides, at every level, with the visible operand mixed with mid-gray (7.5 on the 16-level channel) and rounded to the nearest grid level; <code>experiment.py</code> asserts the coincidence. That color is the fallback answer, and it is the gray fallback from M1 carried over.</p>
+<p>The fallback answer depends on the visible operand alone, so it is defined only when that operand is clean. On a red line whose visible operand is itself red (redness ≥ 0.5), both operand states are reflected. The answer would then be the mix with both operands replaced by mid-gray, which is 7.5 on every channel, halfway between grid levels 6 and 9. With nothing visible, the null has no center on the grid; when one operand is visible, its level always breaks the tie. Those 69 lines take no fallback loss and sit outside the gate of H1.</p>
+<h3 id="measurements">Measurements<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#measurements" title="Link to this heading">&para;</a></h3>
+<p>We run one teacher-forced pass per run per intervention, over all 5,832 lines, through the eval contract in <a href="https://github.com/z0u/sca2/blob/main/src/sca/intervention.py"><code>sca.intervention</code></a>. Each pass gives the log-softmax at the <code>=</code> position, from which we read the probability on the correct answer and on the fallback answer, the argmax, and the mass outside the color vocabulary.</p>
+<p>Each pass also gives the write per (slice, line, position), as in ex-2.2.1, and the clean alignment map. Fallback accuracy, seed agreement, and the composition all come from the argmax on red lines. The training trajectory records the fallback and anti-anchor losses beside the anchor loss and the margin, every 50 steps.</p>
+<p><strong>Noise floor.</strong> As in ex-2.2.1: for each group statistic we take the pooled between-seed standard deviation per condition, computed before any comparison is read. A difference between conditions or arms smaller than twice that value is reported as not resolved. Gates score seed means against fixed thresholds and do not use the floor.</p>
+<h3 id="budget">Budget<a class="anchor-link" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#budget" title="Link to this heading">&para;</a></h3>
+<p>Twenty-four training runs of the ex-2.1.10 recipe, each at about twice the cost of a plain run (see <a href="https://z0u.github.io/sca2/m2/ex-2.2.2/#training">Compute</a>), plus the scoring of twelve stored checkpoints. The scoring is CPU work, at about a second per run per intervention. E6 adds nine fits of a 64×64 matrix, one per no-fallback seed, at a few CPU minutes each.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:sg">
+<p>An identity in the forward pass with a gradient of zero (<code>.detach()</code> in PyTorch), so a loss downstream of it cannot move anything upstream of it. The other losses see the clean pass and are unaffected.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#fnref:sg" title="Back to text">&#8617;</a></p>
+</li>
+<li id="fn:kl">
+<p>A KL term penalizes the distance between the next-token distribution of the model and that of the reference.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/m2/ex-2.2.2/#fnref:kl" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>
