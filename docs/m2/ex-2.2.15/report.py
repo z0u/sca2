@@ -94,7 +94,7 @@ This is a scouting run of {ex.N_RUNS} fresh training runs, with a few prediction
 
 ## How to read this draft
 
-The policies, the four predictions, and the rule were fixed before any run, at commit `TODO`. Everything after that commit is either results filled into their sections or exploratory work, marked as post hoc.
+The policies, the five predictions, and the rule were fixed before any run, at commit `TODO`. Everything after that commit is either results filled into their sections or exploratory work, marked as post hoc.
 
 Each result section opens with what we expect, then a placeholder for what we saw.
 
@@ -139,9 +139,9 @@ This matters more after the [D2.2 pivot](../d2.2/pivot.md). There, a line is a c
 
 {conditions_html()}
 
-Every arm is the primary from ex-2.2.14: `{ex.ANCHORED_OP}` on e₁, labelled at a rate of {ex.LABEL_RATE:g} per line, the pull over the whole line, and the handover recipe. Only the crop policy changes, plus the window for the short pair and the model for the last two.
+Every arm is the primary from ex-2.2.14: `{ex.ANCHORED_OP}` on e₁, labelled at a rate of {ex.LABEL_RATE:g} per line, the pull over the whole line, and the handover recipe. Only the crop policy changes, plus the window for the short pair and the model for the last three.
 
-**Same batches, same labels.** A policy is a weight on the pull of each labelled line, applied after the labels are drawn. So at one seed every {ex.BLOCK}-token arm trains on the same windows with the same labels, and differences between arms at a seed come from the policy. The model arms, `whole-mask` and `whole-tied`, share those windows and labels too, so each pairs with `whole` at a seed. The short-window arms draw differently and are compared with each other.
+**Same batches, same labels.** A policy is a weight on the pull of each labelled line, applied after the labels are drawn. So at one seed every {ex.BLOCK}-token arm trains on the same windows with the same labels, and differences between arms at a seed come from the policy. The model arms, `whole-mask`, `whole-tied`, and `all-tied`, share those windows and labels too, so each pairs with `whole` or `all` at a seed. The short-window arms draw differently and are compared with each other.
 
 **A policy only takes pull away.** A line that a policy keeps gets the same pull it had under `all`, because the term still divides by the number of labelled lines with anything visible. We could instead divide by the number of lines the policy keeps, but then every kept pull would grow stronger as the policy drops more, which is the side effect ex-2.1.7 warned about.
 
@@ -153,7 +153,7 @@ The cost of our choice is that the policies differ a little in total pull, so th
 
 **The halved windows.** At {ex.SHORT_BLOCK} tokens, {CUT_SHORT:.0%} of line visits are cut, about the share the in-context grammar would have. The batch doubles to {ex.SHORT_BATCH} windows, so a step sees the same number of tokens and the runs take the same steps. `all-short` against `whole-short` asks whether the effect grows with the share of cut lines, and whether `whole` still removes it.
 
-**The model arms.** Each keeps `whole` and changes one thing about the model, to test a route for any lean that `whole` leaves on whole lines. `whole-mask` stops attention at each newline, so a position sees only its own line; on a whole line the first operand then sees nothing but itself. The [pivot](../d2.2/pivot.md#the-proposal) names this mask as optional for the in-context grammar. `whole-tied` ties the readout to the embedding table, as `handover-tied` did in ex-2.2.9. The untied readout arrived with the handover recipe, and the [op1-lean reanalysis](../op1-lean/report.py) found the lean on *red* running through it.
+**The model arms.** `whole-mask` and `whole-tied` each keep `whole` and change one thing about the model, to test a route for any lean that `whole` leaves on whole lines. `whole-mask` stops attention at each newline, so a position sees only its own line; on a whole line the first operand then sees nothing but itself. The [pivot](../d2.2/pivot.md#the-proposal) names this mask as optional for the in-context grammar. `whole-tied` ties the readout to the embedding table, as `handover-tied` did in ex-2.2.9. The untied readout arrived with the handover recipe, and the [op1-lean reanalysis](../op1-lean/report.py) found the lean on *red* running through it. `all-tied` pairs with `whole-tied`, so the share of the lean that cut lines carry can be measured under the tied readout as well.
 
 ## The first operand lean is due to cut lines (H1)
 
@@ -169,7 +169,7 @@ If `whole` keeps most of the lean, the lean comes from whole lines (perhaps thro
 
 If the lean of `all` is less than {ex.READABLE_LEAN:g} above the control's, it did not reproduce at these seeds, and H1 is unresolved.
 
-<!-- REVIEW: the smoke test on red (two seeds) found `whole` removing about 30% of the lean and `cut-only` keeping about a third, so on red H1 would miss its pass. The pass gate and CUT_ONLY_SHARE stay as they were, because on a red line the first operand can itself carry the label's evidence, and on a `difference` line it cannot. After Sandy's review of 2543d1b, a partial band (PARTIAL_SHARE) gives a middle result a verdict, and lets the rule adopt a policy that only improves on `all`. Verify: red lands at 29%, just under the partial share, and the share was set with that in view. -->
+<!-- REVIEW: the smoke test on red (two seeds) found `whole` removing 29% of the excess lean and `cut-only` keeping about a third, so on red H1 would miss its pass. The pass gate and CUT_ONLY_SHARE stay as they were, because on a red line the first operand can itself carry the label's evidence, and on a `difference` line it cannot. After Sandy's review of 2543d1b, a partial band (PARTIAL_SHARE) gives a middle result a verdict, and lets the rule adopt a policy that only improves on `all`. Verify: red lands at 29%, just under the partial share, and the share was set with that in view. -->
 
 /// admonition | TODO
 Three figures. (1) The lean at the last block for each arm, one dot per seed with the seed mean, beside the band of the control and the value from ex-2.2.14. (2) The lean at each slice, one line per arm. (3) The lean at the last block through training, one line per arm (the seed mean, with each seed as a hairline), with the schedule of the anchor weight behind it. Table: the seed-mean lean and its excess over the control per arm, with the pull kept beside it.
@@ -223,10 +223,12 @@ Figure: the lean at the last block for `all`, `whole`, `all-short`, and `whole-s
 
 `whole-mask` is the weaker expectation. On a whole line the first operand follows a newline and can attend to the line before it. If the lean draws on that line, the mask removes it. If the lean is built at the first operand from its own token, the mask changes nothing. We record the direction either way.
 
+`all-tied` against `whole-tied` asks H1's question under the tied readout, with no gate: whether the cut lines still add lean once the readout is tied. If the tied readout removes the lean from whole lines only, the gap between the tied pair should be about the size of the gap between `all` and `whole`.
+
 If H1 passes, `whole` leaves little lean to split, and these arms mostly say whether each change costs the anchor or the task (H2).
 
 /// admonition | TODO
-Figure: the lean at the last block for `whole`, `whole-mask`, and `whole-tied`, one dot per seed, with lines joining the seeds they share, beside the control's band and the seed mean of `all`. Table: the lean and its difference from `whole` per model arm, with the op margin and the largest task gap.
+Figure: the lean at the last block for `all`, `whole`, `whole-mask`, `whole-tied`, and `all-tied`, one dot per seed, with lines joining the seeds they share, beside the control's band. Table: the lean and its difference from `whole` per model arm, with the op margin and the largest task gap.
 ///
 
 ## The rule for the pilot
@@ -247,7 +249,7 @@ Anything we think of after seeing the data goes here, marked as post hoc. Three 
 
 **Each role on whole lines.** The mean cosine with e₁ at each role over every op's probe lines, per arm and slice. A line cut before its op word puts its pull on the roles after it, so those roles may lean the way the first operand does, on whole lines as well as on trailing fragments.
 
-**The tied readout.** On `whole-tied` against `whole`, the measurements the untied readout made hard in earlier runs: the readout gap from the op1-lean reanalysis (how much of the log-odds of a syntax word against a color at the first operand rides on e₁), the component on e₁ of the ⏎ embedding row, and whether the op margin drifts down before the anneal, which ex-2.2.10 saw only with the untied readout.
+**The tied readout.** On the tied pair against `all` and `whole`, the measurements the untied readout made hard in earlier runs: the readout gap from the op1-lean reanalysis (how much of the log-odds of a syntax word against a color at the first operand rides on e₁), the component on e₁ of the ⏎ embedding row, and whether the op margin drifts down before the anneal, which ex-2.2.10 saw only with the untied readout.
 
 ## Discussion
 

@@ -174,15 +174,18 @@ ARMS: tuple[Arm, ...] = (
     Arm("whole-short", "whole", SHORT_BLOCK, SHORT_BATCH),
     Arm("whole-mask", "whole", line_mask=True),
     Arm("whole-tied", "whole", tie=True),
+    Arm("all-tied", "all", tie=True),
 )
 """`all` is today's behaviour and should reproduce ex-2.2.14's primary. `whole`, `half`, and `scaled` are the
 grammar-agnostic policies; `knowable` needs to know where the evidence is, which the in-context grammar can
 only approximate through the posterior. `cut-only` pulls the cut lines alone, so that `whole` and `cut-only`
 split `all`'s pull in two. The short pair repeats `all` against `whole` where cut lines are twice as common.
-The last two are `whole` with one change to the model each, to test two routes for whatever lean `whole`
+The model arms are `whole` with one change to the model each, to test two routes for whatever lean `whole`
 leaves: `whole-mask` stops attention at each newline, so a position sees only its own line; `whole-tied` ties
-the readout to the embedding table, as ex-2.2.9's `handover-tied`."""
-# REVIEW: `whole-mask` and `whole-tied` were added after Sandy's review of 2543d1b. They sit outside the rule:
+the readout to the embedding table, as ex-2.2.9's `handover-tied`. `all-tied` pairs with `whole-tied`, so the
+cut lines' share of the lean can be measured under the tied readout too."""
+# REVIEW: `whole-mask` and `whole-tied` were added after Sandy's review of 2543d1b, and `all-tied` after the
+# round that followed. They sit outside the rule:
 # the rule chooses a crop policy, and these change the model. Verify: a reader who wants the pilot's optional
 # newline mask decided here could argue for a branch of the rule that adopts it.
 
@@ -200,7 +203,7 @@ at 300, so every seed here is fresh. Five seeds because the lean is a difference
 gate needs ex-2.2.14's resolution."""
 
 N_RUNS = SEEDS * len(ARMS)
-assert N_RUNS == 50
+assert N_RUNS == 55
 
 # --- What is scored ------------------------------------------------------------------------------------
 
