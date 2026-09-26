@@ -299,6 +299,13 @@ These experiments were preparation for the main work: exercising the infrastruct
     <span class="tags">`anchoring` `operation` `smoke-test` `preregistration`</span>
 
     <!-- mini:figures ./m2/ex-2.2.14/report.py -->
+- [How far the answer moves: an RGB-distance readout beside expected exact match](./m2/answer-distance/report.py) (done)
+
+    A re-score of ex-2.2.11's 54 checkpoints with a distance on the color grid beside expected exact match, in grid steps from the line's raw answer, with a floor and a chance level beside each. On `handover` the answers the operator removes move 44% to 77% of the way from a perfect answer to chance; on `mix` nine in ten sit one or two steps off. The non-red lines move under 0.03 steps, less than the control's own lines do under the same operator. The distances vary between seeds a tenth as much as the kept share of exact match. Adopts the distance, with a set direction, for D2.2's next removal and selectivity gates.
+
+    <span class="tags">`reanalysis` `probes` `methodology` `intervention`</span>
+
+    <!-- mini:figures ./m2/answer-distance/report.py -->
 
 - [Where the op1 lean sits: a reanalysis of ex-2.2.11's stored runs](./m2/op1-lean/report.py)
 
