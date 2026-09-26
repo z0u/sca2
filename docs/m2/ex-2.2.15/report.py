@@ -94,7 +94,7 @@ This is a scouting run of {ex.N_RUNS} fresh training runs, with a few prediction
 
 ## How to read this draft
 
-The policies, the five predictions, and the rule were fixed before any run, at commit `TODO`. Everything after that commit is either results filled into their sections or exploratory work, marked as post hoc.
+The policies, the five predictions, and the rule were fixed before any run, at commit `5334cb9`. Everything after that commit is either results filled into their sections or exploratory work, marked as post hoc.
 
 Each result section opens with what we expect, then a placeholder for what we saw.
 
