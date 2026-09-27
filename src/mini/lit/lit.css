@@ -39,7 +39,10 @@ main.lit {
   padding-inline: var(--gutter);
   padding-block: 2rem;
 }
+/* Border-box, so a block with padding (a list's bullet indent, a blockquote, a code
+ * block) shares its right edge with the paragraphs, and so do the notes floated off it. */
 main.lit > * {
+  box-sizing: border-box;
   max-width: var(--measure);
   margin-inline: auto;
 }
