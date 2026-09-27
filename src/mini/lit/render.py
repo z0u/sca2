@@ -15,8 +15,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mini.lit.document import Document, Runner, Woven, parse
+from mini.lit.notes import load_glossary
 from mini.lit.page import page, to_html
-from mini.reports import Publisher, export_key, link_externalized, mark_verdicts, report_styles, set_report_styles
+from mini.reports import (
+    Publisher,
+    export_key,
+    link_externalized,
+    mark_verdicts,
+    report_glossary,
+    report_styles,
+    set_report_styles,
+)
 from mini.runs import data_root
 
 __all__ = ["render", "compose", "Rendered", "to_pdf", "output_dir"]
@@ -53,10 +62,11 @@ class Rendered:
 def compose(woven: Woven, *, extra_body: str = "") -> tuple[str, float]:
     """The woven Markdown as a complete page, with how long that took.
 
-    The project's shared report stylesheet (``docs/report.css``, :func:`mini.reports.report_styles`) goes in last, so a render, the live server and the export all show it — the site build re-inlines the current source on top. Each hypothesis heading is badged with its section's verdict (:func:`mini.reports.mark_verdicts`), which the build also does, for pages exported before the badge.
+    Terms the project's shared glossary defines (``docs/glossary.toml``, :func:`mini.reports.report_glossary`) are annotated as the document's own are. The project's shared report stylesheet (``docs/report.css``, :func:`mini.reports.report_styles`) goes in last, so a render, the live server and the export all show it — the site build re-inlines the current source on top. Each hypothesis heading is badged with its section's verdict (:func:`mini.reports.mark_verdicts`), which the build also does, for pages exported before the badge.
     """
     t0 = time.perf_counter()
-    html = mark_verdicts(page(to_html(woven.markdown), title=woven.doc.title, extra_body=extra_body))
+    body = to_html(woven.markdown, glossary=load_glossary(report_glossary(woven.doc.path)))
+    html = mark_verdicts(page(body, title=woven.doc.title, extra_body=extra_body))
     html = set_report_styles(html, report_styles(woven.doc.path))
     return html, time.perf_counter() - t0
 
