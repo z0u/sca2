@@ -189,14 +189,18 @@ main.lit details:not(:open) {
     size: 158mm 1010mm;
     /* Side margins are small here and the reading measure comes from `--measure`
      * below, so a figure or a table can reach past the text into the page's margins
-     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+     * the way it does on screen. */
     margin: 10mm 5mm 12mm;
   }
   :root {
-    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
-    --measure: 118mm;
+    /* The text column sits left, with a strip for margin notes down the right (below).
+     * Paper edge to text is 14mm on the left, clear of the reMarkable's toolbar:
+     *   5mm @page + 9mm | 105mm text | 4mm gap | 30mm notes | 5mm @page = 158mm */
+    --measure: 105mm;
+    --note-width: 30mm;
+    --note-gap: 4mm;
   }
-  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+  /* Type. 11pt body on a 105mm column is about 55 characters a line. Both elements:
    * the root sets the rem, and the body's own 0.9rem screen size comes off. */
   html,
   body {
@@ -278,26 +282,19 @@ main.lit details:not(:open) {
     display: none !important;
   }
 
-  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet). A page that
-   * has any gives its text a narrower column set to the left, and its notes a 31mm strip
-   * down the right, in type small enough to leave the text alone (zoom in to read it).
-   * Paper edge to text is then 8mm on the left, and the notes end at the page margin:
-   *   5mm @page + 3mm | 110mm text | 4mm gap | 31mm notes | 5mm @page = 158mm
-   * A page with no margin notes keeps the centred 118mm column above. Floats that clear
-   * each other stack, so a note never overlaps the one before it; it slides down. */
-  main.lit:has(.sidenote:not(.popover)) {
-    --measure: 110mm;
-    --note-width: 31mm;
-    --note-gap: 4mm;
-  }
-  main.lit:has(.sidenote:not(.popover)) > * {
-    margin-left: 3mm;
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), in the strip
+   * set out at the top of this block, in type small enough to leave the text alone (zoom
+   * in to read it). Every page has the strip, notes or not, so all reports print alike.
+   * Floats that clear each other stack, so a note never overlaps the one before it; it
+   * slides down. */
+  main.lit > * {
+    margin-left: 9mm;
     margin-right: auto;
   }
-  main.lit:has(.sidenote:not(.popover)) > figure {
+  main.lit > figure {
     margin-inline: 0;
   }
-  main.lit:has(.sidenote:not(.popover)) > table {
+  main.lit > table {
     margin-inline: auto;
   }
   main.lit > :is(figure, table, h2, hr, .footnote) {
