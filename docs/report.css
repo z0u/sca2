@@ -199,6 +199,11 @@ main.lit details:not(:open) {
     --measure: 105mm;
     --note-width: 30mm;
     --note-gap: 4mm;
+    /* The page's width inside its margins, and how far the text column's centre sits
+     * left of the page's (-12.5mm). */
+    --sheet: 148mm;
+    --text-inset: 9mm;
+    --axis-shift: calc(var(--text-inset) + var(--measure) / 2 - var(--sheet) / 2);
   }
   /* Type. 11pt body on a 105mm column is about 55 characters a line. Both elements:
    * the root sets the rem, and the body's own 0.9rem screen size comes off. */
@@ -288,14 +293,24 @@ main.lit details:not(:open) {
    * Floats that clear each other stack, so a note never overlaps the one before it; it
    * slides down. */
   main.lit > * {
-    margin-left: 9mm;
+    margin-left: var(--text-inset);
     margin-right: auto;
   }
+  /* Figures and tables centre on the text column, as they centre on the page on screen,
+   * and one too wide for that grows to the right once it reaches the left margin. Each
+   * centres on the sheet and moves left by the difference between the two centres, or
+   * less when it is wide: half the room it leaves on the sheet (a translate's percentage
+   * is of the element's own width). A caption is prose, so it sits in the text column. */
   main.lit > figure {
     margin-inline: 0;
   }
-  main.lit > table {
-    margin-inline: auto;
+  main.lit > table,
+  main.lit > figure > :not(figcaption, figure) {
+    translate: clamp(var(--axis-shift), calc(50% - var(--sheet) / 2), 0mm);
+  }
+  main.lit > figure > figcaption {
+    margin-left: var(--text-inset);
+    margin-right: auto;
   }
   main.lit > :is(figure, table, h2, hr, .footnote) {
     clear: right;
