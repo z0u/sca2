@@ -236,6 +236,8 @@ dfn.term {
     box-shadow: none;
     font-size: 0.78rem;
     color: var(--fg-muted);
+    text-align: justify;
+    hyphens: auto;
   }
   .footnote li.sidenoted,
   .footnote.all-sidenoted {

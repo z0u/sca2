@@ -336,6 +336,8 @@ main.lit details:not(:open) {
     text-align: left;
     text-indent: 0;
     color: inherit;
+    text-align: justify;
+    hyphens: auto;
   }
   .sidenote-number,
   .glossnote-term {
