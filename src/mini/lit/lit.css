@@ -137,10 +137,12 @@ body.dark-theme .mini-themed-figure {
   }
 }
 
-/* Admonitions (pymdownx blocks) and details. */
+/* Admonitions (pymdownx blocks) and details. Their side padding is --column-inset, so
+ * a margin note inside one can reach past it to the column's edge (Notes, below). */
 .admonition, details {
+  --column-inset: 1em;
   margin-block: 1.5em;
-  padding: 0.6em 1em;
+  padding: 0.6em var(--column-inset);
   border-left: 3px solid var(--link);
   background: var(--code-bg);
   border-radius: 4px;
@@ -168,6 +170,13 @@ body.dark-theme .mini-themed-figure {
  * note that would overlap the one above slides down instead. A note in a table cell, a
  * caption or a heading (`.popover`) cannot float out of its box, so it stays a hover
  * box everywhere, and its footnote stays in the list. */
+/* How far a block's content sits in from the text column's right edge. Registered as a
+ * length so that `1em` resolves on the padded block, and not in the note's smaller type. */
+@property --column-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
 :root {
   --note-width: 14rem;
   --note-gap: 1.5rem;
@@ -224,7 +233,7 @@ dfn.term {
     clear: right;
     width: var(--note-width);
     max-width: none;
-    margin: 0.3em calc(-1 * (var(--note-width) + var(--note-gap))) 0.8em 0;
+    margin: 0.3em calc(-1 * (var(--note-width) + var(--note-gap) + var(--column-inset))) 0.8em 0;
     padding: 0;
     background: none;
     border: 0;

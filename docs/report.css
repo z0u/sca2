@@ -302,7 +302,7 @@ main.lit details:not(:open) {
     width: var(--note-width);
     margin-block: 0.4em;
     margin-left: var(--note-gap);
-    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-gap), var(--note-width) + var(--note-gap)));
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-gap), var(--note-width) + var(--note-gap)) - var(--column-inset));
     font-family: var(--font-sans);
     font-size: 6pt;
     font-style: normal;
