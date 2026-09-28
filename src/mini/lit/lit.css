@@ -44,7 +44,7 @@ main.lit {
 main.lit > * {
   box-sizing: border-box;
   max-width: var(--measure);
-  margin-inline: auto;
+  margin-inline: calc((100vw - var(--measure)) / 2);
 }
 /* Figures and tables run the full width of the page, out into the column's margins:
  * a wide plot or a many-column table gets the room, and anything narrower than the
@@ -161,8 +161,8 @@ body.dark-theme .mini-themed-figure {
  * definition at its first use in a section. Where a note shows depends on the room:
  *   narrow screen   hidden until its marker is hovered or focused (tapped), then a box
  *                   under the line, across the column; the footnote list stays too
- *   wide screen     in the right margin, beside the line that cites it; the column moves
- *                   left to make room, and the list keeps only what has no margin note
+ *   wide screen     in the right margin, beside the line that cites it; the list keeps
+ *                   only what has no margin note
  *   paper           in the margin as well, with the page geometry in docs/report.css
  * Margin notes are right floats, each clearing the one before (`clear: right`), so a
  * note that would overlap the one above slides down instead. A note in a table cell, a
@@ -212,15 +212,10 @@ dfn.term {
 .glossnote-term::after { content: "."; }
 .sidenote-p-more { display: block; margin-top: 0.4em; }
 
-@media screen and (min-width: 60rem) {
-  /* The column and its margin notes centre as one. Figures and tables keep the page's
-   * full width and start below any note still running beside the text above them. */
-  main.lit > * {
-    margin-left: max(0px, calc((100% - var(--measure) - var(--note-width) - var(--note-gap)) / 2));
-    margin-right: auto;
-  }
-  main.lit > figure { margin-inline: 0; }
-  main.lit > table { margin-inline: auto; }
+/* Wide enough for the centred column plus a note strip on each side:
+ * 40rem measure + 2 × (14rem note + 1.5rem gap) + 2 × 1.5rem gutter = 74rem. */
+@media screen and (min-width: 74rem) {
+  /* Figures and tables start below any note still running beside the text above them. */
   main.lit > :is(figure, table, h2, hr, .footnote) { clear: right; }
   .sidenote:not(.popover) {
     display: block;

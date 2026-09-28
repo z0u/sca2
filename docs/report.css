@@ -189,23 +189,18 @@ main.lit details:not(:open) {
     size: 158mm 1010mm;
     /* Side margins are small here and the reading measure comes from `--measure`
      * below, so a figure or a table can reach past the text into the page's margins
-     * the way it does on screen. */
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
     margin: 10mm 5mm 12mm;
   }
   :root {
-    /* The text column sits left, with a strip for margin notes down the right (below).
-     * Paper edge to text is 14mm on the left, clear of the reMarkable's toolbar:
-     *   5mm @page + 9mm | 105mm text | 4mm gap | 30mm notes | 5mm @page = 158mm */
-    --measure: 105mm;
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, less than a note needs, so for now a note runs off the paper's edge. */
     --note-width: 30mm;
     --note-gap: 4mm;
-    /* The page's width inside its margins, and how far the text column's centre sits
-     * left of the page's (-12.5mm). */
-    --sheet: 148mm;
-    --text-inset: 9mm;
-    --axis-shift: calc(var(--text-inset) + var(--measure) / 2 - var(--sheet) / 2);
   }
-  /* Type. 11pt body on a 105mm column is about 55 characters a line. Both elements:
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
    * the root sets the rem, and the body's own 0.9rem screen size comes off. */
   html,
   body {
@@ -287,31 +282,9 @@ main.lit details:not(:open) {
     display: none !important;
   }
 
-  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), in the strip
-   * set out at the top of this block, in type small enough to leave the text alone (zoom
-   * in to read it). Every page has the strip, notes or not, so all reports print alike.
-   * Floats that clear each other stack, so a note never overlaps the one before it; it
-   * slides down. */
-  main.lit > * {
-    margin-left: var(--text-inset);
-    margin-right: auto;
-  }
-  /* Figures and tables centre on the text column, as they centre on the page on screen,
-   * and one too wide for that grows to the right once it reaches the left margin. Each
-   * centres on the sheet and moves left by the difference between the two centres, or
-   * less when it is wide: half the room it leaves on the sheet (a translate's percentage
-   * is of the element's own width). A caption is prose, so it sits in the text column. */
-  main.lit > figure {
-    margin-inline: 0;
-  }
-  main.lit > table,
-  main.lit > figure > :not(figcaption, figure) {
-    translate: clamp(var(--axis-shift), calc(50% - var(--sheet) / 2), 0mm);
-  }
-  main.lit > figure > figcaption {
-    margin-left: var(--text-inset);
-    margin-right: auto;
-  }
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down. */
   main.lit > :is(figure, table, h2, hr, .footnote) {
     clear: right;
   }
@@ -327,13 +300,14 @@ main.lit details:not(:open) {
     float: right;
     clear: right;
     width: var(--note-width);
-    margin: 0.4em calc(-1 * (var(--note-width) + var(--note-gap))) 0.6em 0;
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-gap), var(--note-width) + var(--note-gap)));
     font-family: var(--font-sans);
     font-size: 6pt;
     font-style: normal;
     font-weight: normal;
     line-height: 1.3;
-    text-align: left;
     text-indent: 0;
     color: inherit;
     text-align: justify;
