@@ -44,7 +44,7 @@ main.lit {
 main.lit > * {
   box-sizing: border-box;
   max-width: var(--measure);
-  margin-inline: calc((100vw - var(--measure)) / 2);
+  margin-inline: auto;
 }
 /* Figures and tables run the full width of the page, out into the column's margins:
  * a wide plot or a many-column table gets the room, and anything narrower than the
