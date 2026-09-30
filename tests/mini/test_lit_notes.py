@@ -21,7 +21,7 @@ class TestSidenotes:
     def test_footnote_is_placed_beside_its_marker(self):
         html = to_html("Text.[^a] More.\n\n[^a]: A *note*.\n")
         assert re.search(
-            r'<sup class="fnref" id="fnref:a">.*?</sup><span class="sidenote" role="note"><span class="sidenote-number">1</span> <span class="sidenote-p">A <em>note</em>.</span></span> More.',
+            r'<sup class="fnref" id="fnref:a">.*?</sup><span class="sidenote" role="note" tabindex="-1"><span class="sidenote-number">1</span> <span class="sidenote-p"><span class="gloss">A <em>note</em>.</span></span></span> More.',
             html,
         )
         assert '<li class="sidenoted" id="fn:a" value="1">' in html
@@ -32,6 +32,13 @@ class TestSidenotes:
         note = html.split('class="sidenote"')[1].split("</p>")[0]
         assert "footnote-backref" not in note
         assert "Note.</span>" in note
+
+    def test_first_sentence_is_the_gloss(self):
+        html = to_html("Text.[^a]\n\n[^a]: A *note*, e.g. this. Then `more`.\n\n    Second.\n")
+        assert (
+            '<span class="gloss">A <em>note</em>, e.g. this.</span><span class="more"> Then <code>more</code>.</span></span>'
+            '<span class="sidenote-p sidenote-p-more">Second.</span>' in html
+        )
 
     def test_note_in_a_table_is_hover_only_and_stays_in_the_list(self):
         html = to_html("| a |\n|---|\n| x[^a] |\n\nText.[^b]\n\n[^a]: In a cell.\n[^b]: In prose.\n")
@@ -62,7 +69,7 @@ class TestGlossary:
         )
         assert html.count('<dfn class="term"') == 3
         assert (
-            '<dfn class="term" tabindex="0">op margins</dfn><span class="sidenote glossnote" role="note"><span class="glossnote-term">Op margin</span> The line margin, <code>m</code>.</span> and the op margin.'
+            '<dfn class="term" tabindex="0">op margins</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Op margin</span> <span class="gloss">The line margin, <code>m</code>.</span></span> and the op margin.'
             in html
         )
         assert '<dfn class="term" tabindex="0">Containment</dfn>' in html
@@ -78,7 +85,32 @@ class TestGlossary:
         shared = {"op margin": Term("Op margin", "Shared."), "band": Term("Band", "Precision.")}
         html = to_html(f"Op margin and band.\n{GLOSSARY}", glossary=shared)
         assert "Shared." not in html
-        assert "Precision.</span>" in html
+        assert '<span class="gloss">Precision.</span></span>' in html
+
+    def test_gloss_leads_the_definition(self):
+        shared = {
+            "op margin": Term("Op margin", "The margin at a rate κ. Usually small."),
+            "band": Term("Band", "Precision, long form.", gloss="Precision."),
+        }
+        html = to_html("Op margin and band.\n", glossary=shared)
+        assert '<span class="gloss">The margin at a rate κ.</span><span class="more"> Usually small.</span>' in html
+        assert '<span class="gloss">Precision.</span><span class="more"> Precision, long form.</span>' in html
+
+    def test_a_colon_can_end_the_gloss(self):
+        shared = {
+            "ema": Term("EMA", "Exponential moving average: a running mean. See <code>a: b</code>."),
+            "ctx": Term("Context", "An <em>x</em>: more."),
+        }
+        html = to_html("An EMA.\n", glossary=shared)
+        assert '<span class="gloss">Exponential moving average</span><span class="more">: a running mean.' in html
+        html = to_html("A context.\n", glossary=shared)
+        assert '<span class="gloss">An <em>x</em></span><span class="more">: more.</span>' in html
+        assert to_html("An EMA.\n", glossary={"ema": Term("EMA", "Short. Then: more.")}).count(
+            '<span class="gloss">Short.</span>'
+        )
+
+    def test_note_is_focusable_off_the_tab_order(self):
+        assert 'class="sidenote glossnote" role="note" tabindex="-1"' in to_html(f"Op margin.\n{GLOSSARY}")
 
     def test_explicit_use_of_a_term_off_auto(self):
         shared = {"band": Term("Band", "Precision.", auto=False)}
@@ -90,5 +122,7 @@ class TestGlossary:
     def test_load_glossary(self, tmp_path):
         assert load_glossary(tmp_path / "missing.toml") == {}
         path = tmp_path / "g.toml"
-        path.write_text('["op margin"]\ndefinition = "A *margin*."\naliases = ["m_op"]\nauto = false\n')
-        assert load_glossary(path) == {"op margin": Term("op margin", "A <em>margin</em>.", ("m_op",), False)}
+        path.write_text('["op margin"]\ndefinition = "A *margin*."\ngloss = "*M*."\naliases = ["m_op"]\nauto = false\n')
+        assert load_glossary(path) == {
+            "op margin": Term("op margin", "A <em>margin</em>.", ("m_op",), False, "<em>M</em>.")
+        }

@@ -5,9 +5,12 @@
 # (src/mini/lit/notes.py). A report's own `## Glossary` section wins over an entry here,
 # so a report that uses a term in a narrower sense says so there.
 #
-# One table per term, keyed by its name. `definition` is inline Markdown. `aliases`
-# (optional) lists other wordings. `auto = false` keeps a term that is also an everyday
-# word from being matched on its own; mark a use of it with [text](term:name).
+# One table per term, keyed by its name. `definition` is inline Markdown. Its first
+# sentence, or what comes before a colon, is the gloss: all the margin shows until hover,
+# and all the PDF shows. So lead with a few words to jog the memory, or give a shorter
+# `gloss` (optional, inline Markdown). `aliases` (optional) lists other wordings. `auto = false` keeps a term that
+# is also an everyday word from being matched on its own; mark a use of it with
+# [text](term:name).
 
 ["expected exact match"]
 definition = "The task score we measure. With drawn answers the correct answer to a line is spread over two or more colors, so we take the chance that an answer drawn from the model agrees with one drawn from the true distribution. Its ceiling is that same chance for the true distribution against itself (Σq²), below 1 on the ops that round."

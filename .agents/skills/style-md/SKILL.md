@@ -45,6 +45,8 @@ A footnote made only of paragraphs becomes a margin note; one holding a list or 
 
 Glossary terms are annotated for you. The first use of each term in every `##` section carries its definition as a margin note, taken from the report's own `## Glossary` `<dl>` (each `<dt>` is a term; commas and parentheses separate its wordings) and then from `docs/glossary.toml`, the shared dictionary. Matching is whole-word and case-insensitive, and skips code, links, headings, tables and captions. `[the spread](term:band)` marks a use in other words, or of a shared term kept off auto-matching (`auto = false`, for everyday words). Mechanics: `src/mini/lit/notes.py`.
 
+Lead each footnote and definition with a few words to jog the memory, as a short first sentence or a head before a colon ("Exponential moving average: a running average that …"). That lead is the gloss: all the margin shows until hover, and all the PDF shows. A shared term can give a shorter `gloss` in `docs/glossary.toml` instead.
+
 Other admonition types and their icons: `details` (folds, unobtrusive), `admonition` (unadorned), `note` ℹ️, `tip` 💡, `important` 💬, `warning` ⚠️, `error` 🛑. The `| title` is optional, except for `details`.
 
 A document weaves top to bottom in file order, so a heading is always where it's written — there's no DAG-ordering concern about when a cell renders relative to its neighbours.

@@ -317,12 +317,9 @@ main.lit details:not(:open) {
   .glossnote-term {
     font-weight: 700;
   }
-  .sidenote-p-more {
-    display: block;
-    margin-top: 0.3em;
-  }
-  main.lit .footnote li.sidenoted,
-  main.lit .footnote.all-sidenoted {
+  /* Only the gloss goes in the margin. The footnote list keeps the whole of each note,
+   * and a report's own glossary the whole of each definition. */
+  main.lit .sidenote :is(.more, .sidenote-p-more) {
     display: none;
   }
   /* A term with its definition beside it needs no underline on paper. */

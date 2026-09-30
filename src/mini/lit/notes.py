@@ -9,6 +9,8 @@ A python-markdown extension (:class:`NotesExtension`) that rewrites the converte
 Where a note goes is the stylesheet's call (``lit.css``): in the margin on a wide screen and on paper, and on hover or focus of its marker on a narrow screen. A note whose marker sits where a margin float cannot reach (a table cell, a caption, a heading) is marked ``popover`` and only ever shows on hover; its footnote keeps its place in the list, so paper still has it. The floats stack rather than overlap because each one clears the one before it (``clear: right``).
 
 A footnote with block content other than paragraphs (a list, a code block) is left to the list: a note is inline markup, since it sits inside the paragraph that cites it.
+
+Each note leads with a *gloss*, a few words to jog the reader's memory, marked ``<span class="gloss">``; the rest of it is ``<span class="more">`` (and a footnote's later paragraphs, ``sidenote-p-more``). The stylesheets show the gloss alone in the margin until the note or its marker is hovered or focused, and on paper. The gloss is a dictionary entry's ``gloss`` when it has one, and otherwise the first sentence of the note, or what comes before a colon if that is shorter (:func:`_lead_end`). So a note that leads with a short sentence or a "head: explanation" needs nothing more.
 """
 
 from __future__ import annotations
@@ -34,12 +36,19 @@ __all__ = ["Term", "NotesExtension", "load_glossary", "local_glossary"]
 
 @dataclass(frozen=True)
 class Term:
-    """A defined term: its display name, its definition as an HTML fragment (inline), the words that match it, and whether prose is scanned for it."""
+    """A defined term: its display name, its definition as an HTML fragment (inline), the words that match it, whether prose is scanned for it, and a short gloss (inline HTML) to lead the note with, in place of the first sentence of the definition."""
 
     name: str
     definition: str
     aliases: tuple[str, ...] = ()
     auto: bool = True
+    gloss: str | None = None
+
+    def parts(self) -> tuple[str, str]:
+        """The note as a gloss and the rest (which starts with its space or colon, or is empty)."""
+        if self.gloss:
+            return self.gloss, " " + self.definition
+        return _split_html(self.definition)
 
     @property
     def key(self) -> str:
@@ -57,10 +66,11 @@ def _norm(text: str) -> str:
 def load_glossary(path: Path) -> dict[str, Term]:
     """The shared dictionary at *path* (TOML), or nothing when there is no file.
 
-    One table per term, keyed by its name; ``definition`` is inline Markdown, ``aliases`` (optional) lists other wordings, and ``auto = false`` keeps a term that is also an everyday word from being matched on its own (mark its uses with ``[text](term:key)``)::
+    One table per term, keyed by its name; ``definition`` is inline Markdown, ``gloss`` (optional, inline Markdown) is a shorter lead than its first sentence, ``aliases`` (optional) lists other wordings, and ``auto = false`` keeps a term that is also an everyday word from being matched on its own (mark its uses with ``[text](term:key)``)::
 
         ["expected exact match"]
         definition = "The task score we measure: …"
+        gloss = "The task score."
         aliases = ["EEM"]
     """
     if not path.is_file():
@@ -70,7 +80,8 @@ def load_glossary(path: Path) -> dict[str, Term]:
     terms = {}
     for name, entry in data.items():
         definition = _unwrap_p(md.reset().convert(entry["definition"]))
-        t = Term(name, definition, tuple(entry.get("aliases", ())), bool(entry.get("auto", True)))
+        gloss = _unwrap_p(md.reset().convert(entry["gloss"])) if "gloss" in entry else None
+        t = Term(name, definition, tuple(entry.get("aliases", ())), bool(entry.get("auto", True)), gloss)
         terms[t.key] = t
     return terms
 
@@ -108,6 +119,84 @@ def _unwrap_p(fragment: str) -> str:
     if paras and re.sub(r"<p>.*?</p>", "", s, flags=re.DOTALL).strip() == "":
         return "<br>".join(p.strip() for p in paras)
     return s
+
+
+# A sentence ends at a stop (and any closing quote or bracket) and a space, before a capital,
+# a symbol (σ, $, a quote), the end of the text, or the element that follows it. A lead can
+# also end at a colon, as in "Exponential moving average: a running average that …".
+_COLON_RE = re.compile(r"(?:^|(?<=\S)):\s")
+_STOP_RE = re.compile(r"[.!?][\"')\]\u201d\u2019]*(\s+)")
+_ABBREV_RE = re.compile(r"(?:^|[\s(])(?:e\.g|i\.e|vs|cf|al|ex|fig|figs|eq|sec|approx)$", re.IGNORECASE)
+_TOKEN_RE = re.compile(r"<[^>]*>|[^<]+")
+_VOID_TAGS = {"br", "img", "wbr", "hr", "input"}
+
+
+def _lead_end(text: str) -> int | None:
+    """Where the lead of *text* ends, if it ends within it: after the stop of its first sentence, or before a colon, whichever comes first."""
+    colon = _COLON_RE.search(text)
+    for m in _STOP_RE.finditer(text, 0, colon.start() if colon else len(text)):
+        after = text[m.end() : m.end() + 1]
+        if _ABBREV_RE.search(text, 0, m.start()):
+            continue
+        if not after or after.isupper() or not after.isascii() or after in "$\"'(`":
+            return m.start(1)
+    return colon.start() if colon else None
+
+
+def _split_html(fragment: str) -> tuple[str, str]:
+    """*fragment* (inline HTML) as its lead (:func:`_lead_end`) and the rest, looking for the end only outside elements."""
+    depth = 0
+    for m in _TOKEN_RE.finditer(fragment):
+        token = m[0]
+        if token.startswith("</"):
+            depth -= 1
+        elif token.startswith("<"):
+            tag = re.match(r"<\s*(\w+)", token)
+            if not token.endswith("/>") and not (tag and tag[1].lower() in _VOID_TAGS):
+                depth += 1
+        elif depth == 0 and (end := _lead_end(token)) is not None:
+            cut = m.start() + end
+            if fragment[cut:].strip():
+                return fragment[:cut], fragment[cut:]
+            break
+    return fragment, ""
+
+
+def _split_lead(el: etree.Element) -> None:
+    """Regroup *el*'s content as a gloss (its lead, :func:`_lead_end`) and, when there is more, the rest."""
+    children = list(el)
+    segments = [el.text or "", *(c.tail or "" for c in children)]
+    cut = next(((i, end) for i, s in enumerate(segments) if (end := _lead_end(s)) is not None), None)
+    gloss = etree.Element("span", {"class": "gloss"})
+    more = etree.Element("span", {"class": "more"})
+    box = gloss
+    el.text = None
+    for i, text in enumerate(segments):
+        if i:
+            child = children[i - 1]
+            el.remove(child)
+            child.tail = None
+            box.append(child)
+        if cut and i == cut[0]:
+            _append_text(box, text[: cut[1]])
+            box = more
+            text = text[cut[1] :]
+        _append_text(box, text)
+    el.append(gloss)
+    if len(more) or (more.text or "").strip():
+        el.append(more)
+    elif more.text:
+        _append_text(gloss, more.text)
+
+
+def _append_text(box: etree.Element, text: str | None) -> None:
+    """Add *text* at the end of *box*: after its last child, or as its text."""
+    if not text:
+        return
+    if len(box):
+        box[-1].tail = (box[-1].tail or "") + text
+    else:
+        box.text = (box.text or "") + text
 
 
 class _CollectLocal(Preprocessor):
@@ -298,10 +387,14 @@ class _NotesTree(Treeprocessor):
 
     def _annotate(self, parent: etree.Element, dfn: etree.Element, term: Term) -> etree.Element:
         dfn.set("tabindex", "0")
-        note = etree.Element("span", {"class": "sidenote glossnote", "role": "note"})
+        note = etree.Element("span", {"class": "sidenote glossnote", "role": "note", "tabindex": "-1"})
         name = etree.SubElement(note, "span", {"class": "glossnote-term"})
         name.text = term.name
-        name.tail = " " + self.stash.store(term.definition)
+        name.tail = " "
+        lead, rest = term.parts()
+        etree.SubElement(note, "span", {"class": "gloss"}).text = self.stash.store(lead)
+        if rest:
+            etree.SubElement(note, "span", {"class": "more"}).text = self.stash.store(rest)
         idx = list(parent).index(dfn)
         note.tail = dfn.tail
         dfn.tail = None
@@ -310,8 +403,10 @@ class _NotesTree(Treeprocessor):
 
 
 def _footnote_note(number: str, li: etree.Element, *, floats: bool) -> etree.Element:
-    """The note for footnote *li* (all paragraphs): its number, then each paragraph as a span, without the ↩ back to the text."""
-    note = etree.Element("span", {"class": "sidenote" if floats else "sidenote popover", "role": "note"})
+    """The note for footnote *li* (all paragraphs): its number, then each paragraph as a span, without the ↩ back to the text; the lead of the first is the gloss."""
+    note = etree.Element(
+        "span", {"class": "sidenote" if floats else "sidenote popover", "role": "note", "tabindex": "-1"}
+    )
     num = etree.SubElement(note, "span", {"class": "sidenote-number"})
     num.text = number
     num.tail = " "
@@ -328,6 +423,8 @@ def _footnote_note(number: str, li: etree.Element, *, floats: bool) -> etree.Ele
             part[-1].tail = _trim(part[-1].tail)
         elif part.text:
             part.text = _trim(part.text)
+        if not i:
+            _split_lead(part)
     return note
 
 
@@ -351,11 +448,7 @@ def _insert_after(el: etree.Element, new: etree.Element, parents: dict[etree.Ele
 
 def _skip(child: etree.Element, into: etree.Element) -> None:
     """Leave *child* out of a copy being built in *into*, keeping the text that follows it."""
-    if child.tail:
-        if len(into):
-            into[-1].tail = (into[-1].tail or "") + child.tail
-        else:
-            into.text = (into.text or "") + child.tail
+    _append_text(into, child.tail)
 
 
 class NotesExtension(Extension):

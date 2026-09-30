@@ -218,7 +218,7 @@ dfn.term {
   color: var(--fg);
 }
 :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote,
-.sidenote:hover {
+.sidenote:is(:hover, :focus) {
   display: block;
 }
 .sidenote-number { font-weight: 700; }
@@ -247,7 +247,22 @@ dfn.term {
     color: var(--fg-muted);
     text-align: justify;
     hyphens: auto;
+    /* Only the gloss (mini.lit.notes) until the note or its marker is hovered, or
+     * focused: a click on either keeps it open. The notes below it slide down. */
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    & .more,
+    & .sidenote-p-more {
+      display: none;
+    }
   }
+  :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
+  .sidenote:not(.popover):is(:hover, :focus) {
+    opacity: 1;
+    & .more { display: inline; }
+    & .sidenote-p-more { display: block; }
+  }
+  .sidenote:focus { outline: none; }
   .footnote li.sidenoted,
   .footnote.all-sidenoted {
     display: none;
