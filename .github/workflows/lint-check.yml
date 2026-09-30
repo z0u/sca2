@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+    # The default types plus labelling, so adding `skip-publish-check` after the last push
+    # re-runs the checks (a re-run of a failed job reuses the old payload, without the label).
+    # The concurrency group below cancels the run the label supersedes.
+    types: [ opened, synchronize, reopened, labeled, unlabeled ]
   workflow_dispatch:
     # Allows manual triggering of the workflow from the GitHub UI
 

@@ -25,7 +25,7 @@ import experiment as ex
 from mini.lit import memo, stop
 from mini.reports import current_publisher
 from mini.store import project_store
-from mini.vis import AxesGrid, AxesRow, figure_html, light_dark, themed
+from mini.vis import AxesGrid, AxesRow, Mosaic, figure_html, light_dark, themed
 
 
 def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
@@ -880,7 +880,7 @@ LEFT = ("span-mean", "pool-t100")
     """,
 )
 def trajectories_plot() -> plt.Figure:
-    fig, axd = plt.subplot_mosaic(GRID, figsize=(7.5, 4.2), sharex=True, layout="constrained")
+    fig, axd = plt.subplot_mosaic(cast(Mosaic, GRID), figsize=(7.5, 4.2), sharex=True, layout="constrained")
     grey = light_dark("#999", "#777")
     gate = light_dark("#555", "#bbb")
     ink = light_dark("#1f6fb4", "#5fa8dd")

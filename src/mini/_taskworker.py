@@ -7,6 +7,7 @@ Loads the cloudpickled call, runs it with the data-dir + progress context (so ``
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 import time
@@ -468,6 +469,7 @@ def execute_task(
 def run_task(data_dir: Path, key: str) -> None:
     """Local subprocess entry: read the staged call from disk and run it."""
     store = MemoStore(data_dir)
+    launched_env = dict(os.environ)  # before the task or its hooks can change it; siblings launch from this
     fn, args, hooks, gen, watchdog_s, watchdog_grace_s = store.read_call(key)
     # Project-scoped artifact store sits beside the experiment's data dir (or the
     # shared HF bucket, if MINI_STORE_BUCKET is set), so a blob put here resolves
@@ -486,6 +488,11 @@ def run_task(data_dir: Path, key: str) -> None:
         watchdog_s=watchdog_s,
         watchdog_grace_s=watchdog_grace_s,
     )
+    # This record has settled, so its slot is free: hand it to the next queued task,
+    # which keeps a capped local run draining with no driver attached.
+    from mini.local_apparatus import launch_queued
+
+    launch_queued(store, launched_env)
 
 
 def main() -> None:

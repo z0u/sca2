@@ -170,6 +170,8 @@ class Ctx:
                 to_launch = (key, gen, fn, args, getattr(app, "_before_hooks", []))
                 self.launched.append(key)
             state = RunState.RUNNING
+        elif state == RunState.RUNNING:
+            app.refresh_queued(self.store, rec)  # a task still waiting for a slot takes this wake's config
         elif state == RunState.DONE and (moved := numerics_drift(rec.get("env"))):
             # A hit whose result predates a library upgrade: same key, same code,
             # a number the current environment may not reproduce. Noted here rather
@@ -303,6 +305,9 @@ def tick(experiment: Experiment, apparatus: Apparatus, keep_stale: bool = False)
             complete=complete,
         )
         _warn_numerics_drift(ctx)
+        # After main, which refreshed each queued task's launch spec to this wake's
+        # config: fill any slot a hard-killed worker freed without handing it on.
+        apparatus.launch_queued(store)
     return True, result
 
 

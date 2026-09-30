@@ -3,6 +3,7 @@
 import json
 import tempfile
 from pathlib import Path
+from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,7 +13,7 @@ import numpy as np
 import experiment as ex
 from mini.lit import memo, stop
 from mini.store import project_store
-from mini.vis import figure_html, light_dark, themed
+from mini.vis import Mosaic, figure_html, light_dark, themed
 
 
 def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
@@ -680,7 +681,7 @@ TRAJ_LEFT = ("span-bare", "op1-bare")
 def trajectories_plot() -> plt.Figure:
     # A tall mosaic: trajectory row, schedule row, spacer, then both again.
     fig, axd = plt.subplot_mosaic(
-        TRAJ_GRID, figsize=(7.5, 6), height_ratios=[3, 1.5, 0.45, 3, 1.5], sharex=True,
+        cast(Mosaic, TRAJ_GRID), figsize=(7.5, 6), height_ratios=[3, 1.5, 0.45, 3, 1.5], sharex=True,
     )  # fmt: skip
     ink = dict(zip(CONDS, light_dark(
         ["#999", "#f2b134", "#c1332a", "#e08a2e", "#7a2320", "#3d7ea6", "#5c3d8f"],

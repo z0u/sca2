@@ -940,8 +940,17 @@ class LocalRecordStore(RecordStore):
             yield  # released when the file closes
 
     def read(self, key: str) -> dict[str, Any] | None:
+        # A rename is atomic on a local disk, but a shared-folder mount (virtiofs, as in a devcontainer on
+        # macOS) can show a reader the name missing mid-rename, between `exists` and the open. Retry briefly.
         p = self.root / f"{key}.json"
-        return json.loads(p.read_text()) if p.exists() else None
+        for delay in (0.01, 0.05, 0.2, None):
+            try:
+                return json.loads(p.read_text()) if p.exists() else None
+            except FileNotFoundError:
+                if delay is None:
+                    raise
+                time.sleep(delay)
+        raise AssertionError("unreachable")
 
     def write(self, key: str, record: dict[str, Any]) -> None:
         with self._locked():
@@ -1150,9 +1159,20 @@ class MemoStore:
         watchdog_s: float | None = None,
         watchdog_grace_s: float | None = None,
     ) -> None:
-        """Stage the cloudpickled call to disk for a local subprocess worker."""
+        """Stage the cloudpickled call to disk for a local subprocess worker, then mark which attempt it belongs to (:meth:`staged_gen`)."""
         self.root.mkdir(parents=True, exist_ok=True)
         self._call(key).write_bytes(cloudpickle.dumps((fn, args, hooks or [], gen, watchdog_s, watchdog_grace_s)))
+        self._staged_marker(key).write_text(gen or "")  # after the call, so the marker never runs ahead of it
+
+    def _staged_marker(self, key: str) -> Path:
+        return self.root / f"{key}.gen"
+
+    def staged_gen(self, key: str) -> str | None:
+        """The attempt whose call is staged for *key*, without unpickling it; ``None`` if nothing (or a call from before the marker) is staged."""
+        try:
+            return self._staged_marker(key).read_text() or None
+        except OSError:
+            return None
 
     def read_call(self, key: str) -> tuple[Callable, tuple, list[Callable], str | None, float | None, float | None]:
         parts = cloudpickle.loads(self._call(key).read_bytes())

@@ -5,7 +5,7 @@ opened: 2026-09-24
 ---
 # Label variants for the inferred op
 
-In the [D2.2 pivot](/docs/m2/d2.2/pivot.md), a binary label on the whole context asks for the op at positions that cannot know it yet: early in the line, where attention has seen too little, and in contexts where replacement noise leaves the posterior on the true op below 0.5. The pooled anchor term softens the first case only. The whole-line label stays the default, since an M3 labeller would likely give that form. Four cheap variants should measure its effect on the task and the anchor:
+In the [D2.2 pivot](/docs/m2/d2.2/pivot.md), a binary label on the whole context asks for the op at positions that cannot know it yet: early in the line, where attention has seen too little, and in contexts where replacement op noise leaves the posterior on the true op below 0.5. The pooled anchor term softens the first case only. The whole-line label stays the default, since an M3 labeller would likely give that form. Four cheap variants should measure its effect on the task and the anchor:
 
 - Leave out the embedding slice.
 - Pull only the latter half of each line, where the posterior given the prefix is at or near its final value. This is the simplest fix along position.

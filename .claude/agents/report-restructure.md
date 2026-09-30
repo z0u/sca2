@@ -7,7 +7,7 @@ description: |
   experiment and conversation context.
 argument-hint: <path to report.py> <line range>
 tools: Read, Edit
-skills: style-md
+skills: style-terms, style-md
 model: opus
 effort: medium
 ---

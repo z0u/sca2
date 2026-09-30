@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [performance, modal, experiments]
 opened: 2026-09-27
+closed: 2026-09-30
 ---
 # Pack several training runs onto one GPU
 
@@ -38,3 +39,11 @@ Probe option 1 first, since a win there costs no science and no memo changes. If
 ### Probe recipe
 
 The 2026-09-27 probe was a throwaway mini experiment: it wrapped `train_one` and swapped `sca.compute.training.sample_anchored_batches` for a generator that timestamps each batch, one role per variant with `single_use_containers=True`, run under `MINI_PROFILE=dev`.
+
+## Notes
+
+**2026-09-27, ex-2.2.16 review** — Sandy asks whether the pilot could pack its seeds. It fits option 2 (every arm has three seeds at one condition, and the pilot has no memo to keep), but its training comes to about $2 over 42 runs, so packing would save pennies and some wall time there. The pilot does not wait on it; a larger sweep is the better first user.
+
+**2026-09-28, ex-2.2.17 round 6** — The d128-L4 run trains at about 2,100–3,100 steps/min, the same as d64-L4, so doubling the width costs nothing per step: more evidence the step is latency-bound, and that a pack of four d64 seeds would likely run in the time of one. The scouting rounds are where this now pays: eight- and sixteen-times runs of about 105k–211k steps, three seeds per arm, and ex-2.2.17 has passed $13. Sandy asks about packing seeds again. A fourth, cheaper step to try alongside option 1: keep the per-step `float(loss)` and metric values on the device and sync every N steps (they only feed `emit_metrics`), which removes one host round trip per step for every run, packed or not.
+
+**2026-09-30, housekeeping** — Closed, with Sandy. Probe 4 in [`training-step-is-host-bound`](./training-step-is-host-bound.md) answered it: a `lax.scan` over the steps cut a d64 step from about 10 ms to 3–4, and once the step is scanned, vmapping 8 seeds costs about 8× one, so packing adds little. The scanned loop landed in `train_anchored` in #228. The next ways to cut the training bill are fewer steps or epochs per run (see [`cheaper-center-control-recipe`](/todo/science/cheaper-center-control-recipe.md)) and changes to the architecture.

@@ -25,7 +25,6 @@ import markdown as md_lib
 
 from mini.lit.page import BASE_CSS_PATH, FONTS, is_lit_page
 from mini.report_print import print_bundle, print_stamp
-from mini.review_marks import baseline_dir, mark_changes, stamp
 from mini.reports import (
     PDF_LEAF,
     PDF_TYPE,
@@ -166,7 +165,7 @@ class LinkResolver:
     source_base: str | None
     site_assets: frozenset[str] = frozenset()
     repo_root: Path | None = None  # used to confirm a link escaping docs/ exists in the repo
-    # Production's URL whatever ``site_base`` is: a PDF links there from every branch (:func:`_printable`).
+    # Production's URL whatever ``site_base`` is: a PDF links there from every branch (:func:`printable`).
     production_base: str | None = None
 
     @classmethod
@@ -273,7 +272,7 @@ def prepare_dirs_and_resolver() -> LinkResolver:
 
 
 @dataclass(frozen=True)
-class _Bundle:
+class Bundle:
     """One report's exported HTML as read from its source, before any assembly.
 
     ``html`` is ``None`` when there's nothing to assemble (never published, or never exported locally). ``notes`` are log lines the read wants printed — held here rather than printed on the spot, so a concurrent read still logs in report order.
@@ -289,7 +288,7 @@ class _Bundle:
     notes: tuple[str, ...] = ()
 
 
-def _read_bundle(report: Path, *, store, pins: dict[str, str], externalizing: bool) -> _Bundle:
+def _read_bundle(report: Path, *, store, pins: dict[str, str], externalizing: bool) -> Bundle:
     """Read one report's exported ``index.html`` — off the bucket, or from ``.mini/exports/``.
 
     Externalize reads *only* the HTML. The page's ``_assets/`` links stay relative and the ``<base>`` sends them to the bundle on the CDN, so pulling the whole bundle here would fetch megabytes of figures the build has no use for. It's also the one step that waits on the network, which is why it's separable: the reports are independent, so the caller runs these together instead of serially.
@@ -301,18 +300,18 @@ def _read_bundle(report: Path, *, store, pins: dict[str, str], externalizing: bo
         bundle = export_dir(report)
         if not (bundle / "index.html").exists():
             nb_rel = report.relative_to(WORKSPACE_ROOT).as_posix()
-            return _Bundle(None, notes=(f"  ! {key}: not exported locally — run `./go preview {nb_rel}` (skipping)",))
+            return Bundle(None, notes=(f"  ! {key}: not exported locally — run `./go preview {nb_rel}` (skipping)",))
         assets = bundle / ASSET_LINK
         html = (bundle / "index.html").read_text("utf-8")
         if not is_lit_page(html):
             nb_rel = report.relative_to(WORKSPACE_ROOT).as_posix()
-            return _Bundle(
+            return Bundle(
                 None, notes=(f"  ! {key}: local export predates mini.lit — run `./go preview {nb_rel}` (skipping)",)
             )
         renditions = tuple(
             p for kind, href in alternates(html).items() if kind != PDF_TYPE and (p := bundle / href).is_file()
         )
-        return _Bundle(html, assets=assets if assets.is_dir() else None, renditions=renditions)
+        return Bundle(html, assets=assets if assets.is_dir() else None, renditions=renditions)
 
     notes: list[str] = []
     revision = pins.get(key)
@@ -323,8 +322,8 @@ def _read_bundle(report: Path, *, store, pins: dict[str, str], externalizing: bo
     html = store.read_export_html(key, revision=revision)
     if html is None:
         notes.append(f"  ! {key}: no synced export on the bucket — run `./go publish` (skipping)")
-        return _Bundle(None, notes=tuple(notes))
-    return _Bundle(html, base_href=store.export_base(key, revision=revision), notes=tuple(notes))
+        return Bundle(None, notes=tuple(notes))
+    return Bundle(html, base_href=store.export_base(key, revision=revision), notes=tuple(notes))
 
 
 @dataclass(frozen=True)
@@ -358,7 +357,7 @@ class PdfMemo:
 
     ``root`` is ``$MINI_PDF_MEMO`` when set, which is how the deploy hands a build the previous ``gh-pages`` commit's copy of the site (production's for ``main``, its own preview's for a PR), or ``.mini/pdfs/`` for a local preview. Fresh prints land there too, and the manifest is written as each one lands and again by :meth:`save`, so the site's own copy is the next build's memo, and a local build that stops partway (a tooling change reprints every report, and the sweep is minutes long) keeps what it printed.
 
-    ``fallbacks`` are further memos, read and never written: the rest of ``$MINI_PDF_MEMO``, split on the path separator. A PDF found there under the same key is copied into ``root`` rather than printed. The deploy gives a preview production's memo this way, so a PR prints only the reports it changed: a PDF's links lead to production from every branch (:func:`_printable`), which is what makes an unchanged report's key the same on both. A new PR starts with no memo of its own, and would otherwise print every report.
+    ``fallbacks`` are further memos, read and never written: the rest of ``$MINI_PDF_MEMO``, split on the path separator. A PDF found there under the same key is copied into ``root`` rather than printed. The deploy gives a preview production's memo this way, so a PR prints only the reports it changed: a PDF's links lead to production from every branch (:func:`printable`), which is what makes an unchanged report's key the same on both. A new PR starts with no memo of its own, and would otherwise print every report.
     """
 
     root: Path
@@ -429,7 +428,7 @@ class PdfMemo:
 _ASSET_REF = re.compile(r"""(?<=["'(])_assets/""")
 
 
-def _printable(bundle: _Bundle, links: LinkResolver, *, from_dir: str, key: str, report_css: str) -> str:
+def printable(bundle: Bundle, links: LinkResolver, *, from_dir: str, key: str, report_css: str) -> str:
     """The page as the PDF prints it: author links resolved to the site and GitHub, the current ``report.css`` on top, and nothing the build adds for a browser (banner, lightbox, deferred figures).
 
     Links are resolved the externalizing way in either mode, and against production rather than a preview's URL, so the PDF's links lead to the published site and its bytes are a function of the report alone (relative, they would carry the loopback port the print served from; a preview's, the PR number, and a PR could then never reuse production's PDFs through :class:`PdfMemo`). The page's own ``#fragment`` links stay bare, which is what makes them in-document jumps in the PDF, so the bundle's figures cannot go through a ``<base>``; externalizing, each ``_assets/`` reference is spelled out against the pinned CDN base instead, and the print fetches them through its cache.
@@ -443,66 +442,14 @@ def _printable(bundle: _Bundle, links: LinkResolver, *, from_dir: str, key: str,
     return html
 
 
-def _git(*args: str) -> str:
-    return subprocess.run(["git", *args], cwd=WORKSPACE_ROOT, check=True, capture_output=True, text=True).stdout.strip()
-
-
-@dataclass(frozen=True)
-class Review:
-    """A print for review on paper, rounds apart (:mod:`mini.review_marks`).
-
-    Every such print names the commit it is of on the edge of its first page, so the next round can be marked against it: with ``since`` (a ref the reader last reviewed), each report that has a baseline there prints with its changes barred in the margin. The note is part of the printed page, so a local preview prints a report again after each commit; the memo (:class:`PdfMemo`) still spares the reprint within one.
-
-    The baseline is ``scripts/review_base.py``'s export of the report at ``since``.
-    """
-
-    since: str | None  # full commit id
-    printed: str  # what the print is of, for the margin note: a short commit id, and whether the tree has edits past it
-
-    @classmethod
-    def at(cls, ref: str | None) -> "Review":
-        head = _git("rev-parse", "--short", "HEAD")
-        dirty = _git("status", "--porcelain", "--untracked-files=no", "--", "docs", "src")
-        try:
-            since = _git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}") if ref else None
-        except subprocess.CalledProcessError:
-            sys.exit(f"--since: unknown git ref {ref!r}")
-        return cls(since, f"{head} + uncommitted edits" if dirty else head)
-
-    def mark(self, printable: str, key: str, *, root: Path) -> str:
-        """*printable* with its change bars, or with the note alone when there is no ``since`` or report *key* has no baseline at it (``review_base.py`` says which reports it exported)."""
-        since = self.since
-        unmarked = stamp(printable, note=f"Printed from {self.printed}")
-        if since is None:
-            return unmarked
-        base = baseline_dir(since, key)
-        if not (base / "index.html").is_file():
-            return unmarked
-        base_html = mark_verdicts((base / "index.html").read_text("utf-8"))
-        note = f"Bars mark changes since {since[:7]} · printed from {self.printed}"
-        return mark_changes(printable, base_html, note=note, root=root, base_root=base)
-
-
-def review_pdf_name(key: str) -> str:
-    """The file name of a report's print for review: its directory's name, as ``ex-2.2.15.pdf`` for ``m2/ex-2.2.15``."""
-    return f"{PurePosixPath(key).name}.pdf"
-
-
-def _place_pdf(pdf: Path, site_dir: Path, key: str, *, reviewing: bool) -> None:
-    """Copy *pdf* beside the page as ``report.pdf``, which the page links; reviewing, also as a copy named for the report, for the reviewer's tablet, which files a document under its file name."""
-    shutil.copy2(pdf, site_dir / PDF_LEAF)
-    if reviewing:
-        shutil.copy2(pdf, site_dir / review_pdf_name(key))
-
-
 def build_reports(
-    links: LinkResolver, store, externalizing: bool, memo: PdfMemo | None = None, review: Review | None = None
+    links: LinkResolver, store, externalizing: bool, memo: PdfMemo | None = None
 ) -> dict[str, FigureStrip]:
     """Assemble each report bundle into ``_site/<key>/index.html``, with its PDF beside it.
 
     Externalize: read the synced HTML from the bucket, insert one ``<base>`` at ``exports/<key>/`` so its relative ``_assets/`` resolve there, and write only the HTML into ``_site`` (the bytes stay on the bucket CDN). Localize: read the bundle from ``.mini/exports`` and copy its ``_assets/`` beside the HTML so it works offline. Author links are resolved to absolute/relative targets either way.
 
-    The PDF (``report.pdf``, for reading on paper or e-ink) is printed here from the assembled page, through *memo* (:class:`PdfMemo`, opened from the environment when not given) so an unchanged report is not printed again. The page links it from the nav chip and declares it as an alternate rendition; when nothing can print (no browser), the page carries neither. With a *review* (every local preview), a copy of the print is also written under the report's name (:func:`review_pdf_name`), the print names the commit it is of, and a report that has a baseline prints with its changes marked (:class:`Review`); the page itself carries neither.
+    The PDF (``report.pdf``, for reading on paper or e-ink) is printed here from the assembled page, through *memo* (:class:`PdfMemo`, opened from the environment when not given) so an unchanged report is not printed again. The page links it from the nav chip and declares it as an alternate rendition; when nothing can print (no browser), the page carries neither. A print for review, stamped with its commit and marked against an earlier round, is ``scripts/render_report.py``'s, and never the site's: its stamp would change the memo key on every commit.
 
     Returns each built report's :class:`FigureStrip` by key, so :func:`convert_markdown` can expand ``mini:figures`` markers from the HTML this pass already fetched.
     """
@@ -539,18 +486,13 @@ def build_reports(
         # The page's own published URL: what its `#fragment` links and its PDF link are
         # spelled out against under the <base>, which would otherwise send both to the bucket.
         page_url = links.resolve(key, from_dir="", out_dir=key, externalizing=True) if bundle.base_href else None
-        printable = _printable(bundle, links, from_dir=from_dir, key=key, report_css=report_css)
-        # A local export is the only kind a review marks; a text-only report has no _assets/
-        # beside its page, and its printable is marked all the same (the root is where the
-        # figures would resolve, and there are none to look up).
-        if review is not None and not externalizing:
-            printable = review.mark(printable, key, root=export_dir(report))
+        to_print = printable(bundle, links, from_dir=from_dir, key=key, report_css=report_css)
         # Localizing, the print serves the bundle's own _assets/; externalizing, the printable
         # names them on the CDN, so the serve root holds the page alone.
-        pdf = memo.pdf(key, printable, serve_from=bundle.assets.parent if bundle.assets else dest.parent)
+        pdf = memo.pdf(key, to_print, serve_from=bundle.assets.parent if bundle.assets else dest.parent)
         pdf_url = None
         if pdf is not None:
-            _place_pdf(pdf, dest.parent, key, reviewing=review is not None and not externalizing)
+            shutil.copy2(pdf, dest.parent / PDF_LEAF)
             pdf_url = f"{page_url}{PDF_LEAF}" if page_url else PDF_LEAF
         strips[key] = FigureStrip(key, bundle.base_href, figures, pdf=pdf_url)
 
@@ -830,14 +772,7 @@ def main():
     mode.add_argument(
         "--localize", action="store_true", help="assemble from .mini/exports/ with assets copied in; works offline"
     )
-    ap.add_argument(
-        "--since",
-        metavar="REF",
-        help="with --localize: print each report that has a baseline at REF (scripts/review_base.py) with its changes barred in the margin",
-    )
     args = ap.parse_args()
-    if args.since and not args.localize:
-        ap.error("--since needs --localize")
 
     # Resolve the store *before* wiping _site, so a missing token can't destroy a build.
     if args.externalize:
@@ -847,8 +782,7 @@ def main():
         store = None
         print("  asset mode: localize (.mini/exports/)")
     links = prepare_dirs_and_resolver()
-    review = Review.at(args.since) if args.localize else None
-    strips = build_reports(links, store, args.externalize, review=review)
+    strips = build_reports(links, store, args.externalize)
     copy_assets()
     copy_md_stylesheet()
     convert_markdown(links, args.externalize, strips)

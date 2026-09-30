@@ -1,6 +1,5 @@
 """Tests for ``mini.lit``: parsing, weaving, incremental re-runs, the memo, and the page."""
 
-import importlib
 import os
 import sys
 import textwrap
@@ -447,32 +446,6 @@ class TestMemo:
             use_publisher(None)
 
 
-class TestChromium:
-    def test_env_then_path_then_playwright_cache(self, tmp_path, monkeypatch):
-        r = importlib.import_module("mini.lit.render")  # by name: mini.lit.render is the function
-
-        monkeypatch.setattr(r.shutil, "which", lambda name: None)
-        monkeypatch.setattr(r, "SANDBOX_CHROMIUM", str(tmp_path / "absent"))
-        monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
-        for var in ("CHROMIUM", "PLAYWRIGHT_CHROMIUM"):
-            monkeypatch.delenv(var, raising=False)
-        assert r._chromium() is None
-        chrome = tmp_path / "chromium-1243" / "chrome-linux-arm64" / "chrome"
-        chrome.parent.mkdir(parents=True)
-        chrome.touch()
-        assert r._chromium() == str(chrome)
-        shell = tmp_path / "chromium_headless_shell-1243" / "chrome-linux-arm64" / "headless_shell"
-        shell.parent.mkdir(parents=True)
-        shell.touch()
-        assert r._chromium() == str(shell)  # the headless shell wins over the full browser in the cache
-        monkeypatch.setattr(r.shutil, "which", lambda name: "/usr/bin/chromium" if name == "chromium" else None)
-        assert r._chromium() == "chromium"
-        exe = tmp_path / "my-chrome"
-        exe.touch()
-        monkeypatch.setenv("CHROMIUM", str(exe))
-        assert r._chromium() == str(exe)
-
-
 class TestCellMark:
     def test_a_marker_splits_a_cell_and_both_halves_display(self, tmp_path):
         """Two values back to back, with no paragraph between: the marker is the boundary prose would have been."""
@@ -499,6 +472,40 @@ class TestRender:
         assert "katex" in html  # math present → KaTeX loaded
         assert "v is 2" in (tmp_path / "out" / "index.md").read_text()
         assert r.woven.errors == []
+
+    def test_writes_each_output_with_its_figures_beside_it(self, tmp_path):
+        """The CLI writes the files it is given, by extension; one in another directory gets its own copy of ``_assets/``, since every output links the figures relatively."""
+        from mini.lit.render import write_outputs
+
+        p = write(tmp_path, '"""\n# Hi\n"""\nv = 2\nrf"""v is {v}."""\n')
+        r = render(p, out_dir=tmp_path / "a", write=False)
+        (tmp_path / "a" / "_assets").mkdir()
+        (tmp_path / "a" / "_assets" / "fig.png").write_bytes(b"png")
+        written = write_outputs(r, [tmp_path / "a" / "r.md", tmp_path / "b" / "r.html"])
+        assert [w.name for w in written] == ["r.md", "r.html"]
+        assert "v is 2" in (tmp_path / "a" / "r.md").read_text()
+        assert "<title>Hi</title>" in (tmp_path / "b" / "r.html").read_text()
+        assert (tmp_path / "b" / "_assets" / "fig.png").read_bytes() == b"png"
+        assert not (tmp_path / "a" / "index.html").exists(), "wrote the default page as well as the ones asked for"
+        with pytest.raises(ValueError, match="unknown format"):
+            write_outputs(r, [tmp_path / "a" / "r.txt"])
+
+    def test_a_pdf_gets_no_copy_of_the_figures(self, tmp_path, monkeypatch):
+        """The PDF is printed from the weave's own ``_assets/``, so a copy beside it would only pile up (every review print goes to one ``.mini/prints/``)."""
+        import mini.report_print
+        from mini.lit.render import write_outputs
+
+        calls = []
+        monkeypatch.setattr(
+            mini.report_print, "print_bundle", lambda bundle, out, **kw: calls.append((bundle, out)) or out
+        )
+        p = write(tmp_path, '"""\n# Hi\n"""\nv = 2\nrf"""v is {v}."""\n')
+        r = render(p, out_dir=tmp_path / "a", write=False)
+        (tmp_path / "a" / "_assets").mkdir()
+        (tmp_path / "a" / "_assets" / "fig.png").write_bytes(b"png")
+        write_outputs(r, [tmp_path / "prints" / "r.pdf"])
+        assert calls == [(tmp_path / "a" / "r.pdf", tmp_path / "prints" / "r.pdf")]
+        assert not (tmp_path / "prints" / "_assets").exists()
 
     def test_markdown_links_an_svg_figure_where_the_page_inlines_it(self, tmp_path):
         p = write(

@@ -79,6 +79,15 @@ def test_normalize_weights_projects_onto_sphere():
         unit(block.mlp.proj.weight, axis=0)
 
 
+def test_fresh_parameters_are_strongly_typed():
+    """No parameter starts weakly typed: a step would hand it back strong, and the jitted step would compile again."""
+    model = build_model(make_config(learnable_alpha=True), key=jr.key(0))
+    weak = [
+        jax.tree_util.keystr(p) for p, x in jax.tree_util.tree_leaves_with_path(model) if getattr(x, "weak_type", False)
+    ]
+    assert weak == []
+
+
 def test_learnable_alpha_trains_and_reports():
     """learnable_alpha turns the residual step into a trained gain, surfaced by scale_report."""
     config = make_config(n_layer=4, residual_alpha_exp=0.5, learnable_alpha=True)

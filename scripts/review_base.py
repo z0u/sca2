@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Export reports as they were at a git ref, as the baseline a re-review print is marked against (``./go preview --since <ref>``).
+"""Export reports as they were at a git ref, as the baseline a re-review print is marked against (``./go render <report> -o <name>.pdf --since <ref>``).
 
 A reader reviews a report on paper, rounds apart, and from the second round on wants to see what changed since the version they last annotated. The site build marks that in the print's margin (:mod:`mini.review_marks`), comparing the report's page with the page as it was at *ref*. This script makes the second one: it checks *ref* out in a throwaway worktree and runs that checkout's own exporter over each named report, so the baseline is woven by the code the reader saw it woven by. The current environment runs it, with the checkout's ``src/`` first on the path, which is fine for the recent refs this is for; a ref old enough to need other dependencies fails, and says so.
 

@@ -24,7 +24,7 @@ A capped session can't babysit a long run, so work in wakes, where each verb is 
 
 Re-running is cheap: completed steps are memo hits, so a `run` only advances the un-run pieces.
 
-To wait for a stage to settle in an agent session that wants one wake-up rather than a sleep loop, use `bin/mini watch <exp> --timeout 10m --json`. It polls read-only, reaps vanished workers, and exits the moment there's something to act on. The exit code names the branch, so no output parsing is needed to decide: `0` means the current tasks all settled DONE, so `run` again to advance the DAG (the tick prints `✓ complete` when nothing is left); `1` means settled with FAILED or CANCELLED, so `logs` and `retry`; `124` means `--timeout` elapsed with work still in flight, so re-watch or report progress.
+To wait for a stage to settle in an agent session that wants one wake-up rather than a sleep loop, use `bin/mini watch <exp> --timeout 9m --json`. It polls read-only, reaps vanished workers, and exits the moment there's something to act on. The exit code names the branch, so no output parsing is needed to decide: `0` means the current tasks all settled DONE, so `run` again to advance the DAG (the tick prints `✓ complete` when nothing is left); `1` means settled with FAILED or CANCELLED, so `logs` and `retry`; `124` means `--timeout` elapsed with work still in flight, so re-watch or report progress.
 
 `3` means attention: a task settled terminally *mid-stage* (a watchdog fired, a vanished worker was reaped) or a RUNNING task's liveness went stale (stale heartbeat, frozen step). Act now instead of waiting out the siblings. Pre-existing terminal tasks don't trigger this, only events that happen during the watch.
 
@@ -70,7 +70,7 @@ Three states look alike from the outside and want different responses.
 
 ### Queued is not running
 
-A record reads RUNNING from launch, but the worker writes `env` as its first action — so until `env` appears, the task is *launched but not started*. `status` shows it as `◌ queued` with its time in queue (`⧖`) instead of a heartbeat, and `watch` tags its bar `— queued`. Locally this is a momentary blip; on Modal a capacity-starved task can sit queued indefinitely, and only the wall-clock budget (below) will reap it. A task stuck on `queued` with an old `⧖` is a scheduling problem (capacity, container boot), not slow code.
+A record reads RUNNING from launch, but the worker writes `env` as its first action — so until `env` appears, the task is *launched but not started*. `status` shows it as `◌ queued` with its time in queue (`⧖`) instead of a heartbeat, and `watch` tags its bar `— queued`. Locally a task queues while `--workers` tasks (default: the CPU count) are already running. Each worker that exits starts the next queued task, so the queue drains even with no driver attached. A waiting task launches with the config of the latest wake that saw it (its role's `env=`, over that shell's environment), so a restart or an edit between wakes applies to it; a task that was already running when its worker died is reaped `FAILED` and needs `retry`. On Modal a capacity-starved task can sit queued indefinitely, and only the wall-clock budget (below) will reap it. A task stuck on `queued` with an old `⧖` is a scheduling problem (capacity, container boot), not slow code.
 
 ### Dead is not slow
 
@@ -124,6 +124,8 @@ Attempt only a local, obvious fix on a terminal task (typo, bad path, wrong hype
 
 ## Delegating & scheduling a long run
 
-To launch and babysit a run without spending the main session's (expensive) context, delegate to the `experiment-monitor` subagent (Haiku): "poll status of `<exp>`, advance if asked, apply a bounded hotfix if a task failed obviously". It does one pass and reports. The Haiku monitor can't spawn other agents, so its escalation flows back to you: on an escalation report, spawn the `experiment-doctor` subagent (Sonnet). Bring a redesign to the human rather than reshaping the experiment yourself.
+Waiting out a long run can stay in the main session, as one background `bin/mini watch --timeout … --json` loop that runs `bin/mini run` after each settled stage and wakes the session when the run completes or a task fails.
 
-For a run too long to watch in one session, set up a scheduled routine (`CronCreate`, or the Claude_Code_Remote `create_trigger`/`send_later` tools — whichever this session offers) at a cadence the user picks; don't assume one. Each wake, the routine spawns the monitor (and, on escalation, the doctor, then notifies). It self-removes when the run settles: when `status` shows a terminal aggregate state, find the routine's id (`CronList` / `list_triggers`, match by name) and delete it (`CronDelete` / `delete_trigger`). A recurring cron costs money, so confirm with the user before creating it.
+If delegating to a subagent, use `experiment-monitor` with `model: sonnet` first in case the first run surfaces bugs. Then, switch to `model: haiku`. Haiku takes short, bounded passes — check a run, retry what flaked, report. Brief a monitor with a wall-time budget, never "until it completes". Example brief: "poll status of `<exp>`, advance if asked, escalate if a task failed".
+
+For a run too long to watch in one session, set up a scheduled routine (`CronCreate`, or the Claude_Code_Remote `create_trigger`/`send_later` tools — whichever this session offers) at a cadence the user picks. Each wake, the routine spawns the monitor (and, on escalation, the doctor, then notifies). It self-removes when the run settles: when `status` shows a terminal aggregate state, find the routine's id (`CronList` / `list_triggers`, match by name) and delete it (`CronDelete` / `delete_trigger`).

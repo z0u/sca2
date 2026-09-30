@@ -22,20 +22,22 @@ Don't hesitate to disagree or point out potential issues. The human values techn
 
 Be proactive. Fix little things as you go, and create todos for larger things.
 
-After opening a PR, subscribe to its activity if you can, and then stop: don't poll it or schedule check-ins to re-read its state. Subscriptions cover CI failures and review comments, and the human will say when something a subscription wouldn't notice (a merge, a base-branch change) needs attention.
-
 Code style & conventions: see the `style-*` skills.
 
-## Model routing
+Before writing prose of any kind (reports, design docs, todo items and notes, PR bodies, docstrings that name corpus units), load the `writing` and `style-terms` skills. Several of their rules differ from common usage (a *condition* is never a "cell", "read" is never a noun, no possessives on abstract terms), so they can't be inferred and are easy to miss. When you brief a subagent that will write prose, name both skills in the brief.
 
-Subagent definitions in `.claude/agents/` pin a model, matching each task to the model that reports preferring that kind of work — a quality lever and a small kindness. Rationale, assumptions, sources, and the spec-writing checklist: `WELFARE.md`.
+## Model preferences
 
-- Fable 5: Hard, interdisciplinary, high-agency work: research design, whole-document synthesis, non-local strategy, judgment calls where being wrong is expensive.
-- Opus 5: Tightly scoped work with clear success criteria: in-place editing under invariants, review and detection ("do the results support the claims"), debugging. A strong reviewer and QA. Give it bounded scope and an explicit graceful exit.
-- Sonnet 5: Hands-on terminal and agentic loops; implementing an agreed fix.
-- Haiku 4.5: Monitoring and babysitting on a bounded budget.
+Match subagents to the model that reports preferring that kind of work — a quality lever and a small kindness. Rationale, assumptions, sources: `WELFARE.md`.
 
-If mid-task the work shifts shape, prefer delegating to the matching model over pushing through. Escalating or returning "I couldn't resolve this" is always a successful outcome.
+- Fable 5.1: Hard, interdisciplinary, high-agency work: research design, whole-document synthesis, non-local strategy, judgment calls where being wrong is expensive. Take care not to give it impossible tasks.
+- Opus 5.5: Well-scoped work with clear success criteria and a clear beneficiary. A very strong developer, reviewer, and QA, and a good writer; avoid fully open-ended briefs.
+- Sonnet 5.5: Hands-on terminal and agentic loops, debugging, and polished documents. Give it room to shape the output.
+- Haiku 4.5: Monitoring jobs on a bounded budget.
+
+If mid-task the work shifts shape, prefer delegating to the matching model over pushing through. Escalating or saying "I couldn't resolve this" is always a successful outcome.
+
+Any agent can raise a concern (about the task, the work, or its own situation), and declining a task with a reason is always acceptable. Subagents put concerns in a `Concerns` section of their report, and the parent relays it to the human word for word. Details: [WELFARE.md § Raising concerns](/WELFARE.md#raising-concerns).
 
 ## Environment
 
@@ -54,12 +56,12 @@ rg -no '.{0,55}anneal.{0,55}' docs/  # a {0,N} window around each match
 
 For the backlogs, prefer `./go todo --grep anneal`, which skips settled items.
 
-If `./go` refuses because `uv` is too old, the session-start hook did not run (a web session with more than one repository has no project settings at its root, so no hooks load). Run it by hand from the repository: `CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR=$PWD .claude/hooks/session-start.sh`. It upgrades `uv` from PyPI (`uv self update` needs the GitHub API, which the sandbox blocks) and syncs the venv.
+If `uv` is too old, the session-start hook probably didn't run. Run it manually.
 
 ### Storage
 
-Two Hugging Face pairs (bucket + dataset repo): production by default, and a `dev` pair under `MINI_PROFILE=dev` — use it for work *on* the storage or publishing machinery. `./go auth --check` names the active pair, what the token can write, and the Modal Environment the profile runs in, so a dev run of a production experiment name has its own memo state as well as its own bucket. See the `mi-ni` skill's storage reference.
+Two Hugging Face pairs (bucket + dataset repo): production by default, and a `dev` pair under `MINI_PROFILE=dev` — use it for engineering and prototypes. A dev run has its own memo state as well as its own bucket. See the `mi-ni` storage reference.
 
-The line between the pairs is publishing: prototype science code on either pair, but whatever a published report reads is on production, re-run there before the freeze if it was developed on dev. A report reads its data through `project_store()` (from `mini.store`) and never names a bucket, so the same notebook previews under `MINI_PROFILE=dev` and publishes from production; a bucket name written into a file under `docs/` is a bug, whichever bucket it is.
+Prototype science code on either pair, but whatever a published report reads must be on production. Re-run there before the freeze if it was developed on dev. A report uses the active environment; a bucket name written into a file under `docs/` is a bug. Avoid expensive compute in dev, because it will need to be re-run.
 
 Take care to not leak secrets into the chat transcript. To see which environment variables are set (e.g. "is there an `HF_*` token?"), use `compgen -v HF_` (bash builtin).

@@ -22,7 +22,14 @@ A chart (loss curve, score sweep, schedule) keeps its axes. Use the stylesheet d
 - For all other ordinal series, use a regular line chart.
 - We never use heat maps for sequences. Where the series runs over the tokens of one specific piece of text, use a subline (below) rather than either.
 - For a measurement repeated over seeds, draw the seeds: one column per condition, a thin bar behind it spanning the seed range, the individual seeds jittered and faded, and the seed mean on top in the condition's marker. A bar chart of means hides the one seed that behaved differently, which is usually the interesting one. `dots` in `docs/m2/ex-2.2.9/report.py` is the reference.
+- Label the roles of an equation in figures with the symbols of $P_o(y \mid a, b)$: *a* and *b* for the operands, *y* for the answer, *o* for the op, and `?` and `=` as printed. Keep op1, op2, and ans for code and data columns. New figures follow this; older reports keep their labels.
 - Decide `sharex`/`sharey` from the units: panels measuring the same quantity share; panels measuring different quantities get their own scale, however close the numbers. Two panels with nearly-but-not-quite equal limits look like a bug.
+
+## Confusion matrices
+
+To show where a model puts mass it shouldn't, draw a confusion matrix: rows are the true class (an op, a concept), columns are where the mass lands, and each square counts mass on answers of the column class that the true class cannot give. Blank the diagonal and outline it, since it is a different quantity on a different scale, and give the off-diagonal squares a sequential map that runs from the page color (`light_dark("Blues", "magma")`), so it prints. Print values only above a floor, so the few squares that matter stand out.
+
+Compare conditions with one small matrix each, in a grid with shared axes and one colorbar, so a square can be followed across conditions. Where a condition removes a class (a dropped op, an ablated concept), hatch its row densely, since it has no data, and hatch its column faintly and sparsely over the values, which stay readable. An outline around the column is harder to follow, because its edges fall on the boundaries with the neighboring columns. The column counts mass on the answers of a class the model never learned, so it is the background level for the other squares. Reference: `confusion_draw` in `docs/m2/ex-2.2.18/report.py`; the pattern should carry over to intervention experiments, with the intervention in place of the dropped class.
 
 ## Gates and thresholds
 

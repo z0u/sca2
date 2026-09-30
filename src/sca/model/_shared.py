@@ -75,7 +75,9 @@ class Scale(eqx.Module):
 
     def __init__(self, n: int, init: float, scale: float):
         self.forward_scale = init / scale
-        self.weight = jnp.full((n,), scale)
+        # An explicit dtype: from a bare Python float the array is weakly typed, a training step hands it back
+        # strongly typed, and the jitted step compiles again for the new signature (twice, with Adam's moments).
+        self.weight = jnp.full((n,), scale, dtype=jnp.float32)
 
     def __call__(self) -> Array:
         return self.weight * self.forward_scale

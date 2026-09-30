@@ -2,6 +2,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import jax.random as jr
 import numpy as np
@@ -125,7 +126,13 @@ def _anchored_step(
     """
     if fallback is None:
         step = make_anchored_train_step(
-            optimizer, tau=anchor.tau, n_lines=n_lines, slices=slices, clean_rows=clean_rows, axes=anchor.axes
+            optimizer,
+            tau=anchor.tau,
+            n_lines=n_lines,
+            slices=slices,
+            clean_rows=clean_rows,
+            axes=anchor.axes,
+            hinge=anchor.hinge,
         )
         return lambda *args: (*step(*args), 0.0, 0.0, 0.0)
     if slices is not None or clean_rows is not None or tuple(anchor.axes) != ANCHOR_AXES:
@@ -133,6 +140,36 @@ def _anchored_step(
     step = make_fallback_train_step(optimizer, fallback, tau=anchor.tau, n_lines=n_lines)
     fb_w_, aa_w_ = jnp.asarray(fb_w), jnp.asarray(aa_w)
     return lambda *args: step(*args, fb_w_, aa_w_)
+
+
+SCAN_STEPS = 16
+"""Training steps per dispatch in `train_anchored`. The step is host-bound on an L4 (Python dispatch and CUDA calls dominate a d64 step), so running several per call cuts its cost (about half, more on a slow host) with identical weights; the rationale and numbers are in `todo/eng/training-step-is-host-bound.md`."""
+
+
+def _scanned(step, n_steps: int):
+    """*n_steps* calls of *step* in one dispatch, as a `lax.scan` over stacked batches and weights.
+
+    *step* has `_anchored_step`'s call shape. The result takes the model, the optimizer state, a tuple of batch arrays with a leading step axis, the two weight arrays, and a boolean `live` array; a step whose flag is off passes the state through untouched, so a dispatch cut short by a trajectory record or an epoch end is padded to the one compiled shape rather than compiled again. It returns the model, the state, and the six per-step outputs as an `(n_steps, 6)` array (zeros where not live).
+    """
+
+    @eqx.filter_jit
+    def run(model, opt_state, batches, weights, anti_weights, live):
+        carry, static = eqx.partition((model, opt_state), eqx.is_array)
+
+        def body(carry, xs):
+            batch, weight, anti_weight, on = xs
+
+            def go(carry):
+                m, s = eqx.combine(carry, static)
+                m, s, *outs = step(m, s, *batch[:4], weight, anti_weight, *batch[4:])
+                return eqx.filter((m, s), eqx.is_array), jnp.stack([jnp.asarray(o, jnp.float32) for o in outs])
+
+            return jax.lax.cond(on, go, lambda carry: (carry, jnp.zeros(6, jnp.float32)), carry)
+
+        carry, outs = jax.lax.scan(body, carry, (batches, weights, anti_weights, live), length=n_steps)
+        return (*eqx.combine(carry, static), outs)
+
+    return run
 
 
 class _Window:
@@ -179,6 +216,9 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     traj_stride: int = 50,
     n_val_batches: int = 4,
     on_record: Callable[[int, LanguageModel], None] | None = None,
+    newline_id: int | None = None,
+    min_line_tokens: int = LINE_TOKENS,
+    loss_mask: np.ndarray | None = None,
 ) -> tuple[LanguageModel, list[TrainingMetrics], dict[str, np.ndarray]]:
     """Train with a concept anchor, recording the alignment trajectory as it goes.
 
@@ -234,6 +274,13 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             and the model as it stands, so a caller can keep a checkpoint at
             every trajectory point (a training-dynamics read needs the model
             through the plateau, where the end checkpoint says nothing).
+        newline_id: passed through to `sample_anchored_batches`: `None` for the
+            fixed-period reproduction path, or the newline token id for a
+            variable-length-line grammar (the in-context grammar).
+        min_line_tokens: passed through to `sample_anchored_batches`, and to
+            size `n_lines`; unused when *newline_id* is `None`.
+        loss_mask: passed through to `sample_anchored_batches` (a
+            verification-line loss mask); `None` for no masking.
     """
     if crop is not None and (anchor.tau is None or fallback is not None):
         raise ValueError("a crop policy needs a pooled anchor (tau set) and no fallback spec")
@@ -253,9 +300,12 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     schedule = configure_schedule(config.scheduler, config.optimizer.learning_rate, epoch_length)
     optimizer = configure_optimizer(model, config.optimizer, schedule)
     opt_state = optimizer.init(eqx.filter(model, eqx.is_inexact_array))
-    n_lines = config.model.block_size // LINE_TOKENS + 2  # a crop straddles at most this many lines
-    train_step = _anchored_step(
-        optimizer, anchor, n_lines, fallback, fallback_weight, anti_anchor_weight, anchor_slices, clean_rows
+    n_lines = config.model.block_size // min_line_tokens + 2  # a crop straddles at most this many lines
+    train_steps = _scanned(
+        _anchored_step(
+            optimizer, anchor, n_lines, fallback, fallback_weight, anti_anchor_weight, anchor_slices, clean_rows
+        ),
+        SCAN_STEPS,
     )
 
     # A fixed validation sample, drawn off its own stream so the training crops
@@ -315,26 +365,52 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     expect_metrics(**expected)
     for epoch in range(config.scheduler.epochs):
         train_losses, anchor_losses, anti_losses = [], [], []
-        for x, y, mask, line_id, *crop_args in sample_anchored_batches(
-            train_data, config.data, config.model, epoch_length, rng, label_p, anchor.span, lines=True, crop=crop
-        ):
-            at = epoch + len(train_losses) / epoch_length
-            weight = float(anchor(at))
-            anti_weight = float(anti(at)) if anti is not None else 0.0
-            model, opt_state, loss, anchor_loss, anti_loss, fb_loss, aa_loss, fb_lines = train_step(
-                model, opt_state, x, y, mask, line_id, jnp.asarray(weight), jnp.asarray(anti_weight), *crop_args
+        batches = sample_anchored_batches(
+            train_data,
+            config.data,
+            config.model,
+            epoch_length,
+            rng,
+            label_p,
+            anchor.span,
+            lines=True,
+            crop=crop,
+            newline_id=newline_id,
+            min_line_tokens=min_line_tokens,
+            loss_mask=loss_mask,
+        )
+        while len(train_losses) < epoch_length:
+            # A dispatch stops at the next trajectory record and at the epoch's end, which need the model there.
+            n = min(SCAN_STEPS, epoch_length - len(train_losses), traj_stride - step % traj_stride)
+            chunk = [next(batches) for _ in range(n)]
+            ats = [epoch + (len(train_losses) + i) / epoch_length for i in range(n)]
+            weights = [float(anchor(at)) for at in ats]
+            anti_weights = [float(anti(at)) if anti is not None else 0.0 for at in ats]
+            pad = SCAN_STEPS - n
+            stacked = tuple(np.stack([b[f] for b in chunk] + [chunk[-1][f]] * pad) for f in range(len(chunk[0])))
+            model, opt_state, outs = train_steps(
+                model,
+                opt_state,
+                stacked,
+                np.asarray(weights + [0.0] * pad, np.float32),
+                np.asarray(anti_weights + [0.0] * pad, np.float32),
+                np.arange(SCAN_STEPS) < n,
             )
-            train_losses.append(float(loss))
-            anchor_losses.append(float(anchor_loss))
-            anti_losses.append(float(anti_loss))
-            step += 1
-            emit_metrics(loss=float(loss), anchor=float(anchor_loss), anchor_weight=weight)
+            loss, anchor_loss, anti_loss, fb_loss, aa_loss, fb_lines = np.asarray(outs[:n]).T.tolist()
+            train_losses += loss
+            anchor_losses += anchor_loss
+            anti_losses += anti_loss
+            step += n
+            emit_metrics(loss=loss[-1], anchor=anchor_loss[-1], anchor_weight=weights[-1])
             if fallback is not None:
-                window.add(float(fb_loss), float(aa_loss), float(fb_lines))
-                emit_metrics(fallback=float(fb_loss), anti_anchor=float(aa_loss))
+                for i in range(n):
+                    window.add(fb_loss[i], aa_loss[i], fb_lines[i])
+                emit_metrics(fallback=fb_loss[-1], anti_anchor=aa_loss[-1])
             emit_progress(step, total_steps)
             if step % traj_stride == 0:
-                record(step, weight, anti_weight, float(anchor_loss), float(anti_loss))
+                record(step, weights[-1], anti_weights[-1], anchor_loss[-1], anti_loss[-1])
+        # Run the sampler to its end, as a for loop would, so any draws after its last batch still happen.
+        assert next(batches, None) is None
 
         val_losses = [
             float(eval_step(model, x, y))

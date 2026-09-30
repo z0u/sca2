@@ -7,19 +7,25 @@ Example::
 
     app = LocalApparatus("my-experiment", max_workers=4)
     results = list(app.map(train, configs))
+
+On the memoized path (``bin/mini run``) each task is a detached subprocess, and ``max_workers`` caps how many run at once. The rest wait staged and RUNNING without a pid, which ``mini status`` shows as queued. :func:`launch_queued` starts them as slots free up. It runs when a batch is staged, when a worker exits, and on each tick or watch poll, so a detached run drains its queue with nobody watching.
 """
 
 from __future__ import annotations
 
 import asyncio
+import fcntl
+import hashlib
+import json
 import logging
 import os
 import secrets
 import signal
+import stat
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import nullcontext, suppress
+from contextlib import contextmanager, nullcontext, suppress
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable, Iterable, TypeVar, override
+from typing import Any, AsyncGenerator, Callable, Iterable, Iterator, TypeVar, cast, override
 
 from mini._queues import QueueLike
 from mini.apparatus import Apparatus
@@ -28,7 +34,7 @@ from mini.local_volume import LocalVolume
 from mini.memo import MemoStore
 from mini.progress import ProgressMessage, progress_context
 from mini.progress_display import RichProgressDisplay
-from mini.runs import data_root, spawn_taskworker
+from mini.runs import RunState, data_root, spawn_taskworker
 from mini.store import Store, project_store, store_context, store_for, store_root_for
 from mini.volume import data_dir_context
 
@@ -47,7 +53,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
     Jobs can report progress via ``emit_progress()`` which is automatically displayed using Rich progress bars when running in a terminal.
     """
 
-    def __init__(self, name: str, max_workers: int = 1, data_dir: Path | str | None = None):
+    def __init__(self, name: str, max_workers: int | None = None, data_dir: Path | str | None = None):
         self.name = name
         self.max_workers = max_workers
         self.watchdog_s: float | None = None
@@ -96,15 +102,56 @@ class LocalApparatus(Apparatus[LocalVolume]):
 
     @override
     def spawn_tasks(self, store: MemoStore, batch: list[tuple[str, str, Callable, tuple, list]]) -> None:
+        """Stage every call, then start as many as the worker cap allows; the rest queue."""
         for key, gen, fn, args, hooks in batch:
             store.write_call(key, fn, args, hooks, gen, self.watchdog_s, self.watchdog_grace_s)  # stage for worker
-            pid = spawn_taskworker(store.data_dir, key, env=self.env)  # pid == pgid, for cancel
-            store.update_if(key, gen, pid=pid)
+            _stage_spec(store, key, gen, self.env)  # after the call: it marks the staging complete
+        self.launch_queued(store)
+
+    @override
+    def launch_queued(self, store: MemoStore) -> list[str]:
+        # The cap lives in the run's meta, so a worker launching a sibling on exit
+        # applies it too; the latest wake's --workers wins.
+        if store.meta().get("local_workers") != self.task_slots:
+            store.set_meta(local_workers=self.task_slots)
+        return launch_queued(store)
+
+    @override
+    def refresh_queued(self, store: MemoStore, rec: dict[str, Any]) -> None:
+        key, gen = rec["key"], rec.get("gen")
+        if rec.get("pid") or not gen:
+            return
+        spec = _read_spec(store, key)
+        if spec is not None and (spec.get("gen") != gen or spec.get("env") == self.env):
+            return  # current already, or the claiming tick is mid-batch
+        # A missing spec was wiped with the runtime dir (a reboot or logout). Re-stage it
+        # only once this attempt's call is staged; before that, the claiming tick is mid-batch.
+        if spec is None and store.staged_gen(key) != gen:
+            return
+        with _launch_lock(store):  # a launch reads then deletes the spec under this lock
+            cur = store.record(key)
+            if cur.get("gen") == gen and not cur.get("pid"):
+                _stage_spec(store, key, gen, self.env)
+
+    @override
+    def cancel(self, store: MemoStore, keys: list[str] | None = None) -> list[str]:
+        # Under the launch lock, so a worker exiting mid-cancel can't start a queued
+        # task after this snapshot and leave it running unstopped.
+        with _launch_lock(store):
+            cancelled = super().cancel(store, keys)
+            for key in cancelled:
+                spec_path(store, key).unlink(missing_ok=True)  # a task cancelled while queued
+            return cancelled
+
+    @property
+    def task_slots(self) -> int:
+        """How many detached task workers may run at once: ``max_workers``, else the CPU count."""
+        return self.max_workers or os.cpu_count() or 1
 
     @override
     def _stop_task(self, rec: dict[str, Any]) -> None:
         """SIGTERM the worker's process group (it's a session leader: pgid == pid)."""
-        if pid := rec.get("pid"):
+        if (pid := rec.get("pid")) and _pid_alive(pid, rec.get("pid_start")):  # not a stranger reusing the pid
             with suppress(ProcessLookupError, PermissionError):
                 os.killpg(pid, signal.SIGTERM)
 
@@ -112,7 +159,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
     def _is_task_alive(self, rec: dict[str, Any]) -> bool:
         """Is the recorded worker pid still a live process? (for ``reap_dead``)."""
         pid = rec.get("pid")
-        return _pid_alive(pid) if pid else True  # no pid yet — can't probe; assume alive
+        return _pid_alive(pid, rec.get("pid_start")) if pid else True  # no pid yet — can't probe; assume alive
 
     @override
     async def amap(
@@ -131,7 +178,8 @@ class LocalApparatus(Apparatus[LocalVolume]):
         # visible in the logs rather than only inferable from the *absence* of
         # Modal's image-build output. ('locally', not 'on CPU': a local box may
         # well have a GPU that JAX/torch will use.)
-        log.info("Running %d jobs locally (%d workers)", n, self.max_workers)
+        workers = self.max_workers or 1
+        log.info("Running %d jobs locally (%d workers)", n, workers)
         run_id = secrets.token_hex(4)
 
         if self._volume is not None:
@@ -139,7 +187,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
 
         progress_display = RichProgressDisplay(n or 0, queue=LocalQueue())
         # Target ~10 emissions/sec overall: interval = max_workers / target_rate_hz
-        emission_interval = self.max_workers / 10.0
+        emission_interval = workers / 10.0
         # Project-scoped artifact store, so a mapped fn's put/get resolves the ambient
         # store on the interactive path too (not only the detached memo worker). Built
         # caller-side and closed over: local execution is in-process threads.
@@ -157,7 +205,7 @@ class LocalApparatus(Apparatus[LocalVolume]):
 
         loop = asyncio.get_running_loop()
 
-        with progress_display, ThreadPoolExecutor(max_workers=self.max_workers) as pool:
+        with progress_display, ThreadPoolExecutor(max_workers=workers) as pool:
             # Submit all tasks
             tasks = [
                 loop.run_in_executor(pool, local_fn, i, *args)
@@ -169,21 +217,166 @@ class LocalApparatus(Apparatus[LocalVolume]):
                 yield await task
 
 
-def _pid_alive(pid: int) -> bool:
-    """Whether *pid* is a running process — counting a zombie as *not* alive.
+# Shared memory, where a runtime dir is missing (containers often lack $XDG_RUNTIME_DIR).
+_SHM = Path("/dev/shm")
 
-    ``os.kill(pid, 0)`` succeeds on a zombie (an exited child not yet reaped), which would keep a hard-killed worker looking alive when it's a direct child of the watcher. On Linux we read ``/proc/<pid>/stat`` and treat state ``Z`` as dead; elsewhere we fall back to a signal-0 probe (no zombie distinction).
+
+def _state_dir(store: MemoStore) -> Path:
+    """Where this run's queued launch specs wait, outside the project and preferably in memory.
+
+    A spec holds a task's env overlay, which could carry a credential if a role passes one through. Out of the project tree, it stays away from tooling that reads the checkout (search, agents, the site build); in memory (tmpfs), it never reaches a disk or a backup. The first of these that is usable wins:
+
+    - ``$XDG_RUNTIME_DIR/mini/launch``: the user's own tmpfs, cleared at logout or reboot.
+    - ``/dev/shm/mini-<uid>/launch``: shared memory, used only if ``mini-<uid>`` is a directory this user owns and nobody else can read. ``/dev/shm`` is shared by all users, so someone else could have created that name first.
+    - ``$XDG_STATE_HOME/mini/launch`` (``~/.local/state``): on disk, where there is no tmpfs (macOS).
+
+    A spec wiped from memory is re-staged by the next wake (:meth:`LocalApparatus.refresh_queued`). The directory name hashes the run's data dir, so two checkouts never share one.
     """
-    proc = Path("/proc") / str(pid)
+    run = store.data_dir.resolve()
+    digest = hashlib.sha256(str(run).encode()).hexdigest()[:12]
+    return _launch_base() / f"{run.name}-{digest}"
+
+
+def _launch_base() -> Path:
+    if (runtime := os.environ.get("XDG_RUNTIME_DIR")) and Path(runtime).is_dir():
+        return Path(runtime) / "mini" / "launch"
+    if _SHM.is_dir() and (shm := _private_dir(_SHM / f"mini-{os.getuid()}")):
+        return shm / "launch"
+    return Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "mini" / "launch"
+
+
+def _private_dir(d: Path) -> Path | None:
+    """*d*, created if need be, if it is a real directory owned by this user with no access for anyone else; else ``None``."""
+    with suppress(FileExistsError):
+        d.mkdir(mode=0o700)
+    try:
+        st = d.lstat()  # lstat: a symlink planted by someone else must not pass
+    except OSError:
+        return None
+    ok = stat.S_ISDIR(st.st_mode) and st.st_uid == os.getuid() and st.st_mode & 0o077 == 0
+    return d if ok else None
+
+
+def spec_path(store: MemoStore, key: str) -> Path:
+    """The launch spec for a queued *key* (see :func:`_stage_spec`)."""
+    return _state_dir(store) / f"{key}.json"
+
+
+def _stage_spec(store: MemoStore, key: str, gen: str, env: dict[str, str]) -> None:
+    """Write *key*'s launch spec: its env overlay, stamped with the attempt's *gen*.
+
+    Written after the call, so it also marks the call as staged for this attempt: a call file left by an earlier attempt doesn't count. Only the overlay is written (config the experiment or project declares), never the launching shell's environment, and only for as long as the task is queued: :func:`launch_queued` deletes the spec once the worker starts. Owner-only permissions, like an SSH key.
+    """
+    d = _state_dir(store)
+    d.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd = os.open(spec_path(store, key), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump({"gen": gen, "env": env}, f)
+
+
+def _read_spec(store: MemoStore, key: str) -> dict[str, Any] | None:
+    try:
+        return json.loads(spec_path(store, key).read_text())
+    except OSError, ValueError:
+        return None
+
+
+# The launching process's values for the keys a worker's overlay replaced (``null`` = unset).
+# It travels in the worker's own environment, which already holds those values, so the
+# shell's environment never reaches disk; a worker reads it to undo its own overlay
+# before it launches a sibling.
+_BASE_ENV_VAR = "MINI_TASK_BASE_ENV"
+
+
+def _launch_env(overlay: dict[str, str], env: dict[str, str] | None = None) -> dict[str, str]:
+    """The whole environment to launch a task with: *env* (this process's, by default), minus the overlay it was itself launched with, plus *overlay*.
+
+    A worker passes the environment it started with, so whatever its task set in ``os.environ`` stays with that task.
+    """
+    env = dict(os.environ) if env is None else env
+    restore: dict[str, str | None] = {}
+    if own := env.get(_BASE_ENV_VAR):  # we are a worker: undo our own overlay first
+        with suppress(ValueError):
+            restore = cast("dict[str, str | None]", json.loads(own))
+    base = {k: v for k, v in env.items() if k not in restore and k != _BASE_ENV_VAR}
+    base |= {k: v for k, v in restore.items() if v is not None}
+    shadowed = {k: base.get(k) for k in overlay}
+    return base | overlay | {_BASE_ENV_VAR: json.dumps(shadowed)}
+
+
+@contextmanager
+def _launch_lock(store: MemoStore) -> Iterator[None]:
+    store.root.mkdir(parents=True, exist_ok=True)
+    with open(store.root / ".launch.lock", "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        yield  # released when the file closes
+
+
+def launch_queued(store: MemoStore, env: dict[str, str] | None = None) -> list[str]:
+    """Start queued tasks while live workers number fewer than the run's cap; return the keys started.
+
+    A queued task is RUNNING with a current ``gen`` and no ``pid``: claimed and staged, waiting for a slot. Live workers are RUNNING records whose pid still runs, so a settled worker (even one still exiting) and a vanished one both free their slot. Launches serialize on a lock file, and each stamps its pid before the lock drops, so two exiting workers can't both start the same task. Nothing starts past the run's wall-clock budget.
+    """
+    if store.budget_expired():
+        return []
+    cap = store.meta().get("local_workers") or os.cpu_count() or 1
+    started: list[str] = []
+    with _launch_lock(store):
+        running = [r for r in store.records() if r.get("state") == RunState.RUNNING and r.get("gen")]
+        live = sum(1 for r in running if r.get("pid") and _pid_alive(r["pid"], r.get("pid_start")))
+        # Staged for its current attempt; one that isn't (its claiming tick is mid-batch,
+        # or it runs on another backend) must not take a slot from one that is.
+        queued = [
+            (r, spec)
+            for r in sorted((r for r in running if not r.get("pid")), key=lambda r: r.get("created_at") or 0)
+            if (spec := _read_spec(store, r["key"])) is not None and spec.get("gen") == r["gen"]
+        ]
+        for rec, spec in queued[: max(0, cap - live)]:
+            key, gen = rec["key"], rec["gen"]
+            launch_env = _launch_env(spec.get("env") or {}, env)
+            pid = spawn_taskworker(store.data_dir, key, env=launch_env, inherit=False)  # pid == pgid, for cancel
+            if store.update_if(key, gen, pid=pid, pid_start=_proc_start(pid)):
+                started.append(key)
+                spec_path(store, key).unlink(missing_ok=True)  # the worker holds its env now
+            else:  # cancelled or re-claimed since the snapshot; its gen fences the worker's writes
+                with suppress(ProcessLookupError, PermissionError):
+                    os.killpg(pid, signal.SIGTERM)
+    return started
+
+
+def _proc_start(pid: int) -> str | None:
+    """An identity for the process now holding *pid*: the boot it belongs to and its start time, or ``None`` where there's no ``/proc`` (or no such process).
+
+    A pid is reused once its process exits, and across a restart any pid may belong to anything. Recorded next to a worker's pid, this tells a later probe whether the pid still names that worker.
+    """
+    try:
+        return f"{_boot_id()}:{_stat_fields(pid)[19]}"  # field 22 of stat: start time since boot
+    except OSError, IndexError:
+        return None
+
+
+def _boot_id() -> str:
+    return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+
+
+def _stat_fields(pid: int) -> list[str]:
+    """``/proc/<pid>/stat`` from the state field on. It reads "pid (comm) state ...", and comm may hold spaces or parens, so split after the final ')'."""
+    return (Path("/proc") / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()
+
+
+def _pid_alive(pid: int, start: str | None = None) -> bool:
+    """Whether *pid* is a running process, and, given the *start* identity from :func:`_proc_start`, the same one that was recorded.
+
+    A zombie (an exited child not yet reaped) counts as dead: ``os.kill(pid, 0)`` succeeds on one, which would keep a hard-killed worker looking alive when it's a direct child of the watcher. On Linux we read ``/proc/<pid>/stat``; elsewhere we fall back to a signal-0 probe, with no zombie or identity check. A record from before ``pid_start`` existed (``start`` is ``None``) skips the identity check.
+    """
     if Path("/proc").is_dir():
-        if not proc.exists():
-            return False
         try:
-            # stat is "pid (comm) state ..."; comm may hold spaces/parens, so the
-            # state field is the first token after the final ')'.
-            return (proc / "stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
+            fields = _stat_fields(pid)
         except OSError:
-            return False  # vanished between the exists() check and the read
+            return False  # no such process, or it vanished mid-read
+        if fields[0] == "Z":
+            return False
+        return start is None or _proc_start(pid) == start
     try:
         os.kill(pid, 0)
         return True

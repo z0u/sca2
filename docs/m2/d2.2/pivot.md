@@ -54,14 +54,14 @@ Lines get longer, from 6 tokens to about 20 with three examples, and their lengt
 For any context, the posterior over ops given the examples can be computed from the op table: how likely each op is to have produced the answers shown. That gives us three things to design with:
 
 - a _graded stimulus_, how strongly the context points to `difference`, which plays the part redness played for _red_;
-- a _designed null_ for suppression, the answer the model should give if it no longer knows `difference`: the answer distribution weighted by the posterior, with `difference` removed and the rest renormalized;
+- a _target null_ for suppression, the answer the model should give if it no longer knows `difference`: the answer distribution weighted by the posterior, with `difference` removed and the rest renormalized;
 - a _label-noise model_: a labeller that labels contexts by their posterior rather than by their true op is realistically noisy.
 
-The posterior uses the same rounding as the corpus. The corpus rounds stochastically, so the answer to an example is a draw from up to eight colors, and the likelihood of a shown answer under an op is the probability that the rounding of that op gives it (`answer_dist` in `sca.data.ops`).[^nearest] Under replacement noise (below) the likelihood also includes the noise: with rate ρ, it is 1 − ρ times the probability under the op, plus ρ times the mean probability under the other ops. This is the posterior a model trained on the noisy corpus can reach at best. It also keeps every op above zero, so the designed null is defined on a context that fits `difference` alone: there it weights the other ops by how nearly they fit.
+The posterior uses the same rounding as the corpus. The corpus rounds stochastically, so the answer to an example is a draw from up to eight colors, and the likelihood of a shown answer under an op is the probability that the rounding of that op gives it (`answer_dist` in `sca.data.ops`).[^nearest] Under replacement op noise (below) the likelihood also includes the noise: with rate ρ, it is 1 − ρ times the probability under the op, plus ρ times the mean probability under the other ops. This is the posterior a model trained on the noisy corpus can reach at best. It also keeps every op above zero, so the target null is defined on a context that fits `difference` alone: there it weights the other ops by how nearly they fit.
 
 [^nearest]: A posterior computed with nearest rounding would be sharper than the corpus supports.
 
-Clean examples would pin the op down fast. On table A+, one clean example puts a posterior above 0.95 on the true op for about half of contexts, and three examples do so for nine in ten. So the example count alone would grade very little. What does grade it is _replacement noise_: showing, in some examples, the answer another op would give. With a replacement rate near 0.3 and three or four examples, the posterior on the true op spreads across the whole range. With three examples at a rate of 0.35, about a fifth of contexts are above 0.95, 45% are between 0.5 and 0.95, and 35% are below 0.5.[^scout]
+Clean examples would pin the op down fast. On table A+, one clean example puts a posterior above 0.95 on the true op for about half of contexts, and three examples do so for nine in ten. So the example count alone would grade very little. What does grade it is _replacement op noise_: showing, in some examples, the answer another op would give. With a replacement rate near 0.3 and three or four examples, the posterior on the true op spreads across the whole range. With three examples at a rate of 0.35, about a fifth of contexts are above 0.95, 45% are between 0.5 and 0.95, and 35% are below 0.5.[^scout]
 
 [^scout]: From a scratch simulation. A [scouting report](/todo/science/scout-posterior-in-context-grammar.md) would put these, and the task ceiling below, into figures.
 
@@ -76,14 +76,14 @@ Their results suggest mid-depth, at the position where the answer forms, which f
 ## Sequence
 
 1. Suppress `difference` on the stored ex-2.2.14 checkpoints. Scoring only, as planned in the [design](design.md#suppress-the-operation-and-the-operands): the op-word edit against a token mask, and the use-site edits on the whole-line primary. It turns "the anchor is a token" into a measurement. Its outcome decides how much of the old line to report, and it does not decide whether to pivot: if the use-site edits move the answer, that is a result worth writing up beside the pivot, and only the new grammar can show whether SCA anchors a concept the model computes.
-2. Train a [new-grammar control](#the-new-grammar-control): the one-context-per-line format, replacement noise, the posterior over ops, a labeller keyed per context, and a regression check that the model learns the task. Like ex-2.2.3, this is a grammar change and needs its own control.
+2. Train a [new-grammar control](#the-new-grammar-control): the one-context-per-line format, replacement op noise, the posterior over ops, a labeller keyed per context, and a regression check that the model learns the task. Like ex-2.2.3, this is a grammar change and needs its own control.
 3. Anchor the latent op, then suppress it, then run the layer sweep and the SGTM baseline, as in the current design.
 
 The [quick route](design.md#quick-route) in the design trains step 2 and the first reads of step 3 in one pilot, and runs step 1 while the grammar is built.
 
 ### The new-grammar control
 
-With the op inferred, no model can do better than answering with the answer distribution weighted by the posterior. That limit, the Bayes ceiling, can be computed for every context, and it is well below 1. With three clean examples we expect about three in four answers to be right, and almost all of the shortfall comes from stochastic rounding: a model told the op would score about the same. Replacement noise adds a shortfall that comes from inference. At three examples and a rate of 0.35, the ceiling falls to about 0.6, while a model told the op would still score about 0.75.[^scout] So the task gate would be the distance of the control from the ceiling, in place of the old accuracy numbers, and the report would show the ceiling for a model told the op beside it, so that the part of the gap due to inference can be seen.
+With the op inferred, no model can do better than answering with the answer distribution weighted by the posterior. That limit, the Bayes ceiling, can be computed for every context, and it is well below 1. With three clean examples we expect about three in four answers to be right, and almost all of the shortfall comes from stochastic rounding: a model told the op would score about the same. Replacement op noise adds a shortfall that comes from inference. At three examples and a rate of 0.35, the ceiling falls to about 0.6, while a model told the op would still score about 0.75.[^scout] So the task gate would be the distance of the control from the ceiling, in place of the old accuracy numbers, and the report would show the ceiling for a model told the op beside it, so that the part of the gap due to inference can be seen.
 
 A calibration check is needed: does the answer distribution of the model match the one weighted by the posterior? That would show whether the model weighs every example appropriately.
 
@@ -112,7 +112,7 @@ The model might key on a surface feature that correlates with the op, such as a 
 This may happen along two axes:
 
 - Along position: attention is causal, so the tokens of the first example have seen nothing that identifies the op.
-- Along evidence: under replacement noise about a third of labelled contexts have a posterior on the true op below 0.5, so the label is right about the op that generated the context and wrong about what the model can work out from it.
+- Along evidence: under replacement op noise about a third of labelled contexts have a posterior on the true op below 0.5, so the label is right about the op that generated the context and wrong about what the model can work out from it.
 
 Still, we will need to tolerate incorrect labels too, since M3 labels will be noisy. A strong pull on those states could hurt the task or teach a shortcut. The pooled anchor term[^pooled] should soften the position axis, but it does nothing for the evidence axis.
 
@@ -212,7 +212,7 @@ The [concept swap](/todo/science/redirect-between-two-anchored-ops.md) gets a na
 - Whether verification lines need a marker at the start of the line as well as before the verdict.
 - Whether to add verification from the start or as a [second stage](#when-to-add-verification). The quick route in the design favors the start, and puts it to a frozen rule in the pilot.
 - Whether to test anchoring at fine-tune time on this grammar: train an unanchored control, then fine-tune it with the anchor term, and compare with anchoring from scratch.
-- Whether contexts should ever hold more than one true op (replacement noise shows the answer of another op, but the context still has one true op). See [topic markers](#topic-markers); it is out of scope for D2.2.
+- Whether contexts should ever hold more than one true op (replacement op noise shows the answer of another op, but the context still has one true op). See [topic markers](#topic-markers); it is out of scope for D2.2.
 - Whether to use soft labels in M3: a labeller that reports its confidence in the op of a context, as a natural-language classifier could.
 
 ### Topic markers

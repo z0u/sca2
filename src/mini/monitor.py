@@ -252,6 +252,8 @@ def drive_and_watch(
                     raise BudgetExpired(cancelled)
                 records = cache.records(store)
                 apparatus.reap_dead(store, records)  # settle vanished workers so a kill can't wedge the drain
+                if any(r.get("state") == RunState.RUNNING and not r.get("pid") for r in records):
+                    apparatus.launch_queued(store)  # and hand freed slots to queued tasks
                 bars.update(records)
                 if not any(r.get("state") == RunState.RUNNING for r in records):
                     break

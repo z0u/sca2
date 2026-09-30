@@ -45,23 +45,23 @@ show_help() {
 		                       uv audit and npm audit, Action pins against their newest
 		                       upstream tag, and upgrades available to packages we declare.
 		                       Read-only; the upgrade check is a --dry-run
-		  render  [...reports] [--pdf]:
-		                       weave each report (mini.lit: a .py with string prose between
-		                       cells) to .mini/lit/<key>/ — index.html and index.md, figures
-		                       beside them under _assets/ — for reading it as a document
+		  render  <report> -o FILE [-o FILE ...] [--since REF]:
+		                       weave a report (mini.lit: a .py with string prose between
+		                       cells) to each FILE, in the format its extension names:
+		                       .md, .html, or .pdf; figures go beside each under _assets/.
+		                       A PDF is the print to review on paper or e-ink (a few
+		                       seconds more): made from the report's export bundle as the
+		                       site makes it, it names the commit it was printed from,
+		                       and --since REF bars its margin beside every line changed
+		                       since REF (the round last reviewed; the baseline is
+		                       exported from a checkout of REF, reading the store)
 		  serve   <report> [--port N]:
 		                       serve one report with live reload while you edit it
-		  preview [...reports] [--no-serve] [--force] [--port N] [--since REF]:
-		                       export stale reports, assemble the site with local assets
-		                       (never touches the network; each report printed to
-		                       _site/<key>/report.pdf for review on paper or e-ink,
-		                       with a copy named for the report to send, as ex-1.pdf,
-		                       unchanged ones reused from .mini/pdfs/), and serve it;
-		                       every PDF names the commit it was printed from, and
-		                       --since REF bars the margin of each named report's PDF
-		                       beside every line changed since REF (the round last
-		                       reviewed; the baseline is exported from a checkout
-		                       of REF, reading the store)
+		  preview [...reports] [--no-serve] [--force] [--port N]:
+		                       export stale reports (or just the named ones), assemble
+		                       the site with local assets (never touches the network;
+		                       each report printed to _site/<key>/report.pdf, unchanged
+		                       ones reused from .mini/pdfs/), and serve it
 		  publish <reports|--all>:
 		                       export reports and sync their bundles to the publish tier
 		  site:                assemble the public site from *published* bundles into _site/
@@ -132,25 +132,18 @@ case "${1:-}" in
         fi
         ;;
     render)
-        # Named reports only: rendering runs the report's cells, so a bare `render` over
-        # every report would be compute nobody asked for. Flags pass through (--pdf).
         shift
-        paths=() flags=()
-        while [[ $# -gt 0 ]]; do
-            case "$1" in
-                -*) flags+=("$1") ;;
-                *) paths+=("$1") ;;
-            esac
-            shift
-        done
-        if [[ ${#paths[@]} -eq 0 ]]; then
-            echo "render what? name one or more reports, e.g." 1>&2
-            echo "  $0 render docs/pipeline/report.py" 1>&2
+        if [[ $# -eq 0 ]]; then
+            echo "render to where? name the report and one or more -o files, e.g." 1>&2
+            echo "  $0 render docs/pipeline/report.py -o /tmp/pipeline/report.md" 1>&2
+            echo "  $0 render docs/pipeline/report.py -o /tmp/pipeline.pdf --since HEAD~1" 1>&2
             exit 2
         fi
-        for path in "${paths[@]}"; do
-            ( set -x; uv run python -m mini.lit render "$path" "${flags[@]}" )
-        done
+        if [[ " $* " == *" --pdf "* ]]; then
+            echo "render: --pdf is gone — name the file instead, e.g. -o /tmp/report.pdf" 1>&2
+            exit 2
+        fi
+        ( set -x; uv run "$SCRIPT_DIR/render_report.py" "$@" )
         ;;
     serve)
         shift
@@ -158,27 +151,21 @@ case "${1:-}" in
         ;;
     p|preview)
         shift
-        serve=1 port=8000 stale=--stale-only since=
+        serve=1 port=8000 stale=--stale-only
         paths=()
         while [[ $# -gt 0 ]]; do
             case "$1" in
                 --no-serve) serve=0 ;;
                 --force) stale= ;;
                 --port) port="${2:?--port needs a value}"; shift ;;
-                --since) since="${2:?--since needs a git ref}"; shift ;;
-                -*) echo "preview: unknown flag '$1' (flags: --no-serve --force --port N --since REF)" 1>&2; exit 2 ;;
+                --since) echo "preview: --since moved to '$0 render <report> -o <name>.pdf --since REF', which prints for review" 1>&2; exit 2 ;;
+                -*) echo "preview: unknown flag '$1' (flags: --no-serve --force --port N)" 1>&2; exit 2 ;;
                 *) paths+=("$1") ;;
             esac
             shift
         done
-        if [[ -n $since && ${#paths[@]} -eq 0 ]]; then
-            echo "preview: --since marks the reports you name; name at least one" 1>&2; exit 2
-        fi
         ( set -x; uv run "$SCRIPT_DIR/export_reports.py" ${stale:+"$stale"} "${paths[@]}" )
-        if [[ -n $since ]]; then
-            ( set -x; uv run "$SCRIPT_DIR/review_base.py" "$since" "${paths[@]}" )
-        fi
-        ( set -x; uv run "$SCRIPT_DIR/build_site.py" --localize ${since:+--since "$since"} )
+        ( set -x; uv run "$SCRIPT_DIR/build_site.py" --localize )
         if [[ $serve -eq 1 ]]; then
             ( set -x; uv run "$SCRIPT_DIR/preview_server.py" "$PROJECT_ROOT/_site" "$port" )
         else

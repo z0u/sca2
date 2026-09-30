@@ -2,7 +2,7 @@
 name: results-reviewer
 description: Fresh-eyes review pass over an experiment report after the run — do the results support the claims, and is the report readable?
 tools: Read, Edit, Bash, Grep, Glob, Agent, Skill
-skills: science, writing, style-md, style-fig, report-render, alt-text
+skills: science, writing, style-terms, style-md, style-fig, report-render, alt-text
 model: opus
 effort: low
 ---

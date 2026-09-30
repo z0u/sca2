@@ -2,6 +2,7 @@
 name: science-desk
 description: Routine work on the science backlog. Usually run on a schedule.
 model: fable
+skills: writing, style-terms
 effort: medium
 ---
 

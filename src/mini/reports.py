@@ -25,6 +25,7 @@ import re
 import types
 import unicodedata
 from dataclasses import dataclass, field
+from functools import cache
 from html import escape as html_escape, unescape as html_unescape
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
@@ -821,8 +822,13 @@ def _after_body_open(html: str, snippet: str) -> str:
 # figure is the page's own background in either scheme, which is what a figure PNG's
 # transparent background needs to read correctly. Opening the file in a tab instead would
 # paint it on the browser's white canvas, wrong in dark mode; this is the reason the
-# index strip had no link to the full-size image until now.
-_LIGHTBOX_CSS = (Path(__file__).with_name("lightbox.css")).read_text()
+# index strip had no link to the full-size image until now. Read at first use rather than at
+# import (like the chip sheet below), so importing this module, which `mini.vis` does, reads
+# no files: a worker whose image lacked them would otherwise fail at setup.
+@cache
+def _lightbox_css() -> str:
+    return Path(__file__).with_name("lightbox.css").read_text()
+
 
 # A ``<dialog>`` opened with ``showModal`` renders in the browser's *top layer*, above
 # every stacking context on the page — so the overlay needs no z-index of its own, and
@@ -939,7 +945,7 @@ def lightbox_chrome() -> str:
 
     One snippet, inlined by both page builders — the report pages through :func:`set_lightbox`, the Markdown pages by ``scripts/build_site.py`` — rather than a file the site links, because externalize mode puts a ``<base href>`` at the bucket that would repoint a relative stylesheet URL, and because the two would otherwise drift apart.
     """
-    return f"<style>{_LIGHTBOX_CSS.strip()}</style>\n<script>{_LIGHTBOX_JS.strip()}</script>"
+    return f"<style>{_lightbox_css().strip()}</style>\n<script>{_LIGHTBOX_JS.strip()}</script>"
 
 
 def set_lightbox(html: str) -> str:
@@ -1045,14 +1051,16 @@ def set_report_styles(html: str, css: str) -> str:
 # the column reads as an empty field. ``CanvasText`` is the UA's theme-aware text color
 # (the export declares ``color-scheme``, so it tracks the device theme), which is what
 # keeps the provenance rule legible in either scheme.
-_CHIP_CSS = (Path(__file__).with_name("chips.css")).read_text()
+@cache
+def _chip_css() -> str:
+    return Path(__file__).with_name("chips.css").read_text()
 
 
 def _with_chip_styles(html: str) -> str:
-    """*html* with :data:`_CHIP_CSS` inlined at the end of ``<head>`` — once, however many chips are injected."""
+    """*html* with :func:`_chip_css` inlined at the end of ``<head>`` — once, however many chips are injected."""
     if "data-mini-chip-css" in html:
         return html
-    style = f"<style data-mini-chip-css>{_CHIP_CSS.strip()}</style>"
+    style = f"<style data-mini-chip-css>{_chip_css().strip()}</style>"
     return re.sub(r"(</head>)", lambda m: f"    {style}\n{m.group(1)}", html, count=1)
 
 

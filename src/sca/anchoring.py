@@ -112,6 +112,9 @@ class AnchorSpec:
     axes: tuple[int, ...] = ANCHOR_AXES
     """Where the concept is pulled to: one axis, or the span of several (`axes_alignment`). The
     anti-subspace term and the trajectory's alignment reads take the same axes."""
+    hinge: tuple[float, float] | None = None
+    """`(cap, softness)` for the pooled term's rounded hinge (`pooled_anchor_term`), or `None` for the plain
+    `1 − cos` term. Needs a pooled anchor (`tau` set); every measurement still reads the raw cosine."""
 
     def __call__(self, epoch) -> np.ndarray:
         return anchor_weight(
@@ -212,11 +215,34 @@ class LabelSpec:
     *p* is a per-token probability. Under `op1` keying it is P(line labeled), read off the first operand alone — the ex-2.1.6..9 labeller, and what a bare array passed in its place means. Under `either` keying it is the per-operand rate: op1 and op2 draw independently and the line is labeled when either does, so the label no longer says which position carried it. Under `line` keying the answer draws too, at the same per-token rate as the operands, so a line is labeled when any of its three colors draws — the labeller a whole-line pull needs, since a pull that covers the answer with no way for the answer to earn the label would still read the label off the operands. *pull* picks the masked positions of a labeled line: the first *span* roles (the prompt span by default, or the whole line at `span=LINE_TOKENS`), or just the slot(s) that drew (`slot`) — the pull of a labeller that names the slot, which the span pull has to match without being told.
 
     Under `op` keying the colors play no part: *p* is a per-op rate table, indexed by the op word at role 1, and each line draws once against its op's rate. It labels an operation rather than a color, so `span` covers the first *span* roles as for the others (the whole line at `span=LINE_TOKENS`) and `slot` marks the op word alone.
+
+    Under `context` keying the colors and the vocabulary play no part either: a context's op comes from an
+    external array stored beside the corpus (as `sca.data.incontext.op_ids` does for the in-context grammar,
+    "the new keying reads the op of each context from an array stored beside the corpus"), one entry per
+    context in corpus order. *context_op* is that array, *anchored_op_id* the index of the anchored op within
+    it, and *label_rate* the per-context draw probability — except under `variant="sampled"`, where the draw
+    compares against *sample_prob* instead (a per-token-position array, constant over a context, already scaled
+    so unconditional labelling matches *label_rate* on average; see
+    `/todo/science/label-variants-in-context-op.md`). *variant* narrows which positions of a drawn context are
+    pulled: `whole` (every position — `pull`/`span` are ignored), `latter` (the latter half of the context, by
+    role), `prefix` (a position once *prefix_ok*, a per-token-position boolean computed from the posterior on
+    the examples before it, says so), or `sampled` (every position of a context drawn as above). The embedding
+    slice being left out of the pull ("no-emb") is not a mask concern: it is `anchor_slices` on the training
+    step, with `variant="whole"` here.
     """
 
     p: Float[np.ndarray, " V"]
-    keying: Literal["op1", "either", "line", "op"] = "op1"
+    keying: Literal["op1", "either", "line", "op", "context"] = "op1"
     pull: Literal["span", "slot"] = "span"
+    context_op: np.ndarray | None = None
+    anchored_op_id: int = 0
+    label_rate: float = 0.0
+    variant: Literal["whole", "latter", "prefix", "sampled"] = "whole"
+    prefix_ok: np.ndarray | None = None
+    sample_prob: np.ndarray | None = None
+    context_len: np.ndarray | None = None
+    """`variant="latter"` only: each context's own token count, indexed like *context_op* (one entry per
+    context in corpus order)."""
 
 
 Crop = Literal["all", "whole", "half", "scaled", "cut-only", "knowable"]
@@ -233,20 +259,27 @@ KNOWABLE_ROLE = 1
 """The op word's role: under `knowable` a line's pool starts here."""
 
 
-def crop_weight(crop: Crop, first: np.ndarray, last: np.ndarray) -> np.ndarray:
-    """The weight *crop* puts on a line visit that shows roles *first* to *last* (inclusive, elementwise)."""
+def crop_weight(
+    crop: Crop, first: np.ndarray, last: np.ndarray, line_tokens: np.ndarray | int = LINE_TOKENS
+) -> np.ndarray:
+    """The weight *crop* puts on a line visit that shows roles *first* to *last* (inclusive, elementwise), for
+    a line whose own token count is *line_tokens*: the fixed `LINE_TOKENS` for the grammars this was written
+    for, or a same-shaped array (one entry per visit) for a grammar whose lines vary in length, such as the
+    in-context grammar's contexts. `knowable` reads roles rather than a length and stays fixed at the
+    op-word grammar's own `KNOWABLE_ROLE`, so it is not meaningful with a variable *line_tokens*.
+    """
     n = last - first + 1
     match crop:
         case "all":
             return np.ones(n.shape, np.float32)
         case "whole":
-            return (n == LINE_TOKENS).astype(np.float32)
+            return (n == line_tokens).astype(np.float32)
         case "half":
-            return (n > LINE_TOKENS / 2).astype(np.float32)
+            return (n > line_tokens / 2).astype(np.float32)
         case "scaled":
-            return (n / LINE_TOKENS).astype(np.float32)
+            return (n / line_tokens).astype(np.float32)
         case "cut-only":
-            return (n < LINE_TOKENS).astype(np.float32)
+            return (n < line_tokens).astype(np.float32)
         case "knowable":
             return ((first <= KNOWABLE_ROLE) & (last >= KNOWABLE_ROLE)).astype(np.float32)
     raise ValueError(f"unknown crop policy {crop!r}")
@@ -285,6 +318,7 @@ def pooled_anchor_term(
     axes: tuple[int, ...] = ANCHOR_AXES,
     line_w: Float[Array, "B N"] | None = None,
     pool: Float[Array, "B T"] | None = None,
+    hinge: tuple[float, float] | None = None,
 ) -> Float[Array, ""]:
     """Mean over labeled lines and slices of the mellowmax of (1 − cos) over each line's span.
 
@@ -295,13 +329,20 @@ def pooled_anchor_term(
     *line_w* weights each line's pooled term (a `Crop` policy's weights). It leaves the denominator alone, so it only ever takes pull away: a line at weight zero still counts as labeled, and a line at weight one keeps the pull it would have had without the weights.
 
     *pool* narrows the positions each line pools over (`knowable`'s positions from the op word on) without narrowing the denominator: a line is counted as labeled by *mask*, and a labeled line with nothing left in its pool contributes zero.
+
+    *hinge*, `(cap, softness)`, remaps the per-position term from `1 − cos` to the rounded hinge `(softness / cap) · softplus((cap − cos) / softness)`: well below the cap this is `1 − cos / cap`, and the gradient fades smoothly to zero over roughly `cap ± 2·softness`, in place of a sharp corner at the cap that could make a state near it flip between pulled and not pulled from step to step against the anti-subspace term's steady push back. `None` is the plain term. Every *measurement* (`alignment`, the trajectory, `axes_alignment` itself) always reads the raw cosine; only this training-time term is remapped.
     """
     member = (line_id[..., None] == jnp.arange(n_lines)) & (mask[..., None] > 0)  # (B, T, N)
     n_labeled = jnp.sum(member.sum(axis=1) > 0)
     sel = member if pool is None else member & (pool[..., None] > 0)
     count = sel.sum(axis=1)  # (B, N) pooled positions per line
     labeled = count > 0
-    x = 1.0 - axes_alignment(states, axes)  # (L1, B, T)
+    cos = axes_alignment(states, axes)  # (L1, B, T)
+    if hinge is None:
+        x = 1.0 - cos
+    else:
+        cap, softness = hinge
+        x = (softness / cap) * jax.nn.softplus((cap - cos) / softness)
     if np.isinf(tau):
         pooled = jnp.einsum("lbt,btn->lbn", x, sel.astype(x.dtype)) / jnp.maximum(count, 1)
     else:
@@ -334,10 +375,13 @@ def make_anchored_train_step(
     slices: tuple[int, ...] | None = None,
     clean_rows: tuple[int, ...] | None = None,
     axes: tuple[int, ...] = ANCHOR_AXES,
+    hinge: tuple[float, float] | None = None,
 ):
     """Build a jitted training step for cross-entropy plus the two weighted anchor terms.
 
     The weights are arguments rather than closures, so the schedules move without recompiling; *tau* is fixed per build, since a condition's pooling does not move over training. With `tau=None` the anchor term is the flat per-position mean (`anchor_term`); with a float (∞ allowed) it is the per-line mellowmax (`pooled_anchor_term`), and *n_lines* bounds the local line index the step's `line_id` argument carries. Returns the three loss terms separately: the anchor term is the training-side view of what the alignment measurements read later, and the anti-subspace term is the same view of the mean alignment the containment gates score. Pass `anti_weight=0` for a bare anchor.
+
+    *hinge*, `(cap, softness)`, remaps the pooled term's per-position quantity as `pooled_anchor_term` describes; it only has an effect with `tau` set (the flat `anchor_term` has no hinge variant) and is fixed per build, like *tau*.
 
     *slices* restricts both terms to the named residual-stream slices (slice 0 is the embedding); `None` is every slice, the term as ex-2.1 and ex-2.2 trained it. *axes* is where both terms read the alignment (`axes_alignment`): one axis, or the span of several. *clean_rows* names embeddings that may not carry the anchor axis: after each optimizer step and nGPT's re-normalization, the axis component of those embeddings is zeroed and they are re-normalized, the same kind of hard constraint as the unit norm. It is the tied-table fix for the syntax-embedding leak: those embeddings stay shared between the embedding table and the readout table, and training finds whatever solution it can with them held off the axis.
     """
@@ -370,7 +414,7 @@ def make_anchored_train_step(
             anchor = (
                 anchor_term(states, mask, axes)
                 if tau is None
-                else pooled_anchor_term(states, mask, line_id, n_lines, tau, axes, line_w, pool)
+                else pooled_anchor_term(states, mask, line_id, n_lines, tau, axes, line_w, pool, hinge)
             )
             anti = anti_subspace_term(states, live, axes)
             return task + weight * anchor + anti_weight * anti, (task, anchor, anti)
@@ -397,7 +441,7 @@ def clean_embedding_rows(model: NGPT, rows: Int[Array, " R"]) -> NGPT:
     return eqx.tree_at(lambda m: m.transformer.wte, model, wte.at[rows].set(cleaned))
 
 
-def sample_anchored_batches(
+def sample_anchored_batches(  # noqa: C901 — one generator with two grammars' arithmetic and several yield shapes
     data: Int[np.ndarray, " T"],
     data_config: DataConfig,
     model_config: ModelConfig,
@@ -407,22 +451,48 @@ def sample_anchored_batches(
     span: int = PROMPT_SPAN,
     lines: bool = False,
     crop: Crop | None = None,
+    newline_id: int | None = None,
+    min_line_tokens: int = LINE_TOKENS,
+    loss_mask: Int[np.ndarray, " T"] | None = None,
 ) -> Iterator[tuple]:
     """Yield *n_batches* of (inputs, targets, anchor mask).
 
     The crops are `sca.data.batches.sample_batches`, repeated here rather than wrapped because the mask needs the crop offsets and that generator does not yield them. *label_p* is a `LabelSpec`, or a bare per-token array meaning op1 keying: the probability that a line draws a label, redrawn per visit as in M1 — so the same line is labeled on one epoch and not the next, and the draws are consumed whatever the anchor weight is, which keeps every condition sharing a labeller on identical batches and label draws for a given seed. (Labellers with different keying consume the stream differently, so *those* comparisons carry corpus-draw noise.)
 
-    With `lines=True` each batch carries a fourth element: the (B, T) local line index (0 .. `block_size // LINE_TOKENS + 1`) that groups positions into lines for `pooled_anchor_term`. The draws are identical either way.
+    With `lines=True` each batch carries a fourth element: the (B, T) local line index (0 .. `block_size // LINE_TOKENS + 1`, or `.. block_size // min_line_tokens + 1` when *newline_id* is given) that groups positions into lines for `pooled_anchor_term`. The draws are identical either way.
 
     With a *crop* policy (and `lines=True`) each batch carries a fifth element: the (B, N) weight of each local line under that policy (`crop_weight`), read off the roles the window shows of it after padding. Under `knowable` a sixth follows, the (B, T) pool mask (see `pooled_anchor_term`). Neither consumes randomness, so the batches and labels are those of `crop=None` at the same seed.
+
+    *newline_id* switches the line and role arithmetic from the fixed `LINE_TOKENS` periodicity every grammar
+    before the in-context one had, to the general form: a line is the run between one `⏎` and the next
+    (`sca.data.incontext.line_role_arrays`), so lines may vary in length. It is `None` by default, which keeps
+    every line and role exactly as the periodic arithmetic gave them — the reproduction path this function has
+    always had, unchanged bit for bit — and required for `spec.keying == "context"`, which has no meaning
+    under a fixed period. *min_line_tokens* bounds how many lines a crop can straddle (the shortest a line can
+    be; `block_size // min_line_tokens + 2` in place of the periodic `block_size // LINE_TOKENS + 2`) and is
+    unused when *newline_id* is `None`. Under `knowable` or a variable *crop* weight, the roles of a variable-length grammar are compared against each line's own token count rather than the fixed `LINE_TOKENS`.
+
+    *loss_mask* (only meaningful with *newline_id*, for a verification corpus) is a boolean array the same
+    length as *data*: wherever it is set, the *target* at that position is replaced with the padding id (0), so
+    the language-model loss is not charged there (`sca.data.incontext`, a `FALSE` verification line's candidate
+    answer token). It never touches *x*, so the model still reads the token it is not asked to predict.
     """
     spec = label_p if isinstance(label_p, LabelSpec) else LabelSpec(np.asarray(label_p))
+    if spec.keying == "context" and newline_id is None:
+        raise ValueError("context keying needs newline_id, since its lines are not LINE_TOKENS-periodic")
     block_size = model_config.block_size
     n_starts = len(data) - block_size - 1
     if n_starts < 1:
         raise ValueError(f"Corpus of {len(data)} tokens is too short for block size {block_size}")
     offsets = np.arange(block_size)
-    n_lines = block_size // LINE_TOKENS + 2  # a crop straddles at most this many lines
+    if newline_id is None:
+        n_lines = block_size // LINE_TOKENS + 2  # a crop straddles at most this many lines
+        line_starts = None
+    else:
+        n_lines = block_size // min_line_tokens + 2
+        from sca.data.incontext import line_boundaries
+
+        line_starts = line_boundaries(data, newline_id)  # global start of every line, corpus-wide
 
     for _ in range(n_batches):
         starts = rng.integers(0, n_starts, size=data_config.batch_size)
@@ -438,12 +508,23 @@ def sample_anchored_batches(
                     y[i, : pad_length - 1] = 0
 
         absolute = starts[:, None] + offsets
-        line = absolute // LINE_TOKENS
+        if line_starts is None:
+            line = absolute // LINE_TOKENS
+            role = absolute % LINE_TOKENS
+            line_tokens: np.ndarray | int = LINE_TOKENS
+        else:
+            line = np.searchsorted(line_starts, absolute, side="right") - 1
+            role = absolute - line_starts[line]
+            ends = np.concatenate([line_starts[1:], [len(data)]])
+            line_tokens = ends[line] - line_starts[line]
         local = line - line[:, :1]
-        role = absolute % LINE_TOKENS
-        draw_mask = _op_mask if spec.keying == "op" else _color_mask
-        # Padded positions are not shown to the model, so they are not pulled either.
-        mask = draw_mask(data, spec, rng, line, local, role, span, n_lines) & (x != 0)
+        if loss_mask is not None:
+            y = np.where(loss_mask[np.minimum(absolute + 1, len(data) - 1)], 0, y)
+        if spec.keying == "context":
+            mask = _context_mask(spec, rng, line, local, role, n_lines, absolute) & (x != 0)
+        else:
+            draw_mask = _op_mask if spec.keying == "op" else _color_mask
+            mask = draw_mask(data, spec, rng, line, local, role, span, n_lines) & (x != 0)
         if lines and crop == "knowable":
             pool = (role >= KNOWABLE_ROLE).astype(np.float32)
             yield (
@@ -451,29 +532,84 @@ def sample_anchored_batches(
                 y,
                 mask.astype(np.float32),
                 local.astype(np.int32),
-                _line_weights(crop, x, local, role, n_lines),
+                _line_weights(crop, x, local, role, n_lines, line_tokens),
                 pool,
             )
         elif lines and crop is not None:
-            yield x, y, mask.astype(np.float32), local.astype(np.int32), _line_weights(crop, x, local, role, n_lines)
+            yield (
+                x,
+                y,
+                mask.astype(np.float32),
+                local.astype(np.int32),
+                _line_weights(crop, x, local, role, n_lines, line_tokens),
+            )
         elif lines:
             yield x, y, mask.astype(np.float32), local.astype(np.int32)
         else:
             yield x, y, mask.astype(np.float32)
 
 
-def _line_weights(crop: Crop, x, local, role, n_lines: int) -> np.ndarray:
+def _line_weights(crop: Crop, x, local, role, n_lines: int, line_tokens: np.ndarray | int = LINE_TOKENS) -> np.ndarray:
     """The (B, N) weight of each local line under *crop*, from the first and last role in view of it. A line
     with nothing in view gets whatever the policy gives an empty run; it has no pulled position, so the pooled
-    term never reads it.
+    term never reads it. *line_tokens* is each line's own token count, fixed for the periodic grammars or a
+    same-shaped array as *x* for a variable-length one (`crop_weight`); either way the comparison is per-line.
     """
     rows = np.broadcast_to(np.arange(x.shape[0])[:, None], x.shape)
     seen = x != 0
-    first = np.full((x.shape[0], n_lines), LINE_TOKENS, np.int64)
+    fill = LINE_TOKENS if np.isscalar(line_tokens) else int(np.max(line_tokens))
+    first = np.full((x.shape[0], n_lines), fill, np.int64)
     last = np.full((x.shape[0], n_lines), -1, np.int64)
     np.minimum.at(first, (rows[seen], local[seen]), role[seen])
     np.maximum.at(last, (rows[seen], local[seen]), role[seen])
-    return crop_weight(crop, first, last)
+    if np.isscalar(line_tokens):
+        return crop_weight(crop, first, last)
+    lt = np.zeros((x.shape[0], n_lines), dtype=np.int64)
+    np.maximum.at(lt, (rows[seen], local[seen]), np.broadcast_to(line_tokens, x.shape)[seen])
+    return crop_weight(crop, first, last, lt)
+
+
+def _context_mask(
+    spec: LabelSpec,
+    rng: np.random.Generator,
+    line: np.ndarray,
+    local: np.ndarray,
+    role: np.ndarray,
+    n_lines: int,
+    absolute: np.ndarray,
+) -> np.ndarray:
+    """The pulled positions under `context` keying: a context labelled by an external per-context op array
+    (`LabelSpec.context_op`), not by any token. *line* carries the corpus-global context id at every position
+    (`sample_anchored_batches` computes it from `⏎` positions under `newline_id`), so `context_op[line]` is the
+    op id at every position directly, and one draw per distinct context in view (via *local*) decides whether
+    it is labelled — except under `variant="sampled"`, where `sample_prob` (already per position, constant
+    over a context) is the draw's own threshold in place of the rate; only contexts of the anchored op are ever labelled. *variant* then
+    narrows which of a labelled context's positions the pull covers: `whole` (every one), `latter` (role at
+    least half the context's own token count, from `context_len`, a per-context array), `prefix` (`prefix_ok`,
+    a boolean the same length as the corpus, precomputed from the posterior on the examples before each
+    position), or `sampled` (every position, as `whole`, of a context whose draw succeeded at its own
+    posterior-scaled rate). *absolute* is each position's corpus-wide index, which `prefix_ok` is keyed on.
+    """
+    assert spec.context_op is not None
+    n_rows = local.shape[0]
+    draw = rng.random((n_rows, n_lines))
+    drew_local = np.take_along_axis(draw, local, axis=1)
+    is_anchored = spec.context_op[line] == spec.anchored_op_id
+    if spec.variant == "sampled":
+        assert spec.sample_prob is not None
+        drew = (drew_local < spec.sample_prob[absolute]) & is_anchored
+    else:
+        drew = (drew_local < spec.label_rate) & is_anchored
+    match spec.variant:
+        case "whole" | "sampled":
+            return drew
+        case "latter":
+            assert spec.context_len is not None
+            return drew & (role >= spec.context_len[line] // 2)
+        case "prefix":
+            assert spec.prefix_ok is not None
+            return drew & spec.prefix_ok[absolute]
+    raise ValueError(f"unknown label variant {spec.variant!r}")
 
 
 def _color_mask(

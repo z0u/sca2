@@ -32,11 +32,13 @@ Runs misbehave while green: "no failures" is not "healthy". `status --brief` doe
 A subagent re-spawn is a cold start, so don't count on the orchestrator to re-invoke you for cadence — **drive within this one invocation**, but always bounded:
 
 1. **Launch / advance** with `bin/mini run <exp>` (one tick advances a stage).
-2. **Wait, don't poll-loop**: `bin/mini watch <exp> --timeout 10m --json` — read-only, and it exits the moment there's something to do. **Branch on the exit code**, not on parsed output:
+2. **Wait, don't poll-loop**: `bin/mini watch <exp> --timeout 9m --json` — read-only, and it exits the moment there's something to do. **Branch on the exit code**, not on parsed output:
    - `0` — stage settled all-DONE → `run` again to advance (it prints `✓ complete` when the whole DAG is finished — then report).
    - `1` — settled with FAILED/CANCELLED → step 4.
    - `3` — attention *now*: a task settled terminally mid-stage (e.g. a watchdog fired) or a worker went stale/wedged — the printed `reason` names the key. Act immediately (step 4 / 5); don't wait for siblings.
    - `124` — timeout, still in flight → re-`watch`, or if you're at your budget, return a progress report.
+
+   Keep `--timeout` at 9m or less. The Bash tool stops waiting at 10 minutes and moves a longer command to the background (seen in ex-2.2.18: a `--timeout 100m` watch was moved, then more background pollers were started to wait on its output file). A background process outlives your report, so the caller gets no completion event until every one of them ends. On `124`, just re-`watch` in the foreground.
 
    The `--json` summary is compact (`outcome`, `reason`, `counts`, `attention`). **Never** write your own `while`/`sleep` polling loop (a `pgrep -f` loop matches its own shell and never returns), never grep/regex CLI output, and **never re-`run` to check progress** (that ticks — it launches work and costs money; the wait lives inside `watch`).
 3. For a one-shot snapshot, `bin/mini status <exp> --json --brief` — aggregate `state`/`settled`, counts, and only the tasks needing attention. Use full `status --json` only when digging into one task; parse JSON with `jq` or Python, not grep.
@@ -55,6 +57,7 @@ Experiments spend real money.
 
 - Honor any **budget or time cap** the caller gives. If none is given, treat the job as **small**: one experiment, short timeouts, no speculative extra runs.
 - Make sure tasks are **bounded** (a `--timeout` / a role that sets one); a run with no time bound can burn money indefinitely.
+- Your own wall time is bounded too. If the caller asks you to stay until a long run completes, treat it as a request for a progress report at your budget: the caller holds the long wait, and a subagent that returns leaves no one to read what its background processes print. So start no background process, and leave none running when you report.
 - If a task overruns its expected time, or you see runaway relaunches / unexpected cost, **`bin/mini cancel <exp>` first**, then report. Cancelling is cheap; a forgotten detached GPU run is not.
 
 ## Hotfix rules — hard guardrails

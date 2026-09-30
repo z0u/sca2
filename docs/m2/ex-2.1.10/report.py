@@ -23,7 +23,7 @@ import numpy as np
 import experiment as ex
 from mini.lit import memo, stop
 from mini.store import project_store
-from mini.vis import AxesGrid, AxesRow, figure_html, light_dark, smooth_step, smooth_step_area, themed
+from mini.vis import AxesGrid, AxesRow, Mosaic, figure_html, light_dark, smooth_step, smooth_step_area, themed
 from sca.colorcube import redness
 from sca.data import named_colors as nc
 from sca.data.colors import N_LEVELS, mix
@@ -819,7 +819,7 @@ def trajectories_plot(
     sched: tuple[np.ndarray, np.ndarray, np.ndarray],
 ) -> plt.Figure:
     sched_epochs, sched_anchor, sched_anti = sched
-    fig, axd = plt.subplot_mosaic(TRAJ_GRID, figsize=(7.5, 4.2), sharex=True, layout="constrained")
+    fig, axd = plt.subplot_mosaic(cast(Mosaic, TRAJ_GRID), figsize=(7.5, 4.2), sharex=True, layout="constrained")
     grey = light_dark("#999", "#777")
     ghost = light_dark("#00000022", "#ffffff2e")
     gate = light_dark("#555", "#bbb")

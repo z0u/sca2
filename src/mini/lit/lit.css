@@ -53,6 +53,11 @@ main.lit > :is(figure, table) {
   max-width: none;
   margin-block: 3rem;
 }
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
 
 /* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
 .highlight pre { background-color: var(--code-bg); }

@@ -205,3 +205,26 @@ def test_repulsion_leaves_a_fully_aligned_state_where_it_is():
     h[0, 0] = 1.0
     out = np.asarray(repulsion(Subspace.axis(WIDTH), a=0.5, b=0.0)(jnp.asarray(h)))
     np.testing.assert_allclose(out, h, rtol=0, atol=1e-6)
+
+
+def test_repulsion_with_a_negative_landing_keeps_the_off_axis_direction():
+    """A landing below the equator (b < 0): the mapper is taken as written, the off-axis direction is kept, and at
+    b = −1 every edited state lands on the antipode itself (the todo item `repulsion-onto-the-fallback`)."""
+    h = unit(np.random.default_rng(3), 9)
+    h[:, 0] = np.linspace(-0.2, 0.95, 9)
+    h[:, 1:] *= np.sqrt(1 - h[:, :1] ** 2) / np.linalg.norm(h[:, 1:], axis=-1, keepdims=True)
+    for b in (-0.5, -1.0):
+        out = np.asarray(repulsion(Subspace.axis(WIDTH), a=0.5, b=b)(jnp.asarray(h)))
+        m = repulsion_mapper(np.maximum(h[:, 0], 0.0), 0.5, b, "linear")
+        moved = h[:, 0] >= 0.5
+        np.testing.assert_allclose(np.linalg.norm(out, axis=-1), 1.0, rtol=0, atol=1e-6)
+        np.testing.assert_allclose(out[moved, 0], m[moved], rtol=0, atol=1e-6)
+        np.testing.assert_allclose(out[~moved], h[~moved], rtol=0, atol=1e-6)
+        expected = np.arccos(np.clip(m[moved], -1, 1)) - np.arccos(np.clip(h[moved, 0], -1, 1))
+        np.testing.assert_allclose(angle_between(h[moved], out[moved]), expected, rtol=0, atol=1e-5)
+        if b > -1:
+            rest_in, rest_out = h[moved, 1:], out[moved, 1:]
+            cos = (rest_in * rest_out).sum(-1) / (np.linalg.norm(rest_in, axis=-1) * np.linalg.norm(rest_out, axis=-1))
+            np.testing.assert_allclose(cos, 1.0, rtol=0, atol=1e-5)
+        else:
+            np.testing.assert_allclose(out[moved, 1:], 0.0, rtol=0, atol=1e-6)

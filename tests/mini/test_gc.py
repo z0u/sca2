@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from mini.gc import apply_gc, plan_gc
-from mini.local_apparatus import LocalApparatus
+from mini.local_apparatus import LocalApparatus, _stage_spec, spec_path
 from mini.orchestration import tick
 from mini.runs import RunState
 
@@ -165,10 +165,13 @@ def test_orphan_dirs_and_settled_calls_collected(tmp_path: Path, monkeypatch, sw
     store.update(rec["key"], state=RunState.RUNNING)
     assert not plan_gc(store).by_kind("staged-call")
     store.update(rec["key"], state=RunState.DONE)
+    _stage_spec(store, rec["key"], "g0", {})  # a spec left by a task cancelled while queued
 
     apply_gc(store, plan)
     assert not ghost.exists()
     assert not store._call(rec["key"]).exists()
+    assert store.staged_gen(rec["key"]) is None  # its marker goes with it
+    assert not spec_path(store, rec["key"]).exists()
     assert store.result(rec["key"]) == 1
 
 

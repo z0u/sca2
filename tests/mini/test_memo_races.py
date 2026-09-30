@@ -183,3 +183,20 @@ def test_concurrent_merges_do_not_drop_fields(tmp_path: Path):
 
     rec = backend.read("k")
     assert rec == {"key": "k", **{f"f{i}": 24 for i in range(8)}}
+
+
+def test_record_read_survives_a_vanishing_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """On a shared-folder mount (virtiofs), a reader can see the record's name exist and then fail to open it while a writer renames over it; the read retries instead of raising out of `watch`."""
+    records = LocalRecordStore(tmp_path / "records")
+    records.write("k", {"state": "running"})
+    real = Path.read_text
+    misses = iter([True])
+
+    def flaky(self: Path, *args, **kwargs) -> str:
+        if self.name == "k.json" and next(misses, False):
+            raise FileNotFoundError(self)
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", flaky)
+    assert records.read("k") == {"state": "running"}
+    assert records.read("absent") is None

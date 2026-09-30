@@ -299,18 +299,18 @@ def _merge_json(path: Path, fields: dict) -> None:
     _atomic_write(path, json.dumps(cur))
 
 
-def spawn_taskworker(data_dir: Path, key: str, env: dict[str, str] | None = None) -> int:
+def spawn_taskworker(data_dir: Path, key: str, env: dict[str, str] | None = None, *, inherit: bool = True) -> int:
     """Launch a detached worker for one memoized task *key*; return its pid.
 
     The local implementation of ``Apparatus.spawn_task``: a subprocess that runs the staged call (``MemoStore._call``) and persists its result/state under the content key, outliving the orchestration tick that launched it.
 
-    *env* is overlaid on the parent environment, the local counterpart of Modal's per-container env: a fresh process per task, so a library that reads its env once at init sees this task's setting rather than an earlier task's.
+    *env* is overlaid on the parent environment, the local counterpart of Modal's per-container env: a fresh process per task, so a library that reads its env once at init sees this task's setting rather than an earlier task's. With ``inherit=False`` it is the worker's whole environment instead.
     """
     proc = subprocess.Popen(
         [sys.executable, "-m", "mini._taskworker", str(data_dir), key],
         start_new_session=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        env=(os.environ | env) if env else None,
+        env=env if not inherit else (os.environ | env) if env else None,
     )
     return proc.pid

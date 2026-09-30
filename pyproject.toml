@@ -60,13 +60,12 @@ dev = [
     "ruff>=0.9.7",  # linter and formatter
     "scipy-stubs>=1.15.2.2",
     "segno>=1.6.1",  # QR code generation
-    # Type checker. 0.0.73 is the first to keep a PEP 695 alias through a widening
-    # generic call. 0.0.82 is excluded: its recursive-implicit-alias work stopped
-    # matching matplotlib's `HashableList` overloads, so every `plt.subplot_mosaic`
-    # call with a `list[list[str]]` mosaic reports `no-matching-overload` (four in
-    # `docs/`, all valid calls). Bisected against 0.0.81, which is clean. Drop the
-    # exclusion once a later release resolves those overloads again.
-    "ty>=0.0.73,!=0.0.82",
+    # Type checker. 0.0.84 fixes a use-after-free in incremental checking. Since
+    # 0.0.82, a `list[list[str]]` mosaic no longer matches matplotlib's recursive
+    # `HashableList` overloads, so the `plt.subplot_mosaic` calls in `docs/` cast
+    # their mosaic to `mini.vis.Mosaic`. The casts can go once ty resolves those
+    # overloads again.
+    "ty>=0.0.84",
     "vulture>=2.14",  # dead code detection
 ]
 local = [

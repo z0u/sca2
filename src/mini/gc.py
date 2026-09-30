@@ -10,7 +10,7 @@ Collectibility is judged against the store's own invariants, not age or size:
 - A **superseded record** (its key absent from the requested-keys manifest) is collectible once the manifest is trustworthy: the last tick ran the DAG to completion (``complete`` in the run meta) and nothing is still unsettled. A *current* record is never collectible — a DONE one is a future memo hit, and even a FAILED one is live state (deleting it would silently convert a terminal failure into a relaunch on the next wake).
 - A **stale attempt file** (a ``result-<gen>.pkl``/``error-<gen>.txt``/ ``result-<gen>.artifacts.json`` under a generation the record no longer owns) is unreachable: readers resolve through the record's current ``gen``, and a fenced zombie writer can't make anything read it again. The one exception is the legacy ``error.txt``, which ``MemoStore.error`` still falls back to when the current attempt left no traceback — that stays live until the current generation writes its own.
 - An **orphaned result dir** has no record at all. Records are claimed before the worker creates its dir, so this is debris, not a race — on Modal it is also the normal end state of a Dict record that expired out from under the Volume.
-- A **staged call** (``.control/memo/<key>.pkl``) is worker spawn input; it is dead once its task is off RUNNING (a relaunch rewrites it). Modal passes the call to ``spawn`` directly, so that backend stages nothing.
+- A **staged call** (``.control/memo/<key>.pkl``, with its ``<key>.gen`` marker and any launch spec) is worker spawn input; it is dead once its task is off RUNNING (a relaunch rewrites it). Modal passes the call to ``spawn`` directly, so that backend stages nothing.
 - An **unreferenced blob** in the CAS is one no record's result and no ref reaches, *and* older than the grace window. The window is what makes the sweep safe against writers the mark phase cannot see — a checkout that hasn't pushed its memo state, or a ``put`` that skipped an upload because the blob already existed moments before the sweep judged it garbage.
 """
 
@@ -119,6 +119,10 @@ class LocalGcIO(GcIO):
 
     def delete_call(self, key: str) -> None:
         self._store._call(key).unlink(missing_ok=True)
+        self._store._staged_marker(key).unlink(missing_ok=True)
+        from mini.local_apparatus import spec_path
+
+        spec_path(self._store, key).unlink(missing_ok=True)  # its launch spec, if it never left the queue
 
 
 class ModalGcIO(GcIO):

@@ -1,3 +1,4 @@
+from dataclasses import field
 from typing import Literal
 
 from pydantic import NonNegativeFloat, PositiveFloat, PositiveInt, model_validator
@@ -35,3 +36,7 @@ class LRFinderSeries:
     best_lr: NonNegativeFloat
     steepest_lr: NonNegativeFloat
     zoom: int
+    raw_lrs: list[NonNegativeFloat] = field(default_factory=list)
+    """Every LR the zoom stepped at, beside `lrs`, which keeps only the steps that set a new low."""
+    raw_losses: list[float] = field(default_factory=list)
+    """The loss at every step of `raw_lrs`, divergence included (possibly non-finite)."""

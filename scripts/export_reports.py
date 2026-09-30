@@ -57,8 +57,11 @@ def bundle_is_stale(path: Path) -> bool:
     return is_stale(path, export_dir(path) / "index.html")
 
 
-def export_one(path: Path) -> Path:
-    """Export *path* to ``.mini/exports/<key>/index.html`` (assets land beside it). Returns the dir."""
+def export_one(path: Path, *, thumbs: bool = True) -> Path:
+    """Export *path* to ``.mini/exports/<key>/index.html`` (assets land beside it). Returns the dir.
+
+    *thumbs* off skips the figure thumbnails, which only the site index reads: a bundle exported for a print (``./go render``) has no use for them. A preview built from such a bundle (``--stale-only``) shows the full figures in its strips; a publish always re-exports, thumbnails and all.
+    """
     out = export_dir(path) / "index.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     # The render rewrites every asset it still produces, and the sync mirrors whatever is
@@ -74,9 +77,10 @@ def export_one(path: Path) -> Path:
         html = set_provenance(html, refs)
     # Small copies of every figure, for the index's strips: made here because this is the
     # one step that holds the figure bytes (the site build fetches only the HTML).
-    html, thumbs = write_thumbnails(html, assets)
     if thumbs:
-        print(f"  thumbs {len(thumbs)} figure(s) -> {assets.relative_to(ROOT)}/thumbs/")
+        html, written = write_thumbnails(html, assets)
+        if written:
+            print(f"  thumbs {len(written)} figure(s) -> {assets.relative_to(ROOT)}/thumbs/")
     out.write_text(html, "utf-8")
     # The PDF is the site build's to print (build_site.PdfMemo), since 2026-09-19; a bundle
     # exported before then still holds one, which the sync would otherwise carry along.

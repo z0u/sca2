@@ -733,6 +733,48 @@ def test_clean_rows_leave_each_step_off_the_axis(corpus):
     assert abs(wte[COLORS[0], ANCHOR_AXIS]) > 1e-4
 
 
+@pytest.mark.parametrize("stride", [5, 7])
+def test_steps_per_dispatch_leave_training_alone(data_dir, tmp_path, monkeypatch, stride):
+    """`train_anchored` runs several steps per dispatch, cut at records and epoch ends and padded to one shape.
+
+    One step per dispatch is the plain loop; sixteen crosses every kind of boundary. The model, the metrics and the trajectory match bit for bit.
+    """
+    from sca.compute import training
+
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    tokens, weights = probe_set()
+    config = training_config().model_copy(
+        update={"scheduler": SchedulerConfig(epochs=4, warmup_epochs=1, min_lr_factor=0.01)}
+    )
+    runs = []
+    for n in (1, 16):
+        monkeypatch.setattr(training, "SCAN_STEPS", n)
+        runs.append(
+            train_anchored(
+                config,
+                data_dir,
+                anchor=AnchorSpec(peak=1.0, warmup_epochs=1, anneal_start=3, anneal_end=4, tau=0.5),
+                anti=AntiSpec(
+                    lam=0.1, peak_ratio=2.5, hold_ratio=0.03, anneal_end=2, anchor_anneal_start=3, anchor_anneal_end=4
+                ),
+                label_p=label_p,
+                probe_tokens=tokens,
+                probe_weights=weights,
+                checkpoint_dir=tmp_path / str(n),
+                traj_stride=stride,
+            )
+        )
+    (m1, metrics1, traj1), (m16, metrics16, traj16) = runs
+    leaves = [jax.tree.leaves(eqx.filter(m, eqx.is_inexact_array)) for m in (m1, m16)]
+    for a, b in zip(*leaves, strict=True):
+        np.testing.assert_array_equal(np.asarray(a), np.asarray(b))
+    assert metrics1 == metrics16
+    assert traj1.keys() == traj16.keys()
+    for k in traj1:
+        np.testing.assert_array_equal(traj1[k], traj16[k], err_msg=k)
+
+
 def test_train_anchored_threads_slices_and_clean_rows(data_dir, tmp_path):
     """The loop accepts both options, and a blocks-only run with clean rows ends with the rows clean."""
     from sca.anchoring import ANCHOR_AXIS
@@ -878,3 +920,185 @@ def test_train_anchored_on_a_plane_pulls_the_labeled_color_into_the_plane(data_d
             traj["alpha_op1"][-1], alignment(model, tokens, axes=plane)[:, :, 0].mean(), rtol=1e-4, atol=1e-5
         )
     assert ends[1.0] > ends[0.0] + 0.4
+
+
+# ex-2.2.16 generalization: variable-length lines (newline_id), context keying, the hinge, and loss_mask.
+
+
+def variable_corpus(rng: np.random.Generator, n_contexts: int = 40) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """A packed corpus of contexts with lengths cycling 12, 18, 24, each closed by `NEWLINE`. Returns the
+    tokens, each context's own length, and the global start of every context (`line_boundaries`'s own array,
+    computed independently so the oracle below shares no code with `sample_anchored_batches`)."""
+    lengths = np.array([12, 18, 24])[np.arange(n_contexts) % 3]
+    chunks, starts = [], []
+    pos = 0
+    for length in lengths:
+        starts.append(pos)
+        body = rng.integers(4, 20, size=length - 1)  # content tokens, never 0 (padding) or NEWLINE
+        chunks.append(np.concatenate([body, [NEWLINE]]))
+        pos += length
+    return np.concatenate(chunks).astype(np.int32), lengths, np.asarray(starts)
+
+
+def test_newline_id_reproduces_the_fixed_grammar_bit_for_bit(corpus):
+    """With `newline_id` given, a grammar whose lines already sit at the fixed `LINE_TOKENS` period (this
+    corpus fixture's own `⏎` every 6 tokens) draws exactly what the periodic arithmetic always has."""
+    mc, dc = model_config(), data_config(0.1)
+    label_p = np.random.default_rng(7).random(64)
+    old = list(sample_anchored_batches(corpus, dc, mc, 3, np.random.default_rng(11), label_p, lines=True, crop="whole"))
+    new = list(
+        sample_anchored_batches(
+            corpus, dc, mc, 3, np.random.default_rng(11), label_p, lines=True, crop="whole", newline_id=NEWLINE
+        )
+    )
+    for (x1, y1, m1, l1, w1), (x2, y2, m2, l2, w2) in zip(old, new, strict=True):
+        np.testing.assert_array_equal(x1, x2)
+        np.testing.assert_array_equal(y1, y2)
+        np.testing.assert_array_equal(m1, m2)
+        np.testing.assert_array_equal(l1, l2)
+        np.testing.assert_array_equal(w1, w2)
+
+
+def test_context_keying_whole_labels_every_position_of_an_anchored_context():
+    from sca.data.incontext import line_role_arrays
+
+    rng = np.random.default_rng(1)
+    data, lengths, starts = variable_corpus(rng)
+    context_op = np.random.default_rng(2).integers(0, 3, size=len(lengths))
+    full_line, _ = line_role_arrays(data, NEWLINE)
+
+    mc, dc = model_config(), data_config(0.0)
+    spec = LabelSpec(
+        p=np.zeros(1), keying="context", context_op=context_op, anchored_op_id=0, label_rate=1.0, variant="whole"
+    )
+    oracle_rng = np.random.default_rng(9)
+    n_starts = len(data) - mc.block_size - 1
+    oracle_starts = oracle_rng.integers(0, n_starts, size=dc.batch_size)
+    x, y, mask = next(sample_anchored_batches(data, dc, mc, 1, np.random.default_rng(9), spec, newline_id=NEWLINE))
+    absolute = oracle_starts[:, None] + np.arange(mc.block_size)
+    expected = (context_op[full_line[absolute]] == 0) & (x != 0)
+    np.testing.assert_array_equal(mask, expected)
+    assert mask.any() and (mask == 0).any()  # some contexts are anchored, some are not, in this window
+
+
+def test_context_keying_latter_labels_only_the_second_half_of_a_context():
+    from sca.data.incontext import line_role_arrays
+
+    data, lengths, starts = variable_corpus(np.random.default_rng(3))
+    context_op = np.zeros(len(lengths), dtype=np.int64)  # every context is anchored
+    full_line, full_role = line_role_arrays(data, NEWLINE)
+    context_len = lengths  # global, indexed like context_op
+
+    mc, dc = model_config(), data_config(0.0)
+    spec = LabelSpec(
+        p=np.zeros(1),
+        keying="context",
+        context_op=context_op,
+        anchored_op_id=0,
+        label_rate=1.0,
+        variant="latter",
+        context_len=context_len,
+    )
+    oracle_rng = np.random.default_rng(4)
+    n_starts = len(data) - mc.block_size - 1
+    oracle_starts = oracle_rng.integers(0, n_starts, size=dc.batch_size)
+    x, y, mask = next(sample_anchored_batches(data, dc, mc, 1, np.random.default_rng(4), spec, newline_id=NEWLINE))
+    absolute = oracle_starts[:, None] + np.arange(mc.block_size)
+    line, role = full_line[absolute], full_role[absolute]
+    expected = (role >= context_len[line] // 2) & (x != 0)
+    np.testing.assert_array_equal(mask, expected)
+    assert mask.any() and (mask == 0).any()  # the pull covers only the latter half
+
+
+def test_context_keying_prefix_reads_an_external_per_position_array():
+    data, lengths, starts = variable_corpus(np.random.default_rng(5))
+    context_op = np.zeros(len(lengths), dtype=np.int64)
+    prefix_ok = np.arange(len(data)) % 5 < 2  # an arbitrary, deterministic stand-in for the posterior gate
+
+    mc, dc = model_config(), data_config(0.0)
+    spec = LabelSpec(
+        p=np.zeros(1),
+        keying="context",
+        context_op=context_op,
+        anchored_op_id=0,
+        label_rate=1.0,
+        variant="prefix",
+        prefix_ok=prefix_ok,
+    )
+    oracle_rng = np.random.default_rng(6)
+    n_starts = len(data) - mc.block_size - 1
+    oracle_starts = oracle_rng.integers(0, n_starts, size=dc.batch_size)
+    x, y, mask = next(sample_anchored_batches(data, dc, mc, 1, np.random.default_rng(6), spec, newline_id=NEWLINE))
+    absolute = oracle_starts[:, None] + np.arange(mc.block_size)
+    expected = prefix_ok[absolute] & (x != 0)
+    np.testing.assert_array_equal(mask, expected)
+    assert mask.any() and (mask == 0).any()
+
+
+def test_context_keying_sampled_draws_at_sample_prob_on_anchored_contexts_only():
+    data, lengths, starts = variable_corpus(np.random.default_rng(7))
+    context_op = np.random.default_rng(8).integers(0, 3, size=len(lengths))  # mixed ops; only op 0 may be labelled
+    sample_prob = (np.arange(len(data)) % 3 == 0).astype(np.float64)  # deterministic 0/1 draw threshold
+
+    mc, dc = model_config(), data_config(0.0)
+    spec = LabelSpec(
+        p=np.zeros(1),
+        keying="context",
+        context_op=context_op,
+        anchored_op_id=0,
+        variant="sampled",
+        sample_prob=sample_prob,
+    )
+    oracle_rng = np.random.default_rng(10)
+    n_starts = len(data) - mc.block_size - 1
+    oracle_starts = oracle_rng.integers(0, n_starts, size=dc.batch_size)
+    x, y, mask = next(sample_anchored_batches(data, dc, mc, 1, np.random.default_rng(10), spec, newline_id=NEWLINE))
+    absolute = oracle_starts[:, None] + np.arange(mc.block_size)
+    context = np.searchsorted(starts, absolute, side="right") - 1
+    expected = (sample_prob[absolute] > 0) & (context_op[context] == 0) & (x != 0)
+    np.testing.assert_array_equal(mask, expected)
+    assert mask.any() and (mask == 0).any()
+
+
+def test_hinge_matches_the_closed_form_and_leaves_the_plain_term_alone_without_it():
+    cos = jnp.array([0.0, 0.4, 0.8, 1.0])
+    states = jnp.zeros((1, 1, 4, 4)).at[..., 0].set(cos)
+    mask, line_id = jnp.ones((1, 4)), jnp.array([[0, 0, 0, 0]])
+    cap, softness = 0.8, 0.05
+
+    got = pooled_anchor_term(states, mask, line_id, 1, np.inf, hinge=(cap, softness))
+    expected_x = (softness / cap) * np.log1p(np.exp((cap - np.asarray(cos)) / softness))
+    np.testing.assert_allclose(got, expected_x.mean(), rtol=1e-5)
+    # Well below the cap the hinge tracks 1 − cos/cap.
+    np.testing.assert_allclose(expected_x[0], 1 - float(cos[0]) / cap, atol=2e-3)
+    # 0.2 past the cap (4 softnesses) it has faded to nearly nothing.
+    assert expected_x[-1] < 0.01
+
+    plain = pooled_anchor_term(states, mask, line_id, 1, np.inf)
+    np.testing.assert_allclose(plain, float((1 - cos).mean()), rtol=1e-6)
+
+
+def test_loss_mask_zeroes_targets_at_marked_positions_and_never_touches_the_inputs():
+    data, lengths, starts = variable_corpus(np.random.default_rng(12))
+    loss_mask = np.arange(len(data)) % 7 == 0  # an arbitrary, deterministic stand-in for a FALSE verification token
+
+    mc, dc = model_config(), data_config(0.0)
+    label_p = np.zeros(64)
+    plain = next(sample_anchored_batches(data, dc, mc, 1, np.random.default_rng(13), label_p, newline_id=NEWLINE))
+    masked = next(
+        sample_anchored_batches(
+            data, dc, mc, 1, np.random.default_rng(13), label_p, newline_id=NEWLINE, loss_mask=loss_mask
+        )
+    )
+    x1, y1, _ = plain
+    x2, y2, _ = masked
+    np.testing.assert_array_equal(x1, x2)  # loss_mask never touches the inputs
+
+    oracle_rng = np.random.default_rng(13)
+    n_starts = len(data) - mc.block_size - 1
+    oracle_starts = oracle_rng.integers(0, n_starts, size=dc.batch_size)
+    absolute = oracle_starts[:, None] + np.arange(mc.block_size)
+    target_at = np.minimum(absolute + 1, len(data) - 1)
+    expected = np.where(loss_mask[target_at], 0, y1)
+    np.testing.assert_array_equal(y2, expected)
+    assert (y2 == 0).sum() > (y1 == 0).sum()  # the mask actually zeroed something beyond ordinary padding

@@ -281,6 +281,32 @@ def apply(
     return Applied(np.concatenate(pres, axis=1), np.concatenate(posts, axis=1), np.concatenate(logits))
 
 
+def logits_at(
+    model: NGPT,
+    tokens: Int[np.ndarray, "N T"],
+    operator: Operator,
+    slices: tuple[int, ...],
+    at: int,
+    positions: np.ndarray | None = None,
+    batch_size: int = 1024,
+) -> Float[np.ndarray, "N V"]:
+    """`apply`, keeping only the logits at position *at*: what a scorer that reads one answer needs, without
+    copying the stream and every position's logits to the host. The last batch is padded to *batch_size*, so
+    each operator compiles once whatever the count of lines.
+    """
+    pos = None if positions is None else jnp.asarray(np.asarray(positions, dtype=np.float32))
+    batch_size = min(batch_size, len(tokens))
+    out = []
+    for i in range(0, len(tokens), batch_size):
+        chunk = tokens[i : i + batch_size]
+        n = len(chunk)
+        if n < batch_size:
+            chunk = np.concatenate([chunk, np.repeat(chunk[-1:], batch_size - n, axis=0)])
+        _, _, logits = _forward_jit(model, jnp.asarray(chunk), operator, tuple(slices), pos)
+        out.append(np.asarray(logits[:n, at]))
+    return np.concatenate(out)
+
+
 def answer_logprobs(logits: Float[np.ndarray, "N T V"], answer_pos: int) -> Float[np.ndarray, "N V"]:
     """Log-probabilities over the vocabulary for the token at *answer_pos*, read at the position before it."""
     return np.asarray(jax.nn.log_softmax(jnp.asarray(logits[:, answer_pos - 1]), axis=-1))

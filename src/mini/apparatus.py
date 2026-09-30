@@ -191,6 +191,19 @@ class Apparatus(ABC, Generic[V]):
         """
         ...
 
+    def launch_queued(self, store: MemoStore) -> list[str]:
+        """Start staged tasks that are waiting for a worker slot; return their keys.
+
+        A backend that caps its own concurrency (local: ``max_workers``) leaves the overflow of a batch claimed RUNNING but unlaunched. ``tick`` and the watch loop call this so a freed slot doesn't wait for the next batch. Default: nothing queues (Modal schedules its own containers).
+        """
+        return []
+
+    def refresh_queued(self, store: MemoStore, rec: dict[str, Any]) -> None:
+        """Bring a RUNNING task that is still waiting for a slot up to this apparatus's config.
+
+        A queued task launches later, possibly after a restart and from a new shell, so the tick that finds it waiting re-stages it with the config it would launch it with now. Default: nothing queues.
+        """
+
     def cancel(self, store: MemoStore, keys: list[str] | None = None) -> list[str]:
         """Stop in-flight tasks, mark them CANCELLED, and return their keys.
 

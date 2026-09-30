@@ -159,7 +159,7 @@ def _build_apparatus(name: str, args: argparse.Namespace) -> Apparatus:
     if env := _project_config().get("env"):
         common["env"] = env
     if backend == "local":
-        app: Apparatus = LocalApparatus(name, max_workers=getattr(args, "workers", 1))
+        app: Apparatus = LocalApparatus(name, max_workers=getattr(args, "workers", None))
         return app.w(**common) if common else app
     if backend == "modal":
         from mini.modal_apparatus import ModalApparatus
@@ -1376,7 +1376,12 @@ def main() -> None:
         p.add_argument("-w", "--watch", action="store_true", help="drive to completion with a live progress bar")
         p.add_argument("--poll", type=float, default=0.5, help="seconds between record polls while watching")
         _add_app_flag(p)
-        p.add_argument("--workers", type=int, default=1, help="local worker threads / task concurrency")
+        p.add_argument(
+            "--workers",
+            type=int,
+            default=None,
+            help="local tasks run at once (default: the CPU count); the rest queue until a slot frees",
+        )
         p.add_argument("--gpu", default=None, help="Modal GPU type, e.g. L4, A100 (--app modal)")
         p.add_argument("--timeout", type=int, default=None, help="per-task timeout in seconds (--app modal)")
         p.add_argument(

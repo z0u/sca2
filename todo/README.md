@@ -44,7 +44,7 @@ priority: high         # optional; the shortlist, capped at six live items
 ---
 # A title, as the first heading
 
-The body, as ordinary prose. The file is a document, so there is room to say why. One line per paragraph, soft-wrapped.
+The body, as ordinary prose. The file is a document, so there is room to say why. One line per paragraph, soft-wrapped. Items and notes follow the `writing` and `style-terms` skills, like any other prose here.
 ```
 
 `finding` is for established knowledge rather than work: a result worth keeping.

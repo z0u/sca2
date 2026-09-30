@@ -1,7 +1,6 @@
 ---
 status: partial
 tags: [methodology, D2.2, D2.4, baselines]
-priority: high
 ---
 # Baseline comparisons for SCA — plan and related-work delta
 
@@ -28,3 +27,5 @@ One thing to settle as part of declaring, since the design already hedges with "
 **2026-09-07, design review** — the auditing-row decision the 09-06 note asked for is made, row by row, in the design's *fallback control* section and the [ex-2.2.2](/docs/m2/ex-2.2.2/report.py) prereg. Off-axis recoverability runs in ex-2.2.2 as an exploratory row (a ridge probe for redness on the intervened operand states, per slice, fallback against no-fallback), because a response trained at the antipode is the case where red could stay readable off-axis. ActPert and relearning rebound are deferred to D2.3: the former beside the RMU row, the latter with a fine-tuning budget costed then, on ex-2.2.1's `ablate` weights as the permanent removal to relearn from. The filtered-corpus row is unchanged (a condition of *suppress operation*). What remains here is the SGTM experiment and the D2.3 rows.
 
 **2026-09-07, ex-2.2.2 prereg** — two pieces of the sweep reached the [ex-2.2.2](/docs/m2/ex-2.2.2/report.py) prereg. LUNAR (arXiv:2502.07218, verified) is named there as the nearest published analogue of fallback control: a redirect into a region the model already produces, where ours trains a region it never otherwise visits. The sweep marks it tractable in a toy transformer, so a LUNAR row joins RMU in the design's D2.3 list. Later the same day, review moved a LUNAR-style redirect into ex-2.2.2 itself as exploratory row E6: one matrix fitted at the embedding of each no-fallback checkpoint, frozen, on the fallback cross-entropy plus an identity term, scored through the contract beside the trained fallback. The D2.3 row would be the full method, against a model with a refusal region of its own. And the off-axis recoverability row (E3) is now specified against the [off-axis R² item](./off-axis-probe-r2-does-bound-intervention.md), with the raw-RGB floor beside it, rather than reported bare.
+
+**2026-09-29, housekeeping** — Off the shortlist. It was promoted because the eval contract was cheapest to fix before any D2.2 experiment code existed; the contract has been in `sca.intervention` since 09-02 and the auditing rows were placed on 09-07, so that reason has lapsed. What remains is the SGTM experiment, which the [pivot](/docs/m2/d2.2/pivot.md) keeps in step 3 (round 4 of the [design](/docs/m2/d2.2/design.md)), behind the in-context control and the first anchored runs, plus the D2.3 rows. Promote it again when step 3 is next.

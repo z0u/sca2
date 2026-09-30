@@ -1,5 +1,5 @@
 from ftfy import ExplanationStep
-from pydantic import BaseModel, NonNegativeFloat, NonNegativeInt, PositiveFloat, PositiveInt
+from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt, PositiveFloat, PositiveInt
 
 from utils.param_types import IntX8, IntX32, IntX64, ZeroToOne
 
@@ -124,6 +124,12 @@ class SchedulerConfig(BaseModel, validate_assignment=True):
 
     min_lr_factor: ZeroToOne
     """Minimum learning rate as factor of the nominal learning rate"""
+
+    lr_sheet: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    """A dopesheet (CSV text) that replaces the warmup-and-cosine schedule: its `lr` column is a multiple of the
+    nominal learning rate, and its STEP column spans the whole run, however long the sheet is (see
+    `sca.training.scheduler.sheet_schedule`). Left out of the serialized config when unset, so configs from
+    before the field existed keep their memo keys."""
 
 
 class TrainingConfig(BaseModel, validate_assignment=True):

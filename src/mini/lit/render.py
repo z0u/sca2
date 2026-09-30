@@ -1,7 +1,7 @@
 """
-Render a document to its outputs: the woven Markdown, the HTML page, and (on request) a PDF.
+Render a document to its outputs: the woven Markdown, the HTML page, and (on request, :func:`write_outputs`) a PDF.
 
-Outputs land in one directory per document — ``.mini/lit/<key>/`` by default, with ``index.html``, ``index.md``, and the ``_assets/`` the figures were written to — so the same relative URLs work opened from disk, served locally, or published as a bundle through ``mini.reports``.
+Outputs land in one directory per document — ``.mini/lit/<key>/`` by default, with ``index.html``, ``index.md``, and the ``_assets/`` the figures were written to — so the same relative URLs work opened from disk, served locally, or published as a bundle through ``mini.reports``. The CLI (``python -m mini.lit render``) writes to the files it is given instead, with ``_assets/`` beside them.
 """
 
 from __future__ import annotations
@@ -9,7 +9,6 @@ from __future__ import annotations
 import os
 import shutil
 from collections.abc import Callable
-import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,7 +27,7 @@ from mini.reports import (
 )
 from mini.runs import data_root
 
-__all__ = ["render", "compose", "Rendered", "to_pdf", "output_dir"]
+__all__ = ["render", "compose", "Rendered", "write_outputs", "output_dir"]
 
 
 def output_dir(doc: Path, *, live: bool = False) -> Path:
@@ -102,65 +101,38 @@ def render(
     return rendered
 
 
+def write_outputs(rendered: Rendered, outs: list[Path]) -> list[Path]:
+    """Write *rendered* to each of *outs*, in the format its suffix names: ``.md``, ``.html``, or ``.pdf``.
+
+    The figures are wherever the weave put them (``_assets/`` under :attr:`Rendered.out_dir`), and the Markdown and HTML link them relatively, so one of those in another directory gets a copy of ``_assets/`` beside it. The PDF is printed by :func:`mini.report_print.print_bundle` from the weave's own ``_assets/``, the print the site build makes, so it matches the one a reviewer reads and needs no copy.
+    """
+    from mini.report_print import print_bundle
+
+    assets = rendered.out_dir / "_assets"
+    written = []
+    for out in outs:
+        out = out.resolve()
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if out.suffix in (".md", ".html") and out.parent != rendered.out_dir and assets.is_dir():
+            shutil.copytree(assets, out.parent / "_assets", dirs_exist_ok=True)
+        match out.suffix:
+            case ".md":
+                _write(out, link_externalized(rendered.woven.markdown))
+            case ".html":
+                _write(out, rendered.html)
+            case ".pdf":
+                # Served from a throwaway root beside the weave, holding the page and its _assets/.
+                # The "bundle" is any path in the weave dir: with html= given, only its parent
+                # (where _assets/ is) matters, and the serve root lands beside it.
+                if print_bundle(rendered.out_dir / out.name, out, html=rendered.html) is None:
+                    raise RuntimeError(f"{out}: no PDF printed (see the log above)")
+            case _:
+                raise ValueError(f"{out}: unknown format {out.suffix!r}; use .md, .html, or .pdf")
+        written.append(out)
+    return written
+
+
 def _write(path: Path, text: str) -> None:
     tmp = path.with_suffix(f"{path.suffix}.{os.getpid()}.tmp")  # per process, so two writers never share a temp file
     tmp.write_text(text)
     tmp.replace(path)
-
-
-CHROMIUM_HINT = (
-    "no Chromium found. Install one (`sudo apt-get install chromium`, or `uvx playwright install --with-deps chromium`), "
-    "or set $CHROMIUM to the binary"
-)
-
-
-SANDBOX_CHROMIUM = "/opt/pw-browsers/chromium"
-"""Where the cloud sandbox keeps its Chromium (the same default as :mod:`mini.report_print`)."""
-
-
-def _chromium() -> str | None:
-    """The first Chromium that exists: ``$CHROMIUM`` (or ``$PLAYWRIGHT_CHROMIUM``, the older spelling), the sandbox's, a browser on ``$PATH``, then Playwright's cache (its download runs only once ``playwright install-deps`` has put the shared libraries in place).
-
-    In the cache we take the headless shell ahead of the full browser: it prints the same PDF, and it links against a smaller set of shared libraries, so it starts in containers where the full build cannot (a missing ``libatk-bridge`` or ``libcups`` leaves the loader unable to start a binary that is sitting right there).
-    """
-    for c in (
-        os.environ.get("CHROMIUM") or os.environ.get("PLAYWRIGHT_CHROMIUM"),
-        SANDBOX_CHROMIUM,
-        "chromium",
-        "chromium-browser",
-        "google-chrome",
-        "chrome",
-    ):
-        if c and (Path(c).is_file() or shutil.which(c)):
-            return c
-    pw_cache = Path(os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or Path.home() / ".cache" / "ms-playwright")
-    for pattern in ("chromium_headless_shell-*/chrome-*/headless_shell", "chromium-*/chrome-*/chrome"):
-        for c in sorted(pw_cache.glob(pattern), reverse=True):
-            if c.is_file():
-                return str(c)
-    return None
-
-
-def to_pdf(html_path: Path, pdf_path: Path | None = None) -> Path:
-    """Print the page to PDF with headless Chromium."""
-    exe = _chromium()
-    if exe is None:
-        raise RuntimeError(CHROMIUM_HINT)
-    pdf_path = pdf_path or html_path.with_suffix(".pdf")
-    argv = [
-        exe,
-        "--headless=new",
-        "--no-sandbox",
-        "--disable-gpu",
-        "--no-pdf-header-footer",
-        f"--print-to-pdf={pdf_path}",
-        html_path.resolve().as_uri(),
-    ]
-    done = subprocess.run(argv, capture_output=True, timeout=120)
-    if done.returncode != 0:
-        # 127 from a binary that is present means the loader could not resolve its shared libraries, so say so: the bare exit code reads like a missing file.
-        why = f"{exe} exited {done.returncode}"
-        if done.returncode == 127 and Path(exe).is_file():
-            why += f" — it exists but could not start, most likely a missing shared library (`ldd {exe} | grep 'not found'`)"
-        raise RuntimeError(f"{why}\n{done.stderr.decode(errors='replace').strip()}")
-    return pdf_path

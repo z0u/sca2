@@ -137,6 +137,14 @@ def _app_page_url(app: modal.App) -> str | None:
     return running.app_page_url
 
 
+def skip_in_source(rel: Path) -> bool:
+    """Whether the worker mount leaves out *rel*, a path relative to a project package.
+
+    Modal's default keeps only `.py` files, which drops package data (`mini`'s stylesheets and mplstyles, `subline`'s theme), so code that reads one fails on a worker while passing locally. This keeps everything but bytecode and dot-files, which the default also leaves out and which an explicit `ignore` would otherwise let through. The source is mounted at container start rather than baked into a layer, so this changes no image build.
+    """
+    return rel.suffix == ".pyc" or any(part == "__pycache__" or part.startswith(".") for part in rel.parts)
+
+
 def make_image() -> modal.Image:
     """Helper to create a Modal image with experiment dependencies.
 
@@ -148,7 +156,7 @@ def make_image() -> modal.Image:
     return (
         modal.Image.debian_slim()
         .pip_install(*deps)
-        .add_local_python_source(*project_deps)
+        .add_local_python_source(*project_deps, ignore=skip_in_source)
     )  # fmt: skip
 
 

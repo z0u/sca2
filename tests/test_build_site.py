@@ -578,12 +578,12 @@ def test_the_printable_page_names_its_figures_on_the_cdn_and_keeps_its_fragments
         site_base="https://z0u.github.io/mi-ni/",
         source_base="https://github.com/z0u/mi-ni/blob/main/docs/",
     )
-    bundle = build_site._Bundle(
+    bundle = build_site.Bundle(
         '<html><head></head><body><img src="_assets/f.png"><a href="#fn1">1</a>'
         '<script>{"src":\\"_assets/g.png\\"}</script></body></html>',
         base_href="https://hf.co/d/r/resolve/abc/exports/probe/",
     )
-    out = build_site._printable(bundle, links, from_dir="probe", key="probe", report_css="p{}")
+    out = build_site.printable(bundle, links, from_dir="probe", key="probe", report_css="p{}")
     assert 'src="https://hf.co/d/r/resolve/abc/exports/probe/_assets/f.png"' in out
     assert '\\"https://hf.co/d/r/resolve/abc/exports/probe/_assets/g.png\\"' in out
     assert 'href="#fn1"' in out
@@ -599,13 +599,13 @@ def test_the_printable_page_links_to_production_from_a_preview():
         source_base="https://github.com/z0u/mi-ni/blob/main/docs/",
         production_base="https://z0u.github.io/mi-ni/",
     )
-    bundle = build_site._Bundle('<html><body><a href="../other/report.py">other</a></body></html>')
-    out = build_site._printable(bundle, links, from_dir="probe", key="probe", report_css="")
+    bundle = build_site.Bundle('<html><body><a href="../other/report.py">other</a></body></html>')
+    out = build_site.printable(bundle, links, from_dir="probe", key="probe", report_css="")
     assert 'href="https://z0u.github.io/mi-ni/other/"' in out
 
 
-def test_a_review_marks_a_text_only_report(tmp_path: Path, monkeypatch):
-    """A report with no figures exports without an `_assets/` dir; its print is stamped (and barred, with a baseline) like any other, since the review reads it the same way."""
+def test_the_site_prints_no_review_stamp(tmp_path: Path, monkeypatch):
+    """The site prints each report unmarked, so its memo key holds from one commit to the next; a print for review is `render_report.py`'s."""
     monkeypatch.setattr(build_site, "WORKSPACE_ROOT", tmp_path)
     monkeypatch.setattr(build_site, "DOCS_DIR", tmp_path / "docs")
     monkeypatch.setattr(build_site, "SITE_DIR", tmp_path / "_site")
@@ -622,17 +622,9 @@ def test_a_review_marks_a_text_only_report(tmp_path: Path, monkeypatch):
         source_base="https://github.com/o/r/blob/main/",
     )
     printer = _Printer()
-    memo = build_site.PdfMemo(tmp_path / "pdfs", stamp="t", printer=printer)
-    review = build_site.Review(since=None, printed="abc1234")
+    for _ in range(2):
+        memo = build_site.PdfMemo(tmp_path / "pdfs", stamp="t", printer=printer)
+        build_site.build_reports(links, None, False, memo=memo)
 
-    build_site.build_reports(links, None, False, memo=memo, review=review)
-
-    assert len(printer.calls) == 1 and "Printed from abc1234" in printer.calls[0]
-    site = tmp_path / "_site" / "ex-1"
-    assert (site / "ex-1.pdf").read_bytes() == (site / "report.pdf").read_bytes(), "no copy named for the report"
-
-
-def test_a_review_print_is_named_for_its_report():
-    """The reviewer's tablet files a document under its file name, so the review copy carries the report's."""
-    assert build_site.review_pdf_name("m2/ex-2.2.15") == "ex-2.2.15.pdf"
-    assert build_site.review_pdf_name("ngpt-scaling") == "ngpt-scaling.pdf"
+    assert len(printer.calls) == 1 and "rv-note" not in printer.calls[0]
+    assert [f.name for f in (tmp_path / "_site" / "ex-1").glob("*.pdf")] == ["report.pdf"]

@@ -10,7 +10,6 @@ from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
 from pandas.api.types import is_numeric_dtype
 
-from mini.vis import light_dark
 from .dopesheet import RESERVED_COLS
 from .timeline import Timeline
 
@@ -97,6 +96,10 @@ def plot_timeline(  # noqa: C901
     show_phase_labels: bool = True,
     line_styles: Sequence[tuple[str | re.Pattern, dict[str, Any]]] | None = None,
 ):
+    # Imported here: mini.vis reads report assets (CSS) that a worker image, which ships only .py files, lacks,
+    # and a training task may realize a timeline without plotting it.
+    from mini.vis import light_dark
+
     if groups is None:
         cols = [col for col in history_df.columns if col not in RESERVED_COLS]
         groups = [ParamGroup(name="", params=cols, height_ratio=1.0)]

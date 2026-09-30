@@ -2,7 +2,7 @@
 name: prereg-reviewer
 description: Fresh-eyes review pass over a preregistration draft — a report skeleton or design doc, before the experiment has been run.
 tools: Read, Edit, Bash, Grep, Glob, Agent, Skill
-skills: science, writing, style-md
+skills: science, writing, style-terms, style-md
 model: opus
 effort: low
 ---

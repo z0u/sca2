@@ -18,6 +18,7 @@ from matplotlib.legend_handler import HandlerBase
 from matplotlib.lines import Line2D
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path as MplPath
+from matplotlib.typing import HashableList
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -32,6 +33,12 @@ type AxesRow = Sequence[Axes]
 
 type AxesGrid = Sequence[Sequence[Axes]]
 """The axes array from ``plt.subplots(m, n)`` — ``cast`` to it to keep ``axes[i][j]`` typed."""
+
+type Mosaic = list[HashableList[str]]
+"""A ``plt.subplot_mosaic`` layout — ``cast`` a ``list[list[str]]`` to it at the call.
+
+Since ty 0.0.82 a ``list[list[str]]`` no longer matches the recursive ``HashableList`` overloads. Annotating the layout itself would type every element as ``str | HashableList[str]``, so the cast widens it only where it is passed.
+"""
 
 
 @contextmanager

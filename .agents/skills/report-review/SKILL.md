@@ -56,7 +56,7 @@ Then, for up to 3 rounds:
 4. If the loop converged and the report is heading for a freeze or a publish, render the document to Markdown and hand that file to the `report-structure` agent:
 
    ```bash
-   ./go render docs/<key>/report.py    # -> .mini/lit/<key>/index.md
+   ./go render docs/<key>/report.py -o .mini/lit/<key>/index.md
    ```
 
    Reviewers edit one section at a time, so duplication between sections, a tl;dr that has grown into a second conclusion, and a findings section that a result never reached only show up in the assembled render. It proposes rather than edits, so bring its cut list to the user rather than acting on it — deleting a paragraph is their call. Skip this step when you escalated: the text will move again.

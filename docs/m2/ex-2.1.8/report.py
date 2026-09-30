@@ -12,6 +12,7 @@ We tested anti-subspace schedules (trailing timing and strength) to find an oper
 import json
 import tempfile
 from pathlib import Path
+from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,7 +22,7 @@ import numpy as np
 import experiment as ex
 from mini.lit import memo, stop
 from mini.store import project_store
-from mini.vis import figure_html, light_dark, themed
+from mini.vis import Mosaic, figure_html, light_dark, themed
 
 
 def load_results() -> tuple[dict, dict[str, np.ndarray]] | None:
@@ -811,7 +812,7 @@ def trajectories_figure(
     @themed(name="trajectories", alt_text=alt_text, caption=caption)
     def plot() -> plt.Figure:
         fig, axd = plt.subplot_mosaic(
-            TRAJ_GRID, figsize=(7.5, 6), height_ratios=[3, 1.5, 0.45, 3, 1.5], sharex=True,
+            cast(Mosaic, TRAJ_GRID), figsize=(7.5, 6), height_ratios=[3, 1.5, 0.45, 3, 1.5], sharex=True,
         )  # fmt: skip
         grey = light_dark("#999", "#777")
         gate = light_dark("#555", "#bbb")

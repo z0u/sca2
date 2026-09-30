@@ -27,6 +27,7 @@ def lr_finder_search(
     steps_per_zoom: int = 10,
     zoom_factor: float = 0.5,
     method: SearchMethod = "steepest",
+    constrain: Callable[[eqx.Module], eqx.Module] | None = None,
     *,
     key: PRNGKeyArray,
 ) -> tuple[float, LRFinderConfig, list[LRFinderSeries]]:
@@ -48,6 +49,8 @@ def lr_finder_search(
         steps_per_zoom: Optimization steps per zoom level.
         zoom_factor: How much of the range to keep on each zoom (log-space).
         method: How to propose the next range from the loss curve.
+        constrain: Applied to the model after every update, as the training step does (an nGPT model
+            re-projects its weights onto the unit sphere), so the probe steps the model the way training will.
         key: PRNG key for dropout.
     """
     if start_lr >= end_lr:
@@ -60,7 +63,10 @@ def lr_finder_search(
     def test_lr(model: eqx.Module, opt_state, inputs, targets, key: PRNGKeyArray):
         loss, grads = eqx.filter_value_and_grad(loss_fn)(model, inputs, targets, key)
         updates, opt_state = optimizer.update(grads, opt_state, eqx.filter(model, eqx.is_inexact_array))
-        return eqx.apply_updates(model, updates), opt_state, loss
+        model = cast(eqx.Module, eqx.apply_updates(model, updates))
+        if constrain is not None:
+            model = constrain(model)
+        return model, opt_state, loss
 
     total_steps = num_zooms * steps_per_zoom
     config = LRFinderConfig(
@@ -88,6 +94,7 @@ def lr_finder_search(
         opt_state = optimizer.init(initial_params)
         lrs: list[float] = []
         losses: list[float] = []
+        raw_losses: list[float] = []
         for i, lr in enumerate(lr_schedule):
             opt_state.hyperparams["learning_rate"] = lr  # ty: ignore[unresolved-attribute]
             inputs, targets = next(batches)
@@ -95,6 +102,7 @@ def lr_finder_search(
             key, step_key = cast(tuple[PRNGKeyArray, PRNGKeyArray], jr.split(key))
             trial_model, opt_state, loss = test_lr(trial_model, opt_state, inputs, targets, step_key)
             loss = float(loss)
+            raw_losses.append(loss)
 
             emit_progress(
                 zoom * steps_per_zoom + i + 1,
@@ -114,7 +122,17 @@ def lr_finder_search(
         proposed_range = _propose_range(method, steepest_lr, lowest_lr)
 
         best_lr = cast(float, np.mean(proposed_range))
-        history.append(LRFinderSeries(lrs=lrs, losses=losses, best_lr=best_lr, steepest_lr=steepest_lr, zoom=zoom + 1))
+        history.append(
+            LRFinderSeries(
+                lrs=lrs,
+                losses=losses,
+                best_lr=best_lr,
+                steepest_lr=steepest_lr,
+                zoom=zoom + 1,
+                raw_lrs=[float(lr) for lr in lr_schedule],
+                raw_losses=raw_losses,
+            )
+        )
 
         current_range = _calculate_zoom_range(proposed_range, current_range, zoom_factor)
 
