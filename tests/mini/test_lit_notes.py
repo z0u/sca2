@@ -21,7 +21,7 @@ class TestSidenotes:
     def test_footnote_is_placed_beside_its_marker(self):
         html = to_html("Text.[^a] More.\n\n[^a]: A *note*.\n")
         assert re.search(
-            r'<sup class="fnref" id="fnref:a">.*?</sup><span class="sidenote" role="note" tabindex="-1"><span class="sidenote-number">1</span> <span class="sidenote-p"><span class="gloss">A <em>note</em>.</span></span></span> More.',
+            r'<sup class="fnref" id="fnref:a">.*?</sup><span class="sidenote" role="note" tabindex="-1"><span class="sidenote-number">1</span> <span class="gloss">A <em>note</em>.</span></span> More.',
             html,
         )
         assert '<li class="sidenoted" id="fn:a" value="1">' in html
@@ -36,8 +36,8 @@ class TestSidenotes:
     def test_first_sentence_is_the_gloss(self):
         html = to_html("Text.[^a]\n\n[^a]: A *note*, e.g. this. Then `more`.\n\n    Second.\n")
         assert (
-            '<span class="gloss">A <em>note</em>, e.g. this.</span><span class="more"> Then <code>more</code>.</span></span>'
-            '<span class="sidenote-p sidenote-p-more">Second.</span>' in html
+            '<span class="gloss">A <em>note</em>, e.g. this.</span><span class="more"> Then <code>more</code>.'
+            '<span class="sidenote-p">Second.</span></span></span>' in html
         )
 
     def test_note_in_a_table_is_hover_only_and_stays_in_the_list(self):
@@ -102,9 +102,15 @@ class TestGlossary:
             "ctx": Term("Context", "An <em>x</em>: more."),
         }
         html = to_html("An EMA.\n", glossary=shared)
-        assert '<span class="gloss">Exponential moving average</span><span class="more">: a running mean.' in html
+        assert (
+            '<span class="gloss">Exponential moving average<span class="lead-colon">:</span></span>'
+            '<span class="more"> a running mean.' in html
+        )
         html = to_html("A context.\n", glossary=shared)
-        assert '<span class="gloss">An <em>x</em></span><span class="more">: more.</span>' in html
+        assert (
+            '<span class="gloss">An <em>x</em><span class="lead-colon">:</span></span><span class="more"> more.</span>'
+            in html
+        )
         assert to_html("An EMA.\n", glossary={"ema": Term("EMA", "Short. Then: more.")}).count(
             '<span class="gloss">Short.</span>'
         )

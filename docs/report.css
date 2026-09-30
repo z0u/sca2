@@ -196,9 +196,12 @@ main.lit details:not(:open) {
     /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
     --measure: 118mm;
     /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
-     * margins, less than a note needs, so for now a note runs off the paper's edge. */
-    --note-width: 30mm;
-    --note-gap: 4mm;
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
   }
   /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
    * the root sets the rem, and the body's own 0.9rem screen size comes off. */
@@ -284,7 +287,9 @@ main.lit details:not(:open) {
 
   /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
    * text, in type small enough to leave the text alone (zoom in to read it). Floats that
-   * clear each other stack, so a note never overlaps the one before it; it slides down. */
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
   main.lit > :is(figure, table, h2, hr, .footnote) {
     clear: right;
   }
@@ -302,7 +307,7 @@ main.lit details:not(:open) {
     width: var(--note-width);
     margin-block: 0.4em;
     margin-left: var(--note-gap);
-    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-gap), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
     font-family: var(--font-sans);
     font-size: 6pt;
     font-style: normal;
@@ -310,17 +315,12 @@ main.lit details:not(:open) {
     line-height: 1.3;
     text-indent: 0;
     color: inherit;
-    text-align: justify;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
     hyphens: auto;
   }
   .sidenote-number,
   .glossnote-term {
     font-weight: 700;
-  }
-  /* Only the gloss goes in the margin. The footnote list keeps the whole of each note,
-   * and a report's own glossary the whole of each definition. */
-  main.lit .sidenote :is(.more, .sidenote-p-more) {
-    display: none;
   }
   /* A term with its definition beside it needs no underline on paper. */
   dfn.term {

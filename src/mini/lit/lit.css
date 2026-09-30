@@ -224,7 +224,21 @@ dfn.term {
 .sidenote-number { font-weight: 700; }
 .glossnote-term { font-weight: 700; }
 .glossnote-term::after { content: "."; }
-.sidenote-p-more { display: block; margin-top: 0.4em; }
+.sidenote .more > .sidenote-p { display: block; margin-top: 0.4em; }
+
+/* A note in the margin, on a wide screen (below) or on paper, is only its gloss until it
+ * opens, with an ellipsis that takes no width, so it never wraps onto a line of its own. */
+@media print, screen and (min-width: 74rem) {
+  .sidenote:not(.popover) {
+    & .more, & .lead-colon { display: none; }
+    &:has(> .more) > .gloss::after {
+      content: "…";
+      display: inline-block;
+      width: 0;
+      white-space: nowrap;
+    }
+  }
+}
 
 /* Wide enough for the centred column plus a note strip on each side:
  * 40rem measure + 2 × (14rem note + 1.5rem gap) + 2 × 1.5rem gutter = 74rem. */
@@ -233,7 +247,8 @@ dfn.term {
   main.lit > :is(figure, table, h2, hr, .footnote) { clear: right; }
   .sidenote:not(.popover) {
     display: block;
-    position: static;
+    position: relative;
+    z-index: auto;
     float: right;
     clear: right;
     width: var(--note-width);
@@ -248,19 +263,27 @@ dfn.term {
     text-align: justify;
     hyphens: auto;
     /* Only the gloss (mini.lit.notes) until the note or its marker is hovered, or
-     * focused: a click on either keeps it open. The notes below it slide down. */
+     * focused: a click on either keeps it open. The rest then opens in a box over the
+     * notes below, so the float keeps its size and nothing else moves. */
     opacity: 0.6;
     transition: opacity 0.2s;
-    & .more,
-    & .sidenote-p-more {
-      display: none;
+    & .more {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      padding-bottom: 0.4em;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
     }
   }
   :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
-  .sidenote:not(.popover):is(:hover, :focus) {
+  .sidenote:not(.popover):is(:hover, :focus, :focus-within) {
     opacity: 1;
-    & .more { display: inline; }
-    & .sidenote-p-more { display: block; }
+    z-index: 5;  /* over the notes below, which are positioned too */
+    & .more { display: block; }
+    & .lead-colon { display: inline; }
+    & > .gloss::after { content: none; }
   }
   .sidenote:focus { outline: none; }
   .footnote li.sidenoted,

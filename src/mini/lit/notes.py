@@ -10,7 +10,7 @@ Where a note goes is the stylesheet's call (``lit.css``): in the margin on a wid
 
 A footnote with block content other than paragraphs (a list, a code block) is left to the list: a note is inline markup, since it sits inside the paragraph that cites it.
 
-Each note leads with a *gloss*, a few words to jog the reader's memory, marked ``<span class="gloss">``; the rest of it is ``<span class="more">`` (and a footnote's later paragraphs, ``sidenote-p-more``). The stylesheets show the gloss alone in the margin until the note or its marker is hovered or focused, and on paper. The gloss is a dictionary entry's ``gloss`` when it has one, and otherwise the first sentence of the note, or what comes before a colon if that is shorter (:func:`_lead_end`). So a note that leads with a short sentence or a "head: explanation" needs nothing more.
+Each note leads with a *gloss*, a few words to jog the reader's memory, marked ``<span class="gloss">``; the rest of it follows in one ``<span class="more">`` (a footnote's later paragraphs are ``sidenote-p`` spans in it), so it can open as one box. The stylesheets show the gloss alone in the margin until the note or its marker is hovered or focused, and on paper. The gloss is a dictionary entry's ``gloss`` when it has one, and otherwise the first sentence of the note, or what comes before a colon if that is shorter (:func:`_lead_end`). So a note that leads with a short sentence or a "head: explanation" needs nothing more.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ class Term:
     gloss: str | None = None
 
     def parts(self) -> tuple[str, str]:
-        """The note as a gloss and the rest (which starts with its space or colon, or is empty)."""
+        """The note as a gloss and the rest (empty when the gloss is all of it)."""
         if self.gloss:
             return self.gloss, " " + self.definition
         return _split_html(self.definition)
@@ -157,13 +157,19 @@ def _split_html(fragment: str) -> tuple[str, str]:
         elif depth == 0 and (end := _lead_end(token)) is not None:
             cut = m.start() + end
             if fragment[cut:].strip():
+                if fragment[cut] == ":":
+                    return fragment[:cut] + _LEAD_COLON, fragment[cut + 1 :]
                 return fragment[:cut], fragment[cut:]
             break
     return fragment, ""
 
 
-def _split_lead(el: etree.Element) -> None:
-    """Regroup *el*'s content as a gloss (its lead, :func:`_lead_end`) and, when there is more, the rest."""
+# A colon that ends a gloss, which the stylesheets hide while the rest of the note is.
+_LEAD_COLON = '<span class="lead-colon">:</span>'
+
+
+def _split_lead(el: etree.Element) -> tuple[etree.Element, etree.Element]:
+    """*el*'s content (which it gives up) as a gloss (its lead, :func:`_lead_end`) and the rest."""
     children = list(el)
     segments = [el.text or "", *(c.tail or "" for c in children)]
     cut = next(((i, end) for i, s in enumerate(segments) if (end := _lead_end(s)) is not None), None)
@@ -179,14 +185,13 @@ def _split_lead(el: etree.Element) -> None:
             box.append(child)
         if cut and i == cut[0]:
             _append_text(box, text[: cut[1]])
-            box = more
             text = text[cut[1] :]
+            if text.startswith(":"):
+                etree.SubElement(box, "span", {"class": "lead-colon"}).text = ":"
+                text = text[1:]
+            box = more
         _append_text(box, text)
-    el.append(gloss)
-    if len(more) or (more.text or "").strip():
-        el.append(more)
-    elif more.text:
-        _append_text(gloss, more.text)
+    return gloss, more
 
 
 def _append_text(box: etree.Element, text: str | None) -> None:
@@ -393,7 +398,7 @@ class _NotesTree(Treeprocessor):
         name.tail = " "
         lead, rest = term.parts()
         etree.SubElement(note, "span", {"class": "gloss"}).text = self.stash.store(lead)
-        if rest:
+        if rest.strip():
             etree.SubElement(note, "span", {"class": "more"}).text = self.stash.store(rest)
         idx = list(parent).index(dfn)
         note.tail = dfn.tail
@@ -403,15 +408,17 @@ class _NotesTree(Treeprocessor):
 
 
 def _footnote_note(number: str, li: etree.Element, *, floats: bool) -> etree.Element:
-    """The note for footnote *li* (all paragraphs): its number, then each paragraph as a span, without the ↩ back to the text; the lead of the first is the gloss."""
+    """The note for footnote *li*, without the ↩ back to the text: its number, the lead of its first paragraph as the gloss, then the rest, with each later paragraph as a span."""
     note = etree.Element(
         "span", {"class": "sidenote" if floats else "sidenote popover", "role": "note", "tabindex": "-1"}
     )
     num = etree.SubElement(note, "span", {"class": "sidenote-number"})
     num.text = number
     num.tail = " "
-    for i, p in enumerate(li):
-        part = etree.SubElement(note, "span", {"class": "sidenote-p sidenote-p-more" if i else "sidenote-p"})
+    parts = []
+    for p in li:
+        part = etree.Element("span", {"class": "sidenote-p"})
+        parts.append(part)
         part.text = p.text
         for child in p:
             if "footnote-backref" in _classes(child):
@@ -423,8 +430,11 @@ def _footnote_note(number: str, li: etree.Element, *, floats: bool) -> etree.Ele
             part[-1].tail = _trim(part[-1].tail)
         elif part.text:
             part.text = _trim(part.text)
-        if not i:
-            _split_lead(part)
+    gloss, more = _split_lead(parts[0])
+    note.append(gloss)
+    more.extend(parts[1:])
+    if len(more) or (more.text or "").strip():
+        note.append(more)
     return note
 
 
