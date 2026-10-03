@@ -546,7 +546,7 @@ class TestRender:
     def test_markdown_dialect(self):
         html = to_html("/// admonition | T\n    type: note\nbody\n///\n\nx[^1]\n\n[^1]: note\n\n| a |\n|---|\n| 1 |\n")
         assert 'class="admonition note"' in html
-        assert 'class="footnote"' in html
+        assert 'class="footnote' in html
         assert "<table>" in html
 
 

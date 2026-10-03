@@ -33,13 +33,19 @@ Math expressions are OK; slight preference for plain Unicode because it's easier
 r"""
 Main content with an inline footnote,[^note] and so on.
 
-[^note]: Renders at the end of the document. Footnote numbers restart per document.
+[^note]: Shows beside its marker: in the margin on a wide screen and in the PDF, on hover on a narrow one. Footnote numbers restart per document.
 
 /// details | Title
 Some backstory.
 ///
 """
 ```
+
+A footnote made only of paragraphs becomes a margin note; one holding a list or code stays in the list at the end, and so does one cited from a table cell, a caption or a heading (it shows on hover).
+
+Glossary terms are annotated for you. The first use of each term in every `##` section carries its definition as a margin note, taken from the report's own `## Glossary` `<dl>` (each `<dt>` is a term; commas and parentheses separate its wordings) and then from `docs/glossary.toml`, the shared dictionary. Matching is whole-word and case-insensitive, and skips code, links, headings, tables and captions. `[the spread](term:band)` marks a use in other words, or of a shared term kept off auto-matching (`auto = false`, for everyday words). Mechanics: `src/mini/lit/notes.py`.
+
+Lead each footnote and definition with a few words to jog the memory, as a short first sentence or a head before a colon ("Exponential moving average: a running average that …"). That lead is the gloss: all the margin shows until hover, and all the PDF shows. A shared term can give a shorter `gloss` in `docs/glossary.toml` instead.
 
 Other admonition types and their icons: `details` (folds, unobtrusive), `admonition` (unadorned), `note` ℹ️, `tip` 💡, `important` 💬, `warning` ⚠️, `error` 🛑. The `| title` is optional, except for `details`.
 
