@@ -1,0 +1,1486 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/0e6f133ca6058fa536c8aac35883cd908962616f/exports/m2/ex-2.2.17/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.2.17: the center control plateau, a scout</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md.css into the md.css the site serves; and VS Code's
+ * Markdown preview lists both files (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
+ *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its definition beside it needs no underline on paper. */
+  dfn.term {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-223/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.17/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.2.17</strong> · <code>93399c0</code> · run 2026-09-27<div>via reports/m2/ex-2.2.17/answers/d128-sweep-0.00316-s0, reports/m2/ex-2.2.17/answers/d64L6-sweep-0.00316-s0, reports/m2/ex-2.2.17/answers/stairs-0.00316-s0, reports/m2/ex-2.2.17/answers/stairs-0.00316-s1, reports/m2/ex-2.2.17/answers/stairs-0.00316-s2, reports/m2/ex-2.2.17/answers/stairs16x-0.00316-s0, reports/m2/ex-2.2.17/answers/sweep-0.00316-s0, reports/m2/ex-2.2.17/answers/sweep-0.00316-s1, reports/m2/ex-2.2.17/answers/sweep-0.00316-s2, reports/m2/ex-2.2.17/answers/sweep16x-0.00316-s0, reports/m2/ex-2.2.17/answers/wsd-0.00316-s0, reports/m2/ex-2.2.17/answers/wsd-0.00316-s1, reports/m2/ex-2.2.17/answers/wsd-0.00316-s2, reports/m2/ex-2.2.17/answers/wsd16x-0.00316-s0, reports/m2/ex-2.2.17/eval, reports/m2/ex-2.2.17/holdout-detail, reports/m2/ex-2.2.17/lr-finder, reports/m2/ex-2.2.17/trajectories</div></div></details>
+<main class="lit">
+<h1 id="ex-2217-the-center-control-plateau-a-scout">Ex 2.2.17: the center control plateau, a scout<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#ex-2217-the-center-control-plateau-a-scout" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>More steps, a newline mask, and a lower learning rate took ex-2.2.16's center control most of the way to its pass line, and then it leveled off. It matches the Bayes ceiling where the examples leave the op uncertain, and falls short where they settle it, keeping some of its mass on answers that the ruled-out ops would give.</p>
+</div>
+<p>This scout set out to lift ex-2.2.16's center control (the unanchored d64-L4 model on the corpus condition <code>k3-r0.3</code>) to its Bayes ceiling of 0.516. Ex-2.2.16 trained it for 50 epochs at a peak learning rate of 0.01, and it reached 0.27. More steps, a newline mask, and a lower rate took it to about 0.45. Past that, neither the shape of the schedule, nor twice the steps, nor a wider or deeper model changed the final score by more than the spread between seeds. The best run, <code>sweep-0.00316-s1</code>, reached 0.464.</p>
+<p>To see where the rest of the gap sits, we scored the answer distribution of each model against the Bayes predictive, context by context. Part of the gap is in how firmly the model commits to the op its examples support, and <code>hsvmix</code> adds a separate shortfall.</p>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#observations" title="Link to this heading">&para;</a></h2>
+<p>Each line is a measurement on the runs of this scout, with no gate.</p>
+<ul>
+<li><strong>E1</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#more-steps-a-lower-rate-and-the-mask-e1">More steps, a lower rate, and the mask</a>: more steps and the newline mask made most of the gain, and a range of peak rates did about equally well.</li>
+<li><strong>E2</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#schedule-length-and-model-size-e2">Schedule, length, and model size</a>: past that, neither the shape of the schedule, nor more steps, nor a wider or deeper model moved the final score.</li>
+<li><strong>E3</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#where-the-gap-sits-e3">Where the gap sits</a>: the model matches the ceiling on contexts whose examples leave the op uncertain, and falls short on those that point to one op.</li>
+<li><strong>E4</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#the-leak-onto-other-ops-e4">The leak onto other ops</a>: where the examples settle the op, the model keeps some of its mass on answers of other ops, mostly the op most like the true one, and more than nearness to the true answer accounts for.</li>
+<li><strong>E5</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#answers-in-the-color-cube-e5">Answers in the color cube</a>: for ten of the eleven ops, the expected answer of the model sits close to the Bayes one, with no shared direction to the difference. <code>hsvmix</code> is the exception.</li>
+<li><strong>E6</strong> <a href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#hsvmix-and-the-hue-gap-e6"><code>hsvmix</code> and the hue gap</a>: <code>hsvmix</code> falls further short of its ceiling the further apart the operand hues are, and neither width nor depth changed that.</li>
+</ul>
+<h2 id="scope">Scope<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#scope" title="Link to this heading">&para;</a></h2>
+<p>This is a scout, run in rounds, each designed on the results of the one before. There is no preregistration and no gate. The pass line that ex-2.2.16 set for its controls, 0.03 below the ceiling at 0.486, is a reference point here. Most conditions after round 1 have one seed, and the three-seed conditions span about 0.03, so a difference smaller than that is not a change.</p>
+<h2 id="why">Why<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#why" title="Link to this heading">&para;</a></h2>
+<p>The anchoring experiments on the in-context grammar compare an anchored model with an unanchored control on the same contexts. At 0.27 against a ceiling of 0.52, ex-2.2.16's center control had learned about half of what its examples allow, so that comparison would mix the effect of the anchor with the unfinished training of both models. We wanted a control recipe that comes close to the ceiling, or else to know where it levels off and why.</p>
+<h2 id="the-runs">The runs<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#the-runs" title="Link to this heading">&para;</a></h2>
+<p>Every run is the unanchored model of ex-2.2.16 on <code>k3-r0.3</code>, with an untied readout. Lengths are multiples of the 50 epochs (13,200 steps) that ex-2.2.16 trained for.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>round</th><th>what changes</th><th class=num>length</th><th class=num>peak LR</th><th class=num>mask</th><th class=num>seeds</th></tr></thead><tbody><tr><td>1</td><td><code>low</code>, <code>long</code>, and <code>long-low</code>: a lower rate, more steps, or both</td><td class=num>1×, 3×, 3×</td><td class=num>0.003, 0.01, 0.003</td><td class=num>no</td><td class=num>3</td></tr><tr><td>2</td><td>a sweep of the peak rate, and one run without the mask</td><td class=num>8×</td><td class=num>0.00032 to 0.01</td><td class=num>yes</td><td class=num>1</td></tr><tr><td>3</td><td>warmup-stable-decay schedule, and two more seeds of the cosine</td><td class=num>8×</td><td class=num>0.00316</td><td class=num>yes</td><td class=num>3</td></tr><tr><td>4</td><td>staircase schedule</td><td class=num>8×</td><td class=num>0.00316</td><td class=num>yes</td><td class=num>3</td></tr><tr><td>5</td><td>each of the three schedules</td><td class=num>16×</td><td class=num>0.00316</td><td class=num>yes</td><td class=num>1</td></tr><tr><td>6</td><td>a wider model, d128-L4</td><td class=num>8×</td><td class=num>0.00316</td><td class=num>yes</td><td class=num>1</td></tr><tr><td>7</td><td>a deeper model, d64-L6</td><td class=num>8×</td><td class=num>0.00316</td><td class=num>yes</td><td class=num>1</td></tr></tbody></table><figcaption><p><strong>The rounds.</strong> Length is a multiple of the steps of ex-2.2.16. The schedule is the cosine unless the row says otherwise.</p></figcaption></figure>
+
+<p>The newline mask stops each position from attending past the start of its own line. Every schedule starts with a linear warm-up from 1% of the peak rate: over the first tenth of the run in round 1, and over 1,320 steps (5 epochs, ex-2.2.16's own warm-up) from round 2 on, whatever the length. The cosine then anneals to 1% of the peak by the end of the run.</p>
+<h2 id="the-measurements">The measurements<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#the-measurements" title="Link to this heading">&para;</a></h2>
+<p>Held-out <em>expected exact match</em> (EEM) is the probability that an answer drawn from the distribution of the model at the query <code>=</code> is a correct answer of the true op. We average it over 22,000 held-out contexts, 2,000 per op.</p>
+<p>The <em>Bayes ceiling</em> is the same score for an ideal predictor. That predictor weighs each op by how well it explains the examples of a context, then answers with the resulting mixture of ops; we call that mixture the <em>Bayes predictive</em>. The ceiling is below 1 because some ops round stochastically, and noisy examples leave the op uncertain.</p>
+<p>The <em>calibration KL</em> is the KL divergence<sup id="fnref:kl"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#fn:kl">1</a></sup> from the Bayes predictive to the distribution of the model, in nats. It measures how much more the model loses on the answer than the ideal predictor does. Zero means the model holds the distribution the examples support.</p>
+<p>The <em>posterior on the true op</em> is the probability the ideal predictor gives the true op after seeing the examples. Replacement op noise lowers it. We call a context <em>confident</em> when that posterior is above 0.99.</p>
+<p>The <em>support</em> of the Bayes predictive on a context is the set of grid colors to which it gives at least 0.02. Probability mass on any other color is <em>off support</em>. An off-support color is <em>another op's answer</em> when some op, applied to the query operands, can give it. Distances are on the color grid, in grid steps: one step is the spacing between neighboring levels of a channel, and the far corner of the cube is 5√3 ≈ 8.7 steps from black.</p>
+<h2 id="more-steps-a-lower-rate-and-the-mask-e1">More steps, a lower rate, and the mask (E1)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#more-steps-a-lower-rate-and-the-mask-e1" title="Link to this heading">&para;</a></h2>
+<p>Round 1 tested two ideas at three seeds each, without the newline mask: that the peak rate of 0.01 was too high, or that the model needed more steps. The <code>low</code> arm trained for the length of ex-2.2.16 at 0.003, <code>long</code> for three times the length at 0.01, and <code>long-low</code> did both. Neither change alone did much, and the two together did the most.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>length</th><th class=num>peak LR</th><th class=num>EEM, seed mean (range)</th><th class=num>KL, seed mean</th></tr></thead><tbody><tr><td><code>low</code></td><td class=num>1×</td><td class=num>0.003</td><td class=num>0.241 (0.223–0.264)</td><td class=num>1.08</td></tr><tr><td><code>long</code></td><td class=num>3×</td><td class=num>0.01</td><td class=num>0.316 (0.291–0.355)</td><td class=num>0.78</td></tr><tr><td><code>long-low</code></td><td class=num>3×</td><td class=num>0.003</td><td class=num>0.360 (0.305–0.394)</td><td class=num>0.65</td></tr></tbody></table><figcaption><p><strong>Round 1.</strong> Three seeds per arm, unmasked, cosine schedule. Ex-2.2.16's control (1×, 0.01) scored 0.27.</p></figcaption></figure>
+
+<p>Every round-1 curve was still rising when the cosine schedule wound down. So round 2 trained for eight times the length (105,600 steps), with the mask. We ran a learning-rate finder on the same configuration. It trains briefly at a rising rate and looks for where the loss falls fastest; here, the steepest descent was near 0.0031. Round 2 then swept the peak rate from 0.01 down to 0.00032 at one seed each, with one more run at 0.00316 without the mask. The figure below follows each run through training, one panel per group of ops, with the learning rate it followed underneath.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/round2-light.png" alt="Six line charts of held-out expected exact match against training step, one per op group, and a learning-rate chart under each column. The runs with peak rates from 0.00178 to 0.01 all end between 0.41 and 0.45 overall; the lower rates end lower. The HSV-channel panel shows sharp rises partway through training, earlier for mid-range rates. The unmasked run ends lowest of the mid-range rates, at 0.33. Each learning rate rises steeply over the first 1,320 steps, then decays along a cosine." width="818" height="663" style="max-width: 100%; height: auto;" data-asset-name="round2" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/round2-dark.png" alt="Six line charts of held-out expected exact match against training step, one per op group, and a learning-rate chart under each column. The runs with peak rates from 0.00178 to 0.01 all end between 0.41 and 0.45 overall; the lower rates end lower. The HSV-channel panel shows sharp rises partway through training, earlier for mid-range rates. The unmasked run ends lowest of the mid-range rates, at 0.33. Each learning rate rises steeply over the first 1,320 steps, then decays along a cosine." width="818" height="663" style="max-width: 100%; height: auto;" data-asset-name="round2" />
+<figcaption><p><strong>Round 2: the peak learning rate at eight times the length.</strong> Each panel of the top two rows is one group of
+ops; the y-axis is held-out expected exact match on a probe set during training (a running mean over three
+points), with the Bayes ceiling of the group dashed. One seed per peak rate, shaded by rate. The gray dashed
+curve is the unmasked run at 0.00316. The bottom row is the learning rate each run followed, repeated under
+each column; the near-vertical rise at the left edge is the warm-up.</p></figcaption></figure>
+
+<p>Four peak rates from 0.00178 to 0.01 ended within 0.04 of each other, and the best was 0.00562 at 0.446. The mask made the largest single difference in the scout: at 0.00316, the unmasked run scored 0.334 and the masked one 0.436. The HSV-channel ops rose steeply once the decaying rate fell below about 0.004, which shaped the next two rounds. From round 3 on, every run trains with the mask at a peak rate of 0.00316, the middle of the good range.</p>
+<h2 id="schedule-length-and-model-size-e2">Schedule, length, and model size (E2)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#schedule-length-and-model-size-e2" title="Link to this heading">&para;</a></h2>
+<p>Round 3 tried a warmup-stable-decay (WSD) schedule, which warms up to 0.00316, holds near 0.0025 until 85% of the run, and then anneals to the same floor as the cosine. Round 4 tried a staircase: holds at 0.0021, 0.001, 0.0001, 1e-05, with short anneals between them, the last hold covering the final 11% of the run. Both ran at three seeds, beside two more seeds of the cosine.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/schedules-light.png" alt="Six line charts of held-out expected exact match against training step, one per op group, and the three learning-rate schedules under each column. The warmup-stable-decay and staircase runs are flat through their holds and rise at each drop in the rate. By the end, the three schedules sit on top of one another in every group, and the seeds differ more than the schedules." width="818" height="663" style="max-width: 100%; height: auto;" data-asset-name="schedules" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/schedules-dark.png" alt="Six line charts of held-out expected exact match against training step, one per op group, and the three learning-rate schedules under each column. The warmup-stable-decay and staircase runs are flat through their holds and rise at each drop in the rate. By the end, the three schedules sit on top of one another in every group, and the seeds differ more than the schedules." width="818" height="663" style="max-width: 100%; height: auto;" data-asset-name="schedules" />
+<figcaption><p><strong>Rounds 3 and 4: three schedules at eight times the length.</strong> As in the round-2 figure, with three seeds per
+schedule, all masked, at a peak rate of 0.00316.</p></figcaption></figure>
+
+<p>The schedules change the path and leave the destination in place. WSD curves stay flat through the hold and rise steeply in the final anneal; the staircase gains most at its first two drops, and almost nothing at the lowest rate. All three end together, and the seeds differ more than the schedules do.</p>
+<p>Round 5 trained each schedule for sixteen times the length (211,200 steps) at one seed. Rounds 6 and 7 trained the cosine at eight times on a wider model (d128-L4) and a deeper one (d64-L6), one seed each, both at seed 0 so that they pair with the other seed-0 runs. The figure below gathers the final scores of all of these.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/conditions-light.png" alt="Two dot charts over eight conditions. Left, expected exact match: every condition sits between 0.43 and 0.47, below the dashed pass line at 0.486 and the solid ceiling at 0.516. Right, the calibration KL: between 0.36 and 0.56 for every condition except the wider d128-L4 model, at 0.95." width="818" height="356" style="max-width: 100%; height: auto;" data-asset-name="conditions" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/conditions-dark.png" alt="Two dot charts over eight conditions. Left, expected exact match: every condition sits between 0.43 and 0.47, below the dashed pass line at 0.486 and the solid ceiling at 0.516. Right, the calibration KL: between 0.36 and 0.56 for every condition except the wider d128-L4 model, at 0.95." width="818" height="356" style="max-width: 100%; height: auto;" data-asset-name="conditions" />
+<figcaption><p><strong>The final score of every masked condition at peak 0.00316.</strong> Each column is one condition; faded dots
+are its seeds, the bar their range, and the diamond their mean. Left, held-out expected exact match, with
+the Bayes ceiling as a solid rule and the pass line as a dashed rule over the hatched failing side. Right,
+the calibration KL (lower is better calibrated).</p></figcaption></figure>
+
+<p>At eight times the length, the nine runs of the three schedules span 0.436 to 0.464. Sixteen times the length adds between 0.002 and 0.006 to the seed-0 run of each schedule. The wider and deeper models gain 0.023 and 0.017 on their seed-0 pair, but seed 0 is the weakest seed under every schedule, and the plain model at seed 1 reaches 0.464.</p>
+<p>Two things about the wider model stand apart from its final score. It learns faster: its HSV channels make their jump near 15k steps, against 25k to 45k for the d64 runs, and it leads through the first half of training. And it is much less well calibrated, at a KL of 0.95 against about 0.5, with a lower training loss than the d64 runs. So it is about as accurate as the others while being more confident than the examples support, which fits a model that has fitted more of its training corpus.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/model-size-light.png" alt="Six line charts of held-out expected exact match against training step, one per op group, and the shared cosine schedule under each column. The wider model rises fastest early, most visibly in the HSV-channel panel, and all three models end close together, within the range of the d64-L4 seeds." width="818" height="663" style="max-width: 100%; height: auto;" data-asset-name="model-size" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/model-size-dark.png" alt="Six line charts of held-out expected exact match against training step, one per op group, and the shared cosine schedule under each column. The wider model rises fastest early, most visibly in the HSV-channel panel, and all three models end close together, within the range of the d64-L4 seeds." width="818" height="663" style="max-width: 100%; height: auto;" data-asset-name="model-size" />
+<figcaption><p><strong>Rounds 6 and 7: a wider and a deeper model.</strong> As in the round-2 figure, for the cosine at eight times the
+length and a peak rate of 0.00316, seed 0 of each model (solid). The dotted curves are seeds 1 and 2 of the
+d64-L4 model, for the seed spread.</p></figcaption></figure>
+
+<h2 id="where-the-gap-sits-e3">Where the gap sits (E3)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#where-the-gap-sits-e3" title="Link to this heading">&para;</a></h2>
+<p>To see where the rest of the gap sits, we scored the final answer distribution of every masked run at 0.00316, context by context (see <a href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#method">Method</a>). The figure below groups the held-out contexts two ways: by the posterior on the true op, and by the number of examples that carry replacement op noise.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/gap-light.png" alt="Two line charts of expected exact match, with the Bayes ceiling dashed. Left, against four bands of the posterior on the true op: the runs sit on the ceiling in the lowest band (0.20 against 0.21) and below it in the other three, by 0.10, 0.10, and 0.06. Right, against the number of noisy examples: below the ceiling with none or one, and on it with two or three. The 14 runs lie close together throughout." width="818" height="338" style="max-width: 100%; height: auto;" data-asset-name="gap" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/gap-dark.png" alt="Two line charts of expected exact match, with the Bayes ceiling dashed. Left, against four bands of the posterior on the true op: the runs sit on the ceiling in the lowest band (0.20 against 0.21) and below it in the other three, by 0.10, 0.10, and 0.06. Right, against the number of noisy examples: below the ceiling with none or one, and on it with two or three. The 14 runs lie close together throughout." width="818" height="338" style="max-width: 100%; height: auto;" data-asset-name="gap" />
+<figcaption><p><strong>Where the model falls short of the ceiling.</strong> Held-out expected exact match of the 14 scored
+runs (thin lines) and their mean (thick), with the Bayes ceiling dashed. Left, contexts grouped by the
+posterior on the true op given their examples; right, by how many of their 3 examples carry
+replacement op noise.</p></figcaption></figure>
+
+<p>Where the examples leave the op uncertain (a posterior below 0.5, or two or more noisy examples out of three), the model scores what the ideal predictor scores. The gap opens once the examples point to one op: 0.098 in the band from 0.5 to 0.9 and 0.097 from 0.9 to 0.99, and it narrows to 0.056 where the posterior is above 0.99. Those two middle bands hold 53% of the contexts and 79% of the gap. All 14 runs share this shape, whatever their schedule, length, or model.</p>
+<h2 id="the-leak-onto-other-ops-e4">The leak onto other ops (E4)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#the-leak-onto-other-ops-e4" title="Link to this heading">&para;</a></h2>
+<p>A model that knew the true op would lose nothing to op uncertainty. So on confident contexts, what remains of the gap is about how the model computes each op, or about the model spreading its mass over ops the examples have ruled out. Where the model puts its off-support mass tells the two apart. The table below splits that mass by whether another op would give the color on the same query.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>op</th><th class=num>ceiling, all contexts</th><th class=num>ceiling, confident</th><th class=num>mass off support</th><th class=num>on other ops' answers</th><th class=num>on no op's answer</th><th class=num>share on other ops</th><th class=num>share if spread evenly</th></tr></thead><tbody><tr><td><code>mix</code></td><td class=num>0.31</td><td class=num>0.42</td><td class=num>0.127</td><td class=num>0.083</td><td class=num>0.044</td><td class=num>65%</td><td class=num>8%</td></tr><tr><td><code>screen</code></td><td class=num>0.43</td><td class=num>0.58</td><td class=num>0.060</td><td class=num>0.033</td><td class=num>0.027</td><td class=num>55%</td><td class=num>8%</td></tr><tr><td><code>multiply</code></td><td class=num>0.42</td><td class=num>0.53</td><td class=num>0.063</td><td class=num>0.036</td><td class=num>0.026</td><td class=num>58%</td><td class=num>8%</td></tr><tr><td><code>lighten</code></td><td class=num>0.71</td><td class=num>1.00</td><td class=num>0.117</td><td class=num>0.103</td><td class=num>0.014</td><td class=num>88%</td><td class=num>8%</td></tr><tr><td><code>darken</code></td><td class=num>0.69</td><td class=num>1.00</td><td class=num>0.102</td><td class=num>0.090</td><td class=num>0.011</td><td class=num>89%</td><td class=num>9%</td></tr><tr><td><code>difference</code></td><td class=num>0.76</td><td class=num>1.00</td><td class=num>0.087</td><td class=num>0.049</td><td class=num>0.037</td><td class=num>57%</td><td class=num>9%</td></tr><tr><td><code>exclusion</code></td><td class=num>0.41</td><td class=num>0.55</td><td class=num>0.066</td><td class=num>0.039</td><td class=num>0.027</td><td class=num>58%</td><td class=num>8%</td></tr><tr><td><code>hsvmix</code></td><td class=num>0.28</td><td class=num>0.39</td><td class=num>0.276</td><td class=num>0.160</td><td class=num>0.116</td><td class=num>58%</td><td class=num>8%</td></tr><tr><td><code>hue-hsv</code></td><td class=num>0.63</td><td class=num>0.84</td><td class=num>0.071</td><td class=num>0.041</td><td class=num>0.030</td><td class=num>57%</td><td class=num>9%</td></tr><tr><td><code>sat-hsv</code></td><td class=num>0.52</td><td class=num>0.70</td><td class=num>0.085</td><td class=num>0.052</td><td class=num>0.033</td><td class=num>61%</td><td class=num>9%</td></tr><tr><td><code>value-hsv</code></td><td class=num>0.52</td><td class=num>0.69</td><td class=num>0.070</td><td class=num>0.040</td><td class=num>0.029</td><td class=num>58%</td><td class=num>8%</td></tr></tbody></table><figcaption><p><strong>The mass each op leaks on confident contexts.</strong> The Bayes ceiling of each op over all its held-out contexts,
+and over its confident contexts (posterior on the true op above 0.99). The mass columns are on the
+confident contexts, as means over the 14 scored runs. "Share if spread evenly" is the share that
+would land on other ops' answers if the off-support mass were spread evenly over the off-support colors.</p></figcaption></figure>
+
+<p>On every op, the model keeps between 6% and 28% of its mass off the support, and more than half of that sits on answers another op would give, where an even spread would put under a tenth.</p>
+<p><code>lighten</code> and <code>darken</code> are the clearest case. Each gives one answer per query, with no rounding, and on a confident context the examples have ruled out the other ops, so the Bayes predictive puts all its mass on that answer and the ceiling is 1. Over all their contexts, where noisy examples often leave the op uncertain, their ceilings are 0.71 and 0.69. On their confident contexts the top answer of the model is the Bayes answer 98% of the time or more, and still about 10% of its mass goes to other ops' answers.</p>
+<p>Other ops' answers are often near the true answer in the cube, and some ops give similar answers (<code>lighten</code> and <code>screen</code> both brighten), so part of this mass could be near misses. To separate the two, we compare colors at the same distance from the support. If nearness alone set the mass, a color that is another op's answer would get the same mass as one that no op gives at that distance. We also repeat the comparison inside the box the two operands span, since several ops give answers between their operands.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/leak-distance-light.png" alt="Two line charts of a mass ratio on a log scale against distance to the support, from 1 to over 3 grid steps. Left, all off-support colors: the mean ratio is 3.9 at one step and rises to 39 beyond three steps. Right, inside the operand box: 3.5 at one step, and 15 at most. Every run lies above the dashed line at 1 at every distance." width="817" height="318" style="max-width: 100%; height: auto;" data-asset-name="leak-distance" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/leak-distance-dark.png" alt="Two line charts of a mass ratio on a log scale against distance to the support, from 1 to over 3 grid steps. Left, all off-support colors: the mean ratio is 3.9 at one step and rises to 39 beyond three steps. Right, inside the operand box: 3.5 at one step, and 15 at most. Every run lies above the dashed line at 1 at every distance." width="817" height="318" style="max-width: 100%; height: auto;" data-asset-name="leak-distance" />
+<figcaption><p><strong>Other ops' answers against other colors at the same distance.</strong> On confident contexts, off the support
+of the Bayes predictive: the mean mass per grid color on other ops' answers divided by the mean mass per
+grid color on colors no op gives, with colors grouped by their distance to the nearest support color.
+Thin lines are the 14 scored runs, the thick line their mean. Left, all off-support colors;
+right, only those inside the box the two operands span. A ratio of 1 (dashed) would mean distance alone
+sets the mass.</p></figcaption></figure>
+
+<p>At every distance, the colors that are other ops' answers get more mass: 3.9 times as much one step from the support, and more further out. Nearness does shape the leak, since 60% of the mass on other ops' answers sits one step from the support. The operand box also matters: at the same distance, a color no op gives gets 2.5 times as much mass when it lies inside the box as off-support colors do on average. But inside the box, other ops' answers still get 3 to 15 times the mass of other colors at the same distance.</p>
+<p>So the model favors the answers of the ops its examples should have ruled out, beyond what nearness or the operands account for. The runs that leak more also score lower: across the 14 runs, the mean leak on other ops' answers correlates with the final score at r = -0.94.</p>
+<p>To see which ops the leak goes to, the figure below breaks it down by op. For each true op, it counts the mass on answers that another op can give and the true op cannot.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/op-confusion-light.png" alt="A heatmap of eleven true ops against eleven ops, with the diagonal left blank and labelled in text, from 0.75 for hsvmix to 0.94. Most off-diagonal squares are pale, near 0.01. Five stand out: lighten onto screen (0.06), hsvmix onto mix (0.06), darken onto multiply (0.05), mix onto hsvmix (0.05), and difference onto exclusion (0.03)." width="610" height="504" style="max-width: 100%; height: auto;" data-asset-name="op-confusion" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/op-confusion-dark.png" alt="A heatmap of eleven true ops against eleven ops, with the diagonal left blank and labelled in text, from 0.75 for hsvmix to 0.94. Most off-diagonal squares are pale, near 0.01. Five stand out: lighten onto screen (0.06), hsvmix onto mix (0.06), darken onto multiply (0.05), mix onto hsvmix (0.05), and difference onto exclusion (0.03)." width="610" height="504" style="max-width: 100%; height: auto;" data-asset-name="op-confusion" />
+<figcaption><p><strong>Where the leak goes, by op.</strong> On confident contexts, rows are the true op. Off the diagonal, each
+square is the mass the model puts on answers that the column op can give and the true op cannot, as a
+mean over the 14 scored runs; the color scale covers these entries alone. The diagonal, in
+text, is the mass on answers of the true op. The Bayes predictive puts under 0.002 in every off-diagonal
+square.</p></figcaption></figure>
+
+<p>Most of the leak goes to one other op, the one most like the true op. On confident contexts, <code>lighten</code> puts 0.06 of its mass on answers only <code>screen</code> gives, and <code>darken</code> puts 0.05 on answers only <code>multiply</code> gives. <code>hsvmix</code> and <code>mix</code> leak onto each other (0.06 and 0.05), and <code>difference</code> onto <code>exclusion</code> (0.03). For every op, the op it leaks onto most is the one whose answers most often coincide with its own: the answer of a <code>lighten</code> query is one that <code>screen</code> can give on 90% of confident contexts, and for <code>darken</code> and <code>multiply</code> the figure is 88%. The leak runs mostly one way, from <code>lighten</code> to <code>screen</code> and from <code>darken</code> to <code>multiply</code> (0.01 and 0.01 in the other direction).</p>
+<p>So where two ops agree on most queries, the model keeps part of its mass on the answers of the other op even after the examples have told them apart.</p>
+<h2 id="answers-in-the-color-cube-e5">Answers in the color cube (E5)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#answers-in-the-color-cube-e5" title="Link to this heading">&para;</a></h2>
+<p>The cubes below put the answers of the model beside the Bayes answers, one panel per op, on the confident contexts of <code>sweep-0.00316-s1</code>. Each context is drawn at its expected answer color: the mean color of the answer distribution, which moves toward the middle of the cube as mass spreads.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/answer-cubes-light.png" alt="Eleven color-cube panels, one per op, each seen down the gray diagonal. Dots (model) sit on or very near their rings (Bayes) for every op except hsvmix, whose stubs are visibly longer and scattered in direction, with a slight pull toward the center of the cube. The deterministic ops (lighten, darken, difference) show almost no displacement." width="814" height="644" style="max-width: 100%; height: auto;" data-asset-name="answer-cubes" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/answer-cubes-dark.png" alt="Eleven color-cube panels, one per op, each seen down the gray diagonal. Dots (model) sit on or very near their rings (Bayes) for every op except hsvmix, whose stubs are visibly longer and scattered in direction, with a slight pull toward the center of the cube. The deterministic ops (lighten, darken, difference) show almost no displacement." width="814" height="644" style="max-width: 100%; height: auto;" data-asset-name="answer-cubes" />
+<figcaption><p><strong>Model answers against Bayes answers, per op.</strong> Each panel is the color cube seen down its gray
+diagonal (white at the center). Each dot is one confident held-out context (posterior on the true op
+above 0.99) of <code>sweep-0.00316-s1</code>, at the expected answer color under the model, and its ring is the
+expected answer color under the Bayes predictive, joined by a stub. Up to 90 contexts per op.</p></figcaption></figure>
+
+<p>None of the stubs is long. For ten of the eleven ops, the expected answer of the model sits within a fraction of a grid step of the Bayes one, with no shared direction to the difference. So the model has learned these ops well, and the leak above is spread thinly around the cube. <code>hsvmix</code> is the exception, as the ops table shows: it keeps 28% of its mass off support on confident contexts, and 12% goes to colors no op gives. It is the one op where the computation itself falls short.</p>
+<h2 id="hsvmix-and-the-hue-gap-e6"><code>hsvmix</code> and the hue gap (E6)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#hsvmix-and-the-hue-gap-e6" title="Link to this heading">&para;</a></h2>
+<p><code>hsvmix</code> mixes two colors in hue, saturation, and value, with the hue taken around the color wheel. Grouping its contexts (posterior above 0.9, two chromatic operands) by how far apart the operand hues are shows where it struggles.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/hsvmix-hue-gap-light.png" alt="Four color-cube panels for hsvmix, by hue gap between the operands: 0 to 30, 30 to 90, 90 to 150, and 150 to 180 degrees. The stubs lengthen as the gap grows. The score falls from 0.35 of a 0.42 ceiling at the smallest gap to 0.15 of 0.34 at the largest." width="818" height="250" style="max-width: 100%; height: auto;" data-asset-name="hsvmix-hue-gap" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/hsvmix-hue-gap-dark.png" alt="Four color-cube panels for hsvmix, by hue gap between the operands: 0 to 30, 30 to 90, 90 to 150, and 150 to 180 degrees. The stubs lengthen as the gap grows. The score falls from 0.35 of a 0.42 ceiling at the smallest gap to 0.15 of 0.34 at the largest." width="818" height="250" style="max-width: 100%; height: auto;" data-asset-name="hsvmix-hue-gap" />
+<figcaption><p><strong><code>hsvmix</code> by the hue gap between its operands.</strong> As in the figure above, for <code>hsvmix</code> contexts with a
+posterior on the true op above 0.9 and two chromatic operands, grouped by how far apart their hues are.
+Under each panel: the expected exact match, mean over the scored runs, against the Bayes ceiling.</p></figcaption></figure>
+
+<p>With nearby hues the model gets 83% of what the ceiling allows; with near-opposite hues it gets 43%. Near-opposite hues are where the midpoint around the wheel moves furthest for a small change in either operand, and at exactly opposite hues the direction around the wheel is a tie. So <code>hsvmix</code> asks for a more precise computation than the other ops, and the model has not learned it. Width and depth did not help: <code>hsvmix</code> scored 0.20 on d128-L4 and 0.19 on d64-L6, against 0.17 on their seed-0 pair.</p>
+<h2 id="what-we-make-of-it">What we make of it<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#what-we-make-of-it" title="Link to this heading">&para;</a></h2>
+<p>The control now sits at about 0.45 on the center condition, with the mask, a peak rate of 0.00316, and eight times the steps of ex-2.2.16. That falls short of the pass line, but it <em>is</em> a model that does in-context inference over ops. It tracks the ceiling across the whole range of evidence, its answers land close to the Bayes answers on ten ops, and its shortfall is concentrated in how firmly it commits once the op is clear, plus one op it computes poorly. That seems a workable baseline for the anchoring experiments, which compare an anchored model with this control on the same contexts.</p>
+<p>Four questions from this scout are on the backlog. Two are about the recipe: whether a curriculum over the replacement rate changes how firmly the model commits (<a href="https://github.com/z0u/sca2/blob/main/todo/science/noise-curriculum-center-control.md">noise curriculum</a>), and whether the wider model with a tuned rate can reach the same level in half the steps (<a href="https://github.com/z0u/sca2/blob/main/todo/science/cheaper-center-control-recipe.md">a cheaper recipe</a>); the wider model learned faster here, which is some encouragement for the second. Two are about the op set: whether to drop one op of each pair whose answers often coincide, since that is where most of the leak goes (<a href="https://github.com/z0u/sca2/blob/main/todo/science/drop-ops-with-similar-answers.md">similar ops</a>), and whether <code>hsvmix</code> needs more training on hue, saturation, and value, or should leave the op set (<a href="https://github.com/z0u/sca2/blob/main/todo/science/hsvmix-hue-precision.md">hsvmix</a>).</p>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#method" title="Link to this heading">&para;</a></h2>
+<p><strong>Scoring.</strong> For every held-out context we score the full answer distribution of the model at the query <code>=</code>, over the 216 color tokens, for the 14 masked runs at 0.00316: every run of rounds 3 to 7 and the round-2 cosine. We then redraw the held-out contexts from their seed to recover which examples carry replacement op noise, which ex-2.2.16 did not publish; the redrawn contexts match the published ones token for token. The answer table, the posterior, and the Bayes predictive come from ex-2.2.16.</p>
+<p><strong>Schedules.</strong> WSD and the staircase are dopesheets: tables of the rate, as a multiple of the peak, at points through the run, stretched to its length. Each warms up over its first 1.25% (1,320 steps at eight times, twice that at sixteen). The learning-rate panels are drawn from the schedule of each run, which matches the rate logged during training.</p>
+<p><strong>Distance to the support.</strong> For each confident context and each off-support color, the grid distance to the nearest color in the support, binned at one step, √2, √3, 2 to √5, √6 to 3, and beyond. Within a bin, the mass per color is the mean over every pair of context and color in it. The operand box holds the grid colors that lie between the two operands on every channel.</p>
+<p><strong>Op confusion.</strong> For each confident context, the grid colors each op can give for the query operands. The diagonal counts the mass on the colors of the true op, and an off-diagonal square the mass on colors of the column op that the true op cannot give; the overlap quoted in the text counts every color of the column op, on the Bayes predictive.</p>
+<p><strong>Cube figures.</strong> Up to 90 contexts per op (or per hue-gap group), a fixed sample from <code>sweep-0.00316-s1</code>; any run would do, since the runs agree closely on every summary above.</p>
+<p><strong>Budget.</strong> The scout cost about $15 on Modal, nearly all of it L4 time for training. A step takes the same time on d64-L4 and d128-L4 (about 2,000 to 3,000 steps a minute), since at these sizes the step is bound by latency rather than arithmetic, so the cost follows the step count. An eight-times run is about 40 minutes of training.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:kl">
+<p>A KL divergence measures how different one probability distribution is from another. It is zero when they match and grows as they differ.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-223/m2/ex-2.2.17/#fnref:kl" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>

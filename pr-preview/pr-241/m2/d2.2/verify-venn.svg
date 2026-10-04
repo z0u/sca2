@@ -1,0 +1,62 @@
+<svg
+  id="verify-venn"
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 640 330"
+  width="640"
+  height="330"
+  role="img"
+  aria-labelledby="verify-venn-title"
+>
+  <title id="verify-venn-title">Venn diagram of the ops that fit each example. The first example, red ? cyan = white, fits four ops: screen, lighten, exclusion, and difference. The second, c999 ? c666 = c333, fits two: multiply and difference. The circles overlap only on difference. A dashed green outline marks the ops that fit the candidate yellow ? red = lime: exclusion and difference. It reaches the overlap, so the candidate is TRUE. A dashed orange outline marks the ops that fit the candidate yellow ? red = yellow: screen, lighten, sat-hsv, and value-hsv. It touches the first circle only, so the candidate is FALSE.</title>
+
+  <style>
+    #verify-venn {
+      --fg:     #1a1a1a;
+      --muted:  #555555;
+      --ex:     #0066cc;
+      --true:   #1a8a3a;
+      --false:  #c05a00;
+    }
+    @media (prefers-color-scheme: dark) {
+      #verify-venn {
+        --fg:     #ffffff;
+        --muted:  #aaaaaa;
+        --ex:     #6cb6ff;
+        --true:   #5fd07a;
+        --false:  #ffa94d;
+      }
+    }
+    #verify-venn text { font: 13px system-ui, sans-serif; fill: var(--fg); text-anchor: middle; }
+    #verify-venn .code { font-family: ui-monospace, monospace; }
+    #verify-venn .muted { fill: var(--muted); }
+    #verify-venn .set { fill: var(--ex); fill-opacity: 0.08; stroke: var(--ex); stroke-width: 2; }
+    #verify-venn .cand { fill: none; stroke-width: 2; stroke-dasharray: 6 4; }
+    #verify-venn .true { stroke: var(--true); }
+    #verify-venn .false { stroke: var(--false); }
+    #verify-venn text.true { fill: var(--true); stroke: none; }
+    #verify-venn text.false { fill: var(--false); stroke: none; }
+  </style>
+
+  <!-- Example sets: circle A is the first example, circle B the second. -->
+  <circle class="set" cx="250" cy="165" r="120" />
+  <circle class="set" cx="378" cy="165" r="95" />
+  <text class="code" x="230" y="32">red ? cyan = white</text>
+  <text class="code" x="420" y="56">c999 ? c666 = c333</text>
+
+  <!-- Op names, placed by region. -->
+  <text x="195" y="115">screen</text>
+  <text x="195" y="145">lighten</text>
+  <text x="258" y="232">exclusion</text>
+  <text x="326" y="168">difference</text>
+  <text x="425" y="168">multiply</text>
+  <text x="62" y="108" class="muted">sat-hsv</text>
+  <text x="62" y="136" class="muted">value-hsv</text>
+
+  <!-- Candidate sets. -->
+  <ellipse class="cand true" cx="296" cy="198" rx="98" ry="50" transform="rotate(-25 296 198)" />
+  <ellipse class="cand false" cx="124" cy="124" rx="122" ry="50" />
+
+  <!-- Legend. -->
+  <text x="320" y="300" class="true code">yellow ? red = lime → TRUE</text>
+  <text x="320" y="322" class="false code">yellow ? red = yellow → FALSE</text>
+</svg>

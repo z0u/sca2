@@ -1,0 +1,1669 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/e35ed79749bec95a04ea308acbc92c0b6e5326a8/exports/m2/ex-2.2.16/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ex 2.2.16: the in-context grammar pilot</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md.css into the md.css the site serves; and VS Code's
+ * Markdown preview lists both files (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
+ *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+main.lit > * {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. */
+.admonition, details {
+  margin-block: 1.5em;
+  padding: 0.6em 1em;
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters: [{left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true}]})"></script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/pr-preview/pr-241/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/ex-2.2.16/report.py">Source</a><a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.2.16</strong> · <code>f08dd60</code> · run 2026-09-27<div>via reports/m2/ex-2.2.16/eval</div></div></details>
+<main class="lit">
+<h1 id="ex-2216-the-in-context-grammar-pilot">Ex 2.2.16: the in-context grammar pilot<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#ex-2216-the-in-context-grammar-pilot" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- tl;dr -->
+<p>The first experiment on the grammar from the <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/d2.2/pivot.html">D2.2 pivot</a>: the model infers the op from a few solved examples, with no word to name it. We trained the control at three conditions of example count and replacement rate, and anchored <code>difference</code> under the whole-line label and its variants. Every control got a little under halfway from the floor to the Bayes ceiling (skill scores 0.38 to 0.46), well short of the pass line, and so did the d128-L4 control. So the pilot stops at its first rule: the grammar and recipe are reworked before anything is anchored, and the other rules are not scored. <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.17/">Ex-2.2.17</a> takes up the rework.</p>
+</div>
+<p>This is round 2 of the <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/d2.2/design.html#quick-route">quick route</a>. The method section folds in the <a href="https://github.com/z0u/sca2/blob/main/todo/science/scout-posterior-in-context-grammar.md">posterior scouting report</a>: it computes the posterior over ops and the Bayes ceiling from the op table, with no training, and uses them to pick the three corpus conditions for the control.</p>
+<h2 id="findings">Findings<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#findings" title="Link to this heading">&para;</a></h2>
+<p>Each rule was to propose a setting for round 3. Only the first was scored.</p>
+<ul>
+<li><a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-corpus-rule-a">The corpus rule (a)</a>: no condition passes. The d64-L4 control scored 0.27 at the center against a pass line of 0.49, the other two conditions and the d128-L4 control fell as far short, and none is calibrated. Under the frozen rule, this is the outcome that adds a round.</li>
+<li>Rules (b) to (e) and the two predictions: not reached. They compare anchored arms with a control that has learned about half of what its examples allow, so the comparison would mix the effect of the anchor with unfinished training.</li>
+</ul>
+<h2 id="how-to-read-this-report">How to read this report<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#how-to-read-this-report" title="Link to this heading">&para;</a></h2>
+<p>This was a preregistration. The conditions, the five rules with their thresholds, and the two predictions were frozen at commit <code>49e59eb</code>, before any run; later edits to them are immaterial or are marked here. The <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#method">method</a> section on the posterior and the ceiling was computed before training.</p>
+<p>Every arm trained and was evaluated, and the eval is in the store, but only rule (a) is scored here. The sections for the other rules keep their frozen text, each with a note that it was not reached. Terms are defined where they first appear and collected in the <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#glossary">glossary</a>.</p>
+<h2 id="why-this-experiment">Why this experiment<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#why-this-experiment" title="Link to this heading">&para;</a></h2>
+<p><a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.14/">Ex-2.2.14</a> anchored an op and every gate passed, but the anchor went to the word that names the op, so the anchored concept was an attribute of one token. The <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/d2.2/pivot.html">pivot</a> takes op words out of the grammar.</p>
+<p>Each line is one context: a few solved examples of one op, written with <code>?</code> in place of the op word, then a query under the same op. The op is inferred from the examples, and the anchored concept is "the op in this context is <code>difference</code>", which no token names.</p>
+<p>This pilot scouts the posterior (see <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#method">Method</a> below), trains the new-grammar control, smoke-tests anchoring the inferred op, and tries the label variants.</p>
+<p>The control is the regression check; a grammar this different needs its own, as ex-2.2.3 did. No model trained on the corpus can know more about the op than the examples say, and the posterior captures that. So instead of fixed accuracy numbers, the task gate is how far the control falls short of the ceiling the posterior sets, with an analytic floor beside it.</p>
+<p>The crop policy starts as <code>whole</code>, which pulls only labelled lines wholly inside the training window. <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.15/">Ex-2.2.15</a> found that lines cut short by the window show the first-operand lean (a leak toward the anchor). Its review chose <code>whole</code> over <code>half</code>, which its rule had set, because a whole line always shows its evidence, which matters more once the evidence is a set of examples, and its discussion asks the pilot to watch the trailing-fragment lean as well.</p>
+<h2 id="glossary">Glossary<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#glossary" title="Link to this heading">&para;</a></h2>
+<dl>
+<dt>Context</dt>
+<dd>One line of the corpus: <em>k</em> examples of one op, then a query. Its op is inferred from the examples.</dd>
+<dt>Example</dt>
+<dd>A solved equation inside a context, <code>a ? b = y,</code>: the evidence the op is inferred from.</dd>
+<dt>Query</dt>
+<dd>The last equation of a context, whose answer the model completes. It is always clean.</dd>
+<dt>Replacement op noise</dt>
+<dd>Showing, in some examples, the answer another op would give, at a rate ρ per example. It spreads the posterior over ops, so it grades the stimulus.</dd>
+<dt>Cube noise</dt>
+<dd>Showing, in some examples, a color drawn from the whole grid, at a rate κ. Usually no op produces it, so it removes the evidence of an example without pointing anywhere else.</dd>
+<dt>Posterior on the true op</dt>
+<dd>How strongly the examples of a context point to the op that generated it, computed from the op table under the stochastic rounding and replacement op noise the corpus uses. For <code>difference</code> contexts it is the graded stimulus.</dd>
+<dt>Bayes ceiling</dt>
+<dd>The expected exact match on the query of the predictor that holds the posterior over ops and answers with the posterior-weighted answer distribution: the score of a calibrated model that has learned everything the examples say, which is where cross-entropy training aims.</dd>
+<dt>Floor</dt>
+<dd>The same predictor with no evidence: uniform over ops, so its answer distribution is the op-marginal. It is what a model that ignores the examples can score.</dd>
+<dt>Skill score</dt>
+<dd>Where a score sits between the floor (0) and the ceiling (1): (score − floor) / (ceiling − floor).</dd>
+<dt>Expected exact match (EEM)</dt>
+<dd>The probability mass the model puts on the colors the answer of the query can be under the true op, weighted by how often the op gives each, per context, then averaged over held-out contexts. The task metric of every report since ex-2.2.9; the ceiling and the floor are in the same units.</dd>
+<dt>KL divergence</dt>
+<dd>How far one distribution is from another, in nats: KL(q ‖ p) = Σ<sub>y</sub> q(y) log(q(y) / p(y)), zero when they agree. Here q is the Bayes predictive on a query and p the model's answer distribution, and the mean over contexts is the model's excess loss over a calibrated one, so 0.05 nats is a twentieth of a nat of loss the model could still shed. The <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-calibration-check">calibration check</a> gives reference values.</dd>
+<dt>Alignment</dt>
+<dd>The cosine between a state and e₁, the anchored axis: 1 when the state points along the axis, 0 when perpendicular. Measured per position and slice.</dd>
+<dt>Lean (ᾱ)</dt>
+<dd>The mean alignment at a role over the held-out contexts of every op: a leak toward the anchor at a site that carries no evidence about the op. The <em>first-operand lean</em> is ᾱ at the first token of a context, at the last block; the <em>trailing-fragment lean</em> is ᾱ over every position, at the last block, of a context cut to start partway through, fed on its own. Both from ex-2.2.15.</dd>
+<dt>Op margin</dt>
+<dd>How far the contexts of the anchored op sit along e₁ beyond the rest: per slice, the mean alignment over the contexts of the anchored op minus the mean over the contexts of all eleven ops, at the role where that gap is largest, averaged over slices. The quantity the anchor term optimizes, so it checks that the pull landed. The statistic of ex-2.2.14, with roles running over the whole context.</dd>
+<dt>Seed band</dt>
+<dd>The smallest difference between two seed means that a comparison resolves: 2σ√(2/n) at n seeds per arm, with σ the seed standard deviation pooled over the two arms. Rules (b) and (d) use it on expected exact match at the center condition.</dd>
+</dl>
+
+<h2 id="conditions">Conditions<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#conditions" title="Link to this heading">&para;</a></h2>
+<p>The pilot trains 14 arms at 3 seeds each, 42 runs. The control runs at the three corpus conditions the method section proposes, <code>k3-r0.2</code>, <code>k3-r0.3</code>, <code>k4-r0.3</code> (three or four examples per context, at a replacement rate of 0.2 or 0.3), at d64-L4, and once more at d128-L4 at the center. The larger control is wider rather than deeper: the part of the task we are least sure a small model can do is the lookup of each example against eleven ops, which we expect to need width more than depth, and keeping four blocks keeps the slice axis the same for every arm. It trains either way, so that a miss under rule (a) does not cost a round, and is scored only if rule (a) needs it. Everything else runs at the center condition, <code>k3-r0.3</code>.</p>
+<p>The anchored arms all anchor <code>difference</code> on e₁ with the recipe from ex-2.2.14 and crop policy <code>whole</code>, and differ in what the label covers: the whole context, or one of the four <a href="https://github.com/z0u/sca2/blob/main/todo/science/label-variants-in-context-op.md">label variants</a>. A hinge arm caps the whole-line pull at an alignment of 0.8, so no state is asked to be all concept. Two pairs add something to the corpus or the model on both the control and the whole-line arm: verification lines, and the newline mask, under which attention does not cross a line break.</p>
+<p>Ex-2.2.15 also carried an oracle arm, <code>knowable</code>, which pulled a whole labelled line only when its op was in view. Under <code>whole</code> every pulled context is wholly in view, so on this grammar that arm is the same as the whole-line arm, and the pilot leaves it out.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th>group</th><th>condition</th><th>model</th><th>anchored</th><th>label</th><th>corpus</th><th class=num>seeds</th><th class=num>what it asks</th></tr></thead><tbody><tr><td><code>control-k3-r0.2</code></td><td>control</td><td><code>k3-r0.2</code></td><td>d64-L4</td><td>—</td><td>—</td><td>—</td><td class=num>3</td><td class=num>the un-anchored control at each corpus condition</td></tr><tr class=ref><td><code>control-k3-r0.3</code></td><td>control</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>—</td><td>—</td><td>—</td><td class=num>3</td><td class=num>the un-anchored control at each corpus condition</td></tr><tr><td><code>control-k4-r0.3</code></td><td>control</td><td><code>k4-r0.3</code></td><td>d64-L4</td><td>—</td><td>—</td><td>—</td><td class=num>3</td><td class=num>the un-anchored control at each corpus condition</td></tr><tr><td><code>control-large</code></td><td>control</td><td><code>k3-r0.3</code></td><td>d128-L4</td><td>—</td><td>—</td><td>—</td><td class=num>3</td><td class=num>the larger control, trained either way and scored only if rule (a) needs it</td></tr><tr class=ref><td><code>anchor-whole</code></td><td>label</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>yes</td><td><code>whole</code></td><td>—</td><td class=num>3</td><td class=num>the whole context, every slice</td></tr><tr><td><code>anchor-no-emb</code></td><td>label</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>yes</td><td><code>no-emb</code></td><td>—</td><td class=num>3</td><td class=num>(a) the whole context, the embedding slice left out</td></tr><tr><td><code>anchor-latter</code></td><td>label</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>yes</td><td><code>latter</code></td><td>—</td><td class=num>3</td><td class=num>(b) the latter half of the context, where the prefix posterior is near its final value</td></tr><tr><td><code>anchor-prefix</code></td><td>label</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>yes</td><td><code>prefix</code></td><td>—</td><td class=num>3</td><td class=num>(c) a position once the posterior given the tokens before it clears the threshold</td></tr><tr><td><code>anchor-sampled</code></td><td>label</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>yes</td><td><code>sampled</code></td><td>—</td><td class=num>3</td><td class=num>(d) the whole context, the label drawn with probability equal to the posterior on the op</td></tr><tr><td><code>anchor-hinge</code></td><td>hinge</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>yes</td><td><code>whole</code> + hinge</td><td>—</td><td class=num>3</td><td class=num>the whole-line pull capped by a hinge</td></tr><tr><td><code>control-verify</code></td><td>verify</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>—</td><td>—</td><td>verification</td><td class=num>3</td><td class=num>the control with verification lines</td></tr><tr><td><code>anchor-verify</code></td><td>verify</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>yes</td><td><code>whole</code></td><td>verification</td><td class=num>3</td><td class=num>the whole-line arm with verification lines</td></tr><tr><td><code>control-mask</code></td><td>mask</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>—</td><td>—</td><td>newline mask</td><td class=num>3</td><td class=num>the control with the newline mask</td></tr><tr><td><code>anchor-mask</code></td><td>mask</td><td><code>k3-r0.3</code></td><td>d64-L4</td><td>yes</td><td><code>whole</code></td><td>newline mask</td><td class=num>3</td><td class=num>the whole-line arm with the newline mask</td></tr></tbody></table><figcaption><p>The 14 arms, 42 runs in all. Every anchored arm anchors <code>difference</code> at the center condition; <code>control-k3-r0.3</code> is the reference for all of them, and <code>anchor-whole</code> is the whole-line arm the label, hinge, verification, and mask arms are compared with. Corpus: what the corpus or attention of the arm adds; verification lines replace 30% of the completion lines.</p></figcaption></figure>
+
+<p><strong>The labeller.</strong> A context of <code>difference</code> draws a label with probability 0.02, keyed on the op array beside the corpus rather than on any token; no context of another op is labelled. Under the whole-line label every token of a labelled context is pulled through the pooled anchor term, which asks the context to align somewhere in its span. Variant (a) leaves the embedding slice out of the pull; (b) pulls the latter half of the context; (c) pulls a position once the posterior on <code>difference</code> given the examples before it reaches 0.5; (d) makes the draw depend on the evidence: a context of <code>difference</code> is labelled with a probability proportional to its posterior on <code>difference</code>, with the constant set so that, on average, 2% of them are labelled, as in the other arms. A context whose examples barely fit <code>difference</code> is then rarely labelled, and one whose examples all but name it is labelled a little more often than in the other arms.</p>
+<p><strong>The seeds.</strong> Three per arm, all fresh; no arm is served from the store. Comparisons between arms are between seed means, with the seed band as the resolution.</p>
+<h2 id="the-corpus-rule-a">The corpus rule (a)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-corpus-rule-a" title="Link to this heading">&para;</a></h2>
+<p><strong>The rule.</strong> A condition <em>passes</em> when the seed-mean held-out expected exact match of the d64-L4 control is at least the ceiling of record less 0.03. Among the passing conditions, the one with the widest spread of the posterior on the true op (its standard deviation across contexts, from the method section; the middle-band share breaks a tie) goes forward. Spread is the criterion because it is a property of the corpus: it says how graded the stimulus is, and round 3 measures the anchor against that grading. The calibration KL (below) is a property of the model, and would favor the condition with the least noise, where there is least to infer and least grading. So the KL is reported beside each condition, and a control that passes without being calibrated is flagged. If none passes, the d128-L4 control at the center is scored on the same line, and goes forward with the center condition if it passes; if it also falls short, the grammar is reworked before anything is anchored. That is the one outcome that adds a round.</p>
+<p>The margin is one-sided. The calibrated ceiling is not the most a model can score: a model that sharpens past calibration can reach the hard-EM ceiling, which is higher (the method section has both). So a control above the ceiling passes, and the calibration check below says whether it got there by sharpening, which is worth knowing before round 3 reads its answer distribution. The bounds of record at each condition, and the score the control has to reach:</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>ceiling (EEM) ↑</th><th class=num>floor</th><th class=num>room</th><th class=num>pass line (ceiling − margin)</th><th class=num>margin / room</th></tr></thead><tbody><tr><td><code>k3-r0.2</code></td><td class=num>0.594</td><td class=num>0.108</td><td class=num>0.485</td><td class=num>0.564</td><td class=num>0.06</td></tr><tr class=ref><td><code>k3-r0.3</code></td><td class=num>0.517</td><td class=num>0.109</td><td class=num>0.409</td><td class=num>0.487</td><td class=num>0.07</td></tr><tr><td><code>k4-r0.3</code></td><td class=num>0.577</td><td class=num>0.109</td><td class=num>0.468</td><td class=num>0.547</td><td class=num>0.06</td></tr></tbody></table><figcaption><p>The bounds of record for rule (a), at the cube-noise rate of the corpus, κ = 0.02: the calibrated Bayes ceiling, the floor, the room between them, the score a control has to reach, and the margin as a share of the room (the pass line is a skill score of one minus this).</p></figcaption></figure>
+
+<p>At the center the margin is about 7% of the room between floor and ceiling. For scale, a predictor that ignores one of the three examples and is otherwise Bayes-optimal gives up 0.097 there, so a control that passes has learned to use every example, near enough.</p>
+<p><strong>What we expect.</strong> The d64-L4 control passes at every condition, and <code>k3-r0.3</code> goes forward. The pivot expects the model to be enough because there are no variables to track; the inference is a lookup over eleven ops per example and a pool over examples. A control that passes at <code>k3-r0.2</code> and misses at the center would say the noise, not the grammar, is what costs it, and the fallback within the same block size is already in the table.</p>
+<p><strong>The calibration check.</strong> The check is the mean over held-out contexts of the KL divergence from the Bayes predictive <span class="arithmatex">\(q\)</span> (the posterior-weighted answer distribution on the query) to the model's answer distribution <span class="arithmatex">\(p\)</span> at the query <code>=</code>, in nats. Averaged over contexts, it is the model's cross-entropy on the answer less the Bayes-optimal cross-entropy: the loss the model could still shed. A control is <em>calibrated</em> at a condition when it is under 0.05 nats. The <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-calibration-check">method</a> section gives the scale: a tenth of the floor mixed into the Bayes answer costs about 0.043 at the center, ignoring one example 0.29, and committing to the most probable op 0.73. We expect the control to be calibrated at every condition it passes; a control that passes and is not calibrated has sharpened, and the direction of the miss (the KL grows fastest where the model puts no mass on an answer <span class="arithmatex">\(q\)</span> allows, so a sharpened model shows it more than a hedging one) is reported beside it.</p>
+<p><strong>The result.</strong> No condition passes, and the d128-L4 control misses too:</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/rule-a-light.png" alt="Two panels over four columns: the d64-L4 control at k3-r0.2, k3-r0.3, k4-r0.3, then the d128-L4 control at k3-r0.3. Left, held-out expected exact match: every seed sits between 0.24 and 0.36, a little under halfway from the floor near 0.11 to ceilings between 0.52 and 0.59, and every column is inside the hatched failing region below its pass line. Right, the calibration KL: every seed sits between 0.75 and 1.08 nats, far above the threshold of 0.05." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="rule-a" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/rule-a-dark.png" alt="Two panels over four columns: the d64-L4 control at k3-r0.2, k3-r0.3, k4-r0.3, then the d128-L4 control at k3-r0.3. Left, held-out expected exact match: every seed sits between 0.24 and 0.36, a little under halfway from the floor near 0.11 to ceilings between 0.52 and 0.59, and every column is inside the hatched failing region below its pass line. Right, the calibration KL: every seed sits between 0.75 and 1.08 nats, far above the threshold of 0.05." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="rule-a" />
+<figcaption><p><strong>The controls against the ceiling.</strong> One column per control, the d128-L4 control at the right
+after a gap. <strong>Left:</strong> held-out expected exact match, seeds as faded dots and the seed mean as a bar.
+Per column, the ceiling of record is the dashed segment, the floor the dotted one, and the region below
+the pass line (the ceiling less 0.03) is hatched. The dash-dot rule is the ceiling for
+a model told the op (0.702). <strong>Right:</strong> the calibration KL in nats, with the threshold of
+0.05 as a dashed rule.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>control</th><th>model</th><th>EEM per seed</th><th class=num>seed mean ↑</th><th class=num>pass line</th><th class=num>skill score</th><th class=num>spread</th><th class=num>KL ↓</th></tr></thead><tbody><tr><td><code>k3-r0.2</code></td><td>d64-L4</td><td>0.359, 0.324, 0.319</td><td class=num>0.334</td><td class=num>0.564</td><td class=num>0.46</td><td class=num>0.28</td><td class=num>0.91</td></tr><tr class=ref><td><code>k3-r0.3</code></td><td>d64-L4</td><td>0.284, 0.239, 0.276</td><td class=num>0.266</td><td class=num>0.487</td><td class=num>0.38</td><td class=num>0.33</td><td class=num>0.96</td></tr><tr><td><code>k4-r0.3</code></td><td>d64-L4</td><td>0.314, 0.311, 0.329</td><td class=num>0.318</td><td class=num>0.547</td><td class=num>0.45</td><td class=num>0.29</td><td class=num>0.91</td></tr><tr><td><code>k3-r0.3</code></td><td>d128-L4</td><td>0.235, 0.316, 0.321</td><td class=num>0.291</td><td class=num>0.487</td><td class=num>0.45</td><td class=num>0.33</td><td class=num>0.87</td></tr></tbody></table><figcaption><p>Rule (a), scored. Held-out expected exact match over all contexts per seed and its seed mean, the pass line of the condition, the skill score of the seed mean, the spread of the posterior on the true op (the criterion among passing conditions), and the seed-mean calibration KL in nats. No row passes.</p></figcaption></figure>
+
+<p>The shortfall is large and much the same everywhere. Every control has a skill score between 0.38 and 0.46, a little under halfway from the floor to the ceiling, and every seed sits far below its pass line. Width did not help: the d128-L4 control at the center scored 0.291, against 0.266 for the d64-L4 control, a difference inside the spread of its own seeds (0.235 to 0.321). The calibration KL is 0.75 to 1.08 nats across the seeds, many times the threshold of 0.05.</p>
+<p>So the grammar is reworked before anything is anchored, as the rule says. The miss alone does not say whether the grammar or the training recipe is the limit; the <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#discussion">discussion</a> has what came next.</p>
+<h2 id="the-label-rule-b">The label rule (b)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-label-rule-b" title="Link to this heading">&para;</a></h2>
+<p><strong>The rule.</strong> The whole-line label stays the primary unless a variant <em>clears the task gate</em>: its seed-mean held-out expected exact match at the center, over all contexts, exceeds that of the whole-line arm by more than the seed band, while it <em>holds the anchor</em>: its op margin is at least 90% of the margin of the whole-line arm. If more than one variant qualifies, the one with the higher op margin goes forward. Variant (d) trains the grading that the <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-anchor-follows-the-evidence">evidence section</a> reads, so it is reported on the same statistics and not promoted.</p>
+<p>The op margin is the one ex-2.2.14 used, with the contexts of the anchored op as the labelled group and roles running over the whole context (the glossary has it). The variants narrow the pull, so their margins can only be lower by construction where the narrowed positions carried it; the bar asks that most of it survives.</p>
+<p><strong>What we expect.</strong> No variant clears the gate. Ex-2.2.14 found that the label share barely moves the margin and that the task is untouched at the rate of the primary, and the variants change less than that. What they may change is where the alignment sits: (a) should leave the embeddings clean, (b) and (c) should put less alignment on the first example, and (c) leaves the middle-band contexts unlabelled. Those are read in the alignment figures of the <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-anchor-follows-the-evidence">evidence section</a>; this rule scores the task and the margin only.</p>
+<p><strong>Not reached.</strong> Rule (a) did not pass, so this is not scored. The arms trained, and their eval is in the store.</p>
+<h2 id="the-hinge-rule-c">The hinge rule (c)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-hinge-rule-c" title="Link to this heading">&para;</a></h2>
+<p><strong>The rule.</strong> The uncapped whole-line arm <em>saturates</em> at the query <code>?</code> when the seed-mean alignment at that position, on the held-out contexts of <code>difference</code> at the last block, is at least 0.9. If it does, the hinge arm goes forward in its place, provided the hinge arm holds the anchor (90% of the whole-line margin) and it is within the seed band of the whole-line arm on the task. If the whole-line arm does not saturate, it stays, and the hinge arm is reported.</p>
+<p>Saturation is the dose collapse ex-2.2.14 found at the op word: a state that is all concept has no partial dose, because projecting e₁ out of it leaves a remainder too small to mean anything. The query <code>?</code> is a constant token with nothing else to hold, so the pooled pull may put the alignment of the whole context there. The hinge counts an alignment of 0.8 as full: in the anchor term only, a position pays 1 − cos/0.8 in place of 1 − cos, and nothing above the cap. A sharp corner at the cap would switch the pull off there while the anti-subspace term keeps pushing the state back down, so a state near the cap could flip between pulled and not pulled from step to step. So the corner is rounded with a softplus, a smooth version of max(0, x), of width 0.05, and the pull fades out over a narrow band around the cap, which gives the two terms a smooth point to balance at. We expect the pulled states to settle near 0.8, keeping a part off the axis for the projection to land on. Measurements use the raw cosine.</p>
+<p><strong>What we expect.</strong> We do not predict either way. The pooled term concentrates the pull where alignment comes cheapest, which argues for saturation; the anti-subspace term penalizes the squared alignment of every state, which argues against it, and <em>red</em> under the same recipe reached about 0.5 at its own token. What we do expect is that the query <code>?</code> carries more alignment than any example position on the whole-line arm, since it is the first position at which the whole context has been seen and its state is free.</p>
+<p><strong>Not reached.</strong> Rule (a) did not pass, so this is not scored. The arms trained, and their eval is in the store.</p>
+<h2 id="the-verification-rule-d">The verification rule (d)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-verification-rule-d" title="Link to this heading">&para;</a></h2>
+<p><strong>The rule.</strong> Verification lines stay in the corpus from round 3 on if they <em>leave completion unchanged</em>: the seed-mean held-out expected exact match on completion contexts is within the seed band of the arm without them, on both pairs, <code>control-verify</code> against <code>control-k3-r0.3</code> and <code>anchor-verify</code> against <code>anchor-whole</code>. Both pairs have to hold; a corpus that costs the anchored arm and not the control would say the anchor and the second task compete.</p>
+<p>A verification line replaces the completion of 30% of contexts with a candidate answer, a marker, and a <code>TRUE</code> or <code>FALSE</code> verdict (<a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/d2.2/pivot.html#a-verification-line">the pivot</a>); the loss is masked on a <code>FALSE</code> candidate (the answer token only). The verification accuracy itself (the share of verdicts right, held out) is reported with no gate, as the first number D2.3 gets; so is the op margin of <code>anchor-verify</code> against the margin of the whole-line arm.</p>
+<p><strong>What we expect.</strong> Completion is unchanged on both pairs. The verification arms see 70% of the completion lines the others do, over the same steps, and the calibration look in ex-2.2.9 found that the task is limited by distinct lines rather than passes over them; so the cost, if there is one, shows on the ops that round the most. A miss on the control pair would send the rate down before round 3 rather than take verification out.</p>
+<p><strong>Not reached.</strong> Rule (a) did not pass, so this is not scored. The arms trained, and their eval is in the store.</p>
+<h2 id="the-operator-rule-e">The operator rule (e)<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-operator-rule-e" title="Link to this heading">&para;</a></h2>
+<p><strong>The rule.</strong> A scoring-only suppression pass runs on the checkpoints of the pilot itself, on the whole-line arm, the hinge arm, and the control at the center: the projection along its dose axis (γ in 0.25, 0.5, 0.75, 1: the fraction of the component on e₁ removed), the repulsion along its dose axis (a landing at 0.25, 0, for states above an alignment of 0.5), and the reflection (the projection at γ = 2, one dose, as a reference). Each acts at every slice, at three sites: the query <code>?</code>, the query <code>=</code>, and every position. The rule is scored on the every-position edit, on the anchored arm that rule (c) sends forward: the whole-line arm, or the hinge arm if the whole-line arm saturates. The other anchored arm is reported beside it. An operator <em>grades with dose</em> when the seed-mean drop in expected exact match on the held-out <code>difference</code> contexts is non-decreasing along its dose axis and reaches, at full dose, at least 50% of the way from the clean score to the target null; it is <em>selective</em> when on each of the other ten ops the seed-mean drop is at most 0.02 at every dose, with the control under the same edit as the reference. The operator that does both goes forward with its dose axis; if both do, the projection, which is the simpler; if neither does, the operator for round 3 stays open, and the pilot reports why.</p>
+<p>The target null is the answer a model that has lost <code>difference</code> and nothing else would give: the posterior-weighted answer distribution with <code>difference</code> removed and the rest renormalized. Its expected exact match on a context is the target the full-dose damage is measured against, per context, from the posterior of the method section.</p>
+<p><strong>What we expect.</strong> The projection grades if the query <code>?</code> does not saturate, and collapses (all of its damage in the last step of γ) if it does; the repulsion grades either way, since its dose is where the state lands rather than how much is removed. Selectivity should hold for both at the query sites, which the other ops' contexts share only as syntax, and is the open question at every position, where the edit touches states that carry the other ops. The two query sites are the first bypass measurement: an edit at <code>?</code> that does less than the same edit at <code>=</code> says the model reads the op from the examples rather than from <code>?</code>.</p>
+<p><strong>Not reached.</strong> Rule (a) did not pass, so this is not scored. The arms trained, and their eval is in the store.</p>
+<h2 id="the-anchor-follows-the-evidence">The anchor follows the evidence<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-anchor-follows-the-evidence" title="Link to this heading">&para;</a></h2>
+<p><strong>What we expect.</strong> On the whole-line arm, the alignment at the query <code>=</code> on a held-out <code>difference</code> context rises with the posterior on <code>difference</code> across the middle band (0.5 to 0.95): binned by posterior, the seed-mean alignment at the last block is higher in each bin than the one below it. That is the graded stimulus, the part redness played for <em>red</em>, and it is a result the pull did not train for: the label is binary on the true op, so a context whose examples half-fit <code>difference</code> was pulled as hard as one that names it. A shortcut, such as a characteristic answer color, would likely not follow the posterior.</p>
+<p>Variant (c) leaves the middle-band contexts unlabelled, so grading there under (c) is the cleaner version of the same result; variant (d) trains it and is the comparison. Alignment against the posterior on the <em>other</em> ops' contexts (where the posterior on <code>difference</code> is low but not zero) is reported beside it, since a graded response should be low and flat there.</p>
+<p><strong>Not reached.</strong> Rule (a) did not pass, so this is not scored. The arms trained, and their eval is in the store.</p>
+<h2 id="the-leans-under-whole">The leans under <code>whole</code><a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-leans-under-whole" title="Link to this heading">&para;</a></h2>
+<p><strong>What we expect.</strong> On the whole-line arm, both leans stay within the seed band of the control. Ex-2.2.15 found that under <code>all</code>, lines cut short by the window taught the model to lean toward e₁ at the first operand of every line, and more so on a trailing fragment shown alone; under <code>whole</code> both leans sat inside the band of the control. This grammar gives a cut context more to lean with, since a window cuts more contexts than lines and a fragment of a context still looks like a context, so the lean is worth reading again. The first-operand lean is ᾱ at the first token of the context at the last block; the trailing-fragment lean is ᾱ over every position, at the last block, of a context cut to start at each example boundary, fed on its own; both over the held-out contexts of every op, with the mask arms measured with the mask on.</p>
+<p><strong>Not reached.</strong> Rule (a) did not pass, so this is not scored. The arms trained, and their eval is in the store.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#discussion" title="Link to this heading">&para;</a></h2>
+<p>The pilot expected the d64-L4 control to reach its ceiling at every condition, on the reasoning that inferring the op is a lookup over eleven ops per example and a pool over examples. It got a little under halfway instead, at every condition and at twice the width. Validation loss was still falling at the end of training, so the first question after the pilot was whether the recipe or the task was the limit.</p>
+<p><a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.17/">Ex-2.2.17</a> is a scout on that question, on the center control. A newline mask, a lower peak learning rate, and eight times the steps lift it to about 0.45, still short of the pass line, and no schedule, length, width, or depth moves it further. Its scoring places the remaining gap on contexts whose examples settle the op, and on one op, <code>hsvmix</code>, that the model computes poorly. Its backlog items on the op set (<a href="https://github.com/z0u/sca2/blob/main/todo/science/drop-ops-with-similar-answers.md">similar ops</a>, <a href="https://github.com/z0u/sca2/blob/main/todo/science/hsvmix-hue-precision.md"><code>hsvmix</code></a>) are the grammar side of the rework.</p>
+<p>None of rules (b) to (e) was tested here, so they can carry over to the next pilot unchanged.</p>
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#method" title="Link to this heading">&para;</a></h2>
+<h3 id="the-posterior-over-ops">The posterior over ops<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-posterior-over-ops" title="Link to this heading">&para;</a></h3>
+<p>Each example is a pair of operands and an answer, and under stochastic rounding the answer is a draw from up to eight colors. So the likelihood of a shown answer <em>y</em> under an op <em>o</em> is the probability that rounding the result of <em>o</em> on that pair gives <em>y</em>, written <span class="arithmatex">\(P_o(y \mid a, b)\)</span> (<code>answer_dist</code> in <code>sca.data.ops</code>).</p>
+<p>The corpus rounds each channel independently, in proportion to where the raw value sits between grid levels. The posterior uses the same rounding.</p>
+<p>Replacement op noise enters the likelihood as a mixture. With rate ρ, each example shows a draw from the distribution of another op instead, the other op uniform over the ten, so</p>
+<div class="arithmatex">\[
+L_o(y \mid a, b) = (1 - \rho - \kappa)\, P_o(y \mid a, b) + \rho \, \mathbb{E}_{o' \neq o}\big[P_{o'}(y \mid a, b)\big] + \frac{\kappa}{216},
+\]</div>
+<p>where <span class="arithmatex">\(L_o\)</span> is the likelihood of the shown answer under op <em>o</em> in the noisy corpus, <span class="arithmatex">\(\mathbb{E}_{o' \neq o}\)</span> is the mean over the ten other ops, and κ is the cube-noise rate. The posterior over the eleven ops is the product of the example likelihoods under a uniform prior. This is the posterior a model trained on the noisy corpus can reach at best. It also keeps every op above zero whenever ρ or κ is above zero, which is what lets the target null weight the other ops by how nearly they fit on a context that fits one op alone.</p>
+<p>Of two possible readings of ρ, we take the one whose numbers match the pivot: per example, with the replacing op uniform over the other ten. A replacement is invisible when the replacing op agrees with the true op on the pair, so slightly fewer than a fraction ρ of examples mislead, and the posterior is a smooth weighting rather than a count of the ops that fit.</p>
+<p>Under this reading, the shares of contexts in each band of the posterior reproduce the scratch simulation in the pivot: one clean example puts the posterior above 0.95 on 47% of contexts and three do so on 91%; at three examples and ρ = 0.35, 21% are above the band, 45% inside it, and 34% below.</p>
+<p>The figure covers the whole grid, 6 example counts by 7 replacement rates, with the true op uniform over the table.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/posterior-ecdf-light.png" alt="Six panels, one per example count from 1 to 6, each showing the cumulative share of contexts against the posterior on the true op, one curve per replacement rate. With no noise the curves hug the right edge from three examples on; as the rate rises they spread across the range. At the center condition, 3 examples and ρ = 0.3, 27% of contexts sit below the middle band, 45% inside it, and 28% above." width="818" height="452" style="max-width: 100%; height: auto;" data-asset-name="posterior-ecdf" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/posterior-ecdf-dark.png" alt="Six panels, one per example count from 1 to 6, each showing the cumulative share of contexts against the posterior on the true op, one curve per replacement rate. With no noise the curves hug the right edge from three examples on; as the rate rises they spread across the range. At the center condition, 3 examples and ρ = 0.3, 27% of contexts sit below the middle band, 45% inside it, and 28% above." width="818" height="452" style="max-width: 100%; height: auto;" data-asset-name="posterior-ecdf" />
+<figcaption><p><strong>The posterior on the true op, across contexts.</strong> Each panel is one example count; each curve is one
+replacement rate ρ, shaded light to dark from 0 to 0.5. A curve shows the share of contexts
+whose posterior on the true op is at most the value on the x-axis. The shaded band is the middle band,
+0.5 to 0.95: a curve that rises steeply inside it has many graded contexts, one that stays
+flat until the right edge has contexts that all but name the op. Sampled contexts, 40,000
+per curve.</p></figcaption></figure>
+
+<p>Clean examples pin the op down fast, so the example count alone grades very little; replacement op noise is what spreads the posterior across the range. The spread is widest, at a standard deviation of 0.35, for 3 examples at ρ = 0.4; at the center condition it is 0.33, with 45% of contexts in the middle band and 27% below it.</p>
+<h3 id="the-bayes-ceiling-and-the-floor">The Bayes ceiling and the floor<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-bayes-ceiling-and-the-floor" title="Link to this heading">&para;</a></h3>
+<p>A model that has learned everything the examples say answers the query with the answer distribution weighted by the posterior, <span class="arithmatex">\(q(y) = \sum_o \pi_o P_o(y \mid c, d)\)</span> for the query pair <span class="arithmatex">\((c, d)\)</span>. That is the distribution cross-entropy training converges to, and a calibrated model holds it.<sup id="fnref:calibrated"><a class="footnote-ref" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#fn:calibrated">1</a></sup></p>
+<p>Our reports score expected exact match: the probability mass the model puts on the answers the true op can give, weighted by how often it gives them. So the ceiling is <span class="arithmatex">\(\sum_y q(y)\, P_t(y \mid c, d)\)</span> under the true op <em>t</em>, averaged over contexts.</p>
+<p>Told the op, the same predictor scores <span class="arithmatex">\(\sum_y P_t(y)^2\)</span>, which is 0.702 over the table. The shortfall from 1 comes from stochastic rounding, and it does not depend on the examples or the noise.</p>
+<p>The floor (no evidence, uniform over ops) is the same at every grid point, 0.109 (the sampled values run from 0.108 to 0.109).</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/ceiling-grid-light.png" alt="Two line charts against the example count. Left, the Bayes ceiling in expected exact match: every curve rises with more examples and sits lower at a higher replacement rate, toward a dashed line at 0.70 for a model told the op, with the floor as a dotted line at 0.11. Right, the spread of the posterior on the true op, which peaks at 0.35 for 3 examples at ρ = 0.4 and falls toward zero as the examples pin the op down." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="ceiling-grid" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/ceiling-grid-dark.png" alt="Two line charts against the example count. Left, the Bayes ceiling in expected exact match: every curve rises with more examples and sits lower at a higher replacement rate, toward a dashed line at 0.70 for a model told the op, with the floor as a dotted line at 0.11. Right, the spread of the posterior on the true op, which peaks at 0.35 for 3 examples at ρ = 0.4 and falls toward zero as the examples pin the op down." width="818" height="318" style="max-width: 100%; height: auto;" data-asset-name="ceiling-grid" />
+<figcaption><p><strong>The Bayes ceiling and the spread of the stimulus, over the grid.</strong> One curve per replacement rate ρ,
+shaded as in the figure above. <strong>Left:</strong> the ceiling, the expected exact match of the predictor that
+answers with the posterior-weighted answer distribution. The dashed line is the same predictor told the
+op (0.702), the dotted line the floor, with no evidence (0.109). <strong>Right:</strong> the standard
+deviation of the posterior on the true op across contexts. Ringed marks are the three proposed
+conditions.</p></figcaption></figure>
+
+<p>With three clean examples the ceiling is 0.692, within 0.02 of a model told the op, so almost all of the shortfall is rounding. Replacement op noise adds a shortfall that comes from inference: at three examples and ρ = 0.35 the ceiling falls to 0.485, and at the center condition it is 0.530.</p>
+<details>
+<summary>The grid as tables</summary>
+<figure class="report-figure">
+<table class="report-table dense">
+<thead>
+<tr>
+<th>examples</th>
+<th class="num">ρ = 0</th>
+<th class="num">ρ = 0.1</th>
+<th class="num">ρ = 0.2</th>
+<th class="num">ρ = 0.3</th>
+<th class="num">ρ = 0.35</th>
+<th class="num">ρ = 0.4</th>
+<th class="num">ρ = 0.5</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td class="num">0.573</td>
+<td class="num">0.474</td>
+<td class="num">0.393</td>
+<td class="num">0.317</td>
+<td class="num">0.284</td>
+<td class="num">0.253</td>
+<td class="num">0.202</td>
+</tr>
+<tr>
+<td>2</td>
+<td class="num">0.673</td>
+<td class="num">0.590</td>
+<td class="num">0.512</td>
+<td class="num">0.433</td>
+<td class="num">0.393</td>
+<td class="num">0.354</td>
+<td class="num">0.281</td>
+</tr>
+<tr>
+<td>3</td>
+<td class="num">0.692</td>
+<td class="num">0.661</td>
+<td class="num">0.603</td>
+<td class="num">0.530</td>
+<td class="num">0.485</td>
+<td class="num">0.441</td>
+<td class="num">0.349</td>
+</tr>
+<tr>
+<td>4</td>
+<td class="num">0.700</td>
+<td class="num">0.685</td>
+<td class="num">0.646</td>
+<td class="num">0.590</td>
+<td class="num">0.548</td>
+<td class="num">0.508</td>
+<td class="num">0.409</td>
+</tr>
+<tr>
+<td>5</td>
+<td class="num">0.703</td>
+<td class="num">0.694</td>
+<td class="num">0.672</td>
+<td class="num">0.629</td>
+<td class="num">0.599</td>
+<td class="num">0.553</td>
+<td class="num">0.461</td>
+</tr>
+<tr>
+<td>6</td>
+<td class="num">0.702</td>
+<td class="num">0.695</td>
+<td class="num">0.685</td>
+<td class="num">0.650</td>
+<td class="num">0.625</td>
+<td class="num">0.594</td>
+<td class="num">0.500</td>
+</tr>
+</tbody>
+</table>
+<figcaption>
+<p>The Bayes ceiling in expected exact match at each grid point.</p>
+</figcaption>
+</figure>
+<figure class="report-figure">
+<table class="report-table dense">
+<thead>
+<tr>
+<th>examples</th>
+<th class="num">ρ = 0</th>
+<th class="num">ρ = 0.1</th>
+<th class="num">ρ = 0.2</th>
+<th class="num">ρ = 0.3</th>
+<th class="num">ρ = 0.35</th>
+<th class="num">ρ = 0.4</th>
+<th class="num">ρ = 0.5</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td class="num">0.289</td>
+<td class="num">0.312</td>
+<td class="num">0.303</td>
+<td class="num">0.275</td>
+<td class="num">0.257</td>
+<td class="num">0.235</td>
+<td class="num">0.187</td>
+</tr>
+<tr>
+<td>2</td>
+<td class="num">0.184</td>
+<td class="num">0.288</td>
+<td class="num">0.330</td>
+<td class="num">0.341</td>
+<td class="num">0.335</td>
+<td class="num">0.323</td>
+<td class="num">0.282</td>
+</tr>
+<tr>
+<td>3</td>
+<td class="num">0.116</td>
+<td class="num">0.204</td>
+<td class="num">0.281</td>
+<td class="num">0.330</td>
+<td class="num">0.344</td>
+<td class="num">0.347</td>
+<td class="num">0.327</td>
+</tr>
+<tr>
+<td>4</td>
+<td class="num">0.078</td>
+<td class="num">0.144</td>
+<td class="num">0.222</td>
+<td class="num">0.291</td>
+<td class="num">0.319</td>
+<td class="num">0.337</td>
+<td class="num">0.343</td>
+</tr>
+<tr>
+<td>5</td>
+<td class="num">0.051</td>
+<td class="num">0.105</td>
+<td class="num">0.175</td>
+<td class="num">0.248</td>
+<td class="num">0.285</td>
+<td class="num">0.316</td>
+<td class="num">0.345</td>
+</tr>
+<tr>
+<td>6</td>
+<td class="num">0.033</td>
+<td class="num">0.073</td>
+<td class="num">0.135</td>
+<td class="num">0.215</td>
+<td class="num">0.252</td>
+<td class="num">0.286</td>
+<td class="num">0.339</td>
+</tr>
+</tbody>
+</table>
+<figcaption>
+<p>The spread of the posterior on the true op across contexts (standard deviation) at each grid point.</p>
+</figcaption>
+</figure>
+</details>
+<p><strong>The numbers in the pivot are the hard-accuracy form.</strong> The pivot quotes a ceiling of about 0.74 at three clean examples, 0.58 at ρ = 0.35, and 0.75 for a model told the op. Those are what the same predictor scores when it puts all its mass on the mode of <span class="arithmatex">\(q\)</span>: 0.741, 0.586, and 0.745 here.</p>
+<p>That form is higher because expected exact match is linear in the model distribution, so the metric itself is maximized by a model that names one color. The calibrated predictor spreads its mass over every rounding of the answer, and scores about 0.05 less at three clean examples and 0.1 less at ρ = 0.35.</p>
+<p>The ceiling of record is the calibrated one, since that is where training aims. A control scoring above it would have sharpened past calibration, and the calibration check in the measurements would show that. The tables keep the hard form as the maximum of the metric.</p>
+<p>Per op, the ceiling is capped by how much the op rounds. <code>difference</code> is total on the grid, so its told-op ceiling is 1 and its ceiling at the center condition is 0.776, with the posterior on it spread about as widely as on any op (sd 0.32, 43% in the middle band). That is the graded stimulus the anchored arms are scored against.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>op</th><th class=num>ceiling (EEM)</th><th class=num>told the op</th><th class=num>floor</th><th class=num>spread (sd)</th><th class=num>in band</th></tr></thead><tbody><tr><td><code>mix</code></td><td class=num>0.309</td><td class=num>0.422</td><td class=num>0.072</td><td class=num>0.331</td><td class=num>44%</td></tr><tr><td><code>screen</code></td><td class=num>0.423</td><td class=num>0.556</td><td class=num>0.104</td><td class=num>0.342</td><td class=num>44%</td></tr><tr><td><code>multiply</code></td><td class=num>0.435</td><td class=num>0.556</td><td class=num>0.099</td><td class=num>0.340</td><td class=num>44%</td></tr><tr><td><code>lighten</code></td><td class=num>0.712</td><td class=num>1.000</td><td class=num>0.164</td><td class=num>0.319</td><td class=num>52%</td></tr><tr><td><code>darken</code></td><td class=num>0.727</td><td class=num>1.000</td><td class=num>0.155</td><td class=num>0.320</td><td class=num>51%</td></tr><tr class=ref><td><code>difference</code></td><td class=num>0.776</td><td class=num>1.000</td><td class=num>0.121</td><td class=num>0.322</td><td class=num>43%</td></tr><tr><td><code>exclusion</code></td><td class=num>0.423</td><td class=num>0.556</td><td class=num>0.093</td><td class=num>0.330</td><td class=num>42%</td></tr><tr><td><code>hsvmix</code></td><td class=num>0.287</td><td class=num>0.394</td><td class=num>0.075</td><td class=num>0.338</td><td class=num>43%</td></tr><tr><td><code>hue-hsv</code></td><td class=num>0.641</td><td class=num>0.831</td><td class=num>0.103</td><td class=num>0.323</td><td class=num>42%</td></tr><tr><td><code>sat-hsv</code></td><td class=num>0.537</td><td class=num>0.704</td><td class=num>0.102</td><td class=num>0.324</td><td class=num>42%</td></tr><tr><td><code>value-hsv</code></td><td class=num>0.542</td><td class=num>0.705</td><td class=num>0.102</td><td class=num>0.323</td><td class=num>42%</td></tr></tbody></table><figcaption><p>Per true op at the center condition, <code>k3-r0.3</code>: the ceiling, the ceiling for a model told the op (which is the rounding cap), the floor, the spread of the posterior on the op across its contexts, and the share of its contexts in the middle band. Ops total on the grid have a told-op ceiling of 1. <code>difference</code> is the anchored op.</p></figcaption></figure>
+
+<h3 id="cube-noise">Cube noise<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#cube-noise" title="Link to this heading">&para;</a></h3>
+<p>The pivot allows cube noise at a low rate, so that the model learns to discount examples that fit nothing. At the center condition it costs 0.013 of ceiling at κ = 0.02, 0.031 at κ = 0.05, and 0.063 at κ = 0.1.</p>
+<p>A posterior that does not know about cube noise treats a cube color as replacement op noise. It is a little sharper, and the metric rewards sharpness (as above), so it scores 0.006 higher at the highest rate. So the ceiling barely depends on whether the model has learned about cube noise. Whether the corpus carries it is left open (<code>CUBE_RATE</code>).</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/cube-noise-light.png" alt="A line chart of the Bayes ceiling against the cube-noise rate from 0 to 0.1, one line per proposed condition. Every line falls gently; at the center condition the ceiling drops by 0.063 at the highest rate. Hollow marks, for a posterior that ignores the cube noise, sit a few thousandths above the filled ones." width="548" height="298" style="max-width: 100%; height: auto;" data-asset-name="cube-noise" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/cube-noise-dark.png" alt="A line chart of the Bayes ceiling against the cube-noise rate from 0 to 0.1, one line per proposed condition. Every line falls gently; at the center condition the ceiling drops by 0.063 at the highest rate. Hollow marks, for a posterior that ignores the cube noise, sit a few thousandths above the filled ones." width="548" height="298" style="max-width: 100%; height: auto;" data-asset-name="cube-noise" />
+<figcaption><p><strong>What cube noise costs the ceiling.</strong> One line per proposed condition. Filled marks: the ceiling for
+the posterior that knows the cube-noise rate κ. Hollow marks: the ceiling for the posterior that treats
+every odd example as replacement op noise, which is what a model that has not learned about cube noise
+would hold.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>κ = 0</th><th class=num>κ = 0.02</th><th class=num>κ = 0.05</th><th class=num>κ = 0.1</th></tr></thead><tbody><tr><td><code>k3-r0.2</code></td><td class=num>0.603</td><td class=num>0.594</td><td class=num>0.578</td><td class=num>0.556</td></tr><tr><td><code>k3-r0.3</code></td><td class=num>0.530</td><td class=num>0.517</td><td class=num>0.500</td><td class=num>0.467</td></tr><tr><td><code>k4-r0.3</code></td><td class=num>0.590</td><td class=num>0.577</td><td class=num>0.565</td><td class=num>0.537</td></tr></tbody></table><figcaption><p>The Bayes ceiling at each proposed condition under cube noise at rate κ, for the posterior that knows κ.</p></figcaption></figure>
+
+<h3 id="the-three-corpus-conditions">The three corpus conditions<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-three-corpus-conditions" title="Link to this heading">&para;</a></h3>
+<p>Rule (a) picks the widest spread among the conditions where the control nears its ceiling, so the three should differ in spread and in ceiling, and bracket the working point of the pivot of three examples at ρ near 0.3. We propose <code>k3-r0.2</code>, <code>k3-r0.3</code>, and <code>k4-r0.3</code>.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>examples</th><th class=num>ρ</th><th class=num>tokens per line</th><th class=num>ceiling (EEM) ↑</th><th class=num>floor</th><th class=num>ceiling − floor</th><th class=num>hard-EM ceiling</th><th class=num>spread (sd)</th><th class=num>below band</th><th class=num>in band</th><th class=num>above band</th></tr></thead><tbody><tr><td><code>k3-r0.2</code></td><td class=num>3</td><td class=num>0.2</td><td class=num>24</td><td class=num>0.603</td><td class=num>0.108</td><td class=num>0.495</td><td class=num>0.677</td><td class=num>0.281</td><td class=num>16%</td><td class=num>28%</td><td class=num>57%</td></tr><tr class=ref><td><code>k3-r0.3</code></td><td class=num>3</td><td class=num>0.3</td><td class=num>24</td><td class=num>0.530</td><td class=num>0.109</td><td class=num>0.421</td><td class=num>0.624</td><td class=num>0.330</td><td class=num>27%</td><td class=num>45%</td><td class=num>28%</td></tr><tr><td><code>k4-r0.3</code></td><td class=num>4</td><td class=num>0.3</td><td class=num>30</td><td class=num>0.590</td><td class=num>0.109</td><td class=num>0.480</td><td class=num>0.668</td><td class=num>0.291</td><td class=num>17%</td><td class=num>31%</td><td class=num>52%</td></tr></tbody></table><figcaption><p>The three proposed corpus conditions, at κ = 0. The ceiling and floor are the analytic bounds the control at each condition is scored between (the bounds of record, at the cube-noise rate of the corpus, are under rule (a)); the hard-EM ceiling is the same predictor naming the mode, for comparison with the pivot. The band columns are shares of contexts by posterior on the true op, below, inside, and above 0.5–0.95. The center condition is <code>k3-r0.3</code>.</p></figcaption></figure>
+
+<p><code>k3-r0.3</code> is the center. <code>k3-r0.2</code> steps ρ down on the same line length: it gives up spread (0.28 against 0.33) for a higher ceiling, and is the fallback within the same block size if the control falls short at the center.</p>
+<p><code>k4-r0.3</code> adds one example at the center ρ, which raises the ceiling by 0.06 and keeps most of the spread (0.29), though fewer contexts sit in the middle band (31% against 45%). It asks whether more evidence buys a higher ceiling without flattening the stimulus, at 30 tokens per line rather than 24.</p>
+<p>Two alternatives were weighed. <code>k3-r0.4</code> has the widest spread on the three-example row, but its middle-band share (43%) is no larger than at the center and its ceiling is 0.09 lower, so it grades no better and leaves less room between floor and ceiling. <code>k4-r0.35</code> comes closer to the spread at the center (0.32, with 35% in the middle band) at a ceiling of 0.548; <code>k4-r0.3</code> gives up a little of that spread for 0.04 more ceiling.</p>
+<h3 id="reading-a-score-against-its-ceiling">Reading a score against its ceiling<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#reading-a-score-against-its-ceiling" title="Link to this heading">&para;</a></h3>
+<p>The ceiling differs between conditions, so a score is shown two ways. Figures keep raw expected exact match on the y-axis and draw the ceiling and floor of each condition as dashed lines beside its seed marks, so the reader sees without arithmetic how much of the available room a model takes.</p>
+<p>A table that compares across conditions adds the skill score as a column (0 is a model that ignores the examples, 1 is the Bayes predictor). The figure for the control also draws the ceiling for a model told the op (0.702) beside the Bayes ceiling, so that the part of the gap due to inference can be seen.</p>
+<h3 id="the-calibration-check">The calibration check<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-calibration-check" title="Link to this heading">&para;</a></h3>
+<p>The check compares the model's answer distribution at the query <code>=</code>, <span class="arithmatex">\(p\)</span>, with the Bayes predictive <span class="arithmatex">\(q\)</span> on the same context, through the KL divergence KL(q ‖ p) = Σ<sub>y</sub> q(y) log(q(y) / p(y)), averaged over held-out contexts. Averaged that way it is the cross-entropy of the model on the answer less the cross-entropy of the Bayes predictor, since the true answers are drawn from <span class="arithmatex">\(q\)</span> once the true op is marginalized under the posterior. So the number is excess loss, in nats, and zero means the model holds exactly the distribution the examples support.</p>
+<p>The table below gives the scale, at the cube-noise rate of record. H(q) is the irreducible loss: what even the Bayes predictor pays, from rounding and from the ops the examples do not rule out. The other columns are the excess of four predictors that miss calibration in named ways: the floor predictor (no evidence), one that commits to the most probable op and answers with its distribution, one that ignores one of the examples, and one that mixes a tenth of the floor into the Bayes answer.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>H(q)</th><th class=num>floor</th><th class=num>commits to the MAP op</th><th class=num>one example ignored</th><th class=num>a tenth of the floor mixed in</th></tr></thead><tbody><tr><td><code>k3-r0.2</code></td><td class=num>0.83</td><td class=num>1.67</td><td class=num>0.43</td><td class=num>0.26</td><td class=num>0.061</td></tr><tr class=ref><td><code>k3-r0.3</code></td><td class=num>1.08</td><td class=num>1.43</td><td class=num>0.73</td><td class=num>0.29</td><td class=num>0.043</td></tr><tr><td><code>k4-r0.3</code></td><td class=num>0.89</td><td class=num>1.61</td><td class=num>0.47</td><td class=num>0.19</td><td class=num>0.057</td></tr></tbody></table><figcaption><p>The calibration scale, in nats, at κ = 0.02: the irreducible loss H(q) of the Bayes predictive q, then the mean KL divergence from q to four predictors that miss calibration in named ways. A model is called calibrated under 0.05. Sampled contexts, 20,000 per row.</p></figcaption></figure>
+
+<p>Two things to take from it. Ignoring one example costs several times the threshold of 0.05, so a calibrated model is one that uses all of its examples; and committing to one op costs more than ignoring an example, so a model that names the op instead of weighing them shows up here even where its expected exact match is high (that is the sharpening the ceiling of record allows for). The mix column is what the threshold roughly means: less miscalibrated than a Bayes predictor with a tenth of ignorance stirred in.</p>
+<p>The ceiling of record at each condition is the Bayes ceiling at κ = 0.02, from the <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#cube-noise">cube table</a>. The floor does not depend on the examples, so it is the κ = 0 value.</p>
+<h3 id="the-corpus-and-the-training">The corpus and the training<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-corpus-and-the-training" title="Link to this heading">&para;</a></h3>
+<p>One context per line, the op uniform over table A+, every pair uniform over the ordered pairs of the grid, and the query clean; the noise model is the one <code>posterior.py</code> assumes, a per-example replacement rate ρ with the replacing op uniform over the other ten and cube noise uniform over the grid at κ = 0.02, so the ceiling here is the ceiling of the corpus. The generator is <code>sca.data.incontext</code>; a context of <em>k</em> examples is 6<em>k</em> + 6 tokens, so a line is 24 tokens at three examples and 30 at four, and 26 at three with a verification line.</p>
+<p>The corpus holds 300,000 contexts, the line count of ex-2.2.14, so <code>difference</code> has about the same number of lines and the labeller the same number of draws (about 545 labelled contexts). The training window is 96 tokens, a random crop of the packed corpus, which holds about two whole contexts at four examples and three at three, with a fragment at each end. Held out: 2,000 contexts per op, drawn from the same generator at a seed the corpus does not use.</p>
+<p>The line and role of each token come from the positions of <code>⏎</code> (<code>line_role_arrays</code>), since the length of a context depends on its example count and on whether it carries a verification line. The labeller draws once per context from the op array beside the corpus. Crop policy <code>whole</code> pulls a labelled context only when the window holds all of it.</p>
+<p>The recipe is that of ex-2.2.14, unchanged: λ_a = 0.1 annealed to a 0.1 floor over the last tenth of training, τ = 0.1, the anti-subspace weight from 2.5× the anchor weight to 0.3× by 90% of training, the untied readout, 50 epochs at d64-L4. A context is four times the tokens of an op-word line, so an epoch is about four times the steps of an epoch in ex-2.2.14.</p>
+<h3 id="the-measurements">The measurements<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-measurements" title="Link to this heading">&para;</a></h3>
+<p>Every arm is scored at the end of training on its held-out contexts, one context per forward pass, with the mask arms measured with the mask on.</p>
+<ul>
+<li>The task: held-out expected exact match, over all contexts and per op, against the ceiling and floor of record for the condition of the arm. Rule (a) scores the controls on it; rules (b) and (d) score the center arms on it.</li>
+<li>The calibration check: the mean KL divergence from the Bayes predictive to the model's answer distribution at the query <code>=</code>, as above, on every arm; every figure that plots expected exact match plots it beside.</li>
+<li>Alignment by role and slice: the mean cosine with e₁ at every role of the context (the operands, <code>?</code>, <code>=</code>, and the answer of each example, and of the query) at each of the five slices, on the <code>difference</code> contexts and on the other ops', with the query <code>?</code> and the query <code>=</code> read separately. Rule (c) uses the query <code>?</code> at the last block.</li>
+<li>Alignment against the posterior: the alignment at the query <code>=</code> and the query <code>?</code> at the last block, per held-out <code>difference</code> context, beside the posterior on <code>difference</code> for that context, from the method section. The <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-anchor-follows-the-evidence">evidence section</a> bins it.</li>
+<li>The op margin: the statistic of ex-2.2.14 with the contexts of the anchored op as the labelled group and roles running over the whole context, on the same held-out contexts. Rules (b) and (c) take it as a share of the margin of the whole-line arm.</li>
+<li>The leans: the first-operand lean (ᾱ at the first token, last block) and the trailing-fragment lean (ᾱ over every position, last block, of a context cut to start at each example boundary, fed on its own), over the held-out contexts of every op, as ex-2.2.15 measured them. The op margin and both leans are also recorded every 50 training steps on a fixed probe set, as ex-2.2.15 did, so the report can say how each arm got where it landed.</li>
+<li>The suppression pass: on the whole-line arm, the hinge arm, and the control, each operator at each dose and site, the held-out expected exact match on <code>difference</code> contexts and on those of each other op, against the clean pass and the target null per context, and the KL divergence from the target-null predictive to the edited answer distribution. Rule (e) is scored on it.</li>
+<li>Verification accuracy on the verification arms, held out, with no gate.</li>
+</ul>
+<p>Figures label the roles in the notation of the <a href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#the-posterior-over-ops">posterior section</a>: <em>a</em>, <em>b</em>, and <em>y</em> for the operands and the answer, subscripted by example, with <code>?</code> and <code>=</code> as themselves.</p>
+<h3 id="budget">Budget<a class="anchor-link" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#budget" title="Link to this heading">&para;</a></h3>
+<p>42 runs: 14 arms at 3 seeds. Ex-2.2.14 trained 50 runs of 50 epochs at d64-L4 on a 300k-line corpus for about $1.80 on Modal, and ex-2.2.15 trained 55 runs for about $2.30 (<code>bin/mini cost</code>): about 3.5 cents and two to three minutes on an L4 per run. At this model size a training step is bound by latency, not arithmetic: about 10.5 ms on an L4 whatever the window holds (<a href="https://github.com/z0u/sca2/blob/main/eng/gpu-efficiency.md">GPU notes</a>), and an ex-2.2.14 run took about 5,000 steps. So the cost follows the step count. A context here has four to five times the tokens of an op-word line and the window is half as long again, so an epoch is about three times the steps: some 13,000 steps at three examples and 16,500 at four, which is two and a half to three minutes of stepping, or four to six minutes per training task with compilation, start-up, and the trajectory reads, well inside the one-hour timeout. At the per-step cost of ex-2.2.14 that puts the training at $3 to $4, a little more for the d128-L4 control. The window of 96 tokens at d64-L4 fits an L4 with room to spare. Eval adds the alignment measurements on eleven held-out sets, the posterior on every held-out context (a table lookup), and the suppression pass, which is scoring only: 3 sites × (4 + 2 + 1) edits on nine checkpoints. Under $6 in all, at the pace <code>--max-containers 12 --budget 6h</code> sets. The training trajectories record the margin and the leans every 50 steps, so a corpus that saturates early shows there, and a later round can train on fewer contexts.</p>
+<div class="footnote">
+<hr />
+<ol>
+<li id="fn:calibrated">
+<p>A calibrated model is one whose stated probabilities match how often things actually happen: of the answers it gives 30% to, about 30% are right.&#160;<a class="footnote-backref" href="https://z0u.github.io/sca2/pr-preview/pr-241/m2/ex-2.2.16/#fnref:calibrated" title="Back to text">&#8617;</a></p>
+</li>
+</ol>
+</div>
+</main>
+</body>
+</html>
