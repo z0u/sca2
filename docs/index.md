@@ -424,4 +424,12 @@ With the control near its best, we anchored `difference` on the new grammar. The
 
     <!-- mini:figures ./m2/ex-2.2.22/report.py -->
 
+- [2.2.23. The slow seeds, trained for longer](./m2/ex-2.2.23/report.py)
+
+    A scout of the runs that miss the second rise in task skill. At 200 epochs a few anchored runs missed it, and at 400 every run made it and ended alike. The edit spills onto other ops on nearly every run that learned the HSV ops, and on none of the half-trained runs, so the clean edits of earlier experiments came mostly from half-trained runs. Training keeps every run, at 400 epochs.
+
+    <span class="tags">`scout` `in-context` `anchoring` `intervention`</span>
+
+    <!-- mini:figures ./m2/ex-2.2.23/report.py -->
+
 </details>

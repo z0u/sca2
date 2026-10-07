@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [D2.2, anchoring, in-context, ex-2.2.22]
 opened: 2026-10-05
+closed: 2026-10-07
 ---
 # Drop runs that miss the second rise?
 
@@ -16,3 +17,7 @@ Two things need checking before that policy is safe.
 The gate itself should be on task skill only (for example held-out exact match by epoch 200), fixed before the anchoring results are seen, so it cannot select on the outcome. That matters here because the edit spills so far appear only on runs that rose quickly: hinge and `cap-0.95` at model seed 700, and the replicate run at 703, where the edit takes `darken` down by many times the gate. Leaving out slow runs will probably raise the spill rate that a report sees. That would be the rate for trained models, which is the one we want, but only if the gate was chosen blind to it.
 
 A longer run of the spilling conditions would answer a related question at the same cost: whether slow runs spill once they make the second rise, or whether spilling belongs to some fast runs only. [pull-slice-restrictions-at-more-seeds](./pull-slice-restrictions-at-more-seeds.md) proposes longer training at more seeds for the slice restrictions, so the two could share runs.
+
+## Notes
+
+**2026-10-07, ex-2.2.23** — [Ex-2.2.23](/docs/m2/ex-2.2.23/report.py) answered this. Every run that missed the rise at 200 epochs made it at 400 and ended with the early risers. But the runs a rule would drop are the runs whose edit stays clean: the edit spills on nearly every run that learned the HSV ops. So the decision is no drop rule; training keeps every run, at 400 epochs. Why the edit spills on fully trained runs is the next question.
