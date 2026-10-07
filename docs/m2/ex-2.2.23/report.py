@@ -687,7 +687,7 @@ rf"""
 <!-- lede -->
 A scout. We train the anchored recipe and the control at {len(ex.SEEDS)} seeds, for 200 epochs and for 400, to see how often a run misses the second rise in task skill, and whether a longer run makes it. We are considering a policy of leaving out the runs that miss it, and this scout asks whether that would be safe.
 
-At 200 epochs, {num_word(len(SLOW))} anchored runs missed the rise where their controls did not, and all of them made it at 400. But the edit spills onto other ops on nearly every run that made the rise, and on none of the runs that missed it. So leaving the slow runs out would raise the share of runs that spill, and we keep every run, at 400 epochs.
+At 200 epochs, {num_word(len(SLOW))} anchored runs missed the rise where their controls did not, and all of them made it at 400. But the edit spills onto other ops on nearly every run that made the rise, and on none of the runs that missed it, so the clean edits of earlier experiments came mostly from half-trained runs. We keep every run, at 400 epochs, where every run makes the rise, and next look into the spill.
 ///
 
 In ex-2.2.21 and ex-2.2.22, a few runs never made the second rise in task skill within 200 epochs, and those runs set most of the seed band of every measurement. This scout trains the recipe of record and the control at {len(ex.NEW_SEEDS)} new seeds at 200 epochs, and at all {len(ex.SEEDS)} seeds at 400 epochs, reusing ex-2.2.21's 200-epoch runs at the other {len(ex.REUSED_SEEDS)}.
@@ -891,10 +891,10 @@ The inputs:
 - E1: the rule leaves out a quarter of the anchored runs at 200 epochs, and fewer controls. The pairing suggests the anchor changes who is slow.
 - E2: every run that missed at 200 epochs makes the rise at 400, so a longer run waits for a slow seed rather than selecting a kind of seed.
 - E3: at 400 epochs a late rise ends with the early ones, in task skill and op margin.
-- E4: the runs the rule leaves out are the runs whose edit stays clean. Leaving them out would select on the edit results after all, though the rule never looks at them.
+- E4: the runs the rule leaves out are the runs whose edit stays clean. Leaving them out would select on the edit results after all, though the rule never looks at them, but against the anchor: it drops the runs that look best.
 - Cost: with a quarter of the runs replaced in each round, a run kept under the rule costs about two-thirds of a 400-epoch run, in sequential rounds, against one round at 400 epochs.
 
-We leave out no runs. The next experiment that trains runs keeps every run, at 400 epochs, where all of them make the rise and end alike. The rule would save a third of the compute, and it would bias the edit results toward the slow runs that never learned what the edit could disturb. More seeds at 200 epochs would keep that mix of half-trained and fully trained runs. Before any further training, the next step is to understand the spill, on the checkpoints this scout already has.
+So we leave out no runs. The next experiment that trains runs should keep every run, at 400 epochs, where all of them make the rise and end alike. The rule would save a third of the compute, but in sequential rounds, and it would still mix runs trained for different lengths. More seeds at 200 epochs would keep the mix of half-trained and fully trained runs, and the clean edits of the half-trained runs would flatter the recipe. Before further training, we would like to understand the spill, on the checkpoints this scout already has.
 """
 
 # %%
@@ -904,7 +904,7 @@ r"""
 
 The largest result here is about the edit. On the five anchored runs at 200 epochs that this scout reuses from ex-2.2.21, the edit stayed within the selectivity criterion on three, and two of those three had missed the rise. With the rise as a factor, the picture is plain: once a run has learned the HSV ops, the edit spills onto other ops on nearly every seed, and more so after 400 epochs. So the selectivity of the edit that ex-2.2.21 and ex-2.2.22 measured leaned on half-trained runs, and the recipe of record does not yet give a selective edit on a fully trained model.
 
-Why the spill comes with the HSV skill is open. The ops it lands on (`darken`, `lighten`, and the HSV ops, `value-hsv` most of all) all deal with lightness, which suggests the fully trained model stores some lightness information along e₁, and the edit removes it with the op. The anti-subspace term is what keeps other information off e₁, and its weight decays with the learning rate, so a 400-epoch run spends twice as many steps learning while the term is weak. That is a guess. Editing at only some positions (the colors, or the evidence for the op), and checking whether the e₁ component of a color tracks its lightness, would test it on the checkpoints this scout already has. If it holds, a weaker anchor late in training would loosen the hold on e₁ further, and keeping the anti-subspace weight up for longer would be the change to try.
+Why the spill comes with the HSV skill is open. The ops it lands on (`darken`, `lighten`, and the HSV ops, `value-hsv` most of all) all deal with lightness, which suggests the fully trained model stores some lightness information along e₁, and the edit removes it with the op. The anti-subspace term keeps other information off e₁, and its weight decays with the learning rate, so a 400-epoch run spends twice as many steps learning while the term is weak. That is a guess. Editing at only some positions (the colors, or the evidence for the op), and checking whether the e₁ component of a color tracks its lightness, would test it on the checkpoints this scout already has. If it holds, a weaker anchor late in training would loosen the hold on e₁ further, and keeping the anti-subspace weight up for longer would be the change to try.
 
 Which seeds make the rise late, and why, is open too. A slow anchored seed is quick under the control, and rises in good time at 400 epochs, so slowness is a property of a path through training rather than of a seed. We don't know what decides it.
 """
