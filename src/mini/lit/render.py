@@ -61,7 +61,7 @@ class Rendered:
 def compose(woven: Woven, *, extra_body: str = "") -> tuple[str, float]:
     """The woven Markdown as a complete page, with how long that took.
 
-    Terms the project's shared glossary defines (``docs/glossary.toml``, :func:`mini.reports.report_glossary`) are annotated as the document's own are. The project's shared report stylesheet (``docs/report.css``, :func:`mini.reports.report_styles`) goes in last, so a render, the live server and the export all show it — the site build re-inlines the current source on top. Each hypothesis heading is badged with its section's verdict (:func:`mini.reports.mark_verdicts`), which the build also does, for pages exported before the badge.
+    Terms the project's shared glossary defines (``docs/glossary.md``, :func:`mini.reports.report_glossary`) are annotated as the document's own are. The project's shared report stylesheet (``docs/report.css``, :func:`mini.reports.report_styles`) goes in last, so a render, the live server and the export all show it — the site build re-inlines the current source on top. Each hypothesis heading is badged with its section's verdict (:func:`mini.reports.mark_verdicts`), which the build also does, for pages exported before the badge.
     """
     t0 = time.perf_counter()
     body = to_html(woven.markdown, glossary=load_glossary(report_glossary(woven.doc.path)))

@@ -1021,8 +1021,8 @@ def report_styles(doc: Path | str) -> str:
 
 
 def report_glossary(doc: Path | str) -> Path:
-    """Where *doc*'s project keeps its shared glossary, ``docs/glossary.toml`` beside ``report.css`` (read by :func:`mini.lit.notes.load_glossary`, which takes a missing file as an empty glossary)."""
-    return _project_root(Path(doc)) / "docs" / "glossary.toml"
+    """Where *doc*'s project keeps its shared glossary, ``docs/glossary.md`` beside ``report.css`` (read by :func:`mini.lit.notes.load_glossary`, which takes a missing file as an empty glossary)."""
+    return _project_root(Path(doc)) / "docs" / "glossary.md"
 
 
 def set_report_styles(html: str, css: str) -> str:

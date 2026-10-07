@@ -88,13 +88,9 @@ class TestGlossary:
         assert '<span class="gloss">Precision.</span></span>' in html
 
     def test_gloss_leads_the_definition(self):
-        shared = {
-            "op margin": Term("Op margin", "The margin at a rate κ. Usually small."),
-            "band": Term("Band", "Precision, long form.", gloss="Precision."),
-        }
-        html = to_html("Op margin and band.\n", glossary=shared)
+        shared = {"op margin": Term("Op margin", "The margin at a rate κ. Usually small.")}
+        html = to_html("Op margin.\n", glossary=shared)
         assert '<span class="gloss">The margin at a rate κ.</span><span class="more"> Usually small.</span>' in html
-        assert '<span class="gloss">Precision.</span><span class="more"> Precision, long form.</span>' in html
 
     def test_a_colon_can_end_the_gloss(self):
         shared = {
@@ -126,9 +122,21 @@ class TestGlossary:
         assert "term:" not in html
 
     def test_load_glossary(self, tmp_path):
-        assert load_glossary(tmp_path / "missing.toml") == {}
-        path = tmp_path / "g.toml"
-        path.write_text('["op margin"]\ndefinition = "A *margin*."\ngloss = "*M*."\naliases = ["m_op"]\nauto = false\n')
+        assert load_glossary(tmp_path / "missing.md") == {}
+        path = tmp_path / "g.md"
+        path.write_text(
+            "# Glossary\n\nIntro.\n\n"
+            "Op margin\nm_op\n:   A *margin*.\n\n"
+            "Band {.manual}\n:   Precision.\n\n    More.\n\n"
+            "Listy\n:   - a\n    - b\n"
+        )
         assert load_glossary(path) == {
-            "op margin": Term("op margin", "A <em>margin</em>.", ("m_op",), False, "<em>M</em>.")
+            "op margin": Term("Op margin", "A <em>margin</em>.", ("m_op",)),
+            "band": Term("Band", "Precision.<br>More.", auto=False),
+        }
+
+    def test_local_glossary_in_markdown_syntax(self):
+        terms = local_glossary("## Glossary\n\nRed line, non-red line\n:   Lines by color.\n\n## Next\n\nA\n:   B\n")
+        assert terms == {
+            "red line, non-red line": Term("Red line, non-red line", "Lines by color.", ("Red line", "non-red line"))
         }

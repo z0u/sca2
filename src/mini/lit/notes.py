@@ -4,13 +4,13 @@ Sidenotes and glossary notes: what a footnote or a defined term says, placed nex
 A python-markdown extension (:class:`NotesExtension`) that rewrites the converted tree, so the Markdown stays plain and the woven ``index.md`` is unchanged. Two things become notes:
 
 - **Footnotes.** Each footnote reference gets a copy of its footnote's text right after it, as a ``<span class="sidenote">``. The list at the end of the document stays, with each item that has a sidenote marked ``sidenoted`` and its number pinned (``value``), so the stylesheet can hide it where the sidenote shows and the remaining items keep their numbers.
-- **Glossary terms.** The first use of a defined term in each ``h2`` section is wrapped in a ``<dfn class="term">`` and followed by the definition, as a ``<span class="sidenote glossnote">``. Definitions come from the document's own ``## Glossary`` section (a ``<dl>``, which wins) and then from a shared dictionary (:func:`load_glossary`, ``docs/glossary.toml``). A term is matched case-insensitively as a whole word, with a plural ``s``/``es``, in running prose only: not in code, links, headings, tables, captions, math, or the glossary itself. ``[text](term:key)`` marks a use the matcher would miss (other wording, or a term the dictionary keeps off auto-matching).
+- **Glossary terms.** The first use of a defined term in each ``h2`` section is wrapped in a ``<dfn class="term">`` and followed by the definition, as a ``<span class="sidenote glossnote">``. Definitions come from the definition list in the document's own ``## Glossary`` section, which wins, and then from a shared dictionary (:func:`load_glossary`, ``docs/glossary.md``); see :func:`dl_terms` for the syntax. A term is matched case-insensitively as a whole word, with a plural ``s``/``es``, in running prose only: not in code, links, headings, tables, captions, math, or the glossary itself. ``[text](term:key)`` marks a use the matcher would miss (other wording, or a term the dictionary keeps off auto-matching).
 
 Where a note goes is the stylesheet's call (``lit.css``): in the margin on a wide screen and on paper, and on hover or focus of its marker on a narrow screen. A note whose marker sits where a margin float cannot reach (a table cell, a caption, a heading) is marked ``popover`` and only ever shows on hover; its footnote keeps its place in the list, so paper still has it. The floats stack rather than overlap because each one clears the one before it (``clear: right``).
 
 A footnote with block content other than paragraphs (a list, a code block) is left to the list: a note is inline markup, since it sits inside the paragraph that cites it.
 
-Each note leads with a *gloss*, a few words to jog the reader's memory, marked ``<span class="gloss">``; the rest of it follows in one ``<span class="more">`` (a footnote's later paragraphs are ``sidenote-p`` spans in it), so it can open as one box. The stylesheets show the gloss alone in the margin until the note or its marker is hovered or focused, and on paper. The gloss is a dictionary entry's ``gloss`` when it has one, and otherwise the first sentence of the note, or what comes before a colon if that is shorter (:func:`_lead_end`). So a note that leads with a short sentence or a "head: explanation" needs nothing more.
+Each note leads with a *gloss*, a few words to jog the reader's memory, marked ``<span class="gloss">``; the rest of it follows in one ``<span class="more">`` (a footnote's later paragraphs are ``sidenote-p`` spans in it), so it can open as one box. The stylesheets show the gloss alone in the margin until the note or its marker is hovered or focused, and on paper. The gloss is the first sentence of the note, or what comes before a colon if that is shorter (:func:`_lead_end`), so a note that leads with a short sentence or a "head: explanation" needs nothing more.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from __future__ import annotations
 import copy
 import html
 import re
-import tomllib
 import xml.etree.ElementTree as etree
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -31,23 +30,20 @@ from markdown.extensions.footnotes import NBSP_PLACEHOLDER
 from markdown.preprocessors import Preprocessor
 from markdown.treeprocessors import Treeprocessor
 
-__all__ = ["Term", "NotesExtension", "load_glossary", "local_glossary"]
+__all__ = ["Term", "NotesExtension", "dl_terms", "load_glossary", "local_glossary"]
 
 
 @dataclass(frozen=True)
 class Term:
-    """A defined term: its display name, its definition as an HTML fragment (inline), the words that match it, whether prose is scanned for it, and a short gloss (inline HTML) to lead the note with, in place of the first sentence of the definition."""
+    """A defined term: its display name, its definition as an HTML fragment (inline), the words that match it, and whether prose is scanned for it."""
 
     name: str
     definition: str
     aliases: tuple[str, ...] = ()
     auto: bool = True
-    gloss: str | None = None
 
     def parts(self) -> tuple[str, str]:
         """The note as a gloss and the rest (empty when the gloss is all of it)."""
-        if self.gloss:
-            return self.gloss, " " + self.definition
         return _split_html(self.definition)
 
     @property
@@ -63,52 +59,59 @@ def _norm(text: str) -> str:
     return " ".join(text.lower().split())
 
 
-def load_glossary(path: Path) -> dict[str, Term]:
-    """The shared dictionary at *path* (TOML), or nothing when there is no file.
-
-    One table per term, keyed by its name; ``definition`` is inline Markdown, ``gloss`` (optional, inline Markdown) is a shorter lead than its first sentence, ``aliases`` (optional) lists other wordings, and ``auto = false`` keeps a term that is also an everyday word from being matched on its own (mark its uses with ``[text](term:key)``)::
-
-        ["expected exact match"]
-        definition = "The task score we measure: …"
-        gloss = "The task score."
-        aliases = ["EEM"]
-    """
-    if not path.is_file():
-        return {}
-    data = tomllib.loads(path.read_text("utf-8"))
-    md = markdown.Markdown(extensions=["pymdownx.tilde", "pymdownx.caret", "pymdownx.mark"])
-    terms = {}
-    for name, entry in data.items():
-        definition = _unwrap_p(md.reset().convert(entry["definition"]))
-        gloss = _unwrap_p(md.reset().convert(entry["gloss"])) if "gloss" in entry else None
-        t = Term(name, definition, tuple(entry.get("aliases", ())), bool(entry.get("auto", True)), gloss)
-        terms[t.key] = t
-    return terms
-
-
-_GLOSSARY_HEADING_RE = re.compile(r"^(#{2,6})\s+Glossary\s*$", re.MULTILINE | re.IGNORECASE)
-_DT_DD_RE = re.compile(r"<dt>(.*?)</dt>\s*<dd>(.*?)</dd>", re.DOTALL)
+_DL_MD = markdown.Markdown(extensions=["def_list", "attr_list", "pymdownx.tilde", "pymdownx.caret", "pymdownx.mark"])
+_DL_ITEM_RE = re.compile(r"<(dt|dd)\b([^>]*)>(.*?)</\1>", re.DOTALL)
 _BLOCK_TAG_RE = re.compile(r"<(?:p|ul|ol|table|pre|div|dl|blockquote|figure)\b", re.IGNORECASE)
 
 
-def local_glossary(text: str) -> dict[str, Term]:
-    """The terms a document defines in its own ``Glossary`` section: each ``<dt>``/``<dd>`` pair of the ``<dl>`` there.
+def dl_terms(markdown_text: str) -> dict[str, Term]:
+    """The terms that the definition lists in *markdown_text* define, in Markdown syntax or as a raw ``<dl>``.
 
-    A ``<dt>`` may name several wordings, split on commas (``Red line, non-red line``), and a parenthesised one is an alias (``ᾱ (containment)``).
+    Each definition (``<dd>``) belongs to the terms (``<dt>``) above it: the first is the name, and any others are aliases. A term may also name several wordings, split on commas (``Red line, non-red line``), and a parenthesised one is an alias (``ᾱ (containment)``). A term with the class ``manual`` (``Band {.manual}``) is only marked where written as ``[text](term:band)``, which suits a term that is also an everyday word. A definition with block content other than paragraphs is skipped, since a note is inline markup::
+
+        Expected exact match
+        EEM
+        :   The task score, as the chance that a drawn answer agrees with a true one. …
     """
+    terms: dict[str, Term] = {}
+    dts: list[tuple[str, str]] = []
+    after_dd = False
+    for tag, attrs, body in _DL_ITEM_RE.findall(_DL_MD.reset().convert(markdown_text)):
+        if tag == "dt":
+            if after_dd:
+                dts.clear()
+                after_dd = False
+            dts.append((attrs, html.unescape(re.sub(r"<[^>]+>", "", body)).strip()))
+            continue
+        after_dd = True
+        definition = _unwrap_p(body.strip())
+        if not dts or _BLOCK_TAG_RE.search(definition):
+            continue
+        (attrs, name), *others = dts
+        # "Red line, non-red line": the whole is the name, and each part is a form of its own.
+        parts = [f.strip() for f in re.split(r",|\(|\)", name) if f.strip()]
+        aliases = (*(parts if len(parts) > 1 else ()), *(n for _, n in others))
+        auto = not re.search(r'class="[^"]*\bmanual\b', attrs)
+        t = Term(name, definition, aliases, auto)
+        terms.setdefault(t.key, t)
+    return terms
+
+
+def load_glossary(path: Path) -> dict[str, Term]:
+    """The shared dictionary at *path*: the definition lists in a Markdown file (:func:`dl_terms`), or nothing when there is no file."""
+    return dl_terms(path.read_text("utf-8")) if path.is_file() else {}
+
+
+_GLOSSARY_HEADING_RE = re.compile(r"^(#{2,6})\s+Glossary\s*$", re.MULTILINE | re.IGNORECASE)
+
+
+def local_glossary(text: str) -> dict[str, Term]:
+    """The terms a document defines in its own ``Glossary`` section (:func:`dl_terms`)."""
     terms: dict[str, Term] = {}
     for m in _GLOSSARY_HEADING_RE.finditer(text):
         level = len(m[1])
         end = re.compile(rf"^#{{1,{level}}}\s", re.MULTILINE).search(text, m.end())
-        section = text[m.end() : end.start() if end else len(text)]
-        for dt, dd in _DT_DD_RE.findall(section):
-            words = html.unescape(re.sub(r"<[^>]+>", "", dt)).strip()
-            forms = [f.strip() for f in re.split(r",|\(|\)", words) if f.strip()]
-            if not forms or _BLOCK_TAG_RE.search(_unwrap_p(dd)):
-                continue
-            # "Red line, non-red line": the whole is the name, and each part is a form of its own.
-            t = Term(words, _unwrap_p(dd.strip()), tuple(forms) if len(forms) > 1 else ())
-            terms[t.key] = t
+        terms |= dl_terms(text[m.end() : end.start() if end else len(text)])
     return terms
 
 
