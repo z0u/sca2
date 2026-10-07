@@ -106,8 +106,8 @@ between the plateau, near 0.2, and where the fast runs end, near 0.5. The rise e
 at or above it."""
 
 CANDIDATE_RULE_LEVELS: tuple[float, ...] = (0.3, 0.35, 0.4)
-"""S1: the levels of HSV skill, on the whole held-out set at the end of training, that a rule for leaving out
-half-trained runs may use. Fixed before any run of this scout, since the edit results at the reused seeds are already
+"""S1: the levels of HSV skill (the average over `HSV_OPS`, or the worst of them), on the whole held-out set at the
+end of training, that a rule for leaving out half-trained runs may use. Fixed before any run of this scout, since the edit results at the reused seeds are already
 known from ex-2.2.21; S1 picks one of them from E1 to E3, and commits it before E4 is filled in. The slow runs of
 ex-2.2.21 and ex-2.2.22 ended between 0.2 and 0.3, and the runs that rose early between 0.45 and 0.5."""
 assert RISE_LEVEL in CANDIDATE_RULE_LEVELS

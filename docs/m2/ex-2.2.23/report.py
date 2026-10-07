@@ -124,7 +124,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-A scout. We train the anchored recipe and the control at {len(ex.SEEDS)} seeds, for 200 epochs and for 400, to see how often a run misses the second rise in task skill, and whether a longer run makes it.
+A scout. We train the anchored recipe and the control at {len(ex.SEEDS)} seeds, for 200 epochs and for 400, to see how often a run misses the second rise in task skill, and whether a longer run makes it. We are considering a policy of leaving out the runs that miss it, and this scout asks whether that would be safe.
 ///
 
 In ex-2.2.21 and ex-2.2.22, a few runs never made the second rise in task skill within 200 epochs, and those runs set most of the seed band of every measurement. This scout trains the recipe of record and the control at {len(ex.NEW_SEEDS)} new seeds at 200 epochs, and at all {len(ex.SEEDS)} seeds at 400 epochs, reusing ex-2.2.21's 200-epoch runs at the other {len(ex.REUSED_SEEDS)}.
@@ -138,7 +138,7 @@ r"""
 Each item below is a measurement on the runs of this scout, with no gate.
 
 - [How often a run misses the rise (E1)](#how-often-a-run-misses-the-rise-e1):
-- [The same seeds at 400 epochs (E2)](#the-same-seeds-at-400-epochs-e2):
+- [Trained for 400 epochs (E2)](#trained-for-400-epochs-e2):
 - [A late rise and an early one (E3)](#a-late-rise-and-an-early-one-e3):
 - [A rule for runs that miss the rise (S1)](#a-rule-for-runs-that-miss-the-rise-s1):
 - [The edit, with and without the rise (E4)](#the-edit-with-and-without-the-rise-e4):
@@ -150,7 +150,7 @@ Each item below is a measurement on the runs of this scout, with no gate.
 rf"""
 ## Scope
 
-This is a scout, with no preregistration and no gate. Each condition has {len(ex.SEEDS)} runs at 200 epochs and {len(ex.SEEDS)} at 400, so a share of runs that miss the rise is known only roughly: one run more or less moves it by about a twelfth. The pairing by seed is what makes the comparisons between the two conditions, and between the two lengths, worth more than the counts alone.
+This is a scout, with no preregistration and no gate. Each condition has {len(ex.SEEDS)} runs at 200 epochs and {len(ex.SEEDS)} at 400, so a share of runs that miss the rise is known only roughly: one run more or less moves it by about a twelfth. Pairing by seed allows comparisons between the two conditions, and between the two lengths.
 """
 
 # %%
@@ -158,21 +158,23 @@ This is a scout, with no preregistration and no gate. Each condition has {len(ex
 rf"""
 ## Why this experiment
 
-The model learns the seven ops in two stages. Early in training it learns `mix`, `lighten`, `darken`, and `{ex.ANCHORED_OP}`, and its task skill rises quickly to a plateau. Some tens of epochs later it learns the three HSV ops, which change one channel of a color in hue, saturation, and value space, and the skill rises a second time. When that second rise comes varies from run to run. A few runs never make it within 200 epochs: their HSV skill stays near where it was on the plateau, and they end well below the others, though they answer the other four ops about as well.
+The model learns the seven ops in two stages. Early in training it learns `mix`, `lighten`, `darken`, and `{ex.ANCHORED_OP}`, with skill rising quickly to a plateau. Some tens of epochs later it learns the three HSV ops, which change one aspect of a color in hue, saturation, and value space, and the skill rises a second time. The timing of the second rise varies from run to run.
 
-In the 200-epoch runs this scout reuses, that happened on the anchored condition only, at two of the five seeds:
+A few runs never make it within 200 epochs: their HSV skill stays near where it was on the plateau, and they end well below the others, though they answer the other four ops about as well. In the 200-epoch runs this scout reuses, that happened on the anchored condition only, at two of the five seeds:
 
 {earlier_figure()}
 
+The two control runs that rose late also ended lower than the three that rose early, so a late rise may leave a run short of the others even when it comes within 200 epochs.
+
 So the seed band of our measurements is mostly a record of which runs made the second rise. Ex-2.2.22 could not tell a small cost of the anchor from a slow start, and along its caps, the runs whose edit spilled onto other ops were all runs that had made the rise. If every run makes the rise when given time, a future experiment could keep the 200-epoch budget and leave out the runs that miss it, as half-trained models. Before that is safe, we need to know three things:
 
-- How often a run misses the rise at 200 epochs, and whether the anchor changes that. Pairing by seed separates a seed that is slow under any condition from one the anchor makes slow. If the anchor decides who is slow, leaving the slow runs out would hide a cost of the anchor, so the number left out of each condition would have to be reported as a measurement in its own right.
+- How often a run misses the rise at 200 epochs, and whether the anchor changes that. Pairing by seed separates a seed that is slow under any condition from one the anchor makes slow. If the anchor decides who is slow, leaving the slow runs out could hide a cost of the anchor. If every slow run would make the rise eventually, that cost may not matter for the full recipe, but the number left out of each condition would still have to be reported wherever it differs between conditions.
 - Whether a run that missed the rise at 200 epochs makes it at 400. If it doesn't, leaving it out selects a kind of seed rather than waiting for a slow one.
-- Whether a run that rises late ends like one that rises early, in task skill, in how well the anchor holds, and in the edit.
+- Whether a run that rises late ends like one that rises early, in task skill, in how well the anchor holds, and in the edit. In the figure above, the late-rising controls end a little lower than the early ones; a run that only rises within 400 epochs could end with the early risers, or lower still.
 
-A 400-epoch run differs from its 200-epoch twin from the start, since the learning rate decays more slowly over a longer schedule, so the two are paired by seed and not by trajectory. A run that rises at 400 epochs and stalls at 200 says that the seed can make the rise under a longer schedule, which is what a policy for the next experiment needs.
+A 400-epoch run differs from its 200-epoch twin from the start, since the learning rate decays more slowly over a longer schedule, so the two have different trajectories. A run that rises by 400 epochs and stalls in 200 would suggest that the seed can make the rise under a longer schedule, which may support a policy that drops slow runs.
 
-Any rule for leaving runs out has to look at task skill only, and be fixed before the edit is scored, so that it cannot select on the anchoring results. That matters here because the edit spilled only on runs that had made the rise.
+Any rule for leaving runs out has to look only at the unedited model (its task skill, or how well calibrated it is), and be fixed before the edit is scored, so that it cannot select on the anchoring results. That matters here because the edit spilled only on runs that *had* made the rise.
 """
 
 # %%
@@ -180,7 +182,7 @@ Any rule for leaving runs out has to look at task skill only, and be fixed befor
 rf"""
 ## Parameters
 
-The recipe of record, as the [D2.2 design](/docs/m2/d2.2/design.md#the-setup-today) states it: the seven-op set, three examples per context with replacement op noise of 0.3, {ex.MODEL}, the newline mask, the whole-line label on about one `{ex.ANCHORED_OP}` context in fifty, every slice pulled, and no cap. That is ex-2.2.21's `anchor-whole` condition. The control is the same without the anchor.
+The recipe of record, as the [D2.2 design](/docs/m2/d2.2/design.md#the-setup-today) currently states it: the seven-op set, three examples per context with replacement op noise of 0.3, {ex.MODEL}, the newline mask, the whole-line label on about one `{ex.ANCHORED_OP}` context in fifty, every slice pulled, and no cap. That is ex-2.2.21's `anchor-whole` condition. The control is the same without the anchor.
 
 {runs_table()}
 
@@ -188,9 +190,8 @@ The recipe of record, as the [D2.2 design](/docs/m2/d2.2/design.md#the-setup-tod
 
 **The seeds.** The reused runs are at model seeds {seed_span(ex.REUSED_SEEDS)}, and the new ones at {seed_span(ex.NEW_SEEDS)}, so every comparison is paired by seed: a condition with its control, and a 200-epoch run with its 400-epoch twin.
 
-/// admonition | Open decision
-Twelve seeds and one longer length (400). The alternatives: 300 epochs, which costs less but may stop short of the rise for the slowest seeds (two of the ex-2.2.21 runs above had not risen by epoch 200); or more seeds at 200 epochs and fewer at 400, which would pin down how often a run misses the rise at the cost of fewer longer runs. To check: the planned cost is in the method, and the counts of E1 shrink by a twelfth per seed dropped.
-///
+<!-- REVIEW: the open decision on seeds and lengths is resolved (Sandy, round 1): twelve seeds at 200 and 400 epochs. 300 epochs was rejected. More seeds at 200 epochs, and twelve runs at 600 epochs if 400 leaves the question open, are to be decided after the results. -->
+More seeds at 200 epochs would pin down how often a run misses the rise, and runs at 600 epochs would help if some seeds have still not risen by 400. Whether either is needed depends on these results.
 """
 
 # %%
@@ -198,15 +199,22 @@ Twelve seeds and one longer length (400). The alternatives: 300 epochs, which co
 rf"""
 ## Measurements
 
-**HSV skill.** Expected exact match (EEM, the probability the model puts on the right answer) on held-out contexts, averaged over the three HSV ops. Through training it is measured every {ex.TRAJ_STRIDE_EPOCHS} epochs on a subsample of the held-out set, and at the end on the whole of it.
+<!-- REVIEW: a definition list now, at Sandy's request (round 1); it becomes this report's glossary once the margin-notes PR (#223) lands. -->
 
-**The rise.** A run has made the second rise once its HSV skill passes {ex.RISE_LEVEL:g}, about halfway between the plateau and where the runs that rise end up. The *rise epoch* is the first record at or above that level. Runs that rise do so quickly, so the level matters little to the epoch; the figure above shows it against the earlier runs. The three HSV ops can rise at different times, and on a few runs only `hue-hsv` rises within 200 epochs, which leaves the average near the level. E1 shows the ops one at a time for that reason.
+HSV skill
+:   Skill on the three HSV ops: expected exact match (EEM, the probability the model puts on the right answer) on held-out contexts, averaged over the three. Beside the average we report the worst of the three, since the ops can rise at different times. Through training it is measured every {ex.TRAJ_STRIDE_EPOCHS} epochs on a subsample of the held-out set, and at the end on the whole of it.
 
-**Task skill.** EEM on held-out contexts over all seven ops, compared with the control at the same seed and length.
+The rise
+:   When a run learns the HSV ops. A run has made the second rise once its HSV skill passes {ex.RISE_LEVEL:g}, about halfway between the plateau and where the runs that rise end up. The *rise epoch* is the first record at or above that level. Runs that rise do so quickly, so the level matters little to the epoch; the figure above shows it against the earlier runs. On a few runs only `hue-hsv` rises within 200 epochs, which leaves the average near the level, so E1 shows the ops one at a time too. A version with no threshold, for E3: the midpoint of a logistic curve fitted to the HSV skill through training, which says when the rise is half done.
 
-**The anchor.** The op margin at the last slice: how far `{ex.ANCHORED_OP}` contexts sit along e₁ beyond the rest, as in ex-2.2.21.
+Task skill
+:   EEM on held-out contexts over all seven ops, compared with the control at the same seed and length.
 
-**The edit.** The projection of e₁ at every position, at doses from a quarter to all of the component, with the two criteria of ex-2.2.21 (E2): the drop on `{ex.ANCHORED_OP}` grows with the dose and reaches at least {ex.GRADING_MIN_DAMAGE:.0%} of the way to the target null, and no other op drops by more than {ex.SELECTIVITY_GATE:g} at any dose. Both drops are net of what the edit does to the control at the same seed and length.
+Op margin
+:   How far `{ex.ANCHORED_OP}` contexts sit along e₁ beyond the rest, at the last slice, as in ex-2.2.21. The second-last slice may say more about the op, since the last feeds only the readout; the eval measures the margin at every slice, so E3 can show both.
+
+The edit
+:   The projection of e₁ at every position, at doses from a quarter to all of the component. Two measurements per run: how far the drop on `{ex.ANCHORED_OP}` gets toward the target null at full dose, and the largest drop on any other op at any dose. Both are net of what the edit does to the control at the same seed and length. Here they are measurements: ex-2.2.21 (E2) set criteria on them (at least {ex.GRADING_MIN_DAMAGE:.0%} of the way, and no other op down by more than {ex.SELECTIVITY_GATE:g}), and E4 uses those only to say which runs fall outside them.
 """
 
 # %%
@@ -217,19 +225,19 @@ r"""
 How many runs of each condition end 200 epochs without having made the rise, paired by seed.
 
 /// admonition | TODO
-The HSV skill through training at 200 epochs, one panel per condition and one line per seed, with the rise level marked; and the skill on each HSV op at the end of training, per run. Beside them, a table of the runs that miss the rise, by seed and condition.
+The HSV skill through training at 200 epochs, one panel per condition and one line per seed, with the rise level marked and the runs of the other condition drawn faintly behind; and the skill on each HSV op at the end of training, per run. Beside them, a table of the runs that miss the rise, by seed and condition.
 ///
 """
 
 # %%
 
 r"""
-## The same seeds at 400 epochs (E2)
+## Trained for 400 epochs (E2)
 
-Whether the runs that missed the rise at 200 epochs make it at 400, and when the rise comes at either length. In ex-2.2.19 the rise came at about the same epoch at either length, which would mean a longer run gives a slow seed more time at a high learning rate, so the rise epoch is shown both in epochs and as a share of training.
+Whether the runs that missed the rise at 200 epochs make it at 400, or the other way round, and when the rise comes at either length. In ex-2.2.19 the rise came at about the same epoch at either length, which would mean a longer run gives a slow seed more time at a high learning rate, so the rise epoch is shown both in epochs and as a share of training.
 
 /// admonition | TODO
-The HSV skill through training at 400 epochs, laid out as in E1, with the seeds that missed at 200 epochs highlighted. Beside it, the rise epoch of every run at 200 and 400 epochs, in epochs and as a share of training.
+The HSV skill through training at 400 epochs, laid out as in E1, with the seeds that missed at 200 epochs highlighted, and any that rose at 200 epochs and miss at 400. Beside it, the rise epoch of every run at 200 and 400 epochs, in epochs and as a share of training.
 ///
 """
 
@@ -238,10 +246,10 @@ The HSV skill through training at 400 epochs, laid out as in E1, with the seeds 
 r"""
 ## A late rise and an early one (E3)
 
-Whether a run that rises late ends like one that rises early, in task skill and in the op margin.
+Whether a run that rises late ends like one that rises early, in task skill and in the op margin: does a run that only rises within 400 epochs end with the early risers, or lower, like the late-rising controls of ex-2.2.21?
 
 /// admonition | TODO
-Task skill at the end of training against the rise epoch, one dot per run, both lengths and both conditions; the same for the op margin on the anchored runs.
+Task skill at the end of training against the rise epoch, one dot per run, both lengths and both conditions, and the same against the logistic midpoint, which has no threshold; the op margin at the last and second-last slices on the anchored runs, laid out the same way.
 ///
 """
 
@@ -251,10 +259,10 @@ rf"""
 ## A rule for runs that miss the rise (S1)
 
 <!-- REVIEW: added that the reused seeds already have known edit results, so the candidate levels are fixed in experiment.py before any run. Committing the level before E4 alone does not blind it to the five reused runs. -->
-A rule that marks a run as half-trained, for the next experiment to leave out and replace with the next unused seed. The rule looks only at the HSV skill on the held-out set at the end of training. Its level is chosen from E1 to E3 and committed before E4 is filled in, so that the choice cannot follow the edit results of this scout. The edit results at the reused seeds (700–704) are already known from ex-2.2.21, so the candidate levels were fixed with this design, before any run: {", ".join(f"{v:g}" for v in ex.CANDIDATE_RULE_LEVELS)}. The chosen level is one of them. We report what each candidate level would leave out of each condition at either length.
+A rule that marks a run as half-trained, for the next experiment to leave out and replace with the next unused seed. The rule looks only at the HSV skill on the held-out set at the end of training, as the average over the three ops or the worst of them. The measure and its level are chosen from E1 to E3 and committed before E4 is filled in, so that the choice cannot follow the edit results of this scout. The edit results at the reused seeds (700–704) are already known from ex-2.2.21, so the candidate levels were fixed with this design, before any run: {", ".join(f"{v:g}" for v in ex.CANDIDATE_RULE_LEVELS)}. The chosen level is one of them. We report what each candidate would leave out of each condition at either length.
 
 /// admonition | TODO
-For each candidate level, the number of runs it leaves out of each condition, at 200 and at 400 epochs, and the commit that fixed the chosen level.
+For each candidate level, by the average and by the worst op, the number of runs it leaves out of each condition, at 200 and at 400 epochs, and the commit that fixed the chosen rule.
 ///
 """
 
@@ -263,10 +271,10 @@ For each candidate level, the number of runs it leaves out of each condition, at
 r"""
 ## The edit, with and without the rise (E4)
 
-Whether the edit meets its two criteria on the runs the rule keeps and on the runs it leaves out, and whether it spills onto other ops more often on one group.
+Whether the edit gets as far toward the target null on the runs the rule keeps as on the runs it leaves out, and whether it spills onto other ops more often on one group.
 
 /// admonition | TODO
-The two edit criteria for every anchored run, at both lengths, grouped by whether the rule of S1 keeps the run.
+A figure of the two edit measurements for every anchored run, one dot per run, at both lengths, grouped by whether the rule of S1 keeps the run, with ex-2.2.21's criteria marked; and the drop on each other op against the dose, one line per run, colored by group.
 ///
 """
 
@@ -281,10 +289,10 @@ How the next experiment trains and counts its runs. The candidates:
 - 400 epochs, keeping every run.
 - 200 epochs, keeping every run, at more seeds.
 
-The criteria: how many runs the rule leaves out of each condition, and whether the anchor changes it (E1); whether the runs that missed at 200 epochs make the rise at 400 (E2); whether a late rise ends like an early one (E3); whether the edit results differ between the runs the rule keeps and the runs it leaves out (E4); and the cost.
+Inputs: how many runs the rule leaves out of each condition, and whether the anchor changes it (E1); whether the runs that missed at 200 epochs make the rise at 400 (E2); whether a late rise ends like an early one (E3); whether the edit results differ between the runs the rule keeps and the runs it leaves out (E4); and the cost.
 
 /// admonition | TODO
-Every criterion for every candidate, and the choice.
+Every input for every candidate, and the choice.
 ///
 """
 
