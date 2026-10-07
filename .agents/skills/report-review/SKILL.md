@@ -17,10 +17,12 @@ The loop below is the runbook. For the reasoning behind it — why the two passe
 
 First pick the reviewer, since the two ask different questions:
 
-- `prereg-reviewer`: the report has no results yet. Is the design sound and worth running as specified?
+- `prereg-reviewer`: a preregistered report with no results yet. Is the design sound and worth running as specified?
 - `results-reviewer`: the results have landed. Do they support the claims, and can a fresh reader follow the report? This one also looks at the rendered figures unless you tell it not to.
 
-The experiment run leaves a signal:
+An exploratory report (`## Observations`, no `**What we expect.**`) is written once its results exist, so it always gets the `results-reviewer`, even with no `experiment.py` beside it: a re-analysis reads another experiment's results. Its design was agreed as a short note rather than a skeleton, so there is nothing for the `prereg-reviewer` to check. Usually one round converges.
+
+For a preregistered report, the experiment run leaves a signal:
 
 - No `experiment.py` beside the report, or one marked `DESIGN_ONLY = True` → prereg. The skeleton is written before the DAG by design, and a design module that holds only constants declares itself with that marker.
 - The report resolves no refs (no `get_refs` / `load_results` in the setup cell) → prereg. There is nothing for it to read yet.

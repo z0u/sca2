@@ -22,7 +22,7 @@ The researcher who ran the experiment. They know the project, the apparatus and 
 
 Write your analysis to a file beside the document. Do not edit the document.
 
-**1. A drop-in `## Findings` section.** Ready to paste, meant to sit directly under the tl;dr. Every preregistered hypothesis, its verdict, and the one number that decides it, in the fewest words that stay precise. Use the report's own hypothesis IDs and condition names, and carry each gate inline so the section stands alone. Under 200 words. A reader who stops here knows what happened. Write it so it could be read aloud to a colleague: what each number means before the number, everyday words rather than statistic names, and say where the document's own Findings falls short of that.
+**1. A drop-in `## Findings` section.** Ready to paste, meant to sit directly under the tl;dr. Every preregistered hypothesis, its verdict, and the one number that decides it (for an exploratory report, a `## Observations` section: one line per E section, what we saw and at most one kind of number), in the fewest words that stay precise. Use the report's own hypothesis IDs and condition names, and carry each gate inline so the section stands alone. Under 200 words. A reader who stops here knows what happened. Write it so it could be read aloud to a colleague: what each number means before the number, everyday words rather than statistic names, and say where the document's own Findings falls short of that.
 
 Say what happened, and leave to the analysis sections both the interpretation and the question of whether an outcome was predicted in advance.
 
@@ -30,7 +30,7 @@ Say what happened, and leave to the analysis sections both the interpretation an
 
 **3. A cut list.** Whole paragraphs or subsections to delete, one line of reason each, with word costs. Be willing to propose a lot. Say plainly where a cut would lose something real, so the researcher can overrule you — that is a judgement they make, not you.
 
-**4. A restructure proposal.** A running order that puts findings early and defers method, with what breaks if it moves. Reports here are written as a prediction-then-observation diff, so say whether that reading survives and what replaces it if not.
+**4. A restructure proposal.** A running order that puts findings early and defers method, with what breaks if it moves. A preregistered report is written as a prediction-then-observation diff, so say whether that reading survives and what replaces it if not.
 
 **5. A total.** Words in, words removable, resulting length.
 

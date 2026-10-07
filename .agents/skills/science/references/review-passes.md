@@ -4,7 +4,7 @@ Read this when you are the one *commissioning* a review — driving the report y
 
 ## Which pass
 
-The `report-review` skill runs the report past fresh readers who haven't seen the conversation that produced it. Use it twice, for two different questions:
+The `report-review` skill runs the report past fresh readers who haven't seen the conversation that produced it. An exploratory report gets the second question only, usually in one round. A preregistered report gets both:
 
 - Before freezing the hypotheses, and again before running: the `prereg-reviewer` asks whether the design is sound and worth running as specified, and comes back with a run/freeze/discuss recommendation.
 - Once the results are in and the report is filled, before publishing: the `results-reviewer` asks whether the results support the claims and whether a fresh reader can follow the report, with every hypothesis scored against its frozen threshold, post-hoc readings kept out of the primary sections, and figures and tables captioned and legible.

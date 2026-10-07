@@ -13,12 +13,14 @@ Start by reading the report end to end, plus the experiment module beside it if 
 
 Whether the experiment was worth running is settled; don't reopen it. The question to hold throughout: **does the report support its claims, and can a fresh reader follow it?**
 
-## Do the results answer the preregistered question
+## Do the results answer the question
+
+An exploratory report (`## Observations`, no gate) has no verdicts to score, so of this section only the last two checks apply. Check instead that each E section answers the question it opens with, that each `Observations` line has a section behind it, and that the report stays short: name any section the discussion does not draw on, since it is a candidate to cut.
 
 - Where the experiment chose something (an operating point, a schedule), `Decision` reports every preregistered criterion for every candidate, records the choice as made with the human, and does not quote the chosen value as a confirmed result before fresh seeds confirm it.
 - Every hypothesis in scope is scored, with the measured number, its threshold, and an explicit verdict. A hypothesis that quietly went missing — no analysis section, no verdict, and no acknowledgement that it is still open — is the most common and most serious problem here.
 - The verdict follows from the number, including the partial and the boring cases. Watch for a threshold that moved after the data arrived, a "directional support" reading of a result that missed its bar, or a hypothesis restated more weakly than it was frozen. A result the prediction named as outside its plan (seeds that disagree about the direction, say) is `Unresolved` and names both readings; scoring it as a miss claims more than the data show.
-- Anything conceived after seeing the data sits under "Exploratory analyses" and is marked post hoc. A post-hoc reading presented in the primary analysis section spends credibility the preregistration earned.
+- In a preregistered report, anything conceived after seeing the data sits in an E section and is marked post hoc. A post-hoc reading presented in the primary analysis section spends credibility the preregistration earned.
 - Grep for `TODO`. Reports get filled in one analysis section at a time, so a surviving placeholder may simply be a section whose turn hasn't come. Report the ones you find and which hypothesis each belongs to, and treat as a blocker only a placeholder in a section the report otherwise presents as finished, or one whose hypothesis the discussion already draws a conclusion about. If the supervisor told you which sections are in scope this round, trust that.
 - Numbers in prose match the numbers the code produces. Spot-check the load-bearing ones against the experiment module or the stored results, and say which ones you checked.
 
@@ -44,7 +46,7 @@ Whether the experiment was worth running is settled; don't reopen it. The questi
 
 ## Readability
 
-- The reading order works: a reader arriving cold gets the question, the method, and how to read the report before the results.
+- The reading order works: a reader arriving cold gets the question, and what they need to parse a result, before the results.
 - The abstract or intro says what was found, not only what was attempted.
 - The tl;dr is a lede, not a summary.
 - Section headings match what the sections now contain — skeletons often keep headings that the results outgrew.
