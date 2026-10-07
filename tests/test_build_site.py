@@ -54,6 +54,15 @@ def test_a_heading_inside_a_details_block_is_given_an_id():
     assert 'id="iteration-0-prep"' in html
 
 
+def test_a_toc_marker_links_the_github_slugs():
+    """The site's ToC has to link the ids this renderer gives its headings, which are GitHub's."""
+    html = build_site.render_markdown("<!-- toc -->\n\n## D2.1: anchoring\n\n### Removing *red*\n")
+
+    toc = html[: html.index("</nav>")]
+    assert f'href="#{github_slug("D2.1: anchoring")}"' in toc
+    assert 'href="#removing-red"' in toc
+
+
 def test_a_mermaid_fence_becomes_the_element_the_library_renders_into():
     """Python-Markdown nests every fence in a `<code>`, which mermaid walks straight past."""
     html, has_mermaid = build_site.promote_mermaid(

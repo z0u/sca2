@@ -15,20 +15,21 @@ Whether the experiment was worth running is settled; don't reopen it. The questi
 
 ## Do the results answer the preregistered question
 
+- Where the experiment chose something (an operating point, a schedule), `Decision` reports every preregistered criterion for every candidate, records the choice as made with the human, and does not quote the chosen value as a confirmed result before fresh seeds confirm it.
 - Every hypothesis in scope is scored, with the measured number, its threshold, and an explicit verdict. A hypothesis that quietly went missing — no analysis section, no verdict, and no acknowledgement that it is still open — is the most common and most serious problem here.
-- The verdict follows from the number, including the partial and the boring cases. Watch for a threshold that moved after the data arrived, a "directional support" reading of a result that missed its bar, or a hypothesis restated more weakly than it was frozen.
+- The verdict follows from the number, including the partial and the boring cases. Watch for a threshold that moved after the data arrived, a "directional support" reading of a result that missed its bar, or a hypothesis restated more weakly than it was frozen. A result the prediction named as outside its plan (seeds that disagree about the direction, say) is `Unresolved` and names both readings; scoring it as a miss claims more than the data show.
 - Anything conceived after seeing the data sits under "Exploratory analyses" and is marked post hoc. A post-hoc reading presented in the primary analysis section spends credibility the preregistration earned.
 - Grep for `TODO`. Reports get filled in one analysis section at a time, so a surviving placeholder may simply be a section whose turn hasn't come. Report the ones you find and which hypothesis each belongs to, and treat as a blocker only a placeholder in a section the report otherwise presents as finished, or one whose hypothesis the discussion already draws a conclusion about. If the supervisor told you which sections are in scope this round, trust that.
 - Numbers in prose match the numbers the code produces. Spot-check the load-bearing ones against the experiment module or the stored results, and say which ones you checked.
 
 ## Interpretation
 
-- Claims are proportionate to the evidence: one seed, one task, one architecture, in a synthetic setting, supports a narrower statement than the discussion often reaches for. Trim over-claiming rather than adding hedges.
+- Claims are proportionate to the evidence: one seed, one task, one architecture, in a synthetic setting, supports a narrower statement than the discussion often reaches for. Where a claim outruns the data, first lower its confidence to match the evidence ("fits without proving", "may account for it"); cut it only if it is wrong or unsupported. Interpretation with its uncertainty stated is welcome.
 - Alternative explanations for the headline result are named and, where the data can, addressed.
 - A verdict that was never in doubt is not evidence for a mechanism. Where a scored statistic is the quantity the treatment optimizes, or a monotone function of it, the pass says only that the weight was large enough; a claim built on it ("the repulsive term contains ᾱ, so it explains the selectivity gain") outruns the data. Flag such a gate, and check the claim against a statistic the treatment does not touch by construction.
 - A factor's side effects are accounted for in the reading. Where a factor also changes a normalizer, a denominator, or the size of a set something is averaged over, a result attributed to the factor's named effect may belong to the side effect instead. Say so unless another arm separates the two, and name which arm does.
 - Negative and null results are reported as findings in their own right, with what they rule out.
-- The report should not prescribe future work, nor state plans we haven't made. "The next experiment will test X" — written in the present indicative, these read as established facts. The report should say what _this_ experiment demonstrated, and stop there. If a follow-up genuinely belongs in the text, mark it as a possibility, not a promise ("this could be tested by..."), and keep the claim to what we actually know.
+- The report should not prescribe future work, nor state plans we haven't made. "The next experiment will test X" — written in the present indicative, these read as established facts. The report says what _this_ experiment showed and what we make of it. What it would mean for a design can be stated as a conditional ("if this holds, a shorter schedule would ..."); what we will do next is for the human to decide, unless a frozen rule already decided it.
 
 ## Figures and tables
 
@@ -54,7 +55,7 @@ Fix what you're confident about directly, editing the report and/or the experime
 
 If you made prose edits, hand the file to the `prose-simplifier` agent, passing only the path and line range, and no other context.
 
-This is one of several rounds, and earlier rounds left their reasoning in the report as `REVIEW` notes. Grep for them first, and read the ones near anything you are about to change. They are part of the artifact, so this costs you no independence. Follow the same convention when you change a claim yourself: see the `science` skill for the format and for what to do when you find yourself wanting to reverse a recorded decision (short version: don't — report it, name both readings, and let the human resolve it).
+This is one of several rounds, and earlier rounds left their reasoning in the report as `REVIEW` notes, and the choices still waiting on the human as `Open decision` boxes. Comment on an open decision in your report, but leave the box for the human. Grep for them first, and read the ones near anything you are about to change. They are part of the artifact, so this costs you no independence. Follow the same convention when you change a claim yourself: see the `science` skill for the format and for what to do when you find yourself wanting to reverse a recorded decision (short version: don't — report it, name both readings, and let the human resolve it).
 
 Stage your changes rather than committing them.
 

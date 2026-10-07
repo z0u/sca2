@@ -56,9 +56,6 @@ class WordTokenizer:
     def encode_words(self, words: Iterable[str]) -> list[int]:
         return [self.stoi[w] for w in words]
 
-    def decode_words(self, tokens: Iterable[int]) -> list[str]:
-        return [self.itos.get(i, "") for i in tokens]
-
 
 def as_words(ex: Example) -> list[str]:
     """One line's token stream: operand, +, operand, =, answer, newline."""
@@ -140,8 +137,3 @@ def sample_corpus(n: int, seed: int, levels: Iterable[int], holdout_frac: float 
 
 def _as_rgb(row: np.ndarray) -> Rgb:
     return (int(row[0]), int(row[1]), int(row[2]))
-
-
-def nearest_distances(vocab_rgb: np.ndarray, target: Rgb) -> np.ndarray:
-    """Euclidean distance (unit-cube units) from *target* to every vocabulary color."""
-    return np.linalg.norm((vocab_rgb - np.array(target)) / (N_LEVELS - 1), axis=1)

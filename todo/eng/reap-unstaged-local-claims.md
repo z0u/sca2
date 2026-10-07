@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [local]
 opened: 2026-09-28
+closed: 2026-10-06
 ---
 # A local claim whose tick died before staging stays RUNNING forever
 

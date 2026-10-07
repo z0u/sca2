@@ -1,6 +1,6 @@
 # D2.2 pivot: an operation the model has to infer
 
-*Drafted 2026-09-23; adopted 2026-09-25 after five review rounds.* A change to which concept D2.2 anchors. The machinery stays the same, and so do the claims in the [design](design.md#what-we-want-to-be-able-to-say), whose [quick route](design.md#quick-route) puts the experiments below in order.
+*Drafted 2026-09-23; adopted 2026-09-25 after five review rounds.* A change to which concept D2.2 anchors. The machinery stays the same, and so do the claims in the [design](design-2026-10.md#what-we-want-to-be-able-to-say), whose [quick route](design-2026-10.md#quick-route) puts the experiments below in order.
 
 In short: ex-2.2.14 anchored an op, but the anchor went to the word that names the op. We propose taking op words out of the grammar, so that the model has to work out the op from a few solved examples. That is closer to what M3, the next milestone, needs: it applies SCA to language models, where the concepts we care about are inferred from context and have no word of their own.
 
@@ -75,11 +75,11 @@ Their results suggest mid-depth, at the position where the answer forms, which f
 
 ## Sequence
 
-1. Suppress `difference` on the stored ex-2.2.14 checkpoints. Scoring only, as planned in the [design](design.md#suppress-the-operation-and-the-operands): the op-word edit against a token mask, and the use-site edits on the whole-line primary. It turns "the anchor is a token" into a measurement. Its outcome decides how much of the old line to report, and it does not decide whether to pivot: if the use-site edits move the answer, that is a result worth writing up beside the pivot, and only the new grammar can show whether SCA anchors a concept the model computes.
+1. Suppress `difference` on the stored ex-2.2.14 checkpoints. Scoring only, as planned in the [design](design-2026-10.md#suppress-the-operation-and-the-operands): the op-word edit against a token mask, and the use-site edits on the whole-line primary. It turns "the anchor is a token" into a measurement. Its outcome decides how much of the old line to report, and it does not decide whether to pivot: if the use-site edits move the answer, that is a result worth writing up beside the pivot, and only the new grammar can show whether SCA anchors a concept the model computes.
 2. Train a [new-grammar control](#the-new-grammar-control): the one-context-per-line format, replacement op noise, the posterior over ops, a labeller keyed per context, and a regression check that the model learns the task. Like ex-2.2.3, this is a grammar change and needs its own control.
 3. Anchor the latent op, then suppress it, then run the layer sweep and the SGTM baseline, as in the current design.
 
-The [quick route](design.md#quick-route) in the design trains step 2 and the first reads of step 3 in one pilot, and runs step 1 while the grammar is built.
+The [quick route](design-2026-10.md#quick-route) in the design trains step 2 and the first reads of step 3 in one pilot, and runs step 1 while the grammar is built.
 
 ### The new-grammar control
 
@@ -126,7 +126,7 @@ The model never sees a label, so none of these gives it a way to read the answer
 
 ### The query `?` saturates
 
-The pooled pull concentrates where alignment comes most easily, and the query `?` is a constant token with nothing else to hold, so the model may push it to a cosine near 1 on e₁ for labelled contexts. That would still be an inferred op, computed from the examples through attention, but it would bring back the dose collapse ex-2.2.14 found at the op word, at that one position. Suppressing at `?` and at the use sites separately would show whether the answer depends on that position (the bypass test from the [design](design.md#suppress-the-operation-and-the-operands)).
+The pooled pull concentrates where alignment comes most easily, and the query `?` is a constant token with nothing else to hold, so the model may push it to a cosine near 1 on e₁ for labelled contexts. That would still be an inferred op, computed from the examples through attention, but it would bring back the dose collapse ex-2.2.14 found at the op word, at that one position. Suppressing at `?` and at the use sites separately would show whether the answer depends on that position (the bypass test from the [design](design-2026-10.md#suppress-the-operation-and-the-operands)).
 
 If it happens, the anchor term has [options](/todo/science/query-symbol-saturation.md):
 **(a)** cap the pull with a hinge that is zero above a target alignment, so no state is asked to be all concept;

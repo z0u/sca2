@@ -60,6 +60,12 @@ fi
 # blocks here, in the session that still has a warm store and can publish cheaply. Pure
 # git plus docs/publish.lock: no store access, no render, seconds at most. CI repeats it
 # read-only, for the pushes that skip this hook.
+#
+# Fetch the base first. A fresh container's origin/main is often behind, and a stale base
+# names every report that a merge in the gap changed without publishing (one under the
+# `skip-publish-check` label, say), as though this branch had changed it. Soft like the rest:
+# offline or slow, the fetch is skipped and the check runs against whatever ref is there.
+timeout 20 git fetch --quiet origin main >/dev/null 2>&1 || true
 base="$(git rev-parse --verify --quiet origin/main 2>/dev/null || true)"
 if [[ -n "$base" && -x .venv/bin/python ]] \
     && stale="$(.venv/bin/python scripts/unpublished_reports.py "$base" 2>/dev/null)" \

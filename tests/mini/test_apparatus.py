@@ -193,7 +193,7 @@ def test_modal_auth_error_has_actionable_message(monkeypatch):
         del args, kwargs
         raise modal.exception.AuthError("not authenticated")
         # pyrefly: ignore [unreachable]
-        yield  # pragma: no cover  — the yield is what makes this an async generator
+        yield  # noqa: V201  # pragma: no cover  — the yield is what makes this an async generator
 
     monkeypatch.setattr(app, "_amap", broken_amap)
 
@@ -512,10 +512,12 @@ _LAUNCHED = {"fc_id": "fc-under-test"}
         ),
     ],
 )
-def test_liveness_settled_states(monkeypatch, record, fake, alive):
+def test_liveness_settled_states(monkeypatch, tmp_path, record, fake, alive):
     """A settled failure must read dead; anything ambiguous stays alive."""
+    from mini.memo import MemoStore
+
     monkeypatch.setattr("modal.FunctionCall.from_id", lambda fc_id: fake)
-    assert _make_modal(monkeypatch)._is_task_alive(record) is alive
+    assert _make_modal(monkeypatch)._is_task_alive(record, MemoStore(tmp_path / "exp")) is alive
 
 
 def test_reap_settles_timeout_killed_modal_task(monkeypatch, tmp_path):

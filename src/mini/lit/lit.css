@@ -6,8 +6,11 @@
  *   docs/report.css            report polish and the print block; inlined after this at
  *                              render, export and site build (mini.reports.set_report_styles),
  *                              so an edit there reaches published reports without a re-export
- *   scripts/md.css             the site's Markdown pages only (base + md, concatenated by
- *                              scripts/build_site.py; VS Code's preview reads both files)
+ *   scripts/md-prose.css       a Markdown page's prose: on the site (below), and inlined
+ *                              after report.css when the page is printed
+ *   scripts/md.css             the site's Markdown pages only (base + md-prose + md,
+ *                              concatenated by scripts/build_site.py; VS Code's preview
+ *                              reads all three files)
  *   mini/chips.css             the nav and provenance chips the site build injects
  *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
  *   subline/theme.css          inside each subline SVG, reading this page's tokens

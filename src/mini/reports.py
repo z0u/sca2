@@ -960,8 +960,9 @@ def set_lightbox(html: str) -> str:
 
 # A verdict admonition's title, lower-cased, to the glyph its badge carries. A tick, a
 # cross and a tilde read in ink, where the admonition's colour is gone; the word rides
-# beside the glyph, so the badge says what the callout says.
-VERDICTS = {"pass": "\u2713", "miss": "\u2717", "partial": "~", "unresolved": "?"}
+# beside the glyph, so the badge says what the callout says. "Decided" closes a selection
+# rule (an S section), which picks among options and has nothing to pass or miss.
+VERDICTS = {"pass": "\u2713", "miss": "\u2717", "partial": "~", "unresolved": "?", "decided": "\u2192"}
 
 _HEADING_RE = re.compile(r"<h([23])\b[^>]*>.*?</h\1>", re.DOTALL)
 _VERDICT_RE = re.compile(r'<div class="admonition(?: [\w-]+)*">\s*<p class="admonition-title">([^<]*)</p>', re.DOTALL)

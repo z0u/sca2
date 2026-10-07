@@ -18,3 +18,7 @@ Suggestion:
 5. Ask for fresh-eyes reviews for both correctness and style (separately) with clean context.
 
 These skills are the backbone of our work and they're worth getting right.
+
+## Notes
+
+**2026-10-06, PM** — [PR #241](https://github.com/z0u/sca2/pull/241) (merged 10-04) changed parts of the workflow without doing step 1 or 4. It made `prose-simplifier` and `report-restructure` run on Fable drafts only, added two fill-in skeletons (`template-scout.py`, `template-prereg.py`) and two exemplars under `.claude/skills/science/references/`, and moved decisions to after the results. So the map in step 1 should start from the current `science` skill and `references/review-passes.md`. The review agents changed only in what interpretation they allow. Still open: no single map or flowchart of the workflow exists yet, and the roles of the reviewers were not redesigned.

@@ -3,6 +3,7 @@ from typing import Type
 from .dopesheet import Dopesheet
 from .model import TStep, Frame
 from .timing_fn import (
+    LinearCosineTimingFunction,
     LinearTimingFunction,
     MinimumJerkTimingFunction,
     StepEndTimingFunction,
@@ -14,10 +15,10 @@ from .transitions import DynamicProp, LogDynamicProp
 INTERPOLATOR_MAP: dict[str, Type[TimingFunction]] = {
     "minjerk": MinimumJerkTimingFunction,
     "linear": LinearTimingFunction,
+    "lincos": LinearCosineTimingFunction,
     "step": StepEndTimingFunction,  # Allow 'step' as alias for 'step-end'
     "step-end": StepEndTimingFunction,
 }
-DEFAULT_TIMING_FUNCTION = MinimumJerkTimingFunction
 
 
 class Timeline:
@@ -46,7 +47,11 @@ class Timeline:
             prop_config = dopesheet.get_prop_config(prop)
 
             # Look up the timing function class based on the config name
-            timing_function_cls = INTERPOLATOR_MAP.get(prop_config.timing_fn, DEFAULT_TIMING_FUNCTION)
+            if prop_config.timing_fn not in INTERPOLATOR_MAP:
+                raise ValueError(
+                    f"unknown interpolator {prop_config.timing_fn!r} for {prop!r}; known: {', '.join(INTERPOLATOR_MAP)}"
+                )
+            timing_function_cls = INTERPOLATOR_MAP[prop_config.timing_fn]
 
             # Use the initial value if available, otherwise default to 0.0
             initial_value = initial_values.get(prop, 0.0)

@@ -49,6 +49,6 @@ docs/
 
 Exported bundles live (gitignored) under `.mini/exports/<key>/` locally; their durable home is the bucket. Nothing under `docs/` holds generated HTML.
 
-`./go render <report> -o <file>` is the light form, for reading rather than serving: the weave alone (no provenance or thumbnails), written to each `-o` file in the format its extension names (`.md`, `.html`, or `.pdf`). The Markdown is the same document as the page, with figures as `<figure>` links to the files in `_assets/` beside it. See the `report-render` skill.
+`./go render <report> -o <file>` is the light form, for reading rather than serving: the weave alone (no provenance or thumbnails), written to each `-o` file in the format its extension names (`.md`, `.html`, or `.pdf`). The Markdown is the same document as the page, with figures as `<figure>` links to the files in `_assets/` beside it. A Markdown page under `docs/` renders the same way, through the same page shell and stylesheets, so a design doc prints for review with `--since` like a report does. See the `report-render` skill.
 
 Heavier or multi-step experiments live in a subdirectory as an importable `experiment.py` (the definition, driven by the `mini` CLI) plus a `report.py` literate script, which reads durable results and publishes. A plain `.py` that isn't a literate script (no `# title:` header) is ignored by the build, so the definition module never lands on the site. See the `mi-ni` skill for authoring, running, and monitoring.

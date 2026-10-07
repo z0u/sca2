@@ -37,17 +37,19 @@ show_help() {
 		  check   [--lint] [--format] [--typecheck] [--test] [--links] [--fix]:
 		                       run checks in parallel (default: all without --fix)
 		                       individual commands: format | lint | types | tests | links
-		                       advisory, and outside check: dead
+		                       outside check, run monthly by a routine: dead
 		  links   [...paths]:  relative doc links and #anchors that no longer resolve
 		                       (default: every .md we author)
-		  deps    [--audit] [--actions] [--updates]:
-		                       dependency review (default: all three) — advisories from
+		  deps    [--audit] [--actions] [--features] [--updates]:
+		                       dependency review (default: all four) — advisories from
 		                       uv audit and npm audit, Action pins against their newest
-		                       upstream tag, and upgrades available to packages we declare.
+		                       upstream tag, dev container features against the registry,
+		                       and upgrades available to packages we declare.
 		                       Read-only; the upgrade check is a --dry-run
 		  render  <report> -o FILE [-o FILE ...] [--since REF]:
 		                       weave a report (mini.lit: a .py with string prose between
-		                       cells) to each FILE, in the format its extension names:
+		                       cells, or a Markdown page under docs/) to each FILE, in
+		                       the format its extension names:
 		                       .md, .html, or .pdf; figures go beside each under _assets/.
 		                       A PDF is the print to review on paper or e-ink (a few
 		                       seconds more): made from the report's export bundle as the

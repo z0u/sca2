@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from mini._debounce import BackgroundEmitter
 from mini._queues import QueueLike
-from mini.urns import matches_urn, parse_urn, to_urn
+from mini.urns import to_urn
 
 # ---------------------------------------------------------------------------
 # Progress message — unified format for all apparatus
@@ -37,20 +37,6 @@ class ProgressMessage:
         return to_urn(
             "mini", "run", self.run_id, "progress", self.job_id, str(self.step), str(self.total), self.message
         )
-
-    @classmethod
-    def matches(cls, message: str) -> bool:
-        return matches_urn(message, "mini:run:*:progress:*:*:*:*")
-
-    @classmethod
-    def from_urn(cls, message: str) -> ProgressMessage:
-        """Convert from a URN."""
-        parts = parse_urn(message)
-        match parts:
-            case ("mini", "run", run_id, "progress", job_id, step, total, msg):
-                return cls(run_id=run_id, job_id=job_id, step=int(step), total=int(total), message=msg)
-            case _:
-                raise ValueError(f"Invalid progress message format: {message}")
 
 
 # ---------------------------------------------------------------------------

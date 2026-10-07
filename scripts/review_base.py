@@ -78,6 +78,30 @@ def export_at(sha: str, reports: list[Path]) -> None:
         git("worktree", "remove", "--force", str(checkout))
 
 
+def render_md_at(sha: str, page: Path) -> None:
+    """Weave Markdown *page* as it was at *sha* into :func:`baseline_dir`, unless it is already there.
+
+    A Markdown page has no cells and reads no results, so there is nothing for a checkout to run: its old text goes through today's weave (:mod:`mini.lit`), and the two pages differ only where the text does.
+    """
+    from mini.lit.document import Runner, parse
+    from mini.lit.render import compose
+
+    rel = page.resolve().relative_to(ROOT).as_posix()
+    dest = baseline_dir(sha, export_key(page))
+    if (dest / "index.html").is_file():
+        print(f"  baseline {rel} @ {sha[:7]}: already rendered")
+        return
+    try:
+        text = git("show", f"{sha}:{rel}")
+    except subprocess.CalledProcessError:
+        print(f"  baseline {rel} @ {sha[:7]}: not in that commit, so its print is unmarked")
+        return
+    html, _ = compose(Runner(page).weave(parse(page, text)))
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "index.html").write_text(html, "utf-8")
+    print(f"  baseline {rel} @ {sha[:7]} -> {dest.relative_to(ROOT)}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("ref", help="the commit the reader last reviewed (any git ref)")

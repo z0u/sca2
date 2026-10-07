@@ -54,7 +54,10 @@ _RELOAD = """
     try {
       const r = await fetch(`/__version?after=${v}`, {cache: "no-store"});
       const n = Number(await r.text());
-      if (n !== v) location.reload();
+      // Stop polling once a reload is asked for. Otherwise the next poll answers at once
+      // (this page's v is stale now) and reloads again, cancelling the navigation in
+      // flight; the tiny poll outruns the page, so the page lands only by luck.
+      if (n !== v) { location.reload(); return; }
     } catch (e) { await new Promise(r => setTimeout(r, 1000)); }
   }
 })();
@@ -69,7 +72,8 @@ class _Site:
         self.out = out
         self.version = 0
         self.changed = threading.Condition()
-        self.lock = threading.Lock()
+        # Reentrant, so a caller can hold it across a check and the publish that depends on it.
+        self.lock = threading.RLock()
 
     def publish(self, html_for: Callable[[str], str], markdown: str | None = None) -> None:
         """Write the page *html_for* builds around the reload script for the next version, then bump."""
@@ -190,11 +194,14 @@ class _Builder:
         self._timer.start()
 
     def _publish_partial(self, woven: Woven) -> None:
+        # Check and publish under one hold of the lock: released in between, the build
+        # could finish and publish the final page in the gap, and this partial would then
+        # replace it.
         with self.site.lock:
             if not self._live:  # the build finished first
                 return
+            self.site.publish(lambda reload: compose(woven, extra_body=reload)[0])
         cell = woven.running
-        self.site.publish(lambda reload: compose(woven, extra_body=reload)[0])
         print(
             f"{self.doc.name}: running the cell at line {cell.line if cell else '?'}, page shows the rest", flush=True
         )
@@ -250,7 +257,7 @@ def serve(
     out = (out_dir or output_dir(doc, live=True)).resolve()
     out.mkdir(parents=True, exist_ok=True)
     site = _Site(out)
-    placeholder = f"<!doctype html><title>{html.escape(doc.name)}</title><p>Rendering {html.escape(doc.name)}…</p>"
+    placeholder = f"<!doctype html><meta charset=utf-8><title>{html.escape(doc.name)}</title><p>Rendering {html.escape(doc.name)}…</p>"
     site.publish(lambda reload: placeholder + reload)
     threading.Thread(target=_watch, args=(doc, _Builder(doc, site), poll), daemon=True).start()
     handler = type("Handler", (_Handler,), {"site": site})

@@ -293,3 +293,52 @@ class StepEndTimingFunction:
         value = self(t)
         # Velocity and acceleration are always zero for step functions
         return DynamicPropState(value=value, velocity=0.0, acceleration=0.0)
+
+
+class LinearCosineTimingFunction:
+    """Rises linearly and falls along a half cosine, so a sheet can spell out the usual warmup-then-cosine schedule.
+
+    Between keyframes `y0` and `y1` over duration `T`, the value is `y0 + (y1 - y0) * t / T` when `y1 > y0`, and
+    `y1 + (y0 - y1) * (1 + cos(pi * t / T)) / 2` when `y1 < y0`. With keyframes at the warmup end and the run end, a
+    sheet matches `optax.warmup_cosine_decay_schedule`. Like the linear function, it ignores the incoming velocity.
+    """
+
+    initial_value: float
+    final_value: float
+    duration: float
+    _falling: bool
+
+    def __init__(
+        self,
+        initial_value: float,
+        initial_velocity: float,  # Ignored
+        initial_acceleration: float,  # Ignored
+        final_value: float,
+        duration: float,
+    ):
+        self.initial_value = initial_value
+        self.duration = duration
+        self.final_value = initial_value if np.isclose(duration, 0.0) else final_value
+        self._falling = self.final_value < initial_value
+
+    def _fraction(self, t: float) -> float:
+        """The share of the way from the initial value to the final one at time *t*."""
+        u = max(0.0, min(1.0, t / self.duration))
+        return (1 - np.cos(np.pi * u)) / 2 if self._falling else u
+
+    def __call__(self, t: float) -> float:
+        if np.isclose(self.duration, 0.0):
+            return self.initial_value
+        return self.initial_value + (self.final_value - self.initial_value) * self._fraction(t)
+
+    def get_state(self, t: float) -> DynamicPropState:
+        if np.isclose(self.duration, 0.0):
+            return DynamicPropState(value=self.initial_value, velocity=0.0, acceleration=0.0)
+        span = self.final_value - self.initial_value
+        u = max(0.0, min(1.0, t / self.duration))
+        if not self._falling:
+            return DynamicPropState(value=self(t), velocity=span / self.duration, acceleration=0.0)
+        w = np.pi / self.duration
+        velocity = span * w * np.sin(np.pi * u) / 2
+        acceleration = span * w * w * np.cos(np.pi * u) / 2
+        return DynamicPropState(value=self(t), velocity=float(velocity), acceleration=float(acceleration))

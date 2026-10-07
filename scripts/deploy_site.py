@@ -7,9 +7,11 @@ The site is a function of two things: `main`, which production is built from, an
 
 **What the previous deploy is for.** Each build prints its reports' PDFs (`build_site.PdfMemo`), and the one thing a from-scratch rebuild would waste is those prints: a few seconds each, for every report of every preview, when almost none of them changed. So the run fetches what `gh-pages` serves now and hands each build the matching part of it (the root to production, `pr-preview/pr-<n>/` to that PR, and the root again for a PR to borrow from) as a memo: a manifest beside the PDFs says what each was printed from, and a report whose page and tooling are unchanged keeps its file, or takes production's. The branch stays one commit deep and is still rewritten whole; it is read before it is replaced.
 
-**What it costs** is rebuilding every preview on every event, at about 30 s each. This repository has a handful of PRs open at a time, so a run is a minute or two. A preview that fails to build is reported (a warning, and a note on the PR) and skipped, so a broken branch never holds back production.
+**What it costs** is rebuilding every preview on every event, at about 30 s each. This repository has a handful of PRs open at a time, so a run is a minute or two. A preview that fails to build is reported (a warning, and a failed status on the PR head) and skipped, so a broken branch never holds back production.
 
-**The open-PR list is read before anything is built**, so an API failure stops the run rather than deploying a site with no previews. Only same-repo PRs get one: a fork's branch would run with the repository's secrets in scope, which is the boundary the preview workflow has always kept. Each PR's file list is read then too, for the reports its comment links: the pins it adds or moves in `docs/publish.lock`.
+**The open-PR list is read before anything is built**, so an API failure stops the run rather than deploying a site with no previews. Only same-repo PRs get one: a fork's branch would run with the repository's secrets in scope, which is the boundary the preview workflow has always kept. Each PR's file list is read then too, for the reports its statuses link: the pins it adds or moves in `docs/publish.lock`.
+
+**Why statuses rather than a comment.** The links reach the PR as commit statuses on its head: one for the preview, one per report the PR publishes, each a "Details" link in the PR's checks box. Until 2026-10-01 they were one comment per PR, rewritten on every push because it named the commit it was built from. An agent subscribed to the PR is woken by every comment and every edit, and a preview link asks nothing of it; commit statuses don't wake it. A status also belongs to the commit it describes, so a new push clears the old links on its own.
 
     uv run --no-project scripts/deploy_site.py --dry-run   # build everything, push nothing
 """
@@ -33,8 +35,8 @@ ROOT = Path(__file__).parent.parent.resolve()
 UMBRELLA = "pr-preview"
 """Where the previews live on the branch: `pr-preview/pr-<n>/` under the production site."""
 
-MARKER = "<!-- site-preview -->"
-"""Identifies the one comment per PR that carries its preview link, so a rebuild edits it rather than adding another."""
+CONTEXT = "preview"
+"""The status context of the whole preview; each report's link is `preview: <key>`."""
 
 LOCK = "docs/publish.lock"
 """The pin manifest (`mini.reports.PUBLISH_LOCK`), spelled out because this script runs without the project installed. A preview serves each report at the revision its branch pins here, so the pins a PR adds or moves are the reports whose preview differs from production."""
@@ -226,7 +228,7 @@ class Report:
 
 
 def rendered(preview: Path, keys: list[str]) -> list[Report]:
-    """The reports among `keys` that the preview build wrote a page for, and whether it printed their PDF, so the comment never links a page that isn't there."""
+    """The reports among `keys` that the preview build wrote a page for, and whether it printed their PDF, so a status never links a page that isn't there."""
     return [
         Report(key, (preview / key / "report.pdf").is_file())
         for key in keys
@@ -234,38 +236,35 @@ def rendered(preview: Path, keys: list[str]) -> list[Report]:
     ]
 
 
-def preview_comment(url: str, sha: str, reports: Sequence[Report] = ()) -> str:
-    changed = "".join(
-        f"\n- [{r.key}]({url}{r.key}/)" + (f" ([PDF]({url}{r.key}/report.pdf))" if r.pdf else "") for r in reports
-    )
-    return (
-        f"{MARKER}\n"
-        f"**Preview:** {url}\n\n"
-        + (f"Reports this PR publishes:\n{changed}\n\n" if changed else "")
-        + f"Built from {sha[:7]}; ready once the [Pages deployment](../deployments) finishes. "
-        "Rebuilt on every push here, and gone once the PR closes."
-    )
+def preview_statuses(url: str, reports: Sequence[Report] = ()) -> dict[str, dict[str, str]]:
+    """The statuses that link a built preview: context → the status body."""
+    statuses = {CONTEXT: {"state": "success", "target_url": url, "description": "The site as this commit builds it"}}
+    for r in reports:
+        statuses[f"{CONTEXT}: {r.key}"] = {
+            "state": "success",
+            "target_url": f"{url}{r.key}/",
+            "description": "Published by this PR" + (", with its PDF" if r.pdf else " (no PDF)"),
+        }
+    return statuses
 
 
-def failure_comment(sha: str) -> str:
+def failure_statuses() -> dict[str, dict[str, str]]:
     run = (
         f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
         if "GITHUB_RUN_ID" in os.environ
         else None
     )
-    where = f" — see [the run]({run})" if run else ""
-    return f"{MARKER}\nThe preview for {sha[:7]} failed to build{where}. Production and the other previews deployed without it."
+    body = {"state": "failure", "description": "The preview failed to build; production deployed without it"}
+    return {CONTEXT: body | ({"target_url": run} if run else {})}
 
 
-def upsert_comment(api: GitHub, number: int, body: str) -> None:
-    """Edit the PR's preview comment in place, or post it the first time. Nothing happens when it already reads `body`."""
-    existing = next((c for c in api.paged(f"/issues/{number}/comments") if MARKER in (c.get("body") or "")), None)
-    if existing and existing["body"] == body:
-        return
-    if existing:
-        api.request("PATCH", f"/issues/comments/{existing['id']}", {"body": body})
-    else:
-        api.request("POST", f"/issues/{number}/comments", {"body": body})
+def post_statuses(api: GitHub, sha: str, statuses: dict[str, dict[str, str]]) -> None:
+    """Set each status on `sha`, skipping those it already carries, so a quiet rebuild writes nothing."""
+    current = {s["context"]: s for s in api.request("GET", f"/commits/{sha}/status").get("statuses", [])}
+    for context, body in statuses.items():
+        if all(current.get(context, {}).get(k) == v for k, v in body.items()):
+            continue
+        api.request("POST", f"/statuses/{sha}", {"context": context, **body})
 
 
 def reconcile(
@@ -335,9 +334,9 @@ def reconcile(
         git("worktree", "prune", cwd=repo)
 
     for number, sha in built.items():
-        upsert_comment(api, number, preview_comment(f"{site_url}{UMBRELLA}/pr-{number}/", sha, reports[number]))
-    for number, sha in failed.items():
-        upsert_comment(api, number, failure_comment(sha))
+        post_statuses(api, sha, preview_statuses(f"{site_url}{UMBRELLA}/pr-{number}/", reports[number]))
+    for sha in failed.values():
+        post_statuses(api, sha, failure_statuses())
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary, "a") as out:
             out.write(f"{message}\n" + "".join(f"\n- ⚠️ #{n}: preview failed to build" for n in failed))

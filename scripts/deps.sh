@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# Dependency check: security advisories, GitHub Action pin freshness, and
-# upgrades available for the packages we declare. Written for the weekly
+# Dependency check: security advisories, GitHub Action pin freshness, dev
+# container feature freshness, and upgrades available for the packages we
+# declare. Written for the weekly
 # deps-routine agent (.claude/agents/deps-routine.md), and runnable by hand
 # via `./go deps`.
 #
@@ -34,8 +35,8 @@ read -r -d '' JQ_DEDUPE <<'JQ'
 JQ
 
 usage() {
-    echo "usage: ./go deps [--audit] [--actions] [--updates]"
-    echo "       (no flags: all three)"
+    echo "usage: ./go deps [--audit] [--actions] [--features] [--updates]"
+    echo "       (no flags: all four)"
 }
 
 # --- Python advisories -------------------------------------------------------
@@ -151,6 +152,36 @@ check_actions() {
           done
 }
 
+# --- Dev container features --------------------------------------------------
+
+check_devcontainer_features() {
+    echo "## Dev container features"
+    # The lockfile is plain JSON (devcontainer.json is JSONC, which jq cannot
+    # read) and also lists features pulled in through `dependsOn`. A feature pin
+    # such as `node:2` floats within its major, so the lock holds the version
+    # actually resolved. ghcr.io serves tag lists to anonymous callers once they
+    # have fetched a pull-only token, so this needs no credentials or CLI.
+    local lock=.devcontainer/devcontainer-lock.json
+    if [[ ! -f "$lock" ]]; then
+        echo "  ⚠️  $lock not found."
+        return 1
+    fi
+    jq -r '.features | to_entries[] | "\(.key) \(.value.version)"' "$lock" \
+        | while read -r ref locked; do
+              local path=${ref#ghcr.io/} pin latest token state
+              pin=${path##*:}; path=${path%:*}
+              token=$(curl -fsS "https://ghcr.io/token?scope=repository:$path:pull" 2>/dev/null | jq -r '.token // empty')
+              latest=$(curl -fsS -H "Authorization: Bearer $token" "https://ghcr.io/v2/$path/tags/list?n=1000" 2>/dev/null \
+                  | jq -r '[.tags[]? | select(test("^[0-9]+(\\.[0-9]+)*$"))] | sort_by(split(".") | map(tonumber)) | last // empty')
+              if   [[ -z "$token" || -z "$latest" ]]; then state='could not reach registry'
+              elif [[ "${latest%%.*}" != "$pin"    ]]; then state="NEW MAJOR $latest (pinned :$pin)"
+              elif [[ "$latest" == "$locked"       ]]; then state='current'
+              else state="lock behind -> $latest"
+              fi
+              printf '    %-62s %-8s %s\n' "$path:$pin" "$locked" "$state"
+          done
+}
+
 # --- Upgrades to packages we declare ----------------------------------------
 
 check_declared_updates() {
@@ -198,14 +229,15 @@ PY
 
 # --- Dispatch ----------------------------------------------------------------
 
-want_audit=0 want_actions=0 want_updates=0
+want_audit=0 want_actions=0 want_features=0 want_updates=0
 if (( $# == 0 )); then
-    want_audit=1 want_actions=1 want_updates=1
+    want_audit=1 want_actions=1 want_features=1 want_updates=1
 fi
 while (( $# )); do
     case "$1" in
         --audit)   want_audit=1 ;;
         --actions) want_actions=1 ;;
+        --features) want_features=1 ;;
         --updates) want_updates=1 ;;
         -h|--help) usage; exit 0 ;;
         *)         echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -222,6 +254,10 @@ if (( want_audit )); then
 fi
 if (( want_actions )); then
     check_actions || status=1
+    echo
+fi
+if (( want_features )); then
+    check_devcontainer_features || status=1
     echo
 fi
 if (( want_updates )); then

@@ -64,8 +64,8 @@ PR_12_REPORTS = [deploy_site.Report("m2/ex-a", pdf=True), deploy_site.Report("m2
 class FakeGitHub:
     """Three open PRs, one of them from a fork, and a record of every write. PR 12 re-pins some reports and unpins one."""
 
-    def __init__(self, comments: dict[int, list[dict[str, Any]]] | None = None):
-        self.comments = comments or {}
+    def __init__(self, statuses: dict[str, list[dict[str, Any]]] | None = None):
+        self.statuses = statuses or {}
         self.writes: list[tuple[str, str, dict[str, Any] | None]] = []
 
     def paged(self, path: str) -> list[dict[str, Any]]:
@@ -82,12 +82,17 @@ class FakeGitHub:
                 {"number": 12, "head": {"sha": "a" * 40, "repo": {"full_name": SLUG}}},
                 {"number": 56, "head": {"sha": "c" * 40, "repo": {"full_name": "someone/sca2"}}},
             ]
-        number = int(path.split("/")[2])
-        return self.comments.get(number, [])
+        raise AssertionError(f"unexpected listing {path}")
 
     def request(self, method: str, path: str, body: dict[str, Any] | None = None) -> Any:
+        if method == "GET" and path.startswith("/commits/"):
+            return {"statuses": self.statuses.get(path.split("/")[2], [])}
         self.writes.append((method, path, body))
         return {}
+
+    def posted(self, sha: str) -> dict[str, dict[str, Any]]:
+        """The statuses written to `sha`, by context."""
+        return {body["context"]: body for _, path, body in self.writes if path == f"/statuses/{sha}" and body}
 
 
 @pytest.fixture
@@ -148,39 +153,28 @@ def test_the_branch_becomes_main_plus_a_preview_per_open_pr(clone: Path, remote:
 
 
 def test_a_broken_preview_is_reported_and_skipped(clone: Path, remote: Path):
-    """PR 34's branch doesn't build. Production and the other preview deploy anyway, and its comment says what happened."""
+    """PR 34's branch doesn't build. Production and the other preview deploy anyway, and its status says what happened."""
     api = FakeGitHub()
     assert deploy_site.reconcile(clone, slug=SLUG, builder=build, api=api) == 0
 
     site = served(remote)
     assert "pr-preview/pr-12/index.html" in site
     assert not [path for path in site if path.startswith("pr-preview/pr-34/")]
-    posted = {path: body or {} for method, path, body in api.writes if method == "POST"}
-    assert "Preview:" in posted["/issues/12/comments"]["body"]
-    assert "failed to build" in posted["/issues/34/comments"]["body"]
+    pr_12 = git("rev-parse", "refs/pull/12/head", cwd=remote)
+    assert api.posted(pr_12)["preview"]["state"] == "success"
+    assert api.posted("b" * 40)["preview"]["state"] == "failure"
 
 
 def test_a_repeat_run_pushes_nothing(clone: Path, remote: Path):
     """The same state builds to the same tree, so the second run leaves the tip alone — and so triggers no Pages deployment."""
     deploy_site.reconcile(clone, slug=SLUG, builder=build, api=FakeGitHub())
     tip = git("rev-parse", "gh-pages", cwd=remote)
-    api = FakeGitHub(
-        comments={
-            12: [
-                {
-                    "id": 1,
-                    "body": deploy_site.preview_comment(
-                        "https://z0u.github.io/sca2/pr-preview/pr-12/",
-                        git("rev-parse", "refs/pull/12/head", cwd=remote),
-                        PR_12_REPORTS,
-                    ),
-                }
-            ]
-        }
-    )
+    pr_12 = git("rev-parse", "refs/pull/12/head", cwd=remote)
+    preview = deploy_site.preview_statuses("https://z0u.github.io/sca2/pr-preview/pr-12/", PR_12_REPORTS)
+    api = FakeGitHub(statuses={pr_12: [{"context": context, **body} for context, body in preview.items()]})
     assert deploy_site.reconcile(clone, slug=SLUG, builder=build, api=api) == 0
     assert git("rev-parse", "gh-pages", cwd=remote) == tip
-    assert not [w for w in api.writes if w[1] == "/issues/12/comments"], "an unchanged preview rewrote its comment"
+    assert not api.posted(pr_12), "an unchanged preview rewrote its statuses"
 
 
 def test_each_build_reads_its_own_part_of_the_previous_deploy(clone: Path, remote: Path):
@@ -226,27 +220,36 @@ def test_previewable_keeps_same_repo_heads_in_number_order():
     )
 
 
-def test_the_preview_comment_is_edited_in_place():
+def test_only_changed_statuses_are_posted():
     api = FakeGitHub(
-        comments={
-            12: [
-                {"id": 7, "body": "an unrelated comment"},
-                {"id": 8, "body": f"{deploy_site.MARKER}\nan older link"},
+        statuses={
+            "a" * 40: [
+                {"context": "preview", "state": "success", "target_url": "https://x/", "description": "d"},
+                {"context": "preview: m2/ex-a", "state": "success", "target_url": "https://x/old/", "description": "d"},
             ]
         }
     )
-    deploy_site.upsert_comment(api, 12, "new body")
-    assert api.writes == [("PATCH", "/issues/comments/8", {"body": "new body"})]
+    deploy_site.post_statuses(
+        api,
+        "a" * 40,
+        {
+            "preview": {"state": "success", "target_url": "https://x/", "description": "d"},
+            "preview: m2/ex-a": {"state": "success", "target_url": "https://x/m2/ex-a/", "description": "d"},
+        },
+    )
+    assert list(api.posted("a" * 40)) == ["preview: m2/ex-a"]
 
 
-def test_the_comment_links_the_reports_the_pr_publishes(clone: Path, remote: Path):
-    """PR 12 re-pins ex-a and ex-b, which its preview renders, so its comment links both, with ex-a's PDF. It drops ex-c, leaves ex-d, and pins ex-e without rendering it: none of those are linked. A PR that moves no pins gets the preview link alone."""
+def test_the_statuses_link_the_reports_the_pr_publishes(clone: Path, remote: Path):
+    """PR 12 re-pins ex-a and ex-b, which its preview renders, so it gets a status for each. It drops ex-c, leaves ex-d, and pins ex-e without rendering it: none of those are linked. A PR that moves no pins gets the preview link alone."""
     assert deploy_site.repinned(FakeGitHub(), 12) == ["m2/ex-a", "m2/ex-b", "m2/ex-e"]
     api = FakeGitHub()
     deploy_site.reconcile(clone, slug=SLUG, builder=build, api=api)
-    body = next(body or {} for method, path, body in api.writes if path == "/issues/12/comments")["body"]
+    posted = api.posted(git("rev-parse", "refs/pull/12/head", cwd=remote))
     preview = "https://z0u.github.io/sca2/pr-preview/pr-12/"
-    assert f"- [m2/ex-a]({preview}m2/ex-a/) ([PDF]({preview}m2/ex-a/report.pdf))" in body
-    assert f"- [m2/ex-b]({preview}m2/ex-b/)\n" in body
-    assert not [key for key in ("ex-c", "ex-d", "ex-e", "ex-z") if key in body]
-    assert "Reports" not in deploy_site.preview_comment(preview, "a" * 40)
+    assert sorted(posted) == ["preview", "preview: m2/ex-a", "preview: m2/ex-b"]
+    assert posted["preview"]["target_url"] == preview
+    assert posted["preview: m2/ex-a"]["target_url"] == f"{preview}m2/ex-a/"
+    assert "with its PDF" in posted["preview: m2/ex-a"]["description"]
+    assert "no PDF" in posted["preview: m2/ex-b"]["description"]
+    assert list(deploy_site.preview_statuses(preview)) == ["preview"]

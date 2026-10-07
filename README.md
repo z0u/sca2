@@ -12,19 +12,19 @@ This is part of a milestone program.
 
 ![Milestone map: M1 (autoencoders) complete, M2 (transformers) in progress, M3 (language models) and M4 (LLM fine-tunes) planned. Within M2, D2.1 (anchor a concept) is complete, D2.2 (operations and steering) in progress, D2.3 (asymmetric verification) planned, and D2.4 (publication) already under way.](/docs/public/milestones.svg)
 
-- M1 anchored concepts in autoencoders. Done: [published in GRaM @ ICLR 2026](https://arxiv.org/abs/2512.12469). [M1 blog post](/references/d1.3-intervening-sca.md); [source](https://github.com/z0u/ex-preppy))
+- M1 anchored concepts in autoencoders. Done: [published in GRaM @ ICLR 2026](https://arxiv.org/abs/2512.12469). [M1 blog post](/references/d1.3-intervening-sca.md); [source](https://github.com/z0u/ex-preppy)
 - **M2 tests whether it transfers to transformers (this project)**
 - M3 and M4: Small language models and LLM fine-tunes with real safety targets, sycophancy the lead candidate.
 
 ### M2
 
-M2 works in a synthetic color-mixing domain with unambiguous ground truth (`red + blue = purple`), in a small transformer:
+M2 trains a small transformer to do vector math. The vectors are colors, in a synthetic color-mixing domain with unambiguous ground truth (`red + blue = purple`):
 
 - D2.1: Does SCA work in a transformer at all? [Reports](/docs/index.md#d21-anchoring-in-a-transformer)
 
   Anchor a concept such as _red_ across the residual stream in the color-mixing task; probe each layer for the anchored concept, and confirm that completion accuracy (predicting the correct result color) matches an un-anchored baseline.
 
-  Done. see [D2.1 blog post](/references/d2.1-anchored-transformer.md).
+  Done. See [D2.1 blog post](/references/d2.1-anchored-transformer.md).
 
 - D2.2: Abstract concepts and steering
 

@@ -198,6 +198,7 @@ class Dopesheet:
              - 'prop:space:interpolator' (e.g., 'lr:log:minjerk') - Customizes both space and interpolator
 
              Default values: space='linear', interpolator='minjerk'
+             Interpolators: 'minjerk', 'linear', 'lincos' (linear rising, half cosine falling), 'step-end' (or 'step')
 
         Example:
             STEP,PHASE,ACTION,lr:log,momentum,z::step-end

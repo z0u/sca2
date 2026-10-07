@@ -96,9 +96,9 @@ def test_reap_dead_settles_a_killed_worker(tmp_path: Path):
 
     os.killpg(pid, signal.SIGKILL)  # crash it without letting it write a result
     deadline = time.monotonic() + 10  # wait until truly gone (a zombie counts as dead)
-    while time.monotonic() < deadline and app._is_task_alive(rec):
+    while time.monotonic() < deadline and app._is_task_alive(rec, store):
         time.sleep(0.05)
-    assert not app._is_task_alive(rec)
+    assert not app._is_task_alive(rec, store)
 
     assert app.reap_dead(store) == [rec["key"]]
     (settled,) = store.records()

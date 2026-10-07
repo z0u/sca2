@@ -73,8 +73,8 @@ def test_snap_name_tie_break_is_deterministic():
 def test_corpus_is_disjoint_and_respects_holdout():
     palette = mv.xkcd_palette(140)
     hex_ops = mv.hex_operands(216, 0)
-    named_train, named_held = mv.holdout_split(mv.distinct_pairs(palette.values()), 0, 0.2)
-    hex_train, hex_held = mv.holdout_split(mv.distinct_pairs(hex_ops), 0, 0.2)
+    _, named_held = mv.holdout_split(mv.distinct_pairs(palette.values()), 0, 0.2)
+    _, hex_held = mv.holdout_split(mv.distinct_pairs(hex_ops), 0, 0.2)
     held_n, held_h = set(named_held), set(hex_held)
     corpus = mv.sample_corpus(
         500, 0, palette, hex_ops,

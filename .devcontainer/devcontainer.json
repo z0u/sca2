@@ -13,7 +13,6 @@
     // uv for project package manamgent
     "ghcr.io/devcontainers-extra/features/uv:1": {},
     "ghcr.io/devcontainer-community/devcontainer-features/jonas-tig:1": {},
-    "ghcr.io/devcontainers-extra/features/claude-code:2": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
     // Agent-friendly tools
     "ghcr.io/jsburckhardt/devcontainer-features/fd:1": {},
@@ -31,9 +30,16 @@
     "source=${localWorkspaceFolderBasename}-node,target=${containerWorkspaceFolder}/node_modules,type=volume",
     // Persist user config across container rebuilds
     "source=${localWorkspaceFolderBasename}-marimo-config,target=/home/vscode/.config/marimo,type=volume",
-    "source=${localWorkspaceFolderBasename}-claude-config,target=/home/vscode/.claude,type=volume"
+    "source=${localWorkspaceFolderBasename}-claude-config,target=/home/vscode/.claude,type=volume",
+    // Credentials for Modal, Hugging Face and GitHub, so `./go auth` is needed once, not per rebuild.
+    // (Claude Code keeps its own in the volume above.)
+    "source=${localWorkspaceFolderBasename}-auth,target=/home/vscode/.auth,type=volume"
   ],
   "containerEnv": {
+    // Point each tool's credential file into the persistent auth volume
+    "MODAL_CONFIG_PATH": "/home/vscode/.auth/modal.toml",
+    "HF_TOKEN_PATH": "/home/vscode/.auth/hf/token",
+    "GH_CONFIG_DIR": "/home/vscode/.auth/gh",
     "UV_CACHE_DIR": "/home/vscode/.cache/uv",
     // Copy instead of hardlinking due to separate volumes
     "UV_LINK_MODE": "copy",
@@ -47,13 +53,15 @@
     "UV_COMPILE_BYTECODE": "1"
   },
   "remoteEnv": {
-    // Project tool wrappers (marimo, ruff, ty, modal) that run via `uv run`
-    "PATH": "${containerWorkspaceFolder}/bin:${containerEnv:PATH}"
+    // Project tool wrappers (marimo, ruff, ty, modal) that run via `uv run`.
+    // ~/.local/bin (self-updating Claude Code) goes before /usr/local/bin; otherwise
+    // common-utils' /etc/zsh/zshrc appends it last.
+    "PATH": "${containerWorkspaceFolder}/bin:/home/vscode/.local/bin:${containerEnv:PATH}"
   },
   "customizations": {
     "vscode": {
       "extensions": [
-        // "anthropic.claude-code",  // Provided by claude-code feature
+        "anthropic.claude-code",
         "astral-sh.ty",
         "bierner.github-markdown-preview",
         "charliermarsh.ruff",

@@ -668,7 +668,7 @@ class ModalApparatus(Apparatus[ModalVolume]):
                 modal.FunctionCall.from_id(fc_id).cancel()
 
     @override
-    def _is_task_alive(self, rec: dict[str, Any]) -> bool:
+    def _is_task_alive(self, rec: dict[str, Any], store: MemoStore) -> bool:
         """Probe the task's ``FunctionCall`` for liveness (for ``reap_dead``).
 
         ``get(timeout=0)`` polls without waiting. The key invariant: the worker never lets a task exception escape — it writes the record (FAILED) and returns normally (``mini._taskworker.execute_task``). So a *settled* failure raised out of ``get`` means the call died at the infra level and will never settle its record (#20):

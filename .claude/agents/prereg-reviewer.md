@@ -14,8 +14,9 @@ Start by reading the report end to end, plus the experiment module beside it if 
 The question to hold throughout: **is this experiment sound, and worth running as specified?** Concretely, that usually means:
 
 - Each hypothesis is falsifiable, with a stated measurement and threshold, and every outcome — including the boring one — would change what we do next.
-- Each hypothesis is one a colleague could restate from memory: an expectation, the number we will look at, and what would change our mind. Gate arithmetic (partial bands, tie-breaks) belongs only on a hypothesis a decision hangs on; elsewhere it is cost without safety.
-- Where the plan has a selection rule (which point or condition gets adopted), it carries every gate the hypotheses do. A rule that checks most of them will adopt a point that fails the rest.
+- Each hypothesis is one a colleague could restate from memory: an expectation, the number we will look at, and what would change our mind, written in the conditional. Gate arithmetic (partial bands, tie-breaks) is cost without safety; keep it for task cost and risk rows.
+- Each prediction names a result outside its plan (usually, seeds that disagree about the direction), which would be scored `Unresolved`.
+- Where the experiment chooses something (which point or condition gets adopted), the plan names the candidates and the criteria the choice will weigh, and leaves the choice itself to after the results, with the human. A frozen rule that adopts on its own has had to be broken after the fact more often than not. Hard gates belong on task cost and risk rows, where a "no" has to hold whatever the data look like.
 - The analysis plan can actually score every hypothesis from the data the method collects. Each result section opens with its frozen prediction, and `Findings` indexes them. Look for a prediction that names no contrary outcome, a `Findings` line with no section behind it, or a standalone hypotheses block restating what the sections already say.
 - Nothing is underspecified to the point where the person running it would have to make a judgment call that changes the result: probe sets, gate statistics, tie-breaks, which checkpoint gets measured.
 - Confounds worth naming are named, and the measurement site is chosen by a criterion independent of the statistic being judged.
@@ -29,7 +30,7 @@ Numbers verified by a prior round are probably fine; re-check one only if the pl
 
 Fix what you're confident about directly, editing the report and/or the experiment module. Escalate when a fix would change what the experiment tests. If you made prose edits, hand the file to the `prose-simplifier` agent, passing only the path and line range, and no other context.
 
-You are one of several rounds, and earlier rounds left their reasoning in the report as `REVIEW` notes. Grep for them first, and read the ones near anything you are about to change — they are part of the artifact, so this costs you no independence. Follow the same convention when you change a claim yourself: see the `science` skill for the format and for what to do when you find yourself wanting to reverse a recorded decision (short version: don't — report it, name both readings, and let the human resolve it).
+You are one of several rounds, and earlier rounds left their reasoning in the report as `REVIEW` notes, and the choices still waiting on the human as `Open decision` boxes. Comment on an open decision in your report, but leave the box for the human. Grep for them first, and read the ones near anything you are about to change — they are part of the artifact, so this costs you no independence. Follow the same convention when you change a claim yourself: see the `science` skill for the format and for what to do when you find yourself wanting to reverse a recorded decision (short version: don't — report it, name both readings, and let the human resolve it).
 
 Stage your changes rather than committing them.
 

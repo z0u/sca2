@@ -17,13 +17,14 @@ from pymdownx.slugs import slugify
 
 from mini.lit.notes import NotesExtension, Term
 
-__all__ = ["to_html", "page", "render_fragment"]
+__all__ = ["to_html", "page", "render_fragment", "expand_toc"]
 
 BASE_CSS_PATH = Path(__file__).with_name("base.css")  # shared with the site's Markdown pages
 CSS_PATH = Path(__file__).with_name("lit.css")  # the frame; its header maps the rest of the CSS
 
 EXTENSIONS = [
     "tables",
+    "def_list",
     "footnotes",
     "attr_list",
     "md_in_html",
@@ -75,13 +76,52 @@ def _show_marks(fragment: str) -> str:
     return _MARK_WORD_RE.sub(lambda m: f'<mark class="pending">{bytes.fromhex(m[1]).decode()}</mark>', fragment)
 
 
+# A table of contents in a Markdown page: `<!-- toc -->` on its own line. GitHub hides the
+# comment (it has an outline of its own), and Python-Markdown passes it through, so the
+# renderer can swap it for a list of the headings.
+TOC_MARKER_RE = re.compile(r"<!--\s*toc\s*-->")
+TOC_LEVELS = (2, 3)
+
+
+def _toc_entries(tokens: list[dict]) -> list[dict]:
+    """The headings at the ToC levels, in page order, flattened out of the converter's nesting."""
+    return [entry for t in tokens for entry in ([t] if t["level"] in TOC_LEVELS else []) + _toc_entries(t["children"])]
+
+
+def _toc_list(tokens: list[dict]) -> str:
+    """A list of the h2 headings, each with its h3 headings nested under it."""
+    groups: list[tuple[dict | None, list[dict]]] = []
+    for t in _toc_entries(tokens):
+        if t["level"] == TOC_LEVELS[0] or not groups:
+            groups.append((t, []) if t["level"] == TOC_LEVELS[0] else (None, [t]))
+        else:
+            groups[-1][1].append(t)
+
+    def link(t: dict) -> str:
+        return f'<a href="#{t["id"]}">{t["html"]}</a>'
+
+    items = []
+    for head, subs in groups:
+        sub = f"<ul>{''.join(f'<li>{link(s)}</li>' for s in subs)}</ul>" if subs else ""
+        items.append(f"<li>{link(head) if head else ''}{sub}</li>")
+    return f"<ul>{''.join(items)}</ul>"
+
+
+def expand_toc(fragment: str, toc_tokens: list[dict]) -> str:
+    """Swap a ``<!-- toc -->`` marker for a nested list of the h2 and h3 headings, from a converter's ``toc_tokens``."""
+    if not TOC_MARKER_RE.search(fragment):
+        return fragment
+    toc = f'<nav class="toc">{_toc_list(toc_tokens)}</nav>'
+    return TOC_MARKER_RE.sub(lambda _: toc, fragment, count=1)
+
+
 def to_html(text: str, *, notes: bool = True, glossary: dict[str, Term] | None = None) -> str:
     """Render a Markdown document to an HTML fragment (a fresh converter per call, so footnote numbering starts at 1).
 
     With *notes*, footnotes are also placed beside the text that cites them, and the first use per section of each term in the document's own glossary or the shared *glossary* carries its definition (:mod:`mini.lit.notes`).
     """
-    converter = _converter(NotesExtension(glossary) if notes else None)
-    return _show_marks(converter.convert(_hide_marks(text)))
+    md = _converter(NotesExtension(glossary) if notes else None)
+    return _show_marks(expand_toc(md.convert(_hide_marks(text)), md.toc_tokens))  # ty: ignore[unresolved-attribute]
 
 
 def render_fragment(text: str) -> str:

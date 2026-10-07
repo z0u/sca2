@@ -28,6 +28,7 @@
     },
     "markdown.styles": [
         "src/mini/lit/base.css",
+        "scripts/md-prose.css",
         "scripts/md.css"
     ],
 }

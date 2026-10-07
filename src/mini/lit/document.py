@@ -83,10 +83,14 @@ def parse(path: Path | str, text: str | None = None) -> Document:
 
     Metadata is the run of ``# key: value`` comment lines before the first code. A top-level expression statement that is a string literal is prose, dedented, and the code between prose statements is a cell (comments alone are not one); a ``# %%`` line splits a cell in two where prose would not fit. A string anywhere else (a docstring in a function, a value) is code, so a *variable* docstring hung under a constant reads as prose here — write it as a comment.
 
+    A Markdown page (``.md``) is one piece of static prose with no metadata, so it goes through the same weave and page as a script: a design doc prints the way a report does.
+
     An f-string at the top level is prose too, evaluated field by field when woven (see :meth:`Runner._prose`): its text here carries each field as a ``{expr}`` placeholder, which is also how a field renders past a :func:`stop`.
     """
     path = Path(path)
     text = path.read_text() if text is None else text
+    if path.suffix == ".md":
+        return Document(path, {}, (Prose(text, 1),))
     lines = text.splitlines(keepends=True)
     segments: list[Prose | Cell] = []
     cursor = 1  # the first cell starts past the header, so ``# code: show`` is not shown as code

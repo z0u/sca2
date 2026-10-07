@@ -25,6 +25,9 @@ Anti-patterns:
 - Statistic names standing in for the thing they measure, and verbs like "reads as" and "carries" where "is" or "has" would do
 - Committing to unplanned future work
 - Possessives on abstract terms
+- Set-piece lead-ins that announce a hedge or a question ("We hold this loosely:", "One question stays open:"); give the reason, or ask the question
+- Digits where a word gives the size ("added little"), and more than one kind of number in a paragraph
+- A trailing clause that restates what the sentence already said
 
 ## Pacing and structure
 

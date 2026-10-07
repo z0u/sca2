@@ -22,6 +22,7 @@ import os
 import secrets
 import signal
 import stat
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext, suppress
 from pathlib import Path
@@ -44,6 +45,9 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 __all__ = ["LocalApparatus"]
+
+CLAIM_GRACE_S = 60.0
+"""How long a claimed, unlaunched task may go without a staged call before ``reap_dead`` settles it. A claiming tick stages within seconds."""
 
 
 class LocalApparatus(Apparatus[LocalVolume]):
@@ -156,10 +160,17 @@ class LocalApparatus(Apparatus[LocalVolume]):
                 os.killpg(pid, signal.SIGTERM)
 
     @override
-    def _is_task_alive(self, rec: dict[str, Any]) -> bool:
-        """Is the recorded worker pid still a live process? (for ``reap_dead``)."""
-        pid = rec.get("pid")
-        return _pid_alive(pid, rec.get("pid_start")) if pid else True  # no pid yet — can't probe; assume alive
+    def _is_task_alive(self, rec: dict[str, Any], store: MemoStore) -> bool:
+        """Is the recorded worker pid still a live process? (for ``reap_dead``).
+
+        With no pid, the task is queued or its claiming tick is mid-batch. A queued task has its call staged for its attempt; a claim that has gone :data:`CLAIM_GRACE_S` without one belongs to a tick that died before staging, and nothing will ever launch it.
+        """
+        if pid := rec.get("pid"):
+            return _pid_alive(pid, rec.get("pid_start"))
+        if store.staged_gen(rec["key"]) == rec.get("gen"):
+            return True  # queued: a worker slot will launch it
+        claimed_at = rec.get("created_at")
+        return claimed_at is None or time.time() - claimed_at < CLAIM_GRACE_S
 
     @override
     async def amap(

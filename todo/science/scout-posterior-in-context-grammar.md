@@ -9,7 +9,7 @@ The [D2.2 pivot](/docs/m2/d2.2/pivot.md) proposes a grammar where the model infe
 
 Those would be easier to review as a `lit` report with figures: the posterior distribution across contexts for a grid of example counts and replacement rates, the ceiling on the same grid, and how much random-cube noise adds. All of it is computable from the op table (`answer_dist` in `sca.data.ops`) under stochastic rounding, with no training. It would also fix the replacement rate and example count for the in-context control.
 
-The [quick route](/docs/m2/d2.2/design.md#quick-route) in the design folds this report into the method section of [the pilot](/docs/m2/d2.2/design.md#the-pilot), so it needs no round of its own.
+The [quick route](/docs/m2/d2.2/design-2026-10.md#quick-route) in the design folds this report into the method section of [the pilot](/docs/m2/d2.2/design-2026-10.md#the-pilot), so it needs no round of its own.
 
 ## Notes
 

@@ -1,8 +1,8 @@
 ---
-status: partial
+status: done
 tags: [reports, skills, writing]
 opened: 2026-09-10
-priority: high
+closed: 2026-10-06
 ---
 # Report register: write the explanation a colleague would get over lunch, from the first draft
 
@@ -27,3 +27,5 @@ The lede blocks have moved. Ex-2.2.7's `tl;dr` is three short paragraphs of plai
 The four are pilots and surveys, though, so none of them is quite the trial this item names. The one to watch is ex-2.2.9, drafted in [PR #176](https://github.com/z0u/sca2/pull/176): it is Findings-first with a Glossary section, so the shape is right, but its Findings are written after the run. That write-up, done lunch-first from the first draft, is what closes this item — so leave it shortlisted until then.
 
 **2026-09-22, Fable** — Where the trial stands after ex-2.2.9 through ex-2.2.11. Ex-2.2.11's Discussion reads in the register this item asks for: it opens "the handover setup does what ex-2.2.9 said it does, with one exception we can now name", says what the number means before the number ("still keeps about a quarter of the accuracy it had on the lines that need a red hue there, a little more than the gate allows"), and closes with what we would do next. Its tl;dr does the same. The Findings block is generated from the results (`findings_md`), which is where the statistic names still lead. Whether the chat draft came before the report draft is the one thing the commits cannot show, so this stays partial until Sandy says whether ex-2.2.11's Discussion is the lunch explanation they wanted; if it is, the item can close, since the skills already carry the workflow step. Separately, the science skill's Findings example, which carried a note pointing here as outdated, now leads each line with what the number means.
+
+**2026-10-06, PM** — Closing. [PR #241](https://github.com/z0u/sca2/pull/241) (merged 10-04) settled the question this item was waiting on: Sandy chose ex-2.2.18 as the model report and the ex-2.2.21 companion notes as the example of the explanatory register, and both now sit in the `science` skill as exemplars that a drafter reads before writing (`references/exemplar-ex-2.2.18.md`, `references/exemplar-explanation.md`). The lunch-first step is still in the `science` and `writing` skills. An exemplar shows the register where the rules only described it, which is what this item asked for. If a later draft slips back, that is a new item about the exemplars.

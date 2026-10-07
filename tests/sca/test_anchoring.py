@@ -698,7 +698,7 @@ def test_slice_selection_restricts_both_terms(corpus):
 
     every = make_anchored_train_step(optimizer)
     blocks = make_anchored_train_step(optimizer, slices=(1, 2))
-    _, _, task_a, anchor_a, anti_a = every(model, opt_state, x, y, mask, line_id, jnp.asarray(1.0), jnp.asarray(1.0))
+    _, _, task_a, anchor_a, _ = every(model, opt_state, x, y, mask, line_id, jnp.asarray(1.0), jnp.asarray(1.0))
     _, _, task_b, anchor_b, anti_b = blocks(model, opt_state, x, y, mask, line_id, jnp.asarray(1.0), jnp.asarray(1.0))
     np.testing.assert_allclose(task_a, task_b, rtol=1e-6, atol=0)
     np.testing.assert_allclose(anchor_a, anchor_term(states, mask), rtol=1e-5, atol=0)

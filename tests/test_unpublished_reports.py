@@ -221,6 +221,18 @@ def test_a_stale_base_does_not_produce_noise(repo):
     assert flagged(repo, "stale-base") == {"docs/overview.py"}
 
 
+def test_a_stale_base_misfires_past_a_merge_that_skipped_publishing(repo):
+    """The limit of the case above, and the reason the pre-push hook fetches `origin/main` first: a merge that moved no pin makes its report read as this branch's when the base predates it."""
+    git(repo, "tag", "stale-base", "main")
+    git(repo, "checkout", "-q", "main")
+    (repo / "docs" / "ex-1" / "report.py").write_text(_APP + "# merged under skip-publish-check\n")
+    commit(repo, "a merge that skipped publishing")
+    git(repo, "checkout", "-q", "work")
+    git(repo, "merge", "-q", "--no-edit", "main")
+    assert flagged(repo) == set()
+    assert flagged(repo, "stale-base") == {"docs/ex-1/report.py"}
+
+
 def test_unknown_base_ref_fails_loudly(repo):
     with pytest.raises(SystemExit, match="nope"):
         unpub.changed_reports("nope", root=repo)

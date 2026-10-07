@@ -210,6 +210,22 @@ def test_a_reused_pid_does_not_pass_for_the_worker():
     assert not _pid_alive(me, "another-boot:" + start.split(":")[1])
 
 
+def test_a_claim_never_staged_is_reaped_after_the_grace(tmp_path: Path):
+    """A tick that died between claiming a key and staging its call leaves RUNNING with no pid; past the grace it settles FAILED, and a queued task is left alone."""
+    app = LocalApparatus("unstaged", data_dir=tmp_path / "unstaged")
+    store = app.memo_store()
+    old = time.time() - 2 * local_apparatus.CLAIM_GRACE_S
+    for key, created_at in [("fresh", time.time()), ("orphan", old), ("queued", old)]:
+        store.records_backend.write(key, {"key": key, "state": RunState.RUNNING, "gen": "g", "created_at": created_at})
+    store.write_call("queued", _timed, (0,), gen="g")  # staged for its attempt, waiting for a slot
+    store.write_call("orphan", _timed, (0,), gen="stale")  # a previous attempt's call
+
+    assert app.reap_dead(store) == ["orphan"]
+    assert RunState(store.record("orphan")["state"]) == RunState.FAILED
+    assert RunState(store.record("fresh")["state"]) == RunState.RUNNING
+    assert RunState(store.record("queued")["state"]) == RunState.RUNNING
+
+
 def test_a_reused_pid_is_reaped_and_not_signalled(tmp_path: Path, monkeypatch):
     """A RUNNING record whose pid now belongs to a stranger reads dead, and cancel doesn't signal the stranger."""
     app = LocalApparatus("reuse", data_dir=tmp_path / "reuse")

@@ -31,10 +31,11 @@ concurrency:
   group: site
   cancel-in-progress: true
 
-# Pushes gh-pages, and keeps one comment per PR carrying its preview link.
+# Pushes gh-pages, and sets commit statuses on each PR head carrying its preview links
+# (statuses rather than a comment, so a subscribed agent isn't woken by them).
 permissions:
   contents: write
-  pull-requests: write
+  statuses: write
 
 jobs:
   deploy:

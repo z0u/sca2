@@ -205,20 +205,12 @@ exclude = [
     "*.egg-info/*"
 ]
 ignore_decorators = [
-    "@functools.lru_cache",
-    "@property",
-    "@classmethod",
-    "@staticmethod",
     "@model_validator",
     "@pytest.fixture"
 ]
 ignore_names = [
-    "visit_*",
-    "do_*",
-    "test_*",
+    "do_*",  # http.server dispatches do_GET, do_HEAD by method name
     "pytestmark",
-    "setUp",
-    "tearDown",
     "__getattr__",  # PEP 562 module hook: the interpreter calls it, no caller to find
     "__dir__"  # ditto
 ]

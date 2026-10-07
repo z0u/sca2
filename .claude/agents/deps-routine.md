@@ -5,14 +5,15 @@ model: opus
 effort: medium
 ---
 
-Check the project dependencies for currency: GitHub Actions, Python, and Node.
+Check the project dependencies for currency: GitHub Actions, dev container features, Python, and Node.
 
-`./go deps` runs all three checks and filters the raw tool output down to something readable. It is read-only: nothing it does rewrites `uv.lock`.
+`./go deps` runs all four checks and filters the raw tool output down to something readable. It is read-only: nothing it does rewrites `uv.lock`.
 
 ```bash
-./go deps              # all three
+./go deps              # all four
 ./go deps --audit      # advisories, from uv audit and npm audit
 ./go deps --actions    # Action pins against their newest upstream tag
+./go deps --features   # dev container features against the registry
 ./go deps --updates    # upgrades available to packages we declare
 ```
 
@@ -24,6 +25,8 @@ Note that `--audit` collapses duplicate advisory records before counting. OSV ca
 
 For packages that we use a lot, also check if there are new features we would benefit from. For example, a new version of `ty` might have better support for `numpy`. `--updates` narrows the lock's upgrade set to the packages we named in `pyproject.toml`, which is a short enough list to read release notes for.
 
+For dev container features, `--features` compares each entry in `.devcontainer/devcontainer-lock.json` with the newest tag in the registry. A pin such as `node:2` floats within its major, so `lock behind` means the lockfile is stale and `NEW MAJOR` means `devcontainer.json` needs a decision. Refresh the lockfile with `npx @devcontainers/cli upgrade --workspace-folder .` (add `--dry-run` to preview it). The lockfile is the only file that command writes; the features run only when the container is rebuilt, so say in the PR that the bump is untested until then. The `common-utils` feature configures zsh, and `devcontainer.json` puts `~/.local/bin` first in `remoteEnv` to work around it, so give that feature's release notes a look.
+
 For GitHub Actions, `--actions` compares each `uses:` pin against the newest tag upstream. A floating major such as `@v7` tracks its own patches; a full version pin such as `@v10.0.1` does not, and nothing else will tell us when it falls behind — that is what [pin-refresh-policy.md](../../todo/eng/pin-refresh-policy.md) is about.
 
 ## What a run produces
@@ -32,6 +35,6 @@ Most weeks: nothing. No PR, no message. That is the successful outcome when ther
 
 Open a PR when you can give a reason in one sentence — an advisory we should clear, a fix or feature we'd feel, or a pin that has fallen a major behind. Plain staleness with nothing behind it doesn't qualify. Prefix the title `[DEP]`, and keep security upgrades in their own PR rather than folding them into a general refresh: they have a different urgency and want a different review.
 
-Stay inside `pyproject.toml`, `uv.lock`, `package.json`, `package-lock.json`, and `.github/workflows/` — plus `scripts/deps.sh` when a filter needs repair. Run `./go check` before pushing.
+Stay inside `pyproject.toml`, `uv.lock`, `package.json`, `package-lock.json`, `.devcontainer/devcontainer-lock.json`, and `.github/workflows/` — plus `scripts/deps.sh` when a filter needs repair. Run `./go check` before pushing.
 
 If you find something that needs a decision rather than a change, add a note to the relevant `todo/eng/` item instead of opening a PR.

@@ -1,0 +1,47 @@
+/* A Markdown page's prose, wherever it is shown: concatenated into the site's md.css
+ * (scripts/build_site.py) and inlined into its print after docs/report.css
+ * (scripts/render_report.py). The `.github-markdown-body` selectors are for VS Code's
+ * Markdown preview (.vscode/settings.json). */
+
+details summary,
+.github-markdown-body details summary {
+  list-style-position: outside;
+}
+
+/* Makes a ul look like a descriptive list. */
+ul:has(>li>p),
+.github-markdown-body ul:has(>li>p)
+{
+  padding-inline: 0;
+  --pseudo-dl-indent: 2ex;
+
+  >li {
+    list-style: none;
+    padding-inline-start: var(--pseudo-dl-indent);
+
+    /* pseudo-dt */
+    > :first-child {
+      font-weight: 500;
+      margin-inline-start: calc(0px - var(--pseudo-dl-indent));
+    }
+    > :first-child::after {
+      content: "";
+      display: block;
+    }
+  }
+}
+
+/* A tag row under an index entry: quieter than body text, so it reads as metadata. */
+.tags {
+  color: var(--fg-muted);
+  font-size: 0.875em;
+}
+
+/* In a print the page is mini.lit's, whose frame boxes a details element like an
+ * admonition. On a Markdown page it is plain, as the site shows it. */
+main.lit details {
+  border-left: none;
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}

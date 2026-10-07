@@ -245,7 +245,7 @@ class Apparatus(ABC, Generic[V]):
 
         reaped: list[str] = []
         for rec in store.records() if records is None else records:
-            if rec.get("state") != RunState.RUNNING or self._is_task_alive(rec):
+            if rec.get("state") != RunState.RUNNING or self._is_task_alive(rec, store):
                 continue
             # Re-read before settling: a worker writes its final state *then* exits,
             # so if it's gone yet the record still says RUNNING it died mid-run. The
@@ -260,7 +260,7 @@ class Apparatus(ABC, Generic[V]):
             reaped.append(rec["key"])
         return reaped
 
-    def _is_task_alive(self, rec: dict[str, Any]) -> bool:
+    def _is_task_alive(self, rec: dict[str, Any], store: MemoStore) -> bool:
         """Is this RUNNING task's worker still alive?
 
         Defaults to ``True`` (unknown → alive): a backend with no liveness probe never reaps a task it can't confirm is dead. False negatives (marking a live task dead) are far more harmful than false positives (letting a stale record linger).

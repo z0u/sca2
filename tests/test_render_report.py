@@ -54,3 +54,17 @@ def test_a_pdf_gets_no_copy_of_the_figures(render_report, tmp_path: Path, monkey
     render_report.write_from_bundle(bundle, "<html>", [tmp_path / "prints" / "r.pdf", tmp_path / "site" / "r.html"])
     assert not (tmp_path / "prints" / "_assets").exists()
     assert (tmp_path / "site" / "_assets" / "fig.png").read_bytes() == b"png"
+
+
+def test_a_markdown_baseline_is_its_old_text_woven_today(render_report, tmp_path: Path, monkeypatch):
+    """A Markdown page has no cells, so its `--since` baseline is the text at the ref through the current weave, with no checkout."""
+    review_base = sys.modules["review_base"]
+    page = tmp_path / "docs" / "design.md"
+    page.parent.mkdir()
+    page.write_text("# Design\n\nNew text.\n")
+    monkeypatch.setattr(review_base, "ROOT", tmp_path)
+    monkeypatch.setattr(review_base, "git", lambda *args, **kw: "# Design\n\nOld text.\n")
+    monkeypatch.setattr(review_base, "baseline_dir", lambda sha, key: tmp_path / "base" / key)
+    review_base.render_md_at("f" * 40, page)
+    html = (tmp_path / "base" / "design" / "index.html").read_text()
+    assert "Old text." in html and '<main class="lit">' in html

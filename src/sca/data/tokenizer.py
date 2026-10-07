@@ -14,13 +14,6 @@ class CharTokenizer:
         self.stoi = {ch: i for i, ch in enumerate(self.vocabulary)}
         self.itos = {i: ch for i, ch in enumerate(self.vocabulary)}
 
-    @classmethod
-    @validate_call
-    def from_string(cls, string: str):
-        """Create a tokenizer from a string."""
-        vocabulary = set(string)
-        return cls(TokenizerConfig(vocabulary=sorted(vocabulary)))
-
     @validate_call
     def encode(self, texts: list[str], block_size: int | None = None) -> list[list[int]]:
         """Encode a batch of texts into token sequences, padded to the same length."""

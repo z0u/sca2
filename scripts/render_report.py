@@ -4,6 +4,8 @@
 Without a PDF this is the weave alone (:mod:`mini.lit`), with the figures under ``_assets/`` beside each output. A PDF is the print a reviewer reads on paper or e-ink, so it is made the way the site makes one, from the report's export bundle (``scripts/export_reports.py``, which adds the provenance footer), with author links resolved to the published site (:func:`build_site.printable`). It also names the commit it was printed from on the edge of its first page, and with ``--since REF`` it bars its margin beside every line changed since REF (:mod:`mini.review_marks`), against a baseline exported from a checkout of REF (``scripts/review_base.py``). The baseline goes through the same exporter, so the two pages differ only where the report does.
 
 Only the named report is exported and printed, and nothing is memoized: a print takes a few seconds, and its stamp changes with every commit anyway.
+
+A Markdown page under ``docs/`` (a design doc, a proposal) renders the same way, through the same page shell and stylesheets. It has no export bundle, so its PDF is printed from the weave (:func:`mini.lit.render`), and its ``--since`` baseline is its old text woven by today's code (:func:`review_base.render_md_at`).
 """
 
 import argparse
@@ -13,9 +15,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from build_site import REPORT_CSS, Bundle, LinkResolver, printable
+from build_site import MD_PROSE_CSS, REPORT_CSS, Bundle, LinkResolver, printable
 from export_reports import export_one
-from review_base import export_at, resolve
+from review_base import export_at, render_md_at, resolve
 
 from mini.lit import render
 from mini.lit.render import write_outputs
@@ -71,6 +73,8 @@ def review_page(report: Path, bundle: Path, review: Review, links: LinkResolver)
     from_dir = "" if from_dir == "." else from_dir
     key = export_key(report)
     report_css = REPORT_CSS.read_text("utf-8") if REPORT_CSS.exists() else ""
+    if report.suffix == ".md":  # its prose prints the way the site shows it, on top of the report frame
+        report_css += "\n" + MD_PROSE_CSS.read_text("utf-8")
     html = mark_verdicts((bundle / "index.html").read_text("utf-8"))
     page = printable(Bundle(html), links, from_dir=from_dir, key=key, report_css=report_css)
     return review.mark(page, key, root=bundle)
@@ -97,7 +101,11 @@ def write_from_bundle(bundle: Path, page: str, outs: list[Path]) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("report", type=Path, help="a report script, e.g. docs/m2/ex-2.2.15/report.py")
+    ap.add_argument(
+        "report",
+        type=Path,
+        help="a report script or a Markdown page, e.g. docs/m2/ex-2.2.15/report.py or docs/m2/d2.2/design.md",
+    )
     ap.add_argument(
         "-o",
         "--out",
@@ -131,10 +139,15 @@ def main() -> None:
         return
 
     since = resolve(args.since) if args.since else None  # before the export, so a bad ref fails fast
-    # Exits on a cell that raised. No thumbnails: only the site index reads them.
-    bundle = export_one(report, thumbs=False)
-    if since:
-        export_at(since, [report])
+    if report.suffix == ".md":
+        bundle = render(report).out_dir  # index.html and index.md, as an export bundle has them
+        if since:
+            render_md_at(since, report)
+    else:
+        # Exits on a cell that raised. No thumbnails: only the site index reads them.
+        bundle = export_one(report, thumbs=False)
+        if since:
+            export_at(since, [report])
     page = review_page(report, bundle, Review.at(since), LinkResolver.discover())
     write_from_bundle(bundle, page, outs)
 

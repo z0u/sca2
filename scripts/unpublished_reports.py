@@ -5,7 +5,7 @@
 
 Both halves are cheap and local — a git diff and a JSON file — so the check needs no store access, no render, and no write credentials. That's the point: the publish itself stays where the data is (a session with a warm store), and CI only has to notice when it didn't happen.
 
-The comparison is also self-correcting when ``origin/main`` is behind, which it often is in a fresh container: a stale base makes *more* reports look changed, but their pins moved in that same range, so they don't register as unpublished.
+A stale base, which a fresh container often has, mostly corrects itself: it makes *more* reports look changed, but their pins moved in that same range, so they don't register as unpublished. That holds only for merges that published. A merge that skipped the check (the ``skip-publish-check`` label) changed a report without moving its pin, so a base from before it names that report as this branch's. So the pre-push hook fetches ``origin/main`` before it compares.
 """
 
 import argparse

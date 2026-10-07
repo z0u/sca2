@@ -33,7 +33,7 @@ Cheap, and worth running after the render once the interpretive sections are in.
 
 ## The prose passes
 
-Prose gets two passes regardless of whether a review round runs — see "Collaborating on a report" in SKILL.md for when they apply. No reviewer agent is involved. In one turn:
+Prose drafted by Fable gets two passes, whether or not a review round runs; Opus and Sonnet drafts skip them unless a reader finds a section hard going. See "Collaborating on a report" in SKILL.md. No reviewer agent is involved. In one turn:
 
 1. Write
 2. Stage changes (unless you have another way to see what the agents change)

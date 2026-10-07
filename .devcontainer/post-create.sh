@@ -13,6 +13,9 @@ set -euo pipefail
     sudo chown -R "$USER:$USER" .venv
     sudo chown -R "$USER:$USER" node_modules
 
+    # Claude Code via the native installer: lives in ~/.local/bin and updates itself.
+    [[ -x ~/.local/bin/claude ]] || curl -fsSL https://claude.ai/install.sh | bash
+
     # Seed default configs if not already present
     [[ -f ~/.config/marimo/marimo.toml ]] || cp .devcontainer/marimo.toml ~/.config/marimo/marimo.toml
 
