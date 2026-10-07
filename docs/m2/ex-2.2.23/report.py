@@ -184,7 +184,7 @@ The recipe of record, as the [D2.2 design](/docs/m2/d2.2/design.md#the-setup-tod
 
 {runs_table()}
 
-**The lengths.** 200 epochs is the recipe; 400 was the recipe before ex-2.2.19 halved it, and every 400-epoch run there (unanchored, three seeds) made the second rise by about a third of the way through. The anchor schedules scale with the length: the weight warms up over the first tenth of training and anneals over the last tenth. The learning rate peaks at the same value and warms up over the same number of epochs at either length, and its cosine decay stretches over the run.
+**The lengths.** 200 epochs is the recipe; 400 was the recipe before ex-2.2.19 halved it, and every 400-epoch run there (unanchored, three seeds) made the second rise, at about the same epoch as the 200-epoch runs. The anchor schedules scale with the length: the weight warms up over the first tenth of training and anneals over the last tenth. The learning rate peaks at the same value and warms up over the same number of epochs at either length, and its cosine decay stretches over the run.
 
 **The seeds.** The reused runs are at model seeds {seed_span(ex.REUSED_SEEDS)}, and the new ones at {seed_span(ex.NEW_SEEDS)}, so every comparison is paired by seed: a condition with its control, and a 200-epoch run with its 400-epoch twin.
 
@@ -217,7 +217,7 @@ r"""
 How many runs of each condition end 200 epochs without having made the rise, paired by seed.
 
 /// admonition | TODO
-The HSV skill through training at 200 epochs, one panel per condition and one line per seed, with the rise level marked. Beside it, a table of the runs that miss the rise, by seed and condition.
+The HSV skill through training at 200 epochs, one panel per condition and one line per seed, with the rise level marked; and the skill on each HSV op at the end of training, per run. Beside them, a table of the runs that miss the rise, by seed and condition.
 ///
 """
 
@@ -226,10 +226,10 @@ The HSV skill through training at 200 epochs, one panel per condition and one li
 r"""
 ## The same seeds at 400 epochs (E2)
 
-Whether the runs that missed the rise at 200 epochs make it at 400, and when the rise comes as a share of training at either length.
+Whether the runs that missed the rise at 200 epochs make it at 400, and when the rise comes at either length. In ex-2.2.19 the rise came at about the same epoch at either length, which would mean a longer run gives a slow seed more time at a high learning rate, so the rise epoch is shown both in epochs and as a share of training.
 
 /// admonition | TODO
-The HSV skill through training at 400 epochs, laid out as in E1, with the seeds that missed at 200 epochs highlighted. Beside it, the rise epoch of every run, at 200 and 400 epochs, as a share of training.
+The HSV skill through training at 400 epochs, laid out as in E1, with the seeds that missed at 200 epochs highlighted. Beside it, the rise epoch of every run at 200 and 400 epochs, in epochs and as a share of training.
 ///
 """
 
@@ -247,10 +247,11 @@ Task skill at the end of training against the rise epoch, one dot per run, both 
 
 # %%
 
-r"""
+rf"""
 ## A rule for runs that miss the rise (S1)
 
-A rule that marks a run as half-trained, for the next experiment to leave out and replace with the next unused seed. The rule looks only at the HSV skill on the held-out set at the end of training. Its level is chosen from E1 to E3 and committed before E4 is filled in, so that the choice cannot follow the edit results. We report what each candidate level would leave out of each condition at either length.
+<!-- REVIEW: added that the reused seeds already have known edit results, so the candidate levels are fixed in experiment.py before any run. Committing the level before E4 alone does not blind it to the five reused runs. -->
+A rule that marks a run as half-trained, for the next experiment to leave out and replace with the next unused seed. The rule looks only at the HSV skill on the held-out set at the end of training. Its level is chosen from E1 to E3 and committed before E4 is filled in, so that the choice cannot follow the edit results of this scout. The edit results at the reused seeds (700–704) are already known from ex-2.2.21, so the candidate levels were fixed with this design, before any run: {", ".join(f"{v:g}" for v in ex.CANDIDATE_RULE_LEVELS)}. The chosen level is one of them. We report what each candidate level would leave out of each condition at either length.
 
 /// admonition | TODO
 For each candidate level, the number of runs it leaves out of each condition, at 200 and at 400 epochs, and the commit that fixed the chosen level.

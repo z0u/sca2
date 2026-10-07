@@ -8,16 +8,21 @@ misses the rise, whether the anchor makes it more likely, whether a longer run m
 late ends like one that rises early. From that, a rule for runs that miss the rise can be fixed before the next
 experiment.
 
-This is the design: the constants the report imports. The DAG comes once the design is agreed.
+The DAG resolves ex-2.2.21's corpus, held-out set, probes, and its 200-epoch runs at the reused seeds by ref, trains
+the new runs with ex-2.2.21's code, and scores every run with ex-2.2.21's eval and ex-2.2.22's suppression pass.
+
+    bin/mini run docs/m2/ex-2.2.23/experiment.py --app modal --max-containers 12 --budget 5h
+    bin/mini status ex-2.2.23
 """
 
 from __future__ import annotations
 
 import importlib.util
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from typing import Any
 
-DESIGN_ONLY = True
+from mini import Ctx, Experiment
 
 
 def _load_sibling(name: str, alias: str):
@@ -100,9 +105,232 @@ RISE_LEVEL = 0.35
 between the plateau, near 0.2, and where the fast runs end, near 0.5. The rise epoch is the first trajectory record
 at or above it."""
 
+CANDIDATE_RULE_LEVELS: tuple[float, ...] = (0.3, 0.35, 0.4)
+"""S1: the levels of HSV skill, on the whole held-out set at the end of training, that a rule for leaving out
+half-trained runs may use. Fixed before any run of this scout, since the edit results at the reused seeds are already
+known from ex-2.2.21; S1 picks one of them from E1 to E3, and commits it before E4 is filled in. The slow runs of
+ex-2.2.21 and ex-2.2.22 ended between 0.2 and 0.3, and the runs that rose early between 0.45 and 0.5."""
+assert RISE_LEVEL in CANDIDATE_RULE_LEVELS
+
 TRAJ_STRIDE_EPOCHS = 4
 """One trajectory record every four epochs at either length, as in ex-2.2.21 at 200 epochs, so the rise epoch is
 resolved alike at both lengths."""
 
 BUDGET_USD = 15
 """About \\$0.13 for a 200-epoch run on an L4 (ex-2.2.22), twice that at 400 epochs, plus the scoring passes."""
+
+
+# =============================================================================================
+# The DAG
+# =============================================================================================
+#
+# Ex-2.2.21's corpus, held-out set, probes, and the checkpoints of its 200-epoch runs at the reused seeds, by ref.
+# The new runs train with ex-2.2.21's `cells` and `train_one`, so a new 200-epoch run differs from a reused one in
+# its seed alone, and a 400-epoch run in its length too. Every run, reused or new, is scored with ex-2.2.21's
+# `eval_one` and ex-2.2.22's suppression pass at every position.
+
+MAIN_KEY = ex2221.MAIN_KEY
+K = ex2222.K
+N_TRAJ_EEM_PER_OP = ex2221.N_TRAJ_EEM_PER_OP
+CONFUSION_CONDITIONS: tuple[str, ...] = ()
+"""No per-context answer distributions are kept: E4 reads the per-op summaries of the suppression pass."""
+
+PREFIX = "reports/m2/ex-2.2.23"
+METRICS_REF = PREFIX + "/metrics"
+TRAJ_REF = PREFIX + "/trajectories"
+CHECKPOINT_REF = PREFIX + "/checkpoints/{label}"
+EVAL_REF = PREFIX + "/eval"
+EVAL_ARRAYS_REF = PREFIX + "/eval-arrays/{label}"
+SUPPRESSION_REF = PREFIX + "/suppression"
+SUPPRESSION_ARRAYS_REF = PREFIX + "/suppression-arrays/{label}"
+
+
+def label_of(condition: str, epochs: int, model_seed: int) -> str:
+    return f"{condition}-e{epochs}-s{model_seed}"
+
+
+def arms(n_seeds: int) -> tuple:
+    """Ex-2.2.21's arms for the two conditions, at *n_seeds* seeds from 700, so its `cells` builds every run."""
+    from dataclasses import replace
+
+    return tuple(replace(ex2221.arm(c.reused_as), seeds=n_seeds) for c in CONDITIONS)
+
+
+def plan(
+    reused: tuple[int, ...] = REUSED_SEEDS, new: tuple[int, ...] = NEW_SEEDS, lengths: tuple[int, ...] = LENGTHS
+) -> list[tuple[Condition, int, int]]:
+    """Every new run as (condition, epochs, model seed): the short length at the new seeds, every other length at
+    every seed.
+    """
+    out = []
+    for c in CONDITIONS:
+        for epochs in lengths:
+            seeds = new if epochs == SHORT else reused + new
+            out += [(c, epochs, s) for s in seeds]
+    return out
+
+
+def new_rows(meta, runs: list[tuple[Condition, int, int]]) -> list[dict]:
+    """One row per new run, built by ex-2.2.21's `cells` and relabelled."""
+    by_name = {c.reused_as: c for c in CONDITIONS}
+    n_seeds = max(s for _, _, s in runs) - SEED_OFFSET + 1
+    built: dict[tuple[str, int, int], dict] = {}
+    for epochs in sorted({e for _, e, _ in runs}):
+        for r in ex2221.cells(arms(n_seeds), {MAIN_KEY: {"meta": meta}}, None, epochs):
+            built[(by_name[r["arm"]].name, epochs, r["model_seed"])] = r
+    rows = []
+    for c, epochs, s in runs:
+        r = built[(c.name, epochs, s)]
+        assert r["config"].seed == s and r["epochs"] == epochs
+        rows.append(r | {"condition": c.name, "source": "ex-2.2.23", "label": label_of(c.name, epochs, s)})
+    return rows
+
+
+def reused_rows(seeds: tuple[int, ...] = REUSED_SEEDS) -> list[dict]:
+    """One row per ex-2.2.21 run scored here, with the label ex-2.2.21 gave it under `source_label`."""
+    return [
+        {
+            "condition": c.name,
+            "epochs": SHORT,
+            "model_seed": s,
+            "source": "ex-2.2.21",
+            "source_label": f"{c.reused_as}-s{s - SEED_OFFSET}",
+            "label": label_of(c.name, SHORT, s),
+        }
+        for c in CONDITIONS
+        for s in seeds
+    ]
+
+
+def design() -> dict[str, Any]:
+    return {
+        "experiment": "ex-2.2.23",
+        "anchored_op": ANCHORED_OP,
+        "ops": list(OP_NAMES),
+        "hsv_ops": list(HSV_OPS),
+        "model": MODEL,
+        "conditions": [asdict(c) for c in CONDITIONS],
+        "lengths": list(LENGTHS),
+        "reused_seeds": list(REUSED_SEEDS),
+        "new_seeds": list(NEW_SEEDS),
+        "rise_level": RISE_LEVEL,
+        "traj_stride_epochs": TRAJ_STRIDE_EPOCHS,
+        "dose_gammas": list(DOSE_GAMMAS),
+        "selectivity_gate": SELECTIVITY_GATE,
+        "grading_min_damage": GRADING_MIN_DAMAGE,
+    }
+
+
+def publish(scored: list[dict], trained: list[dict], evaled: list[dict], suppressed: list[dict]) -> dict:
+    """Every ref the report reads: the design, the trajectories of the new runs, the eval and the suppression pass
+    (one record per run with its condition, length, and seed), their per-context arrays, and every new checkpoint.
+    """
+    import json
+
+    from mini.store import put, set_ref
+
+    keys = ("label", "condition", "epochs", "model_seed", "source")
+    meta = {
+        r["label"]: {k: r[k] for k in keys} | ({"source_label": r["source_label"]} if "source_label" in r else {})
+        for r in scored
+    }
+
+    def slim(r: dict) -> dict:
+        return meta[r["label"]] | {k: v for k, v in r.items() if k != "arrays"}
+
+    for t in trained:
+        set_ref(CHECKPOINT_REF.format(label=t["label"]), t["checkpoint"])
+    for r in evaled:
+        set_ref(EVAL_ARRAYS_REF.format(label=r["label"]), r["arrays"])
+    for r in suppressed:
+        set_ref(SUPPRESSION_ARRAYS_REF.format(label=r["label"]), r["arrays"])
+    set_ref(METRICS_REF, put(json.dumps({"design": design()}).encode(), name="ex-2.2.23-metrics.json"))
+    traj = {t["label"]: meta[t["label"]] | {k: t[k] for k in ("traj", "val_loss", "train_loss")} for t in trained}
+    set_ref(TRAJ_REF, put(json.dumps(traj).encode(), name="ex-2.2.23-trajectories.json"))
+    for ref, records, name in ((EVAL_REF, evaled, "eval"), (SUPPRESSION_REF, suppressed, "suppression")):
+        body = {"design": design(), "runs": [slim(r) for r in records]}
+        set_ref(ref, put(json.dumps(body).encode(), name=f"ex-2.2.23-{name}.json"))
+    return {
+        "n_trained": len(trained),
+        "n_scored": len(evaled),
+        "eem": {r["label"]: r["task"]["eem"]["all"] for r in evaled},
+        "landing": {r["label"]: r["landing"] for r in suppressed},
+    }
+
+
+def run(
+    ctx: Ctx,
+    reused: tuple[int, ...] = REUSED_SEEDS,
+    new: tuple[int, ...] = NEW_SEEDS,
+    lengths: tuple[int, ...] = LENGTHS,
+) -> dict:
+    """The whole DAG: resolve ex-2.2.21's corpus condition and reused runs, train the new runs, score every run, and
+    publish. Seeds and lengths are arguments so a smoke run takes the same path.
+    """
+    old = reused_rows(reused)
+    resolved = ctx.run(ex2222.resolve_reused, [r["source_label"] for r in old], role="prep")
+    rows = new_rows(resolved["meta"], plan(reused, new, lengths))
+    n = len(rows)
+    epoch_length = [ex2222.ex2217.epoch_length_of(resolved["meta"].total_tokens, r["config"]) for r in rows]
+    stride = [round(TRAJ_STRIDE_EPOCHS * e) for e in epoch_length]
+    trained = ctx.map(
+        ex2221.train_one,
+        [r["config"] for r in rows],
+        [r["anchor"] for r in rows],
+        [r["anti"] for r in rows],
+        [r["variant"] for r in rows],
+        [r["anchor_slices"] for r in rows],
+        [r["pull"] for r in rows],
+        [OP_NAMES] * n,
+        [resolved["corpus"]] * n,
+        [resolved["labels"]] * n,
+        [resolved["probes"]] * n,
+        [resolved["holdout"]] * n,
+        [K] * n,
+        stride,
+        [N_TRAJ_EEM_PER_OP] * n,
+        [r["label"] for r in rows],
+        role="train",
+    )
+    keep = ("label", "condition", "epochs", "model_seed", "source")
+    scored = [{k: r[k] for k in keep} for r in rows] + old
+    ckpt = [t["checkpoint"] for t in trained] + [resolved["checkpoints"][r["source_label"]] for r in old]
+    m = len(scored)
+    evaled = ctx.map(
+        ex2221.eval_one,
+        ckpt,
+        [resolved["holdout"]] * m,
+        [None] * m,
+        [OP_NAMES] * m,
+        [K] * m,
+        [r["label"] for r in scored],
+        role="eval",
+    )
+    suppressed = ctx.map(
+        ex2222.suppress_one,
+        ckpt,
+        [resolved["holdout"]] * m,
+        [OP_NAMES] * m,
+        [K] * m,
+        [False] * m,
+        [r["label"] for r in scored],
+        role="suppress",
+    )
+    return ctx.run(publish, scored, trained, evaled, suppressed, role="prep")
+
+
+def main(ctx: Ctx) -> dict:
+    return run(ctx)
+
+
+COMPUTE = {
+    # The refs resolved, and the fan-in that writes every ref.
+    "prep": dict(cpu=2, timeout=1800),
+    # About 52,800 steps at 200 epochs (about 20 minutes on an L4 in ex-2.2.21) and twice that at 400, with the
+    # trajectory. Sized for the 400-epoch runs in a slow container (eng: training-step-is-host-bound).
+    "train": dict(gpu="L4", timeout=4 * 3600, watchdog=900, watchdog_grace=900),
+    "eval": dict(gpu="L4", timeout=900),
+    "suppress": dict(gpu="L4", timeout=1800),
+}
+
+experiment = Experiment(name="ex-2.2.23", main=main, roles=COMPUTE)
