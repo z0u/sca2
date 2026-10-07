@@ -2,8 +2,8 @@
 # title: Ex 2.2.23: The slow seeds, trained for longer
 
 # The design constants come from `experiment.py` beside this script (the directory of the script is on sys.path
-# while it runs). This is the design draft: the only computed figure is the HSV skill through training of the
-# ex-2.2.21 runs this scout reuses, from that experiment's published trajectories.
+# while it runs). The results come from the JSON this experiment publishes under its refs, and the earlier runs from
+# ex-2.2.21's published trajectories.
 import json
 import tempfile
 from pathlib import Path
@@ -154,19 +154,25 @@ MIN_RISE_HEIGHT = 0.1
 """A fitted rise shorter than this, from its floor to its ceiling, is no rise at all: the fit to a flat trajectory
 puts its midpoint anywhere."""
 
+FIT_FROM_EPOCH = 20
+"""The logistic is fitted from this epoch on, after the first stage: on a run that never rises, a fit from the
+start would find the first stage instead."""
+
 
 def logistic_midpoint(t: np.ndarray, y: np.ndarray, epochs: int) -> float | None:
     """The midpoint of a logistic curve fitted to the HSV skill through training: when the rise is half done, with no
     threshold. Bounded to twice the length of training, so a run still rising at the end gets a midpoint past it; a
-    run whose fitted rise is shorter than `MIN_RISE_HEIGHT` gets None.
+    run whose fitted rise is shorter than `MIN_RISE_HEIGHT`, or whose midpoint sits on the start of the fit (a slow
+    climb with no bend in it), gets None.
     """
     from scipy.optimize import curve_fit
 
+    t, y = t[t >= FIT_FROM_EPOCH], y[t >= FIT_FROM_EPOCH]
     p0 = (float(y[: len(y) // 5].mean()), float(max(y.max(), 0.3)), float(t[np.argmax(np.gradient(y))]), epochs / 20)
-    bounds = ((0.0, 0.0, 0.0, epochs / 400), (0.4, 0.7, 2.0 * epochs, epochs / 2))
+    bounds = ((0.0, 0.0, FIT_FROM_EPOCH, epochs / 400), (0.4, 0.7, 2.0 * epochs, epochs / 2))
     p0 = tuple(float(np.clip(v, lo + 1e-6, hi - 1e-6)) for v, lo, hi in zip(p0, *bounds, strict=True))
     (lo, hi, mid, width), _ = curve_fit(logistic, t, y, p0=p0, bounds=bounds, maxfev=20_000)
-    return float(mid) if hi - lo >= MIN_RISE_HEIGHT else None
+    return float(mid) if hi - lo >= MIN_RISE_HEIGHT and mid > FIT_FROM_EPOCH + 1 else None
 
 
 def traj_of(key: Key) -> dict:
@@ -573,8 +579,7 @@ def edit_draw(rows: list[dict], caption: str, alt_text: str) -> str:
             filled = r["epochs"] == ex.SHORT
             ax.plot(r["share"], r["worst"], "o", ms=4.5, color=ink, mfc=ink if filled else "none",
                     mew=0 if filled else 1.0, alpha=0.85)  # fmt: skip
-            bx.plot(ex.DOSE_GAMMAS, r["worst_by_dose"], "-", color=ink, lw=0.9 if filled else 0.9,
-                    ls="-" if filled else "--", alpha=0.7)  # fmt: skip
+            bx.plot(ex.DOSE_GAMMAS, r["worst_by_dose"], color=ink, lw=0.9, ls="-" if filled else "--", alpha=0.7)  # fmt: skip
         for a in (ax, bx):
             a.axhline(ex.SELECTIVITY_GATE, color=light_dark("#000", "#fff"), lw=0.8, ls="--", alpha=0.6)
         ax.axvline(ex.GRADING_MIN_DAMAGE, color=light_dark("#000", "#fff"), lw=0.8, ls="--", alpha=0.6)
@@ -606,6 +611,31 @@ def edit_counts() -> dict[tuple[int, bool], tuple[int, int]]:
     return out
 
 
+# --- Numbers for the prose ----------------------------------------------------------------------------------
+
+
+def epochs_of(values: list[float | None]) -> str:
+    """A range of epochs, from the ones that are set."""
+    v = sorted(x for x in values if x is not None)
+    return f"{v[0]:.0f}" if v[0] == v[-1] else f"{v[0]:.0f} to {v[-1]:.0f}"
+
+
+def span(values: list[float], digits: int = 2) -> str:
+    v = sorted(values)
+    return f"{v[0]:.{digits}f} to {v[-1]:.{digits}f}"
+
+
+SLOW = MISSED[(ANCHOR, ex.SHORT)]
+"""The anchored seeds that miss the rise at 200 epochs."""
+
+COUNTS = edit_counts()
+WORST_LONG = max(keys(ANCHOR, ex.LONG), key=lambda k: RUNS[k]["worst"])
+CLEAN = {e: [k[2] for k in keys(ANCHOR, e) if KEPT[k] and RUNS[k]["selective"]] for e in ex.LENGTHS}
+"""Per length, the kept anchored runs whose edit stays within the selectivity criterion."""
+LEFT_OUT = sorted(RUNS[k]["hsv_min"] for k in RUNS if not KEPT[k])
+NEXT_UP = min(RUNS[k]["hsv_min"] for k in RUNS if KEPT[k])
+
+
 # %%
 
 rf"""
@@ -614,6 +644,8 @@ rf"""
 /// tip |
 <!-- lede -->
 A scout. We train the anchored recipe and the control at {len(ex.SEEDS)} seeds, for 200 epochs and for 400, to see how often a run misses the second rise in task skill, and whether a longer run makes it. We are considering a policy of leaving out the runs that miss it, and this scout asks whether that would be safe.
+
+At 200 epochs the anchor made {num_word(len(SLOW))} seeds slow, and all of them made the rise at 400. But the edit spills onto other ops on nearly every run that made the rise, and on none of the runs that missed it, so leaving the slow runs out would raise the share of runs that spill.
 ///
 
 In ex-2.2.21 and ex-2.2.22, a few runs never made the second rise in task skill within 200 epochs, and those runs set most of the seed band of every measurement. This scout trains the recipe of record and the control at {len(ex.NEW_SEEDS)} new seeds at 200 epochs, and at all {len(ex.SEEDS)} seeds at 400 epochs, reusing ex-2.2.21's 200-epoch runs at the other {len(ex.REUSED_SEEDS)}.
@@ -621,16 +653,16 @@ In ex-2.2.21 and ex-2.2.22, a few runs never made the second rise in task skill 
 
 # %%
 
-r"""
+rf"""
 ## Observations
 
 Each item below is a measurement on the runs of this scout, with no gate.
 
-- [How often a run misses the rise (E1)](#how-often-a-run-misses-the-rise-e1):
-- [Trained for 400 epochs (E2)](#trained-for-400-epochs-e2):
-- [A late rise and an early one (E3)](#a-late-rise-and-an-early-one-e3):
-- [A rule for runs that miss the rise (S1)](#a-rule-for-runs-that-miss-the-rise-s1):
-- [The edit, with and without the rise (E4)](#the-edit-with-and-without-the-rise-e4):
+- [How often a run misses the rise (E1)](#how-often-a-run-misses-the-rise-e1): at 200 epochs, the anchor misses at {num_word(len(SLOW))} of {len(ex.SEEDS)} seeds and the control at none. The controls at those seeds rose early, so the anchor made them slow.
+- [Trained for 400 epochs (E2)](#trained-for-400-epochs-e2): every run of both conditions makes the rise at 400 epochs, including the {num_word(len(SLOW))} that missed it at 200.
+- [A late rise and an early one (E3)](#a-late-rise-and-an-early-one-e3): at 400 epochs, a late rise ends close to an early one in task skill and op margin.
+- [A rule for runs that miss the rise (S1)](#a-rule-for-runs-that-miss-the-rise-s1): the worst HSV op below {ex.RULE[1]:g}, which leaves out four runs at 200 epochs and none at 400.
+- [The edit, with and without the rise (E4)](#the-edit-with-and-without-the-rise-e4): the edit spills onto other ops on {COUNTS[(ex.SHORT, True)][0] + COUNTS[(ex.LONG, True)][0]} of the {COUNTS[(ex.SHORT, True)][1] + COUNTS[(ex.LONG, True)][1]} runs the rule keeps, and on none of the runs it leaves out.
 - [Decision](#decision):
 """
 
@@ -710,38 +742,54 @@ The edit
 
 # %%
 
-r"""
+rf"""
 ## How often a run misses the rise (E1)
 
 How many runs of each condition end 200 epochs without having made the rise, paired by seed.
 
-/// admonition | TODO
-The HSV skill through training at 200 epochs, one panel per condition and one line per seed, with the rise level marked and the runs of the other condition drawn faintly behind; and the skill on each HSV op at the end of training, per run. Beside them, a table of the runs that miss the rise, by seed and condition.
-///
+At 200 epochs, the anchor misses the rise at {num_word(len(SLOW))} of {len(ex.SEEDS)} seeds ({seeds_list(SLOW)}), and the control at {num_word(len(MISSED[(CONTROL, ex.SHORT)]))}. Through training, the HSV skill of those {num_word(len(SLOW))} runs climbs slowly and never bends upward:
+
+{traj_panels(ex.SHORT, {ANCHOR: SLOW}, "ex-2.2.23-traj-200", f"**The HSV skill through training, at 200 epochs.** One line per model seed; the runs that miss the rise are drawn heavier, and the runs of the other condition faintly behind. The dashed line is the rise level ({ex.RISE_LEVEL:g}).", f"Two panels, control and anchor, of HSV skill against epoch for twelve runs each. Every control run passes the dashed rise level; on the anchor panel, {num_word(len(SLOW))} runs stay below it to the end.")}
+
+The pairing says the anchor made these seeds slow. The controls at the same seeds rose early, at epochs {seeds_list([f"{RUNS[(CONTROL, ex.SHORT, s_)]['rise']:.0f}" for s_ in SLOW])}, among the earliest of the twelve.
+
+The figure below splits the final HSV skill into its three ops. Two runs sit near the line from the other side. Control 700 rose late, at epoch {RUNS[(CONTROL, ex.SHORT, 700)]["rise"]:.0f}, and its average of {RUNS[(CONTROL, ex.SHORT, 700)]["hsv"]:.2f} passes the level on `hue-hsv` alone, with the worst op at {RUNS[(CONTROL, ex.SHORT, 700)]["hsv_min"]:.2f}. Of the slow anchored runs, 708 has learned part of `hue-hsv` too.
+
+{grid_figure()}
 """
 
 # %%
 
-r"""
+rf"""
 ## Trained for 400 epochs (E2)
 
 Whether the runs that missed the rise at 200 epochs make it at 400, or the other way round, and when the rise comes at either length. In ex-2.2.19 the rise came at about the same epoch at either length, which would mean a longer run gives a slow seed more time at a high learning rate, so the rise epoch is shown both in epochs and as a share of training.
 
-/// admonition | TODO
-The HSV skill through training at 400 epochs, laid out as in E1, with the seeds that missed at 200 epochs highlighted, and any that rose at 200 epochs and miss at 400. Beside it, the rise epoch of every run at 200 and 400 epochs, in epochs and as a share of training.
-///
+At 400 epochs every run of both conditions makes the rise, including the {num_word(len(ROSE[f"{ANCHOR} late"]))} anchored seeds that missed it at 200, and no run that rose at 200 epochs misses at 400.
+
+{traj_panels(ex.LONG, {ANCHOR: SLOW}, "ex-2.2.23-traj-400", f"**The HSV skill through training, at 400 epochs**, laid out as above. The heavier lines are the seeds whose anchored run missed the rise at 200 epochs ({seeds_list(SLOW)}).", f"Two panels, control and anchor, of HSV skill against epoch over 400 epochs, twelve runs each. Every run passes the dashed rise level, the last of them after epoch {max(RUNS[k]['rise'] for k in keys(ANCHOR, ex.LONG)):.0f}.")}
+
+Those seeds rose at epochs {seeds_list([f"{RUNS[(ANCHOR, ex.LONG, s_)]['rise']:.0f}" for s_ in SLOW])}, which is within the first 200 epochs, though their 200-epoch twins never rose. The rise came at epochs {epochs_of([RUNS[k]["rise"] for k in keys(CONTROL, ex.LONG)])} on the 400-epoch controls and {epochs_of([RUNS[k]["rise"] for k in keys(ANCHOR, ex.LONG)])} on the anchored runs, so the anchor still delays it at some seeds. The latest two (709 and 710) rose well after their 200-epoch twins.
+
+{rise_figure()}
+
+Many seeds rise at about the same epoch at either length, as in ex-2.2.19, but the pairing is loose: several move by 40 epochs or more, either way. So a slow seed at 200 epochs need not be slow at 400, and the 400-epoch run may rise because its learning rate stays higher for longer, or because its trajectory differs from the start.
 """
 
 # %%
 
-r"""
+rf"""
 ## A late rise and an early one (E3)
 
 Whether a run that rises late ends like one that rises early, in task skill and in the op margin: does a run that only rises within 400 epochs end with the early risers, or lower, like the late-rising controls of ex-2.2.21?
 
-/// admonition | TODO
-Task skill at the end of training against the rise epoch, one dot per run, both lengths and both conditions, and the same against the logistic midpoint, which has no threshold; the op margin at the last and second-last slices on the anchored runs, laid out the same way.
-///
+At 400 epochs a late rise ends close to an early one. At 200 epochs, a run that rises in the second half of training ends a little lower, and a run that never rises ends well below the rest.
+
+{late_figure()}
+
+The final task skill of the 400-epoch runs spans {span([RUNS[k]["eem"] for k in keys(CONTROL, ex.LONG)], 3)} on the control and {span([RUNS[k]["eem"] for k in keys(ANCHOR, ex.LONG)], 3)} on the anchor. The lowest is anchored seed 709, which rose at epoch {RUNS[(ANCHOR, ex.LONG, 709)]["rise"]:.0f}. At 200 epochs, the late-rising controls 700 and 703 end at {RUNS[(CONTROL, ex.SHORT, 700)]["eem"]:.2f} and {RUNS[(CONTROL, ex.SHORT, 703)]["eem"]:.2f}, against about {np.median([RUNS[k]["eem"] for k in keys(CONTROL, ex.SHORT)]):.2f} for the median control, and the {num_word(len(SLOW))} anchored runs that never rose end at {span([RUNS[(ANCHOR, ex.SHORT, s_)]["eem"] for s_ in SLOW])}.
+
+The op margin is less tied to the rise. It is between {span([float(RUNS[k]["margin"][-1]) for k in keys(ANCHOR) if k[2] != 708 or k[1] != ex.SHORT])} at the last slice on every anchored run but one: 708 at 200 epochs, at {RUNS[(ANCHOR, ex.SHORT, 708)]["margin"][-1]:.2f}. At the second-last slice that run is at {RUNS[(ANCHOR, ex.SHORT, 708)]["margin"][-2]:.2f}, still the lowest.
 """
 
 # %%
@@ -752,21 +800,25 @@ rf"""
 <!-- REVIEW: added that the reused seeds already have known edit results, so the candidate levels are fixed in experiment.py before any run. Committing the level before E4 alone does not blind it to the five reused runs. -->
 A rule that marks a run as half-trained, for the next experiment to leave out and replace with the next unused seed. The rule looks only at the HSV skill on the held-out set at the end of training, as the average over the three ops or the worst of them. The measure and its level are chosen from E1 to E3 and committed before E4 is filled in, so that the choice cannot follow the edit results of this scout. The edit results at the reused seeds (700–704) are already known from ex-2.2.21, so the candidate levels were fixed with this design, before any run: {", ".join(f"{v:g}" for v in ex.CANDIDATE_RULE_LEVELS)}. The chosen level is one of them. We report what each candidate would leave out of each condition at either length.
 
-/// admonition | TODO
-For each candidate level, by the average and by the worst op, the number of runs it leaves out of each condition, at 200 and at 400 epochs, and the commit that fixed the chosen rule.
-///
+{rule_table()}
+
+Every candidate leaves out runs at 200 epochs only, and mostly anchored ones. We chose the worst op below {ex.RULE[1]:g}, in commit 3268c14, before E4 was computed. It leaves out the three anchored runs that miss the rise ({seeds_list(SLOW)}) and control 700, whose saturation and value ops had not risen; the average would keep that run, though it is half-trained. Those four end with the worst op at {span(LEFT_OUT)}, and the next run up is at {NEXT_UP:.2f} (anchored 705 at 200 epochs), so any level in that gap leaves out the same runs.
 """
 
 # %%
 
-r"""
+rf"""
 ## The edit, with and without the rise (E4)
 
 Whether the edit gets as far toward the target null on the runs the rule keeps as on the runs it leaves out, and whether it spills onto other ops more often on one group.
 
-/// admonition | TODO
-A figure of the two edit measurements for every anchored run, one dot per run, at both lengths, grouped by whether the rule of S1 keeps the run, with ex-2.2.21's criteria marked; and the drop on each other op against the dose, one line per run, colored by group.
-///
+The edit spills onto other ops on nearly every run that has learned the HSV ops, and on none of the runs that have not. At 200 epochs, {num_word(COUNTS[(ex.SHORT, True)][0])} of the {num_word(COUNTS[(ex.SHORT, True)][1])} runs the rule keeps lower another op by more than {ex.SELECTIVITY_GATE:g}, and none of the {num_word(COUNTS[(ex.SHORT, False)][1])} it leaves out does. At 400 epochs the rule keeps every run, and {num_word(COUNTS[(ex.LONG, True)][0])} of {num_word(COUNTS[(ex.LONG, True)][1])} spill.
+
+{edit_figure()}
+
+The spills are large at 400 epochs, up to {RUNS[WORST_LONG]["worst"]:.2f} (seed {WORST_LONG[2]}), and they grow with the dose. At 200 epochs they land mostly on the HSV ops, and on `darken` at three seeds; at 400 epochs, on every other op, most of all `darken` and `lighten`. No seed stays within the criterion at both lengths: of the kept runs, {seeds_list(CLEAN[ex.SHORT])} stay within it at 200 epochs and {seeds_list(CLEAN[ex.LONG])} at 400.
+
+The removal itself holds up: the edit gets {span([RUNS[k]["share"] for k in keys(ANCHOR) if KEPT[k]])} of the way to the target null on the kept runs. Of the runs left out, it gets most of the way on 701 and 702, and almost nowhere ({RUNS[(ANCHOR, ex.SHORT, 708)]["share"]:.2f}) on 708, the run with the lowest op margin.
 """
 
 # %%
@@ -806,5 +858,5 @@ rf"""
 
 **Scoring.** Every run, reused or new, is scored with ex-2.2.21's eval and with the suppression pass of ex-2.2.22, at every position.
 
-**Budget.** Planned at under \${ex.BUDGET_USD}: {ex.N_NEW_RUNS} runs at about \$0.13 for 200 epochs on an L4 (the cost of ex-2.2.22's runs) and twice that for 400, with the scoring passes.
+**Cost.** About \$9 on Modal, under the planned budget of \${ex.BUDGET_USD}, for {ex.N_NEW_RUNS} new runs on an L4 and the scoring passes over all of them and the reused runs.
 """
