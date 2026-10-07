@@ -190,7 +190,7 @@ The recipe of record, as the [D2.2 design](/docs/m2/d2.2/design.md#the-setup-tod
 
 **The seeds.** The reused runs are at model seeds {seed_span(ex.REUSED_SEEDS)}, and the new ones at {seed_span(ex.NEW_SEEDS)}, so every comparison is paired by seed: a condition with its control, and a 200-epoch run with its 400-epoch twin.
 
-<!-- REVIEW: the open decision on seeds and lengths is resolved (Sandy, round 1): twelve seeds at 200 and 400 epochs. 300 epochs was rejected. More seeds at 200 epochs, and twelve runs at 600 epochs if 400 leaves the question open, are to be decided after the results. -->
+<!-- REVIEW: the open decision on seeds and lengths is resolved in review round 1: twelve seeds at 200 and 400 epochs. 300 epochs was rejected. More seeds at 200 epochs, and twelve runs at 600 epochs if 400 leaves the question open, are to be decided after the results. -->
 More seeds at 200 epochs would pin down how often a run misses the rise, and runs at 600 epochs would help if some seeds have still not risen by 400. Whether either is needed depends on these results.
 """
 
@@ -199,7 +199,7 @@ More seeds at 200 epochs would pin down how often a run misses the rise, and run
 rf"""
 ## Glossary
 
-<!-- REVIEW: the measurements, as this report's glossary, at Sandy's request (round 1), so each shows beside its first use in every section. -->
+<!-- REVIEW: the measurements, as this report's glossary, from review round 1, so each shows beside its first use in every section. -->
 
 The measurements this report uses. Each definition also shows in the margin beside the first use of its term in a section.
 
