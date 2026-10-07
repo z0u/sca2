@@ -142,21 +142,21 @@ assert OPS == tuple(ex.OP_NAMES)
 D = OPS.index(ex.ANCHORED_OP)
 OTHER = [o for o in range(len(OPS)) if o != D]
 CONTROL, ANCHOR = (c.name for c in ex.CONDITIONS)
+# A run: (condition, epochs, model seed).
 Key = tuple[str, int, int]
-"""A run: (condition, epochs, model seed)."""
 
 
 def logistic(t: np.ndarray, lo: float, hi: float, mid: float, width: float) -> np.ndarray:
     return lo + (hi - lo) / (1 + np.exp(-(t - mid) / width))
 
 
+# A fitted rise shorter than this, from its floor to its ceiling, is no rise at all: the fit to a flat trajectory puts
+# its midpoint anywhere.
 MIN_RISE_HEIGHT = 0.1
-"""A fitted rise shorter than this, from its floor to its ceiling, is no rise at all: the fit to a flat trajectory
-puts its midpoint anywhere."""
 
+# The logistic is fitted from this epoch on, after the first stage: on a run that never rises, a fit from the start
+# would find the first stage instead.
 FIT_FROM_EPOCH = 20
-"""The logistic is fitted from this epoch on, after the first stage: on a run that never rises, a fit from the
-start would find the first stage instead."""
 
 
 def logistic_midpoint(t: np.ndarray, y: np.ndarray, epochs: int) -> float | None:
@@ -625,13 +625,13 @@ def span(values: list[float], digits: int = 2) -> str:
     return f"{v[0]:.{digits}f} to {v[-1]:.{digits}f}"
 
 
+# The anchored seeds that miss the rise at 200 epochs.
 SLOW = MISSED[(ANCHOR, ex.SHORT)]
-"""The anchored seeds that miss the rise at 200 epochs."""
 
 COUNTS = edit_counts()
 WORST_LONG = max(keys(ANCHOR, ex.LONG), key=lambda k: RUNS[k]["worst"])
+# Per length, the kept anchored runs whose edit stays within the selectivity criterion.
 CLEAN = {e: [k[2] for k in keys(ANCHOR, e) if KEPT[k] and RUNS[k]["selective"]] for e in ex.LENGTHS}
-"""Per length, the kept anchored runs whose edit stays within the selectivity criterion."""
 LEFT_OUT = sorted(RUNS[k]["hsv_min"] for k in RUNS if not KEPT[k])
 NEXT_UP = min(RUNS[k]["hsv_min"] for k in RUNS if KEPT[k])
 
