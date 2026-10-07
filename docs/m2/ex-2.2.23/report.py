@@ -797,7 +797,7 @@ The pairing suggests the anchor slowed these seeds: the controls at the same see
 
 {run_table(ex.SHORT)}
 
-The figure below shows each HSV op on its own. The slow anchored runs are low on all three, though one has learned a little of `hue-hsv`. One control run rose late and has learned `hue-hsv` well but saturation and value only in part, so its average is near the level.
+The figure below shows each HSV op on its own. The slow anchored runs are low on all three, though one has learned part of `value-hsv`. One control run rose late and has learned `hue-hsv` well but saturation and value only in part, so its average is near the level.
 
 {ops_figure()}
 
