@@ -68,7 +68,7 @@ def fetch_all() -> tuple[dict, dict[str, dict[str, np.ndarray]], np.ndarray]:
         arrays = {}
         for lbl, p in zip(labels, paths, strict=True):
             with np.load(p) as z:
-                arrays[lbl] = {k: z[k] for k in (f"k{K}_op_ids", f"k{K}_posterior_at_answer", f"k{K}_alpha_at_answer")}
+                arrays[lbl] = {k: z[k] for k in z.files if not k.endswith("alpha_at_answer") or k.startswith(f"k{K}_")}
         tokens = ex.ex2216.load_holdout(holdout_path, K).tokens
     return summary, arrays, tokens
 
@@ -200,6 +200,51 @@ HI_W_BEFORE = max(mean_of(c, "w_before") for c in ANCHORED)
 LO_W_ALONE = min(mean_of(c, "w_alone") for c in ANCHORED)
 HI_COLOR = max(mean_of(c, "color") for c in ANCHORED)
 
+
+BINS = np.linspace(0, 1, 6)
+MIN_BIN = 20
+# Bins of 0.2: the evidence sits on a few values (most one-example posteriors are near 0.05 or 0.69), so each bin
+# holds one cluster of them, and a point is drawn at the mean evidence of its bin, not the bin center. A bin with
+# fewer points than `MIN_BIN` in a run is left out of that run.
+
+
+def bin_of(x: np.ndarray) -> np.ndarray:
+    return np.clip(np.digitize(x, BINS[1:-1]), 0, len(BINS) - 2)
+
+
+COUNTS = tuple(range(1, 6))
+NEXT_CONDITIONS = ("control", HINGE, "k-mixed")
+
+
+def next_answer(cond: str, k: int) -> dict[str, list]:
+    """On the held-out `difference` contexts with *k* examples, by bin of the posterior given those examples: where
+    the points sit, the seed mean of expected exact match at the query, its seed range, and the ceiling (the ideal
+    predictor). Every run of the condition, the one without an anchor included, since this is about the task.
+    """
+    runs = [ARRAYS[lbl] for lbl in labels_of(cond)]
+    keep = runs[0][f"k{k}_op_ids"] == D
+    post = runs[0][f"k{k}_posterior_at_answer"][keep][:, k - 1]
+    b = bin_of(post)
+    full = [i for i in range(len(BINS) - 1) if (b == i).sum() >= MIN_BIN]
+    eem = np.array([[r[f"k{k}_eem"][keep][b == i].mean() for i in full] for r in runs])
+    ceiling = runs[0][f"k{k}_ceiling"][keep]
+    return {
+        "x": [float(post[b == i].mean()) for i in full],
+        "mean": eem.mean(0).tolist(),
+        "lo": eem.min(0).tolist(),
+        "hi": eem.max(0).tolist(),
+        "ceiling": [float(ceiling[b == i].mean()) for i in full],
+    }
+
+
+NEXT = {c: {k: next_answer(c, k) for k in COUNTS} for c in NEXT_CONDITIONS}
+
+
+def top(cond: str, k: int, key: str = "mean") -> float:
+    """The value of *key* in the top bin of the posterior, where nearly every context with *k* examples sits."""
+    return NEXT[cond][k][key][-1]
+
+
 r"""
 # What the anchor follows at the example answers
 
@@ -219,10 +264,11 @@ rf"""
 - [Each example on its own (E1)](#each-example-on-its-own-e1): plotted against the posterior given that example alone, the lines for the three answer indices lie on top of each other. On every anchored condition, that posterior accounts for at least {LO_ALONE:.0%} of the variance in α (r²), against at most {HI_SO_FAR:.0%} for the posterior given the examples so far.
 - [What the earlier examples add (E2)](#what-the-earlier-examples-add-e2): fitted together with the evidence before that example, the earlier evidence gets a weight of at most {HI_W_BEFORE:.2f}, against at least {LO_W_ALONE:.1f} for the example itself. It shows most on answers that do not fit `difference`.
 - [The answer color alone (E3)](#the-answer-color-alone-e3): the answer color, without its operands, predicts at most {HI_COLOR:.0%} of the variance, so α depends on how the answer relates to its operands.
+- [Predicting the next answer (E4)](#predicting-the-next-answer-e4): at the query the model does combine the examples. With three examples, the control and `hinge` score {top(HINGE, 3):.2f} where the ideal predictor scores {top(HINGE, 3, "ceiling"):.2f}, more than one example alone could support. With one or two examples it falls well short of the ideal predictor, even on `k-mixed`, which was trained on those counts.
 
 ## Scope
 
-This is a re-analysis of the stored by-count pass of ex-2.2.22 on its three-example held-out set, with no preregistration and no gate. It covers the `hinge` condition (six runs: three paired with ex-2.2.21 and three replicates), the whole-line condition (three runs), `k-mixed` (three runs, one left out as below), and the control (five runs). Only the {len(EV["so_far"]):,} held-out `{ex.ANCHORED_OP}` contexts are used, and only their example answers: as ex-2.2.22 found, nearly every query answer has a posterior near 1, so there is too little spread to compare there.
+This is a re-analysis of the stored by-count pass of ex-2.2.22 on its three-example held-out set, with no preregistration and no gate. It covers the `hinge` condition (six runs: three paired with ex-2.2.21 and three replicates), the whole-line condition (three runs), `k-mixed` (three runs, one left out as below), and the control (five runs). Only the {len(EV["so_far"]):,} held-out `{ex.ANCHORED_OP}` contexts are used, and only their example answers: as ex-2.2.22 found, nearly every query answer has a posterior near 1, so there is too little spread to compare there. E4 also uses the held-out sets with 1 to 5 examples, for the task score at the query.
 
 The `k-mixed` run at model seed {", ".join(str(SEED_OF[lbl]) for lbl in NO_ANCHOR)} has no anchor at the example answers: α stays near the control even where the example fits `{ex.ANCHORED_OP}`. It also scores lowest on the task of all the runs here, as the runs that took the slow path through training did in ex-2.2.21. It is left out of the numbers below.
 
@@ -241,24 +287,39 @@ About two thirds of the examples in a `{ex.ANCHORED_OP}` context *fit* it, meani
 
 # %%
 
-BINS = np.linspace(0, 1, 11)
-MIN_BIN = 20
-# A bin with fewer points than this in a run is left out of that run's line.
-
 
 def binned_by_index(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Mean of *y* in each bin of *x*, per answer index: `(K, bins)`, NaN where a bin is thin."""
     out = np.full((K, len(BINS) - 1), np.nan)
     for j in range(K):
-        b = np.clip(np.digitize(x[:, j], BINS[1:-1]), 0, len(BINS) - 2)
+        b = bin_of(x[:, j])
         for i in range(len(BINS) - 1):
             if (b == i).sum() >= MIN_BIN:
                 out[j, i] = y[b == i, j].mean()
     return out
 
 
-def seed_mean(cond: str, key: str) -> np.ndarray:
-    return np.nanmean(np.stack([binned_by_index(EV[key], ALPHA[lbl]) for lbl in scored(cond)]), axis=0)
+def by_evidence(cond: str, key: str) -> dict[str, list]:
+    """Per answer index and bin of the evidence *key*: where the points sit, the seed mean of α, the seed range
+    (the run means, pooled over contexts), and the interquartile range over contexts of α averaged over runs (pooled
+    over seeds first).
+    """
+    runs = np.stack([binned_by_index(EV[key], ALPHA[lbl]) for lbl in scored(cond)])
+    pooled = np.mean([ALPHA[lbl] for lbl in scored(cond)], axis=0)
+    x = binned_by_index(EV[key], EV[key])
+    q25, q75 = np.full_like(x, np.nan), np.full_like(x, np.nan)
+    for j in range(K):
+        b = bin_of(EV[key][:, j])
+        for i in np.flatnonzero(~np.isnan(x[j])):
+            q25[j, i], q75[j, i] = np.percentile(pooled[b == i, j], [25, 75])
+    return {
+        "x": x.tolist(),
+        "mean": np.nanmean(runs, axis=0).tolist(),
+        "lo": np.nanmin(runs, axis=0).tolist(),
+        "hi": np.nanmax(runs, axis=0).tolist(),
+        "q25": q25.tolist(),
+        "q75": q75.tolist(),
+    }
 
 
 def ink(j: int) -> str:
@@ -267,15 +328,17 @@ def ink(j: int) -> str:
 
 def e1_figure() -> str:
     data = {
-        "panels": {key: {c: seed_mean(c, key).tolist() for c in (HINGE, "control")} for key in ("so_far", "alone")},
+        "panels": {key: {c: by_evidence(c, key) for c in (HINGE, "control")} for key in ("so_far", "alone")},
         "inks": [ink(j) for j in range(K)],
     }
     alt = f"""
         Two panels of seed-mean α at the example answers of `{ex.ANCHORED_OP}` contexts, on the `hinge` condition,
-        one line per answer index (the first, second, and third example), with the control drawn as thin grey lines
-        near zero. Left: α against the posterior so far in bins of 0.1; the three lines are offset, with the first
-        answer highest at the same posterior. Right: α against the one-example posterior, which reaches about 0.7 at
-        most; the three lines lie on top of each other, low near zero and near 0.9 at the top.
+        one line per answer index (the first, second, and third example), each with a faint band for the seed range
+        and whiskers for the middle half of the contexts, and the control drawn as thin grey lines near zero. Left: α
+        against the posterior so far; the three lines are offset, with the first answer highest at the same
+        posterior. Right: α against the one-example posterior, which reaches about 0.7 at most; the three lines lie
+        on top of each other, low near zero and near 0.9 at the top. The seed bands are narrow, and the context
+        whiskers are wide, spanning a few tenths at the middle of each line.
     """
     return e1_draw(data, alt)
 
@@ -288,27 +351,35 @@ def e1_draw(data: dict, alt_text: str) -> str:
         caption=f"""
             **α against two summaries of the evidence, on `hinge`.** At each example answer of the held-out
             `{ex.ANCHORED_OP}` contexts, α averaged over slices 2 to {ex.N_LAYER}, against **left:** the posterior so
-            far, and **right:** the one-example posterior, in bins of 0.1. One line per answer index, the seed mean
-            of six runs; a bin with fewer than {MIN_BIN} points in a run is left out of that run. Thin grey lines:
-            the control.
+            far, and **right:** the one-example posterior, in bins of 0.2, each point at the mean evidence of its bin.
+            One line per answer index, the seed mean of six runs; a bin with fewer than {MIN_BIN} points in a run is
+            left out of that run. The band is the seed range of the run means (pooled over contexts first); the
+            whiskers span the middle half of the contexts, on α averaged over the runs (pooled over seeds first).
+            Thin grey lines: the control.
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.0), layout="constrained", sharey=True)
-        mid = (BINS[:-1] + BINS[1:]) / 2
+        fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.2), layout="constrained", sharey=True)
         xlabels = {"so_far": "posterior so far", "alone": "one-example posterior"}
+        nudge = (-0.012, 0.0, 0.012)
+        # The whiskers of the three indices are nudged apart so they don't overlap.
         for ax, (key, curves) in zip(axes, data["panels"].items(), strict=True):
+            ctrl = curves["control"]
             for j in range(K):
-                ax.plot(mid, np.array(curves["control"])[j], "-", lw=0.6, color=light_dark("#999", "#777"))
+                ax.plot(ctrl["x"][j], ctrl["mean"][j], "-", lw=0.6, color=light_dark("#999", "#777"))
+            h = {k: np.array(v) for k, v in curves[HINGE].items()}
             for j in range(K):
-                ax.plot(
-                    mid, np.array(curves[HINGE])[j], "-o", ms=3, lw=1.1, color=data["inks"][j], label=f"example {j + 1}"
-                )
+                ax.fill_between(h["x"][j], h["lo"][j], h["hi"][j], color=data["inks"][j], alpha=0.15, lw=0, zorder=1)
+            for j in range(K):
+                x = h["x"][j] + nudge[j]
+                ax.vlines(x, h["q25"][j], h["q75"][j], color=data["inks"][j], lw=0.8, alpha=0.6, zorder=2)
+                ax.plot(x, h["mean"][j], "-o", ms=3, lw=1.1, color=data["inks"][j], label=f"example {j + 1}", zorder=3)
             ax.axhline(0, color=light_dark("#333", "#ddd"), lw=0.5)
             ax.set_xlabel(xlabels[key], fontsize=9)
             ax.set_xlim(0, 1 if key == "so_far" else 0.75)
         axes[0].set_ylabel("α", fontsize=9)
-        axes[0].legend(frameon=False, fontsize=8, loc="upper left")
+        handles, labels = axes[0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=8)
         return fig
 
     return _plot()
@@ -321,7 +392,7 @@ If α followed the posterior so far, answers with the same posterior would have 
 
 {e1_figure()}
 
-On the left the three lines are offset, as in ex-2.2.22: at a posterior between 0.6 and 0.8, α at the first answer is about as high as it gets, and at the third it is about a third lower. On the right they lie on top of each other. An answer whose example fits `{ex.ANCHORED_OP}` has α near {mean_of(HINGE, "fit"):.2f} at every index, and one that does not fit stays low.
+On the left the three lines are offset, as in ex-2.2.22: at a posterior between 0.6 and 0.8, α at the first answer is about as high as it gets, and at the third it is about a third lower. On the right they lie on top of each other. The seed bands are narrow on both sides. The whiskers are not: at the same posterior so far, α spreads over most of its range from one context to the next, and against the one-example posterior that spread shrinks to a few tenths or less. An answer whose example fits `{ex.ANCHORED_OP}` has α near {mean_of(HINGE, "fit"):.2f} at every index, and one that does not fit stays low.
 
 That explains the offset. At the first answer, a middling posterior means one example that fits `{ex.ANCHORED_OP}` and also fits another op. At the third, it usually means a mix of examples that fit and examples that do not, and α then depends on which kind the latest one is.
 
@@ -413,6 +484,80 @@ The earlier examples get a weight of a few hundredths, against more than one for
 ## The answer color alone (E3)
 
 The one-example posterior depends on the operands as well as the answer. If α could be predicted from the answer color alone, the anchor would be closer to a property of the answer token. Averaged by answer color on half of the contexts and tested on the other half, the answer color accounts for {fmt(HINGE, "color", ".2f")} of the variance on `hinge` (held-out R²), and similar on the other conditions. So the model places the state at an example answer on e₁ according to how that answer relates to its operands.
+
+"""
+
+# %%
+
+
+def e4_figure() -> str:
+    data = {"next": NEXT, "names": [short(c) for c in NEXT_CONDITIONS]}
+    alt = f"""
+        Three panels side by side, for the control, `hinge`, and `k-mixed`. Each plots expected exact match at the
+        query against the posterior on `{ex.ANCHORED_OP}` given the examples, one line per number of examples from 1
+        to 5 in shades running light to dark, with a faint band for the seed range and a dashed diagonal for the
+        ideal predictor. On the control and `hinge`, the line for three examples nearly reaches the diagonal at the
+        top ({top(HINGE, 3):.2f} against {top(HINGE, 3, "ceiling"):.2f} on `hinge`), and the other counts sit lower.
+        On `k-mixed` every line sits well below the diagonal ({top("k-mixed", 3):.2f} with three examples). With
+        one example every condition reaches about {top(HINGE, 1):.2f} at the top bin, against
+        {top(HINGE, 1, "ceiling"):.2f} for the ideal predictor. On `hinge` the band for four and five examples is
+        wide, from one run that drops.
+    """
+    return e4_draw(data, alt)
+
+
+@memo
+def e4_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="next-answer",
+        alt_text=alt_text,
+        caption=f"""
+            **How well the model predicts the next answer.** On the held-out `{ex.ANCHORED_OP}` contexts with 1 to 5
+            examples, expected exact match at the query against the posterior on `{ex.ANCHORED_OP}` given the
+            examples, in bins of 0.2, each point at the mean posterior of its bin. One line per number of examples;
+            the seed mean, with the seed range as a band. Dashed: the ideal predictor, which gets the posterior
+            right. The control and `hinge` were trained on three examples only.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, 3, figsize=(7.6, 2.9), layout="constrained", sharex=True, sharey=True)
+        cmap = plt.get_cmap(light_dark("viridis_r", "viridis"))
+        shades = {k: cmap(0.15 + 0.7 * i / (len(COUNTS) - 1)) for i, k in enumerate(COUNTS)}
+        for ax, name, by_k in zip(axes, data["names"], data["next"].values(), strict=True):
+            ax.plot([0, 1], [0, 1], "--", lw=0.7, color=light_dark("#777", "#999"), zorder=0)
+            for k, d in by_k.items():
+                d = {key: np.array(v) for key, v in d.items()}
+                ax.fill_between(d["x"], d["lo"], d["hi"], color=shades[int(k)], alpha=0.18, lw=0, zorder=1)
+                ax.plot(d["x"], d["mean"], "-o", ms=2.5, lw=1.1, color=shades[int(k)], label=f"{k}", zorder=2)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.set_xlabel("posterior given the examples", fontsize=9)
+            ax.set_title(name, fontsize=9)
+        axes[0].set_ylabel("expected exact match", fontsize=9)
+        handles, labels = axes[0].get_legend_handles_labels()
+        fig.legend(
+            handles,
+            labels,
+            title="examples",
+            loc="outside upper center",
+            ncols=len(labels),
+            frameon=False,
+            fontsize=8,
+            title_fontsize=8,
+        )
+        return fig
+
+    return _plot()
+
+
+rf"""
+## Predicting the next answer (E4)
+
+The anchor follows each example on its own, so how well does the model itself use the examples before it? The by-count pass scored the query on held-out sets with 1 to 5 examples. The query after one example asks for the answer a second example would show (without the noise an example can carry), and the query after two asks for the third. So these scores stand in for how well the model predicts the answers of the later examples. The control and `hinge` were trained on three examples only, so for them the other counts are outside training; `k-mixed` was trained on 1 to 5.
+
+{e4_figure()}
+
+The ideal predictor gets an expected exact match about equal to its posterior, so it follows the diagonal. With three examples, the count they were trained on, the control and `hinge` come close to it: {top(HINGE, 3):.2f} against {top(HINGE, 3, "ceiling"):.2f} in the top bin on `hinge`. With one example every condition falls well short, at about {top(HINGE, 1):.2f} against {top(HINGE, 1, "ceiling"):.2f}, and `k-mixed`, which was trained on that count, does only a little better ({top("k-mixed", 1):.2f}). With two examples the gap is wider still: {top(HINGE, 2):.2f} against {top(HINGE, 2, "ceiling"):.2f} on `hinge`, and {top("k-mixed", 2):.2f} on `k-mixed`. `k-mixed` stays below the diagonal at every count, reaching {top("k-mixed", 3):.2f} with three examples. A single example lifts the posterior to about 0.7 at most, and with three examples the control and `hinge` score well above that, so at the query the model does combine the examples. The anchor at the example answers does not follow that combining.
 
 ## Discussion
 
