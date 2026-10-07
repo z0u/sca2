@@ -197,9 +197,11 @@ More seeds at 200 epochs would pin down how often a run misses the rise, and run
 # %%
 
 rf"""
-## Measurements
+## Glossary
 
-<!-- REVIEW: a definition list now, at Sandy's request (round 1); it becomes this report's glossary once the margin-notes PR (#223) lands. -->
+<!-- REVIEW: the measurements, as this report's glossary, at Sandy's request (round 1), so each shows beside its first use in every section. -->
+
+The measurements this report uses. Each definition also shows in the margin beside the first use of its term in a section.
 
 HSV skill
 :   Skill on the three HSV ops: expected exact match (EEM, the probability the model puts on the right answer) on held-out contexts, averaged over the three. Beside the average we report the worst of the three, since the ops can rise at different times. Through training it is measured every {ex.TRAJ_STRIDE_EPOCHS} epochs on a subsample of the held-out set, and at the end on the whole of it.

@@ -15,6 +15,8 @@ import markdown
 from pygments.formatters.html import HtmlFormatter
 from pymdownx.slugs import slugify
 
+from mini.lit.notes import NotesExtension, Term
+
 __all__ = ["to_html", "page", "render_fragment", "expand_toc"]
 
 BASE_CSS_PATH = Path(__file__).with_name("base.css")  # shared with the site's Markdown pages
@@ -54,8 +56,8 @@ EXTENSION_CONFIGS = {
 }
 
 
-def _converter() -> markdown.Markdown:
-    return markdown.Markdown(extensions=EXTENSIONS, extension_configs=EXTENSION_CONFIGS)
+def _converter(notes: NotesExtension | None = None) -> markdown.Markdown:
+    return markdown.Markdown(extensions=[*EXTENSIONS, *([notes] if notes else [])], extension_configs=EXTENSION_CONFIGS)
 
 
 # A pending mark (``mini.lit.document._Pending``) is HTML, which a code span or fence would
@@ -113,15 +115,18 @@ def expand_toc(fragment: str, toc_tokens: list[dict]) -> str:
     return TOC_MARKER_RE.sub(lambda _: toc, fragment, count=1)
 
 
-def to_html(text: str) -> str:
-    """Render a Markdown document to an HTML fragment (a fresh converter per call, so footnote numbering starts at 1)."""
-    md = _converter()
+def to_html(text: str, *, notes: bool = True, glossary: dict[str, Term] | None = None) -> str:
+    """Render a Markdown document to an HTML fragment (a fresh converter per call, so footnote numbering starts at 1).
+
+    With *notes*, footnotes are also placed beside the text that cites them, and the first use per section of each term in the document's own glossary or the shared *glossary* carries its definition (:mod:`mini.lit.notes`).
+    """
+    md = _converter(NotesExtension(glossary) if notes else None)
     return _show_marks(expand_toc(md.convert(_hide_marks(text)), md.toc_tokens))  # ty: ignore[unresolved-attribute]
 
 
 def render_fragment(text: str) -> str:
-    """Render a short piece of Markdown (a caption) to HTML, with the same dialect as the document body."""
-    return to_html(text)
+    """Render a short piece of Markdown (a caption) to HTML, with the same dialect as the document body and no notes."""
+    return to_html(text, notes=False)
 
 
 @cache

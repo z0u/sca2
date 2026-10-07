@@ -70,6 +70,7 @@ __all__ = [
     "github_slug",
     "insert_base",
     "report_styles",
+    "report_glossary",
     "mark_verdicts",
     "VERDICTS",
     "set_report_styles",
@@ -1017,6 +1018,11 @@ def report_styles(doc: Path | str) -> str:
     """
     css = _project_root(Path(doc)) / "docs" / "report.css"
     return css.read_text("utf-8") if css.exists() else ""
+
+
+def report_glossary(doc: Path | str) -> Path:
+    """Where *doc*'s project keeps its shared glossary, ``docs/glossary.md`` beside ``report.css`` (read by :func:`mini.lit.notes.load_glossary`, which takes a missing file as an empty glossary)."""
+    return _project_root(Path(doc)) / "docs" / "glossary.md"
 
 
 def set_report_styles(html: str, css: str) -> str:

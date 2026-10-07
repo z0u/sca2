@@ -346,6 +346,8 @@ Ex-2.2.14 anchored the op `difference`, and it landed, but almost entirely on th
 
     <span class="tags">`scouting` `anchoring` `labelling` `preregistration`</span>
 
+    <!-- mini:figures ./m2/ex-2.2.15/report.py -->
+
 - [D2.2 pivot: an operation the model has to infer](./m2/d2.2/pivot.md)
 
     Adopted after ex-2.2.14. Since the anchor went to the op word, D2.2 now anchors an op the model infers from solved examples, and no token in the line names the op. That is closer to what M3 needs. Covers the new grammar, what could go wrong with it, and what it changes in the plan for D2.3.
@@ -363,6 +365,8 @@ Once the op had no word, the first question was whether an un-anchored model cou
     The first experiment on the new grammar, where the model infers the op from a few solved examples. Every control got a little under halfway from guessing to the best possible score, so the pilot stopped before anything was anchored.
 
     <span class="tags">`pilot` `in-context` `anchoring` `labelling` `preregistration`</span>
+
+    <!-- mini:figures ./m2/ex-2.2.16/report.py -->
 
 - [2.2.17. The center control plateau](./m2/ex-2.2.17/report.py)
 
@@ -386,11 +390,15 @@ Once the op had no word, the first question was whether an un-anchored model cou
 
     <span class="tags">`in-context` `training`</span>
 
+    <!-- mini:figures ./m2/ex-2.2.19/report.py -->
+
 - [2.2.20. A high-rate head start before the recipe schedule](./m2/ex-2.2.20/report.py)
 
     A short burst at a higher learning rate before the usual schedule kept no more of the skill than the plain run, so the plain schedule stays.
 
     <span class="tags">`in-context` `training`</span>
+
+    <!-- mini:figures ./m2/ex-2.2.20/report.py -->
 
 </details>
 

@@ -33,13 +33,21 @@ Math expressions are OK; slight preference for plain Unicode because it's easier
 r"""
 Main content with an inline footnote,[^note] and so on.
 
-[^note]: Renders at the end of the document. Footnote numbers restart per document.
+[^note]: Shows beside its marker: in the margin on a wide screen and in the PDF, on hover on a narrow one. Footnote numbers restart per document.
 
 /// details | Title
 Some backstory.
 ///
 """
 ```
+
+A footnote made only of paragraphs becomes a margin note; one holding a list or code stays in the list at the end, and so does one cited from a table cell, a caption or a heading (it shows on hover).
+
+Glossary terms are annotated for you. The first use of each term in every `##` section carries its definition as a margin note, taken from the report's own `## Glossary` section and then from `docs/glossary.md`, the shared dictionary. Both are definition lists, in Markdown syntax (the term, then `:   definition` on the next line) or as a `<dl>`. Another term line above the same definition adds a wording, and so do commas and parentheses within one. Matching is whole-word and case-insensitive, and skips code, links, headings, tables and captions. `[the spread](term:band)` marks a use in other words, or of a term kept off auto-matching (`Band {.manual}`, for everyday words). Mechanics: `src/mini/lit/notes.py`.
+
+Prefer a glossary term to a footnote when the aside defines a word the reader will meet again: the definition then shows beside the word in every section, and other reports can share it. A term whose meaning holds across reports goes in `docs/glossary.md`, and one used in a narrower sense goes in the report's own glossary. Keep footnotes for one-off asides, such as a caveat, a source, or a side calculation.
+
+Lead each footnote and definition with a few words to jog the memory, as a short first sentence or a head before a colon ("Exponential moving average: a running average that …"). That lead is the gloss. On a wide screen the margin shows only the gloss until the note is hovered or focused. On paper the margin only ever shows the gloss: footnotes print in full in the list at the end, but a shared definition prints nowhere else, so its gloss has to stand on its own.
 
 Other admonition types and their icons: `details` (folds, unobtrusive), `admonition` (unadorned), `note` ℹ️, `tip` 💡, `important` 💬, `warning` ⚠️, `error` 🛑. The `| title` is optional, except for `details`.
 
