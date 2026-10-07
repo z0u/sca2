@@ -7,6 +7,7 @@
 import json
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -114,6 +115,409 @@ def runs_table() -> str:
         f"**The runs.** {ex.N_NEW_RUNS} new runs, and {len(ex.CONDITIONS) * len(ex.REUSED_SEEDS)} reused from "
         "ex-2.2.21, which trained both conditions at the same settings.",
         text_cols=4,
+    )
+
+
+# --- The results: fetching ----------------------------------------------------------------------------------
+
+
+def fetch_json(refs: list[str]) -> dict[str, Any]:
+    """Each ref's published JSON, by ref."""
+    store = project_store()
+    arts = store.get_refs(refs)
+    missing = [r for r, a in arts.items() if a is None]
+    assert not missing, f"not published yet: {missing}"
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = store.get_many([(arts[r], Path(tmp) / f"{i}.json") for i, r in enumerate(refs)])
+        return {r: json.loads(p.read_text()) for r, p in zip(refs, paths, strict=True)}
+
+
+_results = fetch_json([ex.EVAL_REF, ex.SUPPRESSION_REF, ex.TRAJ_REF])
+EVAL, SUPP, TRAJ_NEW = (_results[r] for r in (ex.EVAL_REF, ex.SUPPRESSION_REF, ex.TRAJ_REF))
+
+# --- The results: one record per run --------------------------------------------------------------------------
+
+OPS: tuple[str, ...] = tuple(EVAL["runs"][0]["ops"])
+assert OPS == tuple(ex.OP_NAMES)
+D = OPS.index(ex.ANCHORED_OP)
+OTHER = [o for o in range(len(OPS)) if o != D]
+CONTROL, ANCHOR = (c.name for c in ex.CONDITIONS)
+Key = tuple[str, int, int]
+"""A run: (condition, epochs, model seed)."""
+
+
+def logistic(t: np.ndarray, lo: float, hi: float, mid: float, width: float) -> np.ndarray:
+    return lo + (hi - lo) / (1 + np.exp(-(t - mid) / width))
+
+
+MIN_RISE_HEIGHT = 0.1
+"""A fitted rise shorter than this, from its floor to its ceiling, is no rise at all: the fit to a flat trajectory
+puts its midpoint anywhere."""
+
+
+def logistic_midpoint(t: np.ndarray, y: np.ndarray, epochs: int) -> float | None:
+    """The midpoint of a logistic curve fitted to the HSV skill through training: when the rise is half done, with no
+    threshold. Bounded to twice the length of training, so a run still rising at the end gets a midpoint past it; a
+    run whose fitted rise is shorter than `MIN_RISE_HEIGHT` gets None.
+    """
+    from scipy.optimize import curve_fit
+
+    p0 = (float(y[: len(y) // 5].mean()), float(max(y.max(), 0.3)), float(t[np.argmax(np.gradient(y))]), epochs / 20)
+    bounds = ((0.0, 0.0, 0.0, epochs / 400), (0.4, 0.7, 2.0 * epochs, epochs / 2))
+    p0 = tuple(float(np.clip(v, lo + 1e-6, hi - 1e-6)) for v, lo, hi in zip(p0, *bounds, strict=True))
+    (lo, hi, mid, width), _ = curve_fit(logistic, t, y, p0=p0, bounds=bounds, maxfev=20_000)
+    return float(mid) if hi - lo >= MIN_RISE_HEIGHT else None
+
+
+def traj_of(key: Key) -> dict:
+    cond, epochs, seed = key
+    if epochs == ex.SHORT and seed in ex.REUSED_SEEDS:
+        c = next(c for c in ex.CONDITIONS if c.name == cond)
+        return TRAJ21[f"{c.reused_as}-s{seed - ex.SEED_OFFSET}"]["traj"]
+    return TRAJ_NEW[ex.label_of(cond, epochs, seed)]["traj"]
+
+
+def build_runs() -> dict[Key, dict[str, Any]]:
+    evals = {r["label"]: r for r in EVAL["runs"]}
+    supps = {r["label"]: r for r in SUPP["runs"]}
+    out: dict[Key, dict[str, Any]] = {}
+    for c in ex.CONDITIONS:
+        for epochs in ex.LENGTHS:
+            for seed in ex.SEEDS:
+                key = (c.name, epochs, seed)
+                label = ex.label_of(*key)
+                t = traj_of(key)
+                pts = [(e, v) for e, v in zip(t["epoch"], t["eem_per_op"], strict=True) if v]
+                epoch = np.array([p[0] for p in pts], float)
+                per_op = np.array([p[1] for p in pts], float)
+                hsv_t, hsv_min_t = per_op[:, HSV_IDX].mean(axis=1), per_op[:, HSV_IDX].min(axis=1)
+                above = np.flatnonzero(hsv_t >= ex.RISE_LEVEL)
+                final_per_op = np.array(evals[label]["task"]["eem"]["per_op"], float)
+                out[key] = {
+                    "label": label,
+                    "epoch": epoch,
+                    "hsv_t": hsv_t,
+                    "hsv_min_t": hsv_min_t,
+                    "rise": float(epoch[above[0]]) if len(above) else None,
+                    "midpoint": logistic_midpoint(epoch, hsv_t, epochs),
+                    "per_op": final_per_op,
+                    "hsv": float(final_per_op[HSV_IDX].mean()),
+                    "hsv_min": float(final_per_op[HSV_IDX].min()),
+                    "eem": float(evals[label]["task"]["eem"]["all"]),
+                    "margin": np.array(evals[label]["margin"]["by_slice"], float),
+                    "supp": supps[label],
+                }
+    return out
+
+
+RUNS = build_runs()
+
+
+def edit_measurements(key: Key) -> dict[str, Any]:
+    """The two edit measurements of one anchored run, net of the control at the same seed and length: the share of
+    the way to the target null the drop on the anchored op gets at full dose, and the largest drop on any other op
+    at any dose; with ex-2.2.21's criteria on them, for marking only.
+    """
+    s, c = RUNS[key]["supp"], RUNS[(CONTROL, *key[1:])]["supp"]
+
+    def drops(r: dict) -> np.ndarray:
+        return np.array(r["clean"]["eem"])[None, :] - np.array([e["eem"] for e in r["edits"]])  # (doses, ops)
+
+    net = drops(s) - drops(c)
+    gap = s["clean"]["eem"][D] - s["null"]["eem"][D]
+    anchored = net[:, D]
+    worst = net[:, OTHER].max(axis=1)
+    rises = all(b >= a - ex.ex2221.GRADE_DIP for a, b in zip(anchored, anchored[1:], strict=False))
+    share = float(anchored[-1] / gap)
+    return {
+        "share": share,
+        "worst": float(worst.max()),
+        "by_dose": net,
+        "grades": bool(rises and share >= ex.GRADING_MIN_DAMAGE),
+        "selective": bool(worst.max() <= ex.SELECTIVITY_GATE),
+    }
+
+
+def keys(cond: str | None = None, epochs: int | None = None) -> list[Key]:
+    return [k for k in RUNS if (cond is None or k[0] == cond) and (epochs is None or k[1] == epochs)]
+
+
+def missed(key: Key, level: float = ex.RISE_LEVEL, measure: str = "hsv") -> bool:
+    """Whether a run ends below *level* of HSV skill on the whole held-out set: the average (`hsv`) or the worst
+    op (`hsv_min`)."""
+    return RUNS[key][measure] < level
+
+
+MISSED = {(c, e): [k[2] for k in keys(c, e) if missed(k)] for c in (CONTROL, ANCHOR) for e in ex.LENGTHS}
+
+# --- The results: shared drawing ------------------------------------------------------------------------------
+
+
+def ink_of(cond: str) -> str:
+    return {CONTROL: light_dark("#555", "#bbb"), ANCHOR: light_dark("#c0392b", "#ff8a76")}[cond]
+
+
+def rule(ax, y: float) -> None:
+    ax.axhline(y, color=light_dark("#000", "#fff"), lw=0.8, ls="--", alpha=0.6)
+
+
+def num_word(n: int) -> str:
+    return ("none", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")[
+        n
+    ]
+
+
+def seeds_list(seeds: list[int]) -> str:
+    if not seeds:
+        return "none"
+    if len(seeds) == 1:
+        return str(seeds[0])
+    return ", ".join(map(str, seeds[:-1])) + f" and {seeds[-1]}"
+
+
+def traj_panels(epochs: int, highlight: dict[str, list[int]], name: str, caption: str, alt: str) -> str:
+    data = {
+        c: {k[2]: (RUNS[k]["epoch"].tolist(), RUNS[k]["hsv_t"].tolist()) for k in keys(c, epochs)}
+        for c in (CONTROL, ANCHOR)
+    }
+    return traj_draw(data, epochs, highlight, name, caption, alt)
+
+
+@memo
+def traj_draw(data: dict, epochs: int, highlight: dict, name: str, caption: str, alt_text: str) -> str:
+    @themed(name=name, alt_text=alt_text, caption=caption)
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.5), layout="constrained", sharey=True)
+        for ax, cond in zip(axes, (CONTROL, ANCHOR), strict=True):
+            other = ANCHOR if cond == CONTROL else CONTROL
+            for x, y in data[other].values():
+                ax.plot(x, y, color=ink_of(other), lw=0.5, alpha=0.18, zorder=1)
+            for seed, (x, y) in data[cond].items():
+                hi = seed in highlight.get(cond, [])
+                ax.plot(
+                    x, y, color=ink_of(cond), lw=1.3 if hi else 0.8, alpha=0.95 if hi else 0.55, zorder=3 if hi else 2
+                )
+            rule(ax, ex.RISE_LEVEL)
+            ax.set_title(cond, fontsize=9)
+            ax.set_xlim(0, epochs)
+            ax.set_xlabel("epoch", fontsize=8)
+        axes[0].set_ylabel("HSV skill (EEM)", fontsize=8)
+        return fig
+
+    return _plot()
+
+
+# --- E1 -----------------------------------------------------------------------------------------------------
+
+
+def grid_figure() -> str:
+    cols = [(c, e) for e in ex.LENGTHS for c in (CONTROL, ANCHOR)]
+    data = {
+        "cols": [f"{c}\n{e} epochs" for c, e in cols],
+        "seeds": list(ex.SEEDS),
+        "per_op": [[RUNS[(c, e, s)]["per_op"][HSV_IDX].tolist() for c, e in cols] for s in ex.SEEDS],
+    }
+    caption = f"""
+        **The HSV skill of every run at the end of training**, on the whole held-out set. One row per model seed, one
+        column per condition and length; each box is split into the three HSV ops (hue, saturation, value, left to
+        right), shaded by skill. The number is the average over the three, in bold where it is below the rise level
+        ({ex.RISE_LEVEL:g}).
+    """
+    alt = f"""
+        A grid of twelve model seeds by four columns (control and anchor, at 200 and at 400 epochs), each cell split
+        into three shaded strips for the HSV ops and labelled with the average. At 200 epochs the control misses the
+        rise at {num_word(len(MISSED[(CONTROL, ex.SHORT)]))} seeds and the anchor at
+        {num_word(len(MISSED[(ANCHOR, ex.SHORT)]))}; at 400 epochs the control misses at
+        {num_word(len(MISSED[(CONTROL, ex.LONG)]))} and the anchor at {num_word(len(MISSED[(ANCHOR, ex.LONG)]))}.
+    """
+    return grid_draw(data, caption, alt)
+
+
+@memo
+def grid_draw(data: dict, caption: str, alt_text: str) -> str:
+    @themed(name="ex-2.2.23-grid", alt_text=alt_text, caption=caption)
+    def _plot() -> plt.Figure:
+        n_rows, n_cols = len(data["seeds"]), len(data["cols"])
+        fig, ax = plt.subplots(figsize=(5.2, 0.28 * n_rows + 1.0), layout="constrained")
+        cmap = plt.get_cmap("viridis")
+        for i in range(n_rows):
+            for j in range(n_cols):
+                ops = data["per_op"][i][j]
+                for o, v in enumerate(ops):
+                    ax.add_patch(
+                        plt.Rectangle((j + o / 3, i), 1 / 3, 1, facecolor=cmap(np.clip((v - 0.15) / 0.45, 0, 1)), lw=0)
+                    )
+                mean = float(np.mean(ops))
+                ax.text(
+                    j + 0.5, i + 0.5, f"{mean:.2f}", ha="center", va="center", fontsize=6.5,
+                    color="white" if mean < 0.4 else "black", fontweight="bold" if mean < ex.RISE_LEVEL else "normal",
+                )  # fmt: skip
+        for j in range(1, n_cols):
+            ax.axvline(j, color=light_dark("white", "#111"), lw=1.5)
+        ax.axvline(n_cols / 2, color=light_dark("#000", "#fff"), lw=1.0)
+        ax.set_xlim(0, n_cols)
+        ax.set_ylim(n_rows, 0)
+        ax.set_xticks(np.arange(n_cols) + 0.5, data["cols"], fontsize=7)
+        ax.xaxis.tick_top()
+        ax.set_yticks(np.arange(n_rows) + 0.5, [str(s) for s in data["seeds"]], fontsize=7)
+        ax.set_ylabel("model seed", fontsize=8)
+        ax.tick_params(length=0)
+        for s in ax.spines.values():
+            s.set_visible(False)
+        return fig
+
+    return _plot()
+
+
+# --- E2 -----------------------------------------------------------------------------------------------------
+
+
+def rise_figure() -> str:
+    pts = {
+        c: [(s, RUNS[(c, ex.SHORT, s)]["rise"], RUNS[(c, ex.LONG, s)]["rise"]) for s in ex.SEEDS]
+        for c in (CONTROL, ANCHOR)
+    }
+    caption = f"""
+        **When the rise comes, at 200 and at 400 epochs**, one dot per model seed and condition: the first epoch at
+        which the HSV skill passes {ex.RISE_LEVEL:g}. A run that never passes it is drawn on the edge, past the end of
+        its training. The diagonal marks the same epoch at either length; the dotted line, the same share of training.
+    """
+    alt = """
+        A scatter of the rise epoch at 400 epochs against the rise epoch at 200 epochs, one dot per seed for each
+        condition, with a diagonal for the same epoch and a steeper line for the same share of training.
+    """
+    return rise_draw(pts, caption, alt)
+
+
+@memo
+def rise_draw(pts: dict, caption: str, alt_text: str) -> str:
+    @themed(name="ex-2.2.23-rise", alt_text=alt_text, caption=caption)
+    def _plot() -> plt.Figure:
+        fig, ax = plt.subplots(figsize=(3.8, 3.4), layout="constrained")
+        edge_x, edge_y = ex.SHORT * 1.08, ex.LONG * 1.06
+        for cond, rows in pts.items():
+            xs = [edge_x if a is None else a for _, a, _ in rows]
+            ys = [edge_y if b is None else b for _, _, b in rows]
+            ax.plot(xs, ys, "o", ms=4.5, color=ink_of(cond), alpha=0.8, label=cond, mew=0)
+        ax.plot([0, edge_x], [0, edge_x], color=light_dark("#000", "#fff"), lw=0.7, alpha=0.5)
+        ax.plot([0, edge_x], [0, 2 * edge_x], color=light_dark("#000", "#fff"), lw=0.7, alpha=0.5, ls=":")
+        ax.axvline(ex.SHORT, color=light_dark("#888", "#777"), lw=0.6)
+        ax.axhline(ex.LONG, color=light_dark("#888", "#777"), lw=0.6)
+        ax.set_xlim(0, edge_x * 1.04)
+        ax.set_ylim(0, edge_y * 1.03)
+        ax.set_xlabel("rise epoch, 200-epoch run", fontsize=8)
+        ax.set_ylabel("rise epoch, 400-epoch run", fontsize=8)
+        ax.legend(fontsize=7, frameon=False, loc="upper left")
+        return fig
+
+    return _plot()
+
+
+def rose_both_ways() -> dict[str, list[int]]:
+    """Per condition, the seeds that missed at 200 epochs and made it at 400, and those that made it at 200 and
+    missed at 400."""
+    out = {}
+    for c in (CONTROL, ANCHOR):
+        out[f"{c} late"] = [s for s in ex.SEEDS if missed((c, ex.SHORT, s)) and not missed((c, ex.LONG, s))]
+        out[f"{c} lost"] = [s for s in ex.SEEDS if not missed((c, ex.SHORT, s)) and missed((c, ex.LONG, s))]
+    return out
+
+
+ROSE = rose_both_ways()
+
+# --- E3 -----------------------------------------------------------------------------------------------------
+
+
+def late_figure() -> str:
+    rows = [
+        {
+            "cond": k[0],
+            "epochs": k[1],
+            "rise": RUNS[k]["rise"],
+            "mid": RUNS[k]["midpoint"],
+            "eem": RUNS[k]["eem"],
+            "margin_last": float(RUNS[k]["margin"][-1]),
+            "margin_prev": float(RUNS[k]["margin"][-2]),
+        }
+        for k in RUNS
+    ]
+    caption = f"""
+        **How a run ends, against when it rose.** One dot per run; filled dots are 200-epoch runs and rings
+        400-epoch runs. The x axis is the share of training at which the rise came: on the left by the rise level
+        ({ex.RISE_LEVEL:g}), and on the right by the midpoint of a logistic curve fitted to the HSV skill, which needs
+        no threshold. Runs that never rose, or are still rising at the end, sit past the right edge. Top: task skill at the end of
+        training. Bottom: the op margin of the anchored runs at the last and second-last slices.
+    """
+    alt = """
+        Four panels. The top two plot the final task skill of every run against the rise time as a share of training,
+        by the rise level and by the logistic midpoint. The bottom two plot the op margin of the anchored runs at the
+        last and second-last slices against the logistic midpoint.
+    """
+    return late_draw(rows, caption, alt)
+
+
+@memo
+def late_draw(rows: list[dict], caption: str, alt_text: str) -> str:
+    @themed(name="ex-2.2.23-late", alt_text=alt_text, caption=caption)
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(2, 2, figsize=(7.0, 4.8), layout="constrained")
+
+        def mark(ax, x, y, r):
+            filled = r["epochs"] == ex.SHORT
+            ink = ink_of(r["cond"])
+            ax.plot(x, y, "o", ms=4.2, color=ink, mfc=ink if filled else "none", mew=0 if filled else 0.9, alpha=0.8)
+
+        for r in rows:
+            share = 1.08 if r["rise"] is None else r["rise"] / r["epochs"]
+            mark(axes[0][0], share, r["eem"], r)
+            mid = 1.08 if r["mid"] is None else min(r["mid"] / r["epochs"], 1.08)
+            mark(axes[0][1], mid, r["eem"], r)
+            if r["cond"] == ANCHOR:
+                mark(axes[1][0], mid, r["margin_last"], r)
+                mark(axes[1][1], mid, r["margin_prev"], r)
+        axes[0][0].set_xlabel("rise epoch / length", fontsize=8)
+        for ax in (axes[0][1], axes[1][0], axes[1][1]):
+            ax.set_xlabel("logistic midpoint / length", fontsize=8)
+        axes[0][0].set_ylabel("task skill (EEM)", fontsize=8)
+        axes[1][0].set_ylabel("op margin, last slice", fontsize=8)
+        axes[1][1].set_ylabel("op margin, second-last slice", fontsize=8)
+        for ax in np.ravel(axes):
+            ax.set_xlim(0, 1.12)
+            ax.axvline(1.0, color=light_dark("#888", "#777"), lw=0.6)
+        handles = [
+            plt.Line2D([], [], ls="", marker="o", color=ink_of(CONTROL), mew=0, label=CONTROL),
+            plt.Line2D([], [], ls="", marker="o", color=ink_of(ANCHOR), mew=0, label=ANCHOR),
+            plt.Line2D([], [], ls="", marker="o", color="grey", mew=0, label="200 epochs"),
+            plt.Line2D([], [], ls="", marker="o", color="grey", mfc="none", mew=0.9, label="400 epochs"),
+        ]
+        fig.legend(handles=handles, loc="outside upper center", ncols=4, frameon=False, fontsize=7)
+        return fig
+
+    return _plot()
+
+
+# --- S1 -----------------------------------------------------------------------------------------------------
+
+
+MEASURES = {"hsv": "average", "hsv_min": "worst op"}
+
+
+def rule_table() -> str:
+    rows = []
+    for measure, name in MEASURES.items():
+        for level in ex.CANDIDATE_RULE_LEVELS:
+            row = [name, f"{level:g}"]
+            for e in ex.LENGTHS:
+                for c in (CONTROL, ANCHOR):
+                    row.append(str(sum(missed(k, level, measure) for k in keys(c, e))))
+            rows.append(row)
+    head = ["HSV skill", "level"] + [f"{c}, {e}" for e in ex.LENGTHS for c in (CONTROL, ANCHOR)]
+    return table_html(
+        head,
+        rows,
+        f"**What each candidate rule would leave out**: the number of runs, of {len(ex.SEEDS)} per column, whose HSV "
+        "skill at the end of training is below the level.",
+        text_cols=2,
     )
 
 

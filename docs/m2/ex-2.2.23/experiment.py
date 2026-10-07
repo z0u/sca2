@@ -112,6 +112,14 @@ known from ex-2.2.21; S1 picks one of them from E1 to E3, and commits it before 
 ex-2.2.21 and ex-2.2.22 ended between 0.2 and 0.3, and the runs that rose early between 0.45 and 0.5."""
 assert RISE_LEVEL in CANDIDATE_RULE_LEVELS
 
+RULE: tuple[str, float] = ("hsv_min", 0.3)
+"""S1, the rule chosen from E1 to E3 and committed before the edit measurements of E4 were computed: a run is
+half-trained when the worst of its three HSV ops ends below 0.3 on the whole held-out set. The worst op rather than
+the average, because the ops can rise one at a time, and a run with only `hue-hsv` risen ended with an average just
+over the rise level; 0.3, because the plateau sits near 0.2 to 0.27 and every run whose ops had all risen ended above
+0.34."""
+assert RULE[1] in CANDIDATE_RULE_LEVELS
+
 TRAJ_STRIDE_EPOCHS = 4
 """One trajectory record every four epochs at either length, as in ex-2.2.21 at 200 epochs, so the rise epoch is
 resolved alike at both lengths."""
