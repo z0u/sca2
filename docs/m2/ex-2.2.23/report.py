@@ -244,7 +244,8 @@ def keys(cond: str | None = None, epochs: int | None = None) -> list[Key]:
 
 def missed(key: Key, level: float = ex.RISE_LEVEL, measure: str = "hsv") -> bool:
     """Whether a run ends below *level* of HSV skill on the whole held-out set: the average (`hsv`) or the worst
-    op (`hsv_min`)."""
+    op (`hsv_min`).
+    """
     return RUNS[key][measure] < level
 
 
@@ -415,7 +416,8 @@ def rise_draw(pts: dict, caption: str, alt_text: str) -> str:
 
 def rose_both_ways() -> dict[str, list[int]]:
     """Per condition, the seeds that missed at 200 epochs and made it at 400, and those that made it at 200 and
-    missed at 400."""
+    missed at 400.
+    """
     out = {}
     for c in (CONTROL, ANCHOR):
         out[f"{c} late"] = [s for s in ex.SEEDS if missed((c, ex.SHORT, s)) and not missed((c, ex.LONG, s))]
@@ -519,6 +521,89 @@ def rule_table() -> str:
         "skill at the end of training is below the level.",
         text_cols=2,
     )
+
+
+# --- E4 -----------------------------------------------------------------------------------------------------
+
+RULE_MEASURE, RULE_LEVEL = ex.RULE
+KEPT = {k: not missed(k, RULE_LEVEL, RULE_MEASURE) for k in RUNS}
+
+for _k in RUNS:
+    if _k[0] == ANCHOR:
+        RUNS[_k] |= edit_measurements(_k)
+
+
+def edit_figure() -> str:
+    rows = [
+        {
+            "epochs": k[1],
+            "kept": KEPT[k],
+            "share": RUNS[k]["share"],
+            "worst": RUNS[k]["worst"],
+            "worst_by_dose": RUNS[k]["by_dose"][:, OTHER].max(axis=1).tolist(),
+        }
+        for k in keys(ANCHOR)
+    ]
+    n_out = sum(not r["kept"] for r in rows)
+    caption = f"""
+        **The edit on every anchored run, by whether the rule of S1 keeps it.** Left: how far the drop on
+        `{ex.ANCHORED_OP}` gets toward the target null at full dose, against the largest drop on any other op at any
+        dose, one dot per run (filled at 200 epochs, rings at 400), both net of the control at the same seed and
+        length. The dashed lines are ex-2.2.21's criteria: at least {ex.GRADING_MIN_DAMAGE:.0%} of the way, and no
+        other op down by more than {ex.SELECTIVITY_GATE:g}. Right: the largest drop on any other op at each dose, one
+        line per run. Blue: runs the rule keeps; orange: the {num_word(n_out)} it leaves out.
+    """
+    alt = f"""
+        Two panels. On the left, a scatter of the largest drop on another op against the share of the way to the target
+        null, one dot per anchored run, colored by whether the rule keeps the run, with dashed lines at
+        {ex.GRADING_MIN_DAMAGE:.0%} and {ex.SELECTIVITY_GATE:g}. On the right, the largest drop on another op against
+        the dose, one line per run.
+    """
+    return edit_draw(rows, caption, alt)
+
+
+@memo
+def edit_draw(rows: list[dict], caption: str, alt_text: str) -> str:
+    @themed(name="ex-2.2.23-edit", alt_text=alt_text, caption=caption)
+    def _plot() -> plt.Figure:
+        fig, (ax, bx) = plt.subplots(1, 2, figsize=(7.0, 2.9), layout="constrained")
+        kept_ink, out_ink = light_dark("#1f6fb2", "#7ab8f5"), light_dark("#d97706", "#fbbf24")
+        for r in rows:
+            ink = kept_ink if r["kept"] else out_ink
+            filled = r["epochs"] == ex.SHORT
+            ax.plot(r["share"], r["worst"], "o", ms=4.5, color=ink, mfc=ink if filled else "none",
+                    mew=0 if filled else 1.0, alpha=0.85)  # fmt: skip
+            bx.plot(ex.DOSE_GAMMAS, r["worst_by_dose"], "-", color=ink, lw=0.9 if filled else 0.9,
+                    ls="-" if filled else "--", alpha=0.7)  # fmt: skip
+        for a in (ax, bx):
+            a.axhline(ex.SELECTIVITY_GATE, color=light_dark("#000", "#fff"), lw=0.8, ls="--", alpha=0.6)
+        ax.axvline(ex.GRADING_MIN_DAMAGE, color=light_dark("#000", "#fff"), lw=0.8, ls="--", alpha=0.6)
+        ax.set_xlabel(f"share of the way to the target null on {ex.ANCHORED_OP}", fontsize=8)
+        ax.set_ylabel("largest drop on another op", fontsize=8)
+        bx.set_xlabel("dose", fontsize=8)
+        bx.set_ylabel("largest drop on another op", fontsize=8)
+        handles = [
+            plt.Line2D([], [], ls="", marker="o", color=kept_ink, mew=0, label="kept"),
+            plt.Line2D([], [], ls="", marker="o", color=out_ink, mew=0, label="left out"),
+            plt.Line2D([], [], ls="", marker="o", color="grey", mew=0, label="200 epochs"),
+            plt.Line2D([], [], ls="", marker="o", color="grey", mfc="none", mew=1.0, label="400 epochs"),
+        ]
+        fig.legend(handles=handles, loc="outside upper center", ncols=4, frameon=False, fontsize=7)
+        return fig
+
+    return _plot()
+
+
+def edit_counts() -> dict[tuple[int, bool], tuple[int, int]]:
+    """Per length and group (kept or not): how many runs fall outside ex-2.2.21's selectivity criterion, of how
+    many.
+    """
+    out = {}
+    for e in ex.LENGTHS:
+        for kept in (True, False):
+            ks = [k for k in keys(ANCHOR, e) if KEPT[k] == kept]
+            out[(e, kept)] = (sum(not RUNS[k]["selective"] for k in ks), len(ks))
+    return out
 
 
 # %%
