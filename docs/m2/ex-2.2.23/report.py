@@ -124,9 +124,9 @@ def runs_table() -> str:
 def fetch_json(refs: list[str]) -> dict[str, Any]:
     """Each ref's published JSON, by ref."""
     store = project_store()
-    arts = store.get_refs(refs)
-    missing = [r for r, a in arts.items() if a is None]
-    assert not missing, f"not published yet: {missing}"
+    found = store.get_refs(refs)
+    arts = {r: a for r, a in found.items() if a is not None}
+    assert len(arts) == len(refs), f"not published yet: {sorted(set(refs) - set(arts))}"
     with tempfile.TemporaryDirectory() as tmp:
         paths = store.get_many([(arts[r], Path(tmp) / f"{i}.json") for i, r in enumerate(refs)])
         return {r: json.loads(p.read_text()) for r, p in zip(refs, paths, strict=True)}
@@ -274,7 +274,7 @@ def num_word(n: int) -> str:
     ]
 
 
-def seeds_list(seeds: list[int]) -> str:
+def seeds_list(seeds: list[int] | list[str]) -> str:
     if not seeds:
         return "none"
     if len(seeds) == 1:
