@@ -906,6 +906,8 @@ The largest result here is about the edit. On the five anchored runs at 200 epoc
 
 Why the spill comes with the HSV skill is open. The ops it lands on (`darken`, `lighten`, and the HSV ops, `value-hsv` most of all) all deal with lightness, which suggests the fully trained model stores some lightness information along e₁, and the edit removes it with the op. The anti-subspace term keeps other information off e₁, and its weight decays with the learning rate, so a 400-epoch run spends twice as many steps learning while the term is weak. That is a guess. Editing at only some positions (the colors, or the evidence for the op), and checking whether the e₁ component of a color tracks its lightness, would test it on the checkpoints this scout already has. If it holds, a weaker anchor late in training would loosen the hold on e₁ further, and keeping the anti-subspace weight up for longer would be the change to try.
 
+Where the anchor lands may matter too. In ex-2.2.16 and ex-2.2.21, the whole-line label put most of its alignment on the answer positions. An answer is a color, and in the examples it is also the evidence for the op, so e₁ there could carry both. A probe for the op at the answer positions of the control would say whether the op is represented there without the anchor. The schedules themselves are ex-2.1.10's, set when *red* was anchored in a grammar of one equation per line, and have not been tuned since the in-context grammar.
+
 Which seeds make the rise late, and why, is open too. A slow anchored seed is quick under the control, and rises in good time at 400 epochs, so slowness is a property of a path through training rather than of a seed. We don't know what decides it.
 """
 
