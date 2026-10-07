@@ -1,5 +1,4 @@
 # title: What the anchor follows at the example answers
-# mini:manual-publish
 
 # A re-analysis of ex-2.2.22's by-count pass, with no new runs. It reads the stored alignment at every answer of the
 # three-example held-out set, rebuilds the evidence of each example from the held-out tokens with the posterior module
