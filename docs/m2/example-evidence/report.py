@@ -561,7 +561,7 @@ The ideal predictor gets an expected exact match about equal to its posterior, s
 
 ## Discussion
 
-At the example answers the anchor marks examples that look like `{ex.ANCHORED_OP}` more than contexts that do. The rise with the posterior that ex-2.2.22 saw comes mostly from this: the more examples fit, the higher the posterior, and each fitting example has a high α of its own. So this measurement does not yet show the anchor holding an inferred op. A site where that could show is one where the line itself says nothing about the op, such as the query `=`, and ex-2.2.21 found the anchor weak there.
+At the example answers the anchor marks examples that look like `{ex.ANCHORED_OP}` more than contexts that do. The rise with the posterior that ex-2.2.22 saw comes mostly from this: the more examples fit, the higher the posterior, and each fitting example has a high α of its own. So this measurement does not yet show the anchor holding an inferred op. The sites where that could show are the `=` tokens, where the model predicts an answer it has not yet seen. The next-token loss covers every one of them, so the model is asked to combine the examples so far at each example `=` as well as at the query `=`. The answer, one token later, is where the example just shown is in view, which is what α follows. Ex-2.2.21 found the anchor weak at the query `=`, and α at the example `=` tokens was not stored.
 
 This fits how the label works. The pull is pooled over the positions of a whole `{ex.ANCHORED_OP}` context, so the model can meet it at positions of its choosing, and the answers of the examples that fit are where a single line shows the op most plainly. The answers that do not fit stay low, which a pooled pull allows.
 
