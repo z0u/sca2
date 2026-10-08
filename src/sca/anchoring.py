@@ -155,7 +155,9 @@ def anchor_weight(
 class AntiSpec:
     """The repulsive companion to the pull, and the schedule it moves on.
 
-    M1 balanced its attractive and repulsive terms in time rather than by a single ratio, so the weight is given relative to the anchor peak `lam`: `peak_ratio` at epoch 0 — full strength before the anchor has ramped in — annealing (minimum-jerk) to `hold_ratio` by `anneal_end` and holding there. From `anchor_anneal_start` both terms share the anchor's end-of-training anneal, so their ratio is constant from the hold point on.
+    M1 balanced its attractive and repulsive terms in time rather than by a single ratio, so the weight is given relative to the anchor peak `lam`: `peak_ratio` at epoch 0 — full strength before the anchor has ramped in — holding until `anneal_start`, then annealing (minimum-jerk) to `hold_ratio` by `anneal_end` and holding there. From `anchor_anneal_start` both terms share the anchor's end-of-training anneal, so their ratio is constant from the hold point on.
+
+    Every keyframe is in epochs, so none of them moves with the LR schedule. The recipe sets them as fractions of the run length (ex-2.2.3's `schedules`), and with `anneal_start` at 0 the anneal then falls across the run in step with the LR cosine; `anneal_start` is the knob that moves it off.
     """
 
     lam: float
@@ -167,7 +169,10 @@ class AntiSpec:
     floor: float = 0.1
     shape: Shape = "min-jerk"
     """Under `flat` the ratio sits at `hold_ratio` throughout and the term skips
-    the anchor's end anneal, so `peak_ratio` and `anneal_end` are unused."""
+    the anchor's end anneal, so `peak_ratio`, `anneal_start` and `anneal_end` are unused."""
+    anneal_start: float = 0.0
+    """The epoch the ratio starts down from `peak_ratio`. At 0, the default and every
+    run before it existed, the anneal starts at once."""
 
     def __call__(self, epoch) -> np.ndarray:
         return anti_subspace_weight(
@@ -175,6 +180,7 @@ class AntiSpec:
             lam=self.lam,
             peak_ratio=self.peak_ratio,
             hold_ratio=self.hold_ratio,
+            anneal_start=self.anneal_start,
             anneal_end=self.anneal_end,
             anchor_anneal_start=self.anchor_anneal_start,
             anchor_anneal_end=self.anchor_anneal_end,
@@ -194,6 +200,7 @@ def anti_subspace_weight(
     anchor_anneal_end: float,
     floor: float,
     shape: Shape = "min-jerk",
+    anneal_start: float = 0.0,
 ) -> np.ndarray:
     """The anti-subspace weight at (fractional) *epoch*: see `AntiSpec`.
 
@@ -203,7 +210,7 @@ def anti_subspace_weight(
     e = np.asarray(epoch, dtype=float)
     if shape == "flat":
         return lam * hold_ratio * np.ones_like(e)
-    ratio = peak_ratio + (hold_ratio - peak_ratio) * _interp(e / anneal_end, shape)
+    ratio = peak_ratio + (hold_ratio - peak_ratio) * _interp((e - anneal_start) / (anneal_end - anneal_start), shape)
     end = 1.0 - (1.0 - floor) * _interp((e - anchor_anneal_start) / (anchor_anneal_end - anchor_anneal_start), shape)
     return lam * ratio * end
 

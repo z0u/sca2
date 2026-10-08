@@ -514,6 +514,25 @@ def test_anti_subspace_schedule_opens_high_and_holds_at_its_ratio():
     np.testing.assert_allclose(late(90), spec(90), rtol=1e-9, atol=0)
 
 
+def test_anti_subspace_anneal_can_start_late():
+    """`anneal_start` holds the peak ratio before the anneal; at 0 it is the schedule every earlier run used."""
+    base = AntiSpec(
+        lam=0.1,
+        peak_ratio=2.5,
+        hold_ratio=0.3,
+        anneal_end=90,
+        anchor_anneal_start=90,
+        anchor_anneal_end=100,
+    )
+    e = np.linspace(0, 100, 401)
+    old = 0.1 * (2.5 + (0.3 - 2.5) * smoothstep(e / 90)) * (1 - 0.9 * smoothstep((e - 90) / 10))
+    np.testing.assert_array_equal(base(e), old)
+    held = replace(base, anneal_start=50)
+    np.testing.assert_allclose(held(np.array([0.0, 25.0, 50.0])), 0.25, rtol=1e-12, atol=0)
+    np.testing.assert_allclose(held(70), 0.1 * 1.4, rtol=1e-12, atol=0)  # halfway from 2.5 to 0.3
+    np.testing.assert_allclose(held(np.array([90.0, 100.0])), base(np.array([90.0, 100.0])), rtol=1e-12, atol=0)
+
+
 def test_the_anti_subspace_term_pushes_the_cloud_off_the_axis(data_dir, tmp_path):
     """The repulsive term works on unlabeled lines too, so it lowers the mean alignment.
 
