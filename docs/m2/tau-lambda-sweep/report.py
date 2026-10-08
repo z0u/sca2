@@ -24,7 +24,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We swept the pool temperature τ and the anchor weight λ_a together, with the in-context pull kept off the embedding slice. Leaving the embedding out keeps the latch off the syntax embeddings over most of the plane, but the edit still spills about as much as before at the recipe point, and the spill grows as the pool softens. The most selective trials sit on a narrow edge, just soft enough for the edit to remove the op at all.
+We swept the pool temperature τ and the anchor weight λ_a together, with the in-context pull kept off the embedding slice. Leaving the embedding out keeps the latch off the syntax embeddings over most of the plane, but at the recipe point the edit still spills about as much as on the every-slice runs without a latch, and the spill grows as the pool softens. The most selective trials tend to sit near a narrow edge, just soft enough for the edit to remove the op at all.
 ///
 
 [Spill-by-position](/docs/m2/spill-by-position/report.py) found that most anchored runs of the recipe latch one syntax embedding onto e₁, and that a latched separator carries much of the spill of the edit. The `no-emb` pull of [ex-2.2.21](/docs/m2/ex-2.2.21/report.py), which leaves the embedding slice out of the anchor and anti-subspace terms, never latched there and scored best on the task, but only at three seeds and 200 epochs. The [backlog item](/todo/science/softer-tau-for-the-in-context-pull.md) on a softer τ asked a related question: whether spreading the pull over more positions would move the anchor where it is needed.
@@ -229,7 +229,9 @@ REMOVAL_TARGET = 0.7
 # The fitted removal the proposal asks for: well past the edge, where the fit is still rising, and below the plateau
 # near 0.9, where the spill is high.
 PROPOSED = propose()
-BEST = sorted((r for r in SWEEP if r["removal"] >= REMOVAL_TARGET), key=lambda r: r["spill"])[:2]
+BEST = sorted((r for r in SWEEP if r["removal"] >= REMOVAL_TARGET), key=lambda r: r["spill"])[:3]
+COSTLY = 0.02
+# A task cost above this is well outside the spread of the recipe runs (seed standard deviation about 0.01).
 
 # --- Drawing ----------------------------------------------------------------------------------------------------
 
@@ -464,7 +466,7 @@ The recipe sets the weight of the anti-subspace term as a multiple of λ_a, so a
 
 With one seed per trial, the fits do the work that repeated seeds would: each measurement gets a Gaussian process over the plane (below), which also estimates how much the trials scatter about it. At the recipe point, removal is nearly the same from seed to seed, and spill is not: its seed standard deviation is {RECIPE_SPILL_SD:.2f}, as large as most of the differences in E3. So a single trial says little about spill, and a pattern has to show across several neighboring trials before we read anything into it.
 
-Two yes/no outcomes from the design turned out not to vary. Every trial made the second rise (its worst HSV op ends above {RISE_LEVEL:g}), and no `no-emb` trial latched a syntax embedding at spill-by-position's level of {LATCH_LEVEL:g}, though the `=` came close on four (E2). So there is no logistic fit for either. The task cost is small everywhere, at most {COST_MAX:.2f} below the controls, scattered over the plane with no pattern the fit could find; it does not constrain the choice of point, and it appears only in the table at the end.
+Two yes/no outcomes from the design turned out not to vary. Every trial made the second rise, the late jump in task skill when the model learns the three HSV ops (its worst HSV op ends above {RISE_LEVEL:g}), and no `no-emb` trial latched a syntax embedding at spill-by-position's level of {LATCH_LEVEL:g}, though the `=` came close on four (E2). So there is no logistic fit for either. The task cost is small everywhere, at most {COST_MAX:.2f} below the controls, scattered over the plane with no pattern the fit could find; it appears in the table at the end, and in E3 where it bears on the trials with the least spill.
 
 ## The measurements
 
@@ -482,7 +484,7 @@ Both edit measurements are net of the seed mean of ex-2.2.23's {len(CONTROLS)} c
 
 Pool temperature
 τ
-:   The temperature of the mellowmax that pools the alignment over the positions of a context: small τ is close to the largest alignment, large τ close to the mean. The recipe uses 0.1.
+:   The temperature of the mellowmax, a smooth stand-in for the maximum, that pools the alignment over the positions of a context: small τ is close to the largest alignment, large τ close to the mean. The recipe uses 0.1.
 
 Target null
 :   What the model would answer without `{ex.ANCHORED_OP}`: the ideal predictor with that op removed from the posterior over ops.
@@ -528,7 +530,7 @@ Where on the plane does the edit remove `{ex.ANCHORED_OP}`? The figure plots rem
 
 {removal_figure()}
 
-Removal depends mostly on τ, through a sharp edge near τ = {EDGE:g}. Above it, every `no-emb` trial removes the op most of the way, about as far as the every-slice runs at the recipe point, and softening the pool further changes little. Below it, most trials remove little. The every-slice trials follow the same edge, a little sharper.
+Removal depends mostly on τ, through a sharp edge near τ = {EDGE:g} (placed by eye). The fit rises again at the sharpest pool, but that rests on one trial. Above it, every `no-emb` trial removes the op most of the way, about as far as the every-slice runs at the recipe point, and softening the pool further changes little. Below it, most trials remove little. The every-slice trials follow the same edge, a little sharper.
 
 The weight makes little difference. The fit finds no change with λ_a over the sixteenfold range of the sweep, and the shades mix on both sides of the edge. Just below it, the two trials that remove the op best are among the heavier ones, which is a hint at most.
 
@@ -566,9 +568,9 @@ Does the pool spread the anchor beyond the example answers as it softens, and do
 
 At the sharpest pool, the anchor of {num_word(len(EQ_RUNS))} trials moves to `=`. On those trials the `=` embedding lies most of the way along e₁, even though the embedding slice is not pulled, and α at every `=` is high on `{ex.ANCHORED_OP}` contexts, and on the contexts of other ops too. The pull at the output of the first block is cheapest to meet by moving a token that every context shares, so leaving out the embedding slice moves the latch one slice up rather than removing it. On those trials the edit removes the op by removing `=` everywhere (E3 shows what that costs). The other {num_word(len(SHARP_RUNS) - len(EQ_RUNS))} trials at the sharpest pool have no anchor in use.
 
-From the edge up to τ ≈ 0.2 the anchor stays at the example answers, and the syntax embeddings stay near zero, as in ex-2.2.21. As the pool softens beyond that, α rises at every `=`, and every syntax embedding comes partway onto e₁, the line break and the separator most. None reaches a full latch, and the weight makes little difference.
+From the edge up to τ ≈ 0.2 the anchor stays at the example answers, and the syntax embeddings stay near zero, as in ex-2.2.21. As the pool softens beyond that, α rises at every `=`, and the most aligned syntax embedding comes partway onto e₁, usually the line break or the separator. None reaches a full latch, and the weight makes little difference.
 
-The every-slice pull latches at most values of τ, as it did at the recipe point: {num_word(len(LATCHED_REFERENCE))} of its {len(REFERENCE) - len(AT_RECIPE)} trials have one syntax embedding on e₁, and at the softest pool its syntax embeddings rise partway too.
+The every-slice pull latches at half the values of τ, much as it did at the recipe point: {num_word(len(LATCHED_REFERENCE))} of its {len(REFERENCE) - len(AT_RECIPE)} trials have one syntax embedding on e₁, and at the softest pool its syntax embeddings rise partway too.
 """
 
 # %%
@@ -648,7 +650,7 @@ The spill follows the anchor at `=`. Among the trials that remove the op, leavin
 
 The trials that spread the anchor onto `=` spill most, and those that keep it at the example answers spill least, though even those spill well above the criterion of ex-2.2.21. The every-slice runs at the recipe point have little α at `=` and spill as widely as the `no-emb` trials, so `=` is one source of spill among others.
 
-Putting removal and spill together, the most selective trials are on the edge, where the pool is just soft enough for the anchor to settle at the example answers and no softer. The two trials with the least spill among those that remove at least {REMOVAL_TARGET:g} of the way are {" and ".join(f"`{r['name']}` (τ = {r['tau']:.2f}, λ_a = {r['lam']:.2f})" for r in BEST)}.
+Putting removal and spill together, the most selective trials tend to sit near the edge, where the pool is just soft enough for the anchor to settle at the example answers and no softer. The three trials with the least spill among those that remove at least {REMOVAL_TARGET:g} of the way are {", ".join(f"`{r['name']}` (τ = {r['tau']:.2f}, λ_a = {r['lam']:.2f})" for r in BEST[:-1])}, and `{BEST[-1]["name"]}` (τ = {BEST[-1]["tau"]:.2f}, λ_a = {BEST[-1]["lam"]:.2f}). Two of them are among the few trials that cost the task something ({" and ".join(f"`{r['name']}`" for r in BEST if r["cost"] > COSTLY)}, whose worst HSV op ends lower than on most trials), so a model that learned the task less well may account for part of their low spill. The third has no task cost, and it sits on the edge.
 
 {plane_figure()}
 
@@ -657,16 +659,21 @@ On the fitted surfaces, the point of least spill where removal reaches {REMOVAL_
 
 # %%
 
+# REVIEW: softened two causal readings in the Discussion ("seems to have been the short training" ->
+# "may", with no 200-epoch arm here; "no choice of slices would remove the latch" -> a conditional, since only the
+# embedding slice was left out), and added that no-emb-04 and no-emb-06 have high task cost (0.03, 0.06; worst
+# HSV op 0.41, 0.34), an alternative reading of their low spill. Verify against the table at the end.
+# E2: "four of its 8" is half, not "most"; "every syntax embedding" -> the top one, since only the max is measured.
 r"""
 ## Discussion
 
-The pull kept off the embedding slice does what spill-by-position hoped for over most of the plane: no syntax embedding latches, and the extra spill that a latched separator brings goes away. But the edit still spills at the recipe τ, about as much as on the every-slice runs without a latch. So most of the spill on a fully trained model has some other source. The `no-emb` runs of ex-2.2.21 and ex-2.2.22 spilled little, and at 200 epochs on three seeds, that seems to have been the short training more than the pull.
+The pull kept off the embedding slice does what spill-by-position hoped for over most of the plane: no syntax embedding latches, and the extra spill that a latched separator brings goes away. But the edit still spills at the recipe τ, about as much as on the every-slice runs without a latch. So most of the spill on a fully trained model has some other source. The `no-emb` runs of ex-2.2.21 and ex-2.2.22 spilled little, and at 200 epochs on three seeds, that may have been the short training more than the pull, though this sweep has no 200-epoch arm to separate the two.
 
-Leaving out the embedding slice also moves the latch rather than removing it, when the pool is sharp. At the sharpest τ the pull is met at the first slice it reaches, by putting the `=` embedding on e₁. That fits the account of the latch in spill-by-position, a pool that is close to a max is met most cheaply by a position every context shares, and it suggests that no choice of slices would remove the latch at a sharp enough pool.
+Leaving out the embedding slice also moves the latch rather than removing it, when the pool is sharp. At the sharpest τ the pull is met at the first slice it reaches, by putting the `=` embedding on e₁. That fits the account of the latch in spill-by-position, a pool that is close to a max is met most cheaply by a position every context shares, and it suggests that leaving out more slices might only move the latch further up at a sharp enough pool, though only the embedding slice was left out here.
 
 Softening the pool spreads the anchor, as the backlog item expected, but onto `=` and the syntax tokens, and the spill grows with it. The anchor does reach the query `=`, though only together with every other `=`. So a softer pool does not help the edit here: by the time the anchor reaches the query, the spill has grown.
 
-So within this plane, the least spill comes at the edge where the anchor first settles at the example answers. It is a narrow band beside a steep slope, and the noise in the spill is about as large as the differences along it, so we hold the proposed point loosely: with one trial per point, we cannot tell whether the spill drops on the edge or the two trials there were lucky draws. If it does drop, removal and spill are traded along τ, and λ_a barely enters. Since λ_a scales the anti-subspace term too, that also suggests a heavier anti-subspace term does little to keep the spill down.
+So within this plane, the least spill comes at the edge where the anchor first settles at the example answers. It is a narrow band beside a steep slope, and the noise in the spill is about as large as the differences along it, so we hold the proposed point loosely: with one trial per point, we cannot tell whether the spill drops on the edge or the trials there were lucky draws. Two of the three least-spilling trials also cost the task something (E3), which leaves one clean trial on the edge. If the spill does drop there, removal and spill are traded along τ, and λ_a barely enters removal; the spill fit varies with λ_a only through single trials. Since λ_a scales the anti-subspace term too, that also suggests a heavier anti-subspace term does little to keep the spill down.
 """
 
 # %%
