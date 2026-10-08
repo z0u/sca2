@@ -553,7 +553,7 @@ def e4_draw(data: dict, alt_text: str) -> str:
 rf"""
 ## Predicting the next answer (E4)
 
-The anchor follows each example on its own, so how well does the model itself use the examples before it? The by-count pass scored the query on held-out sets with 1 to 5 examples. The query after one example asks for the answer a second example would show (without the noise an example can carry), and the query after two asks for the third. So these scores stand in for how well the model predicts the answers of the later examples. The control and `hinge` were trained on three examples only, so for them the other counts are outside training; `k-mixed` was trained on 1 to 5.
+The anchor follows each example on its own, but the next-token loss asks the model to predict each example answer at its `=`, which means combining the examples before it. How well does it do that? The by-count pass scored the query on held-out sets with 1 to 5 examples. The query after one example asks for the answer a second example would show (without the noise an example can carry), and the query after two asks for the third. So these scores stand in for how well the model predicts the answers of the later examples. The control and `hinge` were trained on three examples only, so for them the other counts are outside training; `k-mixed` was trained on 1 to 5.
 
 {e4_figure()}
 
