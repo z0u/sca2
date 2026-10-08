@@ -16,3 +16,7 @@ A short exploratory report, from one forward pass per checkpoint that keeps the 
 For the probes, use cross-validation over contexts (closed-form leave-one-out for the ridge probe, k-fold for the logistic op probe) rather than a single half split. `difference` answers are darker than the operands on average (from the op rules), so lightness and the label go together on `difference` contexts, which is why the lightness measurement leaves them out.
 
 Split from the withdrawn ex-2.2.24 draft (its E1, H1, H3, and E3; see [PR #255](https://github.com/z0u/sca2/pull/255)).
+
+## Notes
+
+**2026-10-08, spill-by-position** — [The position pass](/docs/m2/spill-by-position/report.py) bears on this item. The spill at the example answers lands mostly on `darken` and grows with the removal there; the operands and symbols spill onto `lighten` with no removal at all, so the lightness measurement at the operands looks like the right place to start. Four 400-epoch runs (seeds 701, 704, 705, 709) also hold the op at the separators, so the position map should cover the separators and tell those runs apart.
