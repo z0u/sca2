@@ -25,9 +25,8 @@ ex23 = ex.ex2223
 
 def fetch_json(refs: list[str]) -> list[Any]:
     store = project_store()
-    found = store.get_refs(refs)
-    missing = [r for r, a in found.items() if a is None]
-    assert not missing, f"not published: {missing}"
+    found = {r: a for r, a in store.get_refs(refs).items() if a is not None}
+    assert len(found) == len(refs), f"not published: {sorted(set(refs) - set(found))}"
     with tempfile.TemporaryDirectory() as tmp:
         paths = store.get_many([(found[r], Path(tmp) / f"{i}.json") for i, r in enumerate(refs)])
         return [json.loads(p.read_text()) for p in paths]
@@ -143,9 +142,7 @@ def cell(v: np.ndarray) -> str:
 def table_html(head: list[str], rows: list[list[str]], caption: str, *, text_cols: int = 1) -> str:
     ths = "".join(f"<th{' class=num' if i >= text_cols else ''}>{h}</th>" for i, h in enumerate(head))
     body = "".join(
-        "<tr>"
-        + "".join(f"<td{' class=num' if i >= text_cols else ''}>{c}</td>" for i, c in enumerate(row))
-        + "</tr>"
+        "<tr>" + "".join(f"<td{' class=num' if i >= text_cols else ''}>{c}</td>" for i, c in enumerate(row)) + "</tr>"
         for row in rows
     )
     table = f'<table class="report-table dense"><thead><tr>{ths}</tr></thead><tbody>{body}</tbody></table>'
@@ -372,6 +369,29 @@ SERIES_STYLE = {
 }
 
 
+def map_panel(ax, roles: list[str], panel: dict, what: str) -> None:
+    """One panel of the position map: the example answers shaded, the query marked, one faint smooth step per run,
+    and the seed mean of each series with a marker at every position.
+    """
+    n = len(roles)
+    x = np.arange(n)
+    for p, r in enumerate(roles):
+        if r.startswith("y"):
+            ax.axvspan(p - 0.5, p + 0.5, facecolor=light_dark("#000", "#fff"), alpha=0.06, lw=0)
+    ax.axvline(n - 4 - 0.5, color=rule_color(), lw=0.6, ls=(0, (2, 2)))
+    ax.axhline(0, color=rule_color(), lw=0.4)
+    if what == "spill":
+        ax.axhline(ex23.SELECTIVITY_GATE, color=rule_color(), lw=0.7, ls="--")
+    for g in panel["ghosts"][what]:
+        smooth_step(ax, x, g, ramp=0.6, color=ghost_color(), lw=0.5, alpha=0.8, zorder=1)
+    for name, s in panel["series"].items():
+        color, m = SERIES_STYLE[name]
+        smooth_step(ax, x, s[what], ramp=0.6, color=color, lw=1.2, zorder=3)
+        ax.plot(x, s[what], m, ls="", ms=3.5, color=color, mec=light_dark("white", "#111"), mew=0.5, zorder=4,
+                label=name)  # fmt: skip
+    ax.set_xlim(-0.6, n - 0.4)
+
+
 @memo
 def map_draw(data: dict, alt_text: str) -> str:
     @themed(
@@ -381,38 +401,23 @@ def map_draw(data: dict, alt_text: str) -> str:
             **Removal and spill for each position edited alone, at full dose.** Top: removal of
             `{ex.ANCHORED_OP}`; bottom: spill onto another op; both net of the control at the same seed and length.
             The markers are the seed means, over the runs that hold the op at a separator (E3) and over the other
-            runs; the faint lines are single runs. The shading marks the example answers.
+            runs; the faint lines are single runs. The shading marks the example answers; dashed: the selectivity
+            criterion of ex-2.2.21.
         """,
     )
     def _plot() -> plt.Figure:
-        n = len(data["roles"])
-        x = np.arange(n)
+        roles = data["roles"]
+        n = len(roles)
         fig, axes = plt.subplots(2, 2, figsize=(7.4, 4.0), layout="constrained", sharex=True, sharey="row")
         for col, (e, panel) in enumerate(data["panels"].items()):
             for row, what in enumerate(("removal", "spill")):
-                ax = axes[row, col]
-                for p, r in enumerate(data["roles"]):
-                    if r.startswith("y"):
-                        ax.axvspan(p - 0.5, p + 0.5, facecolor=light_dark("#000", "#fff"), alpha=0.06, lw=0)
-                ax.axvline(n - 4 - 0.5, color=rule_color(), lw=0.6, ls=(0, (2, 2)))
-                ax.axhline(0, color=rule_color(), lw=0.4)
-                if what == "spill":
-                    ax.axhline(ex23.SELECTIVITY_GATE, color=rule_color(), lw=0.7, ls="--")
-                for g in panel["ghosts"][what]:
-                    smooth_step(ax, x, g, ramp=0.6, color=ghost_color(), lw=0.5, alpha=0.8, zorder=1)
-                for name, s in panel["series"].items():
-                    color, m = SERIES_STYLE[name]
-                    smooth_step(ax, x, s[what], ramp=0.6, color=color, lw=1.2, zorder=3)
-                    ax.plot(x, s[what], m, ls="", ms=3.5, color=color, mec=light_dark("white", "#111"), mew=0.5,
-                            zorder=4, label=name)  # fmt: skip
-                ax.set_xlim(-0.6, n - 0.4)
-                if row == 0:
-                    ax.set_title(f"{e} epochs", fontsize=9)
-                    ax.text(n - 4 - 0.3, 0.97, "query", fontsize=6, color=rule_color(), va="top",
-                            transform=ax.get_xaxis_transform())  # fmt: skip
-                if col == 0:
-                    ax.set_ylabel(what, fontsize=8)
-            axes[1, col].set_xticks(x, [role_tick(r) for r in data["roles"]], fontsize=7)
+                map_panel(axes[row, col], roles, panel, what)
+            axes[0, col].set_title(f"{e} epochs", fontsize=9)
+            axes[0, col].text(n - 4 - 0.3, 0.97, "query", fontsize=6, color=rule_color(), va="top",
+                              transform=axes[0, col].get_xaxis_transform())  # fmt: skip
+            axes[1, col].set_xticks(np.arange(n), [role_tick(r) for r in roles], fontsize=7)
+        axes[0, 0].set_ylabel("removal", fontsize=8)
+        axes[1, 0].set_ylabel("spill", fontsize=8)
         for ax in axes[0]:
             ax.set_ylim(-0.1, 0.85)
         for ax in axes[1]:
@@ -478,7 +483,7 @@ def sep_table() -> str:
     return table_html(
         head,
         rows,
-        f"""
+        """
         **The runs that hold the op at a separator.** For each, the separator whose edit removes most, and three
         edits at full dose: that separator alone, the example answers, and every position. Removal, and spill with
         the op it lands on, net of the control at the same seed and length.
@@ -515,7 +520,7 @@ def scatter_draw(rows: list[dict], alt_text: str) -> str:
     @themed(
         name="spill-by-position-separator",
         alt_text=alt_text,
-        caption=f"""
+        caption="""
             **Spill under the full edit against spill under the example-answer edit**, one mark per run at full
             dose, net of the control at the same seed and length. Circles: 200 epochs; triangles: 400. Blue: the
             runs that hold the op at a separator. Dotted: equal spill; dashed: the selectivity criterion of ex-2.2.21.
