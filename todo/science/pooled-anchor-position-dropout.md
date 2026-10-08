@@ -12,3 +12,7 @@ Caveat at very low τ: on steps where the favorite is masked, the pull concentra
 No implementation exists on the anchoring path today — `dropout` appears nowhere in `src/sca` or the m2 experiment modules — so this begins in `src/sca/anchoring.py`, as an extra path inside `pooled_anchor_term` keyed on a `drop_rate` argument that `make_anchored_train_step` forwards.
 
 Split from the older ex-2.1.9 follow-ups item on 2026-08-23. Raised in ex-2.1.9's 2026-08-07 review round, round 3.
+
+## Notes
+
+**2026-10-08, spill-by-position** — The latch is live on the in-context grammar: [the position pass](/docs/m2/spill-by-position/report.py) (E3) found one syntax embedding on e₁ on most anchored runs of ex-2.2.23, at τ = 0.1, and a latched separator carries most of the spill of the edit on four 400-epoch runs.

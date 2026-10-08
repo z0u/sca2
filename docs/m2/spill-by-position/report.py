@@ -84,17 +84,25 @@ KEPT: list[Key] = [k for k in ANCHORED if kept(k)]
 LEFT_OUT: list[Key] = [k for k in ANCHORED if not kept(k)]
 M = {k: measurements(k) for k in KEPT}
 
-SEP_LEVEL = 0.25
-# A run "holds the op at a separator" when editing one separator alone, at full dose, takes the drop on `difference`
-# at least this share of the way to the target null. Each example answer alone takes it about a fifth of the way, so
-# the level sits above what any example answer does on its own.
+LATCH_LEVEL = 0.9
+# A syntax token is latched when its token embedding has an alignment with e₁ above this. On the anchored runs each
+# syntax embedding sits either near 0 or near 1, so any level between them picks out the same runs; the controls stay
+# within a few tenths of 0.
 
 
-def sep_removal(key: Key) -> float:
-    return max(M[key][(f"position {p}", FULL)]["removal"] for p in SEPARATORS)
+def syntax_alignment(key: Key) -> dict[str, float]:
+    """The alignment with e₁ of each syntax embedding, from ex-2.2.23's eval."""
+    return EVALS[ex23.label_of(*key)]["syntax_embeddings"]
 
 
-SEP_RUNS = [k for k in KEPT if sep_removal(k) >= SEP_LEVEL]
+def latched(key: Key) -> str | None:
+    """The syntax token whose embedding lies on e₁ in this run, if any."""
+    on = [t for t, v in syntax_alignment(key).items() if v >= LATCH_LEVEL]
+    assert len(on) <= 1, (key, on)
+    return on[0] if on else None
+
+
+SEP_RUNS = [k for k in KEPT if latched(k) == ","]
 
 
 def runs_at(epochs: int, sep: bool | None = None) -> list[Key]:
@@ -173,7 +181,7 @@ Ex-2.2.23 found that removing the anchored direction from every position also lo
 rf"""
 The question comes from the [backlog item](/todo/science/spill-by-position.md), split from the withdrawn ex-2.2.24 draft. [Ex-2.2.23](/docs/m2/ex-2.2.23/report.py) (E4) found that the edit spills onto other ops, mostly `darken`, `lighten`, and `value-hsv`, on nearly every run that has learned the HSV ops. This page applies the same edit to one set of positions at a time, on ex-2.2.23's checkpoints, with no new training.
 
-At 400 epochs, {num_word(N_SEP[LONG])} of the {num_word(N_KEPT[LONG])} runs also hold the op at the separator after an example, and on those runs the separator is where most of the spill comes from. There, editing the example answers alone spills much less than editing every position.
+Most anchored runs also have one syntax token whose embedding lies on e₁, a latch of the pooled pull. At 400 epochs that token is the separator on {num_word(N_SEP[LONG])} of the {num_word(N_KEPT[LONG])} runs, and on those runs the separator is where most of the spill comes from.
 """
 
 # %%
@@ -181,9 +189,9 @@ At 400 epochs, {num_word(N_SEP[LONG])} of the {num_word(N_KEPT[LONG])} runs also
 rf"""
 ## Observations
 
-- [The sets of positions (E1)](#the-sets-of-positions-e1): editing only the example answers removes `{ex.ANCHORED_OP}` as far as editing every position, and on most runs spills about as much, mostly onto `darken` at 400 epochs. The query positions do almost nothing. The rest of the positions spill without removing, mostly onto `lighten`.
-- [One position at a time (E2)](#one-position-at-a-time-e2): each example answer alone takes the drop on `{ex.ANCHORED_OP}` about a fifth of the way, and spills a little; no other single position removes anything, except the separators on a few runs at 400 epochs.
-- [The runs that use the separator (E3)](#the-runs-that-use-the-separator-e3): on those {num_word(N_SEP[LONG])} runs, editing the first separator alone takes `{ex.ANCHORED_OP}` a third of the way or more and spills heavily. Editing only the example answers there spills a fraction of what the full edit does, though still more than the selectivity criterion of ex-2.2.21 allows.
+- [The sets of positions (E1)](#the-sets-of-positions-e1): editing only the example answers removes `{ex.ANCHORED_OP}` as effectively as editing every position, and on most runs spills about as much, mostly onto `darken` at 400 epochs. The query positions do almost nothing. The rest of the positions spill without removing, mostly onto `lighten`.
+- [One position at a time (E2)](#one-position-at-a-time-e2): each example answer alone takes the drop on `{ex.ANCHORED_OP}` about a fifth of the way, and spills a little. Across positions, the removal follows the alignment with e₁. No other single position removes anything, except the separators on a few runs at 400 epochs.
+- [The latched separator (E3)](#the-latched-separator-e3): those are the runs whose separator embedding lies on e₁ in every context, a latch of the pooled pull. Editing the first separator alone takes `{ex.ANCHORED_OP}` a third of the way or more and spills heavily. Editing only the example answers there spills a fraction of what the full edit does, though still more than the selectivity criterion of ex-2.2.21 allows.
 
 ## Scope
 
@@ -212,6 +220,9 @@ Target null
 
 Separator
 :   The `,` after each example answer, before the next example.
+
+Latch
+:   A pooled pull that settles early on one cheap position and stays there, a different one from run to run: here, a syntax token whose embedding comes to lie on e₁ ([ex-2.1.9](/docs/m2/ex-2.1.9/report.py)).
 """
 
 # %%
@@ -240,8 +251,7 @@ def tradeoff_figure() -> str:
         answers run from near the origin to the right, ending near {mean(runs_at(LONG), "every position"):.1f}
         removal; at 200 epochs they end at about the same spill, and at 400 epochs the every-position line ends higher.
         The query operands and query `=` stay near the origin. The rest rises straight up at 200 epochs with little
-        removal; at 400 epochs it also reaches to the right at full dose, from the runs that hold the op at the
-        separator. A dashed line marks the selectivity criterion of {ex23.SELECTIVITY_GATE:g}.
+        removal; at 400 epochs it also reaches to the right at full dose, from the runs with a latched separator. A dashed line marks the selectivity criterion of {ex23.SELECTIVITY_GATE:g}.
     """
     return tradeoff_draw(tradeoff_data(), alt)
 
@@ -335,7 +345,7 @@ def map_data() -> dict:
             ks = runs_at(e, sep)
             if not ks:
                 continue
-            series["separator runs" if sep else "other runs"] = {
+            series["latched separator" if sep else "other runs"] = {
                 what: [mean(ks, f"position {p}", what=what) for p in range(N_READ)] for what in ("removal", "spill")
             }
         ghosts = {
@@ -351,10 +361,10 @@ def map_figure() -> str:
         A grid of four panels: removal on the top row and spill on the bottom, at 200 epochs on the left and 400 on
         the right. Each panel is a smooth step along the {N_READ} positions of a context, from the first operand to
         the query `=`, with one faint line per run behind the seed means. Removal sits near zero everywhere except at
-        the three example answers, where it rises to about a fifth at each. At 400 epochs a second series, the
-        {num_word(N_SEP[LONG])} runs that hold the op at the separator, also rises at the separators, highest at the
-        first. Spill is small at most positions, with small bumps at the example answers and the query operands; on
-        the separator runs it rises steeply at the separators.
+        the three example answers, where it rises to about a fifth at each. A second series, the runs whose separator
+        embedding lies on e₁ (one at 200 epochs, {num_word(N_SEP[LONG])} at 400), also rises at the separators at 400
+        epochs, highest at the first. Spill is small at most positions, with small bumps at the example answers and
+        the query operands; on the latched runs at 400 epochs it rises steeply at the separators.
     """
     return map_draw(map_data(), alt)
 
@@ -365,8 +375,9 @@ def role_tick(r: str) -> str:
 
 SERIES_STYLE = {
     "other runs": (light_dark("#c0392b", "#ff8a76"), "o"),
-    "separator runs": (light_dark("#1f6fb2", "#7ab8f5"), "^"),
+    "latched separator": (light_dark("#1f6fb2", "#7ab8f5"), "^"),
 }
+# The runs with a latched separator are drawn with hollow markers, in the map and in the scatter of E3.
 
 
 def map_panel(ax, roles: list[str], panel: dict, what: str) -> None:
@@ -387,7 +398,9 @@ def map_panel(ax, roles: list[str], panel: dict, what: str) -> None:
     for name, s in panel["series"].items():
         color, m = SERIES_STYLE[name]
         smooth_step(ax, x, s[what], ramp=0.6, color=color, lw=1.2, zorder=3)
-        ax.plot(x, s[what], m, ls="", ms=3.5, color=color, mec=light_dark("white", "#111"), mew=0.5, zorder=4,
+        hollow = name == "latched separator"
+        ax.plot(x, s[what], m, ls="", ms=3.5, color=color, mfc=light_dark("white", "#111") if hollow else color,
+                mec=color if hollow else light_dark("white", "#111"), mew=0.9 if hollow else 0.5, zorder=4,
                 label=name)  # fmt: skip
     ax.set_xlim(-0.6, n - 0.4)
 
@@ -400,8 +413,8 @@ def map_draw(data: dict, alt_text: str) -> str:
         caption=f"""
             **Removal and spill for each position edited alone, at full dose.** Top: removal of
             `{ex.ANCHORED_OP}`; bottom: spill onto another op; both net of the control at the same seed and length.
-            The markers are the seed means, over the runs that hold the op at a separator (E3) and over the other
-            runs; the faint lines are single runs. The shading marks the example answers; dashed: the selectivity
+            The markers are the seed means, over the runs whose separator embedding lies on e₁ (hollow, E3) and over
+            the other runs; the faint lines are single runs. The shading marks the example answers; dashed: the selectivity
             criterion of ex-2.2.21.
         """,
     )
@@ -430,6 +443,24 @@ def map_draw(data: dict, alt_text: str) -> str:
 
 
 ANSWER_POS = [p for p, r in enumerate(DESIGN["roles"]) if r.startswith("y")]
+
+
+def alignment_by_position(key: Key) -> np.ndarray:
+    """The alignment with e₁ at each position read, on held-out `difference` contexts, averaged over slices."""
+    return np.array(EVALS[ex23.label_of(*key)]["alignment"])[D, :, :N_READ].mean(axis=0)
+
+
+def alignment_r(keys: list[Key]) -> float:
+    """The correlation, over positions and runs, between the alignment at a position and the removal when that
+    position alone is edited.
+    """
+    a = np.concatenate([alignment_by_position(k) for k in keys])
+    r = np.concatenate([[M[k][(f"position {p}", FULL)]["removal"] for p in range(N_READ)] for k in keys])
+    return float(np.corrcoef(a, r)[0, 1])
+
+
+ALIGN_R = alignment_r([k for k in KEPT if k not in SEP_RUNS])
+ALIGN_R_LATCHED = alignment_r(SEP_RUNS)
 ONE_ANSWER = float(np.mean([mean(runs_at(e), f"position {p}") for e in LENGTHS for p in ANSWER_POS]))
 
 rf"""
@@ -441,7 +472,9 @@ The sets in E1 lump positions of different roles together. Editing each position
 
 Each example answer alone takes the drop on `{ex.ANCHORED_OP}` about a fifth of the way, and the three are alike. Together they take it further than their sum ({mean(runs_at(LONG), "example answers"):.2f} at 400 epochs, against three times {ONE_ANSWER:.2f}), so when one answer is edited, the other two make up part of the loss. No other position removes anything, except the separators on the runs of E3.
 
-The spill is spread thinly. Each example answer spills a little, and the operands, those of the query most, spill a little too. A handful pass the criterion on their own on most runs, and together they pass it by far: the spill of the rest in E1 comes from many positions with a small spill each, and from the separators on a few runs. So there is no single position to leave out of the edit that would take the spill away.
+The removal follows the alignment with e₁ on `{ex.ANCHORED_OP}` contexts, which ex-2.2.21 found highest at the example answers. Over every position of every run without a latched separator, the correlation between the alignment at a position (averaged over slices) and the removal when that position is edited is {ALIGN_R:.2f}. On the runs of E3 it is lower ({ALIGN_R_LATCHED:.2f}), for the reason E3 gives.
+
+The spill is spread thinly. Each example answer spills a little, and the operands, those of the query most, spill a little too. A handful pass the criterion on their own on most runs, and together they pass it by far: the spill of the rest in E1 comes from many positions with a small spill each, and from the separators on the runs of E3. So there is no single position to leave out of the edit that would take the spill away.
 """
 
 # %%
@@ -484,7 +517,7 @@ def sep_table() -> str:
         head,
         rows,
         """
-        **The runs that hold the op at a separator.** For each, the separator whose edit removes most, and three
+        **The runs whose separator embedding lies on e₁.** For each, the separator whose edit removes most, and three
         edits at full dose: that separator alone, the example answers, and every position. Removal, and spill with
         the op it lands on, net of the control at the same seed and length.
         """,
@@ -507,9 +540,9 @@ def scatter_data() -> list[dict]:
 def scatter_figure() -> str:
     alt = f"""
         A scatter of the spill under the full edit against the spill under the example-answer edit, one mark per run,
-        circles at 200 epochs and triangles at 400, with the {num_word(len(SEP_RUNS))} runs that hold the op at a
-        separator in a second color. A diagonal marks equal spill. Most runs sit near the diagonal, spread from near
-        zero to about 0.3. The separator runs sit well above it: low spill under the example-answer edit and high under
+        circles at 200 epochs and triangles at 400, with the {num_word(len(SEP_RUNS))} runs whose separator embedding
+        lies on e₁ drawn hollow. A diagonal marks equal spill. Most runs sit near the diagonal, spread from near zero
+        to about 0.3. The hollow triangles sit well above it: low spill under the example-answer edit and high under
         the full edit.
     """
     return scatter_draw(scatter_data(), alt)
@@ -522,8 +555,9 @@ def scatter_draw(rows: list[dict], alt_text: str) -> str:
         alt_text=alt_text,
         caption="""
             **Spill under the full edit against spill under the example-answer edit**, one mark per run at full
-            dose, net of the control at the same seed and length. Circles: 200 epochs; triangles: 400. Blue: the
-            runs that hold the op at a separator. Dotted: equal spill; dashed: the selectivity criterion of ex-2.2.21.
+            dose, net of the control at the same seed and length. Circles: 200 epochs; triangles: 400. Hollow: the
+            runs whose separator embedding lies on e₁. Dotted: equal spill; dashed: the selectivity criterion of
+            ex-2.2.21.
         """,
     )
     def _plot() -> plt.Figure:
@@ -532,10 +566,13 @@ def scatter_draw(rows: list[dict], alt_text: str) -> str:
         ax.plot([0, hi], [0, hi], ":", color=rule_color(), lw=0.8)
         ax.axhline(ex23.SELECTIVITY_GATE, color=rule_color(), lw=0.7, ls="--")
         ax.axvline(ex23.SELECTIVITY_GATE, color=rule_color(), lw=0.7, ls="--")
+        color = SERIES_STYLE["other runs"][0]
         for r in rows:
-            color = SERIES_STYLE["separator runs" if r["sep"] else "other runs"][0]
             m = "o" if r["epochs"] == SHORT else "^"
-            ax.plot(r["answers"], r["every"], m, ms=5, color=color, mec=light_dark("white", "#111"), mew=0.5)
+            if r["sep"]:
+                ax.plot(r["answers"], r["every"], m, ms=5.5, color=color, mfc="none", mew=1.1)
+            else:
+                ax.plot(r["answers"], r["every"], m, ms=5, color=color, mec=light_dark("white", "#111"), mew=0.5)
         ax.set_xlim(-0.02, hi)
         ax.set_ylim(-0.02, hi)
         ax.set_aspect("equal")
@@ -549,20 +586,46 @@ def scatter_draw(rows: list[dict], alt_text: str) -> str:
 SEP_LONG = runs_at(LONG, True)
 OTHER_LONG = runs_at(LONG, False)
 
-rf"""
-## The runs that use the separator (E3)
 
-At 400 epochs, the separators remove `{ex.ANCHORED_OP}` on some runs and not on others. Which runs, and what does that do to the spill? We mark a run as holding the op at a separator when editing one separator alone takes the drop on `{ex.ANCHORED_OP}` at least {SEP_LEVEL:.0%} of the way, more than any one example answer does. That marks {num_word(N_SEP[LONG])} of the {num_word(N_KEPT[LONG])} runs at 400 epochs and {num_word(N_SEP[SHORT])} at 200.
+def latch_table() -> str:
+    tokens = ["⏎", "?", "=", ",", None]
+    counts = {e: Counter(latched(k) for k in runs_at(e)) for e in LENGTHS}
+    rows = [
+        ["none" if t is None else f"<code>{t}</code>", *(str(counts[e][t]) for e in LENGTHS)]
+        for t in tokens
+        if any(counts[e][t] for e in LENGTHS)
+    ]
+    ctrl = max(abs(v) for k in BY_KEY if k[0] == "control" for v in syntax_alignment(k).values())
+    return table_html(
+        ["token on e₁", *(f"{e} epochs" for e in LENGTHS)],
+        rows,
+        f"""
+        **Which syntax embedding lies on e₁.** The number of anchored runs (of those the rule keeps) whose token
+        embedding for each syntax token has an alignment with e₁ above {LATCH_LEVEL:g}. No run has more than one. On
+        the controls every syntax embedding stays within {ctrl:.2f} of zero. The line break (⏎) comes after the
+        query, outside the positions this pass edits.
+        """,
+    )
+
+
+rf"""
+## The latched separator (E3)
+
+At 400 epochs, the separators remove `{ex.ANCHORED_OP}` on some runs and not on others. Which runs, and why? Ex-2.2.21 (E1) noticed that the anchored runs put some syntax embeddings onto e₁, as seed means partway along it. Run by run, it is all or nothing: on most anchored runs the token embedding of one syntax token lies on e₁ (an alignment of 1 to two decimals), and the others stay near zero.
+
+{latch_table()}
+
+This is a *latch*, like the one ex-2.1.9 found under the pooled pull on the earlier grammar: the pull is pooled over the positions of a `{ex.ANCHORED_OP}` context at each slice, and at the embedding slice the cheapest way to meet it is to move one token that every context shares. The {num_word(len(SEP_RUNS))} runs where that token is the separator are the runs whose separators remove `{ex.ANCHORED_OP}`, {num_word(N_SEP[LONG])} at 400 epochs and {num_word(N_SEP[SHORT])} at 200. On those runs the separator state lies on e₁ in every context, whatever the op, so it holds the token rather than the op.
 
 {sep_table()}
 
-On these runs the first separator usually does most: alone, it takes the drop on `{ex.ANCHORED_OP}` a third of the way or more, and its spill comes close to that of the full edit. Editing only the example answers removes as much as ever, and spills a fraction of what the full edit does.
+Editing a latched separator removes nearly all of its embedding, so the blocks after it lose the separator in every context. On the runs at 400 epochs that removes `{ex.ANCHORED_OP}` a third of the way or more and spills nearly as much as the full edit. On the one run at 200 epochs it does much less, so the blocks there may lean on the separator less. Editing only the example answers removes as much as ever on these runs, and spills a fraction of what the full edit does.
 
 {scatter_figure()}
 
-The figure puts the two kinds of run side by side. Most runs sit on the diagonal: the spill is where the removal is, and leaving positions out of the edit changes little. The separator runs sit well above it, because their spill under the full edit comes mostly from the separators. Even there, the example-answer edit spills more than the criterion allows (from {min(values(SEP_LONG, "example answers", what="spill")):.2f} to {max(values(SEP_LONG, "example answers", what="spill")):.2f}).
+The figure puts the two kinds of run side by side. Most runs sit on the diagonal: editing only the example answers changes the spill little. The latched runs at 400 epochs sit well above it, because their spill under the full edit comes mostly from the separators. Even there, the example-answer edit spills more than the criterion allows (from {min(values(SEP_LONG, "example answers", what="spill")):.2f} to {max(values(SEP_LONG, "example answers", what="spill")):.2f}).
 
-We can't say from this pass why some runs come to use the separator. It is the position right after an answer, so it can see the whole example, and the whole-line label pulls every position of a `{ex.ANCHORED_OP}` context toward e₁; a run that settles there may simply be one of the paths the label allows. All the separator runs are at 400 epochs, which fits a hold that forms late, though {num_word(N_SEP[LONG])} runs are too few to say so with confidence.
+The other latches mostly fall outside this pass. The line break comes after the query, so its latch, the most common at 200 epochs, never reaches the answer here. The one run with a latched `?` (seed {", ".join(str(k[2]) for k in KEPT if latched(k) == "?")}, at 200 epochs) has the largest spill of the rest at that length, which fits the same account.
 """
 
 # %%
@@ -573,8 +636,10 @@ rf"""
 The edit removes `{ex.ANCHORED_OP}` at the example answers, and on most runs that is where it spills too, by an amount that grows with the removal. That fits the spill being part of what e₁ holds at the example answers, beside the op, though it does not prove it.
 <!-- REVIEW: softened "So the spill is part of what e₁ holds" to "fits": the edit scores only per-op task outcomes, so co-location of removal and spill is consistent with, not proof of, a shared component. Verify: a probe of e₁ at the example answers for answer lightness would settle it. --> [What the anchor follows at the example answers](/docs/m2/example-evidence/report.py) found that the alignment there follows how well each example fits `{ex.ANCHORED_OP}` on its own. A judgement like that, made one example at a time, would also fire on examples of other ops whose answers happen to fit, and it may carry what makes an answer fit, such as how dark it is: `{ex.ANCHORED_OP}` answers are darker than their operands on average, and at 400 epochs the spill at the example answers lands mostly on `darken`. This pass does not separate those readings, since it keeps only the score per op.
 
-On the runs that do not use the separator, the rest of the positions spill without removing, and at 400 epochs their spill lands mostly on `lighten`. Nothing at those positions helps the model infer the op, so whatever the edit takes from them is something other than the op. So at 400 epochs something besides the op may reach e₁ at the operands and symbols too, though the anti-subspace term is meant to keep it off.
+On the runs without a latched separator, the rest of the positions spill without removing, and at 400 epochs their spill lands mostly on `lighten`. Nothing at those positions helps the model infer the op, so whatever the edit takes from them is something other than the op. So at 400 epochs something besides the op may reach e₁ at the operands and symbols too, though the anti-subspace term is meant to keep it off.
 <!-- REVIEW: scoped the "rest" reading to 400 epochs and non-separator runs: at 200 epochs the spill of the rest lands on varied ops (no op on more than 3 of 9 runs), and on separator runs the rest also removes. -->
 
-If the edit were restricted to the example answers, it would lose the spill of the rest and of the separators, and keep the spill that comes with the removal. On most runs that leaves most of the spill. A selective edit would then need e₁ at the example answers to hold the op and little else, which is a question about training, and this pass can't answer it. The separator runs show that where the op is held differs from run to run, and at one seed between the two lengths, so the positions an edit should act on may differ too.
+If the edit were restricted to the example answers, it would lose the spill of the rest and of the separators, and keep the spill that comes with the removal. On most runs that leaves most of the spill. And restricting the edit is not a remedy we could carry to natural language, where nobody marks the positions in advance. What a selective edit needs is for e₁ to hold the anchored concept and nothing else, wherever in the context the anchor settles, which is a question about training that this pass can't answer.
+
+The latches bear on that question. A syntax embedding on e₁ is something other than the op, put there by the pull itself at the embedding slice, where a token that every context shares is the cheapest place to meet the pull. A softer pool would spread the pull over more positions, and a pull that leaves out the embedding slice kept every syntax embedding clean in ex-2.2.21 (`no-emb`); either could loosen the latch, though this pass only shows that the latch is there and what it costs the edit.
 """

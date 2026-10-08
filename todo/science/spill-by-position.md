@@ -16,4 +16,4 @@ Split from the withdrawn ex-2.2.24 draft (its H2 and E2; see [PR #255](https://g
 
 ## Notes
 
-**2026-10-08, spill-by-position** — Done in [the report](/docs/m2/spill-by-position/report.py). On most runs the removal and the spill sit at the same positions, the example answers; the rest of the positions spill without removing (onto `lighten`); and at 400 epochs four runs also hold the op at the separators, which carry most of their spill.
+**2026-10-08, spill-by-position** — Done in [the report](/docs/m2/spill-by-position/report.py). On most runs the removal and the spill sit at the same positions, the example answers; the rest of the positions spill without removing (onto `lighten`); and on four 400-epoch runs the separator embedding lies on e₁ (a latch of the pooled pull), which carries most of their spill.
