@@ -29,7 +29,7 @@ r"""
 
 ## Scope
 
-This is an exploratory <re-analysis, or study>, with no preregistration and no gate. <Which runs and conditions it covers, and which data. How far a difference between runs can be trusted, with a yardstick such as a seed range.>
+This is an exploratory <re-analysis, or study>, with no preregistration and no gate. <Which runs and conditions it covers, and which data. How far a difference between runs can be trusted, against a reference such as a seed range.>
 
 <Any run left out, and why, in a sentence or two.>
 

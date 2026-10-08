@@ -448,11 +448,11 @@ With the control near its best, we anchored `difference` on the new grammar. The
 
     <!-- mini:figures ./m2/spill-by-position/report.py -->
 
-- [Where the second rise falls on the schedules](./m2/schedules-at-the-rise/report.py)
+- [The peak alignment on other ops, at two lengths](./m2/schedules-at-the-rise/report.py)
 
-    A re-analysis of the ex-2.2.23 trajectories. In the recipe the anti-subspace weight falls in step with the learning rate, so the stored runs cannot tell the two apart. The runs learn the HSV ops at similar epochs at both lengths, so at 400 epochs they do it while the anti-subspace term is still strong, and spill more all the same; the difference lies in the long stretch of training after the rise.
+    A re-analysis of the ex-2.2.23 evaluation, pooling the alignment with e₁ by its peak over the roles that can reach the answer, on contexts of the other ops. Pooled this way it follows the spill: higher at 400 epochs than at 200, and higher on the runs that spill more within each length. Much of the peak is a latched syntax token; the runs that latched ⏎, which comes after the query, barely spill.
 
-    <span class="tags">`reanalysis` `in-context` `anchoring` `schedules`</span>
+    <span class="tags">`reanalysis` `in-context` `anchoring` `intervention`</span>
 
     <!-- mini:figures ./m2/schedules-at-the-rise/report.py -->
 

@@ -74,6 +74,7 @@ These are verbal/writing tics. Some are bombastic can just be removed; others ne
 - carry (convey)
 - read [as] (interpret/understand)
 - gap (measurable difference)
+- yardstick (a reference or scale for judging)
 </anti-example list>
 
 <aside>Some of the agent skills use words like "hedge", but they describe *language*, which is not what our experiments are about.</aside>

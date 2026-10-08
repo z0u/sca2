@@ -37,7 +37,7 @@ Each item below is a measurement on the runs of this scout, with no gate.
 This is a scout, with no preregistration and no gate. Each op set has one run, all from the same model seed, so a difference between two runs is only a hint. For scale, ex-2.2.17 trained this recipe on the full op set at three seeds, and their gaps to the ceiling spanned {min(YARD_GAP):.3f} to {max(YARD_GAP):.3f}.
 ```
 
-Each observation is one or two sentences with at most one kind of number. "Added little" replaced "added at most 0.014" in review: a word gives the reader the size, and the table has the digits. The scope section gives the one yardstick every later comparison leans on, so the sections after it can say "about as wide as the seed range" without repeating it.
+Each observation is one or two sentences with at most one kind of number. "Added little" replaced "added at most 0.014" in review: a word gives the reader the size, and the table has the digits. The scope section gives the one reference every later comparison leans on, so the sections after it can say "about as wide as the seed range" without repeating it.
 
 ## Why this experiment
 
