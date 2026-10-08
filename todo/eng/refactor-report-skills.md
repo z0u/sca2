@@ -27,7 +27,7 @@ These skills are the backbone of our work and they're worth getting right.
 
 **2026-10-08, PM** — Review notes on the printed diff of PR #257 (the exploratory-report change), left for this refactor:
 
-- `science` skill, the conventions list under "Writing any report": the shape is right, but it could be stated more clearly. Rewrite it in the lunchtime register, more like the example-evidence report. A proposed rule to fold in: tables are about 95% quantitative, prose about 95% qualitative, and figures bridge the two.
+- `science` skill, the conventions list under "Writing any report": the shape is right, but it could be stated more clearly. Rewrite it in the lunchtime register, more like the example-evidence report.
 - The pointer to `exemplar-ex-2.2.18.md` "for the register": the register is evolving, so that exemplar may no longer be the one to point at.
-- `template-explore.py`: drop "a backlog item" from where the question came from; make the `Observations` lines qualitative (in place of "at most one kind of number"); find another word for "yardstick"; drop the placeholder for runs left out; and say that what we do next is left unstated in the report, as well as being for the human to decide.
+- `template-explore.py`: drop "a backlog item" from where the question came from; find another word for "yardstick"; drop the placeholder for runs left out; and say that what we do next is left unstated in the report, as well as being for the human to decide.
 - `exemplar-example-evidence.md`: reword "bear on" (in the quoted Discussion).

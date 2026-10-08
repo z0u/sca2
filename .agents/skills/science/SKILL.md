@@ -22,7 +22,7 @@ The example-evidence report is the model: an eight-page re-analysis with three s
 It runs: the lede; one paragraph saying where the question came from and what the report reads or runs; `Observations`; `Scope`; the measurements; three or so E sections; and `Discussion`.
 
 - One question, ideally a puzzle a reader can hold in mind. The paragraph under the lede is the whole "why", with links to the backlog item or earlier report that raised it. Add a `Why this experiment` section only when the question needs a picture of the model to follow from (as in ex-2.2.18).
-- `Observations` sits where a preregistered report has `Findings`: one line per E section, linked to it, saying what we saw with at most one kind of number. A reader who stops there has the result.
+- `Observations` sits where a preregistered report has `Findings`: one line per E section, linked to it, saying what we saw in words, with a number only where no word gives the size. A reader who stops there has the result.
 - `Scope` says which runs and data the report covers, how far a difference between runs can be trusted, and what was left out and why. It usually replaces `Parameters` and `Method`. Keep a method section only for detail that changes how a reader takes a result.
 - Each E section asks one thing, usually the thing the last one left open. It opens with the question, shows one figure or table, says what we saw, and says what we make of it. A section that doesn't feed the discussion belongs in another report, or nowhere.
 - No hypotheses, gates, verdicts, or `Decision`. Choices the results inform are made with the human afterwards, in conversation or a todo item, and stay out of the report.
@@ -32,7 +32,7 @@ When the report needs new runs, agree a short design note with the human first (
 
 ## Writing any report
 
-- Almost always, tabular data should be accompanied by a figure. Tables look like a wall of text to a human; charts are easier to interpret.
+- Tables are quantitative, prose is qualitative, and figures bridge the two. A table holds the digits; the prose says what they mean in words ("the earlier examples barely count"); a figure shows the pattern so a reader can see the size without the digits. Each is about 95% its own kind: prose keeps a number only where its size is the argument and no word captures it, and a table gets a figure beside it almost always, since a table alone looks like a wall of text.
 - Sections carry a short label in their heading, and the index under the lede and cross-references use it: E*n* for an exploratory analysis, and H*n* or S*n* in a preregistered report.
 - Name the experiment when citing a hypothesis or section from another report ("H3 of ex-2.2.19"); a bare "(H3)" means this report.
 - The discussion interprets. It may refer to a result and never requotes it: the deciding number lives in the result section and in the index under the lede.

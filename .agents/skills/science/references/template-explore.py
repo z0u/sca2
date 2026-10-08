@@ -23,7 +23,7 @@ r"""
 r"""
 ## Observations
 
-- [<Short name for E1> (E1)](#short-name-for-e1-e1): <what we saw, with at most one kind of number>.
+- [<Short name for E1> (E1)](#short-name-for-e1-e1): <what we saw, in words>.
 - [<Short name for E2> (E2)](#short-name-for-e2-e2): <one or two sentences>.
 - [<Short name for E3> (E3)](#short-name-for-e3-e3): <one or two sentences>.
 
