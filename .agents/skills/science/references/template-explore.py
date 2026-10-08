@@ -15,7 +15,7 @@ r"""
 <The puzzle or question, and which way it came out, in two or three sentences with no numbers.>
 ///
 
-<Where the question came from (a backlog item, a result an earlier report left unexplained), linked. What this report runs or reads: "with no new runs", or how many runs and seeds.>
+<Where the question came from (a result an earlier report left unexplained, say), linked. What this report runs or reads: "with no new runs", or how many runs and seeds.>
 """
 
 # %%
@@ -29,9 +29,7 @@ r"""
 
 ## Scope
 
-This is an exploratory <re-analysis, or study>, with no preregistration and no gate. <Which runs and conditions it covers, and which data. How far a difference between runs can be trusted, with a yardstick such as a seed range.>
-
-<Any run left out, and why, in a sentence or two.>
+This is an exploratory <re-analysis, or study>, with no preregistration and no gate. <Which runs and conditions it covers, and which data. How far a difference between runs can be trusted, against a scale such as the seed range.>
 
 ## The measurements
 
@@ -73,5 +71,5 @@ r"""
 r"""
 ## Discussion
 
-<What we make of the observations as a whole, with how sure we are, in two to four short paragraphs. What it would mean for a design can be said as a conditional. What we do next is for the human to decide.>
+<What we make of the observations as a whole, with how sure we are, in two to four short paragraphs. What it would mean for a design can be said as a conditional. What we do next is left out of the report, for the human to decide.>
 """

@@ -1,8 +1,8 @@
 # Exemplar: an exploratory report (example-evidence)
 
-Excerpts from `docs/m2/example-evidence/report.py`, frozen here as of commit `a0427bc`, with template expressions shown as they rendered. The live report may change later. It is a re-analysis of ex-2.2.22 with no new runs, and it printed to eight pages. Review found little to change in it and asked for future experiments to take its shape: short, pointed, quick to review, and light on hypotheses and decisions.
+Excerpts from `docs/m2/example-evidence/report.py`, frozen here as of commit `a0427bc`, with template expressions shown as they rendered, and one phrase in the Discussion reworded in a later review. The live report may change later. It is a re-analysis of ex-2.2.22 with no new runs, and it printed to eight pages. Review found little to change in it and asked for future experiments to take its shape: short, pointed, quick to review, and light on hypotheses and decisions.
 
-The notes after each excerpt say what to copy. For sentence-level register, [exemplar-ex-2.2.18.md](exemplar-ex-2.2.18.md) has more.
+The notes after each excerpt say what to copy.
 
 ## Opening
 
@@ -60,10 +60,10 @@ At the example answers the anchor marks examples that look like `difference` mor
 
 This fits how the label works. [...]
 
-It may also bear on the spill that ex-2.2.23 found. [...] This re-analysis covers only `difference` contexts, so it does not test that.
+It may also help explain the spill that ex-2.2.23 found. [...] This re-analysis covers only `difference` contexts, so it does not test that.
 ```
 
-Three short paragraphs: what the result means for the question, why it fits what we know of the method, and what it may bear on elsewhere, with where this page stops. It names a site where the open question could be tested without announcing a next experiment.
+Three short paragraphs: what the result means for the question, why it fits what we know of the method, and what else it may help explain, with where this page stops. It names a site where the open question could be tested without announcing a next experiment.
 
 ## What to copy
 

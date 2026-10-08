@@ -21,7 +21,7 @@ The example-evidence report is the model: an eight-page re-analysis with three s
 
 It runs: the lede; one paragraph saying where the question came from and what the report reads or runs; `Observations`; `Scope`; the measurements; three or so E sections; and `Discussion`.
 
-- One question, ideally a puzzle a reader can hold in mind. The paragraph under the lede is the whole "why", with links to the backlog item or earlier report that raised it. Add a `Why this experiment` section only when the question needs a picture of the model to follow from (as in ex-2.2.18).
+- One question, ideally a puzzle a reader can hold in mind. The paragraph under the lede is the whole "why", with links to the earlier report or result that raised it. Add a `Why this experiment` section only when the question needs a picture of the model to follow from (as in ex-2.2.18).
 - `Observations` sits where a preregistered report has `Findings`: one line per E section, linked to it, saying what we saw in words, with a number only where no word gives the size. A reader who stops there has the result.
 - `Scope` says which runs and data the report covers, how far a difference between runs can be trusted, and what was left out and why. It usually replaces `Parameters` and `Method`. Keep a method section only for detail that changes how a reader takes a result.
 - Each E section asks one thing, usually the thing the last one left open. It opens with the question, shows one figure or table, says what we saw, and says what we make of it. A section that doesn't feed the discussion belongs in another report, or nowhere.
@@ -32,15 +32,15 @@ When the report needs new runs, agree a short design note with the human first (
 
 ## Writing any report
 
-- Tables are quantitative, prose is qualitative, and figures bridge the two. A table holds the digits; the prose says what they mean in words ("the earlier examples barely count"); a figure shows the pattern so a reader can see the size without the digits. Each is about 95% its own kind: prose keeps a number only where its size is the argument and no word captures it, and a table gets a figure beside it almost always, since a table alone looks like a wall of text.
-- Sections carry a short label in their heading, and the index under the lede and cross-references use it: E*n* for an exploratory analysis, and H*n* or S*n* in a preregistered report.
-- Name the experiment when citing a hypothesis or section from another report ("H3 of ex-2.2.19"); a bare "(H3)" means this report.
-- The discussion interprets. It may refer to a result and never requotes it: the deciding number lives in the result section and in the index under the lede.
-- Say what we make of a result, and how sure we are ("fits without proving", "may account for it, though one run is not enough"). What it would mean for a design or an edit can be stated as a conditional. What we will do next is for the human to decide, unless a frozen rule already decided it, so a report never announces the next experiment.
-- Keep rationales, caveats, and worked reasoning at the point of use rather than in a method section, so nothing is said twice.
-- Numbers in prose earn their place by being part of an argument, and most don't: a reader's eyes slide off a sentence with three numbers in it. Use one main measure per section, say which in its first paragraph, and give a second measure only in parentheses. Where a word gives the size ("little", "about as wide as the seed range"), use the word and leave the digits to the figure. A coordinate the reader looks up, a constant of the apparatus, or a value derivable from an adjacent table belongs in a table or in the method, with the prose referring to it. Writing the same quantity out in two sections is how two roundings of it end up in the report.
+A report has three kinds of material, and each does one job. Tables hold the numbers. Prose says what they mean, in words: "the earlier examples barely count". Figures sit between the two, so a reader sees the size of a thing without reading digits. Nearly every table gets a figure beside it, because a table on its own looks like a wall of text.
 
-For the register, read [references/exemplar-ex-2.2.18.md](references/exemplar-ex-2.2.18.md) (a scout report, with notes on what review changed) and [references/exemplar-explanation.md](references/exemplar-explanation.md) (how to explain a mechanism).
+Most numbers don't belong in prose. A sentence with three numbers in it is one a reader's eyes slide past. So each section uses one main measure, says which in its first paragraph, and gives any second measure in parentheses. Where a word gives the size ("little", "about as wide as the seed range"), use the word and let the figure show the digits. A coordinate the reader looks up, a constant of the apparatus, or a value they could take from a nearby table goes in that table, and the prose points at it. Writing the same number out in two places is how a report ends up with two roundings of it.
+
+Say what we make of each result where it appears, and how sure we are: "fits without proving", "may account for it, though one run is not enough". Keep reasons and caveats beside the claim they support too, so nothing is said twice. The discussion then interprets. It can point back to a result, but it doesn't quote the number again, since that lives in the result section and in the index under the lede. What a result would mean for a design can be said as a conditional ("if this holds, a shorter schedule would ..."). What we do next stays out of the report: it is for the human to decide, unless a frozen rule already decided it.
+
+A few labelling habits keep cross-references short. Each section has a short label in its heading (E*n* for an exploratory section, H*n* or S*n* in a preregistered report), and the index under the lede uses it. A bare "(H3)" means this report, and a section of another report takes that report's name: "H3 of ex-2.2.19".
+
+For the register, read [references/exemplar-example-evidence.md](references/exemplar-example-evidence.md) (a whole report) and [references/exemplar-explanation.md](references/exemplar-explanation.md) (how to explain a mechanism).
 
 ### The lede (tl;dr)
 
