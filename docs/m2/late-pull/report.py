@@ -1,5 +1,5 @@
 # ruff: noqa: B018
-# title: Pulling the later blocks only
+# title: Pulling the deeper blocks only
 
 # Twelve new runs: two arms that pull blocks 2 to 4 only, with the anti-subspace term on every slice, and the recipe
 # trained again at the same four seeds for its trajectory. `experiment.py` beside this script trains and measures every
@@ -118,6 +118,31 @@ def ink(arm: str) -> str:
 
 
 MARK = {"whole": "o", "late": "^", "late-clean": "s"}
+NAME = {"whole": "whole", "late": "deep", "late-clean": "deep-clean"}
+"""What the report calls each arm. The `late` arms were renamed `deep` after training, since "late" read as a time in
+training; the stored labels keep the names they were trained under."""
+SCHED_INK = {"anchor": light_dark("#333", "#ddd"), "anti": light_dark("#b4531f", "#dd8f5f")}
+
+
+def schedule_of(arm: str) -> dict:
+    """The anchor and anti-subspace weights along training, which every seed of an arm shares."""
+    t = TRAJ[ex.label_of(arm, SEEDS[0])]["traj"]
+    return {"epoch": t["epoch"], "anchor": t["weight"], "anti": t["anti_weight"]}
+
+
+def draw_schedule(ax: plt.Axes, sched: dict, label: bool = False) -> None:
+    """A strip of the two term weights under an epoch chart: the anchor weight solid, the anti weight dashed."""
+    ax.plot(
+        sched["epoch"], sched["anchor"], color=SCHED_INK["anchor"], lw=1.1, label="anchor weight" if label else None
+    )
+    ax.plot(
+        sched["epoch"], sched["anti"], color=SCHED_INK["anti"], lw=1.1, ls="--", label="anti weight" if label else None
+    )
+    ax.set_ylim(0, 0.27)
+    ax.set_yticks([0, 0.1, 0.2])
+    ax.tick_params(labelsize=7)
+
+
 SLICE_INK = [
     light_dark(c, d)
     for c, d in (
@@ -154,7 +179,7 @@ def seeds_text(seeds: list[int]) -> str:
 
 
 rf"""
-# Pulling the later blocks only
+# Pulling the deeper blocks only
 
 /// tip |
 <!-- lede -->
@@ -167,8 +192,8 @@ Pulling every slice but the embedding had been tried before (ex-2.2.21 and the �
 
 So this experiment trains twelve runs at {ex.EPOCHS} epochs and {len(SEEDS)} seeds:
 
-- `late`: the pull on blocks 2 to 4 only, and the anti-subspace term on every slice, so the first two slices are asked to stay off e₁ rather than left alone.
-- `late-clean`: the same, and after every step the e₁ component of every embedding is set to zero, so the table cannot lean at all. The readout table is untied on this recipe (a separate matrix from the embedding table) and stays free.
+- `deep`: the pull on blocks 2 to 4 only, and the anti-subspace term on every slice, so the first two slices are asked to stay off e₁ rather than left alone.
+- `deep-clean`: the same, and after every step the e₁ component of every embedding is set to zero, so the table cannot lean at all. The readout table is untied on this recipe (a separate matrix from the embedding table) and stays free.
 - `whole`: the recipe of record, every slice pulled, trained again to record the alignment at every slice and position along training.
 
 Each run shares its seed, and so its initialization, batches and label draws, with one anchored run and one control of ex-2.2.23. The anchor weight, the pool temperature τ and both schedules are the recipe values.
@@ -179,8 +204,8 @@ Each run shares its seed, and so its initialization, batches and label draws, wi
 rf"""
 ## Observations
 
-- [The color table (E1)](#the-color-table-e1): in `late` the table leans the same way as on the recipe on every seed, where the controls lean either way, but only about a quarter as far. The lightness in the states at block 1 fades to about half.
-- [Removal and spill (E2)](#removal-and-spill-e2): the full edit removes as much in both new arms as on the recipe. Its spill falls in `late`, and falls to about the criterion in `late-clean`. In both arms, editing block 1 alone removes nearly everything and gives most of the spill that is left.
+- [The color table (E1)](#the-color-table-e1): in `deep` the table leans the same way as on the recipe on every seed, where the controls lean either way, but only about a quarter as far. The lightness in the states at block 1 fades to about half.
+- [Removal and spill (E2)](#removal-and-spill-e2): the full edit removes as much in both new arms as on the recipe. Its spill falls in `deep`, and falls to about the criterion in `deep-clean`. In both arms, editing block 1 alone removes nearly everything and gives most of the spill that is left.
 - [Where the alignment settles (E3)](#where-the-alignment-settles-e3): in the new arms the alignment of `{ex.ANCHORED_OP}` contexts grows at blocks 2 to 4 early in training, as the pull asks. Block 1 follows more slowly, on other ops as well as on `{ex.ANCHORED_OP}`.
 
 ## Scope
@@ -200,7 +225,7 @@ The anchor term is a mean over the pulled slices, so at the same weight each of 
 
 The measurements are those of embedding-lean, taken on every run:
 
-- The lean of the color table: how much further along e₁ the color embeddings sit for black than for white, as the slope of the e₁ component against lightness over the {len(LIGHT)} colors. It is zero in `late-clean`, where the table is held off e₁.
+- The lean of the color table: how much further along e₁ the color embeddings sit for black than for white, as the slope of the e₁ component against lightness over the {len(LIGHT)} colors. It is zero in `deep-clean`, where the table is held off e₁.
 - The lean in the states: the correlation of α with lightness at each slice, over the color positions of contexts of other ops.
 - Removal and spill of the edit, which projects e₁ out of the state at every position on a set of slices. Both are net of the control at the same seed, and the selectivity criterion is a spill of {CRITERION:g}.
 - The task score of each op, as expected exact match on held-out contexts.
@@ -214,7 +239,7 @@ def table_figure() -> str:
     seed = SEEDS[0]
     data = {
         "panels": [
-            {"title": f"{a}, seed {seed}", "axis": RUNS[ex.label_of(a, seed)]["emb_axis_colors"]}
+            {"title": f"{NAME[a]}, seed {seed}", "axis": RUNS[ex.label_of(a, seed)]["emb_axis_colors"]}
             for a in ("whole", "late")
         ],
         "traj": {
@@ -228,10 +253,11 @@ def table_figure() -> str:
             for a in ("whole", "late")
         },
         "controls": [slope(c["emb_axis_colors"]) for c in CONTROLS],
+        "schedule": schedule_of("whole"),
     }
     alt = f"""
-        Dark colors sit far along e₁ on the recipe (up to about 0.9) but only about a third as far with the late
-        pull at seed {seed}; along training the recipe slope falls early to about −1 on most seeds, while the late
+        Dark colors sit far along e₁ on the recipe (up to about 0.9) but only about a third as far with the deep
+        pull at seed {seed}; along training the recipe slope falls early to about −1 on most seeds, while the deep
         slope stays flat for a hundred epochs, then falls to about −0.25, inside the spread of the controls.
     """
     return table_draw(data, alt)
@@ -246,12 +272,16 @@ def table_draw(data: dict, alt_text: str) -> str:
             **The lean of the color embedding table.** Left and middle: the e₁ component of each of the {len(LIGHT)}
             color embeddings against its lightness at the end of training, one run of each arm, each dot drawn in its
             own color. Right: the slope of that component against lightness along training, one hairline per run
-            and the seed mean bold; the ticks at the right edge are the controls at the same seeds. `late-clean` is
-            zero throughout and not drawn.
+            and the seed mean bold; the ticks at the right edge are the controls at the same seeds. `deep-clean` is
+            zero throughout and not drawn. The strip below is the weight of each term, the same in both arms: the
+            anchor weight solid and the anti-subspace weight dashed.
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.6), layout="constrained")
+        fig, ax_ = plt.subplot_mosaic(
+            [["a", "b", "c"], ["a", "b", "s"]], figsize=(7.2, 3.0), layout="constrained", height_ratios=[3, 1]
+        )
+        axes = [ax_["a"], ax_["b"], ax_["c"]]
         for ax, panel in zip(axes[:2], data["panels"], strict=True):
             ax.axhline(0, color=light_dark("#aaa", "#555"), lw=0.5, zorder=0)
             ax.scatter(LIGHT, panel["axis"], s=8, c=RGB, edgecolor=light_dark("#333", "#ddd"), linewidth=0.2, zorder=3)
@@ -268,13 +298,20 @@ def table_draw(data: dict, alt_text: str) -> str:
                 ax.plot(r["epoch"], r["slope"], color=ink(arm), lw=0.4, alpha=0.6, zorder=2)
             ep = np.asarray(runs[0]["epoch"])
             mean = np.mean([r["slope"] for r in runs], axis=0)
-            ax.plot(ep, mean, color=ink(arm), lw=1.6, marker=MARK[arm], markevery=10, ms=4, label=arm, zorder=3)
+            ax.plot(ep, mean, color=ink(arm), lw=1.6, marker=MARK[arm], markevery=10, ms=4, label=NAME[arm], zorder=3)
         end = data["traj"]["whole"][0]["epoch"][-1]
         for v in data["controls"]:
             ax.plot([end * 1.02, end * 1.07], [v, v], color=light_dark("#333", "#ddd"), lw=1.2, zorder=3)
-        ax.set_xlabel("epoch", fontsize=9)
         ax.set_ylabel("slope against lightness", fontsize=9)
+        ax.tick_params(labelbottom=False)
+        sax = ax_["s"]
+        sax.sharex(ax)
+        draw_schedule(sax, data["schedule"], label=True)
+        sax.set_xlabel("epoch", fontsize=9)
+        sax.set_ylabel("weight", fontsize=8)
         handles, labels = ax.get_legend_handles_labels()
+        sh, sl = sax.get_legend_handles_labels()
+        handles, labels = handles + sh, labels + sl
         fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=7)
         return fig
 
@@ -283,7 +320,7 @@ def table_draw(data: dict, alt_text: str) -> str:
 
 def lean_table() -> str:
     rows = [
-        [f"`{a}`", fmt(slope(r["emb_axis_colors"]) for r in runs_of(a))]
+        [f"`{NAME[a]}`", fmt(slope(r["emb_axis_colors"]) for r in runs_of(a))]
         + [fmt(r["r_light_states_other"][s] for r in runs_of(a)) for s in (1, 2)]
         for a in ARMS
     ]
@@ -305,19 +342,19 @@ def lean_table() -> str:
 rf"""
 ## The color table (E1)
 
-If the lean is the pull meeting the embedding with a stand-in, it should fade in `late`, where the pull leaves the first two slices and the anti-subspace term stays on them. A slope of −1 means black sits a whole unit further along e₁ than white.
+If the lean is the pull meeting the embedding with a stand-in, it should fade in `deep`, where the pull leaves the first two slices and the anti-subspace term stays on them. A slope of −1 means black sits a whole unit further along e₁ than white.
 
 {table_figure()}
 
 {lean_table()}
 
-It fades to about a quarter, though not to nothing. The slope in `late` is between {num(SLOPE["late"][2])} and {num(SLOPE["late"][1])} by seed, against about {num(SLOPE_UNLATCHED[0], ".1f")} on the recipe runs with no latch ({seeds_text(LATCHED)} of the recipe is latched on `,` and has a shallow slope too). That is about as steep as the steepest control. But the controls lean either way by seed, and every `late` run leans the same way as the recipe, so what is left is still the pull at work, only weaker.
+It fades to about a quarter, though not to nothing. The slope in `deep` is between {num(SLOPE["late"][2])} and {num(SLOPE["late"][1])} by seed, against about {num(SLOPE_UNLATCHED[0], ".1f")} on the recipe runs with no latch ({seeds_text(LATCHED)} of the recipe is latched on `,` and has a shallow slope too). That is about as steep as the steepest control. But the controls lean either way by seed, and every `deep` run leans the same way as the recipe, so what is left is still the pull at work, only weaker.
 
-The lightness in the states at block 1 fades too, to about half the recipe value, and in `late-clean` it is smaller again. By block 2 it is small in every arm.
+The lightness in the states at block 1 fades too, to about half the recipe value, and in `deep-clean` it is smaller again. By block 2 it is small in every arm.
 <!-- REVIEW: "fades by about as much as the slope" changed to "to about half": r at block 1 goes from −0.49 (−0.6 on
 the unlatched seeds) to −0.23, where the slope goes to a quarter. Verify: the lean table. -->
 
-On the recipe the slope grows from early in training. On `late` it stays near zero for about the first hundred epochs, then grows through the second half, while the whole table drifts a little onto e₁ (E3). The pull on block 2 reaches the table only through block 1, and that is enough to load some lightness onto e₁.
+On the recipe the slope grows from early in training. On `deep` it stays near zero for about the first hundred epochs, then grows through the second half, while the whole table drifts a little onto e₁ (E3). The pull on block 2 reaches the table only through block 1, and that is enough to load some lightness onto e₁.
 
 The growth also coincides with the anneal of the anti-subspace weight, which the Discussion takes up. Part of the lean may also come from the per-slice pull being five thirds of the recipe value.
 <!-- REVIEW: added the anti-schedule reading of the late onset. The anti weight falls from 0.22 at epoch 100 to 0.04
@@ -343,7 +380,7 @@ def edit_figure() -> str:
     }
     alt = """
         Under the full edit every run removes about 0.85 to 0.9, and spill drops from the recipe (up to 0.38) to
-        late (up to 0.17) to late-clean (around the criterion); editing block 1 alone looks much the same, while
+        deep (up to 0.17) to deep-clean (around the criterion); editing block 1 alone looks much the same, while
         editing blocks 2 to 4 spills almost nothing but removes nearly everything on seven runs and almost nothing on five.
     """
     return edit_draw(data, alt)
@@ -379,7 +416,7 @@ def edit_draw(data: dict, alt_text: str) -> str:
             ax.set_title(f"edit on {panel['title']}", fontsize=8)
             ax.set_xlabel("removal", fontsize=9)
         axes[0].set_ylabel("spill", fontsize=9)
-        h = [Line2D([], [], ls="none", marker=MARK[a], color=ink(a), label=a) for a in ARMS]
+        h = [Line2D([], [], ls="none", marker=MARK[a], color=ink(a), label=NAME[a]) for a in ARMS]
         fig.legend(handles=h, loc="outside upper center", ncols=len(h), frameon=False, fontsize=7)
         return fig
 
@@ -391,7 +428,7 @@ def edit_table() -> str:
     rows = [[f"{name}: removal"] + [fmt(removal(r, name) for r in runs_of(a)) for a in ARMS] for name in sets]
     rows += [[f"{name}: spill"] + [fmt((spill(r, name) for r in runs_of(a)), ".3f") for a in ARMS] for name in sets]
     return table_html(
-        ["slices edited"] + [f"`{a}`" for a in ARMS],
+        ["slices edited"] + [f"`{NAME[a]}`" for a in ARMS],
         rows,
         f"""
         **Removal and spill under each slice-restricted edit**, seed mean and range over {len(SEEDS)} runs. The
@@ -409,13 +446,13 @@ The edit on every slice is the goal, since one that has to know which slices to 
 
 {edit_table()}
 
-The spill falls, and removal holds. Under the edit on every slice all twelve runs remove about as much as each other. The recipe runs spill well above the criterion on every seed, and `late` spills less on every seed but stays above it. `late-clean` is within it on {N_WITHIN["late-clean"]} of {len(SEEDS)} runs, and the fourth spills about twice the criterion ({WORST_CLEAN:.3f}).
+The spill falls, and removal holds. Under the edit on every slice all twelve runs remove about as much as each other. The recipe runs spill well above the criterion on every seed, and `deep` spills less on every seed but stays above it. `deep-clean` is within it on {N_WITHIN["late-clean"]} of {len(SEEDS)} runs, and the fourth spills about twice the criterion ({WORST_CLEAN:.3f}).
 
 The task score is the same in all three arms and on the controls (about {TASK_CONTROL[0]:.2f} expected exact match averaged over ops, and no run more than {max(TASK_CONTROL[0] - TASK[a][1] for a in ARMS):.2f} below the controls), so the new pull costs the task nothing we can see.
 
-In both new arms the concept sits at block 1 as well as later. Editing block 1 alone removes at least as much as editing every slice, though block 1 is never pulled, and it gives most of the spill that is left. In `late` the embedding alone still spills on {seeds_text(EMB_SPILLERS)}, where the weaker lean of E1 is still used downstream.
+In both new arms the concept sits at block 1 as well as later. Editing block 1 alone removes at least as much as editing every slice, though block 1 is never pulled, and it gives most of the spill that is left. In `deep` the embedding alone still spills on {seeds_text(EMB_SPILLERS)}, where the weaker lean of E1 is still used downstream.
 
-Editing only blocks 2 to 4 spills almost nothing in any arm, but its removal splits by seed. On seven of the twelve runs it removes nearly everything, and on the other five almost nothing ({seeds_text(LATE_LOW["late"])} in `late`, {seeds_text(LATE_LOW["late-clean"])} in `late-clean`, and {seeds_text(LATE_LOW["whole"])} in `whole`).
+Editing only blocks 2 to 4 spills almost nothing in any arm, but its removal splits by seed. On seven of the twelve runs it removes nearly everything, and on the other five almost nothing ({seeds_text(LATE_LOW["late"])} in `deep`, {seeds_text(LATE_LOW["late-clean"])} in `deep-clean`, and {seeds_text(LATE_LOW["whole"])} in `whole`).
 
 On those five, the answer depends on the e₁ component at block 1, and not on the e₁ component the pull put at blocks 2 to 4. Perhaps the later blocks read block 1 along e₁ and write the answer elsewhere. Or the two edits may differ in some other way that this measurement cannot tell apart. Embedding-lean saw the same split on the recipe and took it as a sign that the concept was partly built from the lean. Here the split persists with the table held off e₁, so it does not need the lean.
 <!-- REVIEW: "the later blocks rebuild the concept from what block 1 passes them, so taking it out after block 1 is
@@ -444,13 +481,14 @@ def alpha_figure() -> str:
                     }
                     for s in SEEDS
                 ],
+                "schedule": schedule_of(a),
             }
             for a in ARMS
         ],
     }
     alt = f"""
-        On the recipe the embedding and block 1 align with e₁ on every op, not just {ex.ANCHORED_OP}; in the late arms
-        blocks 2 to 4 align quickly on {ex.ANCHORED_OP} only, while block 1 (and, in late, the embedding) creeps up
+        On the recipe the embedding and block 1 align with e₁ on every op, not just {ex.ANCHORED_OP}; in the deep arms
+        blocks 2 to 4 align quickly on {ex.ANCHORED_OP} only, while block 1 (and, in deep, the embedding) creeps up
         slowly on all ops through the second half of training.
     """
     return alpha_draw(data, alt)
@@ -464,12 +502,17 @@ def alpha_draw(data: dict, alt_text: str) -> str:
         caption=f"""
             **Mean alignment with e₁ along training, by slice.** The mean of α over the positions of the probe
             contexts of `{ex.ANCHORED_OP}` (top) and of the other ops (bottom), one line per slice; bold is the
-            seed mean and the hairlines are the {len(SEEDS)} runs.
+            seed mean and the hairlines are the {len(SEEDS)} runs. The strips under each column are the anchor
+            weight (solid) and the anti-subspace weight (dashed), the same in every arm.
         """,
     )
     def _plot() -> plt.Figure:
-        fig, axes = plt.subplots(2, 3, figsize=(7.2, 4.2), layout="constrained", sharex=True, sharey=True)
+        fig, axes = plt.subplots(
+            3, 3, figsize=(7.2, 5.0), layout="constrained", sharex=True, sharey="row", height_ratios=[3, 3, 1]
+        )
         for col, panel in enumerate(data["panels"]):
+            draw_schedule(axes[2, col], panel["schedule"], label=col == 0)
+            axes[2, col].set_xlabel("epoch", fontsize=9)
             ep = np.asarray(panel["runs"][0]["epoch"])
             for row, key in enumerate(("anchored", "other")):
                 ax = axes[row, col]
@@ -482,12 +525,13 @@ def alpha_draw(data: dict, alt_text: str) -> str:
                         ep, mean, color=SLICE_INK[s], lw=1.4, marker=SLICE_MARK[s], markevery=12, ms=3.5, label=name
                     )
                 if row == 0:
-                    ax.set_title(panel["arm"], fontsize=8)
-                else:
-                    ax.set_xlabel("epoch", fontsize=9)
+                    ax.set_title(NAME[panel["arm"]], fontsize=8)
         axes[0, 0].set_ylabel(f"α, {ex.ANCHORED_OP}", fontsize=9)
         axes[1, 0].set_ylabel("α, other ops", fontsize=9)
+        axes[2, 0].set_ylabel("weight", fontsize=9)
         handles, labels = axes[0, 0].get_legend_handles_labels()
+        sh, sl = axes[2, 0].get_legend_handles_labels()
+        handles, labels = handles + sh, labels + sl
         fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=7)
         return fig
 
@@ -510,7 +554,7 @@ Much of the rise at block 1, and nearly all of it on the other ops, comes after 
 Verify: block 1 on the other ops rises from about epoch 150 in both new arms, where anti_weight is 0.18 and falling. -->
 
 
-On `late` the embedding also drifts onto e₁ in the second half of training, by about as much on the other ops as on `{ex.ANCHORED_OP}`. That is the whole color table shifting a little toward e₁, with the lightness slope of E1 on top. It does not happen in `late-clean`, where the table is held at zero.
+On `deep` the embedding also drifts onto e₁ in the second half of training, by about as much on the other ops as on `{ex.ANCHORED_OP}`. That is the whole color table shifting a little toward e₁, with the lightness slope of E1 on top. It does not happen in `deep-clean`, where the table is held at zero.
 """
 
 # %%
@@ -529,7 +573,7 @@ On the seeds where the answer to `{ex.ANCHORED_OP}` depends on the e₁ componen
 "too weak", and the split restated as what the edits show rather than as the later blocks rebuilding the concept. -->
 
 
-Four seeds show that `late-clean` spills much less than the recipe, but not whether its one run above the criterion is typical.
+Four seeds show that `deep-clean` spills much less than the recipe, but not whether its one run above the criterion is typical.
 
 ## Glossary
 
