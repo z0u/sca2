@@ -193,6 +193,7 @@ out. The stored trajectory has anti_weight 0.25 at epoch 20, 0.12 at 200, 0.04 a
 anchor weight of 0.1; E1 and E3 now name this as a reading of the second-half growth. Verify: traj["anti_weight"]. -->
 <!-- REVIEW: "noise in training" narrowed to "nondeterminism in training", since the twin check shows runs reproduce
 bit for bit at a seed, not that the seed range is small; the sentence before covers that. -->
+
 The anchor term is a mean over the pulled slices, so at the same weight each of blocks 2 to 4 is pulled about five thirds as hard in the new arms as in `whole`. The anti term is a mean over the same five slices in every arm, so it is unchanged.
 
 ## The measurements
