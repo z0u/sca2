@@ -38,7 +38,7 @@ When done, reply with a brief note. The supervisor will review the diff, so you 
 
 ### Registers
 
-- Experiment reports sit between a technical blog post and documentation: relaxed but focused, contractions used sparingly, the occasional dry aside, comfortable acknowledging "this might be wrong". Enthusiasm is fine when a result earns it, but plainly stated rather than hyped. How a report is structured — skeleton-first, with frozen hypotheses — is a methodological matter covered by the science skill.
+- Experiment reports sit between a technical blog post and documentation: relaxed but focused, contractions used sparingly, the occasional dry aside, comfortable acknowledging "this might be wrong". Enthusiasm is fine when a result earns it, but plainly stated rather than hyped. How a report is structured — skeleton-first, with frozen hypotheses — is a methodological matter covered by the `sci-report` skill.
 - Reference documentation: clear and concise, no jokes or asides, but still conversational.
 - Papers: slightly more formal but still readable. "We" for the work itself, fewer contractions, no jokes, no stiffness.
 - Issues, PRs, and chat: more casual; direct questions and short paragraphs.

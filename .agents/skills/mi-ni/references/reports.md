@@ -1,6 +1,6 @@
 # Reports
 
-A report is a literate script (`mini.lit`; `docs/**/*.py` opening with a `# title:` header) that reads an experiment's durable results and renders them for the web. Two parts of making one live in the science skill rather than here: fixing what the report will claim *before* the experiment runs (the preregistration discipline), and the passes any report prose goes through once written. This file covers the rest — publishing the report as a self-contained bundle once results land.
+A report is a literate script (`mini.lit`; `docs/**/*.py` opening with a `# title:` header) that reads an experiment's durable results and renders them for the web. Two parts of making one live in the `science` and `sci-report` skills rather than here: fixing what the report will claim *before* the experiment runs (the preregistration discipline), and the passes any report prose goes through once written. This file covers the rest — publishing the report as a self-contained bundle once results land.
 
 ## Report bundles
 

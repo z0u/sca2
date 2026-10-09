@@ -7,7 +7,7 @@ argument-hint: <document> [section] [line range]
 
 We're doing science, so we need rigor, but we also need to move fast: a little imprecision is an acceptable price for speed.
 
-This is the quick, inline pass: run it as you write, or when asked to lint a document, with whatever context you already have. For a full reshaping of a report section, use the `report-restructure` skill instead — it runs a fresh-eyes agent with no conversation context and adds a template check, and its agent spec carries the rules this lint borrows from.
+This is the quick, inline pass: run it as you write, or when asked to lint a document, with whatever context you already have. In a report's style review it runs after the `prose-simplifier` and `report-restructure` agents (see the `sci-review-style` agent), and the `report-restructure` agent spec carries the rules this lint borrows from.
 
 By default, our docs and reports contain a lot of text that could be described as "fluff". Examples below, with bad text between `anti-example` tags, and better text (if any) between `corrected-example` tags. Rule of thumb: just say it straight.
 
@@ -132,7 +132,7 @@ Keep first-use definitions of terms, trimmed, and move them to the glossary (or 
 
 Compress against the immediate context: after a cut, everything needed to understand what remains must still be visible nearby. The `report-restructure` agent spec lists the specific ways this goes wrong (stranded referents, lost baselines, flattened counts).
 
-If a report contains results, don't make material changes to preregistration text (e.g. the hypotheses). Follow the `REVIEW`-comment convention in the `science` skill if a change is warranted.
+If a report contains results, don't make material changes to preregistration text (e.g. the hypotheses). Follow the `REVIEW`-comment convention in the `sci-report` skill if a change is warranted.
 
 ## Style
 
@@ -145,7 +145,7 @@ When linting, assume the text is _correct_. Don't check numbers or verify claims
 1. Look for low-perplexity (boring) text
 2. Dedup and de-fluff, rephrasing as necessary
 3. Move asides to footnotes, and definitions to the glossary
-4. If the target is a literate-script report, run `.agents/skills/report-restructure/scripts/check-templates <file>`. It catches syntax errors, and reports dropped or frozen template expressions; check that these were intentional.
+4. If the target is a literate-script report, run `.agents/skills/sci-report/scripts/check-templates <file>`. It catches syntax errors, and reports dropped or frozen template expressions; check that these were intentional.
 5. Give a short report of the flavor of the changes (not details; those will be self-evident).
 
 "Already clean, a few small edits" is a fine outcome.

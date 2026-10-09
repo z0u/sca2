@@ -27,7 +27,7 @@ Use these terms consistently across all reports.
 
 - trial
 
-  One sampled point in a survey's search space; seed-aggregated, like a condition. "Condition" implies named levels chosen in advance, which a sampled point doesn't have, so use "trial" wherever the point came out of a sampling rule. Surveys have trials and no arms. See the `science` skill for the experiment type.
+  One sampled point in a survey's search space; seed-aggregated, like a condition. "Condition" implies named levels chosen in advance, which a sampled point doesn't have, so use "trial" wherever the point came out of a sampling rule. Surveys have trials and no arms. See `references/surveys.md` in the `sci-report` skill for the experiment type.
 
 - seed
 

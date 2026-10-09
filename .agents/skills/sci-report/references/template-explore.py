@@ -1,11 +1,13 @@
 # ruff: noqa: B018
 # title: <What we look at, in a few plain words>
 
-# A fill-in skeleton for an exploratory report, the default shape: one question, a few observations, no
-# preregistration and no gate. It suits a re-analysis of stored results and a study with a few new runs alike. Copy it
-# to docs/<milestone>/<key>/report.py and replace each <...>. The prose is in r-strings so the placeholders render as
-# written; switch a string to rf once it has template expressions. The example-evidence report is this form, filled in
-# (see exemplar-example-evidence.md beside this file). Aim for about eight printed pages.
+# A fill-in skeleton for an exploratory report, the default shape: one question, a few observations, no preregistration
+# and no gate. It suits a re-analysis of stored results and a study with a few new runs alike. Copy it to
+# docs/<milestone>/<key>/report.py and replace each <...>. Before anything runs it is the plan: fill in the question,
+# the scope, the measurements, and the question each E section asks, and leave what we saw as TODO. The prose is in
+# r-strings so the placeholders render as written; switch a string to rf once it has template expressions. The
+# example-evidence report is this form, filled in (see exemplar-example-evidence.md beside this file). Aim for about
+# eight printed pages.
 
 r"""
 # <What we look at, in a few plain words>

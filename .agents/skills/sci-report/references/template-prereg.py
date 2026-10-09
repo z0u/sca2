@@ -3,7 +3,7 @@
 
 # A fill-in skeleton for a preregistered report: copy it to docs/<milestone>/<ex>/report.py and replace each <...>.
 # The prose is in r-strings so the placeholders render as written; switch a string to rf once it has template
-# expressions. The register to aim for is ex-2.2.18 (see exemplar-ex-2.2.18.md beside this file).
+# expressions. The register to aim for is example-evidence (see exemplar-example-evidence.md beside this file).
 
 r"""
 # Ex 2.N.M: <What we try, in a few plain words>
