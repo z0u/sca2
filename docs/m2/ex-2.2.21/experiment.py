@@ -675,6 +675,7 @@ def train_one(
         "traj": {
             kk: np.asarray(traj[kk]).tolist()
             for kk in ("step", "epoch", "lr", "weight", "anti_weight", "val_loss")
+            + (("anchor", "anti") if alpha_map else ())
             if kk in traj
         }
         | {"train_loss": np.interp(np.asarray(traj["epoch"], dtype=np.float64), epoch_axis, epoch_train_loss).tolist()}
