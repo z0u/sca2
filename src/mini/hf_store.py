@@ -26,7 +26,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, cast
 
-from mini.store import Artifact, BlobStat, LocalStore, Store, _cas_key, _hash_file, _tree_sha, artifact_shas
+from mini.store import Artifact, BlobStat, LocalStore, Store, _cas_key, _hash_file, _tree_sha, artifact_shas, tmp_suffix
 
 __all__ = ["HFStore"]
 
@@ -226,7 +226,7 @@ class HFStore(Store):
         for sha in missing:
             blob = self._cache._blob_path(sha)
             blob.parent.mkdir(parents=True, exist_ok=True)
-            pulls.append((blob, blob.with_name(f"{sha}.tmp.{os.getpid()}.{threading.get_ident()}")))
+            pulls.append((blob, blob.with_name(f"{sha}{tmp_suffix()}")))
         try:
             # A retried download rewrites the same temp files, which the atomic
             # rename below and the ``finally`` sweep already account for.
@@ -317,7 +317,7 @@ class HFStore(Store):
                 out[paths[path]] = payload
                 if cached is not None:  # written whole then renamed in, so a reader never sees a partial file
                     cached.parent.mkdir(parents=True, exist_ok=True)
-                    part = cached.with_name(f"{cached.name}.tmp.{os.getpid()}.{threading.get_ident()}")
+                    part = cached.with_name(f"{cached.name}{tmp_suffix()}")
                     part.write_text(payload)
                     part.replace(cached)
         return out

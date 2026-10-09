@@ -54,6 +54,19 @@ def data_root() -> Path:
     return cwd / ".mini"
 
 
+# Env var naming a directory for the caches that are safe to share between checkouts (the weave cache
+# and the bucket's warm cache: both content-keyed, both written through a rename). Unset → `data_root()`.
+CACHE_DIR_ENV = "MINI_CACHE_DIR"
+
+
+def cache_root() -> Path:
+    """Where the shareable caches live: ``$MINI_CACHE_DIR`` if set, else :func:`data_root`.
+
+    A project whose sessions run in separate containers with one shared mount points this at the mount, so a report rendered in one session renders from cache in the others.
+    """
+    return Path(env) if (env := os.environ.get(CACHE_DIR_ENV)) else data_root()
+
+
 def _gpus() -> tuple[str | None, int]:
     """Best-effort GPU model + count, dependency-free. NVIDIA exposes a per-GPU info file on Linux; we don't import torch/jax just to name the card."""
     model, count = None, 0

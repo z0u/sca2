@@ -56,6 +56,8 @@ rg -no '.{0,55}anneal.{0,55}' docs/  # a {0,N} window around each match
 
 For the backlogs, prefer `./go todo --grep anneal`, which skips settled items.
 
+For recon on an earlier report (what it found, how it reads), read its Markdown render instead of the `.py`: `./go render docs/<key>/report.py -o .mini/lit/<key>/index.md`, with figures beside it. The render caches are shared between the project's cloud threads, so it's quick. Open the `.py` only to see how something was computed.
+
 If `uv` is too old, the session-start hook probably didn't run. Run it manually.
 
 ### Storage

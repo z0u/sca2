@@ -7,7 +7,7 @@ effort: medium
 ---
 
 Start by checking the current state. Look for open PRs whose title starts with `[SCI]` (work from a previous run). If one has review comments from me, address them before picking anything new. If one is a plan still waiting on my OK, leave it alone.
-`docs/index.md` says which experiments exist and where each stands. You might also find a `design.md` document, describing the plan for the current deliverable.
+`docs/index.md` says which experiments exist and where each stands. To read one, read its Markdown render (`./go render docs/<key>/report.py -o .mini/lit/<key>/index.md`), which is quicker to take in than the `.py`. You might also find a `design.md` document, describing the plan for the current deliverable.
 
 Then pick one item from the science todos: `./go todo science [--priority]`. What to do with it depends on what the item needs. In order of how little it commits us:
 

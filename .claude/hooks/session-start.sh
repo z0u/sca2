@@ -116,6 +116,24 @@ if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
     fi
 fi
 
+# 3b. Share the render caches between the project's threads. Each thread runs in
+#    its own container, and /mnt/project-files is the one folder they all mount,
+#    so MINI_CACHE_DIR points mini's shareable caches there: the weave cache
+#    (lit-cache: memoized figures and computations, with copies of the figure
+#    files) and the bucket's warm cache (store-cache: content-addressed blobs).
+#    Both write through a temp file and a rename, so concurrent writers are
+#    safe, and a report rendered in one thread takes about two seconds in every
+#    other. A project session says so in CLAUDE_CODE_PROJECTS_SESSION=1; a lone
+#    cloud session, a laptop or the dev container has neither that nor the
+#    folder, and keeps its caches under .mini/. An environment that sets MINI_CACHE_DIR
+#    itself keeps its own value.
+if [[ -n "${CLAUDE_ENV_FILE:-}" && "${CLAUDE_CODE_PROJECTS_SESSION:-}" == 1 && -d /mnt/project-files/ && -z "${MINI_CACHE_DIR:-}" ]]; then
+    if ! grep -qs "MINI_CACHE_DIR" "$CLAUDE_ENV_FILE"; then
+        echo "export MINI_CACHE_DIR=/mnt/project-files/.mini-cache" >> "$CLAUDE_ENV_FILE"
+        log "shared the render caches via MINI_CACHE_DIR"
+    fi
+fi
+
 # 4. Skip mechanical-reformat commits in `git blame` (see .git-blame-ignore-revs).
 #    The dev container sets this in post-create.sh and `./go install` sets it for
 #    local checkouts; the web image runs neither, and the config is repo-local so

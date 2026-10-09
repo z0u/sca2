@@ -1,6 +1,7 @@
 """Tests for ``mini.lit``: parsing, weaving, incremental re-runs, the memo, and the page."""
 
 import os
+import shutil
 import sys
 import textwrap
 from pathlib import Path
@@ -439,11 +440,58 @@ class TestMemo:
         use_publisher(pub)
         try:
             assert h() == h() == "_assets/fig.png" and len(calls) == 1
+            shutil.rmtree(tmp_path / "cache" / "assets")
             (tmp_path / "_assets" / "fig.png").unlink()
             h()
             assert len(calls) == 2 and (tmp_path / "_assets" / "fig.png").exists()
         finally:
             use_publisher(None)
+
+    def test_a_hit_in_a_fresh_directory_restores_its_assets(self, tmp_path):
+        """Another checkout or container sharing the cache has no output directory yet: the cache's copy of the figure fills it, with no redraw."""
+        calls = []
+
+        @memo
+        def h():
+            calls.append(1)
+            pub = current_publisher()
+            assert pub is not None
+            return pub.asset_url(b"png", name="fig.png")
+
+        from mini.reports import current_publisher, use_publisher
+
+        for out in ("one", "two"):
+            pub = Publisher(asset_dir=tmp_path / out / "_assets")
+            use_publisher(pub)
+            try:
+                set_cache_dir(tmp_path / "cache")  # a fresh process: only the disk tier
+                assert h() == "_assets/fig.png"
+            finally:
+                use_publisher(None)
+        assert len(calls) == 1 and (tmp_path / "two" / "_assets" / "fig.png").read_bytes() == b"png"
+
+    def test_a_hit_replaces_a_stale_asset_of_the_same_name(self, tmp_path):
+        """A figure file left by an older render has the right name and the wrong bytes; the hit restores the bytes its record was drawn with."""
+        calls = []
+
+        @memo
+        def h():
+            calls.append(1)
+            pub = current_publisher()
+            assert pub is not None
+            return pub.asset_url(b"new", name="fig.png")
+
+        from mini.reports import current_publisher, use_publisher
+
+        use_publisher(Publisher(asset_dir=tmp_path / "_assets"))
+        try:
+            h()
+            (tmp_path / "_assets" / "fig.png").write_bytes(b"old")
+            set_cache_dir(tmp_path / "cache")  # a fresh process: only the disk tier
+            h()
+        finally:
+            use_publisher(None)
+        assert len(calls) == 1 and (tmp_path / "_assets" / "fig.png").read_bytes() == b"new"
 
 
 class TestCellMark:
