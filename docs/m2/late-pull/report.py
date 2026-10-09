@@ -729,7 +729,9 @@ def hold_table() -> str:
 rf"""
 ## The anti-subspace hold (E4)
 
-In E1 and E3 the table and block 1 moved onto e₁ mostly while the anti-subspace weight was annealing. If the anneal lets go too early, holding that weight higher should keep them off. So a second round repeats `deep` and `deep-clean`, with the anti weight annealed to a higher hold. The hold is 0.1 (equal to the anchor weight) or 0.2, in place of the recipe hold of {hold_text(None)}. The peak at the start, the anneal at the end of training, and the seeds are as before.
+In E1 and E3 the table and block 1 moved onto e₁ mostly while the anti-subspace weight was annealing. If the anneal lets go too early, holding that weight higher should keep them off.
+
+A second round repeats `deep` and `deep-clean` with the anti weight annealed to a hold of 0.1 (equal to the anchor weight) or 0.2, in place of the recipe hold of {hold_text(None)}. The peak at the start, the anneal at the end of training, and the seeds are unchanged.
 
 {hold_figure()}
 
@@ -756,11 +758,13 @@ Moving the pull off the first two slices did most of what embedding-lean expecte
 
 It did not keep the concept out of block 1. The pull on block 2 is cheapest to meet by having block 1 already lean toward e₁, and block 1 has some context to work with, so part of what it puts there is about `{ex.ANCHORED_OP}` and part is shared with other ops.
 
-Keeping out the shared part is the job of the anti-subspace term. On its recipe schedule it does not manage it. Block 1 and the table move onto e₁ mostly in the second half of training. By then the anti weight has annealed from about two and a half times the anchor weight to a third of it. Holding it at twice the anchor weight kept both nearly off e₁ on the other ops in `deep` (E4). So on this pull the recipe anneal lets go too early.
+Keeping out the shared part is the job of the anti-subspace term, and on its recipe schedule it does not. Block 1 and the table move onto e₁ mostly in the second half of training. By then the anti weight has annealed from about two and a half times the anchor weight to a third of it. Holding it at twice the anchor weight kept both nearly off e₁ on the other ops in `deep` (E4). So on this pull the recipe anneal lets go too early.
 
 Embedding-lean found the pull on a color embedding to be an order of magnitude or more above what the anti term costs it. In `deep` the pull reaches the table only through block 1, and a hold of about seven times the recipe value was enough.
 
-The higher hold also took some removal. Some of what the edit removes at the recipe hold seems to sit at block 1. With block 1 kept off e₁, the model answers `{ex.ANCHORED_OP}` with less of it on e₁. The anti term also acts on the pulled blocks, and there the alignment of `{ex.ANCHORED_OP}` contexts falls a little as the hold rises. So part of the cost may be the hold pressing on the pull itself.
+The higher hold also took some removal. Some of what the edit removes at the recipe hold seems to sit at block 1. With block 1 kept off e₁, the model answers `{ex.ANCHORED_OP}` with less of it on e₁.
+
+The anti term also acts on the pulled blocks, and there the alignment of `{ex.ANCHORED_OP}` contexts falls a little as the hold rises. So part of the cost may be the hold pressing on the pull itself.
 
 Among the runs here, `deep` at a hold of 0.2 is the most selective. `deep` at 0.1 and `deep-clean` at the recipe hold remove more, with a little more spill.
 
