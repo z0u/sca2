@@ -67,7 +67,7 @@ Inside a step, ref writes are fenced on the attempt generation: if the task was 
 The backend is configuration, not code — nothing in an experiment or report changes:
 
 - No bucket configured → `LocalStore`, a `cas/<ab>/<sha>` tree under `.mini/store`. The default; no network. Project-wide sharing works *locally*.
-- A bucket configured → `HFStore`, the same layout over a Xet-backed Hugging Face bucket, shared across *machines and backends*: a Modal worker `put`s a blob; a local report or another experiment `get`s it back, no shared Volume. The local dir demotes to a warm cache, one per bucket (`.mini/store-cache/hf/<bucket>`, or under `$MINI_CACHE_DIR` when set, as the project's cloud threads set it to share the cache through their common folder).
+- A bucket configured → `HFStore`, the same layout over a Xet-backed Hugging Face bucket, shared across *machines and backends*: a Modal worker `put`s a blob; a local report or another experiment `get`s it back, no shared Volume. The local dir demotes to a warm cache, one per bucket (`.mini/store-cache/hf/<owner>--<bucket>`, or under `$MINI_CACHE_DIR` when set, as the project's cloud threads set it to share the cache through their common folder).
 
 Set the bucket once in `pyproject.toml` so it travels with the repo (set in one place, not three):
 

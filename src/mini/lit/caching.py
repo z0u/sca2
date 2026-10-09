@@ -14,15 +14,14 @@ import dataclasses
 import functools
 import hashlib
 import logging
-import os
 import pickle
 import shutil
-import uuid
 from pathlib import Path
 from typing import Any, Callable, ParamSpec, TypeVar, overload
 
 from mini.memo import _builtin_name, _is_project_source, _value_json, reachable_values, task_key_parts
 from mini.reports import current_publisher
+from mini.store import tmp_suffix
 
 __all__ = ["memo", "cache_dir", "set_cache_dir"]
 
@@ -131,7 +130,7 @@ def memo(fn: Callable[P, R] | None = None, /, *, version: str | None = None) -> 
                     rec
                     and rec.get("evidence") == evidence
                     and (
-                        _assets_present(rec["assets"], asset_dir)
+                        _assets_match(rec, asset_dir)
                         or _restore_assets(rec["assets"], _asset_copies(key, evidence), asset_dir)
                     )
                 ):
@@ -141,13 +140,14 @@ def memo(fn: Callable[P, R] | None = None, /, *, version: str | None = None) -> 
             mark = len(pub.log) if pub is not None else 0
             value = fn(*args, **kwargs)
             assets = pub.log[mark:] if pub is not None else []
-            rec = {"evidence": evidence, "value": value, "assets": assets, "deps": parts["deps"]}
+            shas = {n: pub._written[n] for n in assets} if pub is not None else {}
+            rec = {"evidence": evidence, "value": value, "assets": assets, "shas": shas, "deps": parts["deps"]}
             _hot[key, evidence] = rec
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 if asset_dir is not None:
                     _keep_assets(assets, asset_dir, _asset_copies(key, evidence))
-                tmp = path.with_suffix(_tmp_suffix())  # two renders may cache the same key at once
+                tmp = path.with_suffix(tmp_suffix())  # two renders may cache the same key at once
                 tmp.write_bytes(pickle.dumps(rec))
                 tmp.replace(path)
             except Exception as e:  # an unpicklable value still returns; it just isn't cached across processes
@@ -165,9 +165,17 @@ def _assets_present(names: list[str], asset_dir: Path | None) -> bool:
     return asset_dir is not None and all((asset_dir / n).exists() for n in names)
 
 
-def _tmp_suffix() -> str:
-    # Unique per writer: the cache may be shared by several containers, whose pids can coincide.
-    return f".{os.getpid()}-{uuid.uuid4().hex[:8]}.tmp"
+def _assets_match(rec: dict[str, Any], asset_dir: Path | None) -> bool:
+    """Whether *asset_dir* holds the files *rec* was drawn with. Names are fixed per figure, so a file left by an older render (here, or before another session wrote this record) has the right name and the wrong bytes."""
+    names, shas = rec["assets"], rec.get("shas", {})
+    if not names:
+        return True
+    if asset_dir is None:
+        return False
+    return all(
+        (p := asset_dir / n).is_file() and n in shas and hashlib.sha256(p.read_bytes()).hexdigest() == shas[n]
+        for n in names
+    )
 
 
 def _asset_copies(key: str, evidence: str) -> Path:
@@ -178,7 +186,7 @@ def _asset_copies(key: str, evidence: str) -> Path:
 def _keep_assets(names: list[str], asset_dir: Path, copies: Path) -> None:
     for n in names:
         (copies / n).parent.mkdir(parents=True, exist_ok=True)
-        tmp = copies / f"{n}{_tmp_suffix()}"
+        tmp = copies / f"{n}{tmp_suffix()}"
         shutil.copyfile(asset_dir / n, tmp)
         tmp.replace(copies / n)
 

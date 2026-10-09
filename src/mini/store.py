@@ -653,6 +653,11 @@ def _hf_token() -> str | None:
         return None
 
 
+def tmp_suffix() -> str:
+    """A temp-file suffix unique to this writer, across containers that share a cache folder (their pids can coincide)."""
+    return f".tmp.{os.getpid()}-{uuid.uuid4().hex[:8]}"
+
+
 def store_for(root: Path | str, *, cache_root: Path | str | None = None) -> Store:
     """The project store for a given local *root* — bucket-backed if configured.
 
@@ -727,9 +732,7 @@ class LocalStore(Store):
         dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists():  # immutable: another writer won the race; bytes are identical by hash
             return
-        tmp = dest.with_name(
-            f"{sha256}.tmp.{os.getpid()}-{uuid.uuid4().hex[:8]}"
-        )  # unique per writer, across containers too
+        tmp = dest.with_name(f"{sha256}{tmp_suffix()}")
         shutil.copyfile(src, tmp)  # copy (never hardlink): a caller mutating dest must not corrupt the CAS
         tmp.replace(dest)  # atomic publish into the CAS
 

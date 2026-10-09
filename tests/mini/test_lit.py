@@ -470,6 +470,29 @@ class TestMemo:
                 use_publisher(None)
         assert len(calls) == 1 and (tmp_path / "two" / "_assets" / "fig.png").read_bytes() == b"png"
 
+    def test_a_hit_replaces_a_stale_asset_of_the_same_name(self, tmp_path):
+        """A figure file left by an older render has the right name and the wrong bytes; the hit restores the bytes its record was drawn with."""
+        calls = []
+
+        @memo
+        def h():
+            calls.append(1)
+            pub = current_publisher()
+            assert pub is not None
+            return pub.asset_url(b"new", name="fig.png")
+
+        from mini.reports import current_publisher, use_publisher
+
+        use_publisher(Publisher(asset_dir=tmp_path / "_assets"))
+        try:
+            h()
+            (tmp_path / "_assets" / "fig.png").write_bytes(b"old")
+            set_cache_dir(tmp_path / "cache")  # a fresh process: only the disk tier
+            h()
+        finally:
+            use_publisher(None)
+        assert len(calls) == 1 and (tmp_path / "_assets" / "fig.png").read_bytes() == b"new"
+
 
 class TestCellMark:
     def test_a_marker_splits_a_cell_and_both_halves_display(self, tmp_path):
