@@ -32,8 +32,8 @@ def fetch_json(ref: str) -> Any:
 
 RESULTS = fetch_json(ex.RESULTS_REF)
 TRAJ = fetch_json(ex.TRAJ_REF)
+# Embedding-lean's measurements of ex-2.2.23, for the twins and controls at the same seeds.
 LEAN = {r["label"]: r for r in fetch_json(ex.lean.RESULTS_REF)["runs"]}
-"""Embedding-lean's measurements of ex-2.2.23, for the twins and controls at the same seeds."""
 DESIGN = RESULTS["design"]
 OPS: tuple[str, ...] = tuple(DESIGN["ops"])
 D = OPS.index(ex.ANCHORED_OP)
@@ -132,8 +132,8 @@ SLICE_MARK = ["o", "D", "^", "s", "v"]
 SLICE_NAME = ["emb", "block 1", "block 2", "block 3", "block 4"]
 
 # A few summaries the prose quotes.
+# The `whole` arm against its twins in ex-2.2.23: same code, seed, batches and label draws.
 TWIN_GAP = max(max(abs(a - b) for a, b in zip(r["clean"], twin_of(r)["clean"], strict=True)) for r in runs_of("whole"))
-"""The `whole` arm against its twins in ex-2.2.23: same code, seed, batches and label draws."""
 SLOPE = {a: mean_range(slope(r["emb_axis_colors"]) for r in runs_of(a)) for a in ARMS}
 SLOPE_UNLATCHED = mean_range(slope(r["emb_axis_colors"]) for r in runs_of("whole") if r["latched"] is None)
 SLOPE_CONTROL = mean_range(slope(c["emb_axis_colors"]) for c in CONTROLS)
@@ -163,7 +163,7 @@ Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter. H
 
 [Embedding-lean](/docs/m2/embedding-lean/report.py) found that every anchored run of ex-2.2.23 leans lightness onto e₁ in its color embedding table. At the embedding there is no context yet for the pull to use, so the pull settles for a token-level stand-in: darker colors are the nearest one for `{ex.ANCHORED_OP}` answers. Editing only blocks 2 to 4 of those runs removed most of `{ex.ANCHORED_OP}` with almost no spill. Editing the embedding alone spilled as much as editing every slice.
 
-Pulling every slice but the embedding had been tried before (ex-2.2.21 and the τ × λ_a sweep). But those runs also left the anti-subspace term off the embedding, and the table leaned all the same.
+Pulling every slice but the embedding had been tried before (ex-2.2.21 and the τ × λₐ sweep). But those runs also left the anti-subspace term off the embedding, and the table leaned all the same.
 
 So this experiment trains twelve runs at {ex.EPOCHS} epochs and {len(SEEDS)} seeds:
 
