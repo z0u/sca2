@@ -76,23 +76,38 @@ class Arm:
     """The slices the anti-subspace term acts on; `None` follows `anchor_slices`."""
     clean: bool
     """Hold every embedding off e₁ after each step."""
+    anti_hold: float | None = None
+    """The anti-subspace weight the schedule anneals to and holds, in place of the recipe hold (0.03); `None` is the
+    recipe schedule. The peak (0.25) and the end-of-training anneal are unchanged."""
 
+
+ANTI_HOLDS: tuple[float, ...] = (0.1, 0.2)
+"""The higher holds of the second round. The recipe anneals the anti weight from 0.25 to 0.03 by about epoch 300; on
+the `late` runs the lean of the table stayed at zero while the weight was at 0.22 or more, and grew from about the
+point it passed 0.2. 0.2 sits just under that, and 0.1 equals the anchor weight."""
 
 ARMS: tuple[Arm, ...] = (
     Arm("late", LATE, EVERY, clean=False),
     Arm("late-clean", LATE, EVERY, clean=True),
     Arm("whole", None, None, clean=False),
+    *(
+        Arm(f"{name}-anti{hold:g}", LATE, EVERY, clean=clean, anti_hold=hold)
+        for hold in ANTI_HOLDS
+        for name, clean in (("late", False), ("late-clean", True))
+    ),
 )
-"""`whole` is the recipe of record (ex-2.2.23's `anchor`), trained again for its trajectory."""
+"""`whole` is the recipe of record (ex-2.2.23's `anchor`), trained again for its trajectory. The report shows the
+`late` arms as `deep`, since "late" read as a time in training; the stored labels keep the names they were trained
+under."""
 
 SEEDS: tuple[int, ...] = ex2223.SEEDS[:4]
 """Model seeds 700 to 703, the first four of ex-2.2.23, so every run has a twin there in each condition."""
 
 TRAJ_STRIDE_EPOCHS = ex2223.TRAJ_STRIDE_EPOCHS
 
-BUDGET_USD = 8
+BUDGET_USD = 12
 """Ex-2.2.23 cost about \\$0.25 to \\$0.3 per 400-epoch run with its scoring; twelve runs and their measurements
-come to about \\$4."""
+come to about \\$4, and the sixteen of the second round about \\$5 more."""
 
 
 def label_of(arm: str, model_seed: int) -> str:
@@ -117,6 +132,9 @@ def rows_of(meta, epochs: int = EPOCHS, seeds: tuple[int, ...] = SEEDS) -> list[
             a.name, 1, a.name, lam=ex2216.LAM, tau=ex2216.TAU, epochs=epochs, ops=OP_NAMES, n_lines=ex2221.N_LINES
         )
         anchor, anti = ex2216.schedules(base)
+        if a.anti_hold is not None:
+            assert anti is not None
+            anti = anti | {"hold_ratio": a.anti_hold / anti["lam"]}
         for s in seeds:
             config, _ = ex2221.recipe_config(meta, s, epochs)
             rows.append(
