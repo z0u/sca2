@@ -158,10 +158,12 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter, and holding the table off e₁ by a hard constraint brought the spill of the full edit to about the selectivity criterion, with removal and the task as before. In both new arms the concept settled partly at block 1, which nothing pulls, and most of the spill that is left comes from there.
+Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms the concept settled partly at block 1, which nothing pulls, and most of the remaining spill comes from there.
 ///
 
-[Embedding-lean](/docs/m2/embedding-lean/report.py) found that every anchored run of ex-2.2.23 leans lightness onto e₁ in its color embedding table, since at the embedding nothing contextual exists for the pull to use, and darker colors are the nearest token-level stand-in for `{ex.ANCHORED_OP}` answers. Editing only blocks 2 to 4 of those runs removed most of `{ex.ANCHORED_OP}` with almost no spill, while editing the embedding alone spilled as much as editing every slice. Pulling every slice but the embedding had been tried before (ex-2.2.21 and the τ × λ_a sweep), but with the anti-subspace term left off the embedding too, and the table leaned all the same.
+[Embedding-lean](/docs/m2/embedding-lean/report.py) found that every anchored run of ex-2.2.23 leans lightness onto e₁ in its color embedding table. At the embedding there is no context yet for the pull to use, so the pull settles for a token-level stand-in: darker colors are the nearest one for `{ex.ANCHORED_OP}` answers. Editing only blocks 2 to 4 of those runs removed most of `{ex.ANCHORED_OP}` with almost no spill. Editing the embedding alone spilled as much as editing every slice.
+
+Pulling every slice but the embedding had been tried before (ex-2.2.21 and the τ × λ_a sweep). But those runs also left the anti-subspace term off the embedding, and the table leaned all the same.
 
 So this experiment trains twelve runs at {ex.EPOCHS} epochs and {len(SEEDS)} seeds:
 
@@ -185,13 +187,13 @@ rf"""
 
 This is an exploratory study, with no preregistration and no gate. Four seeds per arm can show a large change in the lean or the spill, against the seed range, but not a small one. The `whole` arm reproduces its twins in ex-2.2.23 (the task scores of each pair agree to within {TWIN_GAP:.1g}), so a difference between arms at one seed comes from the change of pull, not from nondeterminism in training.
 
-The anti-subspace weight keeps its recipe schedule, a multiple of the anchor weight that anneals from about two and a half times it early in training to a third of it by about the midpoint, and the anchor weight is the recipe value.
+The anchor weight is the recipe value, and the anti-subspace weight keeps its recipe schedule. That schedule is a multiple of the anchor weight: about two and a half times it early in training, annealing to a third of it by about the midpoint.
 <!-- REVIEW: said that the anti schedule anneals, which the earlier text ("a multiple of the anchor weight") left
 out. The stored trajectory has anti_weight 0.25 at epoch 20, 0.12 at 200, 0.04 at 300 and 0.03 after, against an
 anchor weight of 0.1; E1 and E3 now name this as a reading of the second-half growth. Verify: traj["anti_weight"]. -->
 <!-- REVIEW: "noise in training" narrowed to "nondeterminism in training", since the twin check shows runs reproduce
 bit for bit at a seed, not that the seed range is small; the sentence before covers that. -->
- The anchor term is a mean over the pulled slices, so at the same weight each of blocks 2 to 4 is pulled about five thirds as hard in the new arms as in `whole`. The anti term is a mean over the same five slices in every arm, so it is unchanged.
+The anchor term is a mean over the pulled slices, so at the same weight each of blocks 2 to 4 is pulled about five thirds as hard in the new arms as in `whole`. The anti term is a mean over the same five slices in every arm, so it is unchanged.
 
 ## The measurements
 
@@ -415,7 +417,7 @@ The spill falls, and removal holds. Under the edit on every slice all twelve run
 
 In both new arms the concept sits at block 1 as well as later. Editing block 1 alone removes at least as much as editing every slice, though block 1 is never pulled, and it gives most of the spill that is left. In `late` the embedding alone still spills on {seeds_text(EMB_SPILLERS)}, where the weaker lean of E1 is still read downstream.
 
-Editing only blocks 2 to 4 spills almost nothing in any arm, but its removal splits by seed. On seven of the twelve runs it removes nearly everything, and on the other five almost nothing ({seeds_text(LATE_LOW["late"])} in `late`, {seeds_text(LATE_LOW["late-clean"])} in `late-clean`, and {seeds_text(LATE_LOW["whole"])} in `whole`). On those five, the e₁ component at block 1 is what the answer depends on, and the e₁ component the pull put at blocks 2 to 4 is not needed for it: the later blocks may read block 1 along e₁ and write the answer elsewhere, or the two edits may differ in some other way the edit cannot tell apart. Embedding-lean saw the same split on the recipe and took it as a sign that the concept was partly built from the lean. It persists here with the table held off e₁, so the lean is not needed for it.
+Editing only blocks 2 to 4 spills almost nothing in any arm, but its removal splits by seed. On seven of the twelve runs it removes nearly everything, and on the other five almost nothing ({seeds_text(LATE_LOW["late"])} in `late`, {seeds_text(LATE_LOW["late-clean"])} in `late-clean`, and {seeds_text(LATE_LOW["whole"])} in `whole`). On those five, the answer depends on the e₁ component at block 1, and not on the e₁ component the pull put at blocks 2 to 4. Perhaps the later blocks read block 1 along e₁ and write the answer elsewhere. Or the two edits may differ in some other way that this measurement cannot tell apart. Embedding-lean saw the same split on the recipe and took it as a sign that the concept was partly built from the lean. Here the split persists with the table held off e₁, so it does not need the lean.
 <!-- REVIEW: "the later blocks rebuild the concept from what block 1 passes them, so taking it out after block 1 is
 too late" restated as what the two edits show (block-1 e₁ needed, blocks-2-to-4 e₁ not), with the mechanism as one
 reading. "Most runs" became "seven of twelve", since in the new arms it is half. Verify: the removal rows for
@@ -520,7 +522,7 @@ rf"""
 
 Moving the pull off the first two slices did most of what embedding-lean expected of it. The color table leans much less, the lightness in the states fades, and the full edit spills less on every seed. Holding the table off e₁ outright took the spill most of the rest of the way, with nothing lost in removal or in the task. That fits the account that the spill comes from stand-ins at the slices where nothing contextual exists.
 
-It did not keep the concept out of block 1. The pull on block 2 is cheapest to meet by having block 1 already lean toward e₁, and block 1 has some context to work with, so part of what it puts there is about `{ex.ANCHORED_OP}` and part is shared with other ops. Keeping out the shared part is the job of the anti-subspace term, and on its recipe schedule it does not: block 1 and the table move onto e₁ mostly after the anti weight has annealed toward its hold. Embedding-lean estimated the anti term to be an order of magnitude or more too weak per embedding, and this may be the same shortfall at block 1, or the anneal letting go too early; the two are not separated here.
+It did not keep the concept out of block 1. The pull on block 2 is cheapest to meet by having block 1 already lean toward e₁, and block 1 has some context to work with, so part of what it puts there is about `{ex.ANCHORED_OP}` and part is shared with other ops. Keeping out the shared part is the job of the anti-subspace term. On its recipe schedule it does not manage it: block 1 and the table move onto e₁ mostly after the anti weight has annealed toward its hold. Embedding-lean estimated the anti term to be an order of magnitude or more too weak per embedding. This may be the same shortfall at block 1, or the anneal may let go too early; this run does not separate the two.
 
 The split in the edit on blocks 2 to 4 says that, on some seeds, the answer to `{ex.ANCHORED_OP}` depends on the e₁ component at block 1 and not on the one at the later blocks, with or without a lean. If that holds, the edit on every slice is the one to keep, and the remaining spill is a question of what block 1 carries.
 <!-- REVIEW: the two paragraphs above follow the E1, E2 and E3 changes: the anneal named as an alternative to
