@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [D2.2, anchoring, representations, ex-2.2.23]
 opened: 2026-10-08
 ---
@@ -20,3 +20,6 @@ Split from the withdrawn ex-2.2.24 draft (its E1, H1, H3, and E3; see [PR #255](
 ## Notes
 
 **2026-10-08, spill-by-position** — [The position pass](/docs/m2/spill-by-position/report.py) bears on this item. The spill at the example answers lands mostly on `darken` and grows with the removal there; the operands and symbols spill onto `lighten` with no removal at all, so the lightness measurement at the operands looks like the right place to start. Most anchored runs also have one syntax embedding lying on e₁ (⏎, `?`, or `,`, a different one per run; listed in that report, E3), so the map should mark which token each run latched and keep those positions apart from the op. Across positions, the removal under a single-position edit follows the alignment closely on the runs without a latched separator.
+
+**2026-10-09, Claude** — The [lean review](/docs/m2/embedding-lean/report.py) answers the second and third bullets. Lightness is on e₁ in the color embedding table itself on every anchored run (r ≈ −0.7 between lightness and the e₁ component; darker colors further along), about three times larger on runs with no latch, and it fades with depth; the spill tracks it. At the example answers of other ops the per-example "fits `difference`" judgement fires as on `difference` contexts, and the spill does not follow it. The map along the context with op and color probes (first bullet) is not done; what remains is whether it is still wanted once the pull is kept off the early slices.
+
