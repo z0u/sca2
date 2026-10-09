@@ -158,7 +158,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms the concept settled partly at block 1, which nothing pulls, and most of the remaining spill comes from there.
+Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms, block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there.
 ///
 
 [Embedding-lean](/docs/m2/embedding-lean/report.py) found that every anchored run of ex-2.2.23 leans lightness onto e₁ in its color embedding table. At the embedding there is no context yet for the pull to use, so the pull settles for a token-level stand-in: darker colors are the nearest one for `{ex.ANCHORED_OP}` answers. Editing only blocks 2 to 4 of those runs removed most of `{ex.ANCHORED_OP}` with almost no spill. Editing the embedding alone spilled as much as editing every slice.
@@ -180,7 +180,7 @@ rf"""
 ## Observations
 
 - [The color table (E1)](#the-color-table-e1): in `late` the table leans the same way as on the recipe on every seed, where the controls lean either way, but only about a quarter as far. The lightness in the states at block 1 fades to about half.
-- [Removal and spill (E2)](#removal-and-spill-e2): the full edit removes as much in both new arms as on the recipe. Its spill falls in `late`, and falls to about the criterion in `late-clean`. In both arms, editing block 1 alone removes nearly everything.
+- [Removal and spill (E2)](#removal-and-spill-e2): the full edit removes as much in both new arms as on the recipe. Its spill falls in `late`, and falls to about the criterion in `late-clean`. In both arms, editing block 1 alone removes nearly everything and gives most of the spill that is left.
 - [Where the alignment settles (E3)](#where-the-alignment-settles-e3): in the new arms the alignment of `{ex.ANCHORED_OP}` contexts grows at blocks 2 to 4 early in training, as the pull asks. Block 1 follows more slowly, on other ops as well as on `{ex.ANCHORED_OP}`.
 
 ## Scope
@@ -274,7 +274,8 @@ def table_draw(data: dict, alt_text: str) -> str:
             ax.plot([end * 1.02, end * 1.07], [v, v], color=light_dark("#333", "#ddd"), lw=1.2, zorder=3)
         ax.set_xlabel("epoch", fontsize=9)
         ax.set_ylabel("slope against lightness", fontsize=9)
-        ax.legend(frameon=False, fontsize=7, loc="lower left")
+        handles, labels = ax.get_legend_handles_labels()
+        fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=7)
         return fig
 
     return _plot()
@@ -318,7 +319,7 @@ the unlatched seeds) to −0.23, where the slope goes to a quarter. Verify: the 
 
 On the recipe the slope grows from early in training. On `late` it stays near zero for about the first hundred epochs, then grows through the second half, while the whole table drifts a little onto e₁ (E3). The pull on block 2 reaches the table only through block 1, and that is enough to load some lightness onto e₁.
 
-The growth also tracks the anti-subspace schedule, which anneals from its peak to its hold over the same epochs (Scope), so the table may be held off e₁ while the anti term is strong and lean once it is not; this run cannot separate the two. Part of the lean may also come from the per-slice pull being five thirds of the recipe value.
+The growth also coincides with the anneal of the anti-subspace weight, which the Discussion takes up. Part of the lean may also come from the per-slice pull being five thirds of the recipe value.
 <!-- REVIEW: added the anti-schedule reading of the late onset. The anti weight falls from 0.22 at epoch 100 to 0.04
 at epoch 300, the window in which the late slope grows; the earlier text gave only the route through block 1.
 Verify: traj["anti_weight"] against the slope panel. -->
@@ -504,7 +505,7 @@ On the recipe every slice rises together on `{ex.ANCHORED_OP}` contexts, and the
 
 On both new arms, blocks 2 to 4 rise on `{ex.ANCHORED_OP}` contexts within the first few dozen epochs and then level off, and stay low on the other ops. Block 1 rises later and more slowly, on the other ops as well as on `{ex.ANCHORED_OP}`, though less on the others than on the recipe. So block 1 comes to meet part of the pull on block 2, and the anti term does not stop it.
 
-Much of the rise at block 1, and nearly all of it on the other ops, comes after epoch 150, as the anti weight anneals toward its hold (Scope), so the anti term may hold block 1 off e₁ only while it is strong. Its rise on other ops is the spill that E2 traced to the edit on block 1.
+Much of the rise at block 1, and nearly all of it on the other ops, comes after epoch 150, as the anti weight anneals (see the Discussion). Its rise on other ops is the spill that E2 traced to the edit on block 1.
 <!-- REVIEW: added the schedule reading beside "the anti term does not stop it", for the same reason as in E1.
 Verify: block 1 on the other ops rises from about epoch 150 in both new arms, where anti_weight is 0.18 and falling. -->
 
@@ -521,9 +522,9 @@ Moving the pull off the first two slices did most of what embedding-lean expecte
 
 It did not keep the concept out of block 1. The pull on block 2 is cheapest to meet by having block 1 already lean toward e₁, and block 1 has some context to work with, so part of what it puts there is about `{ex.ANCHORED_OP}` and part is shared with other ops.
 
-Keeping out the shared part is the job of the anti-subspace term. On its recipe schedule it does not manage it: block 1 and the table move onto e₁ mostly after the anti weight has annealed toward its hold. Embedding-lean estimated the anti term to be an order of magnitude or more too weak per embedding. This may be the same shortfall at block 1, or the anneal may let go too early; this run does not separate the two.
+Keeping out the shared part is the job of the anti-subspace term. On its recipe schedule it does not manage it: block 1 and the table move onto e₁ mostly in the second half of training, after the anti weight has annealed from about two and a half times the anchor weight to a third of it (Scope). So the table and block 1 may be held off e₁ while the anti term is strong, and lean once it is not. Embedding-lean estimated the anti term to be an order of magnitude or more too weak per embedding. This may be the same shortfall at block 1, or the anneal may let go too early; this run does not separate the two.
 
-If, on some seeds, the answer to `{ex.ANCHORED_OP}` depends on the e₁ component at block 1 and not on the one at the later blocks (E2), the edit on every slice is the one to keep, and the remaining spill is a question of what block 1 carries.
+On the seeds where the answer to `{ex.ANCHORED_OP}` depends on the e₁ component at block 1 and not on the one at the later blocks (E2), the edit on every slice is the one to keep, and the remaining spill is a question of what block 1 carries.
 <!-- REVIEW: the two paragraphs above follow the E1, E2 and E3 changes: the anneal named as an alternative to
 "too weak", and the split restated as what the edits show rather than as the later blocks rebuilding the concept. -->
 
