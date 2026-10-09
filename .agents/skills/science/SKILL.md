@@ -38,7 +38,7 @@ flowchart TD
     conv1 -->|no| write
     conv1 -->|yes| hr["review on paper (human)"]
     hr --> conv2{"converged? (human)"}
-    conv2 -->|no| write
+    conv2 -->|"no, or the discussion is still to write"| write
   end
   conv2 -->|yes| merge["finalize and merge"]
   merge --> stop(( ))
@@ -48,16 +48,22 @@ flowchart TD
 
 **Preregistration**, only when the shape calls for it (a survey takes this branch too). The inception review has already checked the assumptions, so the skeleton goes to the style review and then to the human on paper. If they ask for changes, the update goes back through the assumptions review. Their OK freezes the hypotheses.
 
-**Execution.** Run the experiment (the `mi-ni` skill), then write the report into the same file. Before writing the interpretation (the index under the lede, and the discussion), explain the results to the human in a message, in the register `sci-report` describes, and discuss them: that is the part they most want a hand in, and the part most likely to claim too much. Their reply and your message become the first draft. Each round is then a claims review and a style review. When the rounds converge, the human reviews the report on paper, and their marks start another round until they're happy. Then finalize: resolve every `Open decision` box, publish (the `mi-ni` skill), and merge.
+**Execution.** Run the experiment (the `mi-ni` skill), then write the report into the same file. Each round is a claims review and a style review, and when the rounds converge, the human reviews the report on paper; their marks start another round until they're happy. The interpretation (the index under the lede, and the discussion) is the part the human most wants a hand in, and the part most likely to claim too much. So in a preregistered report, write the result sections first and send them for a paper round before writing the discussion. An exploratory report can be drafted whole in the first pass, though split it the same way if the results surprise you. Then finalize: resolve every `Open decision` box, publish (the `mi-ni` skill), and merge.
 
 ## Choosing a shape
 
-Most of our questions are best answered by a short exploratory report: one question, looked at a few ways, and what we make of it. That is the default. It is quick to write, quick to run, and quick for the human to review on paper, and it spends nothing on predictions, gates, and verdicts that the result might not need.
+Exploratory
+:   One question, looked at a few ways, and what we make of it. The default.
 
-Two other shapes exist for when the default doesn't fit. Propose them in the discussion.
+Preregistered
+:   Predictions and the criteria for any choice are frozen before the run, and each hypothesis gets a verdict.
 
-- Preregister when a claim has to stand without the reader trusting how we chose to look at the data: a result a deliverable will rest on, an operating point to confirm at fresh seeds before it is quoted, or a costly run where a frozen plan keeps us from reading the results to suit.
-- Run a survey when choosing an operating point in a space too large to give every point a hypothesis.
+Survey
+:   A preregistered search: the search plan is frozen instead of an outcome, to choose an operating point in a large space.
+
+Most of our questions are best answered by a short exploratory report. It is quick to write, quick to run, and quick for the human to review on paper, and it spends nothing on formal predictions, gates, and verdicts that the result might not need.
+
+Propose a preregistration if you think it is more appropriate. It suits a claim that has to stand without the reader trusting how we chose to look at the data: a result a deliverable will rest on, an operating point to confirm at fresh seeds before it is quoted, or a costly run where a frozen plan keeps us from reading the results to suit. A survey is the preregistered shape for choosing an operating point in a space too large to give every point a hypothesis.
 
 An exploratory result is as solid as its data, and the report says how sure we are. What it lacks is a prediction made in advance, so if a later design leans on it heavily, a preregistered confirmation settles it.
 
@@ -65,7 +71,7 @@ An exploratory result is as solid as its data, and the report says how sure we a
 
 | Step | Who | Model |
 | --- | --- | --- |
-| Discuss, OK the plan, judge the paper rounds | human | |
+| Discuss, OK the plan, review on paper | human | |
 | Fill in, write, run the reviews, apply proposals | lead | session |
 | Review: assumptions | `sci-review-assumptions` | Fable |
 | Review: claims | `sci-review-claims` | Fable |
@@ -78,7 +84,7 @@ The style review runs on every draft, whoever wrote it. Its two prose passes fin
 
 ## Running a review
 
-A reviewer starts with an empty context, and that isolation is the point: it reads the report the way a reader will. Before each review, commit the draft, so that `git diff` afterwards shows that review's changes alone. Then brief the reviewer with:
+A reviewer starts with an empty context, so it reads the report the way a reader will. Before each review, commit the draft, so that `git diff` afterwards shows that review's changes alone. Then brief the reviewer with:
 
 - The path to the report, and a fresh Markdown render of it (`./go render docs/<key>/report.py -o .mini/lit/<key>/index.md`). Reviews read the render, where a cell that failed to render shows up and the source markup doesn't get in the way. The render re-runs the cells (memoized work comes from the cache), so allow a few minutes.
 - Which sections are in scope, since a report gets written a section at a time and a `TODO` whose turn hasn't come isn't a finding.
@@ -87,7 +93,7 @@ A reviewer starts with an empty context, and that isolation is the point: it rea
 
 The style review is three steps. Hand the path and the line range of each section in scope to `prose-simplifier`, then the same ranges to `report-restructure`, with no other context; in that order, since run the other way the simplifier would unpick the grouping. In a preregistered report, leave the frozen predictions out of the ranges. Then commit, re-render, and brief `sci-review-style` as above.
 
-Each reviewer ends with a short report: `Changes`, `Proposals`, `Tensions`, `Blockers`, and a `Recommendation`, plus a field for its own question (`Numbers checked`, `Retelling`). A reviewer edits what it is sure of and proposes anything that would change what the report claims or cut a whole paragraph. Apply a proposal you agree with, and put the rest to the human. When an applied proposal changes a claim, leave a `REVIEW` note for it (the conventions are in `sci-report`).
+Each reviewer ends with a short report: `Changes`, `Proposals`, `Tensions`, `Blockers`, and a `Recommendation`, plus a field for its own question (`Numbers checked`, `Retelling`). A reviewer edits what it is sure of and proposes anything that would change what the report claims or cut a whole paragraph. Apply a proposal you agree with, and put the edge cases to the human. When an applied proposal changes a claim, leave a `REVIEW` note for it (the conventions are in `sci-report`).
 
 Then decide:
 
