@@ -1,10 +1,11 @@
 # ruff: noqa: B018
 # title: Pulling the deeper blocks only
 
-# Twelve new runs: two arms that pull blocks 2 to 4 only, with the anti-subspace term on every slice, and the recipe
-# trained again at the same four seeds for its trajectory. `experiment.py` beside this script trains and measures every
+# Twenty-eight new runs: two arms that pull blocks 2 to 4 only, with the anti-subspace term on every slice, the recipe
+# trained again at the same four seeds for its trajectory, and the two new arms again at two higher anti holds. `experiment.py` beside this script trains and measures every
 # run; the twins and controls at the same seeds come from ex-2.2.23, as embedding-lean measured them.
 import json
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -101,6 +102,10 @@ def fmt(values, spec: str = ".2f") -> str:
 
 
 def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
+    def code(c: str) -> str:
+        return re.sub(r"`([^`]+)`", r"<code>\1</code>", c)
+
+    head, rows = [code(h) for h in head], [[code(c) for c in r] for r in rows]
     ths = "".join(f"<th{' class=num' if i else ''}>{h}</th>" for i, h in enumerate(head))
     body = "".join(
         "<tr>" + "".join(f"<td{' class=num' if i else ''}>{c}</td>" for i, c in enumerate(r)) + "</tr>" for r in rows
@@ -172,6 +177,22 @@ LATE_LOW = {a: [r["model_seed"] for r in runs_of(a) if removal(r, LATE_SET) < 0.
 EMB_SPILLERS = [r["model_seed"] for r in runs_of("late") if spill(r, EMB) > CRITERION]
 
 
+# The second round: `deep` and `deep-clean` with the anti-subspace weight annealed to a higher hold.
+HOLDS: tuple[float | None, ...] = (None, *ex.ANTI_HOLDS)
+_T = TRAJ[ex.label_of("late", SEEDS[0])]["traj"]
+# The recipe hold: the lowest anti-subspace weight before the anneal at the end of training.
+RECIPE_HOLD = float(min(w for e, w in zip(_T["epoch"], _T["anti_weight"], strict=True) if e < 0.85 * ex.EPOCHS))
+
+
+def held(arm: str, hold: float | None) -> str:
+    """The stored arm key of *arm* at an anti-subspace hold; `None` is the recipe hold."""
+    return arm if hold is None else f"{arm}-anti{hold:g}"
+
+
+def hold_text(hold: float | None) -> str:
+    return f"{RECIPE_HOLD:.2f}" if hold is None else f"{hold:g}"
+
+
 def seeds_text(seeds: list[int]) -> str:
     """A list of seeds in words: 'seed 700', 'seeds 700 and 702', 'seeds 700, 701 and 703'."""
     listed = " and ".join(", ".join(str(s) for s in seeds).rsplit(", ", 1))
@@ -183,7 +204,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms, block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there.
+Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms, block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there. Holding the anti-subspace weight at 0.2 late in training, in place of annealing it to {hold_text(None)}, kept the table and block 1 nearly off e₁ and brought every `deep` run within the criterion, at some cost in removal.
 ///
 
 [Embedding-lean](/docs/m2/embedding-lean/report.py) found that every anchored run of ex-2.2.23 leans lightness onto e₁ in its color embedding table. At the embedding there is no context yet for the pull to use, so the pull settles for a token-level stand-in: darker colors are the nearest one for `{ex.ANCHORED_OP}` answers. Editing only blocks 2 to 4 of those runs removed most of `{ex.ANCHORED_OP}` with almost no spill. Editing the embedding alone spilled as much as editing every slice.
@@ -196,7 +217,7 @@ So this experiment trains twelve runs at {ex.EPOCHS} epochs and {len(SEEDS)} see
 - `deep-clean`: the same, and after every step the e₁ component of every embedding is set to zero, so the table cannot lean at all. The readout table is untied on this recipe (a separate matrix from the embedding table) and stays free.
 - `whole`: the recipe of record, every slice pulled, trained again to record the alignment at every slice and position along training.
 
-Each run shares its seed, and so its initialization, batches and label draws, with one anchored run and one control of ex-2.2.23. The anchor weight, the pool temperature τ and both schedules are the recipe values.
+Each run shares its seed, and so its initialization, batches and label draws, with one anchored run and one control of ex-2.2.23. The anchor weight, the pool temperature τ and both schedules are the recipe values. A second round of sixteen runs repeats `deep` and `deep-clean` with the anti-subspace weight annealed to a higher hold (E4).
 """
 
 # %%
@@ -207,12 +228,13 @@ rf"""
 - [The color table (E1)](#the-color-table-e1): in `deep` the table leans the same way as on the recipe on every seed, where the controls lean either way, but only about a quarter as far. The lightness in the states at block 1 fades to about half.
 - [Removal and spill (E2)](#removal-and-spill-e2): the full edit removes as much in both new arms as on the recipe. Its spill falls in `deep`, and falls to about the criterion in `deep-clean`. In both arms, editing block 1 alone removes nearly everything and gives most of the spill that is left.
 - [Where the alignment settles (E3)](#where-the-alignment-settles-e3): in the new arms the alignment of `{ex.ANCHORED_OP}` contexts grows at blocks 2 to 4 early in training, as the pull asks. Block 1 follows more slowly, on other ops as well as on `{ex.ANCHORED_OP}`.
+- [The anti-subspace hold (E4)](#the-anti-subspace-hold-e4): the higher the hold, the less the table leans and the less block 1 drifts onto e₁ on other ops. At a hold of 0.2 every `deep` run is within the criterion, but removal falls. In `deep-clean` the hold changes less.
 
 ## Scope
 
 This is an exploratory study, with no preregistration and no gate. Four seeds per arm can show a large change in the lean or the spill, against the seed range, but not a small one. The `whole` arm reproduces its twins in ex-2.2.23 (the task scores of each pair agree to within {TWIN_GAP:.1g}), so a difference between arms at one seed comes from the change of pull, not from nondeterminism in training.
 
-The anchor weight is the recipe value, and the anti-subspace weight keeps its recipe schedule. That schedule is a multiple of the anchor weight: about two and a half times it early in training, annealing to a third of it by about the midpoint.
+The anchor weight is the recipe value, and outside E4 the anti-subspace weight keeps its recipe schedule. That schedule is a multiple of the anchor weight: about two and a half times it early in training, annealing to a third of it by about the midpoint.
 <!-- REVIEW: said that the anti schedule anneals, which the earlier text ("a multiple of the anchor weight") left
 out. The stored trajectory has anti_weight 0.25 at epoch 20, 0.12 at 200, 0.04 at 300 and 0.03 after, against an
 anchor weight of 0.1; E1 and E3 now name this as a reading of the second-half growth. Verify: traj["anti_weight"]. -->
@@ -356,7 +378,7 @@ the unlatched seeds) to −0.23, where the slope goes to a quarter. Verify: the 
 
 On the recipe the slope grows from early in training. On `deep` it stays near zero for about the first hundred epochs, then grows through the second half, while the whole table drifts a little onto e₁ (E3). The pull on block 2 reaches the table only through block 1, and that is enough to load some lightness onto e₁.
 
-The growth also coincides with the anneal of the anti-subspace weight, which the Discussion takes up. Part of the lean may also come from the per-slice pull being five thirds of the recipe value.
+The growth also coincides with the anneal of the anti-subspace weight, which E4 changes. Part of the lean may also come from the per-slice pull being five thirds of the recipe value.
 <!-- REVIEW: added the anti-schedule reading of the late onset. The anti weight falls from 0.22 at epoch 100 to 0.04
 at epoch 300, the window in which the late slope grows; the earlier text gave only the route through block 1.
 Verify: traj["anti_weight"] against the slope panel. -->
@@ -549,13 +571,179 @@ On the recipe every slice rises together on `{ex.ANCHORED_OP}` contexts, and the
 
 On both new arms, blocks 2 to 4 rise on `{ex.ANCHORED_OP}` contexts within the first few dozen epochs and then level off, and stay low on the other ops. Block 1 rises later and more slowly, on the other ops as well as on `{ex.ANCHORED_OP}`, though less on the others than on the recipe. So block 1 comes to meet part of the pull on block 2, and the anti term does not stop it.
 
-Much of the rise at block 1, and nearly all of it on the other ops, comes after epoch 150, as the anti weight anneals (see the Discussion). Its rise on other ops is the spill that E2 traced to the edit on block 1.
+Much of the rise at block 1, and nearly all of it on the other ops, comes after epoch 150, as the anti weight anneals (E4). Its rise on other ops is the spill that E2 traced to the edit on block 1.
 <!-- REVIEW: added the schedule reading beside "the anti term does not stop it", for the same reason as in E1.
 Verify: block 1 on the other ops rises from about epoch 150 in both new arms, where anti_weight is 0.18 and falling. -->
 
 
 On `deep` the embedding also drifts onto e₁ in the second half of training, by about as much on the other ops as on `{ex.ANCHORED_OP}`. That is the whole color table shifting a little toward e₁, with the lightness slope of E1 on top. It does not happen in `deep-clean`, where the table is held at zero.
 """
+
+# %%
+
+HOLD_INK = [light_dark(c, d) for c, d in (("#8fbbe0", "#4f7fa8"), ("#2f7bbf", "#7ab8f5"), ("#0b3c73", "#cfe6ff"))]
+HOLD_MARK = ["o", "^", "s"]
+HELD_SLOPE = {h: mean_range(slope(r["emb_axis_colors"]) for r in runs_of(held("late", h))) for h in HOLDS}
+HELD_WITHIN = {
+    (a, h): sum(spill(r) <= CRITERION for r in runs_of(held(a, h))) for a in ("late", "late-clean") for h in HOLDS
+}
+HELD_REMOVAL = {
+    (a, h): mean_range(removal(r) for r in runs_of(held(a, h))) for a in ("late", "late-clean") for h in HOLDS
+}
+TOP = ex.ANTI_HOLDS[-1]
+WORST_TOP_CLEAN = max(runs_of(held("late-clean", TOP)), key=spill)
+LOW_TOP_CLEAN = min(runs_of(held("late-clean", TOP)), key=removal)
+
+
+def task_change(r: dict) -> float:
+    """The mean task score over ops, less that of the control at the same seed."""
+    return float(np.mean(r["clean"]) - np.mean(control_of(r)["clean"]))
+
+
+TASK_DROP_TOP = min(
+    (r for h in ex.ANTI_HOLDS for a in ("late", "late-clean") for r in runs_of(held(a, h))), key=task_change
+)
+TASK_DROP_RECIPE = min(task_change(r) for a in ARMS for r in runs_of(a))
+
+
+def block1_other(lab: str) -> list[float]:
+    """The mean α at block 1 over the positions of the probe contexts of the other ops, along training."""
+    return np.asarray(TRAJ[lab]["traj"]["alpha_other"])[:, 1].mean(axis=1).tolist()
+
+
+def hold_figure() -> str:
+    def series(arm: str, h: float | None, key: str) -> list[dict]:
+        out = []
+        for s in SEEDS:
+            t = TRAJ[ex.label_of(held(arm, h), s)]["traj"]
+            y = (
+                [slope(x) for x in t["emb_axis_colors"]]
+                if key == "slope"
+                else block1_other(ex.label_of(held(arm, h), s))
+            )
+            out.append({"epoch": t["epoch"], "y": y})
+        return out
+
+    panels = [
+        ("late", "slope", "slope against lightness"),
+        ("late", "b1", "α at block 1, other ops"),
+        ("late-clean", "b1", "α at block 1, other ops"),
+    ]
+    data = {
+        "panels": [
+            {"title": NAME[a], "ylabel": yl, "key": k, "holds": [series(a, h, k) for h in HOLDS]} for a, k, yl in panels
+        ],
+        "holds": [hold_text(h) for h in HOLDS],
+        "schedules": [schedule_of(held("late", h)) for h in HOLDS],
+    }
+    alt = f"""
+        In deep, the lean of the table grows through the second half of training at the recipe hold of
+        {hold_text(None)}, about half as much at 0.1, and hardly at all at 0.2; the alignment of block 1 on other ops
+        follows the same order in deep and in deep-clean, and stays near its early level at 0.2.
+    """
+    return hold_draw(data, alt)
+
+
+@memo
+def hold_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="late-pull-hold",
+        alt_text=alt_text,
+        caption=f"""
+            **The lean and block 1 along training, by anti-subspace hold.** Left: the slope of the e₁ component of
+            the color embeddings against lightness in `deep`. Middle and right: the mean α at block 1 over the
+            positions of the probe contexts of the other ops. One line per hold: bold is the seed mean and the
+            hairlines are the {len(SEEDS)} runs. The strips below are the anchor weight (solid gray) and the
+            anti-subspace weight at each hold (dashed).
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(2, 3, figsize=(7.2, 3.4), layout="constrained", sharex=True, height_ratios=[3, 1])
+        axes[0, 2].sharey(axes[0, 1])
+        for col, panel in enumerate(data["panels"]):
+            ax = axes[0, col]
+            ax.axhline(0, color=light_dark("#aaa", "#555"), lw=0.5, zorder=0)
+            for i, runs in enumerate(panel["holds"]):
+                for r in runs:
+                    ax.plot(r["epoch"], r["y"], color=HOLD_INK[i], lw=0.3, alpha=0.6, zorder=2)
+                ep = np.asarray(runs[0]["epoch"])
+                mean = np.mean([r["y"] for r in runs], axis=0)
+                ax.plot(
+                    ep,
+                    mean,
+                    color=HOLD_INK[i],
+                    lw=1.5,
+                    marker=HOLD_MARK[i],
+                    markevery=10,
+                    ms=3.5,
+                    label=f"hold {data['holds'][i]}",
+                    zorder=3,
+                )
+            ax.set_title(panel["title"], fontsize=8)
+            ax.set_ylabel(panel["ylabel"], fontsize=8)
+            sax = axes[1, col]
+            first = data["schedules"][0]
+            sax.plot(first["epoch"], first["anchor"], color=SCHED_INK["anchor"], lw=1.1, label="anchor weight")
+            for i, sched in enumerate(data["schedules"]):
+                sax.plot(sched["epoch"], sched["anti"], color=HOLD_INK[i], lw=1.1, ls="--")
+            sax.set_ylim(0, 0.27)
+            sax.set_yticks([0, 0.1, 0.2])
+            sax.tick_params(labelsize=7)
+            sax.set_xlabel("epoch", fontsize=9)
+        axes[1, 0].set_ylabel("weight", fontsize=8)
+        handles, labels = axes[0, 0].get_legend_handles_labels()
+        sh, sl = axes[1, 0].get_legend_handles_labels()
+        fig.legend(handles + sh, labels + sl, loc="outside upper center", ncols=4, frameon=False, fontsize=7)
+        return fig
+
+    return _plot()
+
+
+def hold_table() -> str:
+    rows = []
+    for a in ("late", "late-clean"):
+        for h in HOLDS:
+            rs = runs_of(held(a, h))
+            rows.append(
+                [
+                    f"`{NAME[a]}`",
+                    hold_text(h),
+                    fmt(slope(r["emb_axis_colors"]) for r in rs),
+                    fmt(removal(r) for r in rs),
+                    fmt((spill(r) for r in rs), ".3f"),
+                    f"{HELD_WITHIN[a, h]} of {len(rs)}",
+                    fmt((task_change(r) for r in rs), ".3f"),
+                ]
+            )
+    return table_html(
+        ["arm", "anti hold", "slope in the table", "removal", "spill", "within criterion", "task change"],
+        rows,
+        f"""
+        **The lean, removal and spill by anti-subspace hold**, seed mean and range over {len(SEEDS)} runs, under the
+        edit on every slice. The task change is the mean score over ops less that of the control at the same seed.
+        The rows at the hold of {hold_text(None)} are the `deep` and `deep-clean` runs of E1 to E3.
+        """,
+    )
+
+
+rf"""
+## The anti-subspace hold (E4)
+
+In E1 and E3 the table and block 1 moved onto e₁ mostly while the anti-subspace weight was annealing. If the anneal lets go too early, holding that weight higher should keep them off. So a second round repeats `deep` and `deep-clean` with the anti weight annealed to a hold of 0.1 (equal to the anchor weight) or 0.2, in place of the recipe hold of {hold_text(None)}. The peak at the start, the anneal at the end of training and the seeds are as before.
+
+{hold_figure()}
+
+The higher the hold, the less the table leans and the less block 1 drifts onto e₁ on other ops. At 0.2 the slope in `deep` is between {num(HELD_SLOPE[TOP][1])} and {num(HELD_SLOPE[TOP][2])} by seed, within the range of the controls and no longer all one sign, and block 1 stays near its early level through training. At 0.1 both grow, but about half as much as at the recipe hold.
+
+{hold_table()}
+
+In `deep` the spill follows. The full edit is within the criterion on {HELD_WITHIN["late", ex.ANTI_HOLDS[0]]} of {len(SEEDS)} runs at 0.1 and on {HELD_WITHIN["late", TOP]} of {len(SEEDS)} at 0.2, where none were at the recipe hold. But removal falls as the hold rises, to between {HELD_REMOVAL["late", TOP][1]:.2f} and {HELD_REMOVAL["late", TOP][2]:.2f} at 0.2. With the concept kept out of block 1, less of `{ex.ANCHORED_OP}` depends on e₁ anywhere.
+
+In `deep-clean` the hold changes less, since its spill was already near the criterion. At 0.2 one run (seed {WORST_TOP_CLEAN["model_seed"]}) spills {spill(WORST_TOP_CLEAN):.3f}, more than any `deep-clean` run at the recipe hold, and another (seed {LOW_TOP_CLEAN["model_seed"]}) removes only {removal(LOW_TOP_CLEAN):.2f}.
+
+The task changes little. The largest drop against the control is {num(-task_change(TASK_DROP_TOP), ".3f")} (seed {TASK_DROP_TOP["model_seed"]} of `{NAME[TASK_DROP_TOP["arm"].split("-anti")[0]]}` at a hold of {TASK_DROP_TOP["arm"].split("-anti")[1]}), against {num(-TASK_DROP_RECIPE, ".3f")} on the runs at the recipe hold.
+"""
+
 
 # %%
 
@@ -566,14 +754,17 @@ Moving the pull off the first two slices did most of what embedding-lean expecte
 
 It did not keep the concept out of block 1. The pull on block 2 is cheapest to meet by having block 1 already lean toward e₁, and block 1 has some context to work with, so part of what it puts there is about `{ex.ANCHORED_OP}` and part is shared with other ops.
 
-Keeping out the shared part is the job of the anti-subspace term. On its recipe schedule it does not manage it: block 1 and the table move onto e₁ mostly in the second half of training, after the anti weight has annealed from about two and a half times the anchor weight to a third of it (Scope). So the table and block 1 may be held off e₁ while the anti term is strong, and lean once it is not. Embedding-lean estimated the anti term to be an order of magnitude or more too weak per embedding. This may be the same shortfall at block 1, or the anneal may let go too early; this run does not separate the two.
+Keeping out the shared part is the job of the anti-subspace term. On its recipe schedule it does not manage it: block 1 and the table move onto e₁ mostly in the second half of training, after the anti weight has annealed from about two and a half times the anchor weight to a third of it. Holding it at twice the anchor weight kept both nearly off e₁ in `deep` (E4). So on this pull the recipe anneal lets go too early. Embedding-lean estimated the anti term to be an order of magnitude or more too weak per embedding, but a hold of about seven times the recipe value was enough here.
+
+The higher hold also took some removal. Some of what the edit removes on the recipe hold seems to sit at block 1, and with block 1 kept off e₁, the model answers `{ex.ANCHORED_OP}` with less of it on e₁. Among the runs here, `deep` at a hold of 0.2 is the most selective, and `deep` at 0.1 and `deep-clean` at the recipe hold remove more with a little more spill.
 
 On the seeds where the answer to `{ex.ANCHORED_OP}` depends on the e₁ component at block 1 and not on the one at the later blocks (E2), the edit on every slice is the one to keep, and the remaining spill is a question of what block 1 carries.
-<!-- REVIEW: the two paragraphs above follow the E1, E2 and E3 changes: the anneal named as an alternative to
-"too weak", and the split restated as what the edits show rather than as the later blocks rebuilding the concept. -->
+<!-- REVIEW: the "too weak or lets go too early" question of the first round is now answered by E4, so this
+paragraph says what the hold showed; the paragraph after it is new, on the removal the hold cost. Verify: the hold
+table. -->
 
 
-Four seeds show that `deep-clean` spills much less than the recipe, but not whether its one run above the criterion is typical.
+Four seeds show that `deep-clean` and the higher holds spill much less than the recipe, but not whether their single runs above the criterion, or the runs with low removal, are typical.
 
 ## Glossary
 
