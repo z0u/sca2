@@ -56,7 +56,7 @@ rg -no '.{0,55}anneal.{0,55}' docs/  # a {0,N} window around each match
 
 For the backlogs, prefer `./go todo --grep anneal`, which skips settled items.
 
-To learn what an earlier report found or how it reads, read its Markdown render rather than its `.py`. `./go render docs/<key>/report.py --cached` prints the path of a render shared by every session of the project, weaving it first if no session has yet; the render has the prose, tables, numbers and figure alt text in order, and its figures beside it under `_assets/`. Open the `.py` when you need how something was computed.
+To learn what an earlier report found or how it reads, read its Markdown render rather than its `.py`. `./go render docs/<key>/report.py -o .mini/lit/<key>/index.md` writes it, with the prose, tables, numbers and figure alt text in order and the figures beside it under `_assets/`. In the project's cloud threads the render caches are shared (`MINI_CACHE_DIR`, set by the session-start hook), so once any thread has rendered a report, it takes a couple of seconds. Open the `.py` when you need how something was computed.
 
 If `uv` is too old, the session-start hook probably didn't run. Run it manually.
 

@@ -1,6 +1,7 @@
 """Tests for ``mini.lit``: parsing, weaving, incremental re-runs, the memo, and the page."""
 
 import os
+import shutil
 import sys
 import textwrap
 from pathlib import Path
@@ -439,11 +440,33 @@ class TestMemo:
         use_publisher(pub)
         try:
             assert h() == h() == "_assets/fig.png" and len(calls) == 1
+            shutil.rmtree(tmp_path / "cache" / "assets")
             (tmp_path / "_assets" / "fig.png").unlink()
             h()
             assert len(calls) == 2 and (tmp_path / "_assets" / "fig.png").exists()
         finally:
             use_publisher(None)
+
+    def test_a_hit_in_a_fresh_directory_restores_its_assets(self, tmp_path):
+        """Another checkout or container sharing the cache has no output directory yet: the cache's copy of the figure fills it, with no redraw."""
+        calls = []
+
+        @memo
+        def h():
+            calls.append(1)
+            return current_publisher().asset_url(b"png", name="fig.png")
+
+        from mini.reports import current_publisher, use_publisher
+
+        for out in ("one", "two"):
+            pub = Publisher(asset_dir=tmp_path / out / "_assets")
+            use_publisher(pub)
+            try:
+                set_cache_dir(tmp_path / "cache")  # a fresh process: only the disk tier
+                assert h() == "_assets/fig.png"
+            finally:
+                use_publisher(None)
+        assert len(calls) == 1 and (tmp_path / "two" / "_assets" / "fig.png").read_bytes() == b"png"
 
 
 class TestCellMark:

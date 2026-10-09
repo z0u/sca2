@@ -31,6 +31,7 @@ import json
 import logging
 import mimetypes
 import os
+import uuid
 import shutil
 import tomllib
 import types
@@ -655,7 +656,7 @@ def _hf_token() -> str | None:
 def store_for(root: Path | str, *, cache_root: Path | str | None = None) -> Store:
     """The project store for a given local *root* — bucket-backed if configured.
 
-    When a bucket is configured (:func:`store_bucket`) *and* a Hugging Face token is available, the durable store is the shared bucket, warm-cached locally at *cache_root* (default: ``store-cache/hf`` beside *root*); otherwise it's a :class:`LocalStore` rooted at *root*. One switch flips every put/get/publish — in a step, a report, or a worker — from on-disk to shared-and-web-reachable.
+    When a bucket is configured (:func:`store_bucket`) *and* a Hugging Face token is available, the durable store is the shared bucket, warm-cached locally at *cache_root* (default: ``store-cache/hf/<bucket>`` beside *root*, or under ``$MINI_CACHE_DIR``; one per bucket); otherwise it's a :class:`LocalStore` rooted at *root*. One switch flips every put/get/publish — in a step, a report, or a worker — from on-disk to shared-and-web-reachable.
 
     Pass *cache_root* when *root*'s neighbourhood is the wrong home for cached bytes: a Modal worker points it at container-local disk, so the cache isn't committed to the Volume alongside results — the bucket already holds the durable copy, and a committed shadow would store every artifact twice.
 
@@ -681,7 +682,13 @@ def store_for(root: Path | str, *, cache_root: Path | str | None = None) -> Stor
     if bucket or repo:
         from mini.hf_store import HFStore
 
-        cache = LocalStore(cache_root if cache_root is not None else root.parent / "store-cache" / "hf")
+        # One cache per bucket: a cached blob makes ``has`` true and skips the upload, so a cache shared by the
+        # production and dev buckets could leave one of them without a blob the other holds.
+        from mini.runs import CACHE_DIR_ENV
+
+        shared = os.environ.get(CACHE_DIR_ENV)
+        default_cache = (Path(shared) if shared else root.parent) / "store-cache" / "hf" / (bucket or repo or "").replace("/", "--")
+        cache = LocalStore(cache_root if cache_root is not None else default_cache)
         return HFStore(bucket, cache=cache, token=token, publish_repo=repo)
     return LocalStore(root)
 
@@ -718,7 +725,9 @@ class LocalStore(Store):
         dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists():  # immutable: another writer won the race; bytes are identical by hash
             return
-        tmp = dest.with_name(f"{sha256}.tmp.{src.stat().st_ino}")
+        tmp = dest.with_name(
+            f"{sha256}.tmp.{os.getpid()}-{uuid.uuid4().hex[:8]}"
+        )  # unique per writer, across containers too
         shutil.copyfile(src, tmp)  # copy (never hardlink): a caller mutating dest must not corrupt the CAS
         tmp.replace(dest)  # atomic publish into the CAS
 

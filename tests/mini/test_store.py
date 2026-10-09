@@ -374,7 +374,19 @@ def test_store_for_threads_publish_repo_into_the_hfstore(tmp_path: Path, monkeyp
     store = store_for(tmp_path / "store")
     assert isinstance(store, HFStore)
     assert store.publish_repo == "ns/pub"  # a bucket for the CAS, a repo for the publish tier
-    assert store._cache.root == tmp_path / "store-cache" / "hf"  # warm cache sits beside root by default
+    assert store._cache.root == tmp_path / "store-cache" / "hf" / "ns--bkt"  # warm cache sits beside root, one per bucket
+
+
+def test_store_for_puts_the_warm_cache_under_the_shared_cache_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Sessions in separate containers that mount one folder share the warm cache through `MINI_CACHE_DIR`."""
+    from mini.hf_store import HFStore
+
+    monkeypatch.setenv("MINI_STORE_BUCKET", "ns/bkt")
+    monkeypatch.setenv("MINI_CACHE_DIR", str(tmp_path / "shared"))
+    monkeypatch.setattr("mini.store._hf_token", lambda: "tok")
+    store = store_for(tmp_path / "store")
+    assert isinstance(store, HFStore)
+    assert store._cache.root == tmp_path / "shared" / "store-cache" / "hf" / "ns--bkt"
 
 
 def test_store_for_falls_back_to_local_without_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

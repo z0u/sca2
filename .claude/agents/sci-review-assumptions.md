@@ -19,7 +19,7 @@ What to look for:
 - The question can be answered from the data the plan collects, and each section the plan lists has the data it will need.
 - Nothing is so underspecified that whoever runs it would have to make a call that changes the result: probe sets, statistics, tie-breaks, which checkpoint gets measured.
 - Confounds worth naming are named.
-- What the plan assumes about earlier results matches those results. Read the reports it cites where a claim turns on one, as Markdown renders (`./go render docs/<key>/report.py --cached` prints the path; the figures are beside it).
+- What the plan assumes about earlier results matches those results. Read the reports it cites where a claim turns on one, as Markdown renders (`./go render docs/<key>/report.py -o .mini/lit/<key>/index.md`; the figures are beside it).
 - The plan and the experiment code agree about what the experiment does. Read the code and the stored results where the plan leans on them.
 - The plan says what this experiment will cover and stops there, without announcing the next one.
 

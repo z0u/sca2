@@ -1,9 +1,9 @@
 """
 A cache for the expensive calls a document makes: figures, fits, anything slow.
 
-``@memo`` keys a call the way :mod:`mini.memo` keys a task — the function's qualified name plus a fingerprint of its inputs is the identity, and a fingerprint of its source (and the project code it references, transitively) is the validity evidence — so editing the plot function re-renders the figure, and editing the prose around it does not. The value is pickled under ``.mini/lit-cache/``; a hit is served from memory within a process and from disk across processes, which is what makes a fresh ``render`` of a figure-heavy report take well under a second.
+``@memo`` keys a call the way :mod:`mini.memo` keys a task — the function's qualified name plus a fingerprint of its inputs is the identity, and a fingerprint of its source (and the project code it references, transitively) is the validity evidence — so editing the plot function re-renders the figure, and editing the prose around it does not. The value is pickled under ``.mini/lit-cache/`` (or ``$MINI_CACHE_DIR/lit-cache/``); a hit is served from memory within a process and from disk across processes, which is what makes a fresh ``render`` of a figure-heavy report take well under a second.
 
-A memoized function that writes assets through the current :class:`~mini.reports.Publisher` (a ``themed`` figure writes two PNGs) has those files recorded with its value, and the hit is honoured only while they exist — so clearing the output directory re-draws, and a stale cache can never point at a missing image.
+A memoized function that writes assets through the current :class:`~mini.reports.Publisher` (a ``themed`` figure writes two PNGs) has those files recorded with its value, and the hit is honoured only while they exist. The cache keeps a copy of those files too, so a hit in a fresh output directory (another checkout, another container sharing the cache) restores them rather than redrawing; with neither copy, the call re-draws, and a stale cache can never point at a missing image.
 
 Inputs need a stable encoding. Plain data, dataclasses, and NumPy arrays are handled (an array is hashed by its bytes); an object whose ``repr`` carries a memory address makes the call miss every time, and :mod:`mini.memo` logs a warning when that happens. Digesting a large input costs time on every call (about half a second for a 10 MB metrics dict), so a results object assembled from published artifacts can define ``__memo_key__()`` returning those artifacts' hashes, and is then keyed by them instead.
 """
@@ -16,6 +16,8 @@ import hashlib
 import logging
 import os
 import pickle
+import shutil
+import uuid
 from pathlib import Path
 from typing import Any, Callable, ParamSpec, TypeVar, overload
 
@@ -35,9 +37,9 @@ _hot: dict[tuple[str, str], Any] = {}
 
 def cache_dir() -> Path:
     if _cache_dir is None:
-        from mini.runs import data_root
+        from mini.runs import cache_root
 
-        return data_root() / "lit-cache"
+        return cache_root() / "lit-cache"
     return _cache_dir
 
 
@@ -125,7 +127,14 @@ def memo(fn: Callable[P, R] | None = None, /, *, version: str | None = None) -> 
                     rec = pickle.loads(path.read_bytes())
                 except Exception:
                     rec = None
-                if rec and rec.get("evidence") == evidence and _assets_present(rec["assets"], asset_dir):
+                if (
+                    rec
+                    and rec.get("evidence") == evidence
+                    and (
+                        _assets_present(rec["assets"], asset_dir)
+                        or _restore_assets(rec["assets"], _asset_copies(key, evidence), asset_dir)
+                    )
+                ):
                     _hot[key, evidence] = rec
                     return rec["value"]
 
@@ -136,7 +145,9 @@ def memo(fn: Callable[P, R] | None = None, /, *, version: str | None = None) -> 
             _hot[key, evidence] = rec
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)
-                tmp = path.with_suffix(f".{os.getpid()}.tmp")  # per process: two renders may cache the same key at once
+                if asset_dir is not None:
+                    _keep_assets(assets, asset_dir, _asset_copies(key, evidence))
+                tmp = path.with_suffix(_tmp_suffix())  # two renders may cache the same key at once
                 tmp.write_bytes(pickle.dumps(rec))
                 tmp.replace(path)
             except Exception as e:  # an unpicklable value still returns; it just isn't cached across processes
@@ -152,3 +163,31 @@ def _assets_present(names: list[str], asset_dir: Path | None) -> bool:
     if not names:
         return True
     return asset_dir is not None and all((asset_dir / n).exists() for n in names)
+
+
+def _tmp_suffix() -> str:
+    # Unique per writer: the cache may be shared by several containers, whose pids can coincide.
+    return f".{os.getpid()}-{uuid.uuid4().hex[:8]}.tmp"
+
+
+def _asset_copies(key: str, evidence: str) -> Path:
+    """Where the cache keeps the assets of one record: by key *and* evidence, so a copy never outlives the value it was drawn with."""
+    return cache_dir() / "assets" / f"{key}-{hashlib.sha256(evidence.encode()).hexdigest()[:12]}"
+
+
+def _keep_assets(names: list[str], asset_dir: Path, copies: Path) -> None:
+    for n in names:
+        (copies / n).parent.mkdir(parents=True, exist_ok=True)
+        tmp = copies / f"{n}{_tmp_suffix()}"
+        shutil.copyfile(asset_dir / n, tmp)
+        tmp.replace(copies / n)
+
+
+def _restore_assets(names: list[str], copies: Path, asset_dir: Path | None) -> bool:
+    """Copy a record's assets from the cache into *asset_dir*, returning whether all of them were there."""
+    if asset_dir is None or not all((copies / n).is_file() for n in names):
+        return False
+    for n in names:
+        (asset_dir / n).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(copies / n, asset_dir / n)
+    return True
