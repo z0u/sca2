@@ -200,7 +200,7 @@ The anchor term is a mean over the pulled slices, so at the same weight each of 
 
 The measurements are those of embedding-lean, taken on every run:
 
-- The lean of the color table: how much further along e₁ the color embeddings sit for black than for white, as the slope of the e₁ component against lightness over the {len(LIGHT)} colors. It is zero in `late-clean` by construction.
+- The lean of the color table: how much further along e₁ the color embeddings sit for black than for white, as the slope of the e₁ component against lightness over the {len(LIGHT)} colors. It is zero in `late-clean`, where the table is held off e₁.
 - The lean in the states: the correlation of α with lightness at each slice, over the color positions of contexts of other ops.
 - Removal and spill of the edit, which projects e₁ out of the state at every position on a set of slices. Both are net of the control at the same seed, and the selectivity criterion is a spill of {CRITERION:g}.
 - The task score of each op, as expected exact match on held-out contexts.
@@ -230,14 +230,9 @@ def table_figure() -> str:
         "controls": [slope(c["emb_axis_colors"]) for c in CONTROLS],
     }
     alt = f"""
-        Three panels. The first two scatter the e₁ component of each color embedding against its lightness, for the
-        recipe and for the late pull at seed {seed}, each dot drawn in its own color. On the recipe the dots fall
-        steeply from about +0.9 for the darkest colors to near zero for white; on the late pull they fall from about
-        +0.3 to near zero, a much shallower slope. The third panel plots that slope along training for both arms:
-        both start near zero, the recipe falls from about epoch 40 to about −1 by the end on three of its four seeds
-        and to about −0.25 on the fourth, and the late pull stays near zero for about a hundred epochs, then falls
-        to about −0.25 on all four. Short ticks at the right edge mark the controls, between about
-        −0.25 and +0.12.
+        Dark colors sit far along e₁ on the recipe (up to about 0.9) but only about a third as far with the late
+        pull at seed {seed}; along training the recipe slope falls early to about −1 on most seeds, while the late
+        slope stays flat for a hundred epochs, then falls to about −0.25, inside the spread of the controls.
     """
     return table_draw(data, alt)
 
@@ -346,12 +341,9 @@ def edit_figure() -> str:
         ],
     }
     alt = """
-        Three scatter panels of spill against removal, one mark per run, shaped and colored by arm. Under the edit on
-        every slice all twelve runs remove between about 0.84 and 0.92; the recipe runs spill from about 0.09 to 0.38,
-        the late runs from about 0.04 to 0.17, and the late-clean runs from below zero to about 0.04, around the
-        criterion line. Under the edit on block 1 alone the late and late-clean runs remove about as much as on
-        every slice, with similar spill, and the recipe runs remove a little less. Under the edit on blocks 2 to 4
-        every run spills almost nothing, but removal splits: seven runs remove about 0.8 to 0.9, and five almost nothing.
+        Under the full edit every run removes about 0.85 to 0.9, and spill drops from the recipe (up to 0.38) to
+        late (up to 0.17) to late-clean (around the criterion); editing block 1 alone looks much the same, while
+        editing blocks 2 to 4 spills almost nothing but removes nearly everything on seven runs and almost nothing on five.
     """
     return edit_draw(data, alt)
 
@@ -420,7 +412,7 @@ The spill falls, and removal holds. Under the edit on every slice all twelve run
 
 The task score is the same in all three arms and on the controls (about {TASK_CONTROL[0]:.2f} expected exact match averaged over ops, and no run more than {max(TASK_CONTROL[0] - TASK[a][1] for a in ARMS):.2f} below the controls), so the new pull costs the task nothing we can see.
 
-In both new arms the concept sits at block 1 as well as later. Editing block 1 alone removes at least as much as editing every slice, though block 1 is never pulled, and it gives most of the spill that is left. In `late` the embedding alone still spills on {seeds_text(EMB_SPILLERS)}, where the weaker lean of E1 is still read downstream.
+In both new arms the concept sits at block 1 as well as later. Editing block 1 alone removes at least as much as editing every slice, though block 1 is never pulled, and it gives most of the spill that is left. In `late` the embedding alone still spills on {seeds_text(EMB_SPILLERS)}, where the weaker lean of E1 is still used downstream.
 
 Editing only blocks 2 to 4 spills almost nothing in any arm, but its removal splits by seed. On seven of the twelve runs it removes nearly everything, and on the other five almost nothing ({seeds_text(LATE_LOW["late"])} in `late`, {seeds_text(LATE_LOW["late-clean"])} in `late-clean`, and {seeds_text(LATE_LOW["whole"])} in `whole`).
 
@@ -456,13 +448,9 @@ def alpha_figure() -> str:
         ],
     }
     alt = f"""
-        A grid of six line charts: three columns for the arms and two rows. The top row plots the mean alignment
-        with e₁ over the positions of the {ex.ANCHORED_OP} probe contexts, one line per slice, along training; the
-        bottom row plots the same on the probe contexts of the other ops. On the recipe every slice rises on the
-        {ex.ANCHORED_OP} contexts, and the embedding and block 1 rise almost as much on the other ops. On the two
-        late arms the {ex.ANCHORED_OP} contexts rise at blocks 2 to 4 within the first few dozen epochs and level off
-        near 0.12, while block 1 rises more slowly to about 0.08. The embedding stays at zero on late-clean; on late
-        it dips below zero early, then rises to about 0.06 in the second half, on the other ops as well. On the other ops the late arms stay low at blocks 2 to 4, with block 1 drifting up.
+        On the recipe the embedding and block 1 align with e₁ on every op, not just {ex.ANCHORED_OP}; in the late arms
+        blocks 2 to 4 align quickly on {ex.ANCHORED_OP} only, while block 1 (and, in late, the embedding) creeps up
+        slowly on all ops through the second half of training.
     """
     return alpha_draw(data, alt)
 
