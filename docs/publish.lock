@@ -46,5 +46,6 @@
  "m2/geometry-rsa": "7abcf6f142c94f67924b4db9192c1b9e01509754",
  "m2/op1-lean": "6afd45dadcb400d74a5ff2e38b69240b04c8c5a2",
  "m2/spill-by-position": "c004b1ad513e286c85d944e7da569dd6fb54765c",
+ "m2/tau-lambda-sweep": "ed7b86d8e8d42f0dcea5754689fb7985192658dd",
  "ngpt-scaling": "d52e5304724b031b784e6fabc9fcaec9aec7f9bc"
 }

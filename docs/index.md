@@ -448,6 +448,14 @@ With the control near its best, we anchored `difference` on the new grammar. The
 
     <!-- mini:figures ./m2/spill-by-position/report.py -->
 
+- [The pool temperature and anchor weight, without the embedding](./m2/tau-lambda-sweep/report.py)
+
+    A sweep of the pool temperature τ and the anchor weight λ_a on the pull that leaves out the embedding slice, one seed per trial, with smooth fits over the plane. Leaving out the embedding keeps the latch off the syntax embeddings over most of the plane, but the edit still spills about as much as on the every-slice runs without a latch, and more as the pool softens. Removal depends on τ through a sharp edge, the weight hardly matters, and the least spill sits near that edge.
+
+    <span class="tags">`sweep` `in-context` `anchoring` `intervention`</span>
+
+    <!-- mini:figures ./m2/tau-lambda-sweep/report.py -->
+
 - [Where the lean comes from](./m2/embedding-lean/report.py)
 
     A re-analysis of the ex-2.2.23 checkpoints and the no-emb trials of the τ × λ_a sweep, asking what the edit removes on the runs with no latch. Every anchored run loads lightness onto e₁ in the color embedding table, a stand-in for `difference` at the slices where nothing contextual exists, and the edit at those slices removes it from every op. Editing only blocks 2 to 4 removes `difference` with almost no spill. The anti-subspace term is far too weak per embedding to hold the table off, and λ_a scales both terms together.
