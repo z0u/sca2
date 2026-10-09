@@ -204,7 +204,8 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms, block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there. A second round held the anti-subspace weight at 0.2 late in training, rather than annealing it to {hold_text(None)}. That kept the table and block 1 nearly off e₁ on the other ops, and brought every `deep` run within the criterion. But removal fell somewhat.
+Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms, block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there. Holding the anti-subspace weight high late in training, rather than annealing it, kept the table and block 1 nearly off e₁ on the other ops and brought every `deep` run within the criterion, though removal fell somewhat.
+<!-- REVIEW: lede trimmed to drop the hold values (0.2 against the recipe hold), which E4 and the Observations give; the claims are unchanged. -->
 ///
 
 [Embedding-lean](/docs/m2/embedding-lean/report.py) found that every anchored run of ex-2.2.23 leans lightness onto e₁ in its color embedding table. At the embedding there is no context yet for the pull to use, so the pull settles for a token-level stand-in: darker colors are the nearest one for `{ex.ANCHORED_OP}` answers. Editing only blocks 2 to 4 of those runs removed most of `{ex.ANCHORED_OP}` with almost no spill. Editing the embedding alone spilled as much as editing every slice.
@@ -228,7 +229,7 @@ rf"""
 - [The color table (E1)](#the-color-table-e1): in `deep` the table leans the same way as on the recipe on every seed, where the controls lean either way, but only about a quarter as far. The lightness in the states at block 1 fades to about half.
 - [Removal and spill (E2)](#removal-and-spill-e2): the full edit removes as much in both new arms as on the recipe. Its spill falls in `deep`, and falls to about the criterion in `deep-clean`. In both arms, editing block 1 alone removes nearly everything and gives most of the spill that is left.
 - [Where the alignment settles (E3)](#where-the-alignment-settles-e3): in the new arms the alignment of `{ex.ANCHORED_OP}` contexts grows at blocks 2 to 4 early in training, as the pull asks. Block 1 follows more slowly, on other ops as well as on `{ex.ANCHORED_OP}`.
-- [The anti-subspace hold (E4)](#the-anti-subspace-hold-e4): the higher the hold, the less the table leans and the less block 1 drifts onto e₁ on other ops. At a hold of 0.2 every `deep` run is within the criterion, but removal falls. In `deep-clean` the hold changes less.
+- [The anti-subspace hold (E4)](#the-anti-subspace-hold-e4): the higher the hold, the less the table leans and the less block 1 drifts onto e₁ on other ops. At a hold of 0.2 every `deep` run is within the criterion, but removal falls. In `deep-clean` the hold changes the spill less, but removal falls there too.
 
 ## Scope
 
@@ -631,7 +632,13 @@ def hold_figure() -> str:
     ]
     data = {
         "panels": [
-            {"title": NAME[a], "ylabel": yl, "key": k, "holds": [series(a, h, k) for h in HOLDS]} for a, k, yl in panels
+            {
+                "title": f"{NAME[a]}: {'table' if k == 'slope' else 'block 1'}",
+                "ylabel": yl,
+                "key": k,
+                "holds": [series(a, h, k) for h in HOLDS],
+            }
+            for a, k, yl in panels
         ],
         "holds": [hold_text(h) for h in HOLDS],
         "schedules": [schedule_of(held("late", h)) for h in HOLDS],
@@ -768,7 +775,7 @@ The anti term also acts on the pulled blocks, and there the alignment of `{ex.AN
 
 Among the runs here, `deep` at a hold of 0.2 is the most selective. `deep` at 0.1 and `deep-clean` at the recipe hold remove more, with a little more spill.
 
-On the seeds where the answer to `{ex.ANCHORED_OP}` depends on the e₁ component at block 1 and not on the one at the later blocks (E2), the edit on every slice is the one to keep, and the remaining spill is a question of what block 1 carries.
+On the seeds where the answer to `{ex.ANCHORED_OP}` depends on the e₁ component at block 1 and not on the one at the later blocks (E2), the edit on every slice is the one to keep, and the remaining spill is a question of what block 1 holds.
 <!-- REVIEW: "kept both nearly off e₁" scoped to the other ops: at a hold of 0.2 the mean α of block 1 on `difference`
 contexts is still about 0.055, against 0.09 at the recipe hold. And a second route for the removal cost added: the
 mean α at blocks 2 to 4 on `difference` falls from about 0.124 to 0.106 between the recipe hold and 0.2, in both
