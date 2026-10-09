@@ -462,11 +462,9 @@ rf"""
 
 This is an exploratory study, with no preregistration and no gate. It trains {len(SWEEP)} `no-emb` trials and {len(REFERENCE) - len(AT_RECIPE)} every-slice trials, each at its own model seed ({ex.SEED_OFFSET} to {ex.SEED_OFFSET + len(ex.TRIALS) - 1}) and for {ex.EPOCHS} epochs, on the recipe of record: ex-2.2.21's corpus with {K} examples per context, the whole-line label, no cap. The `no-emb` trials are scattered over τ from {ex.TAU_RANGE[0]:g} to {ex.TAU_RANGE[1]:g} and λ_a from {ex.LAMBDA_RANGE[0]:g} to {ex.LAMBDA_RANGE[1]:g}, both on log scales, by a scrambled Sobol sequence (a quasi-random pattern that covers a square more evenly than random draws). The every-slice trials are spaced evenly along τ, on a log scale, at the recipe weight of {ex.LAMBDA_DEFAULT:g}. Beside them are ex-2.2.23's {len(AT_RECIPE)} every-slice runs at 400 epochs, all at the recipe point (τ = λ_a = 0.1), which show how far runs differ by seed alone at one point.
 
-The recipe sets the weight of the anti-subspace term as a multiple of λ_a, so a trial at another λ_a moves both terms together. In `no-emb` both leave out the embedding slice.
+The recipe sets the weight of the anti-subspace term as a multiple of λ_a, so the two terms move together and the ratio between them is the same on every trial. The sweep says nothing about the anti-subspace term relative to the pull.
 
-With one seed per trial, the fits do the work that repeated seeds would: each measurement gets a Gaussian process over the plane (below), which also estimates how much the trials scatter about it. At the recipe point, removal is nearly the same from seed to seed, and spill is not: its seed standard deviation is {RECIPE_SPILL_SD:.2f}, as large as most of the differences in E3. So a single trial says little about spill, and a pattern has to show across several neighboring trials before we read anything into it.
-
-Two yes/no outcomes from the design turned out not to vary. Every trial made the second rise, the late jump in task skill when the model learns the three HSV ops (its worst HSV op ends above {RISE_LEVEL:g}), and no `no-emb` trial latched a syntax embedding at spill-by-position's level of {LATCH_LEVEL:g}, though the `=` came close on four (E2). So there is no logistic fit for either. The task cost is small everywhere, at most {COST_MAX:.2f} below the controls, scattered over the plane with no pattern the fit could find; it appears in the table at the end, and in E3 where it bears on the trials with the least spill.
+With one seed per trial, how far a difference can be trusted comes from the fits (see below), which also estimate how much the trials scatter about the surface. At the recipe point, removal is nearly the same from seed to seed, and spill is not: its seed standard deviation is {RECIPE_SPILL_SD:.2f}, as large as most of the differences in E3. So a single trial says little about spill, and a pattern has to show across several neighboring trials before we read anything into it.
 
 ## The measurements
 
@@ -479,6 +477,8 @@ Each measurement is taken on ex-2.2.21's held-out set, as in ex-2.2.23. The edit
 - *Task cost*: the seed mean of the controls minus the trial score.
 
 Both edit measurements are net of the seed mean of ex-2.2.23's {len(CONTROLS)} controls at 400 epochs, so what the edit does to a model with no anchor is not counted. Ex-2.2.23 netted against the control at the same seed; here the trials have new seeds, and on ex-2.2.23's runs pairing by seed made little difference.
+
+Each continuous measurement gets a Gaussian process over the plane, fit in log τ and log λ_a on the `no-emb` trials, leaving out the {num_word(len(EQ_RUNS))} whose anchor sits on `=` (E2). The design also planned logistic fits for two yes/no outcomes, but neither varied: every trial made the second rise, the late jump in task skill when the model learns the three HSV ops (its worst HSV op ends above {RISE_LEVEL:g}), and no `no-emb` trial latched a syntax embedding at spill-by-position's level of {LATCH_LEVEL:g}, though the `=` came close on four (E2). Task cost is small everywhere, at most {COST_MAX:.2f}, with no pattern over the plane; it is in the table at the end, and in E3 where it bears on the trials with the least spill.
 
 ## Glossary
 
@@ -659,6 +659,8 @@ On the fitted surfaces, the point of least spill where removal reaches {REMOVAL_
 
 # %%
 
+# REVIEW: Scope held some method and results (round 2). The fits and the outcomes that did not vary moved to
+# the measurements; Scope keeps the runs, the coupled weights as a limit, and the seed spread.
 # REVIEW: softened two causal readings in the Discussion ("seems to have been the short training" ->
 # "may", with no 200-epoch arm here; "no choice of slices would remove the latch" -> a conditional, since only the
 # embedding slice was left out), and added that no-emb-04 and no-emb-06 have high task cost (0.03, 0.06; worst
