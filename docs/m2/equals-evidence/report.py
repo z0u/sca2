@@ -108,7 +108,9 @@ def evidence(tokens: np.ndarray) -> dict[str, np.ndarray]:
     y, a, b = tok2color[tokens[:, answers]], tok2color[tokens[:, answers - 4]], tok2color[tokens[:, answers - 2]]
     p = table.lookup(a * len(PALETTE) + b, y)  # (ops, n, K)
     others = (p.sum(0, keepdims=True) - p) / (len(OPS) - 1)
-    log_like = np.log((1 - ex.RHO - ex.CUBE_RATE) * p + ex.RHO * others + ex.CUBE_RATE / len(PALETTE)).transpose(1, 2, 0)
+    log_like = np.log((1 - ex.RHO - ex.CUBE_RATE) * p + ex.RHO * others + ex.CUBE_RATE / len(PALETTE)).transpose(
+        1, 2, 0
+    )
 
     def normed(log_post: np.ndarray) -> np.ndarray:
         q = np.exp(log_post - log_post.max(-1, keepdims=True))
@@ -355,6 +357,7 @@ From τ ≈ 0.3 the marks climb, as the sweep found, and they do so in two parts
 """
 
 # %%
+
 
 def by_count() -> dict[str, list]:
     """α at each `=` with evidence before it, against the number of fitting examples before it, on the
