@@ -464,4 +464,12 @@ With the control near its best, we anchored `difference` on the new grammar. The
 
     <!-- mini:figures ./m2/embedding-lean/report.py -->
 
+- [What the anchor follows at the `=` tokens](./m2/equals-evidence/report.py)
+
+    A re-analysis of the ex-2.2.23 checkpoints and the τ × λ_a sweep, reading the anchor at every `=`, where the model has to infer the op from the examples before it. On the recipe the anchor is nearly absent there. A softer pool puts it on the `=` tokens, where it sums the examples that fit `difference`, each by how well it fits, and takes no notice of the ones that do not, which the posterior would. Part of what it puts there is the same on every op.
+
+    <span class="tags">`reanalysis` `in-context` `anchoring`</span>
+
+    <!-- mini:figures ./m2/equals-evidence/report.py -->
+
 </details>
