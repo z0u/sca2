@@ -454,7 +454,9 @@ class TestMemo:
         @memo
         def h():
             calls.append(1)
-            return current_publisher().asset_url(b"png", name="fig.png")
+            pub = current_publisher()
+            assert pub is not None
+            return pub.asset_url(b"png", name="fig.png")
 
         from mini.reports import current_publisher, use_publisher
 

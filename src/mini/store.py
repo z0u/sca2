@@ -687,7 +687,9 @@ def store_for(root: Path | str, *, cache_root: Path | str | None = None) -> Stor
         from mini.runs import CACHE_DIR_ENV
 
         shared = os.environ.get(CACHE_DIR_ENV)
-        default_cache = (Path(shared) if shared else root.parent) / "store-cache" / "hf" / (bucket or repo or "").replace("/", "--")
+        default_cache = (
+            (Path(shared) if shared else root.parent) / "store-cache" / "hf" / (bucket or repo or "").replace("/", "--")
+        )
         cache = LocalStore(cache_root if cache_root is not None else default_cache)
         return HFStore(bucket, cache=cache, token=token, publish_repo=repo)
     return LocalStore(root)

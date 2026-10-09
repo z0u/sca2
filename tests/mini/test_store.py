@@ -374,7 +374,9 @@ def test_store_for_threads_publish_repo_into_the_hfstore(tmp_path: Path, monkeyp
     store = store_for(tmp_path / "store")
     assert isinstance(store, HFStore)
     assert store.publish_repo == "ns/pub"  # a bucket for the CAS, a repo for the publish tier
-    assert store._cache.root == tmp_path / "store-cache" / "hf" / "ns--bkt"  # warm cache sits beside root, one per bucket
+    assert (
+        store._cache.root == tmp_path / "store-cache" / "hf" / "ns--bkt"
+    )  # warm cache sits beside root, one per bucket
 
 
 def test_store_for_puts_the_warm_cache_under_the_shared_cache_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
