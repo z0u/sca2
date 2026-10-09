@@ -31,3 +31,5 @@ These skills are the backbone of our work and they're worth getting right.
 - The pointer to `exemplar-ex-2.2.18.md` "for the register": the register is evolving, so that exemplar may no longer be the one to point at.
 - `template-explore.py`: drop "a backlog item" from where the question came from; find another word for "yardstick"; drop the placeholder for runs left out; and say that what we do next is left unstated in the report, as well as being for the human to decide.
 - `exemplar-example-evidence.md`: reword "bear on" (in the quoted Discussion).
+
+**2026-10-09, skills refactor** — Steps 1 and 2 done on paper: the map of the current workflow, then a redesigned flowchart drawn in review (inception, preregistration, and execution phases, with reviews split into assumptions, claims, and style). The rewrite stays in `.claude/skills/` and `.claude/agents/`, with no plugin (see the [reorg item](skills-agents-reorg.md)).
