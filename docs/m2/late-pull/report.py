@@ -204,18 +204,18 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Pulling only blocks 2 to 4 cut the lean of the color table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms, block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there. Holding the anti-subspace weight high late in training, rather than annealing it, kept the table and block 1 nearly off e₁ on the other ops and brought every `deep` run within the criterion, though removal fell somewhat.
+Pulling only blocks 2 to 4 cut the lean of the color embedding table to about a quarter. Holding the table off e₁ by a hard constraint went further: the spill of the full edit fell to about the selectivity criterion, with removal and the task as before. In both new arms, block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there. Holding the anti-subspace weight high late in training, rather than annealing it, kept the table and block 1 nearly off e₁ on the other ops and brought every `deep` run within the criterion, though removal fell somewhat.
 <!-- REVIEW: lede trimmed to drop the hold values (0.2 against the recipe hold), which E4 and the Observations give; the claims are unchanged. -->
 ///
 
-[Embedding-lean](/docs/m2/embedding-lean/report.py) found that every anchored run of ex-2.2.23 leans lightness onto e₁ in its color embedding table. At the embedding there is no context yet for the pull to use, so the pull settles for a token-level stand-in: darker colors are the nearest one for `{ex.ANCHORED_OP}` answers. Editing only blocks 2 to 4 of those runs removed most of `{ex.ANCHORED_OP}` with almost no spill. Editing the embedding alone spilled as much as editing every slice.
+[The embedding-lean experiment](/docs/m2/embedding-lean/report.py) found that every anchored run of ex-2.2.23 leans lightness onto e₁ in its color embedding table. At the embedding there is no context yet for the pull to use, so the pull settles for a token-level stand-in: darker colors are the nearest one for `{ex.ANCHORED_OP}` answers. Editing only blocks 2 to 4 of those runs removed most of `{ex.ANCHORED_OP}` with almost no spill. Editing the embedding alone spilled as much as editing every slice.
 
 Pulling every slice but the embedding had been tried before (ex-2.2.21 and the τ × λₐ sweep). But those runs also left the anti-subspace term off the embedding, and the table leaned all the same.
 
 So this experiment trains twelve runs at {ex.EPOCHS} epochs and {len(SEEDS)} seeds:
 
 - `deep`: the pull on blocks 2 to 4 only, and the anti-subspace term on every slice, so the first two slices are asked to stay off e₁ rather than left alone.
-- `deep-clean`: the same, and after every step the e₁ component of every embedding is set to zero, so the table cannot lean at all. The readout table is untied on this recipe (a separate matrix from the embedding table) and stays free.
+- `deep-clean`: the same, and after every step the e₁ component of every embedding is set to zero, so the embeddings cannot lean at all. The readout table is untied on this recipe (a separate matrix from the embedding table) and stays free.
 - `whole`: the recipe of record, every slice pulled, trained again to record the alignment at every slice and position along training.
 
 Each run shares its seed, and so its initialization, batches and label draws, with one anchored run and one control of ex-2.2.23. The anchor weight, the pool temperature τ and both schedules are the recipe values. A second round of sixteen runs repeats `deep` and `deep-clean` with the anti-subspace weight annealed to a higher hold (E4).
@@ -226,31 +226,32 @@ Each run shares its seed, and so its initialization, batches and label draws, wi
 rf"""
 ## Observations
 
-- [The color table (E1)](#the-color-table-e1): in `deep` the table leans the same way as on the recipe on every seed, where the controls lean either way, but only about a quarter as far. The lightness in the states at block 1 fades to about half.
+- [The color embedding table (E1)](#the-color-embedding-table-e1): in `deep` the table leans the same way as on the recipe on every seed, where the controls lean either way, but only about a quarter as far. The incidental lightness in the states at block 1 fades to about half.
 - [Removal and spill (E2)](#removal-and-spill-e2): the full edit removes as much in both new arms as on the recipe. Its spill falls in `deep`, and falls to about the criterion in `deep-clean`. In both arms, editing block 1 alone removes nearly everything and gives most of the spill that is left.
 - [Where the alignment settles (E3)](#where-the-alignment-settles-e3): in the new arms the alignment of `{ex.ANCHORED_OP}` contexts grows at blocks 2 to 4 early in training, as the pull asks. Block 1 follows more slowly, on other ops as well as on `{ex.ANCHORED_OP}`.
 - [The anti-subspace hold (E4)](#the-anti-subspace-hold-e4): the higher the hold, the less the table leans and the less block 1 drifts onto e₁ on other ops. At a hold of 0.2 every `deep` run is within the criterion, but removal falls. In `deep-clean` the hold changes the spill less, but removal falls there too.
 
 ## Scope
 
-This is an exploratory study, with no preregistration and no gate. Four seeds per arm can show a large change in the lean or the spill, against the seed range, but not a small one. The `whole` arm reproduces its twins in ex-2.2.23 (the task scores of each pair agree to within {TWIN_GAP:.1g}), so a difference between arms at one seed comes from the change of pull, not from nondeterminism in training.
+This is an exploratory study, with no preregistration and no gate. Four seeds per arm can only resolve a large change in the lean or the spill, against the seed range. The `whole` arm reproduces its twins in ex-2.2.23 (the task scores of each pair agree to within {TWIN_GAP:.1g}), so a difference between arms at one seed comes from the change of pull, not from nondeterminism in training.
 
-The anchor weight is the recipe value, and outside E4 the anti-subspace weight keeps its recipe schedule. That schedule is a multiple of the anchor weight: about two and a half times it early in training, annealing to a third of it by about the midpoint.
-<!-- REVIEW: said that the anti schedule anneals, which the earlier text ("a multiple of the anchor weight") left
-out. The stored trajectory has anti_weight 0.25 at epoch 20, 0.12 at 200, 0.04 at 300 and 0.03 after, against an
-anchor weight of 0.1; E1 and E3 now name this as a reading of the second-half growth. Verify: traj["anti_weight"]. -->
 <!-- REVIEW: "noise in training" narrowed to "nondeterminism in training", since the twin check shows runs reproduce
 bit for bit at a seed, not that the seed range is small; the sentence before covers that. -->
 
-The anchor term is a mean over the pulled slices, so at the same weight each of blocks 2 to 4 is pulled about five thirds as hard in the new arms as in `whole`. The anti term is a mean over the same five slices in every arm, so it is unchanged.
+## Method
 
-## The measurements
+The anchor weight is the recipe value, and outside E4 the anti-subspace weight keeps its recipe schedule. That schedule is a multiple of the anchor weight: about 2.5× early in training, annealing to about 0.3× by about the midpoint.
+<!-- REVIEW: said that the anti schedule anneals, which the earlier text ("a multiple of the anchor weight") left
+out. The stored trajectory has anti_weight 0.25 at epoch 20, 0.12 at 200, 0.04 at 300 and 0.03 after, against an
+anchor weight of 0.1; E1 and E3 now name this as a reading of the second-half growth. Verify: traj["anti_weight"]. -->
 
-The measurements are those of embedding-lean, taken on every run:
+The anchor term is a mean over the pulled slices, so at the same weight each of blocks 2 to 4 is pulled about 5/3 as hard in the new arms as in `whole`. The anti term is a mean over the same five slices in every arm, so it is unchanged.
 
-- The lean of the color table: how much further along e₁ the color embeddings sit for black than for white, as the slope of the e₁ component against lightness over the {len(LIGHT)} colors. It is zero in `deep-clean`, where the table is held off e₁.
-- The lean in the states: the correlation of α with lightness at each slice, over the color positions of contexts of other ops.
-- Removal and spill of the edit, which projects e₁ out of the state at every position on a set of slices. Both are net of the control at the same seed, and the selectivity criterion is a spill of {CRITERION:g}.
+The measurements are those of [the embedding-lean experiment](/docs/m2/embedding-lean/report.py), taken on every run:
+
+- The lightness slope of the color embedding table: how much further along e₁ the color embeddings sit for black than for white, as the slope of the e₁ component against lightness over the {len(LIGHT)} colors. It is zero in `deep-clean`, where the table is held off e₁.
+- The lightness correlation in the states: the correlation of α with lightness at each slice, over the color positions of contexts of other ops.
+- Removal and spill of the edit, which projects e₁ out of the state at every position on a set of slices. Both are net of the control at the same seed, and the selectivity criterion is a spill of at most {CRITERION:g}.
 - The task score of each op, as expected exact match on held-out contexts.
 - Along training, every {ex.TRAJ_STRIDE_EPOCHS} epochs: the mean alignment α with e₁ at every slice and position of the probe contexts, for `{ex.ANCHORED_OP}` and for the other ops, and the e₁ component of every color embedding.
 """
@@ -363,7 +364,7 @@ def lean_table() -> str:
 
 
 rf"""
-## The color table (E1)
+## The color embedding table (E1)
 
 If the lean is the pull meeting the embedding with a stand-in, it should fade in `deep`, where the pull leaves the first two slices and the anti-subspace term stays on them. A slope of −1 means black sits a whole unit further along e₁ than white.
 
@@ -379,7 +380,7 @@ the unlatched seeds) to −0.23, where the slope goes to a quarter. Verify: the 
 
 On the recipe the slope grows from early in training. On `deep` it stays near zero for about the first hundred epochs, then grows through the second half, while the whole table drifts a little onto e₁ (E3). The pull on block 2 reaches the table only through block 1, and that is enough to load some lightness onto e₁.
 
-The growth also coincides with the anneal of the anti-subspace weight, which E4 changes. Part of the lean may also come from the per-slice pull being five thirds of the recipe value.
+The growth also coincides with the anneal of the anti-subspace weight, which E4 changes. Part of the lean may also come from the per-slice pull being 5/3 of the recipe value.
 <!-- REVIEW: added the anti-schedule reading of the late onset. The anti weight falls from 0.22 at epoch 100 to 0.04
 at epoch 300, the window in which the late slope grows; the earlier text gave only the route through block 1.
 Verify: traj["anti_weight"] against the slope panel. -->
@@ -477,7 +478,7 @@ In both new arms the concept sits at block 1 as well as later. Editing block 1 a
 
 Editing only blocks 2 to 4 spills almost nothing in any arm, but its removal splits by seed. On seven of the twelve runs it removes nearly everything, and on the other five almost nothing ({seeds_text(LATE_LOW["late"])} in `deep`, {seeds_text(LATE_LOW["late-clean"])} in `deep-clean`, and {seeds_text(LATE_LOW["whole"])} in `whole`).
 
-On those five, the answer depends on the e₁ component at block 1, and not on the e₁ component the pull put at blocks 2 to 4. Perhaps the later blocks read block 1 along e₁ and write the answer elsewhere. Or the two edits may differ in some other way that this measurement cannot tell apart. Embedding-lean saw the same split on the recipe and took it as a sign that the concept was partly built from the lean. Here the split persists with the table held off e₁, so it does not need the lean.
+On those five, the answer depends on the e₁ component at block 1, and not on the e₁ component the pull put at blocks 2 to 4. Perhaps the later blocks read block 1 along e₁ and write the answer elsewhere. Or the two edits may differ in some other way that this measurement cannot tell apart. [The embedding-lean experiment](/docs/m2/embedding-lean/report.py) saw the same split on the recipe and took it as a sign that the concept was partly built from the lean. Here the split persists with the table held off e₁, so it does not need the lean.
 <!-- REVIEW: "the later blocks rebuild the concept from what block 1 passes them, so taking it out after block 1 is
 too late" restated as what the two edits show (block-1 e₁ needed, blocks-2-to-4 e₁ not), with the mechanism as one
 reading. "Most runs" became "seven of twelve", since in the new arms it is half. Verify: the removal rows for
@@ -577,7 +578,7 @@ Much of the rise at block 1, and nearly all of it on the other ops, comes after 
 Verify: block 1 on the other ops rises from about epoch 150 in both new arms, where anti_weight is 0.18 and falling. -->
 
 
-On `deep` the embedding also drifts onto e₁ in the second half of training, by about as much on the other ops as on `{ex.ANCHORED_OP}`. That is the whole color table shifting a little toward e₁, with the lightness slope of E1 on top. It does not happen in `deep-clean`, where the table is held at zero.
+On `deep` the embedding also drifts onto e₁ in the second half of training, by about as much on the other ops as on `{ex.ANCHORED_OP}`. That is the whole color embedding table shifting a little toward e₁, with the lightness slope of E1 on top. It does not happen in `deep-clean`, where the table is held at zero.
 """
 
 # %%
@@ -761,13 +762,13 @@ The task changes little. The largest drop against the control is {num(-task_chan
 rf"""
 ## Discussion
 
-Moving the pull off the first two slices did most of what embedding-lean expected of it. The color table leans much less, the lightness in the states fades, and the full edit spills less on every seed. Holding the table off e₁ outright took the spill most of the rest of the way, with nothing lost in removal or in the task. That fits the account that the spill comes from stand-ins at the slices where nothing contextual exists.
+Moving the pull off the first two slices did most of what [the embedding-lean experiment](/docs/m2/embedding-lean/report.py) expected of it. The color embedding table leans much less, the lightness in the states fades, and the full edit spills less on every seed. Holding the table off e₁ outright took the spill most of the rest of the way, with nothing lost in removal or in the task. That fits the account that the spill comes from stand-ins at the slices where nothing contextual exists.
 
 It did not keep the concept out of block 1. The pull on block 2 is cheapest to meet by having block 1 already lean toward e₁, and block 1 has some context to work with, so part of what it puts there is about `{ex.ANCHORED_OP}` and part is shared with other ops.
 
-Keeping out the shared part is the job of the anti-subspace term, and on its recipe schedule it does not. Block 1 and the table move onto e₁ mostly in the second half of training. By then the anti weight has annealed from about two and a half times the anchor weight to a third of it. Holding it at twice the anchor weight kept both nearly off e₁ on the other ops in `deep` (E4). So on this pull the recipe anneal lets go too early.
+Keeping out the shared part is the job of the anti-subspace term, and on its recipe schedule it does not. Block 1 and the table move onto e₁ mostly in the second half of training. By then the anti weight has annealed from about 2.5× the anchor weight to about 0.3×. Holding it at 2× the anchor weight kept both nearly off e₁ on the other ops in `deep` (E4). So on this pull the recipe anneal lets go too early.
 
-Embedding-lean found the pull on a color embedding to be an order of magnitude or more above what the anti term costs it. In `deep` the pull reaches the table only through block 1, and a hold of about seven times the recipe value was enough.
+[The embedding-lean experiment](/docs/m2/embedding-lean/report.py) found the pull on a color embedding to be an order of magnitude or more above what the anti term costs it. In `deep` the pull reaches the table only through block 1, and a hold of about 7× the recipe value was enough.
 
 The higher hold also took some removal. Some of what the edit removes at the recipe hold seems to sit at block 1. With block 1 kept off e₁, the model answers `{ex.ANCHORED_OP}` with less of it on e₁.
 
@@ -806,7 +807,7 @@ Removal
 :   How much of `{ex.ANCHORED_OP}` the edit takes out: the net drop in its score under the edit, as a share of the way from the clean score to the target null.
 
 Spill
-:   The largest net drop in score on another op under the edit. The selectivity criterion is {CRITERION:g}.
+:   The largest net drop in score on another op under the edit. The selectivity criterion is a spill of at most {CRITERION:g}.
 
 Target null
 :   The score an ideal predictor would get on `{ex.ANCHORED_OP}` contexts if it had lost that op and answered from the remaining ones.
