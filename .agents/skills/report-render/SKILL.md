@@ -26,7 +26,15 @@ uv run --with cairosvg python -c "import cairosvg; cairosvg.svg2png(url='x.svg',
 
 ## Text path: read the report as Markdown
 
-To *read* a report — prose, headings, tables and figure alt text, assembled in order — export it to Markdown. No browser, no bundle:
+To *read* a report — prose, headings, tables and figure alt text, assembled in order — read its Markdown render. No browser, no bundle. For a report you aren't editing, take it from the shared cache:
+
+```bash
+./go render docs/m2/ex-2.1.1/report.py --cached   # prints the path of index.md; figures beside it under _assets/
+```
+
+The cache lives in the project's shared folder (`/mnt/project-files/rendered/<key>/<version>/`; `MINI_RENDER_CACHE` overrides it, and without the shared folder it falls back to `.mini/rendered/`), so a report is woven once per version and every later session reads the file in well under a second. The version is a digest of the `docs/` and `src/` trees at `HEAD`, the lock files, and the storage profile, so a commit touching neither tree leaves every entry valid. With uncommitted edits under those paths there is no version to look up, and `--cached` renders to `.mini/lit/<key>/index.md` instead, saying so on stderr. Add `-o FILE.md` to copy the render somewhere as well.
+
+To render a report you are editing, name the output:
 
 ```bash
 ./go render docs/m2/ex-2.1.1/report.py -o .mini/lit/m2/ex-2.1.1/index.md   # figures beside it under _assets/

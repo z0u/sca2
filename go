@@ -46,7 +46,7 @@ show_help() {
 		                       upstream tag, dev container features against the registry,
 		                       and upgrades available to packages we declare.
 		                       Read-only; the upgrade check is a --dry-run
-		  render  <report> -o FILE [-o FILE ...] [--since REF]:
+		  render  <report> [-o FILE ...] [--cached] [--since REF]:
 		                       weave a report (mini.lit: a .py with string prose between
 		                       cells, or a Markdown page under docs/) to each FILE, in
 		                       the format its extension names:
@@ -56,7 +56,10 @@ show_help() {
 		                       site makes it, it names the commit it was printed from,
 		                       and --since REF bars its margin beside every line changed
 		                       since REF (the round last reviewed; the baseline is
-		                       exported from a checkout of REF, reading the store)
+		                       exported from a checkout of REF, reading the store).
+		                       --cached reads the Markdown from the render cache shared
+		                       by the project's containers (weaving it there on a miss)
+		                       and prints its path; the way to read a report for recon
 		  serve   <report> [--port N]:
 		                       serve one report with live reload while you edit it
 		  preview [...reports] [--no-serve] [--force] [--port N]:
@@ -136,7 +139,8 @@ case "${1:-}" in
     render)
         shift
         if [[ $# -eq 0 ]]; then
-            echo "render to where? name the report and one or more -o files, e.g." 1>&2
+            echo "render to where? name the report and one or more -o files, or --cached, e.g." 1>&2
+            echo "  $0 render docs/pipeline/report.py --cached" 1>&2
             echo "  $0 render docs/pipeline/report.py -o /tmp/pipeline/report.md" 1>&2
             echo "  $0 render docs/pipeline/report.py -o /tmp/pipeline.pdf --since HEAD~1" 1>&2
             exit 2

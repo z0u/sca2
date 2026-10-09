@@ -86,7 +86,7 @@ The style review runs on every draft, whoever wrote it. Its two prose passes fin
 
 A reviewer starts with an empty context, so it reads the report the way a reader will. Before each review, commit the draft, so that `git diff` afterwards shows that review's changes alone. Then brief the reviewer with:
 
-- The path to the report, and a fresh Markdown render of it (`./go render docs/<key>/report.py -o .mini/lit/<key>/index.md`). Reviews read the render, where a cell that failed to render shows up and the source markup doesn't get in the way. The render re-runs the cells (memoized work comes from the cache), so allow a few minutes.
+- The path to the report, and a fresh Markdown render of it (`./go render docs/<key>/report.py --cached`, which prints the path; the draft is committed, so the render lands in the shared cache for later readers too). Reviews read the render, where a cell that failed to render shows up and the source markup doesn't get in the way. A first render re-runs the cells (memoized work comes from the cache), so allow a few minutes.
 - Which sections are in scope, since a report gets written a section at a time and a `TODO` whose turn hasn't come isn't a finding.
 - A line on what the last round changed, so it doesn't redo that work blind. Leave out the reasoning and verdict of the last round, so its judgment stays independent. The reasoning it may see is what earlier rounds wrote into the report as `REVIEW` notes.
 - Anything the human asked to focus on, and whether the numbers have already been checked against the code.

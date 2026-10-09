@@ -5,6 +5,8 @@ Without a PDF this is the weave alone (:mod:`mini.lit`), with the figures under 
 
 Only the named report is exported and printed, and nothing is memoized: a print takes a few seconds, and its stamp changes with every commit anyway.
 
+With ``--cached``, the Markdown comes from a cache shared by every container of the project (:mod:`render_cache`), so a report is woven once per version however many sessions read it.
+
 A Markdown page under ``docs/`` (a design doc, a proposal) renders the same way, through the same page shell and stylesheets. It has no export bundle, so its PDF is printed from the weave (:func:`mini.lit.render`), and its ``--since`` baseline is its old text woven by today's code (:func:`review_base.render_md_at`).
 """
 
@@ -17,6 +19,7 @@ from pathlib import Path
 
 from build_site import MD_PROSE_CSS, REPORT_CSS, Bundle, LinkResolver, printable
 from export_reports import export_one
+from render_cache import copy_out, lookup, store, version
 from review_base import export_at, render_md_at, resolve
 
 from mini.lit import render
@@ -24,6 +27,7 @@ from mini.lit.render import write_outputs
 from mini.report_print import print_bundle
 from mini.reports import MD_LEAF, export_key, mark_verdicts
 from mini.review_marks import baseline_dir, mark_changes, stamp
+from mini.store import active_profile
 
 ROOT = Path(__file__).parent.parent.resolve()
 DOCS = ROOT / "docs"
@@ -99,6 +103,38 @@ def write_from_bundle(bundle: Path, page: str, outs: list[Path]) -> None:
         print(out)
 
 
+def weave(report: Path, outs: list[Path]) -> None:
+    """Weave *report* to each of *outs* (Markdown or HTML), exiting on a cell that raised."""
+    rendered = render(report, out_dir=outs[0].parent, write=False)
+    if errors := rendered.woven.errors:
+        for o in errors:
+            print(f"error in cell at line {o.cell.line}:\n{o.error}", file=sys.stderr)
+        sys.exit(1)
+    write_outputs(rendered, outs)
+
+
+def cached(report: Path, outs: list[Path]) -> None:
+    """Print the path of *report*'s Markdown in the shared cache (:mod:`render_cache`), weaving it on a miss, and copy it to each of *outs*.
+
+    With edits in the working tree there is no version to look up, so the render goes to *outs*, or to ``.mini/lit/<key>/index.md`` when there are none, and that path is printed.
+    """
+    key = export_key(report)
+    local = outs or [ROOT / ".mini" / "lit" / key / MD_LEAF]
+    ver = version(report, active_profile())
+    if ver is None:
+        print("render cache: skipped, the working tree has edits under docs/ or src/", file=sys.stderr)
+        weave(report, local)
+        print(*local, sep="\n")
+        return
+    if (hit := lookup(key, ver)) is None:
+        weave(report, local)
+        hit = store(local[0], key, ver, report)
+        print(f"render cache: stored {key} at {ver}", file=sys.stderr)
+    for out in outs:
+        copy_out(hit, out)
+    print(hit)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument(
@@ -111,9 +147,15 @@ def main() -> None:
         "--out",
         type=Path,
         action="append",
-        required=True,
+        default=[],
         metavar="FILE",
         help="an output file: .md, .html, or .pdf; repeat for several, all from one weave",
+    )
+    ap.add_argument(
+        "--cached",
+        action="store_true",
+        help="read the Markdown from the shared render cache, weaving it into the cache on a miss, and print its path"
+        " (with -o, copy it there too); a working tree with edits under docs/ or src/ renders without the cache",
     )
     ap.add_argument(
         "--since",
@@ -123,19 +165,22 @@ def main() -> None:
     args = ap.parse_args()
     report = Path(args.report).resolve()
     outs = [Path(o).resolve() for o in args.out]
+    if not outs and not args.cached:
+        ap.error("name one or more -o files, or pass --cached")
+    if args.cached and (bad := [o for o in outs if o.suffix != ".md"]):
+        ap.error(f"-o {bad[0]}: --cached holds Markdown only")
     if bad := [o for o in outs if o.suffix not in FORMATS]:
         ap.error(f"-o {bad[0]}: unknown format {bad[0].suffix or '(no extension)'!r}; use one of {', '.join(FORMATS)}")
     if args.since and not any(o.suffix == ".pdf" for o in outs):
         ap.error("--since marks a PDF; add an -o FILE.pdf")
 
+    if args.cached:
+        cached(report, outs)
+        return
+
     if not any(o.suffix == ".pdf" for o in outs):
-        rendered = render(report, out_dir=outs[0].parent, write=False)
-        if errors := rendered.woven.errors:
-            for o in errors:
-                print(f"error in cell at line {o.cell.line}:\n{o.error}", file=sys.stderr)
-            sys.exit(1)
-        for out in write_outputs(rendered, outs):
-            print(out)
+        weave(report, outs)
+        print(*outs, sep="\n")
         return
 
     since = resolve(args.since) if args.since else None  # before the export, so a bad ref fails fast
