@@ -123,10 +123,11 @@ fi
 #    files) and the bucket's warm cache (store-cache: content-addressed blobs).
 #    Both write through a temp file and a rename, so concurrent writers are
 #    safe, and a report rendered in one thread takes about two seconds in every
-#    other. Elsewhere (a laptop, the dev container) the folder doesn't exist and
-#    the caches stay under .mini/. An environment that sets MINI_CACHE_DIR
+#    other. A project session says so in CLAUDE_CODE_PROJECTS_SESSION=1; a lone
+#    cloud session, a laptop or the dev container has neither that nor the
+#    folder, and keeps its caches under .mini/. An environment that sets MINI_CACHE_DIR
 #    itself keeps its own value.
-if [[ -n "${CLAUDE_ENV_FILE:-}" && -d /mnt/project-files && -z "${MINI_CACHE_DIR:-}" ]]; then
+if [[ -n "${CLAUDE_ENV_FILE:-}" && "${CLAUDE_CODE_PROJECTS_SESSION:-}" == 1 && -d /mnt/project-files/ && -z "${MINI_CACHE_DIR:-}" ]]; then
     if ! grep -qs "MINI_CACHE_DIR" "$CLAUDE_ENV_FILE"; then
         echo "export MINI_CACHE_DIR=/mnt/project-files/.mini-cache" >> "$CLAUDE_ENV_FILE"
         log "shared the render caches via MINI_CACHE_DIR"
