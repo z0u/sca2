@@ -549,11 +549,19 @@ def train_one(
     traj_stride: int,
     n_traj_eem: int,
     label: str,
+    anti_slices=None,
+    clean_rows=None,
+    alpha_map: bool = False,
 ) -> dict:
     """Train one run over the op set *ops*: ex-2.2.16's context-keyed anchor (crop policy `whole`, the label variant
     and slices given), recording every *traj_stride* steps both ex-2.2.16's trajectory on the probe set (the op
     margin over the whole context, the first-operand lean, and the trailing-fragment lean, at the last block) and
     ex-2.2.18's on the first *n_traj_eem* held-out contexts of every op (expected exact match and calibration KL).
+
+    *anti_slices* and *clean_rows* pass through to `train_anchored` (later experiments; `None` is this one's
+    training). With *alpha_map*, each record also keeps the mean alignment at every slice and position of the probe
+    set, over the anchored op's probes (`alpha_anchored`) and the other ops' (`alpha_other`), and the alignment of
+    every color embedding in palette order (`emb_axis_colors`), where a lean in the table would show.
     """
     from sca.anchoring import AnchorSpec, AntiSpec, LabelSpec, alignment
     from sca.compute.training import train_anchored
@@ -612,6 +620,8 @@ def train_one(
     extra: dict[str, list] = {
         k_: [] for k_ in ("m_context", "op1_lean", "fragment_lean", "eem", "eem_per_op", "kl", "kl_per_op")
     }
+    if alpha_map:
+        extra |= {"alpha_anchored": [], "alpha_other": [], "emb_axis_colors": []}
 
     def on_record(_index: int, model) -> None:
         cos = alignment(model, probe_tokens)  # (L1, N, T)
@@ -630,6 +640,11 @@ def train_one(
         extra["eem_per_op"].append([float(eem[sub_op_ids == o].mean()) for o in range(n_ops)])
         extra["kl"].append(float(kl.mean()))
         extra["kl_per_op"].append([float(kl[sub_op_ids == o].mean()) for o in range(n_ops)])
+        if alpha_map:
+            extra["alpha_anchored"].append(cos[:, weights > 0].mean(1).tolist())
+            extra["alpha_other"].append(cos[:, weights == 0].mean(1).tolist())
+            emb = np.asarray(model.transformer.wte[color_ids])
+            extra["emb_axis_colors"].append((emb[:, 0] / np.linalg.norm(emb, axis=1)).tolist())
 
     _, metrics, traj = train_anchored(
         config,
@@ -642,6 +657,8 @@ def train_one(
         probe_line_w=weights,
         crop=CROP_POLICY,
         anchor_slices=anchor_slices,
+        anti_slices=anti_slices,
+        clean_rows=clean_rows,
         checkpoint_dir=workdir,
         traj_stride=traj_stride,
         newline_id=tokenizer.stoi["\n"],

@@ -376,6 +376,7 @@ def make_anchored_train_step(
     clean_rows: tuple[int, ...] | None = None,
     axes: tuple[int, ...] = ANCHOR_AXES,
     hinge: tuple[float, float] | None = None,
+    anti_slices: tuple[int, ...] | None = None,
 ):
     """Build a jitted training step for cross-entropy plus the two weighted anchor terms.
 
@@ -383,13 +384,16 @@ def make_anchored_train_step(
 
     *hinge*, `(cap, softness)`, remaps the pooled term's per-position quantity as `pooled_anchor_term` describes; it only has an effect with `tau` set (the flat `anchor_term` has no hinge variant) and is fixed per build, like *tau*.
 
-    *slices* restricts both terms to the named residual-stream slices (slice 0 is the embedding); `None` is every slice, the term as ex-2.1 and ex-2.2 trained it. *axes* is where both terms read the alignment (`axes_alignment`): one axis, or the span of several. *clean_rows* names embeddings that may not carry the anchor axis: after each optimizer step and nGPT's re-normalization, the axis component of those embeddings is zeroed and they are re-normalized, the same kind of hard constraint as the unit norm. It is the tied-table fix for the syntax-embedding leak: those embeddings stay shared between the embedding table and the readout table, and training finds whatever solution it can with them held off the axis.
+    *slices* restricts both terms to the named residual-stream slices (slice 0 is the embedding); `None` is every slice, the term as ex-2.1 and ex-2.2 trained it. *anti_slices* gives the anti-subspace term a slice set of its own, so the pull can leave a slice out while the anti term still acts there; `None` is the same set as *slices*. *axes* is where both terms read the alignment (`axes_alignment`): one axis, or the span of several. *clean_rows* names embeddings that may not carry the anchor axis: after each optimizer step and nGPT's re-normalization, the axis component of those embeddings is zeroed and they are re-normalized, the same kind of hard constraint as the unit norm. It is the tied-table fix for the syntax-embedding leak: those embeddings stay shared between the embedding table and the readout table, and training finds whatever solution it can with them held off the axis.
     """
     if tau is not None and n_lines < 1:
         raise ValueError(f"pooled anchor (tau={tau}) needs n_lines >= 1, got {n_lines}")
     if slices is not None and len(slices) == 0:
         raise ValueError("slices must name at least one residual-stream slice, or be None for all")
+    if anti_slices is not None and len(anti_slices) == 0:
+        raise ValueError("anti_slices must name at least one residual-stream slice, or be None to follow slices")
     sel = None if slices is None else jnp.asarray(sorted(set(slices)))
+    anti_sel = sel if anti_slices is None else jnp.asarray(sorted(set(anti_slices)))
     rows = None if clean_rows is None else jnp.asarray(sorted(set(clean_rows)))
 
     @eqx.filter_jit
@@ -409,14 +413,13 @@ def make_anchored_train_step(
             states, logits = model.stream_and_logits(x)
             live = (x != 0).astype(states.dtype)
             task = cross_entropy(logits, y)
-            if sel is not None:
-                states = states[sel]
+            pulled = states if sel is None else states[sel]
             anchor = (
-                anchor_term(states, mask, axes)
+                anchor_term(pulled, mask, axes)
                 if tau is None
-                else pooled_anchor_term(states, mask, line_id, n_lines, tau, axes, line_w, pool, hinge)
+                else pooled_anchor_term(pulled, mask, line_id, n_lines, tau, axes, line_w, pool, hinge)
             )
-            anti = anti_subspace_term(states, live, axes)
+            anti = anti_subspace_term(states if anti_sel is None else states[anti_sel], live, axes)
             return task + weight * anchor + anti_weight * anti, (task, anchor, anti)
 
         (_, (task, anchor, anti)), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(model)

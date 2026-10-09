@@ -708,6 +708,13 @@ def test_slice_selection_restricts_both_terms(corpus):
     with pytest.raises(ValueError):
         make_anchored_train_step(optimizer, slices=())
 
+    late = make_anchored_train_step(optimizer, slices=(2,), anti_slices=(0, 1, 2))
+    _, _, _, anchor_c, anti_c = late(model, opt_state, x, y, mask, line_id, jnp.asarray(1.0), jnp.asarray(1.0))
+    np.testing.assert_allclose(anchor_c, anchor_term(states[2:], mask), rtol=1e-5, atol=0)
+    np.testing.assert_allclose(anti_c, anti_subspace_term(states, live), rtol=1e-5, atol=0)
+    with pytest.raises(ValueError):
+        make_anchored_train_step(optimizer, anti_slices=())
+
 
 def test_clean_rows_leave_each_step_off_the_axis(corpus):
     """The row constraint zeroes the axis on the named rows after the update; the rest of the table moves freely."""

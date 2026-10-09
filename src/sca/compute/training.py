@@ -119,6 +119,7 @@ def _anchored_step(
     aa_w: float,
     slices: tuple[int, ...] | None = None,
     clean_rows: tuple[int, ...] | None = None,
+    anti_slices: tuple[int, ...] | None = None,
 ):
     """One call shape for both steps: (model, opt_state, task, anchor, anti, fallback, anti_anchor, fb_lines).
 
@@ -133,10 +134,13 @@ def _anchored_step(
             clean_rows=clean_rows,
             axes=anchor.axes,
             hinge=anchor.hinge,
+            anti_slices=anti_slices,
         )
         return lambda *args: (*step(*args), 0.0, 0.0, 0.0)
-    if slices is not None or clean_rows is not None or tuple(anchor.axes) != ANCHOR_AXES:
-        raise ValueError("anchor_slices, clean_rows, and a multi-axis anchor are not supported with a fallback spec")
+    if slices is not None or clean_rows is not None or anti_slices is not None or tuple(anchor.axes) != ANCHOR_AXES:
+        raise ValueError(
+            "anchor_slices, anti_slices, clean_rows, and a multi-axis anchor are not supported with a fallback spec"
+        )
     step = make_fallback_train_step(optimizer, fallback, tau=anchor.tau, n_lines=n_lines)
     fb_w_, aa_w_ = jnp.asarray(fb_w), jnp.asarray(aa_w)
     return lambda *args: step(*args, fb_w_, aa_w_)
@@ -209,6 +213,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     fallback_weight: float = 0.0,
     anti_anchor_weight: float = 0.0,
     anchor_slices: tuple[int, ...] | None = None,
+    anti_slices: tuple[int, ...] | None = None,
     clean_rows: tuple[int, ...] | None = None,
     crop: Crop | None = None,
     checkpoint_dir: Path,
@@ -258,6 +263,8 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
         anchor_slices: residual-stream slices the anchor and anti-subspace terms
             act on, or None for every slice. `(1, ..., n_layer)` anchors the
             blocks' outputs and leaves the embedding table to the task alone.
+        anti_slices: residual-stream slices the anti-subspace term acts on,
+            or None for the same set as *anchor_slices*.
         clean_rows: embeddings held off the anchor axis by a hard
             constraint after every step (`sca.anchoring.clean_embedding_rows`),
             or None for no constraint. Neither option combines with a fallback spec.
@@ -303,7 +310,15 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     n_lines = config.model.block_size // min_line_tokens + 2  # a crop straddles at most this many lines
     train_steps = _scanned(
         _anchored_step(
-            optimizer, anchor, n_lines, fallback, fallback_weight, anti_anchor_weight, anchor_slices, clean_rows
+            optimizer,
+            anchor,
+            n_lines,
+            fallback,
+            fallback_weight,
+            anti_anchor_weight,
+            anchor_slices,
+            clean_rows,
+            anti_slices,
         ),
         SCAN_STEPS,
     )
