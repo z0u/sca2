@@ -118,9 +118,9 @@ def ink(arm: str) -> str:
 
 
 MARK = {"whole": "o", "late": "^", "late-clean": "s"}
+# What the report calls each arm. The `late` arms were renamed `deep` after training, since "late" read as a time in
+# training; the stored labels keep the names they were trained under.
 NAME = {"whole": "whole", "late": "deep", "late-clean": "deep-clean"}
-"""What the report calls each arm. The `late` arms were renamed `deep` after training, since "late" read as a time in
-training; the stored labels keep the names they were trained under."""
 SCHED_INK = {"anchor": light_dark("#333", "#ddd"), "anti": light_dark("#b4531f", "#dd8f5f")}
 
 
