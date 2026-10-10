@@ -10,6 +10,9 @@ that loss to the hold pressing on the pull at the blocks it pulls. This experime
 - `pool-slices`: the same anti weights, with the pull pooled by one mellowmax over the slice × position pairs of a
   context, over blocks 1 to 4, so the pull chooses the slice as well as the position. The embedding stays out of
   the pool, where a latch could win it.
+- `slice-tau…` (added after the first round, one seed each): the `pool-slices` arm with the pool over slices at a
+  temperature of its own, softer than the recipe τ (0.2, 0.4, 0.8, 1.6), to see whether a softer pool over depth
+  settles less of the pull on block 4.
 
 Each run is paired by model seed with late-pull's `deep` runs (at the recipe hold and at 0.2) and with ex-2.2.23's
 400-epoch controls, so no comparison run is trained again. Every new run is measured as the late-pull experiment
@@ -86,11 +89,22 @@ class Arm:
     """The slices the pull acts on."""
     pool_slices: bool
     """Pool the pull over slices as well as positions."""
+    slice_tau: float | None = None
+    """With `pool_slices`, the temperature of the pool over slices; `None` is the one joint pool at the recipe τ."""
+    seeds: tuple[int, ...] | None = None
+    """The model seeds this arm runs at; `None` is every seed."""
 
+
+SLICE_TAUS = (0.2, 0.4, 0.8, 1.6)
+"""Softer temperatures for the pool over slices, doubling from the recipe τ (0.1, the `pool-slices` arm)."""
+SLICE_TAU_SEED = 701
+"""One seed for the slice-temperature arms: one where `pool-slices` settled on block 4 (seed 700 settled on the
+query answer instead, a different outcome from the one the softer pool is meant to spread)."""
 
 ARMS: tuple[Arm, ...] = (
     Arm("split-anti", LATE, pool_slices=False),
     Arm("pool-slices", BLOCKS, pool_slices=True),
+    *(Arm(f"slice-tau{t:g}", BLOCKS, pool_slices=True, slice_tau=t, seeds=(SLICE_TAU_SEED,)) for t in SLICE_TAUS),
 )
 
 TWINS: tuple[str, ...] = ("late", "late-anti0.2")
@@ -141,12 +155,14 @@ def rows_of(meta, epochs: int = EPOCHS, seeds: tuple[int, ...] = SEEDS) -> list[
         anti = anti | {k: anti[k] * f for k in ("anneal_end", "anchor_anneal_start", "anchor_anneal_end")}
     rows = []
     for a in ARMS:
-        for s in seeds:
+        for s in seeds if a.seeds is None else [s for s in a.seeds if s in seeds] or seeds[:1]:
             config, _ = ex2221.recipe_config(meta, s, epochs)
+            # Only a set slice temperature enters the spec, so the first two arms keep their memo keys.
+            pool = {"pool_slices": a.pool_slices} | ({} if a.slice_tau is None else {"slice_tau": a.slice_tau})
             rows.append(
                 {
                     "config": config,
-                    "anchor": anchor | {"pool_slices": a.pool_slices},
+                    "anchor": anchor | pool,
                     "anti": anti,
                     "arm": asdict(a),
                     "model_seed": s,
@@ -179,6 +195,8 @@ def design() -> dict[str, Any]:
         "arms": [asdict(a) for a in ARMS],
         "anti_peak": ANTI_PEAK,
         "slice_holds": list(SLICE_HOLDS),
+        "slice_taus": list(SLICE_TAUS),
+        "slice_tau_seed": SLICE_TAU_SEED,
         "twins": list(TWINS),
         "seeds": list(SEEDS),
         "slice_sets": {k: list(v) for k, v in lean.SLICE_SETS.items()},

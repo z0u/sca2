@@ -136,6 +136,7 @@ def _anchored_step(
             hinge=anchor.hinge,
             anti_slices=anti_slices,
             pool_slices=anchor.pool_slices,
+            slice_tau=anchor.slice_tau,
         )
         return lambda *args: (*step(*args), 0.0, 0.0, 0.0)
     if (

@@ -21,6 +21,7 @@ from sca.anchoring import (
     anchor_term,
     anti_subspace_term,
     crop_weight,
+    make_anchored_train_step,
     margin,
     pooled_anchor_term,
     sample_anchored_batches,
@@ -397,6 +398,34 @@ def test_slice_pooling_lets_the_pull_choose_the_slice():
         rtol=1e-6,
         atol=0,
     )
+
+
+def test_slice_temperature_spreads_the_pull_over_depth():
+    # Three slices, two positions; slice 0 is closest to the axis, slice 2 furthest.
+    rng = np.random.default_rng(0)
+    states = rng.normal(size=(3, 1, 2, 8)).astype(np.float32)
+    states[0, 0, 0, 0] += 4.0
+    s = jnp.asarray(states)
+    mask = jnp.ones((1, 2), dtype=jnp.float32)
+    line_id = jnp.zeros((1, 2), dtype=jnp.int32)
+    tau = 0.1
+    joint = pooled_anchor_term(s, mask, line_id, 1, tau, pool_slices=True)
+    nested = pooled_anchor_term(s, mask, line_id, 1, tau, pool_slices=True, slice_tau=tau)
+    np.testing.assert_allclose(nested, joint, rtol=1e-5, atol=0)
+    per_slice = pooled_anchor_term(s, mask, line_id, 1, tau)
+    np.testing.assert_allclose(
+        pooled_anchor_term(s, mask, line_id, 1, tau, pool_slices=True, slice_tau=np.inf), per_slice, rtol=1e-6, atol=0
+    )
+
+    def slice_share(slice_tau):
+        grad = jax.grad(lambda t: pooled_anchor_term(t, mask, line_id, 1, tau, pool_slices=True, slice_tau=slice_tau))
+        g = np.linalg.norm(np.asarray(grad(s))[:, 0], axis=(1, 2))
+        return g / g.sum()
+
+    shares = [slice_share(t)[0] for t in (0.1, 0.4, 1.6, np.inf)]
+    assert all(np.diff(shares) < 0)  # the closest slice's share falls as slice_tau grows
+    with pytest.raises(ValueError, match="slice_tau needs pool_slices"):
+        make_anchored_train_step(optax.sgd(0.1), tau=tau, n_lines=1, slice_tau=0.4)
 
 
 def test_softmin_weights_limits():
@@ -1168,7 +1197,7 @@ def test_loss_mask_zeroes_targets_at_marked_positions_and_never_touches_the_inpu
 
 
 def test_slice_pooled_training_with_per_slice_anti_weights(data_dir, tmp_path):
-    """The slice-pooled pull and a per-slice anti weight train end to end, and the trajectory keeps the vector."""
+    """The slice-pooled pull (at a slice temperature of its own) and a per-slice anti weight train end to end, and the trajectory keeps the vector."""
     label_p = np.zeros(64)
     label_p[COLORS[0]] = 0.5
     tokens, weights = probe_set()
@@ -1187,7 +1216,9 @@ def test_slice_pooled_training_with_per_slice_anti_weights(data_dir, tmp_path):
             update={"scheduler": SchedulerConfig(epochs=6, warmup_epochs=2, min_lr_factor=0.01)}
         ),
         data_dir,
-        anchor=AnchorSpec(peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=0.1, pool_slices=True),
+        anchor=AnchorSpec(
+            peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=0.1, pool_slices=True, slice_tau=0.4
+        ),
         anti=anti,
         label_p=label_p,
         probe_tokens=tokens,
