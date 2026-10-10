@@ -135,15 +135,31 @@ def _anchored_step(
             axes=anchor.axes,
             hinge=anchor.hinge,
             anti_slices=anti_slices,
+            pool_slices=anchor.pool_slices,
         )
         return lambda *args: (*step(*args), 0.0, 0.0, 0.0)
-    if slices is not None or clean_rows is not None or anti_slices is not None or tuple(anchor.axes) != ANCHOR_AXES:
+    if (
+        slices is not None
+        or clean_rows is not None
+        or anti_slices is not None
+        or tuple(anchor.axes) != ANCHOR_AXES
+        or anchor.pool_slices
+    ):
         raise ValueError(
-            "anchor_slices, anti_slices, clean_rows, and a multi-axis anchor are not supported with a fallback spec"
+            "anchor_slices, anti_slices, clean_rows, pool_slices, and a multi-axis anchor are not supported with a"
+            " fallback spec"
         )
     step = make_fallback_train_step(optimizer, fallback, tau=anchor.tau, n_lines=n_lines)
     fb_w_, aa_w_ = jnp.asarray(fb_w), jnp.asarray(aa_w)
     return lambda *args: step(*args, fb_w_, aa_w_)
+
+
+def _anti_at(anti: AntiSpec | None, epoch: float) -> float | np.ndarray:
+    """The anti-subspace weight at *epoch*: a float, or a vector over slices under a per-slice `AntiSpec.hold`."""
+    if anti is None:
+        return 0.0
+    w = np.asarray(anti(epoch), np.float32)
+    return float(w) if w.ndim == 0 else w
 
 
 SCAN_STEPS = 16
@@ -338,7 +354,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     step = 0
     window = _Window()
 
-    def record(step: int, weight: float, anti_weight: float, anchor_loss: float, anti_loss: float) -> None:
+    def record(step: int, weight: float, anti_weight: float | np.ndarray, anchor_loss: float, anti_loss: float) -> None:
         alpha = alignment(model, probe_tokens, axes=anchor.axes)[:, :, :PROMPT_SPAN]  # (L1, C, span roles)
         m = margin(alpha, probe_weights)  # (L1, span roles)
         m_op1 = float(m[:, 0].mean())
@@ -400,7 +416,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             chunk = [next(batches) for _ in range(n)]
             ats = [epoch + (len(train_losses) + i) / epoch_length for i in range(n)]
             weights = [float(anchor(at)) for at in ats]
-            anti_weights = [float(anti(at)) if anti is not None else 0.0 for at in ats]
+            anti_weights = [_anti_at(anti, at) for at in ats]
             pad = SCAN_STEPS - n
             stacked = tuple(np.stack([b[f] for b in chunk] + [chunk[-1][f]] * pad) for f in range(len(chunk[0])))
             model, opt_state, outs = train_steps(
@@ -408,7 +424,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
                 opt_state,
                 stacked,
                 np.asarray(weights + [0.0] * pad, np.float32),
-                np.asarray(anti_weights + [0.0] * pad, np.float32),
+                np.asarray(anti_weights + [np.zeros_like(anti_weights[0])] * pad, np.float32),
                 np.arange(SCAN_STEPS) < n,
             )
             loss, anchor_loss, anti_loss, fb_loss, aa_loss, fb_lines = np.asarray(outs[:n]).T.tolist()
@@ -447,7 +463,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     record(
         step,
         float(anchor(end)),
-        float(anti(end)) if anti is not None else 0.0,
+        _anti_at(anti, end),
         float(np.mean(anchor_losses)),
         float(np.mean(anti_losses)),
     )
