@@ -453,11 +453,14 @@ class Store(ABC):
         """Point the mutable name *name* at *art* — the cross-experiment by-name handle.
 
         When an ambient :func:`producer_context` is set (the task worker binds one), the writer's identity rides the payload as a ``producer`` key — ``Artifact.from_dict`` ignores it, so old readers are unaffected.
+
+        Declares a watchdog phase like :meth:`put`: on a remote backend each ref is its own commit round trip, so a publish step that points a few dozen refs emits nothing for minutes (slice-terms: 31 refs, badged stale and cancelled twice while healthy).
         """
         payload = art.to_dict()
         if producer := _producer.get():
             payload["producer"] = {**producer, "written_at": datetime.now(timezone.utc).isoformat()}
-        self._write_ref(name, json.dumps(payload, sort_keys=True))
+        with blocking_phase(f"set_ref {name}", _TRANSFER_OVERHEAD_S):
+            self._write_ref(name, json.dumps(payload, sort_keys=True))
 
     def get_ref(self, name: str) -> Artifact | None:
         """Resolve the name *name* to its artifact handle, or ``None`` if unset.
