@@ -205,7 +205,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-We held the anti-subspace weight high on the embedding and block 1 only, and at the recipe level on the pulled blocks. This kept most of the selectivity of a high hold everywhere, and it gave back the removal that the high hold cost. We also pooled the pull over slices as well as positions. On most seeds it then settled on the last block. But on one seed it settled on a position the prediction does not use, and there the op could not be removed.
+We held the anti-subspace weight high on the embedding and block 1 only, and at the recipe level on the pulled blocks. This kept most of the selectivity of a high hold everywhere, and it gave back the removal that the high hold cost. We also pooled the pull over slices as well as positions. On most seeds the pull then settled on the last block. But on one seed it settled on a position the prediction does not use, and there the op could not be removed.
 ///
 
 [The late-pull experiment](/docs/m2/late-pull/report.py) pulled `{ex.ANCHORED_OP}` toward e₁ at blocks 2 to 4 only, with the anti-subspace term on every slice (the `deep` arm). Holding the anti weight at 0.2 for all of training, in place of the recipe hold of 0.03, kept the color embedding table and block 1 off e₁ on the other ops and brought the spill within the criterion on every seed. But it removed about a tenth less of the op.
@@ -530,9 +530,9 @@ def pool_table() -> str:
             [
                 str(s),
                 SLICE_NAME[SETTLED[s]],
-                f"{removal(r):.2f}",
-                f"{removal(r, BLOCK1):.2f}",
-                f"{removal(r, LATE_SET):.2f}",
+                num(removal(r)),
+                num(removal(r, BLOCK1)),
+                num(removal(r, LATE_SET)),
                 num(max(c["spill"]), ".3f"),
             ]
         )
