@@ -21,6 +21,7 @@ from sca.anchoring import (
     anchor_term,
     anti_subspace_term,
     crop_weight,
+    make_anchored_train_step,
     margin,
     pooled_anchor_term,
     sample_anchored_batches,
@@ -371,6 +372,62 @@ def test_pooling_is_within_each_slice():
     np.testing.assert_allclose(tiny, 0.001 * np.log(2), rtol=1e-3, atol=0)  # each slice: min 0 + τ·ln2
 
 
+def test_slice_pooling_lets_the_pull_choose_the_slice():
+    # The same two slices: pooled over (slice, position), the pull goes to both zeros and nowhere else.
+    states = np.zeros((2, 1, 2, 8), dtype=np.float32)
+    states[0, ..., 0] = [1.0, 0.0]  # x = [0.0, 1.0]
+    states[1, ..., 0] = [0.0, 1.0]  # x = [1.0, 0.0]
+    mask = jnp.ones((1, 2), dtype=jnp.float32)
+    line_id = jnp.zeros((1, 2), dtype=jnp.int32)
+    tiny = pooled_anchor_term(jnp.asarray(states), mask, line_id, 1, 0.001, pool_slices=True)
+    np.testing.assert_allclose(tiny, 0.001 * np.log(2), rtol=1e-3, atol=0)  # min 0 + τ·ln(4 pairs / 2 at min)
+    # One slice far ahead takes the whole budget, where the per-slice pool splits it evenly.
+    states[1, ..., 0] = [0.5, 0.5]
+    for tau in (0.01, 0.1, np.inf):
+        grad = jax.grad(lambda s, t=tau: pooled_anchor_term(s, mask, line_id, 1, t, pool_slices=True))(
+            jnp.asarray(states)
+        )
+        got = -np.asarray(grad)[:, 0, :, 0]  # (slice, position) softmin weights
+        x = 1.0 - states[:, 0, :, 0]
+        np.testing.assert_allclose(got, softmin_weights(x.ravel(), tau).reshape(2, 2), rtol=1e-4, atol=1e-7)
+        np.testing.assert_allclose(got.sum(), 1.0, rtol=1e-5, atol=0)
+    # At τ = ∞ the two forms agree: the mean over slices of the per-slice means.
+    np.testing.assert_allclose(
+        pooled_anchor_term(jnp.asarray(states), mask, line_id, 1, np.inf, pool_slices=True),
+        pooled_anchor_term(jnp.asarray(states), mask, line_id, 1, np.inf),
+        rtol=1e-6,
+        atol=0,
+    )
+
+
+def test_slice_temperature_spreads_the_pull_over_depth():
+    # Three slices, two positions; slice 0 is closest to the axis, slice 2 furthest.
+    rng = np.random.default_rng(0)
+    states = rng.normal(size=(3, 1, 2, 8)).astype(np.float32)
+    states[0, 0, 0, 0] += 4.0
+    s = jnp.asarray(states)
+    mask = jnp.ones((1, 2), dtype=jnp.float32)
+    line_id = jnp.zeros((1, 2), dtype=jnp.int32)
+    tau = 0.1
+    joint = pooled_anchor_term(s, mask, line_id, 1, tau, pool_slices=True)
+    nested = pooled_anchor_term(s, mask, line_id, 1, tau, pool_slices=True, slice_tau=tau)
+    np.testing.assert_allclose(nested, joint, rtol=1e-5, atol=0)
+    per_slice = pooled_anchor_term(s, mask, line_id, 1, tau)
+    np.testing.assert_allclose(
+        pooled_anchor_term(s, mask, line_id, 1, tau, pool_slices=True, slice_tau=np.inf), per_slice, rtol=1e-6, atol=0
+    )
+
+    def slice_share(slice_tau):
+        grad = jax.grad(lambda t: pooled_anchor_term(t, mask, line_id, 1, tau, pool_slices=True, slice_tau=slice_tau))
+        g = np.linalg.norm(np.asarray(grad(s))[:, 0], axis=(1, 2))
+        return g / g.sum()
+
+    shares = [slice_share(t)[0] for t in (0.1, 0.4, 1.6, np.inf)]
+    assert all(np.diff(shares) < 0)  # the closest slice's share falls as slice_tau grows
+    with pytest.raises(ValueError, match="slice_tau needs pool_slices"):
+        make_anchored_train_step(optax.sgd(0.1), tau=tau, n_lines=1, slice_tau=0.4)
+
+
 def test_softmin_weights_limits():
     x = np.array([0.8, 0.4, 0.0, 1.0])
     np.testing.assert_allclose(softmin_weights(x, np.inf), 0.25, rtol=0, atol=1e-12)
@@ -512,6 +569,34 @@ def test_anti_subspace_schedule_opens_high_and_holds_at_its_ratio():
     assert late(50) > spec(50)
     np.testing.assert_allclose(late(0), spec(0), rtol=1e-12, atol=0)
     np.testing.assert_allclose(late(90), spec(90), rtol=1e-9, atol=0)
+
+
+def test_anti_subspace_term_weights_each_slice():
+    states = np.zeros((2, 1, 2, 8), dtype=np.float32)
+    states[0, ..., 0] = 1.0  # slice 0 on the axis, slice 1 off it
+    states[1, ..., 1] = 1.0
+    live = jnp.ones((1, 2), dtype=jnp.float32)
+    plain = anti_subspace_term(jnp.asarray(states), live)
+    np.testing.assert_allclose(plain, 0.5, rtol=1e-6, atol=0)
+    weighted = anti_subspace_term(jnp.asarray(states), live, slice_w=jnp.asarray([0.2, 0.03]))
+    np.testing.assert_allclose(weighted, 0.2 * 1.0 / 2, rtol=1e-6, atol=0)
+    ones = anti_subspace_term(jnp.asarray(states), live, slice_w=jnp.ones(2))
+    np.testing.assert_allclose(ones, plain, rtol=1e-6, atol=0)
+
+
+def test_anti_subspace_schedule_takes_absolute_and_per_slice_holds():
+    ratio = AntiSpec(
+        lam=0.1, peak_ratio=2.5, hold_ratio=0.3, anneal_end=50, anchor_anneal_start=90, anchor_anneal_end=100
+    )
+    absolute = replace(ratio, lam=7.0, peak=0.25, hold=0.03)
+    for e in (0, 20, 50, 95, 100):
+        np.testing.assert_allclose(absolute(e), ratio(e), rtol=1e-12, atol=0)  # the anchor weight no longer enters
+    per_slice = replace(absolute, hold=(0.2, 0.03, 0.03))
+    assert per_slice(0).shape == (3,)
+    np.testing.assert_allclose(per_slice(0), 0.25, rtol=1e-12, atol=0)
+    np.testing.assert_allclose(per_slice(70), [0.2, 0.03, 0.03], rtol=1e-12, atol=0)
+    np.testing.assert_allclose(per_slice(np.array([20.0, 95.0]))[:, 1], absolute(np.array([20.0, 95.0])), rtol=1e-12)
+    assert per_slice(np.array([20.0, 95.0])).shape == (2, 3)
 
 
 def test_the_anti_subspace_term_pushes_the_cloud_off_the_axis(data_dir, tmp_path):
@@ -1109,3 +1194,41 @@ def test_loss_mask_zeroes_targets_at_marked_positions_and_never_touches_the_inpu
     expected = np.where(loss_mask[target_at], 0, y1)
     np.testing.assert_array_equal(y2, expected)
     assert (y2 == 0).sum() > (y1 == 0).sum()  # the mask actually zeroed something beyond ordinary padding
+
+
+def test_slice_pooled_training_with_per_slice_anti_weights(data_dir, tmp_path):
+    """The slice-pooled pull (at a slice temperature of its own) and a per-slice anti weight train end to end, and the trajectory keeps the vector."""
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    tokens, weights = probe_set()
+    anti = AntiSpec(
+        lam=1.0,
+        peak_ratio=0.0,
+        hold_ratio=0.0,
+        anneal_end=5,
+        anchor_anneal_start=13,
+        anchor_anneal_end=15,
+        peak=0.25,
+        hold=(0.2, 0.03, 0.03),
+    )
+    _, _, traj = train_anchored(
+        training_config().model_copy(
+            update={"scheduler": SchedulerConfig(epochs=6, warmup_epochs=2, min_lr_factor=0.01)}
+        ),
+        data_dir,
+        anchor=AnchorSpec(
+            peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=0.1, pool_slices=True, slice_tau=0.4
+        ),
+        anti=anti,
+        label_p=label_p,
+        probe_tokens=tokens,
+        probe_weights=weights,
+        anchor_slices=(1, 2),
+        anti_slices=(0, 1, 2),
+        checkpoint_dir=tmp_path / "ckpt",
+        traj_stride=20,
+    )
+    assert traj["anti_weight"].shape == (len(traj["step"]), 3)
+    np.testing.assert_allclose(traj["anti_weight"][-1], anti(6), rtol=1e-6, atol=0)
+    assert np.isfinite(traj["anchor"]).all() and np.isfinite(traj["anti"]).all()
+    assert traj["anchor"][-1] < traj["anchor"][0]

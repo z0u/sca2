@@ -21,7 +21,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from jaxtyping import Array, Float, Int, PyTree
+from jaxtyping import Array, Bool, Float, Int, PyTree
 
 from sca.config import DataConfig, ModelConfig
 from sca.model import LanguageModel
@@ -115,6 +115,12 @@ class AnchorSpec:
     hinge: tuple[float, float] | None = None
     """`(cap, softness)` for the pooled term's rounded hinge (`pooled_anchor_term`), or `None` for the plain
     `1 − cos` term. Needs a pooled anchor (`tau` set); every measurement still reads the raw cosine."""
+    pool_slices: bool = False
+    """Pool each line over its slice × position pairs in one mellowmax (`pooled_anchor_term`), so the pull may
+    choose the slice too; `False` pools within each slice. Needs a pooled anchor (`tau` set)."""
+    slice_tau: float | None = None
+    """With `pool_slices`, a temperature of its own for the pool over slices (`pooled_anchor_term`): each slice
+    pools its positions at `tau`, then the slices pool at `slice_tau`. `None` is the one joint pool at `tau`."""
 
     def __call__(self, epoch) -> np.ndarray:
         return anchor_weight(
@@ -168,8 +174,16 @@ class AntiSpec:
     shape: Shape = "min-jerk"
     """Under `flat` the ratio sits at `hold_ratio` throughout and the term skips
     the anchor's end anneal, so `peak_ratio` and `anneal_end` are unused."""
+    peak: float | None = None
+    """The weight at epoch 0 as an absolute number, in place of `lam × peak_ratio`; `None` keeps the ratio."""
+    hold: float | tuple[float, ...] | None = None
+    """The weight the schedule anneals to and holds, as an absolute number in place of `lam × hold_ratio`, so a
+    sweep of the anchor weight leaves it where it is. A tuple holds one weight per slice the term acts on (in slice
+    order), each annealing from the same peak; the weight is then a vector over those slices. `None` keeps the
+    ratio."""
 
     def __call__(self, epoch) -> np.ndarray:
+        """The weight at *epoch*, with a trailing slice axis when `hold` is a tuple."""
         return anti_subspace_weight(
             epoch,
             lam=self.lam,
@@ -180,6 +194,8 @@ class AntiSpec:
             anchor_anneal_end=self.anchor_anneal_end,
             floor=self.floor,
             shape=self.shape,
+            peak=self.peak,
+            hold=self.hold,
         )
 
 
@@ -194,18 +210,34 @@ def anti_subspace_weight(
     anchor_anneal_end: float,
     floor: float,
     shape: Shape = "min-jerk",
+    peak: float | None = None,
+    hold: float | tuple[float, ...] | None = None,
 ) -> np.ndarray:
     """The anti-subspace weight at (fractional) *epoch*: see `AntiSpec`.
 
     Under `shape="flat"` the weight is `lam × hold_ratio` for the whole of
     training: a constant ratio to the anchor peak, which is the bracket arm.
+    *peak* and *hold*, when given, are absolute weights in place of the ratios;
+    a tuple *hold* adds a trailing axis, one weight per slice.
     """
     e = np.asarray(epoch, dtype=float)
+    if peak is None and hold is None:
+        if shape == "flat":
+            return lam * hold_ratio * np.ones_like(e)
+        ratio = peak_ratio + (hold_ratio - peak_ratio) * _interp(e / anneal_end, shape)
+        end = 1.0 - (1.0 - floor) * _interp(
+            (e - anchor_anneal_start) / (anchor_anneal_end - anchor_anneal_start), shape
+        )
+        return lam * ratio * end
+    w0 = lam * peak_ratio if peak is None else peak
+    w1 = lam * hold_ratio if hold is None else np.asarray(hold, dtype=float)
+    if np.ndim(w1):
+        e = e[..., None]
     if shape == "flat":
-        return lam * hold_ratio * np.ones_like(e)
-    ratio = peak_ratio + (hold_ratio - peak_ratio) * _interp(e / anneal_end, shape)
+        return w1 * np.ones_like(e)
+    w = w0 + (w1 - w0) * _interp(e / anneal_end, shape)
     end = 1.0 - (1.0 - floor) * _interp((e - anchor_anneal_start) / (anchor_anneal_end - anchor_anneal_start), shape)
-    return lam * ratio * end
+    return w * end
 
 
 @dataclass(frozen=True)
@@ -319,6 +351,8 @@ def pooled_anchor_term(
     line_w: Float[Array, "B N"] | None = None,
     pool: Float[Array, "B T"] | None = None,
     hinge: tuple[float, float] | None = None,
+    pool_slices: bool = False,
+    slice_tau: float | None = None,
 ) -> Float[Array, ""]:
     """Mean over labeled lines and slices of the mellowmax of (1 − cos) over each line's span.
 
@@ -329,6 +363,10 @@ def pooled_anchor_term(
     *line_w* weights each line's pooled term (a `Crop` policy's weights). It leaves the denominator alone, so it only ever takes pull away: a line at weight zero still counts as labeled, and a line at weight one keeps the pull it would have had without the weights.
 
     *pool* narrows the positions each line pools over (`knowable`'s positions from the op word on) without narrowing the denominator: a line is counted as labeled by *mask*, and a labeled line with nothing left in its pool contributes zero.
+
+    *pool_slices* pools over the slice × position pairs of each line in one mellowmax, in place of one per slice, so the pull can choose the slice as well as the position: the softmin weights sum to 1 over the pairs, and the term is the mean over lines alone. The slices pooled over are the ones in *states*.
+
+    *slice_tau* (with *pool_slices*) gives the slice its own temperature: each slice pools its positions at *tau*, then a second mellowmax pools the slices at *slice_tau*. At `slice_tau == tau` this is the one joint pool (every slice has the same positions, so the nested means multiply out); larger values spread the pull over depth, and `inf` is the per-slice form.
 
     *hinge*, `(cap, softness)`, remaps the per-position term from `1 − cos` to the rounded hinge `(softness / cap) · softplus((cap − cos) / softness)`: well below the cap this is `1 − cos / cap`, and the gradient fades smoothly to zero over roughly `cap ± 2·softness`, in place of a sharp corner at the cap that could make a state near it flip between pulled and not pulled from step to step against the anti-subspace term's steady push back. `None` is the plain term. Every *measurement* (`alignment`, the trajectory, `axes_alignment` itself) always reads the raw cosine; only this training-time term is remapped.
     """
@@ -343,29 +381,68 @@ def pooled_anchor_term(
     else:
         cap, softness = hinge
         x = (softness / cap) * jax.nn.softplus((cap - cos) / softness)
-    if np.isinf(tau):
-        pooled = jnp.einsum("lbt,btn->lbn", x, sel.astype(x.dtype)) / jnp.maximum(count, 1)
-    else:
-        # The per-line min keeps exp in range (x − min ≥ 0 within the line); its
-        # dependence cancels analytically, so it carries no gradient of its own.
-        xw = jnp.where(sel[None], x[..., None], jnp.inf)  # (L1, B, T, N)
-        lmin = jax.lax.stop_gradient(jnp.where(labeled, xw.min(axis=2), 0.0))
-        z = jnp.exp(jnp.where(sel[None], -(x[..., None] - lmin[:, :, None, :]) / tau, -jnp.inf))
-        mean_z = z.sum(axis=2) / jnp.maximum(count, 1)
-        pooled = lmin - tau * jnp.log(jnp.where(labeled, mean_z, 1.0))
+    if pool_slices and slice_tau is not None:
+        per_slice = _pool_positions(x, sel, count, labeled, tau)  # (L1, B, N)
+        if np.isinf(slice_tau):
+            pooled = per_slice.mean(axis=0)
+        else:
+            smin = jax.lax.stop_gradient(per_slice.min(axis=0))
+            pooled = smin - slice_tau * jnp.log(jnp.mean(jnp.exp(-(per_slice - smin) / slice_tau), axis=0))
+        kept = labeled if line_w is None else labeled * line_w
+        return jnp.sum(pooled * kept) / (n_labeled + 1e-8)
+    if pool_slices:
+        # One pool per line over (slice, position): the per-slice form below with the slice axis folded in.
+        n_sl = states.shape[0]
+        if np.isinf(tau):
+            pooled = jnp.einsum("lbt,btn->bn", x, sel.astype(x.dtype)) / (n_sl * jnp.maximum(count, 1))
+        else:
+            xw = jnp.where(sel[None], x[..., None], jnp.inf)  # (L1, B, T, N)
+            lmin = jax.lax.stop_gradient(jnp.where(labeled, xw.min(axis=(0, 2)), 0.0))  # (B, N)
+            z = jnp.exp(jnp.where(sel[None], -(x[..., None] - lmin[None, :, None, :]) / tau, -jnp.inf))
+            mean_z = z.sum(axis=(0, 2)) / (n_sl * jnp.maximum(count, 1))
+            pooled = lmin - tau * jnp.log(jnp.where(labeled, mean_z, 1.0))
+        kept = labeled if line_w is None else labeled * line_w
+        return jnp.sum(pooled * kept) / (n_labeled + 1e-8)
+    pooled = _pool_positions(x, sel, count, labeled, tau)
     kept = labeled if line_w is None else labeled * line_w
     return jnp.sum(pooled * kept) / (states.shape[0] * (n_labeled + 1e-8))
 
 
+def _pool_positions(
+    x: Float[Array, "L1 B T"],
+    sel: Bool[Array, "B T N"],
+    count: Int[Array, "B N"],
+    labeled: Bool[Array, "B N"],
+    tau: float,
+) -> Float[Array, "L1 B N"]:
+    """Each line's mellowmax of *x* over its selected positions, within each slice (0 for an unlabeled line)."""
+    if np.isinf(tau):
+        return jnp.einsum("lbt,btn->lbn", x, sel.astype(x.dtype)) / jnp.maximum(count, 1)
+    # The per-line min keeps exp in range (x − min ≥ 0 within the line); its
+    # dependence cancels analytically, so it carries no gradient of its own.
+    xw = jnp.where(sel[None], x[..., None], jnp.inf)  # (L1, B, T, N)
+    lmin = jax.lax.stop_gradient(jnp.where(labeled, xw.min(axis=2), 0.0))
+    z = jnp.exp(jnp.where(sel[None], -(x[..., None] - lmin[:, :, None, :]) / tau, -jnp.inf))
+    mean_z = z.sum(axis=2) / jnp.maximum(count, 1)
+    return lmin - tau * jnp.log(jnp.where(labeled, mean_z, 1.0))
+
+
 def anti_subspace_term(
-    states: Float[Array, "L1 B T C"], live: Float[Array, "B T"], axes: tuple[int, ...] = ANCHOR_AXES
+    states: Float[Array, "L1 B T C"],
+    live: Float[Array, "B T"],
+    axes: tuple[int, ...] = ANCHOR_AXES,
+    slice_w: Float[Array, " L1"] | None = None,
 ) -> Float[Array, ""]:
     """Mean of cos²(h, e₁) over every residual-stream slice and every live position.
 
     M1's anti-subspace penalty with the reserved coordinate axis replaced by our anchor direction (or, for several *axes*, the squared length of the projection onto their span): it asks that the cloud as a whole not sit on the axis, without asking any particular point to leave it. *live* selects the non-pad positions — the ones the model is actually shown — and every line counts, labeled or not, which is what makes the term indiscriminate.
+
+    *slice_w* weights each slice's mean before the mean over slices, so the term carries per-slice weights itself (and is then called at weight 1); `None` is every slice at weight 1.
     """
     cos = axes_alignment(states, axes)  # (L1, B, T)
-    return jnp.sum(cos**2 * live) / (states.shape[0] * (jnp.sum(live) + 1e-8))
+    if slice_w is None:
+        return jnp.sum(cos**2 * live) / (states.shape[0] * (jnp.sum(live) + 1e-8))
+    return jnp.sum(cos**2 * live * slice_w[:, None, None]) / (states.shape[0] * (jnp.sum(live) + 1e-8))
 
 
 def make_anchored_train_step(
@@ -377,12 +454,16 @@ def make_anchored_train_step(
     axes: tuple[int, ...] = ANCHOR_AXES,
     hinge: tuple[float, float] | None = None,
     anti_slices: tuple[int, ...] | None = None,
+    pool_slices: bool = False,
+    slice_tau: float | None = None,
 ):
     """Build a jitted training step for cross-entropy plus the two weighted anchor terms.
 
     The weights are arguments rather than closures, so the schedules move without recompiling; *tau* is fixed per build, since a condition's pooling does not move over training. With `tau=None` the anchor term is the flat per-position mean (`anchor_term`); with a float (∞ allowed) it is the per-line mellowmax (`pooled_anchor_term`), and *n_lines* bounds the local line index the step's `line_id` argument carries. Returns the three loss terms separately: the anchor term is the training-side view of what the alignment measurements read later, and the anti-subspace term is the same view of the mean alignment the containment gates score. Pass `anti_weight=0` for a bare anchor.
 
     *hinge*, `(cap, softness)`, remaps the pooled term's per-position quantity as `pooled_anchor_term` describes; it only has an effect with `tau` set (the flat `anchor_term` has no hinge variant) and is fixed per build, like *tau*.
+
+    *pool_slices* pools the pull over the slice × position pairs of each line (`pooled_anchor_term`), over the slices *slices* names; it needs *tau* set, and *slice_tau* gives the pool over slices its own temperature. *anti_weight* may be a vector with one weight per slice the anti term acts on (in slice order), for per-slice weights (`AntiSpec.hold`).
 
     *slices* restricts both terms to the named residual-stream slices (slice 0 is the embedding); `None` is every slice, the term as ex-2.1 and ex-2.2 trained it. *anti_slices* gives the anti-subspace term a slice set of its own, so the pull can leave a slice out while the anti term still acts there; `None` is the same set as *slices*. *axes* is where both terms read the alignment (`axes_alignment`): one axis, or the span of several. *clean_rows* names embeddings that may not carry the anchor axis: after each optimizer step and nGPT's re-normalization, the axis component of those embeddings is zeroed and they are re-normalized, the same kind of hard constraint as the unit norm. It is the tied-table fix for the syntax-embedding leak: those embeddings stay shared between the embedding table and the readout table, and training finds whatever solution it can with them held off the axis.
     """
@@ -392,6 +473,10 @@ def make_anchored_train_step(
         raise ValueError("slices must name at least one residual-stream slice, or be None for all")
     if anti_slices is not None and len(anti_slices) == 0:
         raise ValueError("anti_slices must name at least one residual-stream slice, or be None to follow slices")
+    if pool_slices and tau is None:
+        raise ValueError("pool_slices needs a pooled anchor (tau set)")
+    if slice_tau is not None and not pool_slices:
+        raise ValueError("slice_tau needs pool_slices")
     sel = None if slices is None else jnp.asarray(sorted(set(slices)))
     anti_sel = sel if anti_slices is None else jnp.asarray(sorted(set(anti_slices)))
     rows = None if clean_rows is None else jnp.asarray(sorted(set(clean_rows)))
@@ -405,7 +490,7 @@ def make_anchored_train_step(
         mask: Float[Array, "B T"],
         line_id: Int[Array, "B T"],
         weight: Float[Array, ""],
-        anti_weight: Float[Array, ""],
+        anti_weight: Float[Array, ""] | Float[Array, " S"],
         line_w: Float[Array, "B N"] | None = None,
         pool: Float[Array, "B T"] | None = None,
     ) -> tuple[LanguageModel, PyTree, Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
@@ -417,10 +502,16 @@ def make_anchored_train_step(
             anchor = (
                 anchor_term(pulled, mask, axes)
                 if tau is None
-                else pooled_anchor_term(pulled, mask, line_id, n_lines, tau, axes, line_w, pool, hinge)
+                else pooled_anchor_term(
+                    pulled, mask, line_id, n_lines, tau, axes, line_w, pool, hinge, pool_slices, slice_tau
+                )
             )
-            anti = anti_subspace_term(states if anti_sel is None else states[anti_sel], live, axes)
-            return task + weight * anchor + anti_weight * anti, (task, anchor, anti)
+            repelled = states if anti_sel is None else states[anti_sel]
+            anti = anti_subspace_term(repelled, live, axes)
+            if anti_weight.ndim == 0:
+                return task + weight * anchor + anti_weight * anti, (task, anchor, anti)
+            weighted = anti_subspace_term(repelled, live, axes, slice_w=anti_weight)
+            return task + weight * anchor + weighted, (task, anchor, anti)
 
         (_, (task, anchor, anti)), grads = eqx.filter_value_and_grad(loss_fn, has_aux=True)(model)
         updates, opt_state = optimizer.update(grads, opt_state, eqx.filter(model, eqx.is_inexact_array))

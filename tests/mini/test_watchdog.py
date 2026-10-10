@@ -248,10 +248,12 @@ def test_store_transfers_declare_a_phase_sized_from_the_payload(tmp_path: Path):
     with progress_context("r", "j", queue=None, emission_interval=0.1, on_phase=spy):
         art = store.put(payload, name="model")
         store.get(art, tmp_path / "back")
+        store.set_ref("reports/model", art)
 
     # 120s overhead + 4 MiB at the 512 KiB/s floor = 8s. One phase per top-level
     # call: the per-child recursion runs on pool threads, which carry no job context.
-    assert declared == [("put model", 128.0), ("get model", 128.0)]
+    # A ref write moves no payload, so it gets the overhead alone.
+    assert declared == [("put model", 128.0), ("get model", 128.0), ("set_ref reports/model", 120.0)]
 
 
 def test_a_body_of_nothing_but_transfers_never_looks_wedged(tmp_path: Path):
