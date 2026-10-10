@@ -1,0 +1,1597 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/7dc8e7365af79b3723ac5a885d78b66cd324114d/exports/m2/example-evidence/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/example-evidence/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What the anchor follows at the example answers</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md-prose.css and scripts/md.css into the md.css the
+ * site serves; and VS Code's Markdown preview lists them all (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+  /* Keep a short label like "(H1)" from wrapping onto a line of its own. `pretty` does this best; browsers without
+     it (Firefox, for now) drop that line and keep `balance`. */
+  text-wrap-style: balance;
+  text-wrap-style: pretty;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md-prose.css       a Markdown page's prose: on the site (below), and inlined
+ *                              after report.css when the page is printed
+ *   scripts/md.css             the site's Markdown pages only (base + md-prose + md,
+ *                              concatenated by scripts/build_site.py; VS Code's preview
+ *                              reads all three files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+/* Border-box, so a block with padding (a list's bullet indent, a blockquote, a code
+ * block) shares its right edge with the paragraphs, and so do the notes floated off it. */
+main.lit > * {
+  box-sizing: border-box;
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. Their side padding is --column-inset, so
+ * a margin note inside one can reach past it to the column's edge (Notes, below). */
+.admonition, details {
+  --column-inset: 1em;
+  margin-block: 1.5em;
+  padding: 0.6em var(--column-inset);
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Notes (mini.lit.notes): a footnote's text beside its marker, and a glossary term's
+ * definition at its first use in a section. Where a note shows depends on the room:
+ *   narrow screen   hidden until its marker is hovered or focused (tapped), then a box
+ *                   under the line, across the column; the footnote list stays too
+ *   wide screen     in the right margin, beside the line that cites it; the list keeps
+ *                   only what has no margin note
+ *   paper           in the margin as well, with the page geometry in docs/report.css
+ * Margin notes are right floats, each clearing the one before (`clear: right`), so a
+ * note that would overlap the one above slides down instead. A note in a table cell, a
+ * caption or a heading (`.popover`) cannot float out of its box, so it stays a hover
+ * box everywhere, and its footnote stays in the list. */
+/* How far a block's content sits in from the text column's right edge. Registered as a
+ * length so that `1em` resolves on the padded block, and not in the note's smaller type. */
+@property --column-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+:root {
+  --note-width: 14rem;
+  --note-gap: 1.5rem;
+}
+main.lit { position: relative; }  /* what a hover box spans */
+sup.fnref > a { text-decoration: none; }
+dfn.term {
+  font-style: inherit;
+  text-decoration: underline dotted color-mix(in srgb, var(--fg) 45%, transparent);
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+.sidenote {
+  display: none;
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  z-index: 10;
+  max-width: var(--measure);
+  margin-top: 0.3em;
+  margin-inline: auto;
+  padding: 0.5em 0.8em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.45;
+  text-align: left;
+  text-indent: 0;
+  color: var(--fg);
+}
+:is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote,
+.sidenote:is(:hover, :focus) {
+  display: block;
+}
+.sidenote-number { font-weight: 700; }
+.glossnote-term { font-weight: 700; }
+.glossnote-term::after { content: "."; }
+.sidenote .more > .sidenote-p { display: block; margin-top: 0.4em; }
+
+/* A note in the margin, on a wide screen (below) or on paper, is only its gloss until it
+ * opens, with an ellipsis that takes no width, so it never wraps onto a line of its own. */
+@media print, screen and (min-width: 74rem) {
+  .sidenote:not(.popover) {
+    & .more, & .lead-colon { display: none; }
+    &:has(> .more) > .gloss::after {
+      content: "…";
+      display: inline-block;
+      width: 0;
+      white-space: nowrap;
+    }
+  }
+}
+
+/* Wide enough for the centred column plus a note strip on each side:
+ * 40rem measure + 2 × (14rem note + 1.5rem gap) + 2 × 1.5rem gutter = 74rem. */
+@media screen and (min-width: 74rem) {
+  /* Figures and tables start below any note still running beside the text above them. */
+  main.lit > :is(figure, table, h2, hr, .footnote) { clear: right; }
+  .sidenote:not(.popover) {
+    display: block;
+    position: relative;
+    z-index: auto;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    max-width: none;
+    margin: 0.3em calc(-1 * (var(--note-width) + var(--note-gap) + var(--column-inset))) 0.8em 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+    text-align: justify;
+    hyphens: auto;
+    /* Only the gloss (mini.lit.notes) until the note or its marker is hovered, or
+     * focused: a click on either keeps it open. The rest then opens in a box over the
+     * notes below, so the float keeps its size and nothing else moves. */
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    & .more {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      padding-bottom: 0.4em;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+  }
+  :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
+  .sidenote:not(.popover):is(:hover, :focus, :focus-within) {
+    opacity: 1;
+    z-index: 5;  /* over the notes below, which are positioned too */
+    & .more { display: block; }
+    & .lead-colon { display: inline; }
+    & > .gloss::after { content: none; }
+  }
+  .sidenote:focus { outline: none; }
+  .footnote li.sidenoted,
+  .footnote.all-sidenoted {
+    display: none;
+  }
+}
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  /* Paper cannot hover, so a note shows only where a stylesheet gives it a margin
+   * (docs/report.css does); otherwise the footnote list carries them all. */
+  .sidenote { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its definition beside it needs no underline on paper. */
+  dfn.term {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its definition beside it needs no underline on paper. */
+  dfn.term {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/example-evidence/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/example-evidence/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>ex-2.2.21</strong> · <code>e185196-dirty</code> (dirty) · run 2026-10-02<div>via reports/m2/ex-2.2.21/holdout/k3-r0.3-no-four</div></div><div><strong>ex-2.2.22</strong> · <code>f468003</code> · run 2026-10-05<div>via reports/m2/ex-2.2.22/by-count, reports/m2/ex-2.2.22/by-count-arrays/anchor-hinge-s0, reports/m2/ex-2.2.22/by-count-arrays/anchor-hinge-s1, reports/m2/ex-2.2.22/by-count-arrays/anchor-hinge-s2, reports/m2/ex-2.2.22/by-count-arrays/anchor-hinge-s3, reports/m2/ex-2.2.22/by-count-arrays/anchor-hinge-s4, reports/m2/ex-2.2.22/by-count-arrays/anchor-hinge-s5, reports/m2/ex-2.2.22/by-count-arrays/anchor-whole-s0, reports/m2/ex-2.2.22/by-count-arrays/anchor-whole-s1, reports/m2/ex-2.2.22/by-count-arrays/anchor-whole-s2, reports/m2/ex-2.2.22/by-count-arrays/control-s0, reports/m2/ex-2.2.22/by-count-arrays/control-s1, reports/m2/ex-2.2.22/by-count-arrays/control-s2, reports/m2/ex-2.2.22/by-count-arrays/control-s3, reports/m2/ex-2.2.22/by-count-arrays/control-s4, reports/m2/ex-2.2.22/by-count-arrays/k-mixed-s0, reports/m2/ex-2.2.22/by-count-arrays/k-mixed-s1, reports/m2/ex-2.2.22/by-count-arrays/k-mixed-s2</div></div></details>
+<main class="lit">
+<h1 id="what-the-anchor-follows-at-the-example-answers">What the anchor follows at the example answers<a class="anchor-link" href="https://z0u.github.io/sca2/m2/example-evidence/#what-the-anchor-follows-at-the-example-answers" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- lede -->
+<p>In ex-2.2.22 the alignment with the anchored direction at the example answers rose with the posterior on <code>difference</code>, but at the same posterior it sat higher at earlier answers. That difference goes away once each answer is compared with the evidence of its own example. The alignment at an example answer follows how well that one example fits <code>difference</code>, and hardly depends on the examples before it.</p>
+</div>
+<p>The <a href="https://github.com/z0u/sca2/blob/main/todo/science/anchor-grades-with-the-posterior.md">backlog item</a> asks whether the anchor holds the op the model has inferred, which would make it grade with the posterior, rather than the binary label it was trained on. <a href="https://z0u.github.io/sca2/m2/ex-2.2.22/">Ex-2.2.22</a> (E3) took a first look and found a rise with the posterior at the example answers, plus an unexplained dependence on the answer index. This page re-analyzes the same stored measurements, with no new runs.</p>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/m2/example-evidence/#observations" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/m2/example-evidence/#each-example-on-its-own-e1">Each example on its own (E1)</a>: plotted against the posterior given that example alone, the lines for the three answer indices lie on top of each other. On every anchored condition, that posterior accounts for at least 89% of the variance in α (r²), against at most 48% for the posterior given the examples so far.</li>
+<li><a href="https://z0u.github.io/sca2/m2/example-evidence/#what-the-earlier-examples-add-e2">What the earlier examples add (E2)</a>: fitted together with the evidence before that example, the earlier evidence gets a weight of at most 0.05, against at least 1.2 for the example itself. It shows most on answers that do not fit <code>difference</code>.</li>
+<li><a href="https://z0u.github.io/sca2/m2/example-evidence/#the-answer-color-alone-e3">The answer color alone (E3)</a>: the answer color, without its operands, predicts at most 9% of the variance, so α depends on how the answer relates to its operands.</li>
+<li><a href="https://z0u.github.io/sca2/m2/example-evidence/#predicting-the-next-answer-e4">Predicting the next answer (E4)</a>: at the query the model does combine the examples. With three examples, the control and <code>hinge</code> score 0.88 where the ideal predictor scores 0.95, more than one example alone could support. With one or two examples it falls well short of the ideal predictor, even on <code>k-mixed</code>, which was trained on those counts.</li>
+</ul>
+<h2 id="scope">Scope<a class="anchor-link" href="https://z0u.github.io/sca2/m2/example-evidence/#scope" title="Link to this heading">&para;</a></h2>
+<p>This is a re-analysis of the stored by-count pass of ex-2.2.22 on its three-example held-out set, with no preregistration and no gate. It covers the <code>hinge</code> condition (six runs: three paired with ex-2.2.21 and three replicates), the whole-line condition (three runs), <code>k-mixed</code> (three runs, one left out as below), and the control (five runs). Only the 2,000 held-out <code>difference</code> contexts are used, and only their example answers: as ex-2.2.22 found, nearly every query answer has a posterior near 1, so there is too little spread to compare there. E4 also uses the held-out sets with 1 to 5 examples, for the task score at the query.</p>
+<p>The <code>k-mixed</code> run at model seed 702 has no anchor at the example answers: α stays near the control even where the example fits <code>difference</code>. It also scores lowest on the task of all the runs here, as the runs that took the slow path through training did in ex-2.2.21. It is left out of the numbers below.</p>
+<h2 id="the-measurements">The measurements<a class="anchor-link" href="https://z0u.github.io/sca2/m2/example-evidence/#the-measurements" title="Link to this heading">&para;</a></h2>
+<p><em>α</em> is the alignment with e₁ (the cosine between a state and the anchored direction), averaged over slices 2 to 4, at the answer of each example. Slice 1 shows the same pattern, more weakly, and the embedding shows none.</p>
+<p>Each example answer is compared with three summaries of the evidence, all on the noise model of the corpus:</p>
+<ul>
+<li>the posterior on <code>difference</code> given the examples up to and including that one (<em>the posterior so far</em>, the one ex-2.2.22 used);</li>
+<li>the posterior given that example alone, from a uniform prior over the seven ops (<em>the one-example posterior</em>);</li>
+<li>the posterior given only the examples before it (<em>the earlier posterior</em>), which is 1/7 at the first example.</li>
+</ul>
+<p>About two thirds of the examples in a <code>difference</code> context <em>fit</em> it, meaning the answer shown is one <code>difference</code> can give on that pair. The rest come from replacement op noise or a random color. A single example can lift the posterior on <code>difference</code> from 1/7 to about 0.7 at most, since other ops can give the same answer on some pairs. An example that does not fit has a one-example posterior near zero.</p>
+<h2 id="each-example-on-its-own-e1">Each example on its own (E1)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/example-evidence/#each-example-on-its-own-e1" title="Link to this heading">&para;</a></h2>
+<p>If α followed the posterior so far, answers with the same posterior would have the same α whatever their position. The left panel below repeats the comparison of ex-2.2.22 on <code>hinge</code>, and the right panel plots the same answers against the one-example posterior.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/alpha-by-evidence-light.png" alt="Two panels of seed-mean α at the example answers of `difference` contexts, on the `hinge` condition, one line per answer index (the first, second, and third example), each with a faint band for the seed range and whiskers for the middle half of the contexts, and the control drawn as thin grey lines near zero. Left: α against the posterior so far; the three lines are offset, with the first answer highest at the same posterior. Right: α against the one-example posterior, which reaches about 0.7 at most; the three lines lie on top of each other, low near zero and near 0.9 at the top. The seed bands are narrow, and the context whiskers are wide, spanning a few tenths at the middle of each line." width="702" height="317" style="max-width: 100%; height: auto;" data-asset-name="alpha-by-evidence" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/alpha-by-evidence-dark.png" alt="Two panels of seed-mean α at the example answers of `difference` contexts, on the `hinge` condition, one line per answer index (the first, second, and third example), each with a faint band for the seed range and whiskers for the middle half of the contexts, and the control drawn as thin grey lines near zero. Left: α against the posterior so far; the three lines are offset, with the first answer highest at the same posterior. Right: α against the one-example posterior, which reaches about 0.7 at most; the three lines lie on top of each other, low near zero and near 0.9 at the top. The seed bands are narrow, and the context whiskers are wide, spanning a few tenths at the middle of each line." width="702" height="317" style="max-width: 100%; height: auto;" data-asset-name="alpha-by-evidence" />
+<figcaption><p><strong>α against two summaries of the evidence, on <code>hinge</code>.</strong> At each example answer of the held-out
+<code>difference</code> contexts, α averaged over slices 2 to 4, against <strong>left:</strong> the posterior so
+far, and <strong>right:</strong> the one-example posterior, in bins of 0.2, each point at the mean evidence of its bin.
+One line per answer index, the seed mean of six runs; a bin with fewer than 20 points in a run is
+left out of that run. The band is the seed range of the run means (pooled over contexts first); the
+whiskers span the middle half of the contexts, on α averaged over the runs (pooled over seeds first).
+Thin grey lines: the control.</p></figcaption></figure>
+
+<p>On the left the three lines are offset, as in ex-2.2.22: at a posterior between 0.6 and 0.8, α at the first answer is about as high as it gets, and at the third it is about a third lower. On the right they lie on top of each other. The seed bands are narrow on both sides. The whiskers are not: at the same posterior so far, α spreads over most of its range from one context to the next, and against the one-example posterior that spread shrinks to a few tenths or less. An answer whose example fits <code>difference</code> has α near 0.88 at every index, and one that does not fit stays low.</p>
+<p>That explains the offset. At the first answer, a middling posterior means one example that fits <code>difference</code> and also fits another op. At the third, it usually means a mix of examples that fit and examples that do not, and α then depends on which kind the latest one is.</p>
+<p>The table gives the same comparison as variance explained, for each anchored condition. The share of the examples so far that fit, a summary that weights every example equally, does a little better than the posterior so far and much worse than the one-example posterior.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>runs</th><th class=num>posterior so far</th><th class=num>share that fit</th><th class=num>one-example posterior</th></tr></thead><tbody><tr><td><code>hinge</code></td><td class=num>6</td><td class=num>0.47 (0.46–0.48)</td><td class=num>0.57 (0.55–0.60)</td><td class=num>0.92 (0.87–0.96)</td></tr><tr><td><code>whole-line</code></td><td class=num>3</td><td class=num>0.46 (0.44–0.47)</td><td class=num>0.54 (0.51–0.57)</td><td class=num>0.89 (0.85–0.91)</td></tr><tr><td><code>k-mixed</code></td><td class=num>2</td><td class=num>0.48 (0.47–0.48)</td><td class=num>0.59 (0.57–0.60)</td><td class=num>0.92 (0.89–0.96)</td></tr></tbody></table><figcaption><p><strong>How much of the variance in α each summary accounts for.</strong> The squared correlation r² between α at
+the example answers (averaged over slices 2 to 4) and each summary of the evidence, over every example
+answer of the held-out <code>difference</code> contexts. Seed mean, with the seed range in brackets.</p></figcaption></figure>
+
+<h2 id="what-the-earlier-examples-add-e2">What the earlier examples add (E2)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/example-evidence/#what-the-earlier-examples-add-e2" title="Link to this heading">&para;</a></h2>
+<p>The one-example posterior leaves some variance unexplained, so the earlier examples might still add something. A least-squares fit of α on the one-example posterior and the earlier posterior together gives each a weight; both are on the same scale, from 0 to 1.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>condition</th><th class=num>weight, this example</th><th class=num>weight, earlier examples</th><th class=num>α, misfit after doubt</th><th class=num>α, misfit after support</th></tr></thead><tbody><tr><td><code>hinge</code></td><td class=num>1.22 (1.13–1.26)</td><td class=num>0.04 (0.02–0.06)</td><td class=num>0.09 (0.05–0.17)</td><td class=num>0.16 (0.10–0.22)</td></tr><tr><td><code>whole-line</code></td><td class=num>1.33 (1.29–1.36)</td><td class=num>0.05 (0.05–0.06)</td><td class=num>0.06 (0.05–0.07)</td><td class=num>0.14 (0.13–0.16)</td></tr><tr><td><code>k-mixed</code></td><td class=num>1.22 (1.21–1.23)</td><td class=num>0.04 (0.02–0.05)</td><td class=num>0.09 (0.08–0.10)</td><td class=num>0.15 (0.14–0.16)</td></tr></tbody></table><figcaption><p><strong>The weight of each example and of the ones before it.</strong> The first two columns: the least-squares
+weights of α on the one-example posterior and on the earlier posterior. The last two: mean α at answers
+whose example does not fit <code>difference</code>, when the earlier posterior is below 0.3 and when it is above
+0.8. Seed mean, with the seed range in brackets.</p></figcaption></figure>
+
+<p>The earlier examples get a weight of a few hundredths, against more than one for the example itself. They show most on the answers that do not fit: there α is a little higher when the earlier examples favor <code>difference</code> than when they do not (0.16 against 0.09 on <code>hinge</code>). On answers that fit, the earlier examples make almost no difference.</p>
+<h2 id="the-answer-color-alone-e3">The answer color alone (E3)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/example-evidence/#the-answer-color-alone-e3" title="Link to this heading">&para;</a></h2>
+<p>The one-example posterior depends on the operands as well as the answer. If α could be predicted from the answer color alone, the anchor would be closer to a property of the answer token. Averaged by answer color on half of the contexts and tested on the other half, the answer color accounts for 0.09 (0.06–0.14) of the variance on <code>hinge</code> (held-out R²), and similar on the other conditions. So the model places the state at an example answer on e₁ according to how that answer relates to its operands.</p>
+<h2 id="predicting-the-next-answer-e4">Predicting the next answer (E4)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/example-evidence/#predicting-the-next-answer-e4" title="Link to this heading">&para;</a></h2>
+<p>The anchor follows each example on its own, but the next-token loss asks the model to predict each example answer at its <code>=</code>, which means combining the examples before it. How well does it do that? The by-count pass scored the query on held-out sets with 1 to 5 examples. The query after one example asks for the answer a second example would show (without the noise an example can carry), and the query after two asks for the third. So these scores stand in for how well the model predicts the answers of the later examples. The control and <code>hinge</code> were trained on three examples only, so for them the other counts are outside training; <code>k-mixed</code> was trained on 1 to 5.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/next-answer-light.png" alt="Three panels side by side, for the control, `hinge`, and `k-mixed`. Each plots expected exact match at the query against the posterior on `difference` given the examples, one line per number of examples from 1 to 5 in shades running light to dark, with a faint band for the seed range and a dashed diagonal for the ideal predictor. On the control and `hinge`, the line for three examples nearly reaches the diagonal at the top (0.88 against 0.95 on `hinge`), and the other counts sit lower. On `k-mixed` every line sits well below the diagonal (0.69 with three examples). With one example every condition reaches about 0.43 at the top bin, against 0.70 for the ideal predictor. On `hinge` the band for four and five examples is wide, from one run that drops." width="740" height="288" style="max-width: 100%; height: auto;" data-asset-name="next-answer" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/next-answer-dark.png" alt="Three panels side by side, for the control, `hinge`, and `k-mixed`. Each plots expected exact match at the query against the posterior on `difference` given the examples, one line per number of examples from 1 to 5 in shades running light to dark, with a faint band for the seed range and a dashed diagonal for the ideal predictor. On the control and `hinge`, the line for three examples nearly reaches the diagonal at the top (0.88 against 0.95 on `hinge`), and the other counts sit lower. On `k-mixed` every line sits well below the diagonal (0.69 with three examples). With one example every condition reaches about 0.43 at the top bin, against 0.70 for the ideal predictor. On `hinge` the band for four and five examples is wide, from one run that drops." width="740" height="288" style="max-width: 100%; height: auto;" data-asset-name="next-answer" />
+<figcaption><p><strong>How well the model predicts the next answer.</strong> On the held-out <code>difference</code> contexts with 1 to 5
+examples, expected exact match at the query against the posterior on <code>difference</code> given the
+examples, in bins of 0.2, each point at the mean posterior of its bin. One line per number of examples;
+the seed mean, with the seed range as a band. Dashed: the ideal predictor, which gets the posterior
+right. The control and <code>hinge</code> were trained on three examples only.</p></figcaption></figure>
+
+<p>The ideal predictor gets an <dfn class="term" tabindex="0">expected exact match</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Expected exact match</span> <span class="gloss">The task score, as the chance that a drawn answer agrees with a true one.</span><span class="more"> With drawn answers, the correct answer to a line is spread over two or more colors, so we take the chance that an answer drawn from the model agrees with one drawn from the true distribution. Its ceiling is that same chance for the true distribution against itself (Σq²), below 1 on the ops that round.</span></span> about equal to its posterior, so it follows the diagonal. With three examples, the count they were trained on, the control and <code>hinge</code> come close to it: 0.88 against 0.95 in the top bin on <code>hinge</code>. With one example every condition falls well short, at about 0.43 against 0.70, and <code>k-mixed</code>, which was trained on that count, does only a little better (0.48). With two examples the gap is wider still: 0.62 against 0.96 on <code>hinge</code>, and 0.68 on <code>k-mixed</code>. <code>k-mixed</code> stays below the diagonal at every count, reaching 0.69 with three examples. A single example lifts the posterior to about 0.7 at most, and with three examples the control and <code>hinge</code> score well above that, so at the query the model does combine the examples. The anchor at the example answers does not follow that combining.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/m2/example-evidence/#discussion" title="Link to this heading">&para;</a></h2>
+<p>At the example answers the anchor marks examples that look like <code>difference</code> more than contexts that do. The rise with the posterior that ex-2.2.22 saw comes mostly from this: the more examples fit, the higher the posterior, and each fitting example has a high α of its own. So this measurement does not yet show the anchor holding an inferred op. The sites where that could show are the <code>=</code> tokens, where the model predicts an answer it has not yet seen. The next-token loss covers every one of them, so the model is asked to combine the examples so far at each example <code>=</code> as well as at the query <code>=</code>. The answer, one token later, is where the example just shown is in view, which is what α follows. Ex-2.2.21 found the anchor weak at the query <code>=</code>, and α at the example <code>=</code> tokens was not stored.</p>
+<p>This fits how the label works. The pull is pooled over the positions of a whole <code>difference</code> context, so the model can meet it at positions of its choosing, and the answers of the examples that fit are where a single line shows the op most plainly. The answers that do not fit stay low, which a pooled pull allows.</p>
+<p>It may also bear on the spill that ex-2.2.23 found. A per-example judgement of whether an answer fits <code>difference</code> given its operands would fire on examples of other ops whose answers happen to fit, and removing e₁ there would touch those ops. This re-analysis covers only <code>difference</code> contexts, so it does not test that.</p>
+</main>
+</body>
+</html>

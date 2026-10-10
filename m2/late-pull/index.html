@@ -1,0 +1,1693 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <base href="https://huggingface.co/datasets/z0u/sca2-pub/resolve/20fbd1808229c3ee2bafa781cd4930a0f9502c86/exports/m2/late-pull/" />
+    <link rel="alternate" type="application/pdf" href="https://z0u.github.io/sca2/m2/late-pull/report.pdf" />
+    <meta name="mini-thumbnails" content="_assets/thumbs/" />
+    <link rel="alternate" type="text/markdown" href="index.md" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulling the deeper blocks only</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<style>
+/* The base sheet: what a woven report page and the site's Markdown pages share —
+ * tokens, type, code, tables, images, quotes, heading anchors. It reaches a page three
+ * ways: mini.lit.page inlines it ahead of lit.css (the report frame); scripts/build_site.py
+ * concatenates it ahead of scripts/md-prose.css and scripts/md.css into the md.css the
+ * site serves; and VS Code's Markdown preview lists them all (.vscode/settings.json). A value changed here
+ * changes every page, so the report-only and site-only rules live in those two sheets. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --fg-muted: #555555;
+  --link: #0066cc;
+  --border: #dddddd;
+  --code-bg: #f5f5f5;
+  --code-accent: #0066cc;
+  --mark: #fff3a8;
+  /* Table rules, in the booktabs manner: the text colour, eased off a little. */
+  --rule: color-mix(in srgb, var(--fg) 75%, transparent);
+  /* The faces, loaded by the one Google Fonts <link> every page shares
+   * (mini.lit.page.FONTS). Inline SVG figures read --font-mono too (src/subline). */
+  --font-sans: "PT Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", serif;
+  --font-mono:
+    "Fira Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --fg: #ffffff;
+    --fg-muted: #aaaaaa;
+    --link: #6cb6ff;
+    --border: #5a5a5a;
+    --code-bg: #2d2d2d;
+    --code-accent: #66d9aa;
+    --mark: #6b5d00;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  /* Prose lands at ~14.4px (a 90% base), the size the reports settled on. */
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+  /* Lora at the regular weight rather than the browser-default bold, with ligatures
+   * on — otherwise the variable font shows its 700 master. */
+  font-weight: 400;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+  /* Keep a short label like "(H1)" from wrapping onto a line of its own. `pretty` does this best; browsers without
+     it (Firefox, for now) drop that line and keep `balance`. */
+  text-wrap-style: balance;
+  text-wrap-style: pretty;
+}
+h1 {
+  margin-top: 0;
+  font-size: 2.25em;
+}
+h2 {
+  margin-top: 4em;
+}
+p {
+  margin-block: 1em;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+code {
+  background-color: var(--code-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+pre {
+  background-color: var(--code-bg);
+  padding: 1em;
+  border-radius: 4px;
+  border-left: 3px solid var(--code-accent);
+  overflow-x: auto;
+  margin-block: 1.5em;
+}
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+}
+
+/* Anchor links on headings. */
+a.anchor-link {
+  opacity: 0;
+  color: var(--fg-muted);
+  transition: opacity 0.2s ease;
+}
+a.anchor-link::after {
+  content: "#";
+  font-size: 0.8em;
+  margin-inline: 0.4em;
+}
+:hover > a.anchor-link {
+  opacity: 1;
+}
+
+/* Tables in the booktabs manner: horizontal rules only — one above the headings, one
+ * under them, one under the last row — and no boxes around cells. Ragged right by
+ * default; a numeric column opts in with `---:` in the Markdown. Top-aligned: a row
+ * whose prose cell wraps to four lines would otherwise leave its short cells floating
+ * in the middle. */
+table {
+  border-collapse: collapse;
+  margin-block: 1.5em;
+  margin-inline: auto;
+}
+th,
+td {
+  padding: 0.35em 0.8em;
+  border: 0;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: 600;
+}
+/* \toprule, \midrule, \bottomrule. The rules are on the cells rather than the table
+ * so that they travel with the content when a wide table scrolls inside its own box. */
+:is(thead, tbody:first-child) > tr:first-child > :is(th, td) {
+  border-top: 2px solid var(--rule);
+}
+thead > tr:last-child > :is(th, td) {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5em;
+}
+tbody > tr:first-child > :is(th, td) {
+  padding-top: 0.5em;
+}
+tbody > tr:last-child > :is(th, td) {
+  border-bottom: 2px solid var(--rule);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline: 1em;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+
+/* The page frame for a woven document, on top of base.css (tokens, type, code, tables).
+ *
+ * Where the rest of the CSS lives, and how each reaches a page:
+ *   base.css (beside this)     shared with the site's Markdown pages; mini.lit.page inlines
+ *                              base + this + the Pygments styles into every page it renders
+ *   docs/report.css            report polish and the print block; inlined after this at
+ *                              render, export and site build (mini.reports.set_report_styles),
+ *                              so an edit there reaches published reports without a re-export
+ *   scripts/md-prose.css       a Markdown page's prose: on the site (below), and inlined
+ *                              after report.css when the page is printed
+ *   scripts/md.css             the site's Markdown pages only (base + md-prose + md,
+ *                              concatenated by scripts/build_site.py; VS Code's preview
+ *                              reads all three files)
+ *   mini/chips.css             the nav and provenance chips the site build injects
+ *   mini/lightbox.css          the click-to-enlarge overlay, injected with its script
+ *   subline/theme.css          inside each subline SVG, reading this page's tokens
+ */
+
+:root {
+  /* The reading measure, and the page's own side inset. Every block in the content
+   * column is capped at --measure and centred; the print stylesheet redefines it in
+   * absolute units (see docs/report.css). */
+  --measure: 40rem;
+  --gutter: 1.5rem;
+  --subfigure-gap: 1.5rem;
+}
+
+/* The page is a vertical flexbox, so the nav and data-provenance chips that
+ * `mini.reports` injects sit above and below the content column in normal flow. */
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* The content column. `main.lit` spans the page and each block *inside* it is capped
+ * at the reading measure and centred — rather than capping the column as a whole —
+ * which is what lets a figure or a table opt out and take the full page width. */
+main.lit {
+  flex: 1 0 auto;
+  padding-inline: var(--gutter);
+  padding-block: 2rem;
+}
+/* Border-box, so a block with padding (a list's bullet indent, a blockquote, a code
+ * block) shares its right edge with the paragraphs, and so do the notes floated off it. */
+main.lit > * {
+  box-sizing: border-box;
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+/* Figures and tables run the full width of the page, out into the column's margins:
+ * a wide plot or a many-column table gets the room, and anything narrower than the
+ * measure still centres on it. Element selectors, so no report has to opt in. */
+main.lit > :is(figure, table) {
+  max-width: none;
+  margin-block: 3rem;
+}
+/* Display math the same way: KaTeX centres it in its box, so an equation wider than the
+ * measure would start at the column's left edge and overhang to the right. */
+main.lit > div.arithmatex {
+  max-width: none;
+}
+
+/* Highlighted code (Pygments, appended to this sheet by mini.lit.page). */
+.highlight pre { background-color: var(--code-bg); }
+.highlight { background: none; }
+
+/* What a cell printed, and what went wrong in one. */
+pre.stdout { border-left-color: var(--fg-muted); color: var(--fg-muted); }
+pre.error { border-left-color: #c33; white-space: pre-wrap; }
+
+/* The cell the live server is waiting on; the page below it is provisional. */
+pre.running { border-left-color: var(--link); color: var(--fg-muted); animation: lit-pulse 1.2s ease-in-out infinite alternate; }
+@keyframes lit-pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+/* A value the document could not compute yet: a name used after `stop()`. */
+mark.pending { background: var(--mark); padding: 0 0.2em; border-radius: 2px; font-size: 0.85em; }
+code mark.pending { font-size: inherit; }
+
+/* Figures: the box runs the full page width (above), and the body centres within it,
+ * so anything smaller than the page sits over the reading column. Sub-figures sit side
+ * by side and reflow to a stack on a narrow viewport. Captions are muted italic. */
+figure {
+  margin-inline: 0; text-align: center;
+}
+figure img {
+  margin-inline: auto; display: block;
+}
+figure:has(> figure) {
+  display: flex;
+  flex-wrap: wrap;  /* for a browser without `balance` */
+  flex-wrap: balance;
+  justify-content: center;
+  gap: var(--subfigure-gap) 0.5rem;
+}
+figure:has(> figure) > figure {
+  margin: 0;
+}
+/* A caption is prose, so it keeps the reading measure even under a full-width figure.
+ * `100%` is the ceiling for a sub-figure, whose own box is narrower than that. */
+figcaption {
+  max-width: min(var(--measure), 100%);
+  margin-top: 0.6em;
+  margin-inline: auto;
+  font-size: 0.9em;
+  font-style: italic;
+  opacity: 0.75;
+  text-wrap: balance;
+  text-align: center;
+}
+/* The main caption of a sub-figure group is a flex item: a full row of its own (a
+ * `max-width` would cap the basis and let a sub-figure share the row, so the measure is
+ * padding here), and the row gap above it comes off, so it sits under the figures as
+ * any caption does. */
+figure:has(> figure) > figcaption {
+  flex-basis: 100%;
+  box-sizing: border-box;
+  max-width: none;
+  padding-inline: max(0px, calc((100% - var(--measure)) / 2));
+  margin-top: calc(0.6em - var(--subfigure-gap));
+}
+/* A caption rendered from Markdown arrives in a <p>; its margins would pad the caption. */
+figcaption > :is(:first-child, :last-child) {
+  margin-block: 0;
+}
+
+/* A themed figure (mini.vis.figures.themed) carries both renders of the plot, and the
+ * page shows one: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. The print rules in docs/report.css pin the
+ * light one. */
+.mini-themed-figure .mini-themed-img-dark { display: none; }
+.mini-themed-figure .mini-themed-img-light { display: block; }
+body[data-theme="dark"] .mini-themed-figure,
+body.dark .mini-themed-figure,
+body.dark-theme .mini-themed-figure {
+  .mini-themed-img-dark { display: block; }
+  .mini-themed-img-light { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(.dark-theme):not(.light):not(.light-theme)
+    .mini-themed-figure {
+    .mini-themed-img-dark { display: block; }
+    .mini-themed-img-light { display: none; }
+  }
+}
+
+/* Admonitions (pymdownx blocks) and details. Their side padding is --column-inset, so
+ * a margin note inside one can reach past it to the column's edge (Notes, below). */
+.admonition, details {
+  --column-inset: 1em;
+  margin-block: 1.5em;
+  padding: 0.6em var(--column-inset);
+  border-left: 3px solid var(--link);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+.admonition-title, details > summary { font-weight: 600; margin: 0; }
+.admonition.warning { border-left-color: #d9822b; }
+.admonition.tip, .admonition.success { border-left-color: #2a9d5c; }
+.admonition.danger, .admonition.error { border-left-color: #c33; }
+.admonition > :first-child { margin-top: 0; }
+.admonition > :last-child { margin-bottom: 0; }
+
+/* Footnotes. */
+.footnote { font-size: 0.9em; color: var(--fg-muted); border-top: 1px solid var(--border); margin-top: 3em; }
+.footnote > hr { display: none; }  /* the border above is the rule; python-markdown writes an <hr> too */
+.footnote-backref { text-decoration: none; }
+
+/* Notes (mini.lit.notes): a footnote's text beside its marker, and a glossary term's
+ * definition at its first use in a section. Where a note shows depends on the room:
+ *   narrow screen   hidden until its marker is hovered or focused (tapped), then a box
+ *                   under the line, across the column; the footnote list stays too
+ *   wide screen     in the right margin, beside the line that cites it; the list keeps
+ *                   only what has no margin note
+ *   paper           in the margin as well, with the page geometry in docs/report.css
+ * Margin notes are right floats, each clearing the one before (`clear: right`), so a
+ * note that would overlap the one above slides down instead. A note in a table cell, a
+ * caption or a heading (`.popover`) cannot float out of its box, so it stays a hover
+ * box everywhere, and its footnote stays in the list. */
+/* How far a block's content sits in from the text column's right edge. Registered as a
+ * length so that `1em` resolves on the padded block, and not in the note's smaller type. */
+@property --column-inset {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+:root {
+  --note-width: 14rem;
+  --note-gap: 1.5rem;
+}
+main.lit { position: relative; }  /* what a hover box spans */
+sup.fnref > a { text-decoration: none; }
+dfn.term {
+  font-style: inherit;
+  text-decoration: underline dotted color-mix(in srgb, var(--fg) 45%, transparent);
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+.sidenote {
+  display: none;
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  z-index: 10;
+  max-width: var(--measure);
+  margin-top: 0.3em;
+  margin-inline: auto;
+  padding: 0.5em 0.8em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1.45;
+  text-align: left;
+  text-indent: 0;
+  color: var(--fg);
+}
+:is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote,
+.sidenote:is(:hover, :focus) {
+  display: block;
+}
+.sidenote-number { font-weight: 700; }
+.glossnote-term { font-weight: 700; }
+.glossnote-term::after { content: "."; }
+.sidenote .more > .sidenote-p { display: block; margin-top: 0.4em; }
+
+/* A note in the margin, on a wide screen (below) or on paper, is only its gloss until it
+ * opens, with an ellipsis that takes no width, so it never wraps onto a line of its own. */
+@media print, screen and (min-width: 74rem) {
+  .sidenote:not(.popover) {
+    & .more, & .lead-colon { display: none; }
+    &:has(> .more) > .gloss::after {
+      content: "…";
+      display: inline-block;
+      width: 0;
+      white-space: nowrap;
+    }
+  }
+}
+
+/* Wide enough for the centred column plus a note strip on each side:
+ * 40rem measure + 2 × (14rem note + 1.5rem gap) + 2 × 1.5rem gutter = 74rem. */
+@media screen and (min-width: 74rem) {
+  /* Figures and tables start below any note still running beside the text above them. */
+  main.lit > :is(figure, table, h2, hr, .footnote) { clear: right; }
+  .sidenote:not(.popover) {
+    display: block;
+    position: relative;
+    z-index: auto;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    max-width: none;
+    margin: 0.3em calc(-1 * (var(--note-width) + var(--note-gap) + var(--column-inset))) 0.8em 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+    text-align: justify;
+    hyphens: auto;
+    /* Only the gloss (mini.lit.notes) until the note or its marker is hovered, or
+     * focused: a click on either keeps it open. The rest then opens in a box over the
+     * notes below, so the float keeps its size and nothing else moves. */
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    & .more {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      padding-bottom: 0.4em;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+  }
+  :is(sup.fnref, dfn.term):is(:hover, :focus, :focus-within) + .sidenote:not(.popover),
+  .sidenote:not(.popover):is(:hover, :focus, :focus-within) {
+    opacity: 1;
+    z-index: 5;  /* over the notes below, which are positioned too */
+    & .more { display: block; }
+    & .lead-colon { display: inline; }
+    & > .gloss::after { content: none; }
+  }
+  .sidenote:focus { outline: none; }
+  .footnote li.sidenoted,
+  .footnote.all-sidenoted {
+    display: none;
+  }
+}
+
+/* Colour swatches (see the style-fig skill). */
+.sw { display: inline-block; width: 0.8em; height: 0.8em; border-radius: 2px; margin-inline: 0.5ch; border: 1px solid #8886; background: var(--sw); }
+.sw-dot { border-radius: 50%; width: 0.6em; height: 0.6em; }
+.sw-open { background: none; border-color: var(--sw); }
+
+/* Definition lists. */
+dl > dt { font-weight: 600; margin-top: 0.8em; }
+
+/* Print: only what the frame needs on its own. The page size, type and page breaks
+ * are docs/report.css's print block, which every rendered report carries. */
+@media print {
+  :root { color-scheme: light; }
+  /* Paper has no viewport to fill, and the chips are hidden, so the flexbox comes off. */
+  body { display: block; min-height: 0; }
+  /* The page's own margins are the gutter here (`@page` in the report stylesheet), so
+   * the column rules above carry over unchanged: prose is capped at --measure, and a
+   * figure or table reaches past it to the full width of the printed page. */
+  main.lit { padding: 0; }
+  a { color: inherit; }
+  a.anchor-link { display: none; }
+  /* Paper cannot hover, so a note shows only where a stylesheet gives it a margin
+   * (docs/report.css does); otherwise the footnote list carries them all. */
+  .sidenote { display: none; }
+}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+@media (prefers-color-scheme: dark) {
+pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #6e7681 }
+.highlight { background: #0d1117; color: #E6EDF3 }
+.highlight .c { color: #8B949E; font-style: italic } /* Comment */
+.highlight .err { color: #F85149 } /* Error */
+.highlight .esc { color: #E6EDF3 } /* Escape */
+.highlight .g { color: #E6EDF3 } /* Generic */
+.highlight .k { color: #FF7B72 } /* Keyword */
+.highlight .l { color: #A5D6FF } /* Literal */
+.highlight .n { color: #E6EDF3 } /* Name */
+.highlight .o { color: #FF7B72; font-weight: bold } /* Operator */
+.highlight .x { color: #E6EDF3 } /* Other */
+.highlight .p { color: #E6EDF3 } /* Punctuation */
+.highlight .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.highlight .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.highlight .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.highlight .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #FFA198 } /* Generic.Error */
+.highlight .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.highlight .go { color: #8B949E } /* Generic.Output */
+.highlight .gp { color: #8B949E } /* Generic.Prompt */
+.highlight .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #79C0FF } /* Generic.Subheading */
+.highlight .gt { color: #FF7B72 } /* Generic.Traceback */
+.highlight .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.highlight .kc { color: #79C0FF } /* Keyword.Constant */
+.highlight .kd { color: #FF7B72 } /* Keyword.Declaration */
+.highlight .kn { color: #FF7B72 } /* Keyword.Namespace */
+.highlight .kp { color: #79C0FF } /* Keyword.Pseudo */
+.highlight .kr { color: #FF7B72 } /* Keyword.Reserved */
+.highlight .kt { color: #FF7B72 } /* Keyword.Type */
+.highlight .ld { color: #79C0FF } /* Literal.Date */
+.highlight .m { color: #A5D6FF } /* Literal.Number */
+.highlight .s { color: #A5D6FF } /* Literal.String */
+.highlight .na { color: #E6EDF3 } /* Name.Attribute */
+.highlight .nb { color: #E6EDF3 } /* Name.Builtin */
+.highlight .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.highlight .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.highlight .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #FFA657 } /* Name.Entity */
+.highlight .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.highlight .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #FF7B72 } /* Name.Namespace */
+.highlight .nx { color: #E6EDF3 } /* Name.Other */
+.highlight .py { color: #79C0FF } /* Name.Property */
+.highlight .nt { color: #7EE787 } /* Name.Tag */
+.highlight .nv { color: #79C0FF } /* Name.Variable */
+.highlight .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.highlight .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.highlight .w { color: #6E7681 } /* Text.Whitespace */
+.highlight .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.highlight .mf { color: #A5D6FF } /* Literal.Number.Float */
+.highlight .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.highlight .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.highlight .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.highlight .sa { color: #79C0FF } /* Literal.String.Affix */
+.highlight .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.highlight .sc { color: #A5D6FF } /* Literal.String.Char */
+.highlight .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.highlight .sd { color: #A5D6FF } /* Literal.String.Doc */
+.highlight .s2 { color: #A5D6FF } /* Literal.String.Double */
+.highlight .se { color: #79C0FF } /* Literal.String.Escape */
+.highlight .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.highlight .si { color: #A5D6FF } /* Literal.String.Interpol */
+.highlight .sx { color: #A5D6FF } /* Literal.String.Other */
+.highlight .sr { color: #79C0FF } /* Literal.String.Regex */
+.highlight .s1 { color: #A5D6FF } /* Literal.String.Single */
+.highlight .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.highlight .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.highlight .vc { color: #79C0FF } /* Name.Variable.Class */
+.highlight .vg { color: #79C0FF } /* Name.Variable.Global */
+.highlight .vi { color: #79C0FF } /* Name.Variable.Instance */
+.highlight .vm { color: #79C0FF } /* Name.Variable.Magic */
+.highlight .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+}
+</style>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its definition beside it needs no underline on paper. */
+  dfn.term {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+    <style data-mini-chip-css>[data-mini-banner],[data-mini-provenance]{
+  box-sizing:border-box;line-height:1.4;font-family:system-ui,sans-serif;
+  width:min(var(--measure, 50rem), 100% - 2 * var(--gutter, 1.5rem));margin-inline:auto}
+[data-mini-banner]{order:-1;margin-block:1rem;
+  display:flex;gap:1rem;align-items:center;font-size:.8125rem}
+[data-mini-banner] a{color:inherit;text-decoration:none;opacity:.7}
+[data-mini-banner] a:hover{text-decoration:underline;opacity:1}
+[data-mini-provenance]{order:1;margin-block:0 2.5rem;font-size:.75rem;
+  background:none;border:0;border-radius:0;padding:.5rem 0 0;
+  border-top:1px solid color-mix(in srgb, CanvasText 15%, transparent)}
+[data-mini-provenance] > summary{cursor:pointer;font-weight:400}
+/* The summary, and the "via <ref>" line under each experiment, recede. */
+[data-mini-provenance] > summary,[data-mini-provenance] > div > div{
+  color:color-mix(in srgb, CanvasText 60%, transparent)}
+@media print{[data-mini-banner],[data-mini-provenance]{display:none}}</style>
+    <style>[data-mini-zoom]{cursor:zoom-in}
+dialog.mini-lightbox{border:0;padding:0;margin:auto;max-width:96vw;max-height:96vh;
+  background:Canvas;color:CanvasText;border-radius:.5rem;box-shadow:0 1rem 3rem rgb(0 0 0/.45)}
+dialog.mini-lightbox::backdrop{background:rgb(0 0 0/.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+dialog.mini-lightbox img{display:block;margin:0 auto;max-width:96vw;max-height:84vh;width:auto;height:auto;
+  transition:filter .18s ease-out,opacity .18s ease-out,width .18s ease-out}
+dialog.mini-lightbox img.mini-lightbox-loading{filter:blur(4px) grayscale(.35);opacity:.55}
+@media (prefers-reduced-motion:reduce){dialog.mini-lightbox img{transition:none}}
+dialog.mini-lightbox figcaption{margin:0;padding:.5rem .75rem;max-width:70ch;
+  font:italic .8125rem/1.5 system-ui,sans-serif;color:color-mix(in srgb,CanvasText 70%,transparent)}
+.mini-lightbox-close{position:absolute;top:.35rem;right:.35rem;width:1.9rem;height:1.9rem;
+  font:1.25rem/1 system-ui,sans-serif;cursor:pointer;color:CanvasText;border-radius:50%;
+  background:color-mix(in srgb,Canvas 70%,transparent);
+  border:1px solid color-mix(in srgb,CanvasText 20%,transparent)}
+@media print{dialog.mini-lightbox{display:none}}</style>
+<script>(function(){
+  if(!window.HTMLDialogElement) return;  // no dialog: the figures simply stay static
+  var ZOOM='[data-mini-zoom]', dlg, seq=0;
+  function chrome(){
+    if(dlg) return dlg;
+    dlg=document.createElement('dialog');
+    dlg.className='mini-lightbox';
+    dlg.innerHTML='<button type="button" class="mini-lightbox-close" aria-label="Close">×</button>'+
+      '<figure style="margin:0"><img alt=""><figcaption></figcaption></figure>';
+    dlg.addEventListener('click',function(ev){
+      // The dialog box is exactly the panel, so a click reported against the dialog
+      // itself landed on the backdrop around it.
+      if(ev.target===dlg||ev.target.closest('.mini-lightbox-close')) dlg.close();
+    });
+    document.body.appendChild(dlg);
+    return dlg;
+  }
+  function fullSrc(img){
+    var light=img.getAttribute('data-mini-full'), dark=img.getAttribute('data-mini-full-dark');
+    if(light||dark){
+      // An index thumbnail names its full-size counterparts. The index is a plain page
+      // with no theme of its own, so the device preference is the whole of the answer.
+      return (dark&&matchMedia('(prefers-color-scheme: dark)').matches&&dark)||light||dark;
+    }
+    // A themed report figure is a light/dark pair of siblings with one hidden by CSS.
+    // Whichever is on screen is the variant the page settled on, however it decided.
+    var pair=(img.parentElement||img).querySelectorAll('img.mini-themed-img-light,img.mini-themed-img-dark');
+    for(var i=0;i<pair.length;i++) if(pair[i].offsetParent) return pair[i].src;
+    return img.src;
+  }
+  function want(img){
+    // The size the report asked for, stamped by the export on the figure's tag and on the
+    // index thumbnail made from it: the figure's *physical* size (see mini.vis.figures), which
+    // for a plot saved at 2x is half its pixels. That is the size it is meant to be drawn
+    // at and the size it looks sharp at on a dense screen, so it is the panel's ceiling
+    // as well as its shape — and it is in the markup before the panel has any bytes.
+    return {w:+img.getAttribute('width')||0, h:+img.getAttribute('height')||0};
+  }
+  function ratio(img){
+    var d=want(img), w=d.w, h=d.h;
+    if(!(w>0&&h>0)){ w=img.naturalWidth; h=img.naturalHeight; }  // unstamped: what it measures
+    return (w>0&&h>0) ? w/h : 0;
+  }
+  function size(ar, px){
+    // As large as the viewport allows, up to the figure's own size. An unstamped figure
+    // has only its pixels to go on, and not until it has them — pass 0 and the fit stands.
+    if(!ar) return '';
+    return 'min(96vw,calc(84vh * '+ar.toFixed(4)+(px?'),'+px+'px':')')+')';
+  }
+  function open(img){
+    var d=chrome(), big=d.querySelector('img'), cap=d.querySelector('figcaption'),
+        fig=img.closest('figure'), own=fig&&fig.querySelector('figcaption'),
+        full=fullSrc(img), shown=img.currentSrc||img.src, ar=ratio(img), w=want(img).w;
+    // Fix the box before any bytes arrive: an image that hasn't loaded has no intrinsic
+    // size, so without this the panel opens flat and jumps open when the figure lands.
+    // A stamped figure opens at its final size; an unstamped one at the right shape,
+    // narrowing to fit its pixels once those arrive.
+    big.style.aspectRatio = ar ? ar.toFixed(4) : '';
+    big.style.width = size(ar, w || (shown===full ? img.naturalWidth : 0));
+    big.alt=img.alt||'';
+    cap.textContent=((own&&own.textContent)||img.alt||'').trim();
+    cap.hidden=!cap.textContent;
+    // Start from the image the page is already showing — on the index a thumbnail the
+    // browser has cached, on a report the full-size figure itself — so the panel paints
+    // this frame rather than holding the figure opened before it. Blown up from a
+    // thumbnail it is soft, so it reads as a placeholder until the real one arrives.
+    var turn = ++seq;
+    big.src=shown;
+    big.classList.toggle('mini-lightbox-loading', shown!==full);
+    d.showModal();
+    if(shown===full) return;
+    var pre=new Image();
+    // Swapping to a decoded image paints without an empty frame in between. A second
+    // click while this one loads takes the panel, so a stale arrival is dropped.
+    pre.onload=pre.onerror=function(){
+      if(turn!==seq) return;
+      if(pre.naturalWidth){ big.src=full; big.style.width=size(ar, w || pre.naturalWidth); }
+      big.classList.remove('mini-lightbox-loading');
+    };
+    pre.src=full;
+  }
+  function target(ev){
+    return ev.target.closest?ev.target.closest(ZOOM):null;
+  }
+  document.addEventListener('click',function(ev){
+    if(ev.button||ev.metaKey||ev.ctrlKey||ev.shiftKey||ev.altKey) return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter'&&ev.key!==' ') return;
+    var img=target(ev);
+    if(img){ ev.preventDefault(); open(img); }
+  });
+  // A deferred figure (mark_figures) that has not scrolled into view has no pixels yet,
+  // and would print as a blank box. Paper has no viewport, so load them all first.
+  window.addEventListener('beforeprint',function(){
+    document.querySelectorAll('img[loading=lazy]').forEach(function(img){ img.loading='eager'; });
+  });
+})();</script>
+    <style>
+/* Shared report styles.
+ *
+ * Single source of truth for cross-report presentation polish, and the whole of the
+ * print block. Applied two ways (see eng/ and mini.reports.set_report_styles):
+ *   - inlined into every page mini.lit renders (`./go render`, `./go serve`, and the
+ *     export), so it shows live while editing and ships in the raw bundle;
+ *   - re-injected from *this* file at site-build time, so central edits here update
+ *     every published report without re-exporting anything.
+ * Keep it small and selector-scoped; it layers on top of mini.lit's own sheets
+ * (base.css and lit.css, which map where the rest of the CSS lives). `main.lit` is a
+ * literate script's content column; those sheets already cover figures, captions,
+ * tables, admonitions and footnotes on screen, so the rules here are the
+ * report-specific pieces and the print ones. */
+
+/* Colour swatch: a small square tinted via the `--sw` custom property, so each
+ * occurrence is just `<span class="sw" style="--sw:#rrggbb">`. See the style-fig skill.
+ * The base `.sw`, `.sw-dot` and `.sw-open` rules live in mini.lit's sheet. */
+.sw-ghost {
+  --sw: transparent;
+  border-color: transparent;
+}
+/* A swatch whose colour is themed: it carries a `--sw-light` / `--sw-dark` pair instead of
+ * a single `--sw`, so the square tracks the same pair a `light_dark` figure uses. The two
+ * hexes ride in separate properties because the element's own `style=` would outrank any
+ * rule that tried to reassign `--sw` directly. Theme detection mirrors the themed-figure
+ * rules in mini.lit's sheet: an explicit theme on the body element wins, and the OS preference
+ * applies only where the body states none. (No literal body tag in this comment: the
+ * export injects its chips after the first one it finds.) */
+.sw-themed {
+  --sw: var(--sw-light);
+}
+body[data-theme="dark"] .sw-themed,
+body.dark .sw-themed,
+body.dark-theme .sw-themed {
+  --sw: var(--sw-dark);
+}
+@media (prefers-color-scheme: dark) {
+  body:not([data-theme="dark"]):not([data-theme="light"]):not(.dark):not(
+      .dark-theme
+    ):not(.light):not(.light-theme)
+    .sw-themed {
+    --sw: var(--sw-dark);
+  }
+}
+
+/* A status badge on the title page — `<mark class="draft">DRAFT</mark>` written before
+ * the h1 — floats to the top right. */
+main.lit p:has(+ h1) > mark:only-child {
+  float: right;
+  background: none;
+  color: inherit;
+  padding-inline: 0.25em;
+  font-family: inherit;
+  font-size: 2.25em;
+  font-weight: inherit;
+  line-height: 1.25;
+
+  &.draft {
+    opacity: 0.5;
+  }
+}
+
+/* A verdict badge in a hypothesis heading — `<mark class="verdict pass">✓ Pass</mark>`,
+ * hoisted from the section's verdict admonition at page-build time
+ * (mini.reports.mark_verdicts). The hoist wraps the heading's words in a span, and the
+ * heading becomes a flex row of the two, so the badge sits at the right edge on the
+ * first line however the words wrap. Plain coloured text, which also prints: in ink the
+ * glyph and the word carry it without the colour. */
+main.lit :is(h2, h3):has(> mark.verdict) {
+  display: flex;
+  align-items: baseline;
+  column-gap: 0.4em;
+
+  > .heading-words {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+main.lit :is(h2, h3) > mark.verdict {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.6em;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: nowrap;
+
+  &.pass {
+    color: #2a9d5c;
+  }
+  &.miss {
+    color: #c33;
+  }
+  &.partial {
+    color: #d9822b;
+  }
+  &.unresolved {
+    opacity: 0.7;
+  }
+  &.decided {
+    color: #2b6cb0;
+  }
+}
+
+/* Authored report tables, a step smaller than the prose so more columns fit. Headings
+ * left-align with their columns by default; annotate numeric columns (header and cells)
+ * with class="num" to right-align on tabular figures. */
+.report-table {
+  font-size: 0.75em;
+}
+.report-table th {
+  text-align: left;
+}
+.report-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.report-table :is(th, td):not(:first-child) {
+  padding-left: 2ex;
+}
+
+/* A spread quoted beside the value it belongs to (±half-range over seeds), and rows that
+ * are context rather than measurement — an external reference, a row of nulls. Both recede
+ * so the eye lands on the measured numbers first. */
+.report-table .range {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+.report-table tr.ref :is(th, td) {
+  opacity: 0.65;
+}
+
+/* Wide tables (e.g. a per-seed completions grid) scroll horizontally inside their own
+ * box rather than wrapping cell contents — which detaches a swatch from its word — or
+ * forcing the whole page to scroll sideways. The table is its own scroll box, so a
+ * report puts the class on the table and no wrapper. */
+main.lit table.report-table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  scrollbar-color: light-dark(#c1c1c1, #6b6b6b) transparent;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Quiet details elements. mini.lit's sheet boxes them like admonitions, which are
+ * designed to be eye-catching — the opposite of what a details element should do. */
+main.lit details {
+  background: transparent;
+  border-radius: 0;
+  padding-block: 0;
+  transition: 0.3s;
+
+  > summary {
+    transition: 0.3s;
+    &:after {
+      content: "…";
+      visibility: hidden;
+    }
+  }
+  > summary + * {
+    margin-top: 0px;
+  }
+}
+main.lit details:not(:open) {
+  border-left-color: transparent;
+
+  > summary {
+    padding: 0;
+    opacity: 0.7;
+    &:after {
+      visibility: visible;
+    }
+  }
+}
+
+/* Print / PDF. Tuned for reading and annotating on a reMarkable 2, whose screen is
+ * 157.8 × 210.4 mm (1404 × 1872 px at 226 ppi). The page is that wide, so it fills the
+ * screen with no letterboxing and 1pt on the page is 1pt on the device; it is far
+ * taller, so a section (which starts a fresh page, below) is one long page to scroll
+ * within, and the swipe between pages is the swipe between sections. Not meant for
+ * paper. The height below is for the browser's print dialog (headers/footers off): the
+ * export (`mini.report_print`) prints taller than this, until no section breaks across
+ * pages, and then clips each page to its content, so a short section is a short page. */
+@media print {
+  @page {
+    size: 158mm 1010mm;
+    /* Side margins are small here and the reading measure comes from `--measure`
+     * below, so a figure or a table can reach past the text into the page's margins
+     * the way it does on screen. Text still sits 20mm in from the paper edge. */
+    margin: 10mm 5mm 12mm;
+  }
+  :root {
+    /* 118mm — the line length the 20mm side margins used to give, kept as it was. */
+    --measure: 118mm;
+    /* Margin notes (below). The centred column leaves 15mm beside it inside the page's
+     * margins, where Chromium stops painting. A note stops --note-edge short of that,
+     * clear of the change bars and stamp of a review print, and overlaps the text by
+     * the rest. */
+    --note-width: 22mm;
+    --note-gap: 2mm;
+    --note-edge: 2mm;
+  }
+  /* Type. 11pt body on a ~120mm column is about 60 characters a line. Both elements:
+   * the root sets the rem, and the body's own 0.9rem screen size comes off. */
+  html,
+  body {
+    font-size: 11pt;
+  }
+  main.lit p,
+  main.lit li,
+  main.lit dd {
+    /* Spacious, for hand-written annotations. */
+    line-height: 2.5;
+  }
+
+  /* Ink. Half-transparent text is faint on e-ink, so lift the muted elements, and darken
+   * links: a screen link blue prints as a mid grey that reads as faded text. */
+  main.lit .footnote {
+    color: inherit;
+  }
+  main.lit a,
+  main.lit a:visited {
+    color: #1d3f78;
+  }
+  /* Dark blue is close to black on e-ink, so a faint underline marks the link. */
+  main.lit a:not(.footnote-backref) {
+    text-decoration: underline;
+    text-decoration-color: rgb(29 63 120 / 0.35);
+    text-decoration-thickness: 0.06em;
+    text-underline-offset: 0.2em;
+  }
+  /* No tint behind admonitions on paper: a filled block flickers on e-ink as the page
+   * redraws, and the left rule marks the block on its own. */
+  .admonition,
+  main.lit details {
+    background: none;
+    border-radius: 0;
+    padding-block: 0;
+  }
+
+  /* Each top-level section starts a fresh page, so the reader swipes between sections and
+   * scrolls within one. The title has no h2, so the first page is the title, the
+   * findings, and whatever else precedes the first section. */
+  main.lit h2 {
+    break-before: page;
+    margin-top: 0;
+  }
+
+  /* Keep things together. A hint rather than a rule: a block taller than a page still
+   * breaks. */
+  .admonition,
+  figure,
+  pre,
+  table,
+  blockquote,
+  main.lit details {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  .admonition-title,
+  figcaption:first-child {
+    break-after: avoid;
+  }
+  figcaption:last-child {
+    break-before: avoid;
+  }
+  tr {
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Figures are always the light variant. The themed-figure rules in mini.lit's sheet
+   * pick the pair by the page theme; paper has one. */
+  .mini-themed-figure .mini-themed-img-light {
+    display: block !important;
+  }
+  .mini-themed-figure .mini-themed-img-dark {
+    display: none !important;
+  }
+
+  /* Margin notes (mini.lit.notes, laid out on screen by mini.lit's sheet), beside the
+   * text, in type small enough to leave the text alone (zoom in to read it). Floats that
+   * clear each other stack, so a note never overlaps the one before it; it slides down.
+   * A note is only its gloss here (mini.lit's sheet), so the footnote list keeps the whole
+   * of each note, and a report's own glossary the whole of each definition. */
+  main.lit > :is(figure, table, h2, hr, .footnote) {
+    clear: right;
+  }
+  main.lit .sidenote:not(.popover) {
+    display: block;
+    position: static;
+    max-width: none;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    float: right;
+    clear: right;
+    width: var(--note-width);
+    margin-block: 0.4em;
+    margin-left: var(--note-gap);
+    margin-right: calc(-1 * min((100vw - var(--measure)) * 0.5 - var(--note-edge), var(--note-width) + var(--note-gap)) - var(--column-inset));
+    font-family: var(--font-sans);
+    font-size: 6pt;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1.3;
+    text-indent: 0;
+    color: inherit;
+    text-align: left;  /* a narrow justified line opens wide gaps between words */
+    hyphens: auto;
+  }
+  .sidenote-number,
+  .glossnote-term {
+    font-weight: 700;
+  }
+  /* A term with its definition beside it needs no underline on paper. */
+  dfn.term {
+    text-decoration: none;
+  }
+
+  /* Tables. Nothing scrolls on paper, so the screen tricks come off: the horizontal
+   * scroll box and the nowrap that fed it. The table becomes a real table again, so
+   * auto layout can wrap its cells to fit the column. A swatch stays with its word (join
+   * them with a non-breaking space). */
+  main.lit table.report-table {
+    display: table;
+    overflow: visible;
+    white-space: normal;
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  /* Cell padding is the widest thing in a nine-column table once the words wrap. */
+  main.lit table.report-table :is(th, td) {
+    padding-inline: 0.35em;
+  }
+  /* A value and its spread, `0.023 ±0.004`, each read as one number. Keep the parts
+   * whole and let the break fall between them when a column is tight. */
+  main.lit table.report-table td.num .range {
+    white-space: nowrap;
+  }
+}
+    </style>
+</head>
+<body>
+    <nav data-mini-banner><a href="https://z0u.github.io/sca2/">&larr; Index</a><a href="https://github.com/z0u/sca2/blob/main/docs/m2/late-pull/report.py">Source</a><a href="https://z0u.github.io/sca2/m2/late-pull/report.pdf">PDF</a></nav>
+    <details data-mini-provenance><summary>Data provenance</summary><div><strong>embedding-lean</strong> · <code>fb9b762</code> · run 2026-10-09<div>via reports/m2/embedding-lean/results</div></div><div><strong>late-pull</strong> · <code>c8eb6f7</code> · run 2026-10-09<div>via reports/m2/late-pull/results, reports/m2/late-pull/trajectories</div></div></details>
+<main class="lit">
+<h1 id="pulling-the-deeper-blocks-only">Pulling the deeper blocks only<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#pulling-the-deeper-blocks-only" title="Link to this heading">&para;</a></h1>
+<div class="admonition tip">
+<!-- lede -->
+<p>Pulling only blocks 2 to 4 cut the <dfn class="term" tabindex="0">lean</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Lean</span> <span class="gloss">Lightness on e₁ in the color embedding table<span class="lead-colon">:</span></span><span class="more"> darker colors sit further along the anchor direction, a stand-in for <code>difference</code> at the slices where nothing contextual exists.</span></span> of the color embedding table to about a quarter. Holding the table off e₁ by a hard constraint went further: the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The largest net drop in score on another op under the edit.</span><span class="more"> The selectivity criterion is a spill of at most 0.02.</span></span> of the full edit fell to about the selectivity criterion, with <dfn class="term" tabindex="0">removal</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the edit takes out<span class="lead-colon">:</span></span><span class="more"> the net drop in its score under the edit, as a share of the way from the clean score to the target null.</span></span> and the task as before. In both new arms, block 1, which nothing pulls, came to hold part of the concept, and most of the remaining spill comes from there. Holding the anti-subspace weight high late in training, rather than annealing it, kept the table and block 1 nearly off e₁ on the other ops and brought every <code>deep</code> run within the criterion, though removal fell somewhat.</p>
+<!-- REVIEW: lede trimmed to drop the hold values (0.2 against the recipe hold), which E4 and the Observations give; the claims are unchanged. -->
+</div>
+<p><a href="https://z0u.github.io/sca2/m2/embedding-lean/">The embedding-lean experiment</a> found that every anchored run of ex-2.2.23 leans lightness onto e₁ in its color embedding table. At the embedding there is no context yet for the pull to use, so the pull settles for a token-level stand-in: darker colors are the nearest one for <code>difference</code> answers. Editing only blocks 2 to 4 of those runs removed most of <code>difference</code> with almost no spill. Editing the embedding alone spilled as much as editing every slice.</p>
+<p>Pulling every slice but the embedding had been tried before (ex-2.2.21 and the τ × λₐ sweep). But those runs also left the <dfn class="term" tabindex="0">anti-subspace term</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Anti-subspace term</span> <span class="gloss">The companion to the pull<span class="lead-colon">:</span></span><span class="more"> the mean of α² over every position and slice it acts on, which asks the states as a whole to stay off e₁.</span></span> off the embedding, and the table leaned all the same.</p>
+<p>So this experiment trains twelve runs at 400 epochs and 4 seeds:</p>
+<ul>
+<li><code>deep</code>: the pull on blocks 2 to 4 only, and the anti-subspace term on every slice, so the first two slices are asked to stay off e₁ rather than left alone.</li>
+<li><code>deep-clean</code>: the same, and after every step the e₁ component of every embedding is set to zero, so the embeddings cannot lean at all. The readout table is untied on this recipe (a separate matrix from the embedding table) and stays free.</li>
+<li><code>whole</code>: the recipe of record, every slice pulled, trained again to record the <dfn class="term" tabindex="0">alignment</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Alignment</span> <span class="gloss">How far a state points along e₁<span class="lead-colon">:</span></span><span class="more"> the cosine between the state and e₁, which is 1 on the anchor direction and 0 off it.</span></span> at every slice and position along training.</li>
+</ul>
+<p>Each run shares its seed, and so its initialization, batches and label draws, with one anchored run and one control of ex-2.2.23. The anchor weight, the pool temperature τ and both schedules are the recipe values. A second round of sixteen runs repeats <code>deep</code> and <code>deep-clean</code> with the anti-subspace weight annealed to a higher hold (E4).</p>
+<h2 id="observations">Observations<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#observations" title="Link to this heading">&para;</a></h2>
+<ul>
+<li><a href="https://z0u.github.io/sca2/m2/late-pull/#the-color-embedding-table-e1">The color embedding table (E1)</a>: in <code>deep</code> the table <dfn class="term" tabindex="0">leans</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Lean</span> <span class="gloss">Lightness on e₁ in the color embedding table<span class="lead-colon">:</span></span><span class="more"> darker colors sit further along the anchor direction, a stand-in for <code>difference</code> at the slices where nothing contextual exists.</span></span> the same way as on the recipe on every seed, where the controls lean either way, but only about a quarter as far. The incidental lightness in the states at block 1 fades to about half.</li>
+<li><a href="https://z0u.github.io/sca2/m2/late-pull/#removal-and-spill-e2">Removal and spill (E2)</a>: the full edit removes as much in both new arms as on the recipe. Its <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The largest net drop in score on another op under the edit.</span><span class="more"> The selectivity criterion is a spill of at most 0.02.</span></span> falls in <code>deep</code>, and falls to about the criterion in <code>deep-clean</code>. In both arms, editing block 1 alone removes nearly everything and gives most of the spill that is left.</li>
+<li><a href="https://z0u.github.io/sca2/m2/late-pull/#where-the-alignment-settles-e3">Where the alignment settles (E3)</a>: in the new arms the <dfn class="term" tabindex="0">alignment</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Alignment</span> <span class="gloss">How far a state points along e₁<span class="lead-colon">:</span></span><span class="more"> the cosine between the state and e₁, which is 1 on the anchor direction and 0 off it.</span></span> of <code>difference</code> contexts grows at blocks 2 to 4 early in training, as the pull asks. Block 1 follows more slowly, on other ops as well as on <code>difference</code>.</li>
+<li><a href="https://z0u.github.io/sca2/m2/late-pull/#the-anti-subspace-hold-e4">The anti-subspace hold (E4)</a>: the higher the hold, the less the table leans and the less block 1 drifts onto e₁ on other ops. At a hold of 0.2 every <code>deep</code> run is within the criterion, but <dfn class="term" tabindex="0">removal</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the edit takes out<span class="lead-colon">:</span></span><span class="more"> the net drop in its score under the edit, as a share of the way from the clean score to the target null.</span></span> falls. In <code>deep-clean</code> the hold changes the spill less, but removal falls there too.</li>
+</ul>
+<h2 id="scope">Scope<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#scope" title="Link to this heading">&para;</a></h2>
+<p>This is an exploratory study, with no preregistration and no gate. Four seeds per arm can only resolve a large change in the <dfn class="term" tabindex="0">lean</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Lean</span> <span class="gloss">Lightness on e₁ in the color embedding table<span class="lead-colon">:</span></span><span class="more"> darker colors sit further along the anchor direction, a stand-in for <code>difference</code> at the slices where nothing contextual exists.</span></span> or the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The largest net drop in score on another op under the edit.</span><span class="more"> The selectivity criterion is a spill of at most 0.02.</span></span>, against the seed range. The <code>whole</code> arm reproduces its twins in ex-2.2.23 (the task scores of each pair agree to within 0.0001), so a difference between arms at one seed comes from the change of pull, not from nondeterminism in training.</p>
+<!-- REVIEW: "noise in training" narrowed to "nondeterminism in training", since the twin check shows runs reproduce
+bit for bit at a seed, not that the seed range is small; the sentence before covers that. -->
+
+<h2 id="method">Method<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#method" title="Link to this heading">&para;</a></h2>
+<p>The anchor weight is the recipe value, and outside E4 the anti-subspace weight keeps its recipe schedule. That schedule is a multiple of the anchor weight: about 2.5× early in training, annealing to about 0.3× by about the midpoint.</p>
+<!-- REVIEW: said that the anti schedule anneals, which the earlier text ("a multiple of the anchor weight") left
+out. The stored trajectory has anti_weight 0.25 at epoch 20, 0.12 at 200, 0.04 at 300 and 0.03 after, against an
+anchor weight of 0.1; E1 and E3 now name this as a reading of the second-half growth. Verify: traj["anti_weight"]. -->
+
+<p>The anchor term is a mean over the pulled slices, so at the same weight each of blocks 2 to 4 is pulled about 5/3 as hard in the new arms as in <code>whole</code>. The anti term is a mean over the same five slices in every arm, so it is unchanged.</p>
+<p>The measurements are those of <a href="https://z0u.github.io/sca2/m2/embedding-lean/">the embedding-lean experiment</a>, taken on every run:</p>
+<ul>
+<li>The lightness slope of the color embedding table: how much further along e₁ the color embeddings sit for black than for white, as the slope of the e₁ component against lightness over the 216 colors. It is zero in <code>deep-clean</code>, where the table is held off e₁.</li>
+<li>The lightness correlation in the states: the correlation of <dfn class="term" tabindex="0">α</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Alignment</span> <span class="gloss">How far a state points along e₁<span class="lead-colon">:</span></span><span class="more"> the cosine between the state and e₁, which is 1 on the anchor direction and 0 off it.</span></span> with lightness at each slice, over the color positions of contexts of other ops.</li>
+<li><dfn class="term" tabindex="0">Removal</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the edit takes out<span class="lead-colon">:</span></span><span class="more"> the net drop in its score under the edit, as a share of the way from the clean score to the target null.</span></span> and <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The largest net drop in score on another op under the edit.</span><span class="more"> The selectivity criterion is a spill of at most 0.02.</span></span> of the edit, which projects e₁ out of the state at every position on a set of slices. Both are net of the control at the same seed, and the selectivity criterion is a spill of at most 0.02.</li>
+<li>The task score of each op, as <dfn class="term" tabindex="0">expected exact match</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Expected exact match</span> <span class="gloss">The task score, as the chance that a drawn answer agrees with a true one.</span><span class="more"> With drawn answers, the correct answer to a line is spread over two or more colors, so we take the chance that an answer drawn from the model agrees with one drawn from the true distribution. Its ceiling is that same chance for the true distribution against itself (Σq²), below 1 on the ops that round.</span></span> on held-out contexts.</li>
+<li>Along training, every 4 epochs: the mean alignment α with e₁ at every slice and position of the probe contexts, for <code>difference</code> and for the other ops, and the e₁ component of every color embedding.</li>
+</ul>
+<h2 id="the-color-embedding-table-e1">The color embedding table (E1)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#the-color-embedding-table-e1" title="Link to this heading">&para;</a></h2>
+<p>If the <dfn class="term" tabindex="0">lean</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Lean</span> <span class="gloss">Lightness on e₁ in the color embedding table<span class="lead-colon">:</span></span><span class="more"> darker colors sit further along the anchor direction, a stand-in for <code>difference</code> at the slices where nothing contextual exists.</span></span> is the pull meeting the embedding with a stand-in, it should fade in <code>deep</code>, where the pull leaves the first two slices and the <dfn class="term" tabindex="0">anti-subspace term</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Anti-subspace term</span> <span class="gloss">The companion to the pull<span class="lead-colon">:</span></span><span class="more"> the mean of α² over every position and slice it acts on, which asks the states as a whole to stay off e₁.</span></span> stays on them. A slope of −1 means black sits a whole unit further along e₁ than white.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/late-pull-table-light.png" alt="Dark colors sit far along e₁ on the recipe (up to about 0.9) but only about a third as far with the deep pull at seed 700; along training the recipe slope falls early to about −1 on most seeds, while the deep slope stays flat for a hundred epochs, then falls to about −0.25, inside the spread of the controls." width="702" height="298" style="max-width: 100%; height: auto;" data-asset-name="late-pull-table" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/late-pull-table-dark.png" alt="Dark colors sit far along e₁ on the recipe (up to about 0.9) but only about a third as far with the deep pull at seed 700; along training the recipe slope falls early to about −1 on most seeds, while the deep slope stays flat for a hundred epochs, then falls to about −0.25, inside the spread of the controls." width="702" height="298" style="max-width: 100%; height: auto;" data-asset-name="late-pull-table" />
+<figcaption><p><strong>The lean of the color embedding table.</strong> Left and middle: the e₁ component of each of the 216
+color embeddings against its lightness at the end of training, one run of each arm, each dot drawn in its
+own color. Right: the slope of that component against lightness along training, one hairline per run
+and the seed mean bold; the ticks at the right edge are the controls at the same seeds. <code>deep-clean</code> is
+zero throughout and not drawn. The strip below is the weight of each term, the same in both arms: the
+anchor weight solid and the anti-subspace weight dashed.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>slope in the table</th><th class=num>r at block 1</th><th class=num>r at block 2</th></tr></thead><tbody><tr><td><code>whole</code></td><td class=num>−0.81 (−1.06 to −0.25)</td><td class=num>−0.49 (−0.62 to −0.19)</td><td class=num>−0.33 (−0.42 to −0.13)</td></tr><tr><td><code>deep</code></td><td class=num>−0.26 (−0.30 to −0.18)</td><td class=num>−0.23 (−0.24 to −0.21)</td><td class=num>−0.15 (−0.20 to −0.10)</td></tr><tr><td><code>deep-clean</code></td><td class=num>0.00 (0.00 to 0.00)</td><td class=num>−0.09 (−0.15 to −0.04)</td><td class=num>−0.09 (−0.13 to −0.07)</td></tr><tr><td>control</td><td class=num>−0.04 (−0.25 to 0.12)</td><td class=num>−0.06 (−0.43 to 0.23)</td><td class=num>−0.08 (−0.41 to 0.24)</td></tr></tbody></table><figcaption><p><strong>The lean, in the table and in the states</strong>, seed mean and range over 4 runs. The slope is that
+of the e₁ component of the color embeddings against lightness; r is the correlation of α with lightness at
+the color positions of contexts of other ops. The controls are ex-2.2.23's at the same seeds.</p></figcaption></figure>
+
+<p>It fades to about a quarter, though not to nothing. The slope in <code>deep</code> is between −0.18 and −0.30 by seed, against about −1.0 on the recipe runs with no <dfn class="term" tabindex="0">latch</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Latch</span> <span class="gloss">A syntax token embedding on e₁, which satisfies the pull at the embedding for every context at once.</span><span class="more"> Found by spill-by-position.</span></span> (seed 701 of the recipe is latched on <code>,</code> and has a shallow slope too). That is about as steep as the steepest control. But the controls lean either way by seed, and every <code>deep</code> run leans the same way as the recipe, so what is left is still the pull at work, only weaker.</p>
+<p>The lightness in the states at block 1 fades too, to about half the recipe value, and in <code>deep-clean</code> it is smaller again. By block 2 it is small in every arm.</p>
+<!-- REVIEW: "fades by about as much as the slope" changed to "to about half": r at block 1 goes from −0.49 (−0.6 on
+the unlatched seeds) to −0.23, where the slope goes to a quarter. Verify: the lean table. -->
+
+<p>On the recipe the slope grows from early in training. On <code>deep</code> it stays near zero for about the first hundred epochs, then grows through the second half, while the whole table drifts a little onto e₁ (E3). The pull on block 2 reaches the table only through block 1, and that is enough to load some lightness onto e₁.</p>
+<p>The growth also coincides with the anneal of the anti-subspace weight, which E4 changes. Part of the lean may also come from the per-slice pull being 5/3 of the recipe value.</p>
+<!-- REVIEW: added the anti-schedule reading of the late onset. The anti weight falls from 0.22 at epoch 100 to 0.04
+at epoch 300, the window in which the late slope grows; the earlier text gave only the route through block 1.
+Verify: traj["anti_weight"] against the slope panel. -->
+
+<h2 id="removal-and-spill-e2">Removal and spill (E2)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#removal-and-spill-e2" title="Link to this heading">&para;</a></h2>
+<p>The edit on every slice is the goal, since one that has to know which slices to skip is a weaker guarantee. The main measure is its <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The largest net drop in score on another op under the edit.</span><span class="more"> The selectivity criterion is a spill of at most 0.02.</span></span>, with <dfn class="term" tabindex="0">removal</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the edit takes out<span class="lead-colon">:</span></span><span class="more"> the net drop in its score under the edit, as a share of the way from the clean score to the target null.</span></span> beside it.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/late-pull-edit-light.png" alt="Under the full edit every run removes about 0.85 to 0.9, and spill drops from the recipe (up to 0.38) to deep (up to 0.17) to deep-clean (around the criterion); editing block 1 alone looks much the same, while editing blocks 2 to 4 spills almost nothing but removes nearly everything on seven runs and almost nothing on five." width="702" height="260" style="max-width: 100%; height: auto;" data-asset-name="late-pull-edit" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/late-pull-edit-dark.png" alt="Under the full edit every run removes about 0.85 to 0.9, and spill drops from the recipe (up to 0.38) to deep (up to 0.17) to deep-clean (around the criterion); editing block 1 alone looks much the same, while editing blocks 2 to 4 spills almost nothing but removes nearly everything on seven runs and almost nothing on five." width="702" height="260" style="max-width: 100%; height: auto;" data-asset-name="late-pull-edit" />
+<figcaption><p><strong>Spill against removal under three slice-restricted edits</strong>, one mark per run. Removal is the net drop on
+<code>difference</code> as a share of the way to the target null; spill is the largest net drop on another op.
+The dashed rule is the selectivity criterion.</p></figcaption></figure>
+
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>slices edited</th><th class=num><code>whole</code></th><th class=num><code>deep</code></th><th class=num><code>deep-clean</code></th></tr></thead><tbody><tr><td>every slice: removal</td><td class=num>0.88 (0.84 to 0.92)</td><td class=num>0.88 (0.86 to 0.90)</td><td class=num>0.89 (0.84 to 0.92)</td></tr><tr><td>embedding: removal</td><td class=num>0.55 (0.42 to 0.74)</td><td class=num>0.18 (0.07 to 0.30)</td><td class=num>−0.03 (−0.08 to 0.00)</td></tr><tr><td>block 1: removal</td><td class=num>0.81 (0.71 to 0.95)</td><td class=num>0.93 (0.88 to 0.98)</td><td class=num>0.91 (0.81 to 0.96)</td></tr><tr><td>blocks 2 to 4: removal</td><td class=num>0.70 (0.14 to 0.91)</td><td class=num>0.48 (0.01 to 0.93)</td><td class=num>0.48 (0.07 to 0.94)</td></tr><tr><td>every slice: spill</td><td class=num>0.229 (0.093 to 0.380)</td><td class=num>0.090 (0.038 to 0.171)</td><td class=num>0.008 (−0.029 to 0.038)</td></tr><tr><td>embedding: spill</td><td class=num>0.233 (0.106 to 0.393)</td><td class=num>0.035 (0.000 to 0.098)</td><td class=num>−0.003 (−0.011 to 0.003)</td></tr><tr><td>block 1: spill</td><td class=num>0.143 (0.064 to 0.267)</td><td class=num>0.083 (0.020 to 0.165)</td><td class=num>0.024 (0.006 to 0.050)</td></tr><tr><td>blocks 2 to 4: spill</td><td class=num>0.021 (−0.004 to 0.067)</td><td class=num>−0.001 (−0.005 to 0.008)</td><td class=num>−0.004 (−0.009 to 0.001)</td></tr></tbody></table><figcaption><p><strong>Removal and spill under each slice-restricted edit</strong>, seed mean and range over 4 runs. The
+<code>whole</code> runs are the same as their twins in ex-2.2.23.</p></figcaption></figure>
+
+<p>The spill falls, and removal holds. Under the edit on every slice all twelve runs remove about as much as each other. The recipe runs spill well above the criterion on every seed, and <code>deep</code> spills less on every seed but stays above it. <code>deep-clean</code> is within it on 3 of 4 runs, and the fourth spills about twice the criterion (0.038).</p>
+<p>The task score is the same in all three arms and on the controls (about 0.57 <dfn class="term" tabindex="0">expected exact match</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Expected exact match</span> <span class="gloss">The task score, as the chance that a drawn answer agrees with a true one.</span><span class="more"> With drawn answers, the correct answer to a line is spread over two or more colors, so we take the chance that an answer drawn from the model agrees with one drawn from the true distribution. Its ceiling is that same chance for the true distribution against itself (Σq²), below 1 on the ops that round.</span></span> averaged over ops, and no run more than 0.01 below the controls), so the new pull costs the task nothing we can see.</p>
+<p>In both new arms the concept sits at block 1 as well as later. Editing block 1 alone removes at least as much as editing every slice, though block 1 is never pulled, and it gives most of the spill that is left. In <code>deep</code> the embedding alone still spills on seeds 700 and 702, where the weaker <dfn class="term" tabindex="0">lean</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Lean</span> <span class="gloss">Lightness on e₁ in the color embedding table<span class="lead-colon">:</span></span><span class="more"> darker colors sit further along the anchor direction, a stand-in for <code>difference</code> at the slices where nothing contextual exists.</span></span> of E1 is still used downstream.</p>
+<p>Editing only blocks 2 to 4 spills almost nothing in any arm, but its removal splits by seed. On seven of the twelve runs it removes nearly everything, and on the other five almost nothing (seeds 700 and 702 in <code>deep</code>, seeds 700 and 701 in <code>deep-clean</code>, and seed 700 in <code>whole</code>).</p>
+<p>On those five, the answer depends on the e₁ component at block 1, and not on the e₁ component the pull put at blocks 2 to 4. Perhaps the later blocks read block 1 along e₁ and write the answer elsewhere. Or the two edits may differ in some other way that this measurement cannot tell apart. <a href="https://z0u.github.io/sca2/m2/embedding-lean/">The embedding-lean experiment</a> saw the same split on the recipe and took it as a sign that the concept was partly built from the lean. Here the split persists with the table held off e₁, so it does not need the lean.</p>
+<!-- REVIEW: "the later blocks rebuild the concept from what block 1 passes them, so taking it out after block 1 is
+too late" restated as what the two edits show (block-1 e₁ needed, blocks-2-to-4 e₁ not), with the mechanism as one
+reading. "Most runs" became "seven of twelve", since in the new arms it is half. Verify: the removal rows for
+block 1 and blocks 2 to 4, per seed. -->
+
+<h2 id="where-the-alignment-settles-e3">Where the alignment settles (E3)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#where-the-alignment-settles-e3" title="Link to this heading">&para;</a></h2>
+<p>A concept that settles where the pull is should show up at blocks 2 to 4 on <code>difference</code> contexts and nowhere on the others. The measure is the mean of <dfn class="term" tabindex="0">α</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Alignment</span> <span class="gloss">How far a state points along e₁<span class="lead-colon">:</span></span><span class="more"> the cosine between the state and e₁, which is 1 on the anchor direction and 0 off it.</span></span> over the positions of a probe context, which mixes the positions where the concept sits with those where it does not, so only its shape over training and slices matters.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/late-pull-alpha-light.png" alt="On the recipe the embedding and block 1 align with e₁ on every op, not just difference; in the deep arms blocks 2 to 4 align quickly on difference only, while block 1 (and, in deep, the embedding) creeps up slowly on all ops through the second half of training." width="702" height="490" style="max-width: 100%; height: auto;" data-asset-name="late-pull-alpha" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/late-pull-alpha-dark.png" alt="On the recipe the embedding and block 1 align with e₁ on every op, not just difference; in the deep arms blocks 2 to 4 align quickly on difference only, while block 1 (and, in deep, the embedding) creeps up slowly on all ops through the second half of training." width="702" height="490" style="max-width: 100%; height: auto;" data-asset-name="late-pull-alpha" />
+<figcaption><p><strong>Mean alignment with e₁ along training, by slice.</strong> The mean of α over the positions of the probe
+contexts of <code>difference</code> (top) and of the other ops (bottom), one line per slice; bold is the
+seed mean and the hairlines are the 4 runs. The strips under each column are the anchor
+weight (solid) and the anti-subspace weight (dashed), the same in every arm.</p></figcaption></figure>
+
+<p>On the recipe every slice rises together on <code>difference</code> contexts, and the embedding and block 1 rise nearly as much on the other ops. That is the <dfn class="term" tabindex="0">lean</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Lean</span> <span class="gloss">Lightness on e₁ in the color embedding table<span class="lead-colon">:</span></span><span class="more"> darker colors sit further along the anchor direction, a stand-in for <code>difference</code> at the slices where nothing contextual exists.</span></span> seen from the states: at those slices the alignment follows the tokens, whatever the op.</p>
+<p>On both new arms, blocks 2 to 4 rise on <code>difference</code> contexts within the first few dozen epochs and then level off, and stay low on the other ops. Block 1 rises later and more slowly, on the other ops as well as on <code>difference</code>, though less on the others than on the recipe. So block 1 comes to meet part of the pull on block 2, and the anti term does not stop it.</p>
+<p>Much of the rise at block 1, and nearly all of it on the other ops, comes after epoch 150, as the anti weight anneals (E4). Its rise on other ops is the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The largest net drop in score on another op under the edit.</span><span class="more"> The selectivity criterion is a spill of at most 0.02.</span></span> that E2 traced to the edit on block 1.</p>
+<!-- REVIEW: added the schedule reading beside "the anti term does not stop it", for the same reason as in E1.
+Verify: block 1 on the other ops rises from about epoch 150 in both new arms, where anti_weight is 0.18 and falling. -->
+
+<p>On <code>deep</code> the embedding also drifts onto e₁ in the second half of training, by about as much on the other ops as on <code>difference</code>. That is the whole color embedding table shifting a little toward e₁, with the lightness slope of E1 on top. It does not happen in <code>deep-clean</code>, where the table is held at zero.</p>
+<h2 id="the-anti-subspace-hold-e4">The anti-subspace hold (E4)<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#the-anti-subspace-hold-e4" title="Link to this heading">&para;</a></h2>
+<p>In E1 and E3 the table and block 1 moved onto e₁ mostly while the anti-subspace weight was annealing. If the anneal lets go too early, holding that weight higher should keep them off.</p>
+<p>A second round repeats <code>deep</code> and <code>deep-clean</code> with the anti weight annealed to a hold of 0.1 (equal to the anchor weight) or 0.2, in place of the recipe hold of 0.03. The peak at the start, the anneal at the end of training, and the seeds are unchanged.</p>
+<figure class="mini-themed-figure">
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-light" src="_assets/late-pull-hold-light.png" alt="In deep, the lean of the table grows through the second half of training at the recipe hold of 0.03, about half as much at 0.1, and hardly at all at 0.2; the alignment of block 1 on other ops follows the same order in deep and in deep-clean, and stays near its early level at 0.2." width="702" height="336" style="max-width: 100%; height: auto;" data-asset-name="late-pull-hold" />
+<img loading="lazy" tabindex="0" data-mini-zoom class="mini-themed-img-dark" src="_assets/late-pull-hold-dark.png" alt="In deep, the lean of the table grows through the second half of training at the recipe hold of 0.03, about half as much at 0.1, and hardly at all at 0.2; the alignment of block 1 on other ops follows the same order in deep and in deep-clean, and stays near its early level at 0.2." width="702" height="336" style="max-width: 100%; height: auto;" data-asset-name="late-pull-hold" />
+<figcaption><p><strong>The lean and block 1 along training, by anti-subspace hold.</strong> Left: the slope of the e₁ component of
+the color embeddings against lightness in <code>deep</code>. Middle and right: the mean α at block 1 over the
+positions of the probe contexts of the other ops. One line per hold: bold is the seed mean and the
+hairlines are the 4 runs. The strips below are the anchor weight (solid gray) and the
+anti-subspace weight at each hold (dashed).</p></figcaption></figure>
+
+<p>The higher the hold, the less the table <dfn class="term" tabindex="0">leans</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Lean</span> <span class="gloss">Lightness on e₁ in the color embedding table<span class="lead-colon">:</span></span><span class="more"> darker colors sit further along the anchor direction, a stand-in for <code>difference</code> at the slices where nothing contextual exists.</span></span> and the less block 1 drifts onto e₁ on other ops. At 0.2 the slope in <code>deep</code> is between −0.12 and 0.01 by seed. That is within the range of the controls, and no longer all one sign. Block 1 stays near its early level through training. At 0.1 both grow, but about half as much as at the recipe hold.</p>
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>anti hold</th><th class=num>slope in the table</th><th class=num>removal</th><th class=num>spill</th><th class=num>within criterion</th><th class=num>task change</th></tr></thead><tbody><tr><td><code>deep</code></td><td class=num>0.03</td><td class=num>−0.26 (−0.30 to −0.18)</td><td class=num>0.88 (0.86 to 0.90)</td><td class=num>0.090 (0.038 to 0.171)</td><td class=num>0 of 4</td><td class=num>−0.003 (−0.006 to 0.001)</td></tr><tr><td><code>deep</code></td><td class=num>0.1</td><td class=num>−0.14 (−0.19 to −0.09)</td><td class=num>0.86 (0.77 to 0.92)</td><td class=num>0.017 (−0.001 to 0.057)</td><td class=num>3 of 4</td><td class=num>−0.004 (−0.010 to 0.000)</td></tr><tr><td><code>deep</code></td><td class=num>0.2</td><td class=num>−0.04 (−0.12 to 0.01)</td><td class=num>0.77 (0.64 to 0.86)</td><td class=num>−0.012 (−0.027 to −0.002)</td><td class=num>4 of 4</td><td class=num>−0.005 (−0.018 to 0.003)</td></tr><tr><td><code>deep-clean</code></td><td class=num>0.03</td><td class=num>0.00 (0.00 to 0.00)</td><td class=num>0.89 (0.84 to 0.92)</td><td class=num>0.008 (−0.029 to 0.038)</td><td class=num>3 of 4</td><td class=num>−0.003 (−0.009 to −0.001)</td></tr><tr><td><code>deep-clean</code></td><td class=num>0.1</td><td class=num>0.00 (0.00 to 0.00)</td><td class=num>0.79 (0.60 to 0.88)</td><td class=num>−0.006 (−0.028 to 0.021)</td><td class=num>3 of 4</td><td class=num>−0.006 (−0.014 to −0.002)</td></tr><tr><td><code>deep-clean</code></td><td class=num>0.2</td><td class=num>0.00 (0.00 to 0.00)</td><td class=num>0.75 (0.49 to 0.88)</td><td class=num>0.006 (−0.031 to 0.063)</td><td class=num>3 of 4</td><td class=num>−0.006 (−0.010 to −0.003)</td></tr></tbody></table><figcaption><p><strong>The lean, removal and spill by anti-subspace hold</strong>, seed mean and range over 4 runs, under the
+edit on every slice. The task change is the mean score over ops less that of the control at the same seed.
+The rows at the hold of 0.03 are the <code>deep</code> and <code>deep-clean</code> runs of E1 to E3.</p></figcaption></figure>
+
+<p>In <code>deep</code> the <dfn class="term" tabindex="0">spill</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The largest net drop in score on another op under the edit.</span><span class="more"> The selectivity criterion is a spill of at most 0.02.</span></span> follows. The full edit is within the criterion on 3 of 4 runs at 0.1 and on 4 of 4 at 0.2, where none were at the recipe hold. But <dfn class="term" tabindex="0">removal</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the edit takes out<span class="lead-colon">:</span></span><span class="more"> the net drop in its score under the edit, as a share of the way from the clean score to the target null.</span></span> falls as the hold rises, to between 0.64 and 0.86 at 0.2. With the concept kept out of block 1, less of <code>difference</code> depends on e₁ anywhere.</p>
+<p>In <code>deep-clean</code> the hold changes the spill less, since it was already near the criterion, but removal falls about as much as in <code>deep</code>. At 0.2 one run (seed 703) spills 0.063, more than any <code>deep-clean</code> run at the recipe hold, and another (seed 701) removes only 0.49.</p>
+<!-- REVIEW: "the hold changes less" narrowed to the spill, and the removal fall in `deep-clean` added: its seed mean
+goes from 0.89 to 0.75 across the holds, against 0.88 to 0.77 in `deep`. Verify: the removal column of the hold table. -->
+
+<p>The task changes little. The largest drop against the control is 0.018 (seed 702 of <code>deep</code> at a hold of 0.2), against 0.009 on the runs at the recipe hold.</p>
+<h2 id="discussion">Discussion<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#discussion" title="Link to this heading">&para;</a></h2>
+<p>Moving the pull off the first two slices did most of what <a href="https://z0u.github.io/sca2/m2/embedding-lean/">the embedding-lean experiment</a> expected of it. The color embedding table <dfn class="term" tabindex="0">leans</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Lean</span> <span class="gloss">Lightness on e₁ in the color embedding table<span class="lead-colon">:</span></span><span class="more"> darker colors sit further along the anchor direction, a stand-in for <code>difference</code> at the slices where nothing contextual exists.</span></span> much less, the lightness in the states fades, and the full edit <dfn class="term" tabindex="0">spills</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Spill</span> <span class="gloss">The largest net drop in score on another op under the edit.</span><span class="more"> The selectivity criterion is a spill of at most 0.02.</span></span> less on every seed. Holding the table off e₁ outright took the spill most of the rest of the way, with nothing lost in <dfn class="term" tabindex="0">removal</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Removal</span> <span class="gloss">How much of <code>difference</code> the edit takes out<span class="lead-colon">:</span></span><span class="more"> the net drop in its score under the edit, as a share of the way from the clean score to the target null.</span></span> or in the task. That fits the account that the spill comes from stand-ins at the slices where nothing contextual exists.</p>
+<p>It did not keep the concept out of block 1. The pull on block 2 is cheapest to meet by having block 1 already lean toward e₁, and block 1 has some context to work with, so part of what it puts there is about <code>difference</code> and part is shared with other ops.</p>
+<p>Keeping out the shared part is the job of the <dfn class="term" tabindex="0">anti-subspace term</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Anti-subspace term</span> <span class="gloss">The companion to the pull<span class="lead-colon">:</span></span><span class="more"> the mean of α² over every position and slice it acts on, which asks the states as a whole to stay off e₁.</span></span>, and on its recipe schedule it does not. Block 1 and the table move onto e₁ mostly in the second half of training. By then the anti weight has annealed from about 2.5× the anchor weight to about 0.3×. Holding it at 2× the anchor weight kept both nearly off e₁ on the other ops in <code>deep</code> (E4). So on this pull the recipe anneal lets go too early.</p>
+<p><a href="https://z0u.github.io/sca2/m2/embedding-lean/">The embedding-lean experiment</a> found the pull on a color embedding to be an order of magnitude or more above what the anti term costs it. In <code>deep</code> the pull reaches the table only through block 1, and a hold of about 7× the recipe value was enough.</p>
+<p>The higher hold also took some removal. Some of what the edit removes at the recipe hold seems to sit at block 1. With block 1 kept off e₁, the model answers <code>difference</code> with less of it on e₁.</p>
+<p>The anti term also acts on the pulled blocks, and there the <dfn class="term" tabindex="0">alignment</dfn><span class="sidenote glossnote" role="note" tabindex="-1"><span class="glossnote-term">Alignment</span> <span class="gloss">How far a state points along e₁<span class="lead-colon">:</span></span><span class="more"> the cosine between the state and e₁, which is 1 on the anchor direction and 0 off it.</span></span> of <code>difference</code> contexts falls a little as the hold rises. So part of the cost may be the hold pressing on the pull itself.</p>
+<p>Among the runs here, <code>deep</code> at a hold of 0.2 is the most selective. <code>deep</code> at 0.1 and <code>deep-clean</code> at the recipe hold remove more, with a little more spill.</p>
+<p>On the seeds where the answer to <code>difference</code> depends on the e₁ component at block 1 and not on the one at the later blocks (E2), the edit on every slice is the one to keep, and the remaining spill is a question of what block 1 holds.</p>
+<!-- REVIEW: "kept both nearly off e₁" scoped to the other ops: at a hold of 0.2 the mean α of block 1 on `difference`
+contexts is still about 0.055, against 0.09 at the recipe hold. And a second route for the removal cost added: the
+mean α at blocks 2 to 4 on `difference` falls from about 0.124 to 0.106 between the recipe hold and 0.2, in both
+arms. Verify: traj["alpha_anchored"][-1] at slices 1 and 2 to 4, by hold. -->
+<!-- REVIEW: the "too weak or lets go too early" question of the first round is now answered by E4, so this
+paragraph says what the hold showed; the paragraph after it is new, on the removal the hold cost. Verify: the hold
+table. -->
+
+<p>Four seeds show that <code>deep-clean</code> and the higher holds spill much less than the recipe, but not whether their single runs above the criterion, or the runs with low removal, are typical.</p>
+<h2 id="glossary">Glossary<a class="anchor-link" href="https://z0u.github.io/sca2/m2/late-pull/#glossary" title="Link to this heading">&para;</a></h2>
+<dl>
+<dt>Alignment</dt>
+<dt>α</dt>
+<dd>How far a state points along e₁: the cosine between the state and e₁, which is 1 on the anchor direction and 0 off it.</dd>
+<dt>Anti-subspace term</dt>
+<dd>The companion to the pull: the mean of α² over every position and slice it acts on, which asks the states as a whole to stay off e₁.</dd>
+<dt>Lean</dt>
+<dd>Lightness on e₁ in the color embedding table: darker colors sit further along the anchor direction, a stand-in for <code>difference</code> at the slices where nothing contextual exists.</dd>
+<dt>Latch</dt>
+<dd>A syntax token embedding on e₁, which satisfies the pull at the embedding for every context at once. Found by spill-by-position.</dd>
+<dt>Removal</dt>
+<dd>How much of <code>difference</code> the edit takes out: the net drop in its score under the edit, as a share of the way from the clean score to the target null.</dd>
+<dt>Spill</dt>
+<dd>The largest net drop in score on another op under the edit. The selectivity criterion is a spill of at most 0.02.</dd>
+<dt>Target null</dt>
+<dd>The score an ideal predictor would get on <code>difference</code> contexts if it had lost that op and answered from the remaining ones.</dd>
+</dl>
+</main>
+</body>
+</html>
