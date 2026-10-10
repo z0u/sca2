@@ -553,14 +553,15 @@ A pull pooled over slices as well as positions asks each labeled context to alig
 
 {pool_figure()}
 
-On three seeds the alignment is largest at block 4, and the profile over slices looks much like that of `split-anti`: low at block 1 and rising to block 4, with blocks 2 and 3 nearly as high through the residual stream. Block 1 aligns a little less than in `split-anti`. On those seeds the spill is within the criterion at every dose, and the edit removes the op as well as in `split-anti` on two of them and a little less on the third.
+On three seeds the alignment is largest at block 4, and the profile over slices looks much like that of `split-anti`: low at block 1 and rising to block 4, with blocks 2 and 3 nearly as high through the residual stream. Block 1 aligns less than in `split-anti`. On those seeds the spill is within the criterion at every dose, and the edit removes the op as well as in `split-anti` on two of them and about a tenth less on the third (seed 702).
 
 {pool_table()}
 
 On {seeds_text(POOL_FAILED)} the example answers stayed near zero at every slice, and the edit removes nothing. What aligned there is the query answer: the state at the answer of the query, which follows the answer token and so shows the op, reaches α of 1 at blocks 3 and 4. That position aligns in every arm, since it is part of every labeled context, but in `pool-slices` on this seed it took the whole of the pull. Along training the example answers rose to about a fifth early on, then fell back as the query answer took over. The prediction of the query answer is made at the query `=`, before that position, so an edit there cannot reach it.
 <!-- REVIEW: the query answer is position {QUERY_ANSWER} of the probe contexts. Verify: traj["alpha_anchored"][-1][:, {QUERY_ANSWER}] for pool-slices-s{POOL_FAILED[0] if POOL_FAILED else ""}, and the same at the example answers. -->
 
-This is the concentration the pooling was expected to bring, landing on a position no one meant it to use. The per-slice pool includes the query answer too, and it aligns there in every arm, about as far at blocks 2 to 4 as here. Why no per-slice run lost its example answers the same way, we can't say from these runs, and with one run in four it may be chance which position gets ahead.
+This is the concentration the pooling was expected to bring, landing on a position no one meant it to use. The arm changes two things against `split-anti`, since block 1 joins the pulled slices as well as the pull being pooled; but block 1 took none of the pull on this seed, so the pooling is the likelier cause.
+<!-- REVIEW: added the second difference of `pool-slices` (block 1 in the pulled set), which the first draft left out. Verify: answers_by_slice for pool-slices-s700 at block 1 (about 0.06) and the query answer at block 1 (0.42), against blocks 3 and 4. --> The per-slice pool includes the query answer too, and it aligns there in every arm, about as far at blocks 2 to 4 as here. Why no per-slice run lost its example answers the same way, we can't say from these runs, and with one run in four it may be chance which position gets ahead.
 """
 
 # %%
@@ -568,7 +569,7 @@ This is the concentration the pooling was expected to bring, landing on a positi
 r"""
 ## Discussion
 
-Setting the anti weight by slice did what the second review expected. The high hold everywhere had two effects, and they sit at different slices. On the embedding and block 1 it keeps the stand-ins off e₁, which is where the spill came from. On the pulled blocks it presses on the alignment at the fitting example answers, which is where the removal went. Splitting the weight keeps the first and lifts the second. On four seeds `split-anti` removes as much as `deep` at the recipe hold, with the spill within the criterion on all but one seed at the full dose.
+Setting the anti weight by slice did what the second review expected. The high hold everywhere had two effects, and they sit at different slices. On the embedding and block 1 it keeps the stand-ins off e₁, which fits where the spill came from. On the pulled blocks it presses on the alignment at the fitting example answers, which fits where the removal went. Splitting the weight keeps the first and lifts the second. On four seeds `split-anti` removes as much as `deep` at the recipe hold, with the spill within the criterion on all but one seed at the full dose.
 
 That one seed spills on the same op where `deep` spilled least, and a little more of block 1 and the table sit on e₁ than at the high hold everywhere. So the split may trade a small amount of selectivity for the removal it gives back. Four seeds can't say whether that trade is typical. If it holds, a hold a little above 0.2 on the first two slices, or the hold of 0.2 with a higher one on block 1, would be the place to look.
 
