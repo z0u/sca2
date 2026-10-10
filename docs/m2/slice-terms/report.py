@@ -205,10 +205,10 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Holding the anti-subspace weight high on the embedding and block 1 only, and at the recipe level on the pulled blocks, kept most of the selectivity of a high hold everywhere and gave back the removal it cost. Pooling the pull over slices as well as positions let it settle on the last block, but on one seed it settled on a position the prediction does not use, and the op could not be removed there.
+We held the anti-subspace weight high on the embedding and block 1 only, and at the recipe level on the pulled blocks. This kept most of the selectivity of a high hold everywhere, and it gave back the removal that the high hold cost. We also pooled the pull over slices as well as positions. On most seeds it then settled on the last block. But on one seed it settled on a position the prediction does not use, and there the op could not be removed.
 ///
 
-[The late-pull experiment](/docs/m2/late-pull/report.py) pulled `{ex.ANCHORED_OP}` toward e₁ at blocks 2 to 4 only, with the anti-subspace term on every slice (the `deep` arm). Holding the anti weight at 0.2 for the whole of training, in place of the recipe hold of 0.03, kept the color embedding table and block 1 off e₁ on the other ops and brought the spill within the criterion on every seed. But it removed about a tenth less of the op. A second review of those runs found that the hold presses on the pull at the blocks it pulls, which may account for the lost removal.
+[The late-pull experiment](/docs/m2/late-pull/report.py) pulled `{ex.ANCHORED_OP}` toward e₁ at blocks 2 to 4 only, with the anti-subspace term on every slice (the `deep` arm). In one arm, the anti weight was held at 0.2 for the whole of training, in place of the recipe hold of 0.03. This kept the color embedding table and block 1 off e₁ on the other ops, and it brought the spill within the criterion on every seed. But it removed about a tenth less of the op. A second review of those runs found that the hold also presses on the pull at the pulled blocks. That may account for the lost removal.
 
 So this report sets the two terms by slice, in two arms of {len(SEEDS)} runs each at {ex.EPOCHS} epochs:
 
@@ -322,7 +322,7 @@ def dose_table() -> str:
 rf"""
 ## Removal and spill (E1)
 
-If the high hold costs removal by pressing on the pull at blocks 2 to 4, then holding high only on the embedding and block 1 should give the removal back, and if the stand-ins live at those first two slices, the spill should stay low. The main measure is removal at the full dose, with the spill at every dose beside it.
+Suppose the high hold costs removal by pressing on the pull at blocks 2 to 4. Then holding it high only on the embedding and block 1 should give the removal back. And if the stand-ins live at those first two slices, the spill should stay low. The main measure is removal at the full dose, with the spill at every dose beside it.
 
 {dose_figure()}
 
@@ -330,9 +330,9 @@ Both hold. On every `split-anti` run, removal grows with the dose to about what 
 
 {dose_table()}
 
-The edit lands about as close to the target null in `split-anti` as in both `deep` arms, which fits the extra removal being the op going, rather than answer mass scattered onto other ops.
+The edit lands about as close to the target null in `split-anti` as in both `deep` arms. So the extra removal seems to be the op itself going away, rather than answer mass scattered onto other ops.
 
-The task change is small, as in `deep`. One `split-anti` run (seed 702) is the lowest of any so far against its control, spread across all ops rather than on `{ex.ANCHORED_OP}`, which suggests seed variation more than a cost of the terms; four seeds cannot separate the two.
+The task change is small, as in `deep`. One `split-anti` run (seed 702) has the lowest task score against its control of any run so far. The loss is spread across all ops rather than concentrated on `{ex.ANCHORED_OP}`, which suggests seed variation more than a cost of the terms. Four seeds cannot separate the two.
 
 So on four seeds the split gets nearly all the selectivity of the high hold with none of its cost in removal. Which slices the edit has to cover is unchanged from late pull: as in `deep`, editing blocks 2 to 4 alone removes nearly everything on two seeds and less than half on the other two, and editing block 1 alone removes most of the op on every seed.
 """
@@ -455,7 +455,7 @@ It did. At blocks 2 to 4, `split-anti` follows `deep` at the recipe hold: the al
 
 {alpha_table()}
 
-Split by whether an example fits `{ex.ANCHORED_OP}`, the alignment at the fitting answers is back to nearly the recipe-hold level. That is the pressure of the high hold on the pulled blocks, lifted. The non-fitting answers are back near the recipe-hold level too. That alignment was never about the op, and the high hold everywhere had cleared it; the split leaves it, and it does not show in the spill.
+Split by whether an example fits `{ex.ANCHORED_OP}`, the alignment at the fitting answers is back to nearly the recipe-hold level. So the pressure that the high hold put on the pulled blocks has been lifted. The non-fitting answers are back near the recipe-hold level too. That alignment was never about the op. The high hold everywhere had cleared it, and the split leaves it in place, but it does not show up in the spill.
 
 The color embedding table leans about a third as much as in `deep`, a little more than at the high hold, and on every seed it leans the way the anchored runs lean. Block 1 on the other ops is a little above the high hold too. Both fit the small spill that remains on one seed.
 """
@@ -549,7 +549,7 @@ def pool_table() -> str:
 rf"""
 ## Where the pooled pull settles (E3)
 
-A pull pooled over slices as well as positions asks each labeled context to align at one place along the stream, and gives each place a share of the pull that grows steeply with how far along it already is. So it should settle on whichever slice aligned first. The question is which slice that is, and whether the edit at every slice still removes the op. The main measure is α at the example answers at each slice.
+When the pull is pooled over slices as well as positions, each labeled context only has to align at one place along the stream. Each place gets a share of the pull, and that share grows steeply with how well aligned the place already is. So the pull should settle on whichever slice aligned first. Which slice is that, and does the edit at every slice still remove the op? The main measure is α at the example answers at each slice.
 
 {pool_figure()}
 
@@ -557,7 +557,7 @@ On three seeds the alignment is largest at block 4, and the profile over slices 
 
 {pool_table()}
 
-On {seeds_text(POOL_FAILED)} the example answers stayed near zero at every slice, and the edit removes nothing. What aligned there is the query answer: the state at the answer of the query, which follows the answer token and so shows the op, reaches α of 1 at blocks 3 and 4. That position aligns in every arm, since it is part of every labeled context, but in `pool-slices` on this seed it took the whole of the pull. Along training the example answers rose to about a fifth early on, then fell back as the query answer took over. The prediction of the query answer is made at the query `=`, before that position, so an edit there cannot reach it.
+On {seeds_text(POOL_FAILED)} the example answers stayed near zero at every slice, and the edit removes nothing. What aligned on this seed is the query answer. This is the state at the answer token of the query, which has seen the answer and so can show the op. It reaches α of 1 at blocks 3 and 4. That position aligns in every arm, since it is part of every labeled context, but in `pool-slices` on this seed it took the whole of the pull. Along training the example answers rose to about a fifth early on, then fell back as the query answer took over. The prediction of the query answer is made at the query `=`, before that position, so an edit there cannot reach it.
 <!-- REVIEW: the query answer is position {QUERY_ANSWER} of the probe contexts. Verify: traj["alpha_anchored"][-1][:, {QUERY_ANSWER}] for pool-slices-s{POOL_FAILED[0] if POOL_FAILED else ""}, and the same at the example answers. -->
 
 This is the concentration the pooling was expected to bring, landing on a position no one meant it to use. The arm changes two things against `split-anti`, since block 1 joins the pulled slices as well as the pull being pooled; but block 1 took none of the pull on this seed, so the pooling is the likelier cause.
