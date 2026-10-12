@@ -14,3 +14,7 @@ Two mechanisms that both begin by unfreezing τ. `make_anchored_train_step` in `
 Any next design here has enough seeds ready: ex-2.1.10 carries `N_SEEDS_PRIMARY = 9`, three times ex-2.1.9's three, so latch rates at the chosen rung can be bounded without re-running ex-2.1.9 wider.
 
 Split from the older ex-2.1.9 follow-ups item on 2026-08-23.
+
+## Notes
+
+**2026-10-12, slice-terms review** — Renewed interest in the soft → sharp schedule from the slice-terms experiment. There the pull pooled over slices as well as positions settled on the query answer alone on one seed of four (a position after the prediction, so the edit removed nothing). A pool that starts soft might keep one position from taking the whole pull early. The pool now has two temperatures, τ_p over positions and τ_ℓ over slices (`AnchorSpec.slice_tau`), so a schedule could move either.
