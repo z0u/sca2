@@ -251,12 +251,12 @@ We also pooled the pull over slices as well as positions. On most seeds the pull
 
 [The late-pull experiment](/docs/m2/late-pull/report.py) pulled `{ex.ANCHORED_OP}` toward e₁ at blocks 2 to 4 only, with the anti-subspace term on every slice (the `deep` arm). Holding the anti weight at 0.2 for all of training, in place of the recipe hold of 0.03, kept the color embedding table and block 1 off e₁ on the other ops and brought the spill within the criterion on every seed. But it removed about a tenth less of the op.
 
-A second review of those runs found that the hold also counters the pull at the pulled blocks, which may account for the lost removal. So this report sets the two terms by slice, in two arms of {len(SEEDS)} runs each at {ex.EPOCHS} epochs:
+A second review of those runs found that the hold also counters the pull at the pulled blocks, which may account for the lost removal. So we set the two terms by slice, in two arms of {len(SEEDS)} runs each at {ex.EPOCHS} epochs:
 
 - `split-anti`: the `deep` pull, with the anti weight held at {ex.EARLY_HOLD:g} on the embedding and block 1 and at the recipe hold of {ex.LATE_HOLD:g} on blocks 2 to 4.
 - `pool-slices`: the same anti weights, with the pull on blocks 1 to 4 pooled over slices as well as positions, so that it may choose where along the stream to align.
 
-A second round asked whether a softer pool over slices would settle less of the pull on block 4. It adds {len(TAU_ARMS)} runs of `pool-slices` at seed {TAU_SEED}, with the pool over slices at a temperature of its own, $\tau_\ell$.
+A second round adds {len(TAU_ARMS)} runs of `pool-slices` at seed {TAU_SEED}, with the pool over slices at a temperature of its own, $\tau_\ell$, to ask whether a softer pool would settle less of the pull on block 4.
 """
 
 # %%
@@ -366,11 +366,15 @@ def dose_table() -> str:
 rf"""
 ## Removal and spill (E1)
 
-Suppose the high $\lambda_{{\bar s}}$ hold costs removal because it counters the pull at blocks 2 to 4. Then holding it high only on the embedding and block 1 should give the removal back. And if the stand-ins live at those first two slices (stand-ins are a hypothesis for what carries the spill, not a settled mechanism), the spill should also stay low. The main measure is removal at the full dose, with the spill at every dose beside it.
+Suppose the high $\lambda_{{\bar s}}$ hold costs removal because it counters the pull at blocks 2 to 4. Then holding it high only on the embedding and block 1 should give the removal back. And if the stand-ins live at those first two slices, the spill should also stay low.
+
+The main measure is removal at the full dose, with the spill at every dose beside it.
 
 {dose_figure()}
 
-Both hold. On every `split-anti` run, removal grows with the dose to about what `deep` removes at the recipe hold (the table below has the ranges). The spill stays within the criterion at every dose on {N_WITHIN["split-anti"]} of {len(SEEDS)} seeds. On seed {SPLIT_SPILLER} it goes over the criterion at the full dose only ({max(dose_curves("split-anti", SPLIT_SPILLER)["spill"]):.3f}, on `{SPLIT_SPILL_OP}`), the same seed and op where `deep` at the recipe hold spilled least. The high hold everywhere is the only arm within the criterion on every seed.
+Both hold. On every `split-anti` run, removal grows with the dose to about what `deep` removes at the recipe hold (the table below has the ranges).
+
+The spill stays within the criterion at every dose on {N_WITHIN["split-anti"]} of {len(SEEDS)} seeds. On seed {SPLIT_SPILLER} it goes over the criterion at the full dose only ({max(dose_curves("split-anti", SPLIT_SPILLER)["spill"]):.3f}, on `{SPLIT_SPILL_OP}`), the same seed and op where `deep` at the recipe hold spilled least. The high hold everywhere is the only arm within the criterion on every seed.
 
 {dose_table()}
 
@@ -378,7 +382,9 @@ The edit lands about as close to the target null in `split-anti` as in both `dee
 
 The task change is small, as in `deep`. One `split-anti` run (seed 702) has the lowest task score against its control of any run so far. The loss is spread across all ops rather than concentrated on `{ex.ANCHORED_OP}`, which suggests seed variation more than a cost of the terms. Four seeds cannot separate the two.
 
-So on four seeds the split gets nearly all the selectivity of the high hold with none of its cost in removal. Which slices the edit has to cover is unchanged from late pull: as in `deep`, editing blocks 2 to 4 alone removes nearly everything on two seeds and less than half on the other two, and editing block 1 alone removes most of the op on every seed.
+So on four seeds the split gets nearly all the selectivity of the high hold with none of its cost in removal.
+
+The slices the edit has to cover are the same as in late pull. As in `deep`, editing blocks 2 to 4 alone removes nearly everything on two seeds and less than half on the other two, and editing block 1 alone removes most of the op on every seed.
 """
 
 # %%
@@ -491,7 +497,7 @@ def alpha_table() -> str:
 rf"""
 ## Where the anti weight counters the pull (E2)
 
-Did the removal come back for the reason we expected, the alignment at the pulled blocks restored with block 1 and the table still off e₁ on the other ops? The main measure is α at the example answers: of `{ex.ANCHORED_OP}` contexts at blocks 2 to 4, and of the other ops at block 1.
+Did the removal come back for the reason we expected, the alignment at the pulled blocks restored with block 1 and the table still off e₁ on the other ops?
 
 {alpha_figure()}
 
@@ -598,15 +604,19 @@ rf"""
 
 Pooled over slices as well as positions, each slice gets a share of the pull that grows steeply with how well aligned it already is. So the pull should settle on whichever slice aligns most readily. The embedding is not in the pool: the pull acts on blocks 1 to 4, and only the anti-subspace term acts on the embedding. The figures show it for comparison.
 
-Which slice is that, and does the edit at every slice still remove the op? The main measure is α at the example answers at each slice.
+Which slice is that, and does the edit at every slice still remove the op?
 
 {pool_figure()}
 
-On three seeds the alignment is largest at blocks 3 and 4, and the profile over slices looks much like that of `split-anti`: low at block 1 and rising to blocks 3 and 4, with block 2 nearly as high. Block 1 aligns less than in `split-anti`. On those seeds the spill is within the criterion at every dose, and the edit removes the op as well as in `split-anti` on two of them and about a tenth less on the third (seed 702).
+On three seeds the alignment is largest at blocks 3 and 4, with block 2 nearly as high and block 1 low. That profile is much like that of `split-anti`, though block 1 aligns less.
+
+On those seeds the spill is within the criterion at every dose, and the edit removes the op as well as in `split-anti` on two of them and about a tenth less on the third (seed 702).
 
 {pool_table()}
 
-On {seeds_text(POOL_FAILED)} the example answers stayed near zero at every slice, and the edit removes nothing. What aligned instead is the query answer, reaching α of 1 at blocks 3 and 4. This is the state at the answer token of the query; it has already seen the answer, so it can show the op. We checked every position of the probe contexts: at no slice does any other position reach more than {OTHER_POSITIONS_MAX:.2f}. That position aligns in every arm, since it is part of every labeled context, but in `pool-slices` on this seed it took the whole of the pull.
+On {seeds_text(POOL_FAILED)} the example answers stayed near zero at every slice, and the edit removes nothing. The query answer aligned instead, reaching α of 1 at blocks 3 and 4 (the state at the answer token of the query has already seen the answer, so it can show the op).
+
+No other position of the probe contexts reaches more than {OTHER_POSITIONS_MAX:.2f} at any slice. The query answer aligns in every arm, since it is part of every labeled context, but in `pool-slices` on this seed it took the whole of the pull.
 
 Along training the example answers rose to about a fifth early on, then fell back as the query answer took over. The prediction of the query answer is made at the query `=`, before that position, so an edit there cannot reach it.
 <!-- REVIEW: the query answer is position {QUERY_ANSWER} of the probe contexts. Verify: traj["alpha_anchored"][-1][:, {QUERY_ANSWER}] for pool-slices-s{POOL_FAILED[0] if POOL_FAILED else ""}, and the same at the example answers. -->
@@ -733,11 +743,13 @@ rf"""
 
 With the slices pooled at the recipe temperature, the pull may put nearly all its weight on whichever slice is ahead, and on three seeds that was block 4. A softer pool over slices spreads the pull back over depth. At a high enough temperature, it becomes the mean of one pool per slice.
 
-So we trained the `pool-slices` arm again at seed {TAU_SEED}, a seed where it settled on block 4. This time the pool over slices has a temperature of its own, $\tau_\ell$. It takes the values {span_text([t for _, t in LADDER[1:]], ".1f")}, each double the last, while the pool over positions stays at $\tau_p = {ex.ex2216.TAU:g}$. When $\tau_\ell = \tau_p$, the two pools are the same as the one joint pool of E3, so the `pool-slices` run is the first rung of the ladder. The main measure is again α at the example answers at each slice.
+So we trained `pool-slices` again at seed {TAU_SEED}, where it had settled on block 4, with $\tau_\ell$ at {span_text([t for _, t in LADDER[1:]], ".1f")}, each double the last, and the pool over positions still at $\tau_p = {ex.ex2216.TAU:g}$. When $\tau_\ell = \tau_p$ the two pools are the same as the one joint pool of E3, so the `pool-slices` run is the first rung of the ladder.
 
 {depth_figure()}
 
-Softening the pool did not take the alignment away from block 4: it stays at about {num(np.mean([answers_by_slice(label_of(a, TAU_SEED))[4] for a, _ in LADDER]))} at every temperature, close to the per-slice arms at this seed. What changes is the earlier blocks. At $\tau_\ell = {ex.ex2216.TAU:g}$, block 1 is at {num(answers_by_slice(label_of("pool-slices", TAU_SEED))[1])} and block 2 below the blocks after it. From the first softer step on, both rise, and the profile over slices looks like that of `split-anti` at this seed. So on this seed the sharp pool had not latched onto block 4 so much as held back the blocks before it, and a softer pool lets them align too.
+Softening the pool did not take the alignment away from block 4. It stays at about {num(np.mean([answers_by_slice(label_of(a, TAU_SEED))[4] for a, _ in LADDER]))} at every temperature, close to the per-slice arms at this seed.
+
+The earlier blocks change instead. At $\tau_\ell = {ex.ex2216.TAU:g}$, block 1 is at {num(answers_by_slice(label_of("pool-slices", TAU_SEED))[1])} and block 2 below the blocks after it. From the first softer step on, both rise, and the profile over slices looks like that of `split-anti` at this seed. So on this seed the sharp pool had not latched onto block 4 so much as held back the blocks before it.
 
 The query answer shifts the same way, with blocks 1 and 2 higher at the softer temperatures. The example answers keep their alignment at every temperature, so this seed shows nothing of the seed {POOL_FAILED[0] if POOL_FAILED else ""} outcome. One seed cannot say whether a softer pool would have kept that seed on the example answers.
 
@@ -745,7 +757,9 @@ The query answer shifts the same way, with blocks 1 and 2 higher at the softer t
 
 Every run on this ladder is within the criterion at every dose, and the task change is small. The largest spill rises a little at the two softest temperatures, toward that of `split-anti` at this seed.
 
-Removal under the full edit is {span_text(removal(RUNS[label_of(a, TAU_SEED)]) for a, _ in LADDER)} across the temperatures, with no trend, and the edit on block 1 alone or on blocks 2 to 4 alone moves around even more. That spread is far larger than the measurement error, so the runs end up as different models even though they share a seed. It is also wider than the spread of the three per-slice arms at this seed ({span_text(removal(RUNS[label_of(a, TAU_SEED)]) for a in ("late", "late-anti0.2", "split-anti"))}), and about as wide as that of `pool-slices` over its three block-4 seeds in E3. So the pooled pull may make the outcome more sensitive to small changes in training; one run per temperature cannot tell that from a real effect of the temperature.
+Removal under the full edit is {span_text(removal(RUNS[label_of(a, TAU_SEED)]) for a, _ in LADDER)} across the temperatures, with no trend, and the edit on block 1 alone or on blocks 2 to 4 alone moves around even more. That spread is far larger than the measurement error, so the runs end up as different models even though they share a seed.
+
+The spread is also wider than that of the three per-slice arms at this seed ({span_text(removal(RUNS[label_of(a, TAU_SEED)]) for a in ("late", "late-anti0.2", "split-anti"))}), and about as wide as that of `pool-slices` over its three block-4 seeds in E3. So the pooled pull may make the outcome more sensitive to small changes in training.
 """
 
 # %%
@@ -757,9 +771,9 @@ On the embedding and block 1, the high $\lambda_{\bar s}$ hold keeps the stand-i
 
 The one `split-anti` seed over the criterion spills on the same op where `deep` spilled least, and a little more of block 1 and the table sit on e₁ than at the high hold everywhere. So the split may trade a small amount of selectivity for the removal it gives back. If that trade is typical, a hold a little above 0.2 on the first two slices, or the hold of 0.2 with a higher one on block 1, would be the place to look.
 
-Where the example answers aligned early, the pooled pull settled on block 4 and the result was much like the split. Where the query answer got ahead, the pull settled there alone. That position is in every labeled context, but it comes after the prediction it would matter for. To work as a recipe, the pooled pull at $\tau_\ell = 0.1$ would need the query answer left out of its pool, which we could not do in production. Even then, the anchor would depend on which position aligns first.
+Where the example answers aligned early, the pooled pull settled on block 4 and the result was much like the split. Where the query answer got ahead, the pull settled there alone, after the prediction it would matter for. To work as a recipe, the pooled pull at $\tau_\ell = 0.1$ would need the query answer left out of its pool, which we could not do in production. Even then, the anchor would depend on which position aligns first.
 
-On the one seed tried, a softer pool over slices made the pooled pull look like the split: blocks 1 to 4 all aligned, with block 4 still the furthest along. So the softer pool takes away the concentration over slices, which was the point of pooling over them, and on this seed what remained was close to the per-slice pull of `split-anti`.
+On the one seed tried, a softer pool over slices let blocks 1 to 4 all align, with block 4 still the furthest along, close to the per-slice pull of `split-anti`. So the softer pool takes away the concentration over slices, which was the point of pooling over them.
 """
 
 # %%
