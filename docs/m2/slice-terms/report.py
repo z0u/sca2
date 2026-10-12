@@ -382,9 +382,9 @@ The edit lands about as close to the target null in `split-anti` as in both `dee
 
 The task change is small, as in `deep`. One `split-anti` run (seed 702) has the lowest task score against its control of any run so far. The loss is spread across all ops rather than concentrated on `{ex.ANCHORED_OP}`, which suggests seed variation more than a cost of the terms. Four seeds cannot separate the two.
 
-So on four seeds the split gets nearly all the selectivity of the high hold with none of its cost in removal.
-
 The slices the edit has to cover are the same as in late pull. As in `deep`, editing blocks 2 to 4 alone removes nearly everything on two seeds and less than half on the other two, and editing block 1 alone removes most of the op on every seed.
+
+So on four seeds the split gets nearly all the selectivity of the high hold with none of its cost in removal.
 """
 
 # %%
@@ -507,7 +507,7 @@ It did. At blocks 2 to 4, `split-anti` follows `deep` at the recipe hold: the al
 
 Split by whether an example fits `{ex.ANCHORED_OP}`, the alignment at the fitting answers is back to nearly the recipe-hold level, so the high hold no longer counters the pull at the pulled blocks.
 
-The non-fitting answers are back near the recipe-hold level too. That alignment was never about the op. The high hold everywhere had cleared it, and the split leaves it in place, but it does not show up in the spill.
+The non-fitting answers are back near the recipe-hold level too. These answers align whatever op the context is under, so this alignment does not mark the op. The high hold everywhere had cleared it, and the split leaves it in place, but it does not show up in the spill.
 
 The color embedding table leans about a third as much as in `deep`, a little more than at the high hold, and on every seed it leans the way the anchored runs lean. Block 1 on the other ops is a little above the high hold too. Both fit the small spill that remains on one seed.
 """
@@ -619,10 +619,9 @@ On {seeds_text(POOL_FAILED)} the example answers stayed near zero at every slice
 No other position of the probe contexts reaches more than {OTHER_POSITIONS_MAX:.2f} at any slice. The query answer aligns in every arm, since it is part of every labeled context, but in `pool-slices` on this seed it took the whole of the pull.
 
 Along training the example answers rose to about a fifth early on, then fell back as the query answer took over. The prediction of the query answer is made at the query `=`, before that position, so an edit there cannot reach it.
-<!-- REVIEW: the query answer is position {QUERY_ANSWER} of the probe contexts. Verify: traj["alpha_anchored"][-1][:, {QUERY_ANSWER}] for pool-slices-s{POOL_FAILED[0] if POOL_FAILED else ""}, and the same at the example answers. -->
 
 Compared with `split-anti`, this arm changes two things: the pull is pooled, and block 1 joins the pulled slices. But block 1 took almost none of the pull on this seed, so the pooling is the likelier cause.
-<!-- REVIEW: added the second difference of `pool-slices` (block 1 in the pulled set), which the first draft left out. Verify: answers_by_slice for pool-slices-s700 at block 1 (about 0.06) and the query answer at block 1 (0.42), against blocks 3 and 4. -->
+
 """
 
 # %%
@@ -799,14 +798,14 @@ Pooling temperature
 $\tau_p$, $\tau_\ell$
 :   How sharply the pull concentrates where alignment is cheapest. Each labeled context is pooled over its positions at $\tau_p$ (low: nearly all of the pull goes to the best-aligned position; high: it spreads evenly), and in `pool-slices` and E4 also over slices at $\tau_\ell$.
 
-Stand-in
-:   Our working hypothesis for what carries the spill, not settled: something token-level that satisfies the pull where no contextual concept can, such as lightness on e₁ in the color embedding table (the lean), or a syntax token embedding on e₁ (a latch).
-
 Removal
 :   How much of `{ex.ANCHORED_OP}` the edit takes out: the net drop in its score under the edit, as a share of the way from the clean score to the target null.
 
 Spill
 :   The largest net drop in score on another op under the edit. The selectivity criterion is a spill of at most {CRITERION:g}.
+
+Stand-in
+:   Our working hypothesis for what carries the spill, not settled: something token-level that satisfies the pull where no contextual concept can, such as lightness on e₁ in the color embedding table (the lean), or a syntax token embedding on e₁ (a latch).
 
 Target null
 :   The score an ideal predictor would get on `{ex.ANCHORED_OP}` contexts if it had lost that op and answered from the remaining ones.
