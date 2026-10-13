@@ -548,8 +548,10 @@ The recipe of record ([`falloff`](/docs/m2/split-anti-seeds/report.py)) sets the
 rf"""
 ## Observations
 
-- [Removal and spill (E1)](#removal-and-spill-e1): every ramp but one lost the anchor on two or three seeds, where `falloff` lost it on none. `{NAME[EMB_TOTAL]}` kept it on every seed, with two runs over the spill criterion. The runs that kept the anchor removed about as much as `falloff`.
-- [When the ramped runs lose the anchor (E2)](#when-the-ramped-runs-lose-the-anchor-e2): the example answers on a lost run never come onto e₁, from the first tens of epochs, while the pull is still warming up. Losses are fewer where the pull on slices 1 to 3 is higher.
+- [Removal and spill (E1)](#removal-and-spill-e1): every ramp but one lost the anchor on two or three seeds, where `falloff` lost it on none. `{NAME[EMB_TOTAL]}` kept it on every seed, with two runs over the spill criterion. The runs that kept the anchor removed about as much as `falloff`, and losses are fewer where the pull on slices 1 to 3 is higher.
+- [When the ramped runs lose the anchor (E2)](#when-the-ramped-runs-lose-the-anchor-e2): the example answers on a lost run never come onto e₁, from the first tens of epochs, while the pull is still warming up.
+<!-- REVIEW: the "losses are fewer where the pull on slices 1 to 3 is higher" line moved from E2 to E1, which is the
+section that shows it; E2 shows the timing only. -->
 - [Where the anchor sits by depth (E3)](#where-the-anchor-sits-by-depth-e3): on the runs that kept it, the alignment by slice is nearly the same in every arm, and the pull on slice 1 brings back neither the drift on the other ops nor the lean in the color table.
 
 ## Scope
@@ -568,7 +570,9 @@ The anti weight is the falloff in every arm, so the ramps from the embedding pul
 
 Every run trains at model seeds {SEEDS[0]} to {SEEDS[-1]} for 400 epochs, and is paired by seed with its `falloff` twin and with ex-2.2.23's control, which share the initialization, batches and label draws. With eight seeds per arm, one or two runs that lose the anchor could come from the seeds alone, so we weigh the counts across arms together rather than one arm at a time.
 
-The edits on slice 1 alone and on slices 2 to 4 alone, which the plan gave a section to, are left out. On the runs that lost the anchor every edit removes almost nothing, and on the others they look like those of `falloff`, with the slices-2-to-4 edit again falling short on seed 710.
+The edits on slice 1 alone and on slices 2 to 4 alone, which the plan gave a section to, are left out. On the runs that lost the anchor every edit removes almost nothing, except on seed 710 of `{NAME[ONE_RAMP]}`, where the slice-1 edit removes about half, as the full edit nearly does. On the others they look like those of `falloff`, with the slices-2-to-4 edit again falling short on seed 710.
+<!-- REVIEW: "every edit removes almost nothing" excepted seed 710 of ramp from 1: slice_removal(ONE_RAMP, 710, SLICE1)
+is 0.52 and the full dose removes 0.44, just under the 0.5 line. -->
 
 ## The measurements
 
@@ -591,7 +595,7 @@ Does a pull that ramps with depth remove as much of the op as the step, and keep
 
 {dose_figure()}
 
-Most ramped runs look like `falloff`: removal climbs with the dose to between three quarters and nine tenths of the op, and the spill stays near zero. But four of the five arms have runs that remove almost nothing at any dose (the dashed lines). Those runs lost the anchor.
+Most ramped runs look like `falloff`: removal climbs with the dose to between three quarters and nine tenths of the op, and the spill stays near zero. But four of the five arms have runs that remove little at any dose (the dashed lines), all but one of them almost nothing. Those runs lost the anchor.
 
 {summary_table()}
 
@@ -599,11 +603,18 @@ Most ramped runs look like `falloff`: removal climbs with the dose to between th
 
 The two ramps from slice 1 lost the anchor on {len(LOST[ONE_RAMP])} and {len(LOST[ONE_TOTAL])} seeds, so scaling that shape up to the step total did not fix it. Scaling it up also pulls slice 4 half again as hard as the step, and one of its runs (seed 705) dropped by more than 0.2 on `value-hsv` against its control, and spilled over the criterion. That is one run, so we take it as a sign to watch rather than a cost of the shape.
 
-Across the five arms, the count of lost runs follows the pull on slices 1 to 3 (the second column): none at 1.8 and 2, two at 1.5, three at 1. Eight seeds per arm is too few to call this a trend, but it fits a simpler reading than the shape of the ramp: the pull on the slices before the last one is what keeps the anchor.
+Across the five arms, the count of lost runs follows the pull on slices 1 to 3 (the second column): none at 1.8 and 2, two at 1.5, three at 1. Eight seeds per arm is too few to call this a trend, and we picked that sum after seeing the counts; the pull on slices 2 and 3 alone is the same in the two step-total arms, which lost none and two, so the ordering rests on the quarter-weight pull on slice 1. Still, it fits a simpler reading than the shape of the ramp: the pull on the slices before the last one is what keeps the anchor.
+<!-- REVIEW: added that the sum over slices 1 to 3 was picked after the counts, and what in the data the ordering
+rests on, so the Discussion weighs the second reading as post hoc. Verify: the pull on slices 2 and 3 alone is 1.5 in
+both step-total arms, which lost 0 and 2. -->
 
 {lost_table()}
 
-The lost runs do not share seeds: seed 706 and seed 708 each lost the anchor in two arms, and the rest in one. On most of them the example answers stay off e₁, and the query answer, which aligns on every run, aligns as usual; this is the loss seen with the uniform holds of the split-anti-seeds experiment. One run of `{NAME[EMB_RAMP]}` (seed 709) settled on the first operands instead, and the edit then removes nothing from `difference` and spills onto the other ops, since every op reads its operands.
+One of these runs is borderline: seed 710 of `{NAME[ONE_RAMP]}` removes a little under half the op, though its example answers are off e₁ at every slice, so it is a weak anchor rather than none. We count it as lost by the rule of the split-anti-seeds experiment.
+
+The lost runs are not the same seeds in every arm: seed 706 and seed 708 each lost the anchor in two arms, and the rest in one. On most of them the example answers stay off e₁, and the query answer aligns as usual, as it does on every run that kept the anchor; this is the loss seen with the uniform holds of the split-anti-seeds experiment. One run of `{NAME[EMB_RAMP]}` (seed 709) settled on the first operands instead, with the query answer off e₁ too, and the edit then removes nothing from `difference` and spills onto the other ops, since every op reads its operands.
+<!-- REVIEW: "the query answer, which aligns on every run" was wrong for seed 709 of ramp from emb (α −0.01 at the query
+answer at slice 4); on every other run it is 0.96 to 1.0. Verify: alpha_by_slice(a, s, pos=QUERY_ANSWER)[-1]. -->
 """
 
 # %%
@@ -617,7 +628,11 @@ When does a ramped run lose the anchor: early, as the pull first arrives, or lat
 
 The lost runs part ways with the others in the first tens of epochs. On a run that keeps the anchor, α at the example answers climbs past 0.4 by about epoch 20 to 40, while the pull is still warming up. On a lost run it rises a little, falls back to near zero, and stays there for the rest of training, at full pull weight. So the outcome is set while the pull arrives, and the long hold after it does not recover it.
 
-The ramps also have more runs that climb late. Two kept runs of `{NAME[EMB_RAMP]}` first crossed 0.4 only at about epoch 60 to 80, and stayed below the others until about epoch 230. In `falloff` one run dips briefly, and none climbs late. This fits the reading of E1: with less pull on slices 2 and 3, the example answers are slower to come onto e₁, and some never do.
+`{NAME[EMB_RAMP]}` also has two kept runs that climb late: they first crossed 0.4 only at about epoch 60 to 80, and stayed below the others until about epoch 230. In `falloff` one run dips briefly, and none climbs late. No other arm has a run like these, including the two ramps from slice 1, which pull slices 2 and 3 less, so slow climbs do not follow the pull sum the way the losses do, and two runs in one arm may be the seeds.
+<!-- REVIEW: "the ramps also have more runs that climb late" narrowed to ramp from emb, and the "fits the reading of E1"
+sentence replaced: the first crossing of 0.4 on kept runs is at epoch 20 to 48 in every other arm (falloff reaches 40
+at seed 711), and only ramp from emb seeds 710 and 711 cross later (76 and 60). Verify: the first epoch at which the
+slice-4 α at the example answers exceeds 0.4, per run. -->
 """
 
 # %%
@@ -635,17 +650,20 @@ On the other ops the alignment peaks at slice 1 in every arm. The ramps from the
 
 {depth_table()}
 
-The lean in the color table stays small in every arm, close to that of `falloff` and well inside the spread of the controls. The two ramps from the embedding lean a little more than the ramps from slice 1. These are differences of a few hundredths, against a slope of about −1 that the recipe had before [the late-pull experiment](/docs/m2/late-pull/report.py) moved the pull off the embedding, so a light pull on slice 1 does not bring that lean back.
+The lean in the color table stays small in every arm, close to that of `falloff` and well inside the spread of the controls. Within that, it grows with the pull on the first slices: the ramps from slice 1 lean least, then `falloff`, then the ramps from the embedding, and every arm leans the same way on every seed, where the controls lean either way. These are differences of a few hundredths, against a slope of about −1 that the recipe had before [the late-pull experiment](/docs/m2/late-pull/report.py) moved the pull off the embedding, so a light pull on slice 1 does not bring that lean back.
+<!-- REVIEW: added the ordering of the small lean by the early pull (claims review). Verify: the slope column of the table and the per-seed slopes. -->
 """
 
 # %%
 
-r"""
+rf"""
 ## Discussion
 
 A pull that ramps with depth, with the weight of the step at slice 4, loses the anchor on more seeds than the step. The loss happens early: the example answers fail to come onto e₁ while the pull warms up, and they stay off it. The runs that keep the anchor end up much like `falloff`, so what the ramp changes is how often a run anchors at all, rather than how well.
 
-Two readings fit. In one, the shape of the ramp matters, and pulling slice 4 harder than the others makes it easier for the pull to settle on the query answer, which aligns at slice 4 on every run. In the other, what matters is how much pull the earlier slices get, and the shape matters only through that. The losses follow the pull on slices 1 to 3 across all five arms, which favors the second reading, but the counts are small and the arms differ in more than that sum.
+Two readings fit. In one, the shape of the ramp matters, and pulling slice 4 harder than the others makes it easier for the pull to settle on the query answer, which aligns at slice 4 on every run but the one that settled on the operands. In the other, what matters is how much pull the earlier slices get, and the shape matters only through that. The losses follow the pull on slices 1 to 3 across all five arms, which favors the second reading, but the counts are small, that sum was chosen after the counts were in, and the arms differ in more than it.
+<!-- REVIEW: "aligns on every run" narrowed: on seed 709 of ramp from emb the query answer is off e₁ (α −0.01 at
+slice 4) as well as the example answers. Verify: alpha_by_slice(EMB_RAMP, 709, pos=QUERY_ANSWER). -->
 
 If the second reading holds, a ramp could keep the anchor as long as the earlier slices get as much pull as the step gives them, and `{NAME[EMB_TOTAL]}` is close to that. It then has no slice boundary for the pull, and its cost is the spill on two of eight seeds. The step in `falloff` gives the earlier slices more, at no cost we could see here.
 """
