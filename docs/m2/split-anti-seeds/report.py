@@ -174,10 +174,10 @@ r"""
 
 /// tip |
 <!-- lede -->
-We trained the candidate recipes from [the slice-terms experiment](/docs/m2/slice-terms/report.py) at eight fresh seeds. Holding the anti-subspace weight high on the first slices only kept the op removable and the edit selective, and a weight that falls off linearly with depth did as well. Holding it high on every slice lost the anchor altogether on one seed in eight.
+We trained the candidate recipes from [the slice-terms experiment](/docs/m2/slice-terms/report.py) at eight fresh seeds. Holding the anti-subspace weight high on the first slices only kept the op removable and the edit selective, and a weight that falls off linearly with depth did as well. Holding it at one level on every slice, high or gentler, lost the anchor altogether on one seed in each arm.
 ///
 
-`split-anti` is the only arm that also clears the task gate.
+Of the four arms, only `split-anti` also clears the gate on damage to the task, the hard criterion of the decision.
 """
 
 # %%
@@ -268,8 +268,7 @@ def dose_figure() -> str:
         "arms": [{"arm": a, "name": NAME[a], "runs": [CURVES[a][s] for s in SEEDS]} for a in ARMS],
     }
     alt = """
-        Four pairs of panels, one per arm, with removal on the left and spill on the right of each pair, against
-        the dose. Removal grows with the dose on nearly every run and reaches about 0.8 to 0.9 at the full dose;
+        Removal (top row) and spill (bottom row) against the dose, one column per arm. Removal grows with the dose on nearly every run and reaches about 0.8 to 0.9 at the full dose;
         the uniform holds each have one run that stays near zero, and the high uniform hold has three more that end
         between 0.55 and 0.75. Spill stays near zero on almost every run, with two hold-0.1 runs and one split-anti
         run going over the criterion at the higher doses.
@@ -283,7 +282,7 @@ def dose_draw(data: dict, alt_text: str) -> str:
         name="split-anti-seeds-dose",
         alt_text=alt_text,
         caption="""
-            **Removal and spill by dose**, the edit at every position and slice, one row per arm. One hairline per
+            **Removal and spill by dose**, the edit at every position and slice, one column per arm. One hairline per
             run and the seed mean bold; the other arms are ghosts behind. The dashed rule is the selectivity
             criterion.
         """,
@@ -457,8 +456,8 @@ def pair_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption=f"""
             **`falloff` against `split-anti`, paired by seed.** Left: removal at the full dose, with the line of
-            equality and a band of ±{H2_BAND:g}. Right: the largest spill at any dose, with the criterion on each
-            axis (dashed).
+            equality and a band of ±{H2_BAND:g}. Right: the largest spill at any dose, with the line of equality and the
+            criterion on each axis (dashed). Seeds off the diagonal are labeled.
         """,
     )
     def _plot() -> plt.Figure:
@@ -482,6 +481,8 @@ def pair_draw(data: dict, alt_text: str) -> str:
                     f(CRITERION, color=light_dark("#333", "#ddd"), lw=0.9, ls="--", zorder=1)
             ax.scatter(x, y, color=ink, marker=MARK[FALLOFF], s=22, zorder=3)
             for s, xi, yi in zip(data["seeds"], x, y, strict=True):
+                if abs(yi - xi) < (0.02 if key == "removal" else 0.008):
+                    continue  # label only the seeds off the diagonal; the rest overlap
                 ax.annotate(str(s), (xi, yi), xytext=(3, 2), textcoords="offset points", fontsize=6)
             ax.set_xlim(lo, hi)
             ax.set_ylim(lo, hi)
@@ -632,7 +633,7 @@ def slices_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption="""
             **Removal by which slices the edit covers**, at the full dose. One column per arm, a thin bar spanning
-            the seeds, and the seed mean in the arm's marker. Open markers are the seed where the edit on slices 2
+            the seeds, the seeds as faded dots, and the seed mean in the arm's marker. Open markers are the seed where the edit on slices 2
             to 4 alone falls short in every arm.
         """,
     )
@@ -774,7 +775,7 @@ Setting the anti weight by slice holds up at fresh seeds. Both the split and the
 
 The gain over the uniform high hold depends on the seed, so the high hold at the pulled slices seems to cost removal through the seeds where the pull struggles to settle on the example answers, rather than by trimming every run a little.
 
-The falloff matching the split suggests the hold matters at its two ends: high on the embedding and slice 1, where the stand-ins seemed to sit in the slice-terms experiment, and low on the slices the pull acts on. Where in between the weight steps down seems not to matter much at this resolution.
+The falloff matching the split suggests the hold matters at its two ends: high on the embedding and slice 1, where the slice-terms experiment found the drift onto e₁ that causes the spill seemed to sit, and low on the slices the pull acts on. Where in between the weight steps down seems not to matter much at this resolution.
 """
 
 # %%
