@@ -1262,13 +1262,22 @@ def test_training_with_per_slice_pull_weights(data_dir, tmp_path):
         update={"scheduler": SchedulerConfig(epochs=6, warmup_epochs=2, min_lr_factor=0.01)}
     )
     anchor = AnchorSpec(peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=0.1, slice_w=(0.5, 1.0))
-    kwargs = dict(label_p=label_p, probe_tokens=tokens, probe_weights=weights, traj_stride=20)
-    _, _, traj = train_anchored(
-        config, data_dir, anchor=anchor, anchor_slices=(1, 2), checkpoint_dir=tmp_path / "ckpt", **kwargs
-    )
+
+    def train(slices: tuple[int, ...], name: str):
+        return train_anchored(
+            config,
+            data_dir,
+            anchor=anchor,
+            label_p=label_p,
+            probe_tokens=tokens,
+            probe_weights=weights,
+            anchor_slices=slices,
+            checkpoint_dir=tmp_path / name,
+            traj_stride=20,
+        )
+
+    _, _, traj = train((1, 2), "ckpt")
     assert np.isfinite(traj["anchor"]).all()
     assert traj["anchor"][-1] < traj["anchor"][0]
     with pytest.raises(ValueError, match="one weight per slice"):
-        train_anchored(
-            config, data_dir, anchor=anchor, anchor_slices=(1, 2, 3), checkpoint_dir=tmp_path / "c2", **kwargs
-        )
+        train((1, 2, 3), "c2")
