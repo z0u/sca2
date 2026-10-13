@@ -417,7 +417,7 @@ def track_draw(data: dict, alt_text: str) -> str:
             wax.set_xlabel("epoch", fontsize=8)
         axes[0, 0].set_ylabel("α, example answers", fontsize=8)
         axes[1, 0].set_ylabel("pull", fontsize=8)
-        seen = {}
+        seen: dict[str, Any] = {}
         for wax in axes[1]:
             for h, lab in zip(*wax.get_legend_handles_labels(), strict=True):
                 seen.setdefault(lab, h)
