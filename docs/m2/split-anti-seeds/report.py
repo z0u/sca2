@@ -177,7 +177,7 @@ r"""
 We trained the candidate recipes from [the slice-terms experiment](/docs/m2/slice-terms/report.py) at eight fresh seeds. Holding the anti-subspace weight high on the first slices only kept the op removable and the edit selective, and a weight that falls off linearly with depth did as well. Holding it high on every slice lost the anchor altogether on one seed in eight.
 ///
 
-`split-anti` is the only arm that also clears the task gate. Against the uniform high hold, the split removes about the same share of the op on half the seeds and much more on the other half, where the high hold anchored weakly or not at all.
+`split-anti` is the only arm that also clears the task gate. Against the uniform high hold, the split removes about the same share of the op on half the seeds and much more on the other half, where the high hold anchored less well or not at all.
 """
 
 # %%
@@ -185,9 +185,9 @@ We trained the candidate recipes from [the slice-terms experiment](/docs/m2/slic
 rf"""
 ## Findings
 
-- [The split keeps both removal and selectivity (H1)](#the-split-keeps-both-removal-and-selectivity-h1) — **{"pass" if H1_PASS else "TODO"}**. `split-anti` removed more than `deep, hold 0.2` on {H1_AHEAD} of {len(SEEDS)} seeds and stayed within the criterion on {N_WITHIN[SPLIT]}, with the whole gain on the four seeds where the uniform hold anchored weakly or not at all.
+- [The split keeps both removal and selectivity (H1)](#the-split-keeps-both-removal-and-selectivity-h1) — **{"pass" if H1_PASS else "TODO"}**. `split-anti` removed more than `deep, hold 0.2` on {H1_AHEAD} of {len(SEEDS)} seeds and stayed within the criterion on {N_WITHIN[SPLIT]}, with the whole gain on the four seeds where the uniform hold anchored less well or not at all.
 - [A linear falloff does as well as the split (H2)](#a-linear-falloff-does-as-well-as-the-split-h2) — **{"pass" if H2_PASS else "TODO"}**. `falloff` removed about as much as `split-anti` and stayed within the criterion on every seed.
-- [Which slices the edit needs (E1)](#which-slices-the-edit-needs-e1) — the edit on slices 2 to 4 alone falls short on the same seed in every arm, so which slices the edit needs is set by the seed rather than by the terms.
+- [Which slices the edit needs (E1)](#which-slices-the-edit-needs-e1) — the edit on slices 2 to 4 alone falls short on the same seed in every arm, which fits the seed, not the terms, deciding where the edit on those slices misses. The edit on slice 1 alone does depend on the arm, removing less under the high uniform hold.
 - [Decision](#decision) — TODO, with the human.
 
 /// admonition | How to read this report
@@ -391,7 +391,11 @@ The gain is not spread over the seeds. On four of them the two arms remove about
 
 {paired_table()}
 
-So the high hold at the pulled slices does cost removal, as the slice-terms experiment found, but here the cost falls on some seeds and not others. Splitting the weight by slice took that cost away on every seed.
+So the high hold at the pulled slices does cost removal, as the slice-terms experiment found, but here the cost falls on some seeds and not others. With the weight split by slice, no seed shows that cost.
+<!-- REVIEW: "took that cost away on every seed" implied a cost on every seed; on four seeds the two arms are level or the split is a little behind. The claim is that no split run is weak (0.79 or more on every seed). Verify: the paired table. -->
+
+Could the gain come from the split carrying less anti weight in total, rather than from where it sits? `deep, hold 0.1` sums to about the same weight over the five slices as `split-anti` (0.50 against 0.49), and it removed less, lost the anchor on one seed, and spilled over the criterion on two. So the placement, and not only the amount, seems to matter.
+<!-- REVIEW: added the total-weight comparison, since `deep, hold 0.1` is the arm that separates amount from placement. Verify: the holds in the parameters table sum to 1.0, 0.5, 0.49, and 0.575. -->
 
 The one `split-anti` run over the criterion (seed {max(SEEDS, key=lambda s: WORST_SPILL[SPLIT][s])}) goes over at the two highest doses only. `falloff` and `deep, hold 0.2` were within the criterion on every seed, and `deep, hold 0.1` on {N_WITHIN["hold0.1"]}.
 
@@ -573,7 +577,7 @@ rf"""
 
 On seven seeds the two arms remove nearly the same share of the op. On seed {FALLOFF_LOW} `falloff` removes about a tenth less, and the spill points sit low for both arms apart from the one `split-anti` run over the criterion.
 
-The alignment by slice shows why the two arms behave alike. In `{ex.ANCHORED_OP}` contexts they are nearly the same at every slice. In the contexts of the other ops, `falloff` sits a little higher at slice 1, where its hold is lower, and a little lower at slices 2 and 3, where its hold is higher. Both differences are small next to the alignment the pull gives.
+The alignment by slice fits with the two arms behaving alike. In `{ex.ANCHORED_OP}` contexts they are nearly the same at every slice. In the contexts of the other ops, `falloff` sits a little higher at slice 1, where its hold is lower, and a little lower at slices 2 and 3, where its hold is higher. Both differences are small next to the alignment the pull gives.
 
 {depth_figure()}
 
@@ -672,12 +676,17 @@ def slices_table() -> str:
     return table_html(head, rows, "**Removal by which slices the edit covers**, at the full dose, by seed and arm.")
 
 
+# The seed where split-anti alone falls to about half on slices 2 to 4 (one run; reported without a reading).
+SPLIT_HALF = min(s for s in SEEDS if s not in LATE_SHORT and slice_removal(SPLIT, s, LATE_SET) < 0.6)
+
 rf"""
-**What we saw.** The edit on slices 2 to 4 alone removes nearly all of the op on almost every run, and falls short on seed {", ".join(map(str, LATE_SHORT))} in every arm. The edit on slice 1 alone removes most of the op on most runs of the split, the falloff and the low uniform hold, and less under the high uniform hold.
+**What we saw.** The edit on slices 2 to 4 alone removes nearly all of the op on almost every run, and falls short on seed {", ".join(map(str, LATE_SHORT))} in every arm; on seed {SPLIT_HALF} it removes about half under `split-anti` and nearly all under the other arms that anchored. The edit on slice 1 alone removes most of the op on most runs of the split, the falloff and the low uniform hold, and less under the high uniform hold, even on the seeds where that hold anchored well.
 
 {slices_figure()}
 
-Which seed the edit on slices 2 to 4 falls short on does not depend on the terms. Every arm shares the initialization, batches and label draws of its seed, so this fits the seed deciding where the evidence for the op is read. The reading in the introduction to this section would put that in which block moves the evidence to the `=` sites, and this experiment does not test it.
+Which seed the edit on slices 2 to 4 falls short on does not depend on the terms. Every arm shares the initialization, batches and label draws of its seed, so this fits the seed deciding where the evidence for the op is read. The reading in the introduction to this section would put that in which block moves the evidence to the `=` sites, and this experiment does not test it. How much the edit on slice 1 alone removes does depend on the terms, so the hold at the pulled slices shifts some of what the edit reaches, without moving the seed on which the later slices miss.
+<!-- REVIEW: narrowed the E1 claim to the slices-2-to-4 edit. The slice-1 edit removes less under `deep, hold 0.2` on the well-anchored seeds too (0.39 to 0.64 against 0.74 to 0.87 for the split), so "which slices the edit needs is set by the seed rather than by the terms" outran the table. Verify: the slice-1 columns of the table. -->
+<!-- The seed-708 shortfall under `split-anti` on slices 2 to 4 is one run and is reported without a reading. -->
 
 {slices_table()}
 
@@ -741,7 +750,7 @@ rf"""
 Only `split-anti` clears the task gate. The three other arms each lose more than {num(abs(GATE_OP))} on some op at some seed, and every such loss is on one of the HSV ops ({", ".join(f"`{o}`" for o in GATE_OPS)}). The controls at these seeds differ from one another by at most {num(CONTROL_SPREAD, ".3f")} on any op, so these losses are larger than the controls differ by.
 
 /// admonition | Open decision
-The frozen criteria leave `split-anti` as the only candidate: it clears the gate, has the highest landing, and removes about as much as `falloff`, with one run over the spill criterion where `falloff` has none. `falloff` misses the gate on one op at one seed, by a small margin. To check: whether that one loss should exclude `falloff`, or whether the gate needs a seed band for the HSV ops, which learn late.
+The frozen criteria leave `split-anti` as the only candidate: it clears the gate, and it removes about as much and lands about as close as `falloff`, with one run over the spill criterion where `falloff` has none. `falloff` misses the gate on one op at one seed, by a small margin, and that seed (708) is also the one where it removed a tenth less than the split and where its task change over all ops was lowest, so the miss is one soft run rather than a single op slipping. To check: whether that one run should exclude `falloff`, or whether the gate needs a seed band for the HSV ops, which learn late; and, if `falloff` is kept, that its spill advantage over the split rests on one run at seed 704.
 ///
 """
 
@@ -757,7 +766,7 @@ The size of the gain over the uniform high hold depends on the seed. Where the u
 
 The falloff matching the split suggests the hold matters at its two ends: high on the embedding and slice 1, where the stand-ins seemed to sit in the slice-terms experiment, and low on the slices the pull acts on. Where in between the weight steps down seems not to matter much at this resolution.
 
-The seed where the edit on slices 2 to 4 alone falls short is the same in every arm. Whatever decides which slices the edit needs, the anti weight does not seem to move it.
+The seed where the edit on slices 2 to 4 alone falls short is the same in every arm. Whatever decides where the later slices miss, the anti weight does not seem to move it, though it does change how much the edit on slice 1 alone removes.
 """
 
 # %%
