@@ -540,7 +540,9 @@ We tried replacing the step in the pull weight (nothing on the embedding or slic
 
 Where a ramp kept the anchor, it removed as much of the op as `falloff`, and put the concept at the same depths. The runs that lost it parted ways with the others during the warm-up of the pull, and the losses fit how much the pull acts on slices 1 to 3.
 
-The recipe of record ([`falloff`](/docs/m2/split-anti-seeds/report.py)) sets the anti weight $\lambda_{{\bar s}}$ by slice, falling in a straight line from the embedding to slice 4, so no slice boundary has to be chosen for it. The pull still has one: it acts on slices 2 to 4 at the full anchor weight $\lambda_a$, and not at all on the embedding or slice 1. This report tries the mirror of the falloff for the pull, a weight that rises in a straight line with depth, in {len(ex.ARMS)} new arms of {len(SEEDS)} runs each at the seeds of the split-anti-seeds experiment, so the `falloff` runs there are the baseline with no new training.
+The recipe of record ([`falloff`](/docs/m2/split-anti-seeds/report.py)) sets the anti weight $\lambda_{{\bar s}}$ by slice, falling in a straight line from the embedding to slice 4, so no slice boundary has to be chosen for it. The pull still has a boundary: it acts on slices 2 to 4 at the full anchor weight $\lambda_a$, and not at all on the embedding or slice 1.
+
+This report tries the mirror image of the falloff for the pull: a weight that rises in a straight line with depth. There are {len(ex.ARMS)} new arms of {len(SEEDS)} runs each. They use the seeds of the split-anti-seeds experiment, so the `falloff` runs from there serve as the baseline with no new training.
 """
 
 # %%
@@ -603,7 +605,7 @@ Most ramped runs look like `falloff`: removal climbs with the dose to between th
 
 The two ramps from slice 1 lost the anchor on {len(LOST[ONE_RAMP])} and {len(LOST[ONE_TOTAL])} seeds, so scaling that shape up to the step total did not fix it. Scaling it up also pulls slice 4 half again as hard as the step, and one of its runs (seed 705) dropped by more than 0.2 on `value-hsv` against its control, and spilled over the criterion. That is one run, so we take it as a sign to watch rather than a cost of the shape.
 
-Across the five arms, the count of lost runs follows the pull on slices 1 to 3 (the second column): none at 1.8 and 2, two at 1.5, three at 1. Eight seeds per arm is too few to call this a trend, and we picked that sum after seeing the counts; the pull on slices 2 and 3 alone is the same in the two step-total arms, which lost none and two, so the ordering rests on the quarter-weight pull on slice 1. Still, it fits a simpler reading than the shape of the ramp: the pull on the slices before the last one is what keeps the anchor.
+Across the five arms, the count of lost runs follows the pull on slices 1 to 3 (the second column): none at 1.8 and 2, two at 1.5, three at 1. Eight seeds per arm is too few to call this a trend, and we picked that sum after seeing the counts. Also, the pull on slices 2 and 3 alone is the same in the two step-total arms, which lost none and two. So the ordering rests on the quarter-weight pull on slice 1. Still, it fits a simpler reading than the shape of the ramp: the pull on the slices before the last one is what keeps the anchor.
 <!-- REVIEW: added that the sum over slices 1 to 3 was picked after the counts, and what in the data the ordering
 rests on, so the Discussion weighs the second reading as post hoc. Verify: the pull on slices 2 and 3 alone is 1.5 in
 both step-total arms, which lost 0 and 2. -->
@@ -612,7 +614,9 @@ both step-total arms, which lost 0 and 2. -->
 
 One of these runs is borderline: seed 710 of `{NAME[ONE_RAMP]}` removes a little under half the op, though its example answers are off e₁ at every slice, so it is a weak anchor rather than none. We count it as lost by the rule of the split-anti-seeds experiment.
 
-The lost runs are not the same seeds in every arm: seed 706 and seed 708 each lost the anchor in two arms, and the rest in one. On most of them the example answers stay off e₁, and the query answer aligns as usual, as it does on every run that kept the anchor; this is the loss seen with the uniform holds of the split-anti-seeds experiment. One run of `{NAME[EMB_RAMP]}` (seed 709) settled on the first operands instead, with the query answer off e₁ too, and the edit then removes nothing from `difference` and spills onto the other ops, since every op reads its operands.
+The lost runs are not the same seeds in every arm: seed 706 and seed 708 each lost the anchor in two arms, and the rest in one. On most of them the example answers stay off e₁, and the query answer aligns as usual, as it does on every run that kept the anchor. This is the same kind of loss seen with the uniform holds of the split-anti-seeds experiment.
+
+One run of `{NAME[EMB_RAMP]}` (seed 709) settled on the first operands instead, and its query answer is off e₁ too. On that run the edit removes nothing from `difference`. It spills onto the other ops instead, since every op reads its operands.
 <!-- REVIEW: "the query answer, which aligns on every run" was wrong for seed 709 of ramp from emb (α −0.01 at the query
 answer at slice 4); on every other run it is 0.96 to 1.0. Verify: alpha_by_slice(a, s, pos=QUERY_ANSWER)[-1]. -->
 """
@@ -650,7 +654,7 @@ On the other ops the alignment peaks at slice 1 in every arm. The ramps from the
 
 {depth_table()}
 
-The lean in the color table stays small in every arm, close to that of `falloff` and well inside the spread of the controls. Within that, it grows with the pull on the first slices: the ramps from slice 1 lean least, then `falloff`, then the ramps from the embedding, and every arm leans the same way on every seed, where the controls lean either way. These are differences of a few hundredths, against a slope of about −1 that the recipe had before [the late-pull experiment](/docs/m2/late-pull/report.py) moved the pull off the embedding, so a light pull on slice 1 does not bring that lean back.
+The lean in the color table stays small in every arm, close to that of `falloff` and well inside the spread of the controls. Within that, it grows with the pull on the first slices: the ramps from slice 1 lean least, then `falloff`, then the ramps from the embedding, and every arm leans the same way on every seed, where the controls lean either way. But these are differences of a few hundredths. Before [the late-pull experiment](/docs/m2/late-pull/report.py) moved the pull off the embedding, the recipe had a slope of about −1. So a light pull on slice 1 does not bring that lean back.
 <!-- REVIEW: added the ordering of the small lean by the early pull (claims review). Verify: the slope column of the table and the per-seed slopes. -->
 """
 
@@ -661,7 +665,7 @@ rf"""
 
 A pull that ramps with depth, with the weight of the step at slice 4, loses the anchor on more seeds than the step. The loss happens early: the example answers fail to come onto e₁ while the pull warms up, and they stay off it. The runs that keep the anchor end up much like `falloff`, so what the ramp changes is how often a run anchors at all, rather than how well.
 
-Two readings fit. In one, the shape of the ramp matters, and pulling slice 4 harder than the others makes it easier for the pull to settle on the query answer, which aligns at slice 4 on every run but the one that settled on the operands. In the other, what matters is how much pull the earlier slices get, and the shape matters only through that. The losses follow the pull on slices 1 to 3 across all five arms, which favors the second reading, but the counts are small, that sum was chosen after the counts were in, and the arms differ in more than it.
+Two readings fit. In one, the shape of the ramp matters: pulling slice 4 harder than the others makes it easier for the pull to settle on the query answer. (The query answer aligns at slice 4 on every run but the one that settled on the operands.) In the other, what matters is how much pull the earlier slices get, and the shape matters only through that. The losses follow the pull on slices 1 to 3 across all five arms, which favors the second reading, but the counts are small, that sum was chosen after the counts were in, and the arms differ in more than it.
 <!-- REVIEW: "aligns on every run" narrowed: on seed 709 of ramp from emb the query answer is off e₁ (α −0.01 at
 slice 4) as well as the example answers. Verify: alpha_by_slice(EMB_RAMP, 709, pos=QUERY_ANSWER). -->
 
