@@ -462,7 +462,7 @@ def depth_draw(data: dict, alt_text: str) -> str:
         caption=f"""
             **Alignment at the example answers by slice**, at the end of training, on the probe contexts of
             `{ex.ANCHORED_OP}` (left) and of the other ops (right), over the runs that kept the anchor: the seed mean
-            in the arm's marker. Underneath are the pull weight at each slice, relative to the step, and the anti
+            in the arm's marker; the two top panels have their own scales. Underneath are the pull weight at each slice, relative to the step, and the anti
             hold, which every arm shares.
         """,
     )
@@ -564,11 +564,12 @@ This is an exploratory study, with no preregistration and no gate. The new arms 
 Matching the step at slice 4 means each of these pulls less in total than the step: five sixths as much for `{NAME[EMB_RAMP]}`, and two thirds for `{NAME[ONE_RAMP]}`. When the first results showed both losing the anchor more often than `falloff`, we added two arms with the same shapes scaled to the step total (`{NAME[EMB_TOTAL]}` and `{NAME[ONE_TOTAL]}`), which pull slice 4 harder than the step does. These were not in the plan.
 <!-- REVIEW: the total-matched arms were added after the first results, to separate the shape of the ramp from the lower total pull; the plan named that as the first alternative reading of a removal drop. -->
 
+<!-- No figure beside this table: the pull and anti strips under the E3 figure draw the same weights. -->
 {weights_table()}
 
 The anti weight is the falloff in every arm, so the ramps from the embedding pull slice 1 against a hold of about 0.16.
 
-[The late-pull experiment](/docs/m2/late-pull/report.py) moved the pull off the embedding and slice 1 to keep the lightness lean off the embedding table, and found that slice 1, unpulled, came to hold part of the concept. A pull there might bring some of the lean back; E3 looks for it. No pair of arms differs at slice 1 alone, so an effect there is read beside slices 2 and 3.
+[The late-pull experiment](/docs/m2/late-pull/report.py) moved the pull off the embedding and slice 1 to keep the lightness lean off the embedding table, and found that slice 1, unpulled, came to hold part of the concept. A pull there might bring some of the lean back; E3 looks for it. No pair of arms differs at slice 1 alone, so an effect there can only be judged together with slices 2 and 3.
 
 Every run trains at model seeds {SEEDS[0]} to {SEEDS[-1]} for 400 epochs, paired by seed with its `falloff` twin and with ex-2.2.23's control (same initialization, batches and label draws). With eight seeds per arm, one or two lost runs could come from the seeds alone, so we weigh the counts across arms together.
 
@@ -612,6 +613,7 @@ The pull on slices 2 and 3 alone is the same in the two step-total arms, which l
 rests on, so the Discussion weighs the second reading as post hoc. Verify: the pull on slices 2 and 3 alone is 1.5 in
 both step-total arms, which lost 0 and 2. -->
 
+<!-- No figure beside this table: the lost runs are the dashed lines of the dose figure above; this lists their seeds and α. -->
 {lost_table()}
 
 One of these runs is borderline: seed 710 of `{NAME[ONE_RAMP]}` removes a little under half the op, though its example answers are off e₁ at every slice, so it is a weak anchor rather than none. We count it as lost by the rule of the split-anti-seeds experiment.
@@ -652,9 +654,9 @@ On the runs that kept the anchor, does the alignment by slice follow the pull we
 
 {depth_figure()}
 
-The alignment by slice is nearly the same in every arm, though the pull weights differ a lot. On `difference`, α at the example answers rises from near zero at the embedding to about 0.64 at slice 4 in every arm. The two ramps from slice 1 sit a little lower at slices 1 and 2. So where the anchor sits follows the step at slice 4, and the lighter pull earlier does not move it.
+The alignment by slice is nearly the same in every arm, though the pull weights differ a lot. On `difference`, α at the example answers rises from near zero at the embedding to about 0.64 at slice 4 in every arm. The two ramps from slice 1 are a little lower at slices 1 and 2. So where the anchor sits follows the step at slice 4, and the lighter pull earlier does not move it.
 
-On the other ops the alignment peaks at slice 1 in every arm. The ramps from the embedding sit about where `falloff` does there, though `falloff` does not pull slice 1, and the ramps from slice 1 sit a little lower. So the pull on slice 1 adds little to the drift on the other ops.
+On the other ops the alignment peaks at slice 1 in every arm. The ramps from the embedding are about where `falloff` is there, though `falloff` does not pull slice 1, and the ramps from slice 1 are a little lower. So the pull on slice 1 adds little to the drift on the other ops.
 
 {depth_table()}
 
@@ -671,7 +673,7 @@ rf"""
 
 A ramp with the step weight at slice 4 changes how often a run anchors at all, rather than how well: it loses the anchor on more seeds than the step, and the runs that keep it end up much like `falloff`.
 
-Two readings fit. In one, the shape of the ramp matters: pulling slice 4 harder than the others makes it easier for the pull to settle on the query answer. (The query answer aligns at slice 4 on every run but the one that settled on the operands.) In the other, what matters is how much pull the earlier slices get, and the shape matters only through that.
+Two readings fit. In one, the shape of the ramp matters. The pull is pooled over the positions of each context, so at slice 4, where the query answer is already on e₁, it asks little of the example answers; a ramp moves the pull toward slice 4, and so away from the slices where the example answers are what it pulls. In the other, what matters is how much pull the earlier slices get, and the shape matters only through that.
 
 The losses follow the pull on slices 1 to 3 across all five arms, which favors the second reading, but the counts are small, that sum was chosen after the counts were in, and the arms differ in more than it.
 <!-- REVIEW: "aligns on every run" narrowed: on seed 709 of ramp from emb the query answer is off e₁ (α −0.01 at
