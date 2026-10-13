@@ -372,6 +372,25 @@ def test_pooling_is_within_each_slice():
     np.testing.assert_allclose(tiny, 0.001 * np.log(2), rtol=1e-3, atol=0)  # each slice: min 0 + τ·ln2
 
 
+def test_per_slice_pull_weights_scale_each_slice_inside_the_mean():
+    # Two slices with x = [0.0, 1.0] and [1.0, 0.0]; at τ = ∞ each slice's term is 0.5.
+    states = np.zeros((2, 1, 2, 8), dtype=np.float32)
+    states[0, ..., 0] = [1.0, 0.0]
+    states[1, ..., 0] = [0.0, 1.0]
+    mask = jnp.ones((1, 2), dtype=jnp.float32)
+    line_id = jnp.zeros((1, 2), dtype=jnp.int32)
+    s = jnp.asarray(states)
+    plain = pooled_anchor_term(s, mask, line_id, 1, np.inf)
+    ones = pooled_anchor_term(s, mask, line_id, 1, np.inf, slice_w=jnp.ones(2))
+    np.testing.assert_allclose(ones, plain, rtol=1e-6, atol=0)
+    ramp = pooled_anchor_term(s, mask, line_id, 1, np.inf, slice_w=jnp.asarray([0.5, 1.0]))
+    np.testing.assert_allclose(ramp, (0.5 * 0.5 + 1.0 * 0.5) / 2, rtol=1e-6, atol=0)
+    # The gradient at each slice carries its weight: the first slice gets half the pull of the second.
+    grad = jax.grad(lambda x: pooled_anchor_term(x, mask, line_id, 1, 0.1, slice_w=jnp.asarray([0.5, 1.0])))(s)
+    budget = -np.asarray(grad)[:, 0, :, 0].sum(axis=1)
+    np.testing.assert_allclose(budget, [0.25, 0.5], rtol=1e-5, atol=0)
+
+
 def test_slice_pooling_lets_the_pull_choose_the_slice():
     # The same two slices: pooled over (slice, position), the pull goes to both zeros and nowhere else.
     states = np.zeros((2, 1, 2, 8), dtype=np.float32)
@@ -1232,3 +1251,24 @@ def test_slice_pooled_training_with_per_slice_anti_weights(data_dir, tmp_path):
     np.testing.assert_allclose(traj["anti_weight"][-1], anti(6), rtol=1e-6, atol=0)
     assert np.isfinite(traj["anchor"]).all() and np.isfinite(traj["anti"]).all()
     assert traj["anchor"][-1] < traj["anchor"][0]
+
+
+def test_training_with_per_slice_pull_weights(data_dir, tmp_path):
+    """A pull with one weight per slice trains end to end, and a weight per slice it lacks is refused."""
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    tokens, weights = probe_set()
+    config = training_config().model_copy(
+        update={"scheduler": SchedulerConfig(epochs=6, warmup_epochs=2, min_lr_factor=0.01)}
+    )
+    anchor = AnchorSpec(peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=0.1, slice_w=(0.5, 1.0))
+    kwargs = dict(label_p=label_p, probe_tokens=tokens, probe_weights=weights, traj_stride=20)
+    _, _, traj = train_anchored(
+        config, data_dir, anchor=anchor, anchor_slices=(1, 2), checkpoint_dir=tmp_path / "ckpt", **kwargs
+    )
+    assert np.isfinite(traj["anchor"]).all()
+    assert traj["anchor"][-1] < traj["anchor"][0]
+    with pytest.raises(ValueError, match="one weight per slice"):
+        train_anchored(
+            config, data_dir, anchor=anchor, anchor_slices=(1, 2, 3), checkpoint_dir=tmp_path / "c2", **kwargs
+        )
