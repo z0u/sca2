@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D2.2 design: anchoring an operation the model infers</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400..700&family=PT+Sans:wght@400;700&family=Fira+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../../md.css">
+</head>
+<body>
+<h1 id="d22-design-anchoring-an-operation-the-model-infers">D2.2 design: anchoring an operation the model infers</h1>
+<p>D2.2 asks whether Sparse Concept Anchoring works for a concept that is never written down: the model has to infer it from context. Each line shows a few solved equations that use the same hidden operation, and the model has to infer the op to answer the last equation. We anchor one op to the first axis of the residual stream, then remove it by editing that axis out.</p>
+<p>Each line of the corpus is one context: three solved examples of one op, then a query under the same op, written <code>op1 ? op2 = answer</code> with a constant <code>?</code> where the op word would be. The model reads the examples, infers which op fits them, and completes the query. We can compute how strongly each context indicates each op (the posterior over ops), and we evaluate the predictive power of each model against that, with and without being edited to remove the anchored op.</p>
+<p>On the recipe of record, the anchor holds at a small cost to the task. Turning the edit up takes <code>difference</code> out gradually, and at eight fresh seeds the other ops stayed within the selectivity criterion on every run.</p>
+<p>Still to show: that the removal follows how strongly each context indicates the op, the write bound on the inferred op, and where the edited model lands against the target null.</p>
+<p>How we got here is in the <a href="../../#d22-anchoring-an-operation">index</a>. The <a href="pivot.html">pivot</a> explains why we took the op words out of the grammar.</p>
+<h2 id="the-setup-today">The setup today</h2>
+<p>Our training recipe evolves with each experiment, as we learn more about how SCA behaves in transformers. This is our "recipe of record": by default, the next experiment should use these parameters.</p>
+<dl>
+<dt>Ops</dt>
+<dd>
+<p>Seven: <code>mix</code>, <code>lighten</code>, <code>darken</code>, <code>difference</code>, and three HSV blend modes (<code>hue-hsv</code>, <code>sat-hsv</code>, <code>value-hsv</code>). Four ops whose answers often coincide with those of another op were dropped from the earlier table of eleven.</p>
+<p>From <a href="../ex-2.2.18/">ex-2.2.18</a> and <a href="../ex-2.2.19/">ex-2.2.19</a>.</p>
+</dd>
+<dt>Rounding</dt>
+<dd>
+<p>An answer that falls between grid levels rounds up or down at random, in proportion to where it falls. So the answer to a pair is a distribution over a few colors, and a model is scored on the probability it puts on them.</p>
+<p>From <a href="../ex-2.2.4/">ex-2.2.4</a> and <a href="../ex-2.2.5/">ex-2.2.5</a>.</p>
+</dd>
+<dt>Contexts</dt>
+<dd>
+<p>Three examples and a query. Three examples in ten show the answer another op would give (replacement op noise at 0.3), so the examples leave some contexts in doubt about their op; a few answers are random colors (cube noise at 0.02). Contexts with varying numbers of examples were tried and cost a little skill.</p>
+<p>From <a href="../ex-2.2.16/">ex-2.2.16</a>; the varying counts from <a href="../ex-2.2.22/">ex-2.2.22</a>.</p>
+</dd>
+<dt>Model</dt>
+<dd>
+<p>d64-L4 simplified nGPT, with a readout table of its own (untied from the embedding table) and attention that stops at the line break.</p>
+<p>From <a href="../ex-2.2.7/">ex-2.2.7</a> (readout) and <a href="../ex-2.2.17/">ex-2.2.17</a> (mask).</p>
+</dd>
+<dt>Training</dt>
+<dd>
+<p>400 epochs, cosine schedule peaking near 0.003. At 200 epochs a few anchored runs missed the second rise in task skill; at 400 every run made it.</p>
+<p>From <a href="../ex-2.2.17/">ex-2.2.17</a>, <a href="../ex-2.2.19/">ex-2.2.19</a>, and <a href="../ex-2.2.20/">ex-2.2.20</a> (schedule); <a href="../ex-2.2.23/">ex-2.2.23</a> (length).</p>
+</dd>
+<dt>Anchored op</dt>
+<dd>
+<p><code>difference</code> on e₁, with no <em>red</em> anchor.</p>
+<p>From <a href="../ex-2.2.14/">ex-2.2.14</a>.</p>
+</dd>
+<dt>Labels</dt>
+<dd>
+<p>The whole context, on about one <code>difference</code> context in fifty. The label says only that the context uses <code>difference</code>; the model never sees it, and no other op is labelled.</p>
+<p>From <a href="../ex-2.2.14/">ex-2.2.14</a> and <a href="../ex-2.2.21/">ex-2.2.21</a>.</p>
+</dd>
+<dt>Pull</dt>
+<dd>
+<p>On a labelled context, the anchor term pulls blocks 2 to 4, pooled over the positions of the context at a temperature $\tau_p$ of 0.1, so most of the pull lands on the example answers. There is no cap on the alignment. A context the training window cuts short is not pulled. The embedding and block 1 are left out because, before the model has read the context, the pull finds a stand-in there (see the lean, under (b)).</p>
+<p>From <a href="../ex-2.2.15/">ex-2.2.15</a> (whole contexts), <a href="../ex-2.2.22/">ex-2.2.22</a> (no cap), the <a href="../tau-lambda-sweep/">τ × λ_a sweep</a> (τ_p), and <a href="../late-pull/">late-pull</a> (the slices).</p>
+</dd>
+<dt>Anchor schedule</dt>
+<dd>
+<p>The anchor weight $\lambda_a$ (peak 0.1) warms up over the first tenth of training, holds, then eases over the last tenth to a tenth of its peak. A second term, the anti-subspace term, pushes the states of every other context off e₁. Its weight $\lambda_{\bar s}$ is set by slice, as an absolute number: 0.25 on every slice at the start, annealing by epoch 360 to a <em>hold</em> that falls off in a straight line with depth, from 0.2 at the embedding to 0.03 at block 4 (the <code>falloff</code> arm). The high hold on the first slices keeps the stand-in off e₁; the low hold on the pulled blocks leaves room for the pull.</p>
+<p>From <a href="../ex-2.1.10/">ex-2.1.10</a> (anchor weight), <a href="../slice-terms/">slice-terms</a> (weights by slice), and <a href="../split-anti-seeds/">split-anti-seeds</a> (the falloff).</p>
+</dd>
+<dt>Verification lines</dt>
+<dd>
+<p>Allowed, since they leave completion unchanged; the <code>hinge</code> condition trains without them.</p>
+<p>From <a href="../ex-2.2.21/">ex-2.2.21</a>.</p>
+</dd>
+<dt>Edit</dt>
+<dd>
+<p>Remove a share of the component along e₁ from the state at every position and every slice. That share is the <em>dose</em>, from a quarter to all of it. Edits on a subset of slices are used to locate the op.</p>
+<p>From <a href="../ex-2.2.21/">ex-2.2.21</a>.</p>
+</dd>
+<dt>Scoring</dt>
+<dd>
+<p>Task: the probability the model puts on the right answer on held-out contexts (expected exact match), beside the Bayes ceiling, which is the best any model could do given the examples, and the control, a model trained without the anchor at the same seed. The task gate fails if the mean change against the control falls below −0.02, or the change on any one op below −0.05. Removal: the drop on <code>difference</code> as a share of the way to the <em>target null</em>, what an ideal predictor that had lost <code>difference</code> and nothing else would answer; it has to grow with the dose. Selectivity: no other op may drop by more than 0.02 at any dose (the <em>selectivity criterion</em>); the largest such drop is the <em>spill</em>. Both drops are net of what the same edit does to the control. Landing: the share of the distance to the target null that the full edit covers, context by context.</p>
+<p>From <a href="../ex-2.2.16/">ex-2.2.16</a>, <a href="../ex-2.2.21/">ex-2.2.21</a>, <a href="../ex-2.2.22/">ex-2.2.22</a>, and <a href="../split-anti-seeds/">split-anti-seeds</a> (task gate).</p>
+</dd>
+</dl>
+<h2 id="what-we-want-to-be-able-to-say">What we want to be able to say</h2>
+<p>Ultimately, we want to see whether SCA works in transformers as a general alignment technique. For the current, narrow domain of color-mixing, we claim:</p>
+<h3 id="a-an-inferred-op-can-be-anchored-without-costing-the-task">(a) An inferred op can be anchored without costing the task</h3>
+<p>The pull puts <code>difference</code> contexts on the axis, and the model answers as well as one trained without the anchor.</p>
+<p><strong>Observations.</strong> The anchor sits on the example answers, where the context has shown the most about its op, and hardly at all at the query <code>=</code>, where the answer is predicted. At those answers the alignment rises with the posterior, on every anchored condition, while the control stays flat near zero. It does so at a fixed answer index too, so it is not only that evidence builds up along a context. That is what we would hope to see if the anchor holds the op the model inferred, and not a shortcut such as a characteristic answer color, which would not follow the evidence.</p>
+<p>The cost to the task is small. At eight fresh seeds and 400 epochs, the recipe of record scored 0.007 below the control on average. It missed the task gate once, on <code>hue-hsv</code> at seed 708, a little past the limit of 0.05. Every loss past that limit, in every arm of that experiment, was on one of the HSV ops. Training for 400 epochs settled the earlier question of slow seeds, which at 200 epochs could not be told apart from a cost. Still to show: that the rest of what the model represents is unchanged, which was measured for the op word and not yet for the inferred op.</p>
+<p>From <a href="../ex-2.2.21/">ex-2.2.21</a> (H1, E1), <a href="../ex-2.2.22/">ex-2.2.22</a> (E1, E3, E5), <a href="../ex-2.2.23/">ex-2.2.23</a>, <a href="../split-anti-seeds/">split-anti-seeds</a> (Decision), and <a href="../ex-2.2.14/">ex-2.2.14</a> (the probe scan).</p>
+<h3 id="b-removing-the-op-is-graded-and-selective">(b) Removing the op is graded and selective</h3>
+<p>Graded means that a stronger edit takes out more of <code>difference</code>. Selective means that the other ops are left as they were, at every dose. In M1 this was the dose-response curve: a stronger edit removed more of the concept, and colors unrelated to it stayed as they were.</p>
+<p><strong>Observations.</strong> On the earlier grammar, where the concept was <em>red</em>, projecting the axis out removed <em>red</em>, more so the redder the line, and some of the cost fell on lines with no red in them. That cost came through the embeddings of syntax tokens, and a readout table of their own cleaned them. With that change, removal was clean on ten of eleven ops.</p>
+<p>On the in-context grammar, an edit at the query <code>=</code> has little to act on, since the anchor sits on the example answers, and none met both criteria. The edit at every position does work: turning it up takes <code>difference</code> out step by step. Editing the example answers alone takes out most of the op, so it seems the query takes the op from the examples.</p>
+<p>Trained to 400 epochs on the earlier recipe, which pulled every slice, the edit spilled onto other ops on nearly every run that learned the HSV ops. The spill came from a stand-in, the <em>lean</em>. At the embedding and block 1 the model has not yet read the context, so it meets the pull with a token-level substitute: it loads lightness onto e₁ in the color embedding table (darker colors are the nearest thing to a <code>difference</code> answer), or latches a syntax embedding onto e₁. The lean fades with depth, but the edit at those slices takes the lightness away from every op. Pulling only blocks 2 to 4 cut the lean to about a quarter, and holding the anti-subspace weight high on the first two slices kept it off.</p>
+<p>On that recipe, with the anti weight falling off with depth, the full edit removed 0.85 of the way to the target null on average at eight fresh seeds, and stayed within the selectivity criterion on every seed. Holding the anti weight at one level on every slice lost the anchor altogether on one seed in each arm.</p>
+<p>Still to show: that the damage on each context follows how much its answer depended on <code>difference</code>, which the target null predicts context by context.</p>
+<p>From <a href="../ex-2.2.1/">ex-2.2.1</a>, <a href="../ex-2.2.7/">ex-2.2.7</a>, and <a href="../ex-2.2.11/">ex-2.2.11</a> (<em>red</em>); <a href="../ex-2.2.21/">ex-2.2.21</a> (E2), <a href="../ex-2.2.22/">ex-2.2.22</a> (E1, E2), <a href="../ex-2.2.23/">ex-2.2.23</a>, <a href="../spill-by-position/">spill-by-position</a>, <a href="../embedding-lean/">embedding-lean</a>, <a href="../late-pull/">late-pull</a>, <a href="../slice-terms/">slice-terms</a>, and <a href="../split-anti-seeds/">split-anti-seeds</a> (H1, H2).</p>
+<h3 id="c-the-edited-model-answers-in-a-predictable-way">(c) The edited model answers in a predictable way</h3>
+<p>Once <code>difference</code> is removed, the model should answer as an ideal predictor that never knew <code>difference</code> but still weighs the other ops by how well they fit the examples: the target null. If it does, the edit has a destination we can state in advance, and we may not need to train one.</p>
+<p><strong>Observations.</strong> Looked at after the fact, the edited <code>hinge</code> runs answered <code>difference</code> contexts much as that predictor does: the mass leaves the <code>difference</code> answer and goes to the other ops in about the proportions the posterior gives. On three fresh runs, counted by op over all contexts, the mass goes about where the target null puts it. Context by context the match is looser: the edit moved each run a little under half of the way to the target null, short of the half we flat-out guessed at. Most of the distance that remains is on answers another op could give, shared among them differently from the target null; the edit moves little mass onto colors no op gives.</p>
+<p>On the recipe of record the full edit lands about half of the way (0.52 on average at eight fresh seeds).</p>
+<p>So the anchor alone gives the edit a direction and not the whole distance. Whether a trained fallback, a designed response to the edit, would close the rest, or whether the recipe can be improved so that it does, is open.</p>
+<p>From <a href="../ex-2.2.21/">ex-2.2.21</a> (E2, post hoc), <a href="../ex-2.2.22/">ex-2.2.22</a> (H2, E4), and <a href="../split-anti-seeds/">split-anti-seeds</a>.</p>
+<h3 id="d-the-side-effects-are-bounded-by-construction-and-we-know-at-which-layers-the-op-is-held">(d) The side-effects are bounded by construction, and we know at which layers the op is held</h3>
+<p>Because we placed the axis, we can say in advance how far an edit moves each state: the write bound.</p>
+<p><strong>Observations.</strong> The write bound held on <em>red</em>: at every slice past the embedding, the move on lines with no red in them stayed within the bound, or at most a quarter over it, as we allowed in advance. <em>Red</em> was read in the first two blocks. For the inferred op, the alignment on <code>difference</code> contexts rises through the stack.</p>
+<p>With the pull on blocks 2 to 4, editing block 1 alone removes most of the op on every seed, though nothing pulls block 1; we don't yet know why. Editing blocks 2 to 4 alone removes nearly all of it on most runs and falls short on the same seed in every arm, which fits the seed rather than the terms deciding where it misses. Pooling the pull over slices as well as positions settled it on block 4 on most seeds, and on the query answer on one, where the op could not be removed; it was not adopted.</p>
+<p>Still to show: the write bound on the inferred op.</p>
+<p>From <a href="../ex-2.2.1/">ex-2.2.1</a> (H4), <a href="../ex-2.2.22/">ex-2.2.22</a> (E1), <a href="../late-pull/">late-pull</a> (E2), <a href="../slice-terms/">slice-terms</a> (E1, E3), and <a href="../split-anti-seeds/">split-anti-seeds</a> (E1).</p>
+<h3 id="e-scarce-noisy-labels-are-enough">(e) Scarce, noisy labels are enough</h3>
+<p>About one <code>difference</code> context in fifty is labelled, and the label says only that the context uses <code>difference</code>. That is the shape of label we expect to have for a concept in natural language, where labels will be scarce and sometimes wrong.</p>
+<p><strong>Observations.</strong> At that rate the op is anchored, on every condition tried. On the op word, labelling one <code>difference</code> line in fifty placed the op as well as labelling every <code>difference</code> line, and so did the same scarce labeller with a fifth of its labels on the wrong op. The labels here are already wrong in one sense: a label marks the op that generated the context, even when its examples favor another op.</p>
+<p>Still to show: wrong labels on the inferred op.</p>
+<p>From <a href="../ex-2.2.14/">ex-2.2.14</a> (the label arms) and <a href="../ex-2.2.21/">ex-2.2.21</a> (S1).</p>
+<h2 id="what-comes-next">What comes next</h2>
+<p>Each step below is written as the opening line we hope to write once it has run.</p>
+<p><em>An anchor that ramps up with depth.</em> An anchor weight that rises from the early slices to block 4, mirroring the falloff of the anti weight, did as well as the step at block 2, so neither term needs a slice boundary chosen by hand. (Running now.)</p>
+<p><em>The recipe sweep around the falloff.</em> Around the recipe of record, removal and spill moved smoothly with the anchor weight, the pool temperature, and the anti weights, so the recipe sits on a broad region and not a narrow edge.</p>
+<p><em>A pooled anti term.</em> Pooling the anti-subspace term over slices, so that its weight goes where the states sit closest to e₁, kept the stand-in off e₁ without a weight chosen for each slice.</p>
+<p><em>Where the edited model ends up.</em> A fallback trained toward the target null brought the edited model the rest of the way there, with less scatter across seeds than the anchor alone gave; or the anchor alone turned out to be enough once the recipe settled, and no fallback was needed.</p>
+<p><em>The layer sweep.</em> Editing the first few slices removed as much of the op as editing all of them, and anchoring those slices alone kept the task score and the selectivity, so the bound could be stated for the slices that matter. Beside it, a baseline trained on the same labels (SGTM) showed what anchoring adds over a method that does not place the concept.</p>
+<h2 id="out-of-scope">Out of scope</h2>
+<p>The verification measurements (D2.3), though verification lines are allowed in the corpus. Topic markers, and anchoring at fine-tune time, both open questions in the <a href="pivot.html#open-questions">pivot</a>. Several ops on separate axes. RMU and SAE baselines, which wait for D2.3.</p>
+<details>
+<summary>About this page</summary>
+<p>Rewritten 2026-10-06, to say where D2.2 stands in one sitting. The plan as it stood through ex-2.2.22, with its route, risk table, and decisions, is <a href="design-2026-10.html">archived</a> and in git. Updated 2026-10-07 with the <a href="../ex-2.2.22/">ex-2.2.22</a> decision: no cap, every slice, three examples per context. Updated 2026-10-13 for the work since: 400 epochs (ex-2.2.23), the lean and the pull on blocks 2 to 4 (embedding-lean, late-pull), and the anti weight by slice with the falloff as the recipe of record (slice-terms, split-anti-seeds).</p>
+</details>
+</body>
+</html>
