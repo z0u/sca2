@@ -34,9 +34,13 @@ This is an exploratory study, with no preregistration and no gate. The two arms 
 
 TODO: the table of pull and anti weights by slice for the three arms.
 
-Matching the step at slice 4 means each ramp pulls less in total than the step: about five sixths as much for `ramp from emb`, and two thirds for `ramp from 1`. The other choice, matching the total, would pull slice 4 harder than the recipe does. The τ×λ sweep found removal changed little with $\lambda_a$, so we expect the shape to matter more than this difference in total, though that sweep pulled every slice after the embedding with one weight.
+Matching the step at slice 4 means each ramp pulls less in total than the step: about five sixths as much for `ramp from emb`, and two thirds for `ramp from 1`. The other choice, matching the total, would pull slice 4 harder than the recipe does. The τ×λ sweep found removal changed little with $\lambda_a$, so we expect the shape to matter more than this difference in total, though that sweep pulled every slice after the embedding with one weight, and its anti weight scaled with $\lambda_a$, so it varied the amount of pull at a fixed ratio to the anti term, where here the anti weight stays put.
+<!-- REVIEW: added that the τ×λ sweep co-scaled the anti term (its discussion says the ratio was the same on every trial), since the ramps change the pull against a fixed anti hold. Verify: the sweep's discussion, last paragraph. -->
 
-The anti weight is the falloff in every arm, so `ramp from emb` pulls slice 1 against a hold of about 0.16. [The late-pull experiment](/docs/m2/late-pull/report.py) moved the pull off slice 1 to keep the lightness lean off the embedding table, so a pull there may bring some of it back; E2 looks for that.
+The two arms differ from each other at slices 2 and 3 as well as at slice 1, and the three arms give three levels of pull at slices 2 and 3. So a difference between `ramp from emb` and the others at slice 1 is not by itself the pull on slice 1 at work; E2 reads it beside what happens at slices 2 and 3.
+
+The anti weight is the falloff in every arm, so `ramp from emb` pulls slice 1 against a hold of about 0.16. [The late-pull experiment](/docs/m2/late-pull/report.py) moved the pull off the embedding and slice 1 to keep the lightness lean off the embedding table, and found that slice 1, with nothing pulling it, came to hold part of the concept and gave most of the spill that was left. A pull there may bring some of the lean back, or may change what slice 1 holds; E2 looks for both.
+<!-- REVIEW: added that the pull was moved off both the embedding and slice 1, and that late-pull found slice 1 took up part of the concept unpulled, so the prior for E2 cuts both ways. Verify: late-pull's lede and E2. -->
 
 Every run trains at model seeds 704 to 711 for 400 epochs, and is paired by seed with its `falloff` twin and with ex-2.2.23's control, which share the initialization, batches and label draws. With eight seeds, a difference in removal of a few hundredths is within what seeds alone gave between the split and the falloff, so we take a difference as real only where it shows on most seeds.
 
