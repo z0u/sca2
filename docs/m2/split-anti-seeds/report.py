@@ -24,7 +24,7 @@ r"""
 - [Decision](#decision) — TODO.
 
 /// admonition | How to read this report
-This report was preregistered: the predictions and the criteria for the decision were frozen at commit `TODO`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place.
+This report was preregistered: the predictions and the criteria for the decision were frozen at commit `ff44a17`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place.
 ///
 """
 
