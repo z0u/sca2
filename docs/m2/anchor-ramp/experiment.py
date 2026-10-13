@@ -7,7 +7,10 @@ slice 4. Two arms replace the step with a straight-line ramp of the pull, rising
 - `ramp-emb`: zero at the embedding, so slice 1 is pulled at a quarter of the slice-4 weight.
 - `ramp-1`: zero at slice 1, so the pull starts at slice 2 (a third of the slice-4 weight) as the step does.
 
-Both keep `falloff`'s anti weight on every slice, and everything else is split-anti-seeds' training, measurement and
+After the first results, two more arms take the same shapes scaled to the step's total pull (the sum of the
+weights over slices), so slice 4 is pulled harder than in the step: `ramp-emb-total` and `ramp-1-total`.
+
+All keep `falloff`'s anti weight on every slice, and everything else is split-anti-seeds' training, measurement and
 dose scoring, at its seeds (704 to 711). Its `falloff` runs and ex-2.2.23's controls are the twins, so nothing they
 trained is trained again, and every comparison is paired by initialization, batches and label draws.
 
@@ -84,15 +87,26 @@ class Arm:
 
 STEP = tuple(1.0 if s in LATE else 0.0 for s in EVERY)
 """The recipe's pull by slice, for the figures: the `falloff` arm."""
-ARMS: tuple[Arm, ...] = (
-    Arm("ramp-emb", tuple(s / 4 for s in EVERY), "ramp from emb"),
-    Arm("ramp-1", tuple(max(0, s - 1) / 3 for s in EVERY), "ramp from 1"),
-)
-assert all(a.pull[-1] == 1.0 for a in ARMS)
+RAMP_EMB = tuple(s / 4 for s in EVERY)
+RAMP_1 = tuple(max(0, s - 1) / 3 for s in EVERY)
 
-BUDGET_USD = 8
-"""Split-anti-seeds cost about \\$0.35 per 400-epoch run with its measurements: 16 runs come to about \\$6, and their
-dose scoring under \\$1."""
+
+def scaled_to_total(pull: tuple[float, ...]) -> tuple[float, ...]:
+    """*pull* scaled so its sum over slices matches the step's (three)."""
+    return tuple(w * sum(STEP) / sum(pull) for w in pull)
+
+
+ARMS: tuple[Arm, ...] = (
+    Arm("ramp-emb", RAMP_EMB, "ramp from emb"),
+    Arm("ramp-1", RAMP_1, "ramp from 1"),
+    # Added after the first results: the same shapes with the step's total pull, so slice 4 is pulled harder.
+    Arm("ramp-emb-total", scaled_to_total(RAMP_EMB), "ramp from emb, step total"),
+    Arm("ramp-1-total", scaled_to_total(RAMP_1), "ramp from 1, step total"),
+)
+
+BUDGET_USD = 14
+"""Split-anti-seeds cost about \\$0.35 per 400-epoch run with its measurements: 32 runs come to about \\$11, and their
+dose scoring about \\$1."""
 
 
 def label_of(arm: str, model_seed: int) -> str:
