@@ -28,7 +28,7 @@ import textwrap
 import time
 import types
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Generator
 from contextlib import contextmanager
 from pathlib import Path, PurePath
 from typing import Any, Callable, Iterator, cast
@@ -933,7 +933,7 @@ class LocalRecordStore(RecordStore):
         self.root = Path(root)
 
     @contextmanager
-    def _locked(self) -> Iterator[None]:
+    def _locked(self) -> Generator[None]:
         self.root.mkdir(parents=True, exist_ok=True)
         with open(self.root / ".lock", "w") as f:
             fcntl.flock(f, fcntl.LOCK_EX)

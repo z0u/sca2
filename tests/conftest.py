@@ -29,9 +29,9 @@ def load_script(name: str) -> ModuleType:
 def _no_ambient_backend(monkeypatch):
     """A Modal-first shell must not steer the tests. `MINI_APP` would resolve CLI commands that omit `--app` onto the modal path (#47) — for a `run` test, real spawns — and the CLI's other-backend peek would touch the network on any empty read. Tests opt in to a backend explicitly (flags, markers, or mocks); a test of the hint itself re-patches `_peek`.
 
-    The same goes for the storage profile and the Modal Environment: an engineering shell exports `MINI_PROFILE=dev`, which would select a profile table the tests' tmp projects don't define and move publish pins to the profile's lock file. Tests that mean a profile set it themselves (the `hf` tests pick `dev` explicitly).
+    The same goes for the storage profile and the Modal Environment: an engineering shell exports `MINI_PROFILE=dev`, which would select a profile table the tests' tmp projects don't define and move publish pins to the profile's lock file. Tests that mean a profile set it themselves (the `hf` tests pick `dev` explicitly). A project session exports `MINI_CACHE_DIR` to share caches between threads, which would move the warm cache out of a test's tmp dir; the tests of that sharing set it themselves.
     """
-    for var in ("MINI_APP", "MINI_PROFILE", "MODAL_ENVIRONMENT"):
+    for var in ("MINI_APP", "MINI_PROFILE", "MODAL_ENVIRONMENT", "MINI_CACHE_DIR"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr("mini.__main__._peek", lambda name, backend: 0)
 

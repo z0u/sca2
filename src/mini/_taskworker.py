@@ -13,11 +13,10 @@ import threading
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Generator
 
 import cloudpickle
 
-from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from itertools import count
 from math import isfinite
@@ -313,7 +312,7 @@ def _phase_hook(
             record(phase=None, phase_until=None, phase_at=now, heartbeat_at=now)
 
     @contextmanager
-    def phase(label: str, timeout_s: float) -> Iterator[None]:
+    def phase(label: str, timeout_s: float) -> Generator[None]:
         # The watchdog's budget goes on first and comes off last, so it covers the two
         # stamps as well as the span between them. Those stamps are control-plane writes
         # — a store-wide ``flock`` locally, a network round trip on Modal — and they make

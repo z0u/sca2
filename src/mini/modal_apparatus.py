@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager, nullcontext
 from functools import wraps
 from itertools import count
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Iterable, TypeVar, cast, override
+from typing import TYPE_CHECKING, Any, Callable, Iterable, TypeVar, cast, override, AsyncGenerator
 
 if TYPE_CHECKING:
     from mini.gc import GcIO
@@ -798,7 +798,7 @@ class ModalApparatus(Apparatus[ModalVolume]):
 async def _startup_watchdog(
     display: RichProgressDisplay,
     timeout_seconds: float,
-) -> AsyncIterator[None]:
+) -> AsyncGenerator[None]:
     """Raise if no remote container checks in within *timeout_seconds*.
 
     Once the display receives any message (set via ``display._any_message``), the deadline is cancelled and the body runs without a time limit.

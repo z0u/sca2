@@ -41,7 +41,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Literal
+from typing import Any, Iterable, Iterator, Literal, Generator
 
 from mini.progress import blocking_phase
 
@@ -286,7 +286,7 @@ _resolved: contextvars.ContextVar[dict[str, dict[str, Any] | None] | None] = con
 
 
 @contextmanager
-def producer_context(info: dict[str, Any]) -> Iterator[None]:
+def producer_context(info: dict[str, Any]) -> Generator[None]:
     """Bind *info* as the identity ``set_ref`` stamps into refs written in this context.
 
     Set by the task worker around a step (experiment name, task key, and the run's code state from its stored lineage). Refs written outside any producer context are simply unstamped — capture degrades, it never blocks a write.
@@ -299,7 +299,7 @@ def producer_context(info: dict[str, Any]) -> Iterator[None]:
 
 
 @contextmanager
-def resolved_refs_context(seen: dict[str, dict[str, Any] | None]) -> Iterator[None]:
+def resolved_refs_context(seen: dict[str, dict[str, Any] | None]) -> Generator[None]:
     """Collect every ref resolved in this context into *seen* (name → stamped producer).
 
     The task worker reads the collected set back after the step to record which upstream experiments actually fed it (``upstream_refs`` on the task record).
@@ -518,7 +518,7 @@ class Store(ABC):
 
 
 @contextmanager
-def _spill(data: bytes) -> Iterator[Path]:
+def _spill(data: bytes) -> Generator[Path]:
     """Write *data* to a short-lived temp file (so a bytes ``put`` reuses the file path)."""
     import tempfile
 
@@ -795,7 +795,7 @@ _store: contextvars.ContextVar[Store | None] = contextvars.ContextVar("mini_stor
 
 
 @contextmanager
-def store_context(store: Store) -> Iterator[None]:
+def store_context(store: Store) -> Generator[None]:
     """Bind *store* as the ambient store for :func:`put` / :func:`get` in this context."""
     token = _store.set(store)
     try:

@@ -86,10 +86,10 @@ def _is_transient(exc: BaseException) -> bool:
 
     A 4xx usually says the request itself is wrong — a token without write access, a bucket that isn't there — so retrying only delays an error that was already final. 5xx, transport failures, and one measured 4xx come back.
     """
-    import httpx
+    import httpx2
     from huggingface_hub.errors import HfHubHTTPError
 
-    if isinstance(exc, httpx.TimeoutException | httpx.NetworkError | httpx.RemoteProtocolError):
+    if isinstance(exc, httpx2.TimeoutException | httpx2.NetworkError | httpx2.RemoteProtocolError):
         return True
     if isinstance(exc, HfHubHTTPError):
         response = getattr(exc, "response", None)

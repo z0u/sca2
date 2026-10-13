@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import contextvars
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass, field
 
@@ -141,7 +141,7 @@ def emit_progress(step: int, total: int, message: str = ""):
 
 
 @contextmanager
-def blocking_phase(label: str, timeout_s: float) -> Iterator[None]:
+def blocking_phase(label: str, timeout_s: float) -> Generator[None]:
     """Declare a span that legitimately makes no step progress.
 
     The worker's progress watchdog aborts a task whose ``(step, total)`` stops advancing, which is what turns a wedged worker into a fast retryable failure instead of a burnt role timeout. But some spans have no steps to report and are perfectly healthy: uploading a checkpoint after the last step, pulling a dataset before the first, a long eval between epochs. Name one, and the watchdog measures it against *timeout_s* instead of the tight step threshold::

@@ -24,7 +24,7 @@ import traceback
 import types
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from typing import Any, NoReturn
 
 from mini.reports import Publisher, current_publisher, use_publisher
@@ -312,7 +312,7 @@ class _ThreadStdout:
         return getattr(self.real, name)
 
     @contextlib.contextmanager
-    def capture(self) -> Iterator[io.StringIO]:
+    def capture(self) -> Generator[io.StringIO]:
         tid = threading.get_ident()
         self.captures[tid] = buf = io.StringIO()
         try:

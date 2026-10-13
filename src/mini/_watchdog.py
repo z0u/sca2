@@ -17,7 +17,7 @@ import sys
 import threading
 import time
 import traceback
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from itertools import count
 from typing import Any, Callable
@@ -69,7 +69,7 @@ class Watchdog:
             self._advanced_at = time.monotonic()
 
     @contextmanager
-    def phase(self, label: str, timeout_s: float) -> Iterator[None]:
+    def phase(self, label: str, timeout_s: float) -> Generator[None]:
         """Allow *timeout_s* without step progress for a declared blocking span.
 
         Setup gets ``grace_s``; this is the same allowance for any span the task names as legitimately step-free — uploading a checkpoint, pulling a dataset, a long eval between epochs. The clock resets on both entry and exit, so the span gets its whole budget and the loop that follows gets its whole timeout.

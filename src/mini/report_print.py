@@ -22,7 +22,7 @@ import subprocess
 import threading
 import urllib.error
 import urllib.request
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -169,7 +169,7 @@ def _build_serve_root(bundle: Path, root: Path, *, html: str | None = None) -> N
 
 
 @contextmanager
-def served_bundle(bundle: Path, *, html: str | None = None) -> Iterator[str]:
+def served_bundle(bundle: Path, *, html: str | None = None) -> Generator[str]:
     """Serve *bundle* (a dir with ``index.html`` + ``_assets/``, or the ``index.html``) offline; yields its URL.
 
     The serve root is a throwaway copy beside the bundle (``.render-<name>/``, gitignored under ``.mini``), removed on exit. *html* replaces the bundle's page for the duration, for a caller that has rewritten it (resolved links, say) without wanting that in the bundle itself.

@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Generator
 
 import pytest
 
@@ -236,7 +236,7 @@ def test_store_transfers_declare_a_phase_sized_from_the_payload(tmp_path: Path):
     declared: list[tuple[str, float]] = []
 
     @contextmanager
-    def spy(label: str, timeout_s: float) -> Iterator[None]:
+    def spy(label: str, timeout_s: float) -> Generator[None]:
         declared.append((label, timeout_s))
         yield
 

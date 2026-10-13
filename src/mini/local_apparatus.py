@@ -27,7 +27,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext, suppress
 from pathlib import Path
-from typing import Any, AsyncGenerator, Callable, Iterable, Iterator, TypeVar, cast, override
+from typing import Any, AsyncGenerator, Callable, Iterable, TypeVar, cast, override, Generator
 
 from mini._queues import QueueLike
 from mini.apparatus import Apparatus
@@ -337,7 +337,7 @@ def _launch_env(overlay: dict[str, str], env: dict[str, str] | None = None) -> d
 
 
 @contextmanager
-def _launch_lock(store: MemoStore) -> Iterator[None]:
+def _launch_lock(store: MemoStore) -> Generator[None]:
     store.root.mkdir(parents=True, exist_ok=True)
     with open(store.root / ".launch.lock", "w") as f:
         fcntl.flock(f, fcntl.LOCK_EX)

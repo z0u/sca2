@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterator
 
-import httpx
+import httpx2
 import pytest
 from huggingface_hub.errors import HfHubHTTPError
 
@@ -21,8 +21,8 @@ PAYLOAD = b"the blob bytes"
 
 def http_error(status: int) -> HfHubHTTPError:
     """What ``huggingface_hub`` raises once ``hf_raise_for_status`` sees a bad response."""
-    request = httpx.Request("POST", "https://bucket.invalid/api/buckets/ns/bucket/batch")
-    return HfHubHTTPError(f"HTTP {status}", response=httpx.Response(status, request=request))
+    request = httpx2.Request("POST", "https://bucket.invalid/api/buckets/ns/bucket/batch")
+    return HfHubHTTPError(f"HTTP {status}", response=httpx2.Response(status, request=request))
 
 
 class FlakyApi:
@@ -121,4 +121,16 @@ def test_a_transient_error_on_a_download_is_retried(tmp_path: Path, waits: list[
 
     assert s._cache._blob_path(SHA).read_bytes() == PAYLOAD
     assert api.calls == {"paths_info": 2, "batch": 0, "download": 2}
+    assert waits == [10.0, 10.0]
+
+
+def test_a_timeout_is_retried(tmp_path: Path, waits: list[float]):
+    # Transport failures reach us as the HTTP library's own types rather than as an
+    # HfHubHTTPError, so this is the case that breaks quietly if the library moves.
+    request = httpx2.Request("POST", "https://bucket.invalid/api/buckets/ns/bucket/batch")
+    api = FlakyApi(fail_times=1, error=httpx2.ReadTimeout("timed out", request=request))
+    art = store(tmp_path, api).put(PAYLOAD, name="blob")
+
+    assert art.size == len(PAYLOAD)
+    assert api.calls == {"paths_info": 2, "batch": 2, "download": 0}
     assert waits == [10.0, 10.0]
