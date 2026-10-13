@@ -177,7 +177,8 @@ r"""
 We trained the candidate recipes from [the slice-terms experiment](/docs/m2/slice-terms/report.py) at eight fresh seeds. Holding the anti-subspace weight high on the first slices only kept the op removable and the edit selective, and a weight that falls off linearly with depth did as well. Holding it at one level on every slice, high or gentler, lost the anchor altogether on one seed in each arm.
 ///
 
-Of the four arms, only `split-anti` also clears the gate on damage to the task, the hard criterion of the decision.
+We chose `falloff` as the recipe of record. By the frozen gate on damage to the task only `split-anti` qualified, and `falloff` missed that gate on one op at one seed.
+<!-- REVIEW: the decision was open in the previous draft; the human chose `falloff` after reading the results. This departs from the frozen task gate, and the report says so here and in the decision. -->
 """
 
 # %%
@@ -188,10 +189,10 @@ rf"""
 - [The split keeps both removal and selectivity (H1)](#the-split-keeps-both-removal-and-selectivity-h1) — **{"pass" if H1_PASS else "TODO"}**. `split-anti` removed more than `deep, hold 0.2` on {H1_AHEAD} of {len(SEEDS)} seeds and stayed within the criterion on {N_WITHIN[SPLIT]}, with the whole gain on the four seeds where the uniform hold anchored less well or not at all.
 - [A linear falloff does as well as the split (H2)](#a-linear-falloff-does-as-well-as-the-split-h2) — **{"pass" if H2_PASS else "TODO"}**. `falloff` removed about as much as `split-anti` and stayed within the criterion on every seed.
 - [Which slices the edit needs (E1)](#which-slices-the-edit-needs-e1) — the edit on slices 2 to 4 alone falls short on the same seed in every arm, which fits the seed rather than the terms deciding where it misses. The edit on slice 1 alone does depend on the arm: it removes less under the high uniform hold.
-- [Decision](#decision) — TODO, with the human.
+- [Decision](#decision) — `falloff` is the recipe of record. Only `split-anti` cleared the frozen task gate; `falloff` missed it on one op at one seed, and we kept it for its spill and its shape.
 
 /// admonition | How to read this report
-This report was preregistered: the predictions and the criteria for the decision were frozen at commit `ff44a17`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place. The note on runs that lost the anchor, in H1, was not planned.
+This report was preregistered: the predictions and the criteria for the decision were frozen at commit `ff44a17`, before any run of this experiment. Each section opens with what we expect, and the results replaced the placeholders in place. The subsection on runs that lost the anchor, in H1, was not planned, and the decision departs from the frozen task gate.
 ///
 """
 
@@ -238,8 +239,8 @@ The measurements and dose scoring are those of the slice-terms experiment.
 - Removal: the net drop in the score on `difference` under the edit, as a share of the way from the clean score to the target null. The edit projects e₁ out of the state at every position, on a set of slices, at a dose of a quarter, a half, three quarters, or all of the e₁ component. Higher is better.
 - Spill: the largest net drop on another op under the edit. A run is within the criterion when its spill is at most 0.02 at every dose.
 - Both are net of the control at the same seed.
-- Landing: the share of the distance to the target null that the full edit covers, as total variation on `difference` contexts.
-- Task change: the mean score over ops, less that of the control.
+- Landing: the share of the distance to the target null that the full edit covers, as total variation on `difference` contexts. Higher is better.
+- Task change: the mean score over ops, less that of the control. Zero means no damage; below zero is a loss.
 - The alignment α with e₁ at the example answers, at every slice, at the end of training, and the slope of the color embedding table (the e₁ component of the color embeddings against lightness).
 """
 
@@ -333,13 +334,15 @@ def dose_table() -> str:
         for a in ARMS
     ]
     return table_html(
-        ["arm", "removal", "within criterion", "spill, any dose", "raw spill", "landing", "task change"],
+        ["arm", "removal ↑", "within criterion ↑", "spill, any dose ↓", "raw spill ↓", "landing ↑", "task change ↑"],
         rows,
         f"""
         **Removal, spill, landing and task**, seed mean and range over {len(SEEDS)} runs. Removal is at the full
         dose; "spill, any dose" is the largest net spill over the four doses, and "within criterion" counts the runs
         where it is at most {CRITERION:g}. The raw spill is the largest drop on another op at the full dose without
-        subtracting the control. The landing and task change are as in the measurements.
+        subtracting the control. The landing is the share of the distance to the target null that the full edit
+        covers, and the task change is the mean score over ops less that of the control. Arrows mark which direction
+        is better.
         """,
     )
 
@@ -396,23 +399,23 @@ So the high hold at the pulled slices does cost removal, as the slice-terms expe
 The gain seems to come from where the anti weight sits, and not only from how much there is. `deep, hold 0.1` sums to about the same weight over the five slices as `split-anti` (0.50 against 0.49), and it removed less, lost the anchor on one seed, and spilled over the criterion on two.
 <!-- REVIEW: added the total-weight comparison, since `deep, hold 0.1` is the arm that separates amount from placement. Verify: the holds in the parameters table sum to 1.0, 0.5, 0.49, and 0.575. -->
 
-The one `split-anti` run over the criterion (seed {max(SEEDS, key=lambda s: WORST_SPILL[SPLIT][s])}) goes over at the two highest doses only. `falloff` and `deep, hold 0.2` were within the criterion on every seed, and `deep, hold 0.1` on {N_WITHIN["hold0.1"]}.
+The one `split-anti` run over the spill criterion (seed {max(SEEDS, key=lambda s: WORST_SPILL[SPLIT][s])}) goes over at the two highest doses only. `falloff` and `deep, hold 0.2` were within the criterion on every seed, and `deep, hold 0.1` on {N_WITHIN["hold0.1"]}.
 
 {dose_table()}
 
 The edit lands a little closer to the target null in the two arms with a split or falloff hold than in the uniform ones. The task change is small in every arm, and smallest in `split-anti`.
 
-/// admonition | Post hoc
+/// admonition | Pass
+`split-anti` removed more than `deep, hold 0.2` on {H1_AHEAD} of {len(SEEDS)} seeds, by {num(H1_MEAN)} on average, with {N_WITHIN[SPLIT]} of {len(SEEDS)} runs within the criterion.
+///
+
+### Runs that lost the anchor (post hoc)
+
 Each uniform hold lost the anchor on one seed. On those runs the example answers stay off e₁ at every slice, and the query answer aligns instead, as in seed 700 of `pool-slices` in the slice-terms experiment. The prediction of the query answer is made at the query `=`, before that position, so an edit there cannot reach it.
 
 {lost_table()}
 
-Neither the split nor the falloff lost the anchor on any seed. One reading is that a high hold at the pulled slices makes the example answers costly to align, so the pull settles on the position that aligns most readily. Eight seeds per arm give two such runs in all, so this is a pattern to watch rather than an established cause.
-///
-
-/// admonition | Pass
-`split-anti` removed more than `deep, hold 0.2` on {H1_AHEAD} of {len(SEEDS)} seeds, by {num(H1_MEAN)} on average, with {N_WITHIN[SPLIT]} of {len(SEEDS)} runs within the criterion.
-///
+Neither the split nor the falloff lost the anchor on any seed. One reading is that a high hold at the pulled slices makes the example answers costly to align, so the pull settles on the position that aligns most readily. Eight seeds per arm give two such runs in all, so this is a pattern to watch rather than an established cause. A different pooling temperature τ_p might also keep the pull on the example answers; we have not tried one here.
 """
 
 
@@ -669,12 +672,12 @@ def slices_draw(data: dict, alt_text: str) -> str:
 
 
 def slices_table() -> str:
+    edits = (("slice 1", SLICE1), ("2 to 4", LATE_SET))
     rows = [
-        [str(s)] + [num(slice_removal(a, s, SLICE1)) for a in ARMS] + [num(slice_removal(a, s, LATE_SET)) for a in ARMS]
-        for s in SEEDS
+        [f"`{NAME[a]}`", label] + [num(slice_removal(a, s, sl)) for s in SEEDS] for label, sl in edits for a in ARMS
     ]
-    head = ["seed"] + [f"slice 1, `{NAME[a]}`" for a in ARMS] + [f"2 to 4, `{NAME[a]}`" for a in ARMS]
-    return table_html(head, rows, "**Removal by which slices the edit covers**, at the full dose, by seed and arm.")
+    head = ["arm", "slices"] + [str(s) for s in SEEDS]
+    return table_html(head, rows, "**Removal by which slices the edit covers**, at the full dose, by arm and seed.")
 
 
 # The seed where split-anti alone falls to about half on slices 2 to 4 (one run; reported without a reading).
@@ -687,9 +690,9 @@ The edit on slice 1 alone removes most of the op on most runs of the split, the 
 
 {slices_figure()}
 
-Which seed the edit on slices 2 to 4 falls short on does not depend on the terms. Every arm shares the initialization, batches, and label draws of its seed, so this fits the seed deciding where the evidence for the op is read. The reading in the introduction to this section would trace that to which block moves the evidence to the `=` sites.
+The edit on slices 2 to 4 alone falls short on the same seed in every arm. Every arm shares the initialization, batches, and label draws of its seed, so this fits the seed deciding where the evidence for the op is read. The reading in the introduction to this section would trace that to which block moves the evidence to the `=` sites.
 
-How much the edit on slice 1 alone removes does depend on the terms. So the hold at the pulled slices shifts some of what the edit reaches, but it does not move the seed on which the later slices miss.
+The edit on slice 1 alone removes different amounts in different arms. So the hold at the pulled slices shifts some of what the edit reaches, but it does not move the seed on which the later slices miss.
 <!-- REVIEW: narrowed the E1 claim to the slices-2-to-4 edit. The slice-1 edit removes less under `deep, hold 0.2` on the well-anchored seeds too (0.39 to 0.64 against 0.74 to 0.87 for the split), so "which slices the edit needs is set by the seed rather than by the terms" outran the table. Verify: the slice-1 columns of the table. -->
 <!-- The seed-708 shortfall under `split-anti` on slices 2 to 4 is one run and is reported without a reading. -->
 
@@ -704,14 +707,7 @@ The runs that lost the anchor (in H1) remove almost nothing under any edit, and 
 r"""
 ## Decision
 
-We choose the recipe of record for D2.2 among the four arms, with the human, once the results are in. The criteria, reported for every arm:
-
-- Runs within the criterion, out of 8.
-- Removal at the full dose, seed mean and range.
-- Landing.
-- Task change. This is a hard gate: an arm whose mean task change is below −0.02, or which loses more than 0.05 on any op at any seed against its control, is not a candidate.
-
-These are fresh seeds for every arm, so the chosen arm's numbers here can be quoted as a result without a further confirmation.
+We chose the recipe of record for D2.2 among the four arms by the criteria frozen with the predictions: runs within the spill criterion, removal at the full dose, landing, and a hard gate on the task change. These were fresh seeds for every arm, so the numbers for the chosen arm can be quoted as a result without a further confirmation.
 """
 
 # %%
@@ -735,13 +731,21 @@ def decision_table() -> str:
         for a in ARMS
     ]
     return table_html(
-        ["arm", "within criterion", "removal", "landing", "task change", "worst op change", "clears the gate"],
+        [
+            "arm",
+            "within criterion ↑",
+            "removal ↑",
+            "landing ↑",
+            "task change ↑",
+            "worst op change ↑",
+            "clears the task gate",
+        ],
         rows,
         f"""
         **Every criterion for every arm.** Removal and landing as seed mean and range. The task change is the mean
         over seeds of the mean score over ops, less that of the control. The worst op change is the largest loss
         on any one op at any seed against its control. The gate excludes an arm whose task change is below
-        {num(GATE_MEAN)}, or whose worst op change is below {num(GATE_OP)}.
+        {num(GATE_MEAN)}, or whose worst op change is below {num(GATE_OP)}. Arrows mark which direction is better.
         """,
     )
 
@@ -754,15 +758,9 @@ rf"""
 
 Only `split-anti` clears the task gate. The three other arms each lose more than {num(abs(GATE_OP))} on some op at some seed, and every such loss is on one of the HSV ops ({", ".join(f"`{o}`" for o in GATE_OPS)}). These losses are larger than the spread between the controls at these seeds, at most {num(CONTROL_SPREAD, ".3f")} on any op.
 
-/// admonition | Open decision
-The frozen criteria leave `split-anti` as the only candidate. It removes about as much and lands about as close as `falloff`, but has one run over the spill criterion, where `falloff` has none.
+We chose `falloff` anyway, which departs from the frozen gate. Its one miss is on `{WORST_OP[FALLOFF][2]}` at seed {WORST_OP[FALLOFF][1]}, a little past the limit. That seed is also where `falloff` removed a tenth less than the split, and where its task change over all ops was lowest, so the miss looks like one weaker run rather than an op that `falloff` harms. The HSV ops are the last to be learned, so a gate on any op at any seed may be stricter for them than for the others.
 
-`falloff` misses the gate on one op at one seed, by a small margin. That seed (708) is also where it removed a tenth less than the split, and where its task change over all ops was lowest. So the miss is one soft run rather than a single op slipping.
-
-Still to check:
-(a) whether that one run should exclude `falloff`, or whether the gate needs a seed band for the HSV ops, which learn late;
-(b) if `falloff` is kept, that its spill advantage over the split rests on one run, at seed 704.
-///
+In its favor, `falloff` kept every run within the spill criterion, and its spill varied less across seeds than that of the split. That advantage rests on one run, the `split-anti` run at seed 704. The falloff also has no slice boundary to choose, and its levels can still be tuned, for example with a lower anti weight on the earliest slices.
 """
 
 

@@ -18,3 +18,5 @@ Split from the older ex-2.1.9 follow-ups item on 2026-08-23.
 ## Notes
 
 **2026-10-12, slice-terms review** — Renewed interest in the soft → sharp schedule from the slice-terms experiment. There the pull pooled over slices as well as positions settled on the query answer alone on one seed of four (a position after the prediction, so the edit removed nothing). A pool that starts soft might keep one position from taking the whole pull early. The pool now has two temperatures, τ_p over positions and τ_ℓ over slices (`AnchorSpec.slice_tau`), so a schedule could move either.
+
+**2026-10-13, split-anti-seeds** — The pull settled on the query answer again in [the split-anti-seeds experiment](/docs/m2/split-anti-seeds/report.py), this time pooling within each slice: once under each uniform anti hold (seeds 708 and 706), and never under the split or the falloff. A different τ_p, or a soft → sharp schedule for it, might keep the pull on the example answers there too.
