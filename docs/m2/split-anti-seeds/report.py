@@ -9,7 +9,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We train the candidate recipes from [the slice-terms experiment](/docs/m2/slice-terms/report.py) at eight seeds none of them has seen, to ask whether holding the anti-subspace weight high on the first slices only keeps the op removable and the edit selective. Beside it we try an anti weight that falls off linearly with depth, so that no slice boundary has to be chosen.
+We train the candidate recipes from [the slice-terms experiment](/docs/m2/slice-terms/report.py) at eight fresh seeds, to ask whether holding the anti-subspace weight high on the first slices only keeps the op removable and the edit selective. Beside it we try an anti weight that falls off linearly with depth, so that no slice boundary has to be chosen.
 ///
 """
 
@@ -33,7 +33,7 @@ This report was preregistered: the predictions and the criteria for the decision
 r"""
 ## Why this experiment
 
-The pull asks the states at the example answers of `difference` contexts to align with e₁, and the anti-subspace term asks every other state to stay off it. When the anti weight anneals low, the color embedding table and block 1 drift onto e₁ on the other ops, and the edit that projects e₁ out takes some of those ops with it: the spill. [The late-pull experiment](/docs/m2/late-pull/report.py) found that a higher hold everywhere keeps the spill within the criterion, at some cost in removal. [The slice-terms experiment](/docs/m2/slice-terms/report.py) traced that cost to the hold countering the pull at the pulled blocks, and held the weight high on the embedding and block 1 only. On its four seeds this gave the removal back and kept the spill within the criterion on three.
+The pull indirectly asks the states at the example answers of `difference` contexts to align with e₁, and the anti-subspace term asks every other state to stay off it. When the anti weight anneals low, the color embedding table and slice 1 drift onto e₁ on the other ops, and the edit that projects e₁ out takes some of those ops with it: the spill. [The late-pull experiment](/docs/m2/late-pull/report.py) found that a higher hold everywhere keeps the spill within the criterion, at some cost in removal. [The slice-terms experiment](/docs/m2/slice-terms/report.py) traced that cost to the hold countering the pull at the pulled slices, and held the weight high on the embedding and slice 1 only. On its four seeds this gave the removal back and kept the spill within the criterion on three.
 
 Those four seeds are the ones the arms were chosen on, so the result may be partly fitted to them. Before the split becomes the recipe a deliverable rests on, it should hold at fresh seeds, beside the arms it was chosen over.
 
@@ -45,22 +45,20 @@ The split also sets a boundary by hand: high on the first two slices, low after.
 r"""
 ## Parameters
 
-Every arm pulls `difference` toward e₁ at the example answers of blocks 2 to 4, with the anti-subspace term on every slice (the `deep` pull of the late-pull experiment). The anchor weight $\lambda_a$ (0.1), the pooling temperature $\tau_p$ (0.1), the label, the corpus and the schedules are the recipe values, at 400 epochs. The anti weight $\lambda_{\bar s}$ starts at 0.25 on every slice and anneals to its hold by epoch 360, as in the slice-terms experiment. The arms differ only in that hold:
+Every arm pulls `difference` toward e₁ at slices 2 to 4, pooled over the positions of each labeled context, so that most of the pull lands on the example answers. The anti-subspace term acts on every slice (the `deep` pull of the late-pull experiment). The anchor weight $\lambda_a$ (0.1), the pooling temperature $\tau_p$ (0.1), the label, the corpus and the schedules are the recipe values, at 400 epochs. The anti weight $\lambda_{\bar s}$ starts at 0.25 on every slice and anneals to its *hold* by epoch 360, as in the slice-terms experiment. The arms differ only in that hold:
 
-| arm | emb | block 1 | block 2 | block 3 | block 4 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `deep, hold 0.2` | 0.2 | 0.2 | 0.2 | 0.2 | 0.2 |
-| `deep, hold 0.1` | 0.1 | 0.1 | 0.1 | 0.1 | 0.1 |
-| `split-anti` | 0.2 | 0.2 | 0.03 | 0.03 | 0.03 |
-| `falloff` | 0.2 | 0.1575 | 0.115 | 0.0725 | 0.03 |
+<figure class="report-figure"><table class="report-table dense"><thead><tr><th>arm</th><th class=num>emb</th><th class=num>1</th><th class=num>2</th><th class=num>3</th><th class=num>4</th></tr></thead><tbody>
+<tr><td><code>deep, hold 0.2</code></td><td class=num>0.2</td><td class=num>0.2</td><td class=num>0.2</td><td class=num>0.2</td><td class=num>0.2</td></tr>
+<tr><td><code>deep, hold 0.1</code></td><td class=num>0.1</td><td class=num>0.1</td><td class=num>0.1</td><td class=num>0.1</td><td class=num>0.1</td></tr>
+<tr><td><code>split-anti</code></td><td class=num>0.2</td><td class=num>0.2</td><td class=num>0.03</td><td class=num>0.03</td><td class=num>0.03</td></tr>
+<tr><td><code>falloff</code></td><td class=num>0.2</td><td class=num>0.16</td><td class=num>0.12</td><td class=num>0.07</td><td class=num>0.03</td></tr>
+</tbody></table><figcaption><p><strong>The hold of the anti weight by slice</strong>, for each arm. Slice 0 is the embedding. The <code>falloff</code> holds are a straight line from 0.2 to 0.03, rounded here to two places.</p></figcaption></figure>
 
-`falloff` runs in a straight line between the two holds of `split-anti`, so it matches the split at the embedding and block 4 and differs between them. `deep, hold 0.1` is the gentler uniform hold, a candidate for the recipe in its own right.
+`falloff` runs in a straight line between the two holds of `split-anti`, so it matches the split at the embedding and slice 4 and differs between them. `deep, hold 0.1` is the gentler uniform hold, a candidate for the recipe in its own right.
 
 Each arm trains at model seeds 704 to 711, 32 runs in all. Ex-2.2.23 trained 400-epoch controls (no pull, no anti term) at these seeds, so every run has a control with the same initialization, batches and label draws. No arm has been trained at these seeds before.
 
-/// admonition | Open decision
-`deep` at the recipe hold (0.03 everywhere) is left out, since it spilled over the criterion on every seed so far. Adding it (8 runs, about \$3) would give a removal ceiling at the fresh seeds to compare against. To check: whether the Decision needs that ceiling, or only the comparison between candidates.
-///
+`deep` at the recipe hold (0.03 everywhere) is left out, since it spilled over the criterion on every seed so far.
 """
 
 # %%
@@ -85,6 +83,8 @@ r"""
 
 **What we expect.** On the slice-terms seeds, `split-anti` removed more than `deep, hold 0.2` at every seed and stayed within the criterion on three of four. We expect the same at the fresh seeds. The main number is the removal at the full dose, paired by seed against `deep, hold 0.2`.
 
+A pass needs both removal and spill to hold:
+
 - A pass would be `split-anti` removing more than `deep, hold 0.2` on at least 6 of 8 seeds, by at least 0.05 on average, with at least 7 of 8 runs within the criterion.
 - A partial pass would be the removal gain holding with 5 or 6 runs within the criterion.
 - A miss would be no removal gain (fewer than 5 seeds ahead, or an average gain under 0.02), or 4 or fewer runs within the criterion.
@@ -101,16 +101,18 @@ Removal and spill by dose for every arm, one hairline per run and the seed mean 
 r"""
 ## A linear falloff does as well as the split (H2)
 
-**What we expect.** `falloff` holds block 1 a little lower than `split-anti` and blocks 2 and 3 higher. The lower hold at block 1 may let a little more spill through, and the higher holds at blocks 2 and 3 may counter the pull there and cost a little removal. We expect both effects to be small. The main number is the removal at the full dose, paired by seed against `split-anti`.
+**What we expect.** `falloff` holds slice 1 a little lower than `split-anti` and slices 2 and 3 higher. The lower hold at slice 1 may let a little more spill through, and the higher holds at slices 2 and 3 may counter the pull there and cost a little removal. We expect both effects to be small. The main number is the removal at the full dose, paired by seed against `split-anti`.
 
-- A pass would be `falloff` removing within 0.03 of `split-anti` on average, with no more than one fewer run within the criterion.
-- A miss would be `falloff` removing 0.03 or more less on average, or having two or more fewer runs within the criterion.
+As in H1, a pass needs both removal and spill to hold:
+
+- A pass would be `falloff` removing within 0.03 of `split-anti` on average, with at least 7 of 8 runs within the criterion.
+- A miss would be `falloff` removing 0.03 or more less than `split-anti` on average, or 6 or fewer runs within the criterion.
 - If `falloff` removes 0.03 or more than `split-anti` on average, that would also be outside what we expect, and we would report it as a pass with the gain named.
 
 If the seeds split evenly on the direction of the removal difference and the average is near the 0.03 edge, the verdict would be Unresolved.
 
 /// admonition | TODO
-Removal against `split-anti` at the same seed, one point per seed, with the line of equality and a band of ±0.03. Beside it, α at the end of training by slice at the example answers of `difference` contexts and at block 1 on the other ops, for `falloff` and `split-anti`.
+Removal and largest spill against `split-anti` at the same seed, one point per seed, with the line of equality and a band of ±0.03 for removal and the criterion for spill. Beside it, α at the end of training by slice at the example answers, in `difference` contexts and in the contexts of the other ops, for `falloff` and `split-anti`, one hairline per run and the seed mean bold.
 ///
 """
 
@@ -119,12 +121,12 @@ Removal against `split-anti` at the same seed, one point per seed, with the line
 r"""
 ## Which slices the edit needs (E1)
 
-On the slice-terms seeds and the late-pull seeds, editing block 1 alone removed most of the op on every seed, while editing blocks 2 to 4 alone removed nearly everything on some seeds and little on others. One reading is that the evidence for the op is carried from the example answers to the `=` sites by attention, in some other direction than e₁, and that the block whose heads make that move reads the example answers as they are at its input. Block 1 is upstream of every such block, so clearing e₁ there removes the evidence before it moves. Clearing blocks 2 to 4 leaves the block-1 copy for block 2 to read. This reading is not tested here.
+On the slice-terms seeds and the late-pull seeds, editing slice 1 alone removed most of the op on every seed, while editing slices 2 to 4 alone removed nearly everything on some seeds and little on others. One reading is that the evidence for the op is carried from the example answers to the `=` sites by attention, in some other direction than e₁, and that the block whose heads make that move reads the example answers as they are at its input. Slice 1 is the input to every block after it, so clearing e₁ there removes the evidence before it moves. Clearing slices 2 to 4 leaves the copy at slice 1 for block 2 to read. This reading is not tested here.
 
-We repeat the edit on block 1 alone and on blocks 2 to 4 alone for every run, to see whether the split by seed holds at the fresh seeds and in each arm.
+We repeat the edit on slice 1 alone and on slices 2 to 4 alone for every run, to see whether the split by seed holds at the fresh seeds and in each arm.
 
 /// admonition | TODO
-Removal under the edit on block 1 alone and on blocks 2 to 4 alone, by arm and seed.
+Removal under the edit on slice 1 alone and on slices 2 to 4 alone, by arm and seed.
 ///
 """
 
