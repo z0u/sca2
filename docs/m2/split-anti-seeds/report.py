@@ -112,7 +112,7 @@ As in H1, a pass needs both removal and spill to hold:
 If the seeds split evenly on the direction of the removal difference and the average is near the 0.03 edge, the verdict would be Unresolved.
 
 /// admonition | TODO
-Removal and largest spill against `split-anti` at the same seed, one point per seed, with the line of equality and a band of ±0.03 for removal and the criterion for spill. Beside it, α at the end of training by slice at the example answers, in `difference` contexts and in the contexts of the other ops, for `falloff` and `split-anti`, one hairline per run and the seed mean bold.
+Removal and largest spill against `split-anti` at the same seed, one point per seed, with the line of equality and a band of ±0.03 for removal and the criterion for spill. Beside it, α at the end of training by slice at the example answers, in `difference` contexts and in the contexts of the other ops, for `falloff` and `split-anti`, one hairline per run and the seed mean bold, with the hold of each arm by slice in a shared-x panel underneath.
 ///
 """
 
