@@ -137,6 +137,7 @@ def _anchored_step(
             anti_slices=anti_slices,
             pool_slices=anchor.pool_slices,
             slice_tau=anchor.slice_tau,
+            anchor_slice_w=anchor.slice_w,
         )
         return lambda *args: (*step(*args), 0.0, 0.0, 0.0)
     if (
@@ -145,9 +146,10 @@ def _anchored_step(
         or anti_slices is not None
         or tuple(anchor.axes) != ANCHOR_AXES
         or anchor.pool_slices
+        or anchor.slice_w is not None
     ):
         raise ValueError(
-            "anchor_slices, anti_slices, clean_rows, pool_slices, and a multi-axis anchor are not supported with a"
+            "anchor_slices, anti_slices, clean_rows, pool_slices, slice_w, and a multi-axis anchor are not supported with a"
             " fallback spec"
         )
     step = make_fallback_train_step(optimizer, fallback, tau=anchor.tau, n_lines=n_lines)

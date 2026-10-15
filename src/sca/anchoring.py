@@ -121,6 +121,10 @@ class AnchorSpec:
     slice_tau: float | None = None
     """With `pool_slices`, a temperature of its own for the pool over slices (`pooled_anchor_term`): each slice
     pools its positions at `tau`, then the slices pool at `slice_tau`. `None` is the one joint pool at `tau`."""
+    slice_w: tuple[float, ...] | None = None
+    """One weight per pulled slice (in slice order), multiplying that slice's pooled term inside the mean over the
+    pulled slices, so the pull can ramp with depth (`pooled_anchor_term`). The scheduled weight scales them all;
+    `None` is every pulled slice at weight 1. Needs a pooled anchor (`tau` set) pooled within each slice."""
 
     def __call__(self, epoch) -> np.ndarray:
         return anchor_weight(
@@ -353,6 +357,7 @@ def pooled_anchor_term(
     hinge: tuple[float, float] | None = None,
     pool_slices: bool = False,
     slice_tau: float | None = None,
+    slice_w: Float[Array, " L1"] | None = None,
 ) -> Float[Array, ""]:
     """Mean over labeled lines and slices of the mellowmax of (1 − cos) over each line's span.
 
@@ -367,6 +372,8 @@ def pooled_anchor_term(
     *pool_slices* pools over the slice × position pairs of each line in one mellowmax, in place of one per slice, so the pull can choose the slice as well as the position: the softmin weights sum to 1 over the pairs, and the term is the mean over lines alone. The slices pooled over are the ones in *states*.
 
     *slice_tau* (with *pool_slices*) gives the slice its own temperature: each slice pools its positions at *tau*, then a second mellowmax pools the slices at *slice_tau*. At `slice_tau == tau` this is the one joint pool (every slice has the same positions, so the nested means multiply out); larger values spread the pull over depth, and `inf` is the per-slice form.
+
+    *slice_w* (without *pool_slices*) weights each slice's pooled term before the mean over slices, one weight per slice in *states*, as `anti_subspace_term` weights its slices; `None` is every slice at weight 1.
 
     *hinge*, `(cap, softness)`, remaps the per-position term from `1 − cos` to the rounded hinge `(softness / cap) · softplus((cap − cos) / softness)`: well below the cap this is `1 − cos / cap`, and the gradient fades smoothly to zero over roughly `cap ± 2·softness`, in place of a sharp corner at the cap that could make a state near it flip between pulled and not pulled from step to step against the anti-subspace term's steady push back. `None` is the plain term. Every *measurement* (`alignment`, the trajectory, `axes_alignment` itself) always reads the raw cosine; only this training-time term is remapped.
     """
@@ -404,6 +411,8 @@ def pooled_anchor_term(
         kept = labeled if line_w is None else labeled * line_w
         return jnp.sum(pooled * kept) / (n_labeled + 1e-8)
     pooled = _pool_positions(x, sel, count, labeled, tau)
+    if slice_w is not None:
+        pooled = pooled * slice_w[:, None, None]
     kept = labeled if line_w is None else labeled * line_w
     return jnp.sum(pooled * kept) / (states.shape[0] * (n_labeled + 1e-8))
 
@@ -445,6 +454,26 @@ def anti_subspace_term(
     return jnp.sum(cos**2 * live * slice_w[:, None, None]) / (states.shape[0] * (jnp.sum(live) + 1e-8))
 
 
+def _check_step_options(tau, n_lines, slices, anti_slices, pool_slices, slice_tau, anchor_slice_w) -> None:
+    """Refuse the combinations of `make_anchored_train_step` options that have no meaning."""
+    if tau is not None and n_lines < 1:
+        raise ValueError(f"pooled anchor (tau={tau}) needs n_lines >= 1, got {n_lines}")
+    if slices is not None and len(slices) == 0:
+        raise ValueError("slices must name at least one residual-stream slice, or be None for all")
+    if anti_slices is not None and len(anti_slices) == 0:
+        raise ValueError("anti_slices must name at least one residual-stream slice, or be None to follow slices")
+    if pool_slices and tau is None:
+        raise ValueError("pool_slices needs a pooled anchor (tau set)")
+    if slice_tau is not None and not pool_slices:
+        raise ValueError("slice_tau needs pool_slices")
+    if anchor_slice_w is not None and (
+        tau is None or pool_slices or slices is None or len(anchor_slice_w) != len(set(slices))
+    ):
+        raise ValueError(
+            "anchor_slice_w needs a pooled anchor (tau set), no pool_slices, and one weight per slice in slices"
+        )
+
+
 def make_anchored_train_step(
     optimizer: optax.GradientTransformation,
     tau: float | None = None,
@@ -456,6 +485,7 @@ def make_anchored_train_step(
     anti_slices: tuple[int, ...] | None = None,
     pool_slices: bool = False,
     slice_tau: float | None = None,
+    anchor_slice_w: tuple[float, ...] | None = None,
 ):
     """Build a jitted training step for cross-entropy plus the two weighted anchor terms.
 
@@ -463,23 +493,15 @@ def make_anchored_train_step(
 
     *hinge*, `(cap, softness)`, remaps the pooled term's per-position quantity as `pooled_anchor_term` describes; it only has an effect with `tau` set (the flat `anchor_term` has no hinge variant) and is fixed per build, like *tau*.
 
-    *pool_slices* pools the pull over the slice × position pairs of each line (`pooled_anchor_term`), over the slices *slices* names; it needs *tau* set, and *slice_tau* gives the pool over slices its own temperature. *anti_weight* may be a vector with one weight per slice the anti term acts on (in slice order), for per-slice weights (`AntiSpec.hold`).
+    *pool_slices* pools the pull over the slice × position pairs of each line (`pooled_anchor_term`), over the slices *slices* names; it needs *tau* set, and *slice_tau* gives the pool over slices its own temperature. *anti_weight* may be a vector with one weight per slice the anti term acts on (in slice order), for per-slice weights (`AntiSpec.hold`). *anchor_slice_w* is the pull's fixed per-slice weights (`AnchorSpec.slice_w`), one per slice in *slices*; it needs *tau* set and no *pool_slices*.
 
     *slices* restricts both terms to the named residual-stream slices (slice 0 is the embedding); `None` is every slice, the term as ex-2.1 and ex-2.2 trained it. *anti_slices* gives the anti-subspace term a slice set of its own, so the pull can leave a slice out while the anti term still acts there; `None` is the same set as *slices*. *axes* is where both terms read the alignment (`axes_alignment`): one axis, or the span of several. *clean_rows* names embeddings that may not carry the anchor axis: after each optimizer step and nGPT's re-normalization, the axis component of those embeddings is zeroed and they are re-normalized, the same kind of hard constraint as the unit norm. It is the tied-table fix for the syntax-embedding leak: those embeddings stay shared between the embedding table and the readout table, and training finds whatever solution it can with them held off the axis.
     """
-    if tau is not None and n_lines < 1:
-        raise ValueError(f"pooled anchor (tau={tau}) needs n_lines >= 1, got {n_lines}")
-    if slices is not None and len(slices) == 0:
-        raise ValueError("slices must name at least one residual-stream slice, or be None for all")
-    if anti_slices is not None and len(anti_slices) == 0:
-        raise ValueError("anti_slices must name at least one residual-stream slice, or be None to follow slices")
-    if pool_slices and tau is None:
-        raise ValueError("pool_slices needs a pooled anchor (tau set)")
-    if slice_tau is not None and not pool_slices:
-        raise ValueError("slice_tau needs pool_slices")
+    _check_step_options(tau, n_lines, slices, anti_slices, pool_slices, slice_tau, anchor_slice_w)
     sel = None if slices is None else jnp.asarray(sorted(set(slices)))
     anti_sel = sel if anti_slices is None else jnp.asarray(sorted(set(anti_slices)))
     rows = None if clean_rows is None else jnp.asarray(sorted(set(clean_rows)))
+    pull_w = None if anchor_slice_w is None else jnp.asarray(anchor_slice_w, dtype=jnp.float32)
 
     @eqx.filter_jit
     def train_step(
@@ -503,7 +525,7 @@ def make_anchored_train_step(
                 anchor_term(pulled, mask, axes)
                 if tau is None
                 else pooled_anchor_term(
-                    pulled, mask, line_id, n_lines, tau, axes, line_w, pool, hinge, pool_slices, slice_tau
+                    pulled, mask, line_id, n_lines, tau, axes, line_w, pool, hinge, pool_slices, slice_tau, pull_w
                 )
             )
             repelled = states if anti_sel is None else states[anti_sel]
