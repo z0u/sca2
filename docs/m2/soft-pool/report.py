@@ -581,7 +581,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-We tried the two changes the anchor-ramp losses suggested, crossed: a pooling temperature that starts soft and sharpens over the pull warm-up, and a pull on slices 1 to 3 only, with nothing on slice 4. Every arm with the soft start kept the anchor on every seed, but each spilled more than its twin with a fixed temperature. The ramp over slices 1 to 3 at the fixed temperature lost the anchor on one seed, in a new way.
+We tried the two changes the anchor-ramp losses suggested, crossed: a pooling temperature that starts soft and sharpens over the pull warm-up, and a pull on slices 1 to 3 only, with nothing on slice 4. Every arm with the soft start kept the anchor on every seed, but the edit spilled more under each of them than at the fixed temperature. The ramp over slices 1 to 3 at the fixed temperature lost the anchor on one seed, in a new way.
 ///
 
 In [the anchor-ramp experiment](/docs/m2/anchor-ramp/report.py), a pull that ramps with depth lost the anchor on two or three of eight seeds, where the step in [`falloff`](/docs/m2/split-anti-seeds/report.py) lost it on none. The lost runs split off from the kept ones during the pull warm-up, around epochs 16 to 24: on a kept run the example answers rise onto e₁ along with the query answer, and on a lost run they fall back. The losses also followed how little pull slices 1 to 3 had, though that ordering was picked after the counts were in.
@@ -597,7 +597,7 @@ rf"""
 ## Observations
 
 - [Removal and spill (E1)](#removal-and-spill-e1): the soft start kept the anchor on every seed in all three arms that had it, and the ramp at the fixed temperature lost it on one. Removal on the kept runs was close to that of `falloff` everywhere. But each soft arm had runs over the spill criterion, and the pool over slices 1 to 3 had the most.
-- [When the runs settle (E2)](#when-the-runs-settle-e2): a soft pool holds every position back through the first part of the warm-up, then the example answers come onto e₁ with the query answer on every seed, a record or two later than under `falloff`. The one lost run fell back after it had risen partway, and came onto e₁ again only near epoch 100, too late for the edit to remove the op.
+- [When the runs settle (E2)](#when-the-runs-settle-e2): a soft pool holds every position back through the first part of the warm-up, then the example answers come onto e₁ with the query answer on every seed, a record or two later than under `falloff`. The one lost run fell back after it had risen partway, climbed back only slowly from about epoch 100, and ended below every kept run, with the edit removing almost nothing.
 - [Where the anchor sits by depth (E3)](#where-the-anchor-sits-by-depth-e3): without a pull on slice 4, the alignment there falls back from its slice-3 level, and the pooled arm settles where the ramp does. The syntax embeddings stay off e₁ in every arm, so the extra spill under a soft pool does not come from a latch.
 
 ## Scope
@@ -640,7 +640,10 @@ Does a soft pool early, or a pull on slices 1 to 3 alone, keep the anchor on eve
 
 {dose_figure()}
 
-Every run but one climbs with the dose to between about seven tenths and nine tenths of the op, as `falloff` does. The exception is one run of `{NAME[RAMP]}` (the dashed line), which removes almost nothing at any dose. With the soft start the same ramp kept the anchor on that seed, so in the one pair where the soft start could help, it did. One seed is too few to say more than that it fits.
+Every run but one climbs with the dose to between about seven tenths and nine tenths of the op, as `falloff` does. The exception is one run of `{NAME[RAMP]}` (the dashed line), which removes almost nothing at any dose. With the soft start the same ramp kept the anchor on that seed, so in the one pair where the soft start could help, it did. But at a loss rate of one in eight, the soft twin would most often have kept that seed anyway, so this fits the soft start helping without being evidence that it does.
+<!-- REVIEW: lowered the one-seed claim by its base rate. With one loss in eight under the fixed ramp, the soft
+twin keeping that seed is the likely outcome even if the temperature does nothing, so it supports the reading only
+as a consistency check. Verify: the counts in the summary table (7 of 8 against 8 of 8). -->
 
 {summary_table()}
 
@@ -662,13 +665,19 @@ A soft pool slows the start. In the step pair, at epoch {EARLY} the query answer
 
 {settle_table()}
 
-So the soft pool does not lift the example answers early, ahead of the query answer, as we had pictured. A likely reading is that it spreads the pull so thinly over the positions that nothing moves much until the temperature is low enough to choose, and by then the example answers rise in step with the query answer. Eight seeds per arm fit this reading without proving it.
+So the soft pool does not lift the example answers early, ahead of the query answer, as we had pictured. A likely reading is that it spreads the pull so thinly over the positions that nothing moves much until the temperature is low enough to choose, and by then the example answers rise in step with the query answer. On that reading the soft start works mostly as a delay, and a pull whose warm-up simply started later might settle the runs the same way; no arm here separates the two. One thing the step pair does show is that the soft start tightened the spread: under `falloff` one seed (711) crossed {RISE:g} late, at epoch 40, and under the soft start every seed crossed at the same record. Eight seeds per arm fit this reading without proving it.
+<!-- REVIEW: named the delay reading as an alternative the arms don't separate, since the soft pool's effect at epoch
+16 is indistinguishable from a later warm-up. Added the seed-711 tightening from the settle table as the one
+observation on the step pair that bears on the benefit. Verify: first-rise column of the settle table. -->
 
-The lost run of `{NAME[RAMP]}` (seed 708) is a different kind of loss from those in the anchor-ramp experiment. Its example answers rose partway with the others, fell back at the next record, and stayed below {RISE:g} until about epoch 100, while its query answer stayed on e₁.
+The lost run of `{NAME[RAMP]}` (seed 708) is a different kind of loss from those in the anchor-ramp experiment. Its example answers rose partway with the others, fell back at the next record, and stayed below {RISE:g} until about epoch 100, while its query answer stayed on e₁. After that they climbed only to about four fifths of the kept level, and never reached it.
 
 {lost_table()}
 
-By the end of training it is nearly as aligned as the kept runs, at the example answers and at the query answer, yet the edit removes almost nothing on it, at any slice. A likely reading is that the model learned to solve `difference` while the anchor was away, along a path that does not go through e₁, and the anchor that came back later is only along for the ride. One run can't settle that, but it is a way to lose the anchor that alignment alone would not show.
+By the end of training its query answer is as aligned as on the kept runs, and its example answers end below every kept run but well above zero, yet the edit removes almost nothing on it, at any slice. A likely reading is that the model learned to solve `difference` while the anchor was away, along a path that does not go through e₁, and the alignment that came back later is only along for the ride. One run can't settle that, but it is a way to lose the anchor that alignment alone would understate: the losses in the anchor-ramp experiment ended near zero, and this one ends at four fifths of the kept level.
+<!-- REVIEW: "nearly as aligned as the kept runs" was wrong for the example answers (0.49 against a kept range of 0.59
+to 0.64, in the table above), so the claim is now that alignment understates the loss, not that it hides it. The
+query answer (0.93 against 0.94 to 0.98) does support "as aligned". Verify: the lost-run table and its caption. -->
 """
 
 # %%
@@ -694,11 +703,11 @@ The syntax embeddings stay off e₁ in every arm, within a few hundredths, so no
 r"""
 ## Discussion
 
-The soft start got the example answers onto e₁ on every seed it was tried on, apparently by holding the pull back until it can choose, so that the example answers rise with the query answer. That fits the reading from anchor-ramp, that runs are lost in the first tens of epochs when the sharp pool gives the query answer nearly all of the pull. But the evidence for a benefit is one seed, and the cost is clear: each soft arm spilled more than its fixed twin, and the pool over slices 1 to 3 spilled most.
+The soft start got the example answers onto e₁ on every seed it was tried on, apparently by holding the pull back until it can choose, so that the example answers rise with the query answer. That fits the reading from anchor-ramp, that runs are lost in the first tens of epochs when the sharp pool gives the query answer nearly all of the pull. But the evidence for a benefit is one seed, which the fixed ramp's loss rate makes a likely outcome either way, and the cost is clear: both soft twins spilled more than their fixed arms, and the pool over slices 1 to 3, which has no fixed twin, spilled most.
 
-The ramp over slices 1 to 3 lost the anchor on one seed of eight at the fixed temperature, where the anchor-ramp ramps from slice 1 lost two or three. That fits the second reading of anchor-ramp, that the earlier slices need about as much pull as the step gives them: this ramp gives slices 1 to 3 exactly that, and drops slice 4 instead. Its one loss came later and in another way, with the anchor back by the end but no longer doing the work. That is a reason to keep scoring removal, and not alignment alone, when judging a run.
+The ramp over slices 1 to 3 lost the anchor on one seed of eight at the fixed temperature, where the anchor-ramp ramps from slice 1 lost two or three. That fits the second reading of anchor-ramp, that the earlier slices need about as much pull as the step gives them: this ramp gives slices 1 to 3 exactly that, and drops slice 4 instead. Its one loss came later and in another way, with the alignment partly back by the end but no longer doing the work. That is a reason to keep scoring removal, and not alignment alone, when judging a run.
 
-If the spill can be kept down, a soft start with the ramp would have no slice boundary for the pull and no lost seeds here. As it stands, `falloff` still keeps the anchor on every seed with the edit inside the criterion, which no new arm matched on both counts.
+If the spill can be kept down, the soft ramp is a pull without the step between slices 1 and 2 that kept the anchor on every seed here. As it stands, `falloff` still keeps the anchor on every seed with the edit inside the criterion, which no new arm matched on both counts.
 """
 
 # %%
