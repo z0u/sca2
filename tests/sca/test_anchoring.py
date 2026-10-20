@@ -23,6 +23,7 @@ from sca.anchoring import (
     crop_weight,
     make_anchored_train_step,
     margin,
+    pool_temperature,
     pooled_anchor_term,
     sample_anchored_batches,
     smoothstep,
@@ -445,6 +446,38 @@ def test_slice_temperature_spreads_the_pull_over_depth():
     assert all(np.diff(shares) < 0)  # the closest slice's share falls as slice_tau grows
     with pytest.raises(ValueError, match="slice_tau needs pool_slices"):
         make_anchored_train_step(optax.sgd(0.1), tau=tau, n_lines=1, slice_tau=0.4)
+
+
+def test_pool_temperature_sharpens_geometrically_then_holds():
+    taus = pool_temperature(np.array([0.0, 20.0, 40.0, 41.0, 400.0]), 1.0, 0.1, 40.0)
+    np.testing.assert_allclose(taus, [1.0, 0.1**0.5, 0.1, 0.1, 0.1], rtol=1e-12, atol=0)
+    dense = pool_temperature(np.linspace(0, 40, 101), 1.0, 0.1, 40.0)
+    assert (np.diff(dense) < 0).all()
+    spec = AnchorSpec(peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=0.1)
+    assert not spec.scheduled_tau
+    assert spec.taus(0.0)[0] == 0.1 and np.isnan(spec.taus(0.0)[1])
+    soft = replace(spec, pool_slices=True, slice_tau=0.4, tau_start=1.0, slice_tau_start=4.0, tau_anneal_end=40.0)
+    assert soft.scheduled_tau
+    np.testing.assert_allclose(soft.taus(0.0), (1.0, 4.0), rtol=1e-12, atol=0)
+    np.testing.assert_allclose(soft.taus(20.0), (0.1**0.5, 1.6**0.5), rtol=1e-12, atol=0)
+    np.testing.assert_allclose(soft.taus(100.0), (0.1, 0.4), rtol=1e-12, atol=0)
+
+
+def test_traced_temperatures_match_static_ones():
+    rng = np.random.default_rng(1)
+    s = jnp.asarray(rng.normal(size=(3, 2, 4, 8)).astype(np.float32))
+    mask = jnp.ones((2, 4), dtype=jnp.float32)
+    line_id = jnp.asarray([[0, 0, 1, 1]] * 2, dtype=jnp.int32)
+    for kw in ({}, {"pool_slices": True}, {"pool_slices": True, "slice_tau": 0.4}):
+        static = pooled_anchor_term(s, mask, line_id, 2, 0.3, **kw)
+        traced = jax.jit(
+            lambda t, u, kw=kw: pooled_anchor_term(
+                s, mask, line_id, 2, t, **(kw | ({"slice_tau": u} if "slice_tau" in kw else {}))
+            )
+        )(jnp.float32(0.3), jnp.float32(0.4))
+        np.testing.assert_allclose(traced, static, rtol=1e-6, atol=0)
+    with pytest.raises(ValueError, match="scheduled temperature needs a finite tau"):
+        make_anchored_train_step(optax.sgd(0.1), tau=np.inf, n_lines=1, scheduled_tau=True)
 
 
 def test_softmin_weights_limits():
@@ -1281,3 +1314,39 @@ def test_training_with_per_slice_pull_weights(data_dir, tmp_path):
     assert traj["anchor"][-1] < traj["anchor"][0]
     with pytest.raises(ValueError, match="one weight per slice"):
         train((1, 2, 3), "c2")
+
+
+def test_training_with_a_scheduled_pool_temperature(data_dir, tmp_path):
+    """A schedule that holds still trains the same model as the fixed temperature, and a moving one is recorded."""
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    tokens, weights = probe_set()
+    config = training_config().model_copy(
+        update={"scheduler": SchedulerConfig(epochs=4, warmup_epochs=2, min_lr_factor=0.01)}
+    )
+    fixed = AnchorSpec(
+        peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=0.1, pool_slices=True, slice_tau=0.4
+    )
+
+    def train(anchor: AnchorSpec, name: str):
+        return train_anchored(
+            config,
+            data_dir,
+            anchor=anchor,
+            label_p=label_p,
+            probe_tokens=tokens,
+            probe_weights=weights,
+            anchor_slices=(1, 2),
+            checkpoint_dir=tmp_path / name,
+            traj_stride=2,
+        )
+
+    _, _, plain = train(fixed, "fixed")
+    _, _, still = train(replace(fixed, tau_start=0.1, slice_tau_start=0.4, tau_anneal_end=2.0), "still")
+    np.testing.assert_allclose(still["anchor"], plain["anchor"], rtol=1e-5, atol=1e-7)
+    assert "tau" not in plain
+    _, _, moving = train(replace(fixed, tau_start=1.0, slice_tau_start=4.0, tau_anneal_end=4.0), "moving")
+    assert moving["tau"].shape == (len(moving["step"]), 2)
+    assert moving["tau"][0, 0] > moving["tau"][-1, 0]
+    np.testing.assert_allclose(moving["tau"][-1], (0.1, 0.4), rtol=1e-6, atol=0)
+    assert np.isfinite(moving["anchor"]).all()

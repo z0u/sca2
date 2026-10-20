@@ -125,6 +125,34 @@ class AnchorSpec:
     """One weight per pulled slice (in slice order), multiplying that slice's pooled term inside the mean over the
     pulled slices, so the pull can ramp with depth (`pooled_anchor_term`). The scheduled weight scales them all;
     `None` is every pulled slice at weight 1. Needs a pooled anchor (`tau` set) pooled within each slice."""
+    tau_start: float | None = None
+    """The position pool's temperature at epoch 0, sharpening to `tau` by `tau_anneal_end` and holding there
+    (`pool_temperature`), so the pool can start soft while the pull settles; `None` holds `tau` throughout. Needs a
+    finite `tau` and `tau_anneal_end`."""
+    slice_tau_start: float | None = None
+    """The same for the pool over slices: `slice_tau` at epoch 0, sharpening to `slice_tau` over the same window.
+    Needs a finite `slice_tau`."""
+    tau_anneal_end: float | None = None
+    """The epoch by which a scheduled temperature reaches its end value."""
+
+    @property
+    def scheduled_tau(self) -> bool:
+        """Whether either pooling temperature moves over training, which makes it a step input."""
+        return self.tau_start is not None or self.slice_tau_start is not None
+
+    def taus(self, epoch) -> tuple[float, float]:
+        """The two pooling temperatures (positions, slices) at *epoch*: `tau` and `slice_tau` unless scheduled. A
+        slice temperature that is not set reads as `nan`, since nothing uses it.
+        """
+        end = self.tau_anneal_end if self.tau_anneal_end is not None else 1.0
+        tau = np.inf if self.tau is None else self.tau
+        slice_tau = np.nan if self.slice_tau is None else self.slice_tau
+        return (
+            tau if self.tau_start is None else float(pool_temperature(epoch, self.tau_start, tau, end)),
+            slice_tau
+            if self.slice_tau_start is None
+            else float(pool_temperature(epoch, self.slice_tau_start, slice_tau, end)),
+        )
 
     def __call__(self, epoch) -> np.ndarray:
         return anchor_weight(
@@ -159,6 +187,16 @@ def anchor_weight(
     ramp = _interp(e / warmup_epochs, shape)
     anneal = _interp((e - anneal_start) / (anneal_end - anneal_start), shape)
     return peak * ramp * (1.0 - (1.0 - floor) * anneal)
+
+
+def pool_temperature(epoch, start: float, end: float, anneal_end: float) -> np.ndarray:
+    """A pooling temperature that sharpens from *start* at epoch 0 to *end* by *anneal_end*, then holds.
+
+    The move is minimum-jerk in log τ (`smoothstep`), so each halving takes about as long as the last and the
+    temperature arrives at its end value at rest.
+    """
+    t = smoothstep(np.asarray(epoch, dtype=float) / anneal_end)
+    return np.exp(np.log(start) + (np.log(end) - np.log(start)) * t)
 
 
 @dataclass(frozen=True)
@@ -350,13 +388,13 @@ def pooled_anchor_term(
     mask: Float[Array, "B T"],
     line_id: Int[Array, "B T"],
     n_lines: int,
-    tau: float,
+    tau: float | Float[Array, ""],
     axes: tuple[int, ...] = ANCHOR_AXES,
     line_w: Float[Array, "B N"] | None = None,
     pool: Float[Array, "B T"] | None = None,
     hinge: tuple[float, float] | None = None,
     pool_slices: bool = False,
-    slice_tau: float | None = None,
+    slice_tau: float | Float[Array, ""] | None = None,
     slice_w: Float[Array, " L1"] | None = None,
 ) -> Float[Array, ""]:
     """Mean over labeled lines and slices of the mellowmax of (1 − cos) over each line's span.
@@ -375,6 +413,8 @@ def pooled_anchor_term(
 
     *slice_w* (without *pool_slices*) weights each slice's pooled term before the mean over slices, one weight per slice in *states*, as `anti_subspace_term` weights its slices; `None` is every slice at weight 1.
 
+    *tau* and *slice_tau* may be traced scalars, for a temperature scheduled over training (`AnchorSpec.tau_start`); only a static float can be ∞.
+
     *hinge*, `(cap, softness)`, remaps the per-position term from `1 − cos` to the rounded hinge `(softness / cap) · softplus((cap − cos) / softness)`: well below the cap this is `1 − cos / cap`, and the gradient fades smoothly to zero over roughly `cap ± 2·softness`, in place of a sharp corner at the cap that could make a state near it flip between pulled and not pulled from step to step against the anti-subspace term's steady push back. `None` is the plain term. Every *measurement* (`alignment`, the trajectory, `axes_alignment` itself) always reads the raw cosine; only this training-time term is remapped.
     """
     member = (line_id[..., None] == jnp.arange(n_lines)) & (mask[..., None] > 0)  # (B, T, N)
@@ -390,7 +430,7 @@ def pooled_anchor_term(
         x = (softness / cap) * jax.nn.softplus((cap - cos) / softness)
     if pool_slices and slice_tau is not None:
         per_slice = _pool_positions(x, sel, count, labeled, tau)  # (L1, B, N)
-        if np.isinf(slice_tau):
+        if _is_inf(slice_tau):
             pooled = per_slice.mean(axis=0)
         else:
             smin = jax.lax.stop_gradient(per_slice.min(axis=0))
@@ -400,7 +440,7 @@ def pooled_anchor_term(
     if pool_slices:
         # One pool per line over (slice, position): the per-slice form below with the slice axis folded in.
         n_sl = states.shape[0]
-        if np.isinf(tau):
+        if _is_inf(tau):
             pooled = jnp.einsum("lbt,btn->bn", x, sel.astype(x.dtype)) / (n_sl * jnp.maximum(count, 1))
         else:
             xw = jnp.where(sel[None], x[..., None], jnp.inf)  # (L1, B, T, N)
@@ -417,15 +457,20 @@ def pooled_anchor_term(
     return jnp.sum(pooled * kept) / (states.shape[0] * (n_labeled + 1e-8))
 
 
+def _is_inf(tau) -> bool:
+    """Whether a pooling temperature is the static ∞ (the mean form); a traced temperature is always finite."""
+    return not isinstance(tau, jax.Array) and bool(np.isinf(tau))
+
+
 def _pool_positions(
     x: Float[Array, "L1 B T"],
     sel: Bool[Array, "B T N"],
     count: Int[Array, "B N"],
     labeled: Bool[Array, "B N"],
-    tau: float,
+    tau: float | Float[Array, ""],
 ) -> Float[Array, "L1 B N"]:
     """Each line's mellowmax of *x* over its selected positions, within each slice (0 for an unlabeled line)."""
-    if np.isinf(tau):
+    if _is_inf(tau):
         return jnp.einsum("lbt,btn->lbn", x, sel.astype(x.dtype)) / jnp.maximum(count, 1)
     # The per-line min keeps exp in range (x − min ≥ 0 within the line); its
     # dependence cancels analytically, so it carries no gradient of its own.
@@ -454,7 +499,9 @@ def anti_subspace_term(
     return jnp.sum(cos**2 * live * slice_w[:, None, None]) / (states.shape[0] * (jnp.sum(live) + 1e-8))
 
 
-def _check_step_options(tau, n_lines, slices, anti_slices, pool_slices, slice_tau, anchor_slice_w) -> None:
+def _check_step_options(  # noqa: C901 — one check per option
+    tau, n_lines, slices, anti_slices, pool_slices, slice_tau, anchor_slice_w, scheduled_tau=False
+) -> None:
     """Refuse the combinations of `make_anchored_train_step` options that have no meaning."""
     if tau is not None and n_lines < 1:
         raise ValueError(f"pooled anchor (tau={tau}) needs n_lines >= 1, got {n_lines}")
@@ -472,6 +519,8 @@ def _check_step_options(tau, n_lines, slices, anti_slices, pool_slices, slice_ta
         raise ValueError(
             "anchor_slice_w needs a pooled anchor (tau set), no pool_slices, and one weight per slice in slices"
         )
+    if scheduled_tau and (tau is None or np.isinf(tau) or (slice_tau is not None and np.isinf(slice_tau))):
+        raise ValueError("a scheduled temperature needs a finite tau (and a finite slice_tau, if set)")
 
 
 def make_anchored_train_step(
@@ -486,18 +535,21 @@ def make_anchored_train_step(
     pool_slices: bool = False,
     slice_tau: float | None = None,
     anchor_slice_w: tuple[float, ...] | None = None,
+    scheduled_tau: bool = False,
 ):
     """Build a jitted training step for cross-entropy plus the two weighted anchor terms.
 
-    The weights are arguments rather than closures, so the schedules move without recompiling; *tau* is fixed per build, since a condition's pooling does not move over training. With `tau=None` the anchor term is the flat per-position mean (`anchor_term`); with a float (∞ allowed) it is the per-line mellowmax (`pooled_anchor_term`), and *n_lines* bounds the local line index the step's `line_id` argument carries. Returns the three loss terms separately: the anchor term is the training-side view of what the alignment measurements read later, and the anti-subspace term is the same view of the mean alignment the containment gates score. Pass `anti_weight=0` for a bare anchor.
+    The weights are arguments rather than closures, so the schedules move without recompiling; *tau* is fixed per build unless *scheduled_tau* is set (below). With `tau=None` the anchor term is the flat per-position mean (`anchor_term`); with a float (∞ allowed) it is the per-line mellowmax (`pooled_anchor_term`), and *n_lines* bounds the local line index the step's `line_id` argument carries. Returns the three loss terms separately: the anchor term is the training-side view of what the alignment measurements read later, and the anti-subspace term is the same view of the mean alignment the containment gates score. Pass `anti_weight=0` for a bare anchor.
 
     *hinge*, `(cap, softness)`, remaps the pooled term's per-position quantity as `pooled_anchor_term` describes; it only has an effect with `tau` set (the flat `anchor_term` has no hinge variant) and is fixed per build, like *tau*.
 
     *pool_slices* pools the pull over the slice × position pairs of each line (`pooled_anchor_term`), over the slices *slices* names; it needs *tau* set, and *slice_tau* gives the pool over slices its own temperature. *anti_weight* may be a vector with one weight per slice the anti term acts on (in slice order), for per-slice weights (`AntiSpec.hold`). *anchor_slice_w* is the pull's fixed per-slice weights (`AnchorSpec.slice_w`), one per slice in *slices*; it needs *tau* set and no *pool_slices*.
 
+    *scheduled_tau* makes the two pooling temperatures a step input, as the weights are (`AnchorSpec.tau_start`): the step then takes `taus`, the (positions, slices) pair at this step, in place of *tau* and *slice_tau*, which fix only the form of the pool and must be finite.
+
     *slices* restricts both terms to the named residual-stream slices (slice 0 is the embedding); `None` is every slice, the term as ex-2.1 and ex-2.2 trained it. *anti_slices* gives the anti-subspace term a slice set of its own, so the pull can leave a slice out while the anti term still acts there; `None` is the same set as *slices*. *axes* is where both terms read the alignment (`axes_alignment`): one axis, or the span of several. *clean_rows* names embeddings that may not carry the anchor axis: after each optimizer step and nGPT's re-normalization, the axis component of those embeddings is zeroed and they are re-normalized, the same kind of hard constraint as the unit norm. It is the tied-table fix for the syntax-embedding leak: those embeddings stay shared between the embedding table and the readout table, and training finds whatever solution it can with them held off the axis.
     """
-    _check_step_options(tau, n_lines, slices, anti_slices, pool_slices, slice_tau, anchor_slice_w)
+    _check_step_options(tau, n_lines, slices, anti_slices, pool_slices, slice_tau, anchor_slice_w, scheduled_tau)
     sel = None if slices is None else jnp.asarray(sorted(set(slices)))
     anti_sel = sel if anti_slices is None else jnp.asarray(sorted(set(anti_slices)))
     rows = None if clean_rows is None else jnp.asarray(sorted(set(clean_rows)))
@@ -515,7 +567,12 @@ def make_anchored_train_step(
         anti_weight: Float[Array, ""] | Float[Array, " S"],
         line_w: Float[Array, "B N"] | None = None,
         pool: Float[Array, "B T"] | None = None,
+        taus: Float[Array, " 2"] | None = None,
     ) -> tuple[LanguageModel, PyTree, Float[Array, ""], Float[Array, ""], Float[Array, ""]]:
+        if scheduled_tau != (taus is not None):
+            raise ValueError("pass taus exactly when the step was built with scheduled_tau")
+        slice_tau_now = slice_tau if taus is None or slice_tau is None else taus[1]
+
         def loss_fn(model: LanguageModel):
             states, logits = model.stream_and_logits(x)
             live = (x != 0).astype(states.dtype)
@@ -525,7 +582,18 @@ def make_anchored_train_step(
                 anchor_term(pulled, mask, axes)
                 if tau is None
                 else pooled_anchor_term(
-                    pulled, mask, line_id, n_lines, tau, axes, line_w, pool, hinge, pool_slices, slice_tau, pull_w
+                    pulled,
+                    mask,
+                    line_id,
+                    n_lines,
+                    tau if taus is None else taus[0],
+                    axes,
+                    line_w,
+                    pool,
+                    hinge,
+                    pool_slices,
+                    slice_tau_now,
+                    pull_w,
                 )
             )
             repelled = states if anti_sel is None else states[anti_sel]
