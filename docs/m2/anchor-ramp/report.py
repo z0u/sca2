@@ -618,7 +618,7 @@ both step-total arms, which lost 0 and 2. -->
 
 One of these runs is borderline: seed 710 of `{NAME[ONE_RAMP]}` removes a little under half the op, though its example answers are off e₁ at every slice, so it is a weak anchor rather than none. We count it as lost by the rule of the split-anti-seeds experiment.
 
-The lost runs are not the same seeds in every arm: seed 706 and seed 708 each lost the anchor in two arms, and the rest in one. On most of them the example answers stay off e₁, and the query answer aligns as usual, as it does on every run that kept the anchor. This is the same kind of loss seen with the uniform holds of the split-anti-seeds experiment.
+The lost runs are not the same seeds in every arm: seed 706 and seed 708 each lost the anchor in two arms, and the rest in one. On most of them the example answers stay off e₁, and the query answer aligns as usual, as it does on every run that kept the anchor. No other position takes its place: the separators and the newline stay off e₁ at every slice. This is the same kind of loss seen with the uniform holds of the split-anti-seeds experiment.
 
 One run of `{NAME[EMB_RAMP]}` (seed 709) settled on the first operands instead, and its query answer is off e₁ too. On that run the edit removes nothing from `difference`. It spills onto the other ops instead, since every op reads its operands.
 <!-- REVIEW: "the query answer, which aligns on every run" was wrong for seed 709 of ramp from emb (α −0.01 at the query
