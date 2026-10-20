@@ -5,6 +5,7 @@ Every bucket call is wrapped so that a server-side blip doesn't take a run down 
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -12,6 +13,7 @@ import httpx2
 import pytest
 from huggingface_hub.errors import HfHubHTTPError
 
+import mini.hf_store as hf_store
 from mini.hf_store import _RETRY_WAITS, HFStore
 from mini.store import LocalStore, _cas_key
 
@@ -134,3 +136,22 @@ def test_a_timeout_is_retried(tmp_path: Path, waits: list[float]):
     assert art.size == len(PAYLOAD)
     assert api.calls == {"paths_info": 2, "batch": 2, "download": 0}
     assert waits == [10.0, 10.0]
+
+
+def test_a_hung_bucket_write_is_abandoned_and_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, waits: list[float]
+):
+    release = threading.Event()
+
+    class HangingOnceApi(FlakyApi):
+        def batch_bucket_files(self, bucket: str, **ops: Any) -> None:
+            self.calls["batch"] += 1
+            if self.calls["batch"] == 1:
+                release.wait(5)  # hangs past the deadline, as the Modal commits did
+
+    monkeypatch.setattr(hf_store, "_COMMIT_TIMEOUT_S", 0.05)
+    api = HangingOnceApi()
+    store(tmp_path, api).set_ref("x", store(tmp_path, api).put(PAYLOAD, name="blob"))
+    release.set()
+    assert api.calls["batch"] == 3  # the put's commit twice (the first abandoned), then the ref's
+    assert len(waits) == 1

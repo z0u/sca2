@@ -71,7 +71,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-We tried two ways to make the anchor settle more reliably without the step in the pull weight: a pooling temperature that starts soft and sharpens over the warm-up, and a pull on slices 1 to 3 only. TODO: which way it came out.
+We tried the two changes the anchor-ramp losses suggested, crossed: a pooling temperature that starts soft and sharpens over the warm-up, and a pull on slices 1 to 3 only, with nothing on slice 4. TODO: which way it came out.
 ///
 
 In [the anchor-ramp experiment](/docs/m2/anchor-ramp/report.py), a pull that ramps with depth lost the anchor on two or three of eight seeds, where the step in [`falloff`](/docs/m2/split-anti-seeds/report.py) lost it on none. The lost runs split off from the kept ones during the pull warm-up, around epochs 16 to 24: on a kept run the example answers rise onto e₁ along with the query answer, and on a lost run they fall back. The losses also followed how little pull slices 1 to 3 had, though that ordering was picked after the counts were in.
@@ -99,7 +99,7 @@ This is an exploratory study, with no preregistration and no gate. Two factors a
 
 {arms_table()}
 
-The fourth arm pools the pull over the slice × position pairs of slices 1 to 3 (the nested pool of [the slice-terms experiment](/docs/m2/slice-terms/report.py)), so the pull can choose the slice as well as the position. Its slice pool temperature $\tau_\ell$ starts at {ex.SLICE_TAU_START:g}, near a plain mean over slices, and sharpens to {ex.SLICE_TAU:g} over the same window as $\tau_p$. The end value rests on one seed: in E4 of slice-terms, $\tau_\ell$ from 0.2 to 1.6 at seed 701 all removed about as much and stayed within the criterion, with no trend, and the joint pool at 0.1 lost the anchor on one seed of four. So {ex.SLICE_TAU:g} sits inside the range that worked there.
+The fourth arm pools the pull over the slice × position pairs of slices 1 to 3 (the nested pool of [the slice-terms experiment](/docs/m2/slice-terms/report.py)), so the pull can choose the slice as well as the position. Its slice pool temperature $\tau_\ell$ starts at {ex.SLICE_TAU_START:g}, near a plain mean over slices, and sharpens to {ex.SLICE_TAU:g} over the same window as $\tau_p$. The end value rests on one seed: in E4 of slice-terms, $\tau_\ell$ from 0.2 to 1.6 at seed 701 removed between about three quarters and nine tenths of the op, with no trend, and every run stayed within the criterion, while the joint pool at 0.1 lost the anchor on one seed of four. So {ex.SLICE_TAU:g} sits inside the range that worked there.
 
 A soft pool and a ramp each change more than one thing, so it helps to list them:
 

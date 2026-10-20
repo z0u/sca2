@@ -75,6 +75,43 @@ _RETRY_WAITS = (10.0, 20.0, 40.0)
 _RETRY_STATUSES = frozenset({422, *range(500, 600)})
 """HTTP statuses worth another attempt."""
 
+# A bucket commit can also hang with no error at all. In the soft-pool smoke run on
+# 2026-10-20, three of four Modal workers sat in ``new_upload_commit`` with nothing
+# transferred until the 900 s step watchdog aborted them, while the same puts from a
+# local shell took a few seconds each (todo/eng/bucket-commit-outlasts-the-watchdog.md).
+# So each write attempt gets a deadline of its own, and a commit that outlives it is
+# treated as transient: four attempts at this deadline plus the waits above stay under
+# the 900 s watchdog the training roles set.
+_COMMIT_TIMEOUT_S = 180.0
+"""Seconds one bucket write attempt may take before it is abandoned and retried."""
+
+
+class CommitTimeout(TimeoutError):
+    """A bucket write that neither finished nor failed within :data:`_COMMIT_TIMEOUT_S`."""
+
+
+def _with_deadline[T](call: Callable[[], T], seconds: float) -> T:
+    """Run *call* on a daemon thread and wait at most *seconds* for it.
+
+    A daemon thread, so an abandoned attempt can't keep the process alive at exit. The abandoned call may still land later; every wrapped write is idempotent (see above), so a late landing changes nothing.
+    """
+    box: dict[str, Any] = {}
+
+    def run() -> None:
+        try:
+            box["value"] = call()
+        except BaseException as e:  # noqa: BLE001 — re-raised on the caller's thread
+            box["error"] = e
+
+    t = threading.Thread(target=run, name="bucket-write", daemon=True)
+    t.start()
+    t.join(seconds)
+    if t.is_alive():
+        raise CommitTimeout(f"no answer in {seconds:.0f}s")
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
+
 
 def _sleep_before_retry(seconds: float) -> None:
     """Wait, with ±25% jitter so a sweep's workers don't all come back at the same instant."""
@@ -89,7 +126,7 @@ def _is_transient(exc: BaseException) -> bool:
     import httpx2
     from huggingface_hub.errors import HfHubHTTPError
 
-    if isinstance(exc, httpx2.TimeoutException | httpx2.NetworkError | httpx2.RemoteProtocolError):
+    if isinstance(exc, CommitTimeout | httpx2.TimeoutException | httpx2.NetworkError | httpx2.RemoteProtocolError):
         return True
     if isinstance(exc, HfHubHTTPError):
         response = getattr(exc, "response", None)
@@ -165,8 +202,11 @@ class HFStore(Store):
         return self.bucket
 
     def _batch(self, bucket: str, **ops: Any) -> None:
-        """One ``batch_bucket_files`` commit — every bucket mutation goes through here, so they all get the retry ring."""
-        _retrying(f"bucket write to {bucket}", lambda: self.api.batch_bucket_files(bucket, **ops))
+        """One ``batch_bucket_files`` commit — every bucket mutation goes through here, so they all get the retry ring, and a deadline on each attempt."""
+        _retrying(
+            f"bucket write to {bucket}",
+            lambda: _with_deadline(lambda: self.api.batch_bucket_files(bucket, **ops), _COMMIT_TIMEOUT_S),
+        )
 
     # -- existence / cache ----------------------------------------------------
 

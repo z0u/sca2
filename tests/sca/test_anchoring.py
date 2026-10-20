@@ -1,6 +1,7 @@
 """Concept anchoring: the pull lands on the right positions, and it moves the stream."""
 
 from dataclasses import replace
+from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -468,7 +469,8 @@ def test_traced_temperatures_match_static_ones():
     s = jnp.asarray(rng.normal(size=(3, 2, 4, 8)).astype(np.float32))
     mask = jnp.ones((2, 4), dtype=jnp.float32)
     line_id = jnp.asarray([[0, 0, 1, 1]] * 2, dtype=jnp.int32)
-    for kw in ({}, {"pool_slices": True}, {"pool_slices": True, "slice_tau": 0.4}):
+    variants: list[dict[str, Any]] = [{}, {"pool_slices": True}, {"pool_slices": True, "slice_tau": 0.4}]
+    for kw in variants:
         static = pooled_anchor_term(s, mask, line_id, 2, 0.3, **kw)
         traced = jax.jit(
             lambda t, u, kw=kw: pooled_anchor_term(
