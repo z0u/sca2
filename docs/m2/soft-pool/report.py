@@ -205,7 +205,10 @@ def dose_figure() -> str:
         ],
     }
     alt = """
-        TODO alt text once the results are in.
+        Removal (top row) and spill (bottom row) against the dose, one column per arm. In every arm most runs climb
+        to between about 0.7 and 0.9 removal at the full dose. One dashed run of the fixed ramp stays near zero at
+        every dose. Spill stays near zero on most runs; each soft arm has a couple of runs just over the dashed
+        criterion at the full dose, and one run of the soft pool reaches about 0.07.
     """
     return dose_draw(data, alt)
 
@@ -348,7 +351,12 @@ def track_figure() -> str:
         ],
     }
     alt = """
-        TODO alt text once the results are in.
+        Alignment at slice 3 against epoch, first hundred epochs, one column per arm. Top row, example answers:
+        under falloff most runs rise past 0.4 by epoch 20; under the soft arms every run rises a few epochs later,
+        close together; in the fixed ramp one dashed run rises to 0.3, drops back and wobbles below 0.4 until about
+        epoch 100. Second row, the query answer rises to about 0.8 in every run, a little later under the soft arms.
+        Underneath, the anchor weight ramps from 0 to 0.1 by epoch 40 in every arm, and the temperature falls from 1
+        to 0.1 by epoch 40 in the soft arms and stays at 0.1 in the others.
     """
     return track_draw(data, alt)
 
@@ -432,7 +440,10 @@ def depth_figure() -> str:
         ],
     }
     alt = """
-        TODO alt text once the results are in.
+        Alignment at the example answers by slice for the runs that kept the anchor. On difference every arm rises
+        from near zero at the embedding to about 0.6 at slice 3; at slice 4 the step arms stay near 0.64 while the
+        ramp and pool arms fall to about 0.46. On the other ops every arm peaks at slice 1, at about 0.15 to 0.21.
+        Underneath, the pull weight by slice and the anti hold falling from 0.2 at the embedding to 0.03 at slice 4.
     """
     return depth_draw(data, alt)
 
@@ -515,6 +526,54 @@ def depth_table() -> str:
     )
 
 
+RISE = 0.4  # The level at which E2 calls the example answers on e₁, as in anchor-ramp.
+EARLY = 16  # The epoch E2 compares the arms at, early in the warm-up where anchor-ramp's lost runs fell behind.
+
+
+def first_rise(arm: str, seed: int) -> float:
+    """The first recorded epoch at which α at the example answers, at the tracked slice, goes over `RISE`."""
+    t = np.asarray(alpha_track(arm, seed, ANSWERS))
+    above = np.flatnonzero(t > RISE)
+    return float(np.asarray(traj_of(arm, seed)["epoch"])[above[0]]) if len(above) else float("nan")
+
+
+def at_epoch(arm: str, seed: int, pos: list[int] | int, epoch: float) -> float:
+    ep = np.asarray(traj_of(arm, seed)["epoch"])
+    return float(np.asarray(alpha_track(arm, seed, pos))[int(np.argmin(abs(ep - epoch)))])
+
+
+RISES = {a: [first_rise(a, s) for s in SEEDS] for a in ARMS}
+
+
+def settle_table() -> str:
+    rows = [
+        [
+            f"`{NAME[a]}`",
+            fmt((at_epoch(a, s, QUERY_ANSWER, EARLY) for s in SEEDS)),
+            fmt((at_epoch(a, s, ANSWERS, EARLY) for s in SEEDS)),
+            fmt(RISES[a], ".0f"),
+            fmt((at_epoch(a, s, ANSWERS, 48) for s in SEEDS)),
+        ]
+        for a in ARMS
+    ]
+    return table_html(
+        [
+            "arm",
+            f"α query answer, epoch {EARLY}",
+            f"α example answers, epoch {EARLY}",
+            f"first epoch over {RISE:g}",
+            "α example answers, epoch 48",
+        ],
+        rows,
+        f"""
+        **How the runs settle.** α at slice {TRACK_SLICE} on the `{ex.ANCHORED_OP}` probe contexts, seed mean and
+        range over every run: at the query answer and the example answers at epoch {EARLY}, the first recorded epoch
+        at which the example answers go over {RISE:g} (records are every four epochs), and the example answers at
+        epoch 48, just after the warm-up.
+        """,
+    )
+
+
 # %%
 
 rf"""
@@ -522,7 +581,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-We tried the two changes the anchor-ramp losses suggested, crossed: a pooling temperature that starts soft and sharpens over the warm-up, and a pull on slices 1 to 3 only, with nothing on slice 4. TODO: which way it came out.
+We tried the two changes the anchor-ramp losses suggested, crossed: a pooling temperature that starts soft and sharpens over the pull warm-up, and a pull on slices 1 to 3 only, with nothing on slice 4. Every arm with the soft start kept the anchor on every seed, but each spilled more than its twin with a fixed temperature. The ramp over slices 1 to 3 at the fixed temperature lost the anchor on one seed, in a new way.
 ///
 
 In [the anchor-ramp experiment](/docs/m2/anchor-ramp/report.py), a pull that ramps with depth lost the anchor on two or three of eight seeds, where the step in [`falloff`](/docs/m2/split-anti-seeds/report.py) lost it on none. The lost runs split off from the kept ones during the pull warm-up, around epochs 16 to 24: on a kept run the example answers rise onto e₁ along with the query answer, and on a lost run they fall back. The losses also followed how little pull slices 1 to 3 had, though that ordering was picked after the counts were in.
@@ -537,16 +596,16 @@ The {len(ex.ARMS)} new arms, of {len(ex.SEEDS)} runs each, cross the two changes
 rf"""
 ## Observations
 
-- Removal and spill (E1): TODO.
-- When the runs settle (E2): TODO.
-- Where the anchor sits by depth (E3): TODO.
+- [Removal and spill (E1)](#removal-and-spill-e1): the soft start kept the anchor on every seed in all three arms that had it, and the ramp at the fixed temperature lost it on one. Removal on the kept runs was close to that of `falloff` everywhere. But each soft arm had runs over the spill criterion, and the pool over slices 1 to 3 had the most.
+- [When the runs settle (E2)](#when-the-runs-settle-e2): a soft pool holds every position back through the first part of the warm-up, then the example answers come onto e₁ with the query answer on every seed, a record or two later than under `falloff`. The one lost run fell back after it had risen partway, and came onto e₁ again only near epoch 100, too late for the edit to remove the op.
+- [Where the anchor sits by depth (E3)](#where-the-anchor-sits-by-depth-e3): without a pull on slice 4, the alignment there falls back from its slice-3 level, and the pooled arm settles where the ramp does. The syntax embeddings stay off e₁ in every arm, so the extra spill under a soft pool does not come from a latch.
 
 ## Scope
 
 This is an exploratory study, with no preregistration and no gate. Two factors are crossed, with `falloff` as the condition where both are at their recipe level:
 
-- The pull shape: the step on slices 2 to 4 (the recipe), or a ramp over slices 1 to 3 at a third, two thirds and the full weight, with nothing on the embedding or slice 4. The ramp adds up to the step over slices 1 to 3 (two each), so it moves the pull of slice 4 away rather than adding to the earlier slices.
-- The position pool temperature $\tau_p$: fixed at 0.1 (the recipe), or soft-to-sharp, starting at {ex.TAU_START:g} and sharpening to 0.1 by epoch 40, the end of the pull warm-up. The move is smooth in log $\tau_p$, so the pool halves its temperature at a steady pace and comes to rest at 0.1.
+- The pull shape: the step on slices 2 to 4 (the recipe), or a ramp over slices 1 to 3 at a third, two thirds and the full weight, with nothing on the embedding or slice 4. The ramp adds up to the step over slices 1 to 3 (two each), so the earlier slices keep the pull the step gives them, and the pull on slice 4 goes.
+- The position pool temperature $\tau_p$: fixed at 0.1 (the recipe), or soft-to-sharp, starting at {ex.TAU_START:g} and sharpening to 0.1 by epoch 40, the end of the pull warm-up. The move is smooth in log $\tau_p$, so the pool halves its temperature at a steady pace and comes to rest at 0.1. It is about halfway there in log terms at epoch 20, when the split in the anchor-ramp runs happened: at that temperature the query answer, if well ahead of an example answer, takes a few times its share of the pull, where at 0.1 it takes about fifty times.
 
 {arms_table()}
 
@@ -558,14 +617,14 @@ A soft pool and a ramp each change more than one thing, so it helps to list them
 - The ramp pulls two thirds as much in total as the step, all of it moved off slice 4. A difference between the ramp and the step can come from the shape or from the lower total.
 - The pool over slices 1 to 3 pulls as much in total as the step, and lets the pull choose where it goes.
 
-Every run trains at model seeds {ex.SEEDS[0]} to {ex.SEEDS[-1]} for 400 epochs, paired by seed with its `falloff` twin and with ex-2.2.23's control (same initialization, batches and label draws). With eight seeds per arm, one or two lost runs could come from the seeds alone, so we weigh the counts across arms together.
+Every run trains at model seeds {ex.SEEDS[0]} to {ex.SEEDS[-1]} for 400 epochs, paired by seed with its `falloff` twin and with ex-2.2.23's control (same initialization, batches and label draws). With eight seeds per arm, one or two lost runs could come from the seeds alone, so we weigh the counts across arms together. `falloff` lost no runs at these seeds, so the step pair can show what a soft start costs, and only the ramp pair can show what it buys.
 
 ## The measurements
 
 The measurements and dose scoring are those of the split-anti-seeds experiment.
 
 - Removal: the net drop in the score on `difference` under the edit, as a share of the way from the clean score to the target null. The edit projects e₁ out of the state at every position and slice, at a dose of a quarter, a half, three quarters, or all of the e₁ component. Higher is better.
-- Spill: the largest net drop on another op under the edit. A run is within the criterion when its spill is at most 0.02 at every dose.
+- Spill: the largest net drop on another op under the edit. A run is within the criterion when its spill is at most {CRITERION:g} at every dose.
 - Both are net of the control at the same seed.
 - A run lost the anchor when the full edit removes less than half of the op, as in the split-anti-seeds experiment.
 - Task change: the mean score over ops, less that of the control. Zero means no damage.
@@ -574,32 +633,60 @@ The measurements and dose scoring are those of the split-anti-seeds experiment.
 
 # %%
 
-r"""
+rf"""
 ## Removal and spill (E1)
 
 Does a soft pool early, or a pull on slices 1 to 3 alone, keep the anchor on every seed, and does it keep the edit as selective as `falloff`? The main measure is the removal at the full dose, with the spill at any dose beside it. The crossing separates the two factors: the soft step against `falloff` isolates the temperature, and the fixed ramp against `falloff` isolates the shape.
 
-TODO.
+{dose_figure()}
+
+Every run but one climbs with the dose to between about seven tenths and nine tenths of the op, as `falloff` does. The exception is one run of `{NAME[RAMP]}` (the dashed line), which removes almost nothing at any dose. With the soft start the same ramp kept the anchor on that seed, so in the one pair where the soft start could help, it did. One seed is too few to say more than that it fits.
+
+{summary_table()}
+
+The soft start costs selectivity. `falloff` and `{NAME[RAMP]}` stayed within the criterion on every seed, and their soft twins went over it on two seeds each, by a little. The pool over slices 1 to 3 went over on half its seeds, one of them (seed 711) by more than three times the criterion. The τ×λ_a sweep found the same direction for a softer fixed temperature, so this seems to be the price of a soft pool, even one that is soft for the first tenth of training only.
+
+The ramp also costs a little removal. Over the kept runs, both ramps remove a few hundredths less than the step, and `{NAME[RAMP_SOFT]}` has three runs near seven tenths. The mean task score is unchanged in every arm, and no new arm loses more on any one op than `falloff` does.
 """
 
 # %%
 
-r"""
+rf"""
 ## When the runs settle (E2)
 
-Does the soft pool carry the example answers onto e₁ with the query answer through the warm-up, where the lost runs of the anchor-ramp experiment fell back? The main measure is α at the example answers along training, with the temperature and the pull weight in strips underneath, and α at the query answer beside it.
+Does the soft pool carry the example answers onto e₁ with the query answer through the warm-up, where the lost runs of the anchor-ramp experiment fell back? The main measure is α at the example answers along training, at slice {TRACK_SLICE}, the deepest slice every arm pulls. The query answer is in the row underneath, and the anchor weight and the temperature in strips below that.
 
-TODO.
+{track_figure()}
+
+A soft pool slows the start. In the step pair, at epoch {EARLY} the query answer under `falloff` is already partway onto e₁ and the example answers are following it, while under the soft start both are still near zero. A record or two later the example answers come up on every seed of `{NAME[STEP_SOFT]}`, all crossing {RISE:g} at the same record. The ramp starts slowly at slice {TRACK_SLICE} at either temperature, since it pulls that slice at two thirds of the step weight. With the soft start its runs cross {RISE:g} within a few records of one another, and at the fixed temperature one run is left behind.
+
+{settle_table()}
+
+So the soft pool does not lift the example answers early, ahead of the query answer, as we had pictured. A likely reading is that it spreads the pull so thinly over the positions that nothing moves much until the temperature is low enough to choose, and by then the example answers rise in step with the query answer. Eight seeds per arm fit this reading without proving it.
+
+The lost run of `{NAME[RAMP]}` (seed 708) is a different kind of loss from those in the anchor-ramp experiment. Its example answers rose partway with the others, fell back at the next record, and stayed below {RISE:g} until about epoch 100, while its query answer stayed on e₁.
+
+{lost_table()}
+
+By the end of training it is nearly as aligned as the kept runs, at the example answers and at the query answer, yet the edit removes almost nothing on it, at any slice. A likely reading is that the model learned to solve `difference` while the anchor was away, along a path that does not go through e₁, and the anchor that came back later is only along for the ride. One run can't settle that, but it is a way to lose the anchor that alignment alone would not show.
 """
 
 # %%
 
-r"""
+rf"""
 ## Where the anchor sits by depth (E3)
 
-On the runs that kept the anchor, where does the alignment sit by slice? With nothing on slice 4, does slice 4 still hold the concept as the residual stream carries it up, and where does the pool over slices 1 to 3 settle, given that the pool over every block settled on block 4 in the slice-terms experiment?
+On the runs that kept the anchor, where does the alignment sit by slice? With nothing on slice 4, does slice 4 still hold the concept as the residual stream carries it up, and where does the pool over slices 1 to 3 settle, given that the pool over every block settled on block 4 in the slice-terms experiment? Beside it, we check the syntax embeddings, since in the τ×λ_a sweep a soft pool spilled through the `=` embedding coming onto e₁.
 
-TODO.
+{depth_figure()}
+
+Up to slice 3 the arms are nearly alike, and the soft start changes nothing there. At slice 4, where the ramp and the pool put no pull, the example answers fall back to about three quarters of their slice-3 level, and the query answer falls from near one to about four fifths. Under the step they hold their slice-3 level. So the concept rides up past the last pulled slice, though only partly, and the edit still finds it, since it acts on every slice.
+
+The pool over slices 1 to 3 settles much as the ramp does, a little higher at slices 1 and 2. In slice-terms, the pool over every block settled on block 4, the last one in the pool, and here it settles on slice 3, again the last one. The other ops peak at slice 1 in every arm, as in `falloff`.
+
+{depth_table()}
+
+The syntax embeddings stay off e₁ in every arm, within a few hundredths, so nothing latches, and the spill of E1 does not come from the route the τ×λ_a sweep found. The other ops end about as aligned in the step pair, and a little more aligned under the soft ramp than under the fixed one, though not by enough to account for the spill. So where the extra spill comes from is still open.
 """
 
 # %%
@@ -607,7 +694,11 @@ TODO.
 r"""
 ## Discussion
 
-TODO.
+The soft start got the example answers onto e₁ on every seed it was tried on, apparently by holding the pull back until it can choose, so that the example answers rise with the query answer. That fits the reading from anchor-ramp, that runs are lost in the first tens of epochs when the sharp pool gives the query answer nearly all of the pull. But the evidence for a benefit is one seed, and the cost is clear: each soft arm spilled more than its fixed twin, and the pool over slices 1 to 3 spilled most.
+
+The ramp over slices 1 to 3 lost the anchor on one seed of eight at the fixed temperature, where the anchor-ramp ramps from slice 1 lost two or three. That fits the second reading of anchor-ramp, that the earlier slices need about as much pull as the step gives them: this ramp gives slices 1 to 3 exactly that, and drops slice 4 instead. Its one loss came later and in another way, with the anchor back by the end but no longer doing the work. That is a reason to keep scoring removal, and not alignment alone, when judging a run.
+
+If the spill can be kept down, a soft start with the ramp would have no slice boundary for the pull and no lost seeds here. As it stands, `falloff` still keeps the anchor on every seed with the edit inside the criterion, which no new arm matched on both counts.
 """
 
 # %%
@@ -615,5 +706,5 @@ TODO.
 r"""
 ## Method
 
-The pooling temperatures are step inputs here, scheduled like the weights (`AnchorSpec.tau_start`, `slice_tau_start` and `tau_anneal_end`); before this experiment they were fixed when the training step was built. Training otherwise follows the split-anti-seeds experiment unchanged. The trajectory of each run also keeps α by slice and position for each op separately, and the e₁ component of every syntax embedding, for later use.
+The pooling temperatures are step inputs here, scheduled like the weights (`AnchorSpec.tau_start`, `slice_tau_start` and `tau_anneal_end`); before this experiment they were fixed when the training step was built. The schedule is minimum-jerk in log τ from the start value at epoch 0 to the end value at epoch 40, and holds after. Training otherwise follows the split-anti-seeds experiment unchanged. The trajectory of each run also keeps α by slice and position for each op separately, and the e₁ component of every syntax embedding, for later use. The 32 runs cost about \$11.
 """
