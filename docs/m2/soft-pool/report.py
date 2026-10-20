@@ -508,6 +508,10 @@ def depth_table() -> str:
         [f"`{NAME[a]}`"]
         + [num(float(np.mean([alpha_by_slice(a, s)[sl] for s in KEPT[a]]))) if KEPT[a] else "–" for sl in range(1, 5)]
         + [
+            num(float(np.mean([alpha_by_slice(a, s, pos=QUERY_ANSWER)[sl] for s in KEPT[a]]))) if KEPT[a] else "–"
+            for sl in (3, 4)
+        ]
+        + [
             num(float(np.mean([alpha_by_slice(a, s, "alpha_other")[sl] for s in KEPT[a]]))) if KEPT[a] else "–"
             for sl in (1, 2)
         ]
@@ -515,11 +519,23 @@ def depth_table() -> str:
         for a in ARMS
     ]
     return table_html(
-        ["arm", "α at 1", "α at 2", "α at 3", "α at 4", "α other ops, 1", "α other ops, 2", "syntax e₁"],
+        [
+            "arm",
+            "α at 1",
+            "α at 2",
+            "α at 3",
+            "α at 4",
+            "query, 3",
+            "query, 4",
+            "α other ops, 1",
+            "α other ops, 2",
+            "syntax e₁",
+        ],
         rows,
         f"""
         **Alignment by slice, and the syntax embeddings.** α at the example answers on `{ex.ANCHORED_OP}` and on the
-        other ops, seed mean over the runs that kept the anchor. "Syntax e₁" is the largest e₁ component (in size)
+        other ops, seed mean over the runs that kept the anchor. "Query" is α at the query answer on `{ex.ANCHORED_OP}`.
+        "Syntax e₁" is the largest e₁ component (in size)
         among the embeddings of `?`, `=`, `,` and the newline, seed mean and range over every run; a latch would show
         as a value near one.
         """,
@@ -615,7 +631,7 @@ This is an exploratory study, with no preregistration and no gate. Two factors a
 
 The fourth arm pools the pull over the slice × position pairs of slices 1 to 3 (the nested pool of [the slice-terms experiment](/docs/m2/slice-terms/report.py)), so the pull can choose the slice as well as the position. Its slice pool temperature $\tau_\ell$ starts at {ex.SLICE_TAU_START:g}, near a plain mean over slices, and sharpens to {ex.SLICE_TAU:g} over the same window as $\tau_p$.
 
-The end value rests on one seed. In E4 of slice-terms, at seed 701, every $\tau_\ell$ from 0.2 to 1.6 removed about three quarters to nine tenths of the op, with no trend and every run within the criterion, while the joint pool at $\tau_\ell$ = 0.1 lost the anchor on one seed of four. So {ex.SLICE_TAU:g} sits inside the range that worked there.
+The end value rests on one seed. In E4 of slice-terms, at seed 701, every $\tau_\ell$ from 0.2 to 1.6 removed about three quarters to nine tenths of the op, with no trend and every run within the criterion, while the joint pool at $\tau_\ell$ = 0.1 lost the anchor on one seed of four. So {ex.SLICE_TAU:g} is inside the range that worked there.
 
 A soft pool and a ramp each change more than one thing:
 
@@ -625,7 +641,7 @@ A soft pool and a ramp each change more than one thing:
 
 Every run trains at model seeds {ex.SEEDS[0]} to {ex.SEEDS[-1]} for 400 epochs, paired by seed with its `falloff` twin and with ex-2.2.23's control (same initialization, batches and label draws).
 
-With eight seeds per arm, one or two lost runs could come from the seeds alone, so we weigh the counts across arms together. `falloff` lost no runs at these seeds, so the step pair can show what a soft start costs, and only the ramp pair can show what it buys.
+With eight seeds per arm, one or two lost runs could come from the seeds alone, so we weigh the counts across arms together. `falloff` lost no runs at these seeds, so the step pair can only show a soft start doing harm, and only the ramp pair can show it helping.
 
 ## The measurements
 
@@ -657,9 +673,9 @@ as a consistency check. Verify: the counts in the summary table (7 of 8 against 
 
 {summary_table()}
 
-The soft start costs selectivity. `falloff` and `{NAME[RAMP]}` stayed within the criterion on every seed, and their soft twins went over it on two seeds each, by a little. The pool over slices 1 to 3 went over on half its seeds, one of them (seed 711) by more than three times the criterion. The τ×λ_a sweep found the same for a softer fixed temperature, so this seems to be the price of a soft pool, even one that is soft for the first tenth of training only.
+The soft start makes the edit less selective. `falloff` and `{NAME[RAMP]}` stayed within the criterion on every seed, and their soft twins went over it on two seeds each, by a little. The pool over slices 1 to 3 went over on half its seeds, one of them (seed 711) by more than three times the criterion. The τ×λ_a sweep found the same for a softer fixed temperature, so this seems to be the price of a soft pool, even one that is soft for the first tenth of training only.
 
-The ramp also costs a little removal. Over the kept runs, both ramps remove a few hundredths less than the step, and `{NAME[RAMP_SOFT]}` has three runs near seven tenths. The mean task score is unchanged in every arm, and no new arm loses more on any one op than `falloff` does.
+The ramp also removes a little less. Over the kept runs, both ramps remove a few hundredths less than the step, and `{NAME[RAMP_SOFT]}` has three runs near seven tenths. The mean task score is unchanged in every arm, and no new arm loses more on any one op than `falloff` does.
 """
 
 # %%
