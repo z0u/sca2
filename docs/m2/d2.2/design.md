@@ -50,7 +50,7 @@ Labels
     From [ex-2.2.14](../ex-2.2.14/report.py) and [ex-2.2.21](../ex-2.2.21/report.py).
 
 Pull
-: On a labelled context, the anchor term pulls blocks 2 to 4, pooled over the positions of the context at a temperature $\tau_p$ of 0.1, so most of the pull lands on the example answers. There is no cap on the alignment. A context the training window cuts short is not pulled. The embedding and block 1 are left out because, before the model has read the context, the pull finds a stand-in there (see the lean, under (b)). A pull weight that ramps with depth in place of the step lost the anchor on more seeds, and a $\tau_p$ that starts soft spilled more, so the step and the fixed temperature stay.
+: On a labelled context, the anchor term pulls blocks 2 to 4, pooled over the positions of the context at a temperature $\tau_p$ of 0.1, so most of the pull lands on the example answers. There is no cap on the alignment. A context the training window cuts short is not pulled. The embedding and block 1 are left out because, before the model has read the context, the pull finds a stand-in there (see the lean, under (b)). A pull weight that ramps with depth in place of the step lost the anchor on more seeds, and a $\tau_p$ that starts soft spilled more, so the step and the fixed temperature stay for now.
 
     From [ex-2.2.15](../ex-2.2.15/report.py) (whole contexts), [ex-2.2.22](../ex-2.2.22/report.py) (no cap), the [τ × λ_a sweep](../tau-lambda-sweep/report.py) (τ_p), [late-pull](../late-pull/report.py) (the slices), and [anchor-ramp](../anchor-ramp/report.py) and [soft-pool](../soft-pool/report.py) (the alternatives).
 
@@ -69,24 +69,40 @@ Edit
 
     From [ex-2.2.21](../ex-2.2.21/report.py).
 
-Scoring
-: Task: the probability the model puts on the right answer on held-out contexts (expected exact match), beside the Bayes ceiling, which is the best any model could do given the examples, and the control, a model trained without the anchor at the same seed. The task gate fails if the mean change against the control falls below −0.02, or the change on any one op below −0.05. Removal: the drop on `difference` as a share of the way to the *target null*, what an ideal predictor that had lost `difference` and nothing else would answer; it has to grow with the dose. Selectivity: no other op may drop by more than 0.02 at any dose (the *selectivity criterion*); the largest such drop is the *spill*. Both drops are net of what the same edit does to the control. Landing: the share of the distance to the target null that the full edit covers, context by context. A run has *lost the anchor* when the full edit removes less than half of the op.
+### Scoring
 
-    From [ex-2.2.16](../ex-2.2.16/report.py), [ex-2.2.21](../ex-2.2.21/report.py), [ex-2.2.22](../ex-2.2.22/report.py), and [split-anti-seeds](../split-anti-seeds/report.py) (task gate and lost anchors).
+Every run is scored on held-out contexts against the control, a model trained without the anchor at the same seed.
+
+Task
+: The probability the model puts on the right answer (expected exact match), beside the Bayes ceiling, which is the best any model could do given the examples. The task gate fails if the mean change against the control falls below −0.02, or the change on any one op below −0.05.
+
+Removal
+: The drop on `difference` under the edit, as a share of the way to the *target null*: what an ideal predictor that had lost `difference` and nothing else would answer. It has to grow with the dose.
+
+Selectivity
+: No other op may drop by more than 0.02 at any dose (the *selectivity criterion*). The largest such drop is the *spill*. Both drops, here and under removal, are net of what the same edit does to the control.
+
+Landing
+: The share of the distance to the target null that the full edit covers, context by context.
+
+Lost anchor
+: A run has lost the anchor when the full edit removes less than half of the op.
+
+From [ex-2.2.16](../ex-2.2.16/report.py), [ex-2.2.21](../ex-2.2.21/report.py), [ex-2.2.22](../ex-2.2.22/report.py), and [split-anti-seeds](../split-anti-seeds/report.py) (task gate and lost anchors).
 
 ## What we want to be able to say
 
 Ultimately, we want to see whether SCA works in transformers as a general alignment technique. For the current, narrow domain of color-mixing, we claim:
 
-### (a) An inferred op can be anchored without costing the task
+### (a) An inferred op can be anchored on every run, without costing the task
 
-The pull puts `difference` contexts on the axis, and the model answers as well as one trained without the anchor.
+The pull puts `difference` contexts on the axis on every seed, and the model answers as well as one trained without the anchor.
 
 **Observations.** The anchor sits on the example answers, where the context has shown the most about its op, and hardly at all at the query `=`, where the answer is predicted. At those answers the alignment rises with the posterior, on every anchored condition, while the control stays flat near zero. It does so at a fixed answer index too, so it is not only that evidence builds up along a context. That is what we would hope to see if the anchor holds the op the model inferred, and not a shortcut such as a characteristic answer color, which would not follow the evidence.
 
-The cost to the task is small. At eight fresh seeds and 400 epochs, the recipe of record scored 0.007 below the control on average. It missed the task gate once, on `hue-hsv` at seed 708, a little past the limit of 0.05. Every loss past that limit, in every arm of that experiment, was on one of the HSV ops. Training for 400 epochs settled the earlier question of slow seeds, which at 200 epochs could not be told apart from a cost. Whether the anchor lands at all depends on the seed. `falloff` kept it on all eight seeds it has run at, which fits a loss rate anywhere from none to about three in ten. Its close variants lost it on one to three seeds of eight: the uniform anti holds, the pulls that ramp with depth, and the ramp over blocks 1 to 3. On most lost runs the example answers never come onto e₁, while the query answer aligns as usual. The lost runs part from the kept ones in the first tens of epochs, while the pull warms up: at $\tau_p$ = 0.1 the pool gives nearly all of the pull to the position closest to e₁, which early on is the query answer, and on a lost run the example answers fall back. A $\tau_p$ that starts soft and sharpens by the end of the warm-up kept the anchor on every seed in every arm that had it, though the edit spilled more (see (b)). One lost run had its example answers come back onto e₁ late in training, and the edit still removed almost nothing, so a run is judged by its removal and not by its alignment alone.
+The cost to the task is small. At eight fresh seeds and 400 epochs, the recipe of record scored 0.007 below the control on average. It missed the task gate once, on `hue-hsv` at seed 708, a little past the limit of 0.05. Every loss past that limit, in every arm of that experiment, was on one of the HSV ops. Training for 400 epochs settled the earlier question of slow seeds, which at 200 epochs could not be told apart from a cost. The anchor does not land on every run, and this is the largest gap in the recipe: a method that loses the concept on one run in eight would have to be checked run by run. `falloff` kept it on all eight seeds it has run at, which fits a loss rate anywhere from none to about three in ten. Its close variants lost it on one to three seeds of eight: the uniform anti holds, the pulls that ramp with depth, and the ramp over blocks 1 to 3. On most lost runs the example answers never come onto e₁, while the query answer aligns as usual. The lost runs part from the kept ones in the first tens of epochs, while the pull warms up: at $\tau_p$ = 0.1 the pool gives nearly all of the pull to the position closest to e₁, which early on is the query answer, and on a lost run the example answers fall back. A $\tau_p$ that starts soft and sharpens by the end of the warm-up kept the anchor on every seed in every arm that had it, though the edit spilled more (see (b)). That is 24 runs with the soft start and no loss, against losses in every arm with a ramp at the fixed temperature, though the soft arms differ in more than the temperature. One lost run had its example answers come back onto e₁ late in training, and the edit still removed almost nothing, so a run is judged by its removal and not by its alignment alone.
 
-Still to show: that the rest of what the model represents is unchanged, which was measured for the op word and not yet for the inferred op.
+Still to show: a recipe that keeps the anchor on every seed, at enough seeds to say the loss rate is low. And beyond the task score, which is unchanged, that the rest of the representation keeps its shape: the color geometry and the states of the other ops, which the probe scan measured for the op word and not yet for the inferred op.
 
 From [ex-2.2.21](../ex-2.2.21/report.py) (H1, E1), [ex-2.2.22](../ex-2.2.22/report.py) (E1, E3, E5), [ex-2.2.23](../ex-2.2.23/report.py), [split-anti-seeds](../split-anti-seeds/report.py) (Decision), [anchor-ramp](../anchor-ramp/report.py) (E1, E2), [soft-pool](../soft-pool/report.py) (E1, E2), and [ex-2.2.14](../ex-2.2.14/report.py) (the probe scan).
 
@@ -102,7 +118,7 @@ Trained to 400 epochs on the earlier recipe, which pulled every slice, the edit 
 
 On that recipe, with the anti weight falling off with depth, the full edit removed 0.85 of the way to the target null on average at eight fresh seeds, and stayed within the selectivity criterion on every seed. Holding the anti weight at one level on every slice lost the anchor altogether on one seed in each arm.
 
-A pool that starts soft makes the edit less selective. Each soft arm went over the criterion on two to four seeds of eight, where the two arms at the fixed temperature stayed within it on every seed. While the pool is soft its pull reaches every position, and the other ops come partway onto e₁ during the rise; that lift is gone by the end of training, but it goes loosely with the spill. The [τ × λ_a sweep](../tau-lambda-sweep/report.py) found the same for a fixed temperature that is softer throughout.
+A pool that starts soft makes the edit less selective, at least on its own, with no other change such as a lower $\lambda_a$ or a higher $\lambda_{\bar s}$. Each soft arm went over the criterion on two to four seeds of eight, where the two arms at the fixed temperature stayed within it on every seed. While the pool is soft its pull reaches every position, and the other ops come partway onto e₁ during the rise; that lift is gone by the end of training, but it goes loosely with the spill. The [τ × λ_a sweep](../tau-lambda-sweep/report.py) found the same for a fixed temperature that is softer throughout.
 
 Still to show: that the damage on each context follows how much its answer depended on `difference`, which the target null predicts context by context.
 
@@ -130,6 +146,8 @@ With the pull on blocks 2 to 4, editing block 1 alone removes most of the op on 
 
 On the runs that keep the anchor, where it sits by depth hardly depends on how the pull is spread over blocks 2 to 4. Under the step and under every ramp, the alignment at the example answers rises to about 0.64 at block 4. With nothing pulling block 4, it falls back there to about three quarters of its level at block 3, and the edit still finds it, since it acts on every slice.
 
+The states are unit vectors, and the edit takes out the e₁ component and renormalizes, so it turns each state by an angle set by its alignment, arcsin α. On *red*, the bound at each slice and position was the angle at the 99th percentile of the clean α over lines with no red, and the write was the angle of the α arriving at the edit, which can differ from the clean α once an earlier slice has been edited. For the inferred op the same map runs over slices and over the roles of every equation in the context, on contexts of the other ops. The anti term is what keeps it small, so we expect the bound to be loosest at block 1, where the other ops sit closest to e₁ (α about 0.18 at the example answers on `falloff`, seed mean). The bound covers the immediate write only; what the later blocks do with a turned state is what the spill measures.
+
 Still to show: the write bound on the inferred op.
 
 From [ex-2.2.1](../ex-2.2.1/report.py) (H4), [ex-2.2.22](../ex-2.2.22/report.py) (E1), [late-pull](../late-pull/report.py) (E2), [slice-terms](../slice-terms/report.py) (E1, E3), [split-anti-seeds](../split-anti-seeds/report.py) (E1), [anchor-ramp](../anchor-ramp/report.py) (E3), and [soft-pool](../soft-pool/report.py) (E3).
@@ -146,37 +164,49 @@ From [ex-2.2.14](../ex-2.2.14/report.py) (the label arms) and [ex-2.2.21](../ex-
 
 ## What comes next
 
-The recipe of record is settled enough to measure the claims on. The open work is of four kinds: measuring what D2.2 still has to show, finding out how reliably the recipe anchors, simplifying or tuning the recipe, and understanding where the op is held. Every change to training below uses only what a real corpus would give us: a label per context, term weights, schedules, and temperatures. None is keyed to the role of a position, such as the example answers, since real text has no roles marked.
+The recipe of record is settled enough to measure the claims on. The open work is of five kinds: measuring what D2.2 still has to show, making the anchor land on every run, comparing with other methods, tuning the recipe, and understanding where the op is held. Every change to training below uses only what a real corpus would give us: a label per context, term weights, schedules, and temperatures. None is keyed to the role of a position, such as the example answers, since real text has no roles marked.
 
 ### The claims still to show
 
-*The write bound, the grading, and the landing.* A re-analysis of the stored `falloff` runs at seeds 704 to 711, with no new training. It would measure how far the edit moves each state against the bound the axis sets in advance, slice by slice (d); whether the drop on each context follows how much its answer depended on `difference` (b); and where the distance that the edit leaves to the target null goes, op by op (c). D2.2 needs these whichever recipe it ends with, and they are cheap to repeat on a later one. In the [backlog](/todo/science/write-bound-and-landing-on-the-inferred-op.md).
+*The write bound, the grading, and the landing.* A re-analysis of the stored `falloff` runs at seeds 704 to 711, with no new training. It would measure how far the edit turns each state against the bound the axis sets in advance, slice by slice and role by role (d); whether the drop on each context follows how much its answer depended on `difference` (b); and where the answers of the edited model fall short of the target null, op by op (c). D2.2 needs these whichever recipe it ends with, and they are cheap to repeat on a later one. In the [backlog](/todo/science/write-bound-and-landing-on-the-inferred-op.md).
 
-*How far an edit could land.* The full edit covers about half of the distance to the target null. A model trained with no `difference` contexts would show how close any model comes, and so whether half is short. If it is, a fallback trained toward the target null is the designed response from M1, to be tried again on the current recipe. In the backlog: [a reference model](/todo/science/reference-model-without-the-anchored-op.md) and [fallback control](/todo/science/fallback-control-on-the-untied-recipe.md).
+*How far an edit could land.* The full edit covers about half of the distance to the target null. A model trained with no `difference` contexts would show how close any model comes, and so whether half is short. It is also the filtered-corpus baseline below. If half is short, a fallback trained toward the target null is the designed response from M1, to be tried again on the current recipe. In the backlog: [a reference model](/todo/science/reference-model-without-the-anchored-op.md) and [fallback control](/todo/science/fallback-control-on-the-untied-recipe.md).
 
 *Wrong labels on the inferred op.* One arm with a fifth of the labels on contexts of other ops, as was done for the op word, at the seeds of the recipe (e). In the [backlog](/todo/science/wrong-labels-on-the-inferred-op.md).
 
-### How reliably the recipe anchors
+### An anchor on every run
 
-*More seeds of `falloff`.* Eight more seeds with their controls would narrow the loss rate, which is now anywhere from none to about three in ten. Until then an arm that loses one seed in eight cannot be told apart from the recipe, so this helps judge every later arm, the sweep included. At the cost of the last two scouts (about \$11 for 32 runs), it would be about \$6. In the [backlog](/todo/science/falloff-at-more-seeds.md). Beside it, a few runs at [600 epochs](/todo/science/spill-at-600-epochs.md) would show whether the hold still keeps the lean off with more training.
+*How often the anchor is lost.* With no losses in eight, the loss rate of `falloff` could be as high as three in ten (the 95% upper bound). Eight more seeds with no loss would bring that bound to about one in six, 24 more to about one in eleven, and showing it is under one in twenty would take about 60 seeds with no loss. Full runs at that count cost more than the question is worth, but the outcome is set in the first forty or so epochs, so a screen could stop early: train new seeds on the full-length schedule to about epoch 60, and call a run lost when the example answers have not come onto e₁. The stored trajectories of about a hundred runs whose outcome we know would show first whether that call agrees with the removal; it would miss the late kind of loss seen once in the soft-pool experiment. Screened this way, 32 seeds of `falloff` and 32 of the soft start would cost about as much as ten full runs (under \$5), and compare the two loss rates as well as bounding them. A short report of its own. In the [backlog](/todo/science/falloff-at-more-seeds.md).
 
-### Simplifying or tuning the recipe
+*Keeping the soft start and its anchors, without the spill.* The soft start kept the anchor on all 24 of its runs, so it is the lead for a recipe that lands every time, if its spill can be kept down. The arms to run, each against the soft ramp over blocks 1 to 3 or the soft step: a lower $\lambda_a$ or a stronger anti term while the pool is soft, the anti term off on block 4 where the ramp does not pull, and a later $\lambda_a$ warm-up at the fixed temperature. The last tells the soft start apart from a plain delay; if a delay keeps the anchor as well, it might do so without the extra spill of a soft pool. In the [backlog](/todo/science/soft-pool-spill-follow-ups.md).
 
-*Keeping the spill of a soft pool down.* The soft ramp over blocks 1 to 3 kept the anchor on every seed with no step between blocks 1 and 2, so it would be a candidate if its spill can be kept down. The arms beside it: a stronger anti term while the pool is soft, the anti term off on block 4 where nothing pulls, and a later $\lambda_a$ warm-up at the fixed temperature. The last tells the soft start apart from a plain delay; if a delay does as well, it might keep the anchor without the extra spill of a soft pool. In the [backlog](/todo/science/soft-pool-spill-follow-ups.md).
+### Comparing with other methods
+
+The blog post on D2.2 should show what anchoring adds over methods that do not place the concept. Three comparisons fit before D2.3, through the same scorer (`sca.intervention`), in order of cost:
+
+- Post-hoc directions on the controls. Fit a direction for `difference` on the states of the un-anchored controls at seeds 704 to 711 (diff-in-means, a ridge probe, and LEACE, the linear eraser), with the same scarce labels, and edit along it. No training. On *red*, in ex-2.2.1, these directions cost the lines with no red about as much as they removed from red, since the un-anchored model keeps red on directions the mix also uses.
+- A filtered corpus: the model trained with no `difference` contexts, the same runs as the reference model above.
+- SGTM, a training-time method that masks gradients so that labelled examples update only parameters set aside for the concept, which are then removed. Its own experiment, on the same labels.
+
+RMU, SAE and LUNAR rows wait for D2.3. In the [backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md).
+
+### Tuning the recipe
 
 *The full recipe sweep around `falloff`.* The weights and schedules have changed one at a time since the D2.1 survey and have not been tuned together. As in [ex-2.1.11](../ex-2.1.11/report.py): replace each schedule with flat levels to see which can go, then survey what is left (the anchor weight, the two ends of the anti falloff, $\tau_p$, the peak learning rate) with about 32 trials at one seed, spread evenly over the space by a Sobol sequence, and confirm the best few at three seeds. One seed per trial will rarely show a loss rate of one in eight, so the survey scores removal on every trial and leaves the loss rate to the confirmation. The sweep could also tune the falloff for its one task-gate miss, on `hue-hsv`, and the anchor-ramp losses suggest the pull on the early blocks as a dimension of its own. In the [backlog](/todo/science/full-recipe-sweep-after-the-lean-fix.md).
 
 *An anti weight by slice that needs no end points.* The two ends of the falloff are set by hand. An anti term pooled over slices would put its weight where the states sit closest to e₁. But it acts on every context, labelled or not, and how to pool it there without catching the pull is unclear. Part of this may fit in the sweep. In the [backlog](/todo/science/principled-per-slice-anti-weight.md).
 
+*Longer training* (low priority). A few runs at [600 epochs](/todo/science/spill-at-600-epochs.md) would show whether the hold still keeps the lean off with more training.
+
 ### Where the op is held
 
 *Why block 1 alone holds most of the op.* Editing block 1 alone removes most of the op on every seed, though nothing pulls block 1, and we have no account of it yet. An op probe at each slice and position of the `falloff` runs would show where the op is readable before block 2; the alignment is already stored, so only the probes are new. It bears on the write bound and on the layer sweep. In the [backlog](/todo/science/what-e1-holds-beside-the-op.md).
 
-*The layer sweep and a baseline.* Whether editing the first few slices removes as much of the op as editing all of them, and whether anchoring those slices alone keeps the task score and the selectivity, so the bound could be stated for the slices that matter. Beside it, a baseline trained on the same labels (SGTM) would show what anchoring adds over a method that does not place the concept. In the [backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md).
+*The layer sweep.* Whether editing the first few slices removes as much of the op as editing all of them, and whether anchoring those slices alone keeps the task score and the selectivity, so the bound could be stated for the slices that matter.
 
 ### A suggested order
 
-We would start with the re-analysis of the claims: it needs no training, D2.2 needs it whichever recipe wins, and what it finds may change what the sweep should score. The extra `falloff` seeds are cheap and could train beside it. After those, the choice is between the soft-pool follow-ups, which would simplify the recipe, and the full sweep, which would tune it as it stands. The sweep is the larger of the two, and is easier to read once the loss rate is known.
+We would start with the re-analysis of the claims: it needs no training, D2.2 needs it whichever recipe wins, and what it finds may change what the sweep should score. The loss-rate screen could run beside it, as a short report of its own, and the post-hoc comparison is another re-analysis that could follow. After those, the soft-start follow-ups, which aim at the anchor landing on every run, come before the full sweep, which is easier to read once the loss rate is known.
 
 ## Out of scope
 
@@ -184,6 +214,6 @@ The verification measurements (D2.3), though verification lines are allowed in t
 
 <details markdown="1"><summary>About this page</summary>
 
-Rewritten 2026-10-06, to say where D2.2 stands in one sitting. The plan as it stood through ex-2.2.22, with its route, risk table, and decisions, is [archived](design-2026-10.md) and in git. Updated 2026-10-07 with the [ex-2.2.22](../ex-2.2.22/report.py) decision: no cap, every slice, three examples per context. Updated 2026-10-13 for the work since: 400 epochs (ex-2.2.23), the lean and the pull on blocks 2 to 4 (embedding-lean, late-pull), and the anti weight by slice with the falloff as the recipe of record (slice-terms, split-anti-seeds). Updated 2026-10-21 for the anchor-ramp and soft-pool experiments (the step pull and fixed τ_p stay; lost anchors and the spill of a soft pool), with the next steps rewritten as open choices.
+Rewritten 2026-10-06, to say where D2.2 stands in one sitting. The plan as it stood through ex-2.2.22, with its route, risk table, and decisions, is [archived](design-2026-10.md) and in git. Updated 2026-10-07 with the [ex-2.2.22](../ex-2.2.22/report.py) decision: no cap, every slice, three examples per context. Updated 2026-10-13 for the work since: 400 epochs (ex-2.2.23), the lean and the pull on blocks 2 to 4 (embedding-lean, late-pull), and the anti weight by slice with the falloff as the recipe of record (slice-terms, split-anti-seeds). Updated 2026-10-21 for the anchor-ramp and soft-pool experiments (the step pull and fixed τ_p stay; lost anchors and the spill of a soft pool), with the next steps rewritten as open choices. Revised the same day after review: lost anchors as a gap in claim (a), the scoring as its own section, what the write bound is in this grammar, a loss-rate screen, and the comparisons with other methods.
 
 </details>
