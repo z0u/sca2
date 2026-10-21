@@ -114,10 +114,24 @@ def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
     return figure_html(table, caption=caption, class_="report-figure")
 
 
-INK = {FALLOFF: light_dark("#2a9d8f", "#7fd8c8"), CONTROL: light_dark("#888", "#999")}
-WRITE_INK = light_dark("#c0392b", "#ff8a76")
-GHOST = light_dark("#bbb", "#555")
-RULE = light_dark("#aaa", "#555")
+# Theme inks are functions: `light_dark` picks by the theme active when it is called, so a module-level value
+# would freeze the light ink into the dark variant too.
+
+
+def ink() -> str:
+    return light_dark("#2a9d8f", "#7fd8c8")
+
+
+def write_ink() -> str:
+    return light_dark("#c0392b", "#ff8a76")
+
+
+def ghost() -> str:
+    return light_dark("#bbb", "#555")
+
+
+def rule() -> str:
+    return light_dark("#aaa", "#555")
 
 
 # --- E1: the write and the bound -----------------------------------------------------------------------------
@@ -208,11 +222,11 @@ def turn_table() -> str:
     return table_html(
         ["example answers, other ops", *SLICE_TICK],
         rows,
-        f"""**How far the edit turns the example answers of the other ops**, by slice, as the angle of the clean
-        state (the bound, at the 99th percentile) and the angle it arrives with under the edit (the write); seed
-        mean over {len(SEEDS)} runs. An answer *fits* when `{ex.ANCHORED_OP}` could give it on its operands
-        ({N_FIT:,} answers per run, against {N_NOFIT:,} that do not). The control has no anchor; the seed
-        means of a 99th percentile and a median are each taken per run, then averaged.""",
+        f"""**How far the edit turns the example answers of the other ops**, by slice. Each entry is the angle
+        arcsin |α| at the 99th percentile or the median over those answers, clean → as it arrives under the full
+        edit; at the 99th percentile these are the bound and the write. Seed mean over {len(SEEDS)} runs, each
+        quantile taken per run and then averaged. An answer *fits* when `{ex.ANCHORED_OP}` could give it on its
+        operands ({N_FIT:,} answers per run, against {N_NOFIT:,} that do not). The control has no anchor.""",
     )
 
 
@@ -227,8 +241,8 @@ def turn_draw(data: dict, alt_text: str) -> str:
         caption=f"""
             **The bound and the write on the contexts of the other ops**, by position along a context, one panel
             per slice (the embedding at the bottom). The {Q:.0%} quantile of |α| over the {int((~IS_D).sum()):,}
-            contexts of the six other ops, seed mean: clean (the bound, solid) and as it arrives under the full edit
-            (the write, dashed). At the answers (*y*) only those that do not fit `{ex.ANCHORED_OP}` count. The control, with no anchor, is the ghost.
+            contexts of the six other ops, seed mean: clean (the bound) and as it arrives under the full edit
+            (the write). At the answers (*y*) only those that do not fit `{ex.ANCHORED_OP}` count. The control, with no anchor, is the ghost.
         """,
     )
     def _plot() -> plt.Figure:
@@ -237,11 +251,11 @@ def turn_draw(data: dict, alt_text: str) -> str:
         x = np.arange(N_POS)
         for row, ax in enumerate(axes):
             sl = 4 - row
-            smooth_step(ax, x, data["control"][sl], color=GHOST, lw=0.8, ramp=0.6, zorder=1)
-            smooth_step(ax, x, data["bound"][sl], color=INK[FALLOFF], lw=1.4, ramp=0.6, zorder=3)
-            ax.plot(x, data["bound"][sl], ls="none", marker="o", ms=3, color=INK[FALLOFF], zorder=4)
-            smooth_step(ax, x, data["write"][sl], color=WRITE_INK, lw=1.2, ls="--", ramp=0.6, zorder=3)
-            ax.plot(x, data["write"][sl], ls="none", marker="v", ms=3, color=WRITE_INK, zorder=4)
+            smooth_step(ax, x, data["control"][sl], color=ghost(), lw=0.8, ramp=0.6, zorder=1)
+            smooth_step(ax, x, data["bound"][sl], color=ink(), lw=1.4, ramp=0.6, zorder=3)
+            ax.plot(x, data["bound"][sl], ls="none", marker="o", ms=3, color=ink(), zorder=4)
+            smooth_step(ax, x, data["write"][sl], color=write_ink(), lw=1.2, ls="--", ramp=0.6, zorder=3)
+            ax.plot(x, data["write"][sl], ls="none", marker="v", ms=3, color=write_ink(), zorder=4)
             ax.set_ylim(0, 1.0)
             ax.set_yticks([0, 0.5, 1])
             ax.text(1.01, 0.5, SLICE_TICK[sl], transform=ax.transAxes, va="center", fontsize=8)
@@ -249,9 +263,9 @@ def turn_draw(data: dict, alt_text: str) -> str:
         axes[-1].set_xticks(x, POS_LABEL, fontsize=7)
         axes[2].set_ylabel(f"|α|, {Q:.0%} quantile", fontsize=8)
         handles = [
-            plt.Line2D([], [], color=INK[FALLOFF], marker="o", ms=3, lw=1.4, label="clean (bound)"),
-            plt.Line2D([], [], color=WRITE_INK, marker="v", ms=3, lw=1.2, ls="--", label="under the edit (write)"),
-            plt.Line2D([], [], color=GHOST, lw=0.8, label="control, clean"),
+            plt.Line2D([], [], color=ink(), marker="o", ms=3, lw=1.4, label="clean (bound)"),
+            plt.Line2D([], [], color=write_ink(), marker="v", ms=3, lw=1.2, ls="--", label="under the edit (write)"),
+            plt.Line2D([], [], color=ghost(), lw=0.8, label="control, clean"),
         ]
         fig.legend(handles=handles, loc="outside upper center", ncols=3, frameon=False, fontsize=8)
         return fig
@@ -262,11 +276,9 @@ def turn_draw(data: dict, alt_text: str) -> str:
 def turn_figure() -> str:
     data = {"bound": BOUND, "write": WRITE, "control": seed_mean(CONTROL, "bound")}
     alt = (
-        f"Five stacked panels, one per slice, of the {Q:.0%} quantile of |alpha| along the 24 positions of a context, "
-        "on contexts of the other ops. At the embedding the clean and edited curves coincide near 0.08 at the colors. "
-        f"At slice 1 both sit near 0.55 at the example answers and below 0.1 elsewhere. At slices 2 to 4 the clean "
-        "curve stays low except at the example answers, and the curve under the edit sits at or below the clean one "
-        "everywhere. The control ghost sits near 0.3 at the colors at every slice."
+        "Five stacked panels, one per slice. The curve under the edit matches the clean one up to block 1 and falls "
+        "well below it from block 2 on, most at the answers, where the clean curve peaks at 0.3 to 0.65. The control "
+        "is higher than both at the colors."
     )
     return turn_draw(data, alt)
 
@@ -380,11 +392,11 @@ def grading_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption=f"""
             **The drop under the full edit, by how much each context needed `{ex.ANCHORED_OP}`.** **Left:** on
-            `{ex.ANCHORED_OP}` contexts, the share of the way to the target null that the edit takes each bin of
+            `{ex.ANCHORED_OP}` contexts, the share of the way to the target null that the edit takes in each bin of
             the posterior on `{ex.ANCHORED_OP}`, as a ratio of bin means; one hairline per run and the seed mean
-            bold. **Right:** on the contexts of the other ops, the change in expected exact match under the edit
-            (up is a gain), against the change the target null predicts, one point per bin of the posterior on
-            `{ex.ANCHORED_OP}` and run. The diagonal is where the edit would match the target null. Both net of
+            bold, with the target null as the dashed rule at 1. **Right:** on the contexts of the other ops, the change in expected exact match under the edit
+            (up is a gain), against the change the target null predicts, one point per run and bin of the posterior on
+            `{ex.ANCHORED_OP}` (labeled; these bins differ from the left). The diagonal is where the edit would match the target null. Both net of
             the control.
         """,
     )
@@ -394,9 +406,9 @@ def grading_draw(data: dict, alt_text: str) -> str:
         ax = axes[0]
         x = np.arange(len(data["bins"]))
         for s in data["share"]:
-            ax.plot(x, s, color=INK[FALLOFF], lw=0.5, alpha=0.6)
-        ax.plot(x, np.mean(data["share"], axis=0), color=INK[FALLOFF], lw=1.6, marker="D", ms=4)
-        ax.axhline(1, color=RULE, lw=0.7, ls="--", zorder=0)
+            ax.plot(x, s, color=ink(), lw=0.5, alpha=0.6)
+        ax.plot(x, np.mean(data["share"], axis=0), color=ink(), lw=1.6, marker="D", ms=4)
+        ax.axhline(1, color=rule(), lw=0.7, ls="--", zorder=0)
         ax.set_ylim(0, 1.1)
         ax.set_xticks(x, data["bins"], fontsize=7)
         ax.set_xlabel(f"posterior on {ex.ANCHORED_OP}", fontsize=8)
@@ -404,11 +416,11 @@ def grading_draw(data: dict, alt_text: str) -> str:
         ax.tick_params(labelsize=7)
         ax = axes[1]
         lim = max(float(np.max(data["null"])), float(np.max(data["edit"]))) * 1.1
-        ax.plot([0, lim], [0, lim], color=RULE, lw=0.7, ls="--", zorder=0)
+        ax.plot([0, lim], [0, lim], color=rule(), lw=0.7, ls="--", zorder=0)
         marks = ["o", "s", "^", "D"]
         for b, m in enumerate(marks):
             ys = [g[b] for g in data["edit"]]
-            ax.plot([data["null"][b]] * len(ys), ys, ls="none", marker=m, ms=3.5, color=INK[FALLOFF], alpha=0.6)
+            ax.plot([data["null"][b]] * len(ys), ys, ls="none", marker=m, ms=3.5, color=ink(), alpha=0.6)
             ax.annotate(
                 data["obins"][b], (data["null"][b], max(ys)), xytext=(3, 3), textcoords="offset points", fontsize=6.5
             )
@@ -431,11 +443,10 @@ def grading_figure() -> str:
         "edit": [GAIN_EDIT[s].tolist() for s in SEEDS],
     }
     alt = (
-        f"Left: share removed against five bins of the posterior on {ex.ANCHORED_OP}, eight thin lines and a bold "
-        f"mean, all between about {SHARE_MEAN.min():.1f} and {SHARE_MEAN.max():.1f}, roughly level. Right: gain "
-        "under the edit against gain under the target null for the other ops, four clusters of points that rise "
-        "with the diagonal: the two lowest sit on or a little above it, and the highest, at about 0.33 on the "
-        "x axis, sits about a third under it."
+        f"Left: the share removed is roughly level across the posterior on {ex.ANCHORED_OP}, with the seed mean "
+        f"between {SHARE_MEAN.min():.2f} and {SHARE_MEAN.max():.2f} and the seeds spread widest in the lowest bin. "
+        "Right: on the other ops the gain under the edit rises with the gain the target null predicts, on or a "
+        "little above the diagonal in the two lowest bins and about a third under it in the highest."
     )
     return grading_draw(data, alt)
 
@@ -554,6 +565,8 @@ def land(key: str) -> list[float]:
     return [float(LAND[s][key]) for s in SEEDS]
 
 
+# No figure beside this table or the next: they hold a few seed-mean proportions, and the landing figure below
+# draws the distances they lead up to.
 def mass_table() -> str:
     heads = [*CATS, "off the palette"]
     rows = []
@@ -577,12 +590,13 @@ def landing_draw(data: dict, alt_text: str) -> str:
         name="edit-effects-landing",
         alt_text=alt_text,
         caption=f"""
-            **How far the answers sit from where they should be**, as total variation on the held-out
-            `{ex.ANCHORED_OP}` contexts. One column per comparison, the {len(SEEDS)} seeds as faded dots and the seed
-            mean on top. The first two columns are the yardstick: the clean model against the Bayes predictor it
+            **How far the answers are from where they should be**, as total variation on the held-out
+            `{ex.ANCHORED_OP}` contexts. One column per comparison, the {len(SEEDS)} seeds as faded dots over a gray
+            bar for their range, and the seed mean on top. The first two columns, left of the dotted rule, are the
+            yardstick: the clean model against the Bayes predictor it
             learned to match, and the control against the same. The third is the edited model against the target
             null, and the last two are the legs of the path through the nearest mixture: the edited answers against
-            the nearest mixture of the ops' answers, and that mixture against the target null.
+            the nearest mixture of the answers of the ops, and that mixture against the target null.
         """,
     )
     def _plot() -> plt.Figure:
@@ -590,22 +604,22 @@ def landing_draw(data: dict, alt_text: str) -> str:
         rng = np.random.default_rng(0)
         for i, (_, vals) in enumerate(data["cols"]):
             v = np.asarray(vals)
-            ax.plot([i, i], [v.min(), v.max()], color=GHOST, lw=3, solid_capstyle="round", zorder=1)
+            ax.plot([i, i], [v.min(), v.max()], color=ghost(), lw=3, solid_capstyle="round", zorder=1)
             ax.plot(
                 i + rng.uniform(-0.12, 0.12, len(v)),
                 v,
                 ls="none",
                 marker="o",
                 ms=3,
-                color=INK[FALLOFF],
+                color=ink(),
                 alpha=0.4,
                 zorder=2,
             )
-            ax.plot(i, v.mean(), ls="none", marker="D", ms=6, color=INK[FALLOFF], zorder=3)
+            ax.plot(i, v.mean(), ls="none", marker="D", ms=6, color=ink(), zorder=3)
         ax.set_xticks(range(len(data["cols"])), [n for n, _ in data["cols"]], fontsize=7)
         ax.set_ylim(0, 0.5)
         ax.set_ylabel("total variation", fontsize=8)
-        ax.axvline(2.5 - 1, color=RULE, lw=0.5, ls=":")
+        ax.axvline(2.5 - 1, color=rule(), lw=0.5, ls=":")
         ax.tick_params(labelsize=7)
         return fig
 
@@ -621,10 +635,10 @@ def landing_figure() -> str:
         ("mixture\nvs null", land("mixture_to_null")),
     ]
     alt = (
-        "Five columns of seed dots. The clean model and the control sit about "
-        f"{np.mean(land('clean_to_bayes')):.2f} from the Bayes predictor. The edited model sits about "
-        f"{np.mean(land('left')):.2f} from the target null. The edited answers sit about {np.mean(land('off_mixture')):.2f} "
-        f"from the nearest mixture of the ops, and that mixture about {np.mean(land('mixture_to_null')):.2f} from the target null."
+        f"The edited model is about {np.mean(land('left')):.2f} from the target null, more than twice as far as the "
+        f"clean model and the control are from the Bayes predictor (about {np.mean(land('clean_to_bayes')):.2f}). "
+        f"The nearest mixture of the ops is close to the edited answers ({np.mean(land('off_mixture')):.2f}) but "
+        f"{np.mean(land('mixture_to_null')):.2f} from the target null."
     )
     return landing_draw({"cols": cols}, alt)
 
@@ -686,8 +700,8 @@ With eight runs, a pattern seen on every seed is one we can lean on; a differenc
 - The *bound* at a slice and position: the arcsin of the 99th percentile of the clean |α| over the contexts of the six other ops. It follows H4 of [ex-2.2.1](/docs/m2/ex-2.2.1/report.py), and is set from the clean geometry before any edit. At the example answers it counts only the answers that do not fit `difference`. The ones that fit are evidence for the op, and the anchor is meant to put them on e₁ (the [example-evidence report](/docs/m2/example-evidence/report.py) found it does).
 - The write stays *within the bound* when its 99th percentile over the same states is no larger. Ex-2.2.1 allowed a quarter over (a ratio of {TOLERANCE}) as a tolerance; we quote the ratio.
 - *Dependence*: how much a context needed `difference`. It is the expected exact match of the clean model less that of the target null on the same context, so it is the most the edit could take off without going past the target null.
-- The *drop* on a context: its expected exact match on the clean pass less that under the edit, net of the drop the same edit causes on the control at the same context. The share removed in a group of contexts is the mean drop over the mean dependence.
-- The *net share*: the part of the removal beyond what taking out an arbitrary axis costs. It sits below the share the edit takes on its own, since under the same edit the control loses more on `difference` contexts than on any other op ({CONTROL_DROP_D:.2f} in expected exact match).
+- The *drop* on a context: its expected exact match on the clean pass less that under the edit, net of the drop the same edit causes on the control at the same context.
+- The share removed in a group of contexts, or *net share*: the mean drop over the mean dependence, so the part of the removal beyond what taking out an arbitrary axis costs. It is below the share without the control subtracted, since under the same edit the control loses more on `difference` contexts than on any other op ({CONTROL_DROP_D:.2f} in expected exact match).
 - The *landing*, or distance left: the total variation distance between the edited answers and the target null, on `difference` contexts. We also give the share of the clean distance that the edit covers, as a ratio of the means over those contexts (the number split-anti-seeds quotes).
 
 [^alpha]: Alignment α: the component of the unit-length state along e₁, which is its cosine similarity with e₁. Renormalizing rescales the edited state back to unit length.
@@ -699,13 +713,13 @@ With eight runs, a pattern seen on every seed is one we can lean on; a differenc
 rf"""
 ## How far the edit turns the other ops (E1)
 
-The anti-subspace term keeps the states of other ops off e₁, so we expect the edit to turn them only a little. We expect the turn to be largest at block 1, where split-anti-seeds found the other ops sit closest to e₁ at the end of training. It should be smaller at the pulled blocks, where they sit lower.
+The anti-subspace term keeps the states of other ops off e₁, so we expect the edit to turn them only a little. We expect the turn to be largest at block 1, where split-anti-seeds found the other ops closest to e₁ at the end of training. It should be smaller at the pulled blocks, where they are lower.
 
 Does the turn under the edit stay within the bound the clean geometry sets, at every slice and role? Or does a later block put e₁ back onto the other ops after the edit has taken it out upstream?
 <!-- REVIEW: the first draft of the plan gave "where the anti weight is low but the pull has room" as the reason for the smallest turn at the pulled blocks; a low hold leaves more room on e₁, not less, so the reason now cites where the other ops were measured to sit. Verify: the alignment-by-slice figure of split-anti-seeds (H2), right panel. -->
 <!-- REVIEW: the bound at the example answers counts only the answers that do not fit `difference` (assumptions review). About one example answer in seventeen in another op's context fits, enough to set the 99th percentile there, and those states are evidence the anchor is meant to place. Verify: the fitting rows of the table below. -->
 
-The figure shows the bound and the write at every position of a context, slice by slice, with the control behind.
+The figure shows the bound and the write at every position of a context, slice by slice, with the control behind. The two curves part at the answers (*y*).
 
 {turn_figure()}
 
@@ -715,9 +729,8 @@ At block 1 the write is about the bound. Only the embedding has been edited befo
 
 The bound is widest at the answers. At the example answers it is widest at block 1, as we expected: there the answers of the other ops come partway onto e₁, about twice as far as in the control. At the query answer it stays wide with depth, from {angle(BOUND[1, QUERY_ANSWER]):.0f}° at block 1 to {angle(BOUND[4, QUERY_ANSWER]):.0f}° at block 4, while at the example answers it narrows.
 
-The wide bound at the query answer comes from a small tail. At blocks 2 to 4, a few in a hundred contexts of other ops have their query answer close to e₁, while the median stays at a few degrees. We found nothing in the examples that sets those contexts apart (their posterior on `difference` is about as low as in the rest), so this is unexplained.
+The wide bound at the query answer comes from a small tail. At blocks 2 to 4, a few in a hundred contexts of other ops have their query answer close to e₁, while the median stays at a few degrees. We found nothing in the examples that sets those contexts apart (their posterior on `difference` is about as low as in the rest), so this is unexplained. The edit takes these query answers off e₁ at the earlier slices, before they get there. At the other roles the bound is a few degrees at every slice. It is smaller than in the control at the colors, and about the same at the syntax.
 <!-- REVIEW: "about one in a hundred" and "no higher" were sized from the 99th percentile alone; counting |α| > 0.5 at the query answer of the other ops gives 4% at block 2 and 2% at blocks 3 and 4, and the posterior on `difference` in that tail is 0.05 against 0.04 in the rest (claims review). -->
- The edit takes these query answers off e₁ at the earlier slices, before they get there. At the other roles the bound is a few degrees at every slice. It is smaller than in the control at the colors, and about the same at the syntax.
 
 {turn_table()}
 
@@ -727,7 +740,7 @@ Turning these states is the edit doing its job: they are the evidence for `diffe
 
 So on the recipe of record the bound holds in the sense of ex-2.2.1. The anchor gives a turn we can state in advance from the clean map, and nothing downstream adds to it.
 
-The bound does not cover what the later blocks make of a state that was turned at block 1; that is what the spill measures. At block 1 the other ops sit closer to e₁ than in a model with no anchor, so that is where any spill would start.
+The bound does not cover what the later blocks make of a state that was turned at block 1; that is what the spill measures. At block 1 the other ops are closer to e₁ than in a model with no anchor, so that is where any spill would start.
 """
 
 # %%
@@ -743,22 +756,23 @@ The main measure is the share removed by bin of the posterior. The correlation o
 
 The target null also predicts a change on the contexts of other ops. Where an example showed the answer of `difference`, removing the op should move the answer back toward the true op, which is a gain.
 
+The figure shows both: the share removed on `difference` contexts (left) and the gain on the other ops (right).
+
 {grading_figure()}
 
-The share removed is about level across the posterior: between {SHARE_MEAN.min():.2f} and {SHARE_MEAN.max():.2f} at the seed mean, lowest in the {BIN_LABEL[SHARE_LOW_BIN]} bin. The lowest bin is the noisiest, since its contexts needed little to begin with, and one seed there goes a little past the target null. No other bin shows the overshoot a coarse feature would give. (The drop correlates with the Bayes dependence at r = {span(R_BAYES.values())}.)
+The share removed is about level across the posterior: between {SHARE_MEAN.min():.2f} and {SHARE_MEAN.max():.2f} at the seed mean, lowest in the {BIN_LABEL[SHARE_LOW_BIN]} bin. The lowest bin is the noisiest, since its contexts needed little to begin with, and two seeds there go a little past the target null. No other bin shows the overshoot a coarse feature would give. The drop correlates with the Bayes dependence at r = {span(R_BAYES.values())}.
 
 {grading_table()}
+
+Without subtracting the control the share is level too, and higher: between {RAW_SHARE_MEAN.min():.2f} and {RAW_SHARE_MEAN.max():.2f} by bin. The shape of the net share across bins comes from the control, whose own drop under the edit varies by bin. So that shape says where an arbitrary edit costs the most, rather than anything about the anchor.
+<!-- REVIEW: cut "the edit is a little shy where the evidence is split" (claims review). Without the control subtraction the share by bin is level near 0.9 to 0.97; the dip in the net share is the control's own drop by bin. Verify: the "not net of the control" row of the table. -->
 
 On the contexts of other ops, the edit helps where their examples point at `difference`, and the more they point at it, the more it helps. That is the direction the target null predicts, and the edit goes most of the way.
 
 Where the posterior on `difference` is {OTHER_LABEL[3]}, the edit gains {GAIN_EDIT_MEAN[3]:.2f} against {GAIN_NULL[3]:.2f} for the target null. In the two low bins it gains a little more than the target null, {GAIN_EDIT_MEAN[1]:.2f} against {GAIN_NULL[1]:.2f} at {OTHER_LABEL[1]}.
 
-Part of that excess comes from subtracting the control. Under the edit the control loses a little on every op, but on the contexts whose examples point at `difference` it gains a little instead, on every seed. Without subtracting the control, the gains are {num(RAW_GAIN_MEAN[1])} and {num(RAW_GAIN_MEAN[3])}.
+Part of the excess in the low bins comes from subtracting the control, which loses a little there under the edit. Where the examples point most at `difference` the control gains a little instead, on every seed, so there the net gain is the smaller one. Without subtracting the control, the gains are {num(RAW_GAIN_MEAN[1])} at {OTHER_LABEL[1]} and {num(RAW_GAIN_MEAN[3])} at {OTHER_LABEL[3]}. Most contexts of other ops have almost no posterior on `difference` ({N_OBIN[0]:,} of {int((~IS_D).sum()):,} below 0.05), and there the target null predicts almost no change.
 <!-- REVIEW: the control's drop by bin on the other ops is +0.03 below a posterior of 0.2 and −0.03 at ≥ 0.5 (a gain), so the earlier wording, which had it losing everywhere, did not fit the raw gain of 0.26 being above the net 0.23 (claims review). -->
- Most contexts of other ops have almost no posterior on `difference` ({N_OBIN[0]:,} of {int((~IS_D).sum()):,} below 0.05), and there the target null predicts almost no change.
-
-Without subtracting the control the share is level too, and higher: between {RAW_SHARE_MEAN.min():.2f} and {RAW_SHARE_MEAN.max():.2f} by bin. The shape of the net share across bins comes from the control, whose own drop under the edit varies by bin. So that shape says where an arbitrary edit costs the most, rather than anything about the anchor.
-<!-- REVIEW: cut "the edit is a little shy where the evidence is split" (claims review). Without the control subtraction the share by bin is level near 0.9 to 0.97; the dip in the net share is the control's own drop by bin. Verify: the "not net of the control" row of the table. -->
 
 So the drop is graded the way claim (b) asks: in proportion to what each context needed. The gain on the other ops fits the anchor holding what the examples show about `difference`, wherever it appears, rather than what the label marks.
 """
@@ -768,7 +782,7 @@ So the drop is graded the way claim (b) asks: in proportion to what each context
 rf"""
 ## Where the edited answers fall short (E3)
 
-The full edit covers about half of the distance to the target null on `difference` contexts ({span(land("landing"))} here).
+On `difference` contexts the full edit covers about half of the distance from the clean answers to the target null: a share of {span(land("landing"))}. That is a different measure from the share removed in E2. E2 scores the probability on the right answer, which the edit takes most of the way to the null; the landing compares the whole answer distribution, including how the mass that leaves `difference` is shared among the other ops.
 
 Where is the rest? It could be on the answers of `difference` that the edit leaves behind, on colors no op gives, or on the answers of the other ops, weighed differently from the target null. These would point to different causes: a weak removal, damage to the answer, or a model that has lost `difference` and weighs what is left in its own way.
 
@@ -784,15 +798,15 @@ So the shortfall is context by context. It could be in how the edited model weig
 
 We measure the two legs of the path through that mixture: from the edited answers to the mixture, and from the mixture to the target null. Total variation is a distance, so the two legs can add to more than the whole.
 
-For a yardstick, the clean model sits some distance from the Bayes predictor it learned to match. On `difference` contexts that distance is {span(land("clean_to_bayes"))}, about as far as the control, and it is a little further on the other ops. This is a comparison point rather than a floor, since the two are distances between different pairs. But it says how close a model of this size gets to an ideal predictor when nothing has been edited.
+For a yardstick, the clean model is some distance from the Bayes predictor it learned to match. On `difference` contexts that distance is {span(land("clean_to_bayes"))}, about as far as the control, and it is a little further on the other ops. This is a comparison point rather than a floor, since the two are distances between different pairs. But it says how close a model of this size gets to an ideal predictor when nothing has been edited. The figure puts the yardstick beside the distance left and the two legs.
 
 {landing_figure()}
 
 The edited answers are close to a mixture of the answers of the ops ({span(land("off_mixture"))}, against {np.mean(land("clean_off_mixture")):.2f} on the clean pass). So they are mostly well formed: answers the other ops give, with about the right spread within each op.
 
-The mixture, though, sits {span(land("mixture_to_null"))} from the target null, so the edited model weighs the other ops differently from the posterior, context by context. In all, the distance left is about two and a half times the yardstick.
+The mixture, though, is {span(land("mixture_to_null"))} from the target null, so the edited model weighs the other ops differently from the posterior, context by context. In all, the distance left is about two and a half times the yardstick.
 
-The edited model does use the examples to weigh the other ops, partly. Take a predictor that has lost `difference` and weighs the other ops equally, whatever the examples show. It sits further from the edited answers ({np.mean(land("uniform_left")):.2f}) than the target null does.
+The edited model does use the examples to weigh the other ops, partly. Take a predictor that has lost `difference` and weighs the other ops equally, whatever the examples show. It is further from the edited answers ({np.mean(land("uniform_left")):.2f}) than the target null does.
 
 This fits the reading in claim (c) that the anchor gives the edit a direction and not the whole distance. The edit takes `difference` away cleanly, and the model answers with the other ops. It weighs them by the examples, but less sharply or less accurately than the target null weighs them.
 """
@@ -806,9 +820,9 @@ On the recipe of record, the edit behaves at all three scales the way the placed
 
 The contexts of other ops whose examples point at `difference` recover as the target null predicts. That fits the anchor holding the evidence for the op, wherever it appears, and the edit removing that evidence.
 
-The gap is in where the answers land. The edit sends the mass to the right ops overall. But within a context, it shares the mass among them only partly by how well each fits the examples.
+The shortfall is in where the answers land. The edit sends the mass to the right ops overall. But within a context, it shares the mass among them only partly by how well each fits the examples.
 
-One reading is that the evidence the model uses to tell the other ops apart also travels partly along e₁, so taking out the axis blurs it. Another is that the model never needed fine weights among the other ops on `difference` contexts, since the answer there was `difference`. This page does not separate them. A model trained without `difference` contexts would show how close any model of this size comes to the target null, and so how much of the gap is the edit.
+One reading is that the evidence the model uses to tell the other ops apart also travels partly along e₁, so taking out the axis blurs it. Another is that the model never needed fine weights among the other ops on `difference` contexts, since the answer there was `difference`. This page does not separate them. A model trained without `difference` contexts would show how close any model of this size comes to the target null, and so how much of the shortfall is the edit.
 
 If the spill grows on a later recipe, the bound map at block 1 is the first place to look, since that is where the bound is widest.
 """
