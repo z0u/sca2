@@ -561,7 +561,10 @@ def train_one(
     *anti_slices* and *clean_rows* pass through to `train_anchored` (later experiments; `None` is this one's
     training). With *alpha_map*, each record also keeps the mean alignment at every slice and position of the probe
     set, over the anchored op's probes (`alpha_anchored`) and the other ops' (`alpha_other`), and the alignment of
-    every color embedding in palette order (`emb_axis_colors`), where a lean in the table would show.
+    every color embedding in palette order (`emb_axis_colors`), where a lean in the table would show; and, split by
+    op, the same map for each op's probes in *ops* order (`alpha_by_op`), with the alignment of every embedding that
+    is not a color, in token order (`emb_axis_syntax`), where a latch on a syntax embedding
+    would show.
     """
     from sca.anchoring import AnchorSpec, AntiSpec, LabelSpec, alignment
     from sca.compute.training import train_anchored
@@ -602,6 +605,7 @@ def train_one(
     color_ids = np.array([tokenizer.stoi[n] for n in PALETTE])
     tok2color = np.full(config.model.vocab_size, -1)
     tok2color[color_ids] = np.arange(len(PALETTE))
+    syntax_ids = np.setdiff1d(np.arange(1, len(tokenizer.itos)), color_ids)  # every token but pad and the colors
     sub_ho = ex2216.Holdout(
         sub_tokens,
         sub_op_ids,
@@ -621,7 +625,13 @@ def train_one(
         k_: [] for k_ in ("m_context", "op1_lean", "fragment_lean", "eem", "eem_per_op", "kl", "kl_per_op")
     }
     if alpha_map:
-        extra |= {"alpha_anchored": [], "alpha_other": [], "emb_axis_colors": []}
+        extra |= {
+            "alpha_anchored": [],
+            "alpha_other": [],
+            "emb_axis_colors": [],
+            "alpha_by_op": [],
+            "emb_axis_syntax": [],
+        }
 
     def on_record(_index: int, model) -> None:
         cos = alignment(model, probe_tokens)  # (L1, N, T)
@@ -645,6 +655,12 @@ def train_one(
             extra["alpha_other"].append(cos[:, weights == 0].mean(1).tolist())
             emb = np.asarray(model.transformer.wte[color_ids])
             extra["emb_axis_colors"].append((emb[:, 0] / np.linalg.norm(emb, axis=1)).tolist())
+            # Rounded, since seven ops' maps per record would otherwise triple the stored trajectory.
+            extra["alpha_by_op"].append(
+                [np.round(cos[:, o * per_op : (o + 1) * per_op].mean(1), 4).tolist() for o in range(n_ops)]
+            )
+            table_ = np.asarray(model.transformer.wte)[syntax_ids]
+            extra["emb_axis_syntax"].append((table_[:, 0] / np.linalg.norm(table_, axis=1)).tolist())
 
     _, metrics, traj = train_anchored(
         config,
@@ -674,7 +690,7 @@ def train_one(
         "train_loss": epoch_train_loss.tolist(),
         "traj": {
             kk: np.asarray(traj[kk]).tolist()
-            for kk in ("step", "epoch", "lr", "weight", "anti_weight", "val_loss")
+            for kk in ("step", "epoch", "lr", "weight", "anti_weight", "tau", "val_loss")
             + (("anchor", "anti") if alpha_map else ())
             if kk in traj
         }

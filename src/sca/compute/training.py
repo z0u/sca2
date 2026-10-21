@@ -138,8 +138,9 @@ def _anchored_step(
             pool_slices=anchor.pool_slices,
             slice_tau=anchor.slice_tau,
             anchor_slice_w=anchor.slice_w,
+            scheduled_tau=anchor.scheduled_tau,
         )
-        return lambda *args: (*step(*args), 0.0, 0.0, 0.0)
+        return lambda *args, **kw: (*step(*args, **kw), 0.0, 0.0, 0.0)
     if (
         slices is not None
         or clean_rows is not None
@@ -147,10 +148,11 @@ def _anchored_step(
         or tuple(anchor.axes) != ANCHOR_AXES
         or anchor.pool_slices
         or anchor.slice_w is not None
+        or anchor.scheduled_tau
     ):
         raise ValueError(
-            "anchor_slices, anti_slices, clean_rows, pool_slices, slice_w, and a multi-axis anchor are not supported with a"
-            " fallback spec"
+            "anchor_slices, anti_slices, clean_rows, pool_slices, slice_w, a scheduled tau, and a multi-axis anchor are"
+            " not supported with a fallback spec"
         )
     step = make_fallback_train_step(optimizer, fallback, tau=anchor.tau, n_lines=n_lines)
     fb_w_, aa_w_ = jnp.asarray(fb_w), jnp.asarray(aa_w)
@@ -169,27 +171,28 @@ SCAN_STEPS = 16
 """Training steps per dispatch in `train_anchored`. The step is host-bound on an L4 (Python dispatch and CUDA calls dominate a d64 step), so running several per call cuts its cost (about half, more on a slow host) with identical weights; the rationale and numbers are in `todo/eng/training-step-is-host-bound.md`."""
 
 
-def _scanned(step, n_steps: int):
+def _scanned(step, n_steps: int, scheduled_tau: bool = False):
     """*n_steps* calls of *step* in one dispatch, as a `lax.scan` over stacked batches and weights.
 
-    *step* has `_anchored_step`'s call shape. The result takes the model, the optimizer state, a tuple of batch arrays with a leading step axis, the two weight arrays, and a boolean `live` array; a step whose flag is off passes the state through untouched, so a dispatch cut short by a trajectory record or an epoch end is padded to the one compiled shape rather than compiled again. It returns the model, the state, and the six per-step outputs as an `(n_steps, 6)` array (zeros where not live).
+    *step* has `_anchored_step`'s call shape. The result takes the model, the optimizer state, a tuple of batch arrays with a leading step axis, the two weight arrays, the `(n_steps, 2)` pooling temperatures (passed to the step only under *scheduled_tau*), and a boolean `live` array; a step whose flag is off passes the state through untouched, so a dispatch cut short by a trajectory record or an epoch end is padded to the one compiled shape rather than compiled again. It returns the model, the state, and the six per-step outputs as an `(n_steps, 6)` array (zeros where not live).
     """
 
     @eqx.filter_jit
-    def run(model, opt_state, batches, weights, anti_weights, live):
+    def run(model, opt_state, batches, weights, anti_weights, taus, live):
         carry, static = eqx.partition((model, opt_state), eqx.is_array)
 
         def body(carry, xs):
-            batch, weight, anti_weight, on = xs
+            batch, weight, anti_weight, tau, on = xs
+            kw = {"taus": tau} if scheduled_tau else {}
 
             def go(carry):
                 m, s = eqx.combine(carry, static)
-                m, s, *outs = step(m, s, *batch[:4], weight, anti_weight, *batch[4:])
+                m, s, *outs = step(m, s, *batch[:4], weight, anti_weight, *batch[4:], **kw)
                 return eqx.filter((m, s), eqx.is_array), jnp.stack([jnp.asarray(o, jnp.float32) for o in outs])
 
             return jax.lax.cond(on, go, lambda carry: (carry, jnp.zeros(6, jnp.float32)), carry)
 
-        carry, outs = jax.lax.scan(body, carry, (batches, weights, anti_weights, live), length=n_steps)
+        carry, outs = jax.lax.scan(body, carry, (batches, weights, anti_weights, taus, live), length=n_steps)
         return (*eqx.combine(carry, static), outs)
 
     return run
@@ -340,6 +343,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             anti_slices,
         ),
         SCAN_STEPS,
+        anchor.scheduled_tau,
     )
 
     # A fixed validation sample, drawn off its own stream so the training crops
@@ -353,7 +357,8 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     traj: dict[str, list] = {k: [] for k in (*keys, "val_loss", "anchor", "anti", "pi", "alpha_roles")}
     if fallback is not None:
         traj |= {k: [] for k in _Window.KEYS}
-    tau_eff = np.inf if anchor.tau is None else anchor.tau
+    if anchor.scheduled_tau:
+        traj["tau"] = []
     step = 0
     window = _Window()
 
@@ -372,8 +377,11 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             traj.setdefault("m_line", []).append(m_line)
             emit_metrics(m_line=m_line)
         # What the pull chose: the softmin weight each span role would take at the
-        # anchor's τ, label-affinity-weighted over colors. Uniform at τ = ∞.
-        traj["pi"].append(np.einsum("lct,c->lt", softmin_weights(1.0 - alpha, tau_eff), probe_weights))
+        # anchor's τ (as it stands now), label-affinity-weighted over colors. Uniform at τ = ∞.
+        taus = anchor.taus(step / epoch_length)
+        traj["pi"].append(np.einsum("lct,c->lt", softmin_weights(1.0 - alpha, taus[0]), probe_weights))
+        if anchor.scheduled_tau:
+            traj["tau"].append(taus)
         traj["step"].append(step)
         traj["epoch"].append(step / epoch_length)
         traj["lr"].append(float(jnp.asarray(schedule(step))))
@@ -420,6 +428,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             ats = [epoch + (len(train_losses) + i) / epoch_length for i in range(n)]
             weights = [float(anchor(at)) for at in ats]
             anti_weights = [_anti_at(anti, at) for at in ats]
+            taus = [anchor.taus(at) for at in ats]
             pad = SCAN_STEPS - n
             stacked = tuple(np.stack([b[f] for b in chunk] + [chunk[-1][f]] * pad) for f in range(len(chunk[0])))
             model, opt_state, outs = train_steps(
@@ -428,6 +437,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
                 stacked,
                 np.asarray(weights + [0.0] * pad, np.float32),
                 np.asarray(anti_weights + [np.zeros_like(anti_weights[0])] * pad, np.float32),
+                np.nan_to_num(np.asarray(taus + [taus[-1]] * pad, np.float32), nan=1.0, posinf=1.0),
                 np.arange(SCAN_STEPS) < n,
             )
             loss, anchor_loss, anti_loss, fb_loss, aa_loss, fb_lines = np.asarray(outs[:n]).T.tolist()
