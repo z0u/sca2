@@ -6,13 +6,13 @@ high as three in ten. Its close variants lost it on one to three seeds of eight,
 was set in the first sixty or so epochs: on a run that lost the anchor, the example answers were off e₁ through epochs
 44 to 64, and on every run that kept it they were on. So this experiment trains each new seed on the full 400-epoch
 schedule and stops it at epoch 64, and the report calls each run from α at the example answers over that window. A
-run whose window falls between the stored lost and kept runs is trained again to the end and dose-scored, so that the
-call never rests on the window alone where the stored runs could not settle it.
+run not firmly kept by that call (a lost call, or a window between the stored lost and kept runs) is trained again to
+the end and dose-scored, so every loss counted is a measured one.
 
 Two seeds of each arm are also re-trained, stopped early, at seeds the stored runs used, so the report can check that
 stopping early leaves the trajectory up to the stop unchanged.
 
-    bin/mini run docs/m2/loss-rate/experiment.py --app modal --max-containers 16 --budget 2h
+    bin/mini run docs/m2/loss-rate/experiment.py --app modal --max-containers 16 --budget 3h
     bin/mini status loss-rate
 """
 
@@ -81,7 +81,7 @@ TRACK_SLICE = 3
 LOST_MAX = 0.15
 """The highest window mean on a stored run that lost the anchor (rounded up)."""
 KEPT_MIN = 0.28
-"""The lowest window mean on a stored run that kept it (rounded down). A screen run between the two is finished."""
+"""The lowest window mean on a stored run that kept it (rounded down). A screen run below it is finished."""
 CALL_AT = 0.22
 """Below this window mean a screen run is called lost: the middle of the gap."""
 
@@ -257,7 +257,8 @@ def run(ctx: Ctx, epochs: int = EPOCHS, stop: int = STOP_EPOCH, seeds: tuple[int
     if not publishes:
         return {"labels": [t["label"] for t in trained]}
     calls = ctx.run(publish_screen, rows, trained, role="prep")
-    unsure = {(c["arm"], c["model_seed"]) for c in calls if c["call"].endswith("?")}
+    # Every run not firmly kept is finished, so each loss counted is a measured one.
+    unsure = {(c["arm"], c["model_seed"]) for c in calls if c["call"] != "kept"}
     full = [r for r in rows_of(resolved["meta"], seeds, None, epochs) if (r["arm"]["name"], r["model_seed"]) in unsure]
     out = {"n_screen": len(calls), "n_unsure": len(full)}
     if not full:
