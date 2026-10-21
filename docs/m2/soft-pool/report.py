@@ -614,7 +614,7 @@ def transient_draw(data: dict, alt_text: str) -> str:
     def _plot() -> plt.Figure:
         arms = data["arms"]
         fig = plt.figure(figsize=(7.4, 2.9), layout="constrained")
-        left, right = fig.subfigures(1, 2, width_ratios=[3.2, 1.3])
+        left, right = fig.subfigures(1, 2, width_ratios=[3.2, 1.3], squeeze=False)[0]
         axes = left.subplots(2, len(arms), sharex=True, sharey="row", height_ratios=[3, 0.8], squeeze=False)
         for col, arm in enumerate(arms):
             ax, tax = axes[:, col]
