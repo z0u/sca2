@@ -607,7 +607,7 @@ def transient_draw(data: dict, alt_text: str) -> str:
             **The other ops during the rise.** Left: α on the probe contexts of the other ops along the first hundred
             epochs, the mean over their positions and slices 1 to 3, one column per arm; one hairline per run, the
             seed mean bold, and the other arms as ghosts. The shaded band is epochs {w0} to {w1}, and the strip
-            underneath is the position pool temperature $\tau_p$ (log scale). Right: the highest α in that band
+            underneath is the position pool temperature $\\tau_p$ (log scale). Right: the highest α in that band
             against the spill of E1 at any dose, one point per run; the dashed rule is the selectivity criterion.
         """,
     )
