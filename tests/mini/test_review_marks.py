@@ -78,6 +78,27 @@ def test_a_redrawn_figure_is_barred_although_its_name_is_the_same(browser, tmp_p
     assert _barred(browser, fig, fig, tmp_path) == ["img"]
 
 
+def _png(pixels: bytes, *ancillary: tuple[bytes, bytes]) -> bytes:
+    """A PNG-shaped file: a header, *ancillary* chunks, and *pixels* as its data (no checksums; the digest skips them)."""
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return len(body).to_bytes(4, "big") + kind + body + b"\0\0\0\0"
+
+    head = chunk(b"IHDR", b"1x1")
+    return b"\x89PNG\r\n\x1a\n" + head + b"".join(chunk(k, v) for k, v in ancillary) + chunk(b"IDAT", pixels)
+
+
+def test_a_figure_rewritten_with_new_metadata_keeps_its_digest(tmp_path: Path):
+    from mini.review_marks import tag_images
+
+    (tmp_path / "a.png").write_bytes(_png(b"pixels", (b"tEXt", b"Software")))
+    (tmp_path / "b.png").write_bytes(_png(b"pixels", (b"caBX", b"manifest 1"), (b"tEXt", b"Software")))
+    (tmp_path / "c.png").write_bytes(_png(b"other pixels", (b"tEXt", b"Software")))
+    tags = [tag_images(f'<img src="{n}.png">', tmp_path) for n in "abc"]
+    assert tags[0] == tags[1].replace("b.png", "a.png")
+    assert tags[0] != tags[2].replace("c.png", "a.png")
+
+
 def _counts(browser, head: str, base: str, tmp_path: Path) -> list[str]:
     """The change count at the top of each section of the marked *head* page, in document order."""
     html = mark_changes(_page(head), _page(base), note="since abc", root=tmp_path, base_root=tmp_path / "base")

@@ -227,12 +227,36 @@ def baseline_dir(sha: str, key: str) -> Path:
     return data_root() / "review" / sha / key
 
 
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def _image_digest(path: Path) -> str:
+    """A digest of what *path* shows. For a PNG that is its critical chunks alone (header, palette, pixels): the
+    ancillary ones carry metadata that can change while the image does not, such as a content-credentials manifest
+    (``caBX``) stamped with a fresh instance id each time the file is written, which made every figure read as redrawn.
+    Any other file is digested whole.
+    """
+    data = path.read_bytes()
+    h = hashlib.sha256()
+    if not data.startswith(_PNG_SIGNATURE):
+        h.update(data)
+        return h.hexdigest()[:16]
+    i = len(_PNG_SIGNATURE)
+    while i + 8 <= len(data):
+        n = int.from_bytes(data[i : i + 4], "big")
+        kind = data[i + 4 : i + 8]
+        if kind[:1].isupper():  # A critical chunk; ancillary ones start with a lower-case letter.
+            h.update(data[i + 4 : i + 8 + n])
+        i += 12 + n
+    return h.hexdigest()[:16]
+
+
 def tag_images(html: str, root: Path) -> str:
-    """Tag each ``<img>`` in *html* with a digest of its file under *root* (``data-rv``), so a redrawn figure reads as changed although its name is stable. An image that is not a local file keeps its ``src`` as its identity."""
+    """Tag each ``<img>`` in *html* with a digest of its file under *root* (``data-rv``), so a redrawn figure reads as changed although its name is stable. An image that is not a local file keeps its ``src`` as its identity. A PNG is digested by its pixels, not its metadata (:func:`_image_digest`)."""
 
     def tag(m: re.Match[str]) -> str:
         path = root / m[1]
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16] if path.is_file() else m[1]
+        digest = _image_digest(path) if path.is_file() else m[1]
         return m[0].replace("<img", f'<img data-rv="{digest}"', 1)
 
     return _IMG_RE.sub(tag, html)
