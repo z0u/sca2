@@ -246,6 +246,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     newline_id: int | None = None,
     min_line_tokens: int = LINE_TOKENS,
     loss_mask: np.ndarray | None = None,
+    stop_epoch: int | None = None,
 ) -> tuple[LanguageModel, list[TrainingMetrics], dict[str, np.ndarray]]:
     """Train with a concept anchor, recording the alignment trajectory as it goes.
 
@@ -310,6 +311,9 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             size `n_lines`; unused when *newline_id* is `None`.
         loss_mask: passed through to `sample_anchored_batches` (a
             verification-line loss mask); `None` for no masking.
+        stop_epoch: stop after this many epochs of the full-length schedule,
+            or None to train to its end. The learning rate, the term weights
+            and the batches up to the stop are those of the full run.
     """
     if crop is not None and (anchor.tau is None or fallback is not None):
         raise ValueError("a crop policy needs a pooled anchor (tau set) and no fallback spec")
@@ -405,7 +409,8 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     if fallback is not None and fallback_weight > 0:
         expected["fallback"] = "down"
     expect_metrics(**expected)
-    for epoch in range(config.scheduler.epochs):
+    end = config.scheduler.epochs if stop_epoch is None else stop_epoch
+    for epoch in range(end):
         train_losses, anchor_losses, anti_losses = [], [], []
         batches = sample_anchored_batches(
             train_data,
@@ -472,7 +477,6 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
         if epoch > 0 and epoch % checkpoint_every == 0:
             save_checkpoint(model, config, all_metrics[-1], checkpoint_dir)
 
-    end = config.scheduler.epochs
     record(
         step,
         float(anchor(end)),

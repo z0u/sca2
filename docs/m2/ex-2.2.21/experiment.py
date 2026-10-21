@@ -552,6 +552,7 @@ def train_one(
     anti_slices=None,
     clean_rows=None,
     alpha_map: bool = False,
+    stop_epoch: int | None = None,
 ) -> dict:
     """Train one run over the op set *ops*: ex-2.2.16's context-keyed anchor (crop policy `whole`, the label variant
     and slices given), recording every *traj_stride* steps both ex-2.2.16's trajectory on the probe set (the op
@@ -565,6 +566,8 @@ def train_one(
     op, the same map for each op's probes in *ops* order (`alpha_by_op`), with the alignment of every embedding that
     is not a color, in token order (`emb_axis_syntax`), where a latch on a syntax embedding
     would show.
+
+    *stop_epoch* stops training early on the unchanged schedule (`train_anchored`); `None` trains to the end.
     """
     from sca.anchoring import AnchorSpec, AntiSpec, LabelSpec, alignment
     from sca.compute.training import train_anchored
@@ -681,6 +684,7 @@ def train_one(
         min_line_tokens=context_length(k),
         loss_mask=loss_mask,
         on_record=on_record,
+        stop_epoch=stop_epoch,
     )
     epoch_train_loss = np.asarray([m.train_loss for m in metrics], dtype=np.float64)
     epoch_axis = np.arange(1, len(epoch_train_loss) + 1, dtype=np.float64)
