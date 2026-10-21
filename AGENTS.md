@@ -58,18 +58,12 @@ For the backlogs, prefer `./go todo --grep anneal`, which skips settled items.
 
 For recon on an earlier report (what it found, how it reads), read its Markdown render instead of the `.py`: `./go render docs/<key>/report.py -o .mini/lit/<key>/index.md`, with figures beside it. The render caches are shared between the project's cloud threads, so it's quick. Open the `.py` only to see how something was computed.
 
-### When the project config doesn't load
-
-Some cloud sessions, project threads among them, load this file but none of the rest of `.claude/`: the session-start hook doesn't run, and the repo skills and agent types aren't registered. The signs are an "Unknown skill" from the Skill tool for a skill named here, a `uv` too old for `./go`, or no orientation block at the start of the session. The files are all in the checkout, so work from them:
-
-- A skill is `.agents/skills/<name>/SKILL.md` (`.claude/skills` links there): read it in place of invoking it. A subagent has the same gap, so a brief that names a skill gives its path too.
-- An agent type is `.claude/agents/<name>.md`: brief a general-purpose agent with its body, on the model its frontmatter names, and list the paths of the skills its `skills:` line names.
-- The hook runs by hand: `CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR=$PWD .claude/hooks/session-start.sh`. Its PATH change doesn't reach the session's shells this way, so call tools through `./go` or `uv run`. `./go` shares the render caches between project threads by itself.
+If the Skill tool doesn't know a repo skill, `.claude/` didn't load (some cloud sessions): read `.agents/skills/<name>/SKILL.md` and `.claude/agents/<name>.md` directly, and run `.claude/hooks/session-start.sh` by hand (see its header).
 
 ### Storage
 
 Two Hugging Face pairs (bucket + dataset repo): production by default, and a `dev` pair under `MINI_PROFILE=dev` — use it for engineering and prototypes. A dev run has its own memo state as well as its own bucket. See the `mi-ni` storage reference.
 
-Prototype science code on either pair, but whatever a published report reads must be on production. Re-run there before the freeze if it was developed on dev. A report uses the active environment; a bucket name written into a file under `docs/` is a bug. Avoid expensive compute in dev, because it will need to be re-run. A render only reads the store, so render a published report from production (no `MINI_PROFILE`) even in an engineering session; the dev pair doesn't hold its results.
+Prototype science code on either pair, but whatever a published report reads must be on production. Re-run there before the freeze if it was developed on dev. A report uses the active environment; a bucket name written into a file under `docs/` is a bug. Avoid expensive compute in dev, because it will need to be re-run. Render published reports without `MINI_PROFILE`: their results are only on production.
 
 Take care to not leak secrets into the chat transcript. To see which environment variables are set (e.g. "is there an `HF_*` token?"), use `compgen -v HF_` (bash builtin).
