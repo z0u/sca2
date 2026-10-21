@@ -409,7 +409,8 @@ def grading_figure() -> str:
         f"Left: share removed against five bins of the posterior on {ex.ANCHORED_OP}, eight thin lines and a bold "
         f"mean, all between about {SHARE_MEAN.min():.1f} and {SHARE_MEAN.max():.1f}, roughly level. Right: gain "
         "under the edit against gain under the target null for the other ops, four clusters of points that rise "
-        "along the diagonal and sit a little under it."
+        "with the diagonal: the two lowest sit on or a little above it, and the highest, at about 0.33 on the "
+        "x axis, sits about a third under it."
     )
     return grading_draw(data, alt)
 
@@ -548,8 +549,8 @@ def landing_draw(data: dict, alt_text: str) -> str:
             `{ex.ANCHORED_OP}` contexts. One column per comparison, the {len(SEEDS)} seeds as faded dots and the seed
             mean on top. The first two columns are the yardstick: the clean model against the Bayes predictor it
             learned to match, and the control against the same. The third is the edited model against the target
-            null, and the last two split it: the edited answers against the nearest mixture of the ops' answers, and
-            that mixture against the target null.
+            null, and the last two are the legs of the path through the nearest mixture: the edited answers against
+            the nearest mixture of the ops' answers, and that mixture against the target null.
         """,
     )
     def _plot() -> plt.Figure:
@@ -631,7 +632,7 @@ rf"""
 
 - [How far the edit turns the other ops (E1)](#how-far-the-edit-turns-the-other-ops-e1): the write stays within the bound at every slice past the embedding, at most {RATIO_MAX:.2f} times it (seed mean), and the blocks after an edit do not put e₁ back on the other ops. The bound is widest at the answers, and at the example answers most of all at block 1. Example answers of other ops that fit `difference` sit on e₁ and are turned most, as the evidence they are.
 - [Whether the drop follows what each context needed (E2)](#whether-the-drop-follows-what-each-context-needed-e2): the edit takes about the same share of the way to the target null on contexts that barely needed `difference` as on those that needed it most. On the contexts of other ops whose examples point at `difference`, the edit gives back some of what those examples cost, as the target null says it should.
-- [Where the edited answers fall short (E3)](#where-the-edited-answers-fall-short-e3): almost all the mass leaves the answers only `difference` gives and lands on the answers of the other ops, in about the right overall proportions. What is left is mostly how the edited model weighs those ops context by context. The distance left is a little over twice the distance between the clean model and the Bayes predictor it was trained to match.
+- [Where the edited answers fall short (E3)](#where-the-edited-answers-fall-short-e3): almost all the mass leaves the answers only `difference` gives and lands on the answers of the other ops, in about the right overall proportions. What is left is mostly how the edited model weighs those ops context by context. The distance left is about two and a half times the distance between the clean model and the Bayes predictor it was trained to match.
 
 ## Scope
 
@@ -664,7 +665,9 @@ The figure shows the bound and the write at every position of a context, slice b
 
 The write stays within the bound past the embedding, give or take the tolerance of ex-2.2.1. At the seed mean the largest ratio of write to bound is {RATIO_MAX:.2f}, at block {RATIO_WORST[0] + 1}, position `{POS_LABEL[RATIO_WORST[1]]}` of the {["first", "second", "third", "query"][RATIO_WORST[1] // UNIT]} equation. Seed by seed, a few sites go past the tolerance of ex-2.2.1 ({len(OVER)} of the {len(SEEDS) * 4 * N_POS} sites past the embedding), all where the bound itself is tiny, at most {OVER_BOUND_MAX:.0f}°. At block 1 the write is about the bound, since only the embedding has been edited before it, and the embedding holds little. From block 2 on it falls well below: at the example answers that do not fit, block 2 turns them by {ANS_RATIO[2]:.0%} of their bound and block 4 by {ANS_RATIO[4]:.0%}. So the blocks after an edit do not put e₁ back on the other ops; they leave less there than the clean model had.
 
-The bound is widest at the answers. At the example answers it is widest at block 1, as we expected: there the answers of the other ops come partway onto e₁, about twice as far as in the control. At the query answer it widens with depth instead, to {angle(BOUND[4, QUERY_ANSWER]):.0f}° at block 4. That comes from a small tail: about one context of another op in a hundred has its query answer close to e₁ at blocks 2 to 4, while the median stays a few degrees. We found nothing in the examples that sets those contexts apart (their posterior on `difference` is no higher than the rest), so this is unexplained. The edit takes them off before they get there. At the other roles the bound is a few degrees at every slice, smaller than in the control at the colors and about the same at the syntax.
+The bound is widest at the answers. At the example answers it is widest at block 1, as we expected: there the answers of the other ops come partway onto e₁, about twice as far as in the control. At the query answer it widens with depth instead, to {angle(BOUND[4, QUERY_ANSWER]):.0f}° at block 4. That comes from a small tail: a few contexts of another op in a hundred have their query answer close to e₁ at blocks 2 to 4, while the median stays a few degrees. We found nothing in the examples that sets those contexts apart (their posterior on `difference` is about as low as in the rest), so this is unexplained.
+<!-- REVIEW: "about one in a hundred" and "no higher" were sized from the 99th percentile alone; counting |α| > 0.5 at the query answer of the other ops gives 4% at block 2 and 2% at blocks 3 and 4, and the posterior on `difference` in that tail is 0.05 against 0.04 in the rest (claims review). -->
+ The edit takes them off before they get there. At the other roles the bound is a few degrees at every slice, smaller than in the control at the colors and about the same at the syntax.
 
 {turn_table()}
 
@@ -688,7 +691,9 @@ The share removed is about level across the posterior: between {SHARE_MEAN.min()
 
 {grading_table()}
 
-On the contexts of other ops the edit helps where their examples point at `difference`, and by more the more they point at it, close to what the target null predicts. Where the posterior on `difference` is {OTHER_LABEL[3]} the edit gains {GAIN_EDIT_MEAN[3]:.2f} against {GAIN_NULL[3]:.2f} for the target null; in the two low bins it gains a little more than the target null, {GAIN_EDIT_MEAN[1]:.2f} against {GAIN_NULL[1]:.2f} at {OTHER_LABEL[1]}. Part of that excess comes from subtracting the control, which loses a little on every op under the edit: without subtracting it, the gains are {num(RAW_GAIN_MEAN[1])} and {num(RAW_GAIN_MEAN[3])}. Most contexts of other ops have almost no posterior on `difference` ({N_OBIN[0]:,} of {int((~IS_D).sum()):,} below 0.05), and there the target null predicts almost no change.
+On the contexts of other ops the edit helps where their examples point at `difference`, and by more the more they point at it, close to what the target null predicts. Where the posterior on `difference` is {OTHER_LABEL[3]} the edit gains {GAIN_EDIT_MEAN[3]:.2f} against {GAIN_NULL[3]:.2f} for the target null; in the two low bins it gains a little more than the target null, {GAIN_EDIT_MEAN[1]:.2f} against {GAIN_NULL[1]:.2f} at {OTHER_LABEL[1]}. Part of that excess comes from subtracting the control, which loses a little on every op under the edit, though on the contexts whose examples point at `difference` it gains a little instead, on every seed: without subtracting it, the gains are {num(RAW_GAIN_MEAN[1])} and {num(RAW_GAIN_MEAN[3])}.
+<!-- REVIEW: the control's drop by bin on the other ops is +0.03 below a posterior of 0.2 and −0.03 at ≥ 0.5 (a gain), so the earlier wording, which had it losing everywhere, did not fit the raw gain of 0.26 being above the net 0.23 (claims review). -->
+ Most contexts of other ops have almost no posterior on `difference` ({N_OBIN[0]:,} of {int((~IS_D).sum()):,} below 0.05), and there the target null predicts almost no change.
 
 So the drop is graded the way claim (b) asks: in proportion to what each context needed. The middle bins, where the examples disagree, lose a little less than the confident ones, so the edit is a little shy where the evidence is split. The gain on the other ops fits the anchor holding what the examples show about `difference`, wherever it appears, rather than what the label marks.
 """
@@ -704,17 +709,17 @@ The full edit covers about half of the distance to the target null on `differenc
 
 The edit moves nearly all the mass off the answers only `difference` gives, and onto the answers of the other ops. A little more lands on colors no op gives than on the clean pass. Nearly all of the distance left is on the answers of the other ops.
 
-Overall, the edited model spreads that mass over the other ops about as the target null does: each op gets roughly its share, with `lighten` a little short.
+Overall, the edited model spreads that mass over the other ops about as the target null does: each op gets roughly its share, with `lighten` and `hue-hsv` a little short.
 
 {op_mass_table()}
 
-So the shortfall is context by context. To separate how the edited model weighs the ops from how it shapes the answer of each op, we fit each edited answer distribution with the nearest mixture of the ops' answer distributions (non-negative weights), and split the distance in two: from the edited answers to that mixture, and from the mixture to the target null.
+So the shortfall is context by context. To separate how the edited model weighs the ops from how it shapes the answer of each op, we fit each edited answer distribution with the nearest mixture of the ops' answer distributions (non-negative weights), and measure the two legs of the path through it: from the edited answers to that mixture, and from the mixture to the target null. Total variation is a distance, so the two legs can add to more than the whole.
 
 For a yardstick, the clean model sits some distance from the Bayes predictor it learned to match, on `difference` contexts ({span(land("clean_to_bayes"))}, about as far as the control) and a little further on the other ops. That is a comparison point rather than a floor, since the two are distances between different pairs, but it says how close a model of this size gets to an ideal predictor when nothing has been edited.
 
 {landing_figure()}
 
-The edited answers are close to a mixture of the ops' answers ({span(land("off_mixture"))}, against {np.mean(land("clean_off_mixture")):.2f} on the clean pass), so they are mostly well formed: answers the other ops give, with about the right spread within each op. The mixture, though, sits {span(land("mixture_to_null"))} from the target null, so the edited model weighs the other ops differently from the posterior, context by context. The distance left in all is a little over twice the yardstick.
+The edited answers are close to a mixture of the ops' answers ({span(land("off_mixture"))}, against {np.mean(land("clean_off_mixture")):.2f} on the clean pass), so they are mostly well formed: answers the other ops give, with about the right spread within each op. The mixture, though, sits {span(land("mixture_to_null"))} from the target null, so the edited model weighs the other ops differently from the posterior, context by context. The distance left in all is about two and a half times the yardstick.
 
 The edited model does use the examples to weigh the other ops, partly. A predictor that has lost `difference` and weighs the other ops equally, whatever the examples show, sits further from the edited answers ({np.mean(land("uniform_left")):.2f}) than the target null does.
 
