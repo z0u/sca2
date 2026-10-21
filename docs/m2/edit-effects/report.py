@@ -651,10 +651,12 @@ r"""
 
 /// tip |
 <!-- lede -->
-We looked at what the edit does on the recipe of record, at three scales: how far it turns the states of the other ops, how much each `difference` context loses, and where the edited answers go. The turn stays within the bound the clean geometry sets, and the loss on each context follows how much it needed `difference`. The edited answers go to the other ops in about the right overall proportions, but context by context they weigh those ops differently from the target null, and that is most of the distance left.
+We looked at what the edit does on the recipe of record, at three scales: how far it turns the states of the other ops, how much each `difference` context loses, and where the edited answers go. The turn stays within the bound the clean geometry sets. The loss on each context follows how much it needed `difference`. The edited answers go to the other ops in about the right overall proportions, but context by context they weigh those ops differently from the target null, and that is most of the distance left.
 ///
 
-The [D2.2 design doc](/docs/m2/d2.2/design.md) lists three claims that the recipe of record has no measurement for yet: the write bound of claim (d), the grading context by context of claim (b), and where the edited model lands, claim (c). None needs new training. This page measures all three on the eight `falloff` runs of [split-anti-seeds](/docs/m2/split-anti-seeds/report.py), from the dose scoring that experiment stored and one new pass over the held-out contexts that records the alignment with e₁ at every slice and position, clean and under the edit.
+The [D2.2 design doc](/docs/m2/d2.2/design.md) lists three claims that the recipe of record has no measurement for yet: the write bound of claim (d), the grading context by context of claim (b), and where the edited model lands, claim (c). None needs new training.
+
+This page measures all three on the eight `falloff` runs of [split-anti-seeds](/docs/m2/split-anti-seeds/report.py). It uses the dose scoring that experiment stored, plus one new pass over the held-out contexts. That pass records the alignment with e₁ at every slice and position, clean and under the edit.
 """
 
 # %%
@@ -662,24 +664,34 @@ The [D2.2 design doc](/docs/m2/d2.2/design.md) lists three claims that the recip
 rf"""
 ## Observations
 
-- [How far the edit turns the other ops (E1)](#how-far-the-edit-turns-the-other-ops-e1): the write stays within the bound at every slice past the embedding, at most {RATIO_MAX:.2f} times it (seed mean), and the blocks after an edit do not put e₁ back on the other ops. The bound is widest at the answers, and at the example answers most of all at block 1. Example answers of other ops that fit `difference` sit on e₁ and are turned most, as the evidence they are.
-- [Whether the drop follows what each context needed (E2)](#whether-the-drop-follows-what-each-context-needed-e2): the edit takes about the same share of the way to the target null on contexts that barely needed `difference` as on those that needed it most. On the contexts of other ops whose examples point at `difference`, the edit gives back some of what those examples cost, as the target null says it should.
-- [Where the edited answers fall short (E3)](#where-the-edited-answers-fall-short-e3): almost all the mass leaves the answers only `difference` gives and lands on the answers of the other ops, in about the right overall proportions. What is left is mostly how the edited model weighs those ops context by context. The distance left is about two and a half times the distance between the clean model and the Bayes predictor it was trained to match.
+- [How far the edit turns the other ops (E1)](#how-far-the-edit-turns-the-other-ops-e1): the write stays within the bound at every slice past the embedding, at most {RATIO_MAX:.2f} times it (seed mean). The blocks after an edit do not put e₁ back on the other ops. The bound is widest at the answers, and at the example answers it is widest at block 1. Example answers of other ops that fit `difference` are evidence for it; they sit on e₁, and the edit turns them most.
+- [Whether the drop follows what each context needed (E2)](#whether-the-drop-follows-what-each-context-needed-e2): the edit takes about the same share of the way to the target null on contexts that barely needed `difference` as on those that needed it most. Some contexts of other ops have examples that point at `difference`. There the edit gives back some of what those examples cost, as the target null says it should.
+- [Where the edited answers fall short (E3)](#where-the-edited-answers-fall-short-e3): almost all the mass leaves the answers only `difference` gives. It lands on the answers of the other ops, in about the right overall proportions. What is left is mostly how the edited model weighs those ops context by context. The distance left is about two and a half times the distance between the clean model and the Bayes predictor[^bayes] it was trained to match.
+
+
+[^bayes]: Bayes predictor: the best answer given the examples, which weighs the answers of each op by the posterior over ops (the probability of each op given the examples).
 
 ## Scope
 
-This is an exploratory re-analysis, with no preregistration and no gate. It covers the `falloff` arm of split-anti-seeds (the recipe of record) at model seeds 704 to 711, and the control at each of those seeds from ex-2.2.23, trained without the anchor at the same initialization, batches and label draws. Every measurement is on the {len(OP_IDS):,} held-out contexts of ex-2.2.21, {int(IS_D.sum()):,} per op, each three examples and a query.
+This is an exploratory re-analysis, with no preregistration and no gate. It covers the `falloff` arm of split-anti-seeds (the recipe of record) at model seeds 704 to 711. It also covers the control at each of those seeds from ex-2.2.23, which was trained without the anchor at the same initialization, batches, and label draws.
 
-The edit is the full edit of the recipe: the whole e₁ component taken out of the state at every position and every slice. E2 and E3 use the full dose only; split-anti-seeds already showed that the removal grows with the dose. With eight runs, a pattern seen on every seed is one we can lean on; a difference between seeds is noted and not explained. E3 confirms on the recipe of record what ex-2.2.22 found informally on an earlier recipe, and takes it one step further.
+Every measurement is on the {len(OP_IDS):,} held-out contexts of ex-2.2.21, {int(IS_D.sum()):,} per op, each with three examples and a query. The edit is the full edit of the recipe: the whole e₁ component taken out of the state at every position and every slice. E2 and E3 use the full dose only, since split-anti-seeds already showed that the removal grows with the dose.
+
+With eight runs, a pattern seen on every seed is one we can lean on; a difference between seeds is noted and not explained. E3 confirms on the recipe of record what ex-2.2.22 found informally on an earlier recipe, and takes it one step further.
 
 ## The measurements
 
-- The turn, or *write*: the angle by which the edit turns a state. The states are unit vectors and the edit renormalizes, so the turn is arcsin of the alignment α the state arrives with. At the embedding that is the clean α; at a later slice it is the α left after the blocks have read the edited states of the slices before.
+- The turn, or *write*: the angle by which the edit turns a state. The states are unit vectors and the edit renormalizes them, so the turn is the arcsin of the alignment α[^alpha] that the state arrives with. At the embedding that is the clean α. At a later slice it is the α left after the blocks have read the edited states of the slices before.
 - Whether an example *fits* `difference`: its answer is one that `difference` gives on its operands. In a context of another op, a fitting example is usually one where the replacement op noise showed the answer of `difference`.
-- The *bound* at a slice and position: arcsin of the 99th percentile of the clean |α| over the contexts of the six other ops, as in H4 of [ex-2.2.1](/docs/m2/ex-2.2.1/report.py), set before any edit from the clean geometry. At the example answers it counts only the answers that do not fit `difference`: the ones that fit are evidence for the op, and the anchor is meant to put them on e₁ (the [example-evidence report](/docs/m2/example-evidence/report.py) found it does). The write stays within the bound when its 99th percentile over the same states is no larger. Ex-2.2.1 allowed a quarter over (a ratio of {TOLERANCE}) as a tolerance; we quote the ratio.
-- *Dependence*: how much a context needed `difference`, as the expected exact match of the clean model less that of the target null on the same context. It is the most the edit could take off without going past the target null.
-- The *drop* on a context: its expected exact match on the clean pass less that under the edit, net of the drop the same edit causes on the control at the same context. The share removed in a group of contexts is the mean drop over the mean dependence. The control loses more on `difference` contexts under the same edit than on any other op ({CONTROL_DROP_D:.2f} in expected exact match), so the net share is the part of the removal beyond what taking out an arbitrary axis costs, and sits below the share the edit takes on its own.
-- The *landing* and the distance left: the total variation distance between the edited answers and the target null, on `difference` contexts, and the share of the clean distance that the edit covers, as a ratio of the means over those contexts, the number split-anti-seeds quotes.
+- The *bound* at a slice and position: the arcsin of the 99th percentile of the clean |α| over the contexts of the six other ops. It follows H4 of [ex-2.2.1](/docs/m2/ex-2.2.1/report.py), and is set from the clean geometry before any edit. At the example answers it counts only the answers that do not fit `difference`. The ones that fit are evidence for the op, and the anchor is meant to put them on e₁ (the [example-evidence report](/docs/m2/example-evidence/report.py) found it does).
+- The write stays *within the bound* when its 99th percentile over the same states is no larger. Ex-2.2.1 allowed a quarter over (a ratio of {TOLERANCE}) as a tolerance; we quote the ratio.
+- *Dependence*: how much a context needed `difference`. It is the expected exact match of the clean model less that of the target null on the same context, so it is the most the edit could take off without going past the target null.
+- The *drop* on a context: its expected exact match on the clean pass less that under the edit, net of the drop the same edit causes on the control at the same context. The share removed in a group of contexts is the mean drop over the mean dependence.
+- The *net share*: the part of the removal beyond what taking out an arbitrary axis costs. It sits below the share the edit takes on its own, since under the same edit the control loses more on `difference` contexts than on any other op ({CONTROL_DROP_D:.2f} in expected exact match).
+- The *landing*, or distance left: the total variation distance between the edited answers and the target null, on `difference` contexts. We also give the share of the clean distance that the edit covers, as a ratio of the means over those contexts (the number split-anti-seeds quotes).
+
+[^alpha]: Alignment α: the component of the unit-length state along e₁, which is its cosine similarity with e₁. Renormalizing rescales the edited state back to unit length.
+
 """
 
 # %%
@@ -687,7 +699,9 @@ The edit is the full edit of the recipe: the whole e₁ component taken out of t
 rf"""
 ## How far the edit turns the other ops (E1)
 
-The anti-subspace term keeps the states of other ops off e₁, so we expect the edit to turn them only a little: most at block 1, where split-anti-seeds found the other ops sit closest to e₁ at the end of training, and less at the pulled blocks, where they sit lower. The question is whether the turn under the edit stays within the bound the clean geometry sets, at every slice and role, or whether a later block puts e₁ back onto the other ops after the edit has taken it out upstream.
+The anti-subspace term keeps the states of other ops off e₁, so we expect the edit to turn them only a little. We expect the turn to be largest at block 1, where split-anti-seeds found the other ops sit closest to e₁ at the end of training. It should be smaller at the pulled blocks, where they sit lower.
+
+Does the turn under the edit stay within the bound the clean geometry sets, at every slice and role? Or does a later block put e₁ back onto the other ops after the edit has taken it out upstream?
 <!-- REVIEW: the first draft of the plan gave "where the anti weight is low but the pull has room" as the reason for the smallest turn at the pulled blocks; a low hold leaves more room on e₁, not less, so the reason now cites where the other ops were measured to sit. Verify: the alignment-by-slice figure of split-anti-seeds (H2), right panel. -->
 <!-- REVIEW: the bound at the example answers counts only the answers that do not fit `difference` (assumptions review). About one example answer in seventeen in another op's context fits, enough to set the 99th percentile there, and those states are evidence the anchor is meant to place. Verify: the fitting rows of the table below. -->
 
@@ -695,17 +709,25 @@ The figure shows the bound and the write at every position of a context, slice b
 
 {turn_figure()}
 
-The write stays within the bound past the embedding, give or take the tolerance of ex-2.2.1. At the seed mean the largest ratio of write to bound is {RATIO_MAX:.2f}, at block {RATIO_WORST[0] + 1}, position `{POS_LABEL[RATIO_WORST[1]]}` of the {["first", "second", "third", "query"][RATIO_WORST[1] // UNIT]} equation. Seed by seed, a few sites go past the tolerance of ex-2.2.1 ({len(OVER)} of the {len(SEEDS) * 4 * N_POS} sites past the embedding), all where the bound itself is tiny, at most {OVER_BOUND_MAX:.0f}°. At block 1 the write is about the bound, since only the embedding has been edited before it, and the embedding holds little. From block 2 on it falls well below: at the example answers that do not fit, block 2 turns them by {ANS_RATIO[2]:.0%} of their bound and block 4 by {ANS_RATIO[4]:.0%}. So the blocks after an edit do not put e₁ back on the other ops; they leave less there than the clean model had.
+The write stays within the bound past the embedding, give or take the tolerance of ex-2.2.1. At the seed mean, the largest ratio of write to bound is {RATIO_MAX:.2f}, at block {RATIO_WORST[0] + 1}, position `{POS_LABEL[RATIO_WORST[1]]}` of the {["first", "second", "third", "query"][RATIO_WORST[1] // UNIT]} equation. Seed by seed, a few sites go past the tolerance ({len(OVER)} of the {len(SEEDS) * 4 * N_POS} sites past the embedding). All of them are where the bound itself is tiny, at most {OVER_BOUND_MAX:.0f}°.
 
-The bound is widest at the answers. At the example answers it is widest at block 1, as we expected: there the answers of the other ops come partway onto e₁, about twice as far as in the control. At the query answer it stays wide with depth, from {angle(BOUND[1, QUERY_ANSWER]):.0f}° at block 1 to {angle(BOUND[4, QUERY_ANSWER]):.0f}° at block 4, while at the example answers it narrows. That comes from a small tail: a few contexts of another op in a hundred have their query answer close to e₁ at blocks 2 to 4, while the median stays a few degrees. We found nothing in the examples that sets those contexts apart (their posterior on `difference` is about as low as in the rest), so this is unexplained.
+At block 1 the write is about the bound. Only the embedding has been edited before it, and the embedding holds little. From block 2 on the write falls well below the bound: at the example answers that do not fit, block 2 turns them by {ANS_RATIO[2]:.0%} of their bound and block 4 by {ANS_RATIO[4]:.0%}. So the blocks after an edit do not put e₁ back on the other ops; they leave less there than the clean model had.
+
+The bound is widest at the answers. At the example answers it is widest at block 1, as we expected: there the answers of the other ops come partway onto e₁, about twice as far as in the control. At the query answer it stays wide with depth, from {angle(BOUND[1, QUERY_ANSWER]):.0f}° at block 1 to {angle(BOUND[4, QUERY_ANSWER]):.0f}° at block 4, while at the example answers it narrows.
+
+The wide bound at the query answer comes from a small tail. At blocks 2 to 4, a few in a hundred contexts of other ops have their query answer close to e₁, while the median stays at a few degrees. We found nothing in the examples that sets those contexts apart (their posterior on `difference` is about as low as in the rest), so this is unexplained.
 <!-- REVIEW: "about one in a hundred" and "no higher" were sized from the 99th percentile alone; counting |α| > 0.5 at the query answer of the other ops gives 4% at block 2 and 2% at blocks 3 and 4, and the posterior on `difference` in that tail is 0.05 against 0.04 in the rest (claims review). -->
- The edit takes them off before they get there. At the other roles the bound is a few degrees at every slice, smaller than in the control at the colors and about the same at the syntax.
+ The edit takes these query answers off e₁ at the earlier slices, before they get there. At the other roles the bound is a few degrees at every slice. It is smaller than in the control at the colors, and about the same at the syntax.
 
 {turn_table()}
 
-The table puts the example answers in degrees. On the clean pass the answers that fit `difference` climb onto e₁ with depth, to within a few degrees of it by block 3. Under the edit they never get there: block 1 turns them by about a quarter of a right angle, and each later block finds them far less aligned than the clean model had them, so the writes after block 1 are small. Turning these states is the edit doing its job: they are the evidence for `difference` in a context that otherwise points elsewhere, and E2 finds that removing them helps those contexts.
+The table puts the example answers in degrees. On the clean pass, the answers that fit `difference` climb onto e₁ with depth, to within a few degrees of it by block 3. Under the edit they never get there. Block 1 turns them by about a quarter of a right angle, and each later block finds them far less aligned than the clean model had them, so the writes after block 1 are small.
 
-So on the recipe of record the bound holds in the sense of ex-2.2.1. The anchor gives a turn we can state in advance from the clean map, and nothing downstream adds to it. What the bound does not cover is what the later blocks make of a state that was turned at block 1, which is what the spill measures; at block 1 the other ops sit closer to e₁ than in a model with no anchor, so that is where any spill would start.
+Turning these states is the edit doing its job: they are the evidence for `difference` in a context that otherwise points elsewhere, and E2 finds that removing them helps those contexts.
+
+So on the recipe of record the bound holds in the sense of ex-2.2.1. The anchor gives a turn we can state in advance from the clean map, and nothing downstream adds to it.
+
+The bound does not cover what the later blocks make of a state that was turned at block 1; that is what the spill measures. At block 1 the other ops sit closer to e₁ than in a model with no anchor, so that is where any spill would start.
 """
 
 # %%
@@ -713,21 +735,29 @@ So on the recipe of record the bound holds in the sense of ex-2.2.1. The anchor 
 rf"""
 ## Whether the drop follows what each context needed (E2)
 
-The target null predicts the drop context by context: a context whose examples all fit `difference` should lose most, and one whose examples point elsewhere should lose little. If the anchor holds the inferred op, the edit should take about the same share of the way to the target null in every group of contexts, whatever their posterior on `difference`. If it holds something coarser, such as the label or a color feature of `difference` answers, it would take off about the same amount everywhere, which would be a larger share on the contexts that barely needed the op. The main measure is the share removed by bin of the posterior (the correlation of drop with the dependence of the Bayes predictor is a second, weaker sign, since the clean model already tracks the posterior).
+The target null predicts the drop context by context. A context whose examples all fit `difference` should lose most, and one whose examples point elsewhere should lose little. If the anchor holds the inferred op, the edit should take about the same share of the way to the target null in every group of contexts, whatever their posterior on `difference`.
 
-The target null also predicts a change on the contexts of other ops: where an example showed the answer of `difference`, removing the op should move the answer back toward the true op, a gain. We look at both.
+If the anchor holds something coarser, such as the label or a color feature of `difference` answers, the edit would take off about the same amount everywhere. That would be a larger share on the contexts that barely needed the op.
+
+The main measure is the share removed by bin of the posterior. The correlation of drop with the dependence of the Bayes predictor is a second, weaker sign, since the clean model already tracks the posterior.
+
+The target null also predicts a change on the contexts of other ops. Where an example showed the answer of `difference`, removing the op should move the answer back toward the true op, which is a gain.
 
 {grading_figure()}
 
-The share removed is about level across the posterior: between {SHARE_MEAN.min():.2f} and {SHARE_MEAN.max():.2f} at the seed mean, lowest in the {BIN_LABEL[SHARE_LOW_BIN]} bin. The lowest bin is the noisiest, since its contexts needed little to begin with, and one seed there goes a little past the target null; no other bin shows the overshoot a coarse feature would give. (The drop correlates with the Bayes dependence at r = {span(R_BAYES.values())}.)
+The share removed is about level across the posterior: between {SHARE_MEAN.min():.2f} and {SHARE_MEAN.max():.2f} at the seed mean, lowest in the {BIN_LABEL[SHARE_LOW_BIN]} bin. The lowest bin is the noisiest, since its contexts needed little to begin with, and one seed there goes a little past the target null. No other bin shows the overshoot a coarse feature would give. (The drop correlates with the Bayes dependence at r = {span(R_BAYES.values())}.)
 
 {grading_table()}
 
-On the contexts of other ops the edit helps where their examples point at `difference`, and by more the more they point at it: in the direction the target null predicts, and most of the way. Where the posterior on `difference` is {OTHER_LABEL[3]} the edit gains {GAIN_EDIT_MEAN[3]:.2f} against {GAIN_NULL[3]:.2f} for the target null; in the two low bins it gains a little more than the target null, {GAIN_EDIT_MEAN[1]:.2f} against {GAIN_NULL[1]:.2f} at {OTHER_LABEL[1]}. Part of that excess comes from subtracting the control, which loses a little on every op under the edit, though on the contexts whose examples point at `difference` it gains a little instead, on every seed: without subtracting it, the gains are {num(RAW_GAIN_MEAN[1])} and {num(RAW_GAIN_MEAN[3])}.
+On the contexts of other ops, the edit helps where their examples point at `difference`, and the more they point at it, the more it helps. That is the direction the target null predicts, and the edit goes most of the way.
+
+Where the posterior on `difference` is {OTHER_LABEL[3]}, the edit gains {GAIN_EDIT_MEAN[3]:.2f} against {GAIN_NULL[3]:.2f} for the target null. In the two low bins it gains a little more than the target null, {GAIN_EDIT_MEAN[1]:.2f} against {GAIN_NULL[1]:.2f} at {OTHER_LABEL[1]}.
+
+Part of that excess comes from subtracting the control. Under the edit the control loses a little on every op, but on the contexts whose examples point at `difference` it gains a little instead, on every seed. Without subtracting the control, the gains are {num(RAW_GAIN_MEAN[1])} and {num(RAW_GAIN_MEAN[3])}.
 <!-- REVIEW: the control's drop by bin on the other ops is +0.03 below a posterior of 0.2 and −0.03 at ≥ 0.5 (a gain), so the earlier wording, which had it losing everywhere, did not fit the raw gain of 0.26 being above the net 0.23 (claims review). -->
  Most contexts of other ops have almost no posterior on `difference` ({N_OBIN[0]:,} of {int((~IS_D).sum()):,} below 0.05), and there the target null predicts almost no change.
 
-Without subtracting the control the share is level too, and higher: between {RAW_SHARE_MEAN.min():.2f} and {RAW_SHARE_MEAN.max():.2f} by bin. The shape of the net share across bins comes from the control, whose own drop under the edit varies by bin, so it says where an arbitrary edit costs the most rather than anything about the anchor.
+Without subtracting the control the share is level too, and higher: between {RAW_SHARE_MEAN.min():.2f} and {RAW_SHARE_MEAN.max():.2f} by bin. The shape of the net share across bins comes from the control, whose own drop under the edit varies by bin. So that shape says where an arbitrary edit costs the most, rather than anything about the anchor.
 <!-- REVIEW: cut "the edit is a little shy where the evidence is split" (claims review). Without the control subtraction the share by bin is level near 0.9 to 0.97; the dip in the net share is the control's own drop by bin. Verify: the "not net of the control" row of the table. -->
 
 So the drop is graded the way claim (b) asks: in proportion to what each context needed. The gain on the other ops fits the anchor holding what the examples show about `difference`, wherever it appears, rather than what the label marks.
@@ -738,27 +768,33 @@ So the drop is graded the way claim (b) asks: in proportion to what each context
 rf"""
 ## Where the edited answers fall short (E3)
 
-The full edit covers about half of the distance to the target null on `difference` contexts ({span(land("landing"))} here). The rest could be on the answers of `difference` the edit leaves behind, on colors no op gives, or on the answers of the other ops, weighed differently from the target null. Each would point somewhere different: a weak removal, damage to the answer, or a model that has lost `difference` and weighs what is left in its own way.
+The full edit covers about half of the distance to the target null on `difference` contexts ({span(land("landing"))} here).
+
+Where is the rest? It could be on the answers of `difference` that the edit leaves behind, on colors no op gives, or on the answers of the other ops, weighed differently from the target null. These would point to different causes: a weak removal, damage to the answer, or a model that has lost `difference` and weighs what is left in its own way.
 
 {mass_table()}
 
 The edit moves nearly all the mass off the answers only `difference` gives, and onto the answers of the other ops. A little more lands on colors no op gives than on the clean pass. Nearly all of the distance left is on the answers of the other ops.
 
-Overall, the edited model spreads that mass over the other ops about as the target null does: each op gets roughly its share, with `lighten` and `hue-hsv` a little short.
+Overall, the edited model spreads that mass over the other ops about as the target null does. Each op gets roughly its share, with `lighten` and `hue-hsv` a little short.
 
 {op_mass_table()}
 
-So the shortfall is context by context. To separate how the edited model weighs the ops from how it shapes the answer of each op, we fit each edited answer distribution with the nearest mixture of the ops' answer distributions (non-negative weights), and measure the two legs of the path through it: from the edited answers to that mixture, and from the mixture to the target null. Total variation is a distance, so the two legs can add to more than the whole.
+So the shortfall is context by context. It could be in how the edited model weighs the ops, or in how it shapes the answer of each op. To separate the two, we fit each edited answer distribution with the nearest mixture of the answer distributions of the ops, with non-negative weights.
 
-For a yardstick, the clean model sits some distance from the Bayes predictor it learned to match, on `difference` contexts ({span(land("clean_to_bayes"))}, about as far as the control) and a little further on the other ops. That is a comparison point rather than a floor, since the two are distances between different pairs, but it says how close a model of this size gets to an ideal predictor when nothing has been edited.
+We measure the two legs of the path through that mixture: from the edited answers to the mixture, and from the mixture to the target null. Total variation is a distance, so the two legs can add to more than the whole.
+
+For a yardstick, the clean model sits some distance from the Bayes predictor it learned to match. On `difference` contexts that distance is {span(land("clean_to_bayes"))}, about as far as the control, and it is a little further on the other ops. This is a comparison point rather than a floor, since the two are distances between different pairs. But it says how close a model of this size gets to an ideal predictor when nothing has been edited.
 
 {landing_figure()}
 
-The edited answers are close to a mixture of the ops' answers ({span(land("off_mixture"))}, against {np.mean(land("clean_off_mixture")):.2f} on the clean pass), so they are mostly well formed: answers the other ops give, with about the right spread within each op. The mixture, though, sits {span(land("mixture_to_null"))} from the target null, so the edited model weighs the other ops differently from the posterior, context by context. The distance left in all is about two and a half times the yardstick.
+The edited answers are close to a mixture of the answers of the ops ({span(land("off_mixture"))}, against {np.mean(land("clean_off_mixture")):.2f} on the clean pass). So they are mostly well formed: answers the other ops give, with about the right spread within each op.
 
-The edited model does use the examples to weigh the other ops, partly. A predictor that has lost `difference` and weighs the other ops equally, whatever the examples show, sits further from the edited answers ({np.mean(land("uniform_left")):.2f}) than the target null does.
+The mixture, though, sits {span(land("mixture_to_null"))} from the target null, so the edited model weighs the other ops differently from the posterior, context by context. In all, the distance left is about two and a half times the yardstick.
 
-This fits the reading in claim (c) that the anchor gives the edit a direction and not the whole distance. The edit takes `difference` away cleanly, and the model answers with the other ops, weighed by the examples less sharply or less accurately than the target null weighs them.
+The edited model does use the examples to weigh the other ops, partly. Take a predictor that has lost `difference` and weighs the other ops equally, whatever the examples show. It sits further from the edited answers ({np.mean(land("uniform_left")):.2f}) than the target null does.
+
+This fits the reading in claim (c) that the anchor gives the edit a direction and not the whole distance. The edit takes `difference` away cleanly, and the model answers with the other ops. It weighs them by the examples, but less sharply or less accurately than the target null weighs them.
 """
 
 # %%
@@ -766,9 +802,13 @@ This fits the reading in claim (c) that the anchor gives the edit a direction an
 r"""
 ## Discussion
 
-On the recipe of record, the edit behaves at all three scales the way the placed axis says it should, to a first approximation. The turn on the states of other ops is bounded by the clean map, slice by slice, and the blocks downstream of an edit leave less on e₁ than they found. The loss on each `difference` context follows how much that context needed the op, with no sign of a coarser feature, and the contexts of other ops whose examples point at `difference` recover as the target null predicts. That fits the anchor holding the evidence for the op, wherever it appears, and the edit removing that evidence.
+On the recipe of record, the edit behaves at all three scales the way the placed axis says it should, to a first approximation. The turn on the states of other ops is bounded by the clean map, slice by slice, and the blocks downstream of an edit leave less on e₁ than they found. The loss on each `difference` context follows how much that context needed the op, with no sign of a coarser feature.
 
-The gap is in where the answers land. The edit sends the mass to the right ops overall, but within a context it shares it among them only partly by how well each fits the examples. One reading is that the evidence the model uses to tell the other ops apart travels partly along e₁ too, so that taking out the axis blurs it; another is that the model never needed fine weights among the other ops on `difference` contexts, since the answer there was `difference`. This page does not separate them. A model trained without `difference` contexts would show how close any model of this size comes to the target null, and so how much of the gap is the edit.
+The contexts of other ops whose examples point at `difference` recover as the target null predicts. That fits the anchor holding the evidence for the op, wherever it appears, and the edit removing that evidence.
 
-Block 1 is where the bound is widest and where the other ops sit closer to e₁ than in a model with no anchor. If the spill grows on a later recipe, the bound map at block 1 is the first place to look.
+The gap is in where the answers land. The edit sends the mass to the right ops overall. But within a context, it shares the mass among them only partly by how well each fits the examples.
+
+One reading is that the evidence the model uses to tell the other ops apart also travels partly along e₁, so taking out the axis blurs it. Another is that the model never needed fine weights among the other ops on `difference` contexts, since the answer there was `difference`. This page does not separate them. A model trained without `difference` contexts would show how close any model of this size comes to the target null, and so how much of the gap is the edit.
+
+If the spill grows on a later recipe, the bound map at block 1 is the first place to look, since that is where the bound is widest.
 """
