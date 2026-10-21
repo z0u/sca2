@@ -99,7 +99,7 @@ def first_rise(traj: dict) -> float:
 
 
 # Every stored run: its experiment, arm, seed, outcome and window mean.
-STORED_RUNS = []
+STORED_RUNS: list[dict[str, Any]] = []
 for name, trajs in STORED_TRAJ.items():
     for label, t in trajs.items():
         arm, seed = label.rsplit("-s", 1)
@@ -123,7 +123,7 @@ SLOWEST = min((r for r in STORED_RUNS if not r["lost"]), key=lambda r: r["window
 assert LOST_HI < ex.LOST_MAX and KEPT_LO >= ex.KEPT_MIN  # the constants the experiment called with
 
 
-def held_out() -> list[dict]:
+def held_out() -> list[dict[str, Any]]:
     """For each stored experiment, the cut chosen on the other two (the middle of their gap), and the runs of the
     held-out one it sorts wrongly.
     """
@@ -170,7 +170,7 @@ REPRO_MAX = max(r["diff"] for r in REPRO)
 CALL = {(c["arm"], c["model_seed"]): c for c in CALLS["runs"]}
 
 
-def outcome(arm: str, seed: int) -> dict:
+def outcome(arm: str, seed: int) -> dict[str, Any]:
     """One seed of an arm: its window mean, the call, and whether it lost the anchor, from the full edit where the
     run was trained to the end (the stored seeds, and the screen runs not called kept) and from the call otherwise.
     """
@@ -221,10 +221,9 @@ LATE_P = float(stats.binomtest(len(LATE_ONLY[FALLOFF]), len(LATE_ONLY[FALLOFF]) 
                                alternative="greater").pvalue) if LATE_ONLY[FALLOFF] or LATE_ONLY[SOFT] else 1.0  # fmt: skip
 # The one-sided sign test that `falloff` is late more often, over the seeds where only one arm was late.
 WINDOW_R = float(np.corrcoef([WINDOWS[FALLOFF], WINDOWS[SOFT]])[0, 1])
-FINISHED = sorted((OUT[a][s] | {"arm": a, "seed": s} for a in ARMS for s in SEEDS if OUT[a][s]["removal"] is not None),
+FINISHED: list[dict[str, Any]] = sorted((OUT[a][s] | {"arm": a, "seed": s} for a in ARMS for s in SEEDS if OUT[a][s]["removal"] is not None),
                   key=lambda o: o["seed"])  # fmt: skip
 SLOW = [o for o in FINISHED if not o["lost"]]
-WRONG_PROVISIONAL = [o for o in FINISHED if (o["call"] == "lost?") != o["lost"] and o["call"].endswith("?")]
 
 
 def table_html(head: list[str], rows: list[list[str]], caption: str) -> str:
