@@ -19,6 +19,13 @@ if command -v uv >/dev/null 2>&1; then
     fi
 fi
 
+# Share the render caches between a project's cloud threads. The session-start hook does this
+# through the session's env file (its step 3b), but some cloud sessions never run the hook, so
+# ./go sets it too. A value already set wins.
+if [[ "${CLAUDE_CODE_PROJECTS_SESSION:-}" == 1 && -d /mnt/project-files/ && -z "${MINI_CACHE_DIR:-}" ]]; then
+    export MINI_CACHE_DIR=/mnt/project-files/.mini-cache
+fi
+
 show_usage() {
     echo "usage: $SELF [-h] {install,auth,check,deps,render,serve,preview,publish,site,todo,worktrees} ..."
 }

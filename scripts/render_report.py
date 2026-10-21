@@ -24,6 +24,7 @@ from mini.lit.render import write_outputs
 from mini.report_print import print_bundle
 from mini.reports import MD_LEAF, export_key, mark_verdicts
 from mini.review_marks import baseline_dir, mark_changes, stamp
+from mini.store import active_profile
 
 ROOT = Path(__file__).parent.parent.resolve()
 DOCS = ROOT / "docs"
@@ -153,4 +154,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit as e:
+        # A failed render under a storage profile has usually missed results that are only on production.
+        if e.code not in (0, None, 2) and (profile := active_profile()):
+            print(
+                f"note: rendered under MINI_PROFILE={profile}; a published report reads production, so render it without MINI_PROFILE",
+                file=sys.stderr,
+            )
+        raise
