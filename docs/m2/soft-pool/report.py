@@ -902,7 +902,7 @@ The ramp over slices 1 to 3 lost the anchor on one seed of eight at the fixed te
 
 Its one loss came later and in another way, with the alignment partly back by the end but no longer doing the work. That is a reason to keep scoring removal, and not alignment alone, when judging a run.
 
-The soft ramp kept the anchor on every seed here without the step between slices 1 and 2, so it would be a candidate if its spill can be kept down. If the spill comes from the soft pool reaching every position, as E3 suggests, two changes would aim at it: a soft pool over the answer positions only, so the pull is shared among the example answers and the query answer and nowhere else, or a stronger anti term while the pool is soft. Turning the anti term off on slice 4 might also let the ramp keep the concept there. As it stands, `falloff` still keeps the anchor on every seed with the edit inside the criterion, which no new arm matched on both counts.
+The soft ramp kept the anchor on every seed here without the step between slices 1 and 2, so it would be a candidate if its spill can be kept down. If the spill comes from the soft pool reaching every position, as E3 suggests, a stronger anti term while the pool is soft would aim at it. Turning the anti term off on slice 4 might also let the ramp keep the concept there. As it stands, `falloff` still keeps the anchor on every seed with the edit inside the criterion, which no new arm matched on both counts.
 """
 
 # %%

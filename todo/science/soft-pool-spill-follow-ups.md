@@ -9,8 +9,7 @@ In the [soft-pool experiment](/docs/m2/soft-pool/report.py), a pooling temperatu
 
 Arms that would test it, each beside the soft ramp:
 
-- A soft pool over the answer positions only (example answers and query answer), so the pull is shared among them and nowhere else.
-- A stronger anti term while the pool is soft.
+- A stronger anti term while the pool is soft, so the lift on the other ops during the rise stays small. (A soft pool over the answer positions alone would also aim at it, but it needs role labels that real text won't have, so it is out.)
 - The anti term off on slice 4 for the arms that don't pull there. The anti term acts on every position, the `difference` answers included, and nothing on slice 4 counters it under the ramp. That may be why α falls there (0.46 against 0.64 under the step). The review wondered whether the model's work to meet a balanced pull on slice 3 and an unbalanced anti term on slice 4 could feed the spill indirectly. The arms so far argue against a large effect: the fixed ramp has that imbalance and the least spill of any arm, and the soft ramp spills about as much as the soft step, which has no imbalance. It may cost removal instead, since both ramps remove a few hundredths less than the step.
 - A later or slower λ_a warm-up at the fixed temperature, which separates the soft start from a plain delay. The review also wondered about a faster one.
 
