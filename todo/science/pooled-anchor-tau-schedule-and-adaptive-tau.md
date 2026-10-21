@@ -1,5 +1,5 @@
 ---
-status: open
+status: partial
 tags: [anchoring, schedules, ex-2.1.9, M3]
 opened: 2026-08-23
 ---
@@ -20,3 +20,5 @@ Split from the older ex-2.1.9 follow-ups item on 2026-08-23.
 **2026-10-12, slice-terms review** — Renewed interest in the soft → sharp schedule from the slice-terms experiment. There the pull pooled over slices as well as positions settled on the query answer alone on one seed of four (a position after the prediction, so the edit removed nothing). A pool that starts soft might keep one position from taking the whole pull early. The pool now has two temperatures, τ_p over positions and τ_ℓ over slices (`AnchorSpec.slice_tau`), so a schedule could move either.
 
 **2026-10-13, split-anti-seeds** — The pull settled on the query answer again in [the split-anti-seeds experiment](/docs/m2/split-anti-seeds/report.py), this time pooling within each slice: once under each uniform anti hold (seeds 708 and 706), and never under the split or the falloff. A different τ_p, or a soft → sharp schedule for it, might keep the pull on the example answers there too.
+
+**2026-10-21, soft-pool** — The soft → sharp schedule has run, in [the soft-pool experiment](/docs/m2/soft-pool/report.py). `AnchorSpec` now takes `tau_start`, `slice_tau_start` and `tau_anneal_end`, so τ_p and τ_ℓ can move over training, which settles the shared first step above. A τ_p that started at 1 and sharpened to 0.1 by epoch 40 kept the anchor on every seed in every arm that had it, but each soft arm spilled more than its fixed twin. That follow-up is in [Keep the spill of a soft pool down](./soft-pool-spill-follow-ups.md). The trainable τ with a counterweight is still untried.
