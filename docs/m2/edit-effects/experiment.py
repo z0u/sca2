@@ -57,13 +57,19 @@ N_SLICES = ex2222.N_LAYER + 1
 
 PREFIX = "reports/m2/edit-effects"
 RESULTS_REF = PREFIX + "/results"
+FITS_REF = PREFIX + "/fits"
 ARRAYS_REF = PREFIX + "/arrays/{label}"
 
 
 def runs() -> list[dict]:
     """The `falloff` runs and the controls at the same seeds, with the ref of each checkpoint."""
     anchored = [
-        {"label": sas.label_of(ARM, s), "arm": ARM, "model_seed": s, "ref": sas.CHECKPOINT_REF.format(label=sas.label_of(ARM, s))}
+        {
+            "label": sas.label_of(ARM, s),
+            "arm": ARM,
+            "model_seed": s,
+            "ref": sas.CHECKPOINT_REF.format(label=sas.label_of(ARM, s)),
+        }
         for s in SEEDS
     ]
     controls = [
@@ -127,6 +133,31 @@ def measure_one(checkpoint, holdout, label: str) -> dict:
     return {"label": label, "arrays": put(buf.getvalue(), name=f"edit-effects-{label}.npz"), "turn_check": worst}
 
 
+def fits(checkpoint, holdout) -> dict:
+    """Which answers of the held-out contexts each op can give on their operands, for each example and then the
+    query: `(contexts, examples + 1, ops)`, true where the probability of that answer under the op is above zero.
+    The tokenizer comes from *checkpoint*; every run shares it.
+    """
+    import io
+
+    from mini.store import get, put
+
+    workdir = get_data_dir() / "edit-effects" / "fits"
+    _, _, _, tok2color = ex2216._load_run(checkpoint, workdir)
+    ho = ex2216.load_holdout(get(holdout, workdir / "holdout.npz"), K)
+    P = ex2216._get_posterior()
+    table = P.build_table(ex2222.ex2218.table_of(OP_NAMES))
+    n_colors = int(tok2color.max()) + 1
+    out = np.zeros((len(ho.tokens), K + 1, len(OP_NAMES)), bool)
+    for e in range(K + 1):
+        a, b, y = (tok2color[ho.tokens[:, 6 * e + j]] for j in (0, 2, 4))
+        valid = (a >= 0) & (b >= 0) & (y >= 0)
+        out[:, e] = (table.lookup(a * n_colors + b, np.maximum(y, 0)) > 0).T & valid[:, None]
+    buf = io.BytesIO()
+    np.savez_compressed(buf, fits=out, op_ids=ho.op_ids.astype(np.int8))
+    return {"arrays": put(buf.getvalue(), name="edit-effects-fits.npz")}
+
+
 def design() -> dict[str, Any]:
     return {
         "experiment": "edit-effects",
@@ -141,7 +172,7 @@ def design() -> dict[str, Any]:
     }
 
 
-def publish(meta: list[dict], measured: list[dict]) -> dict:
+def publish(meta: list[dict], measured: list[dict], fitted: dict) -> dict:
     import json
 
     from mini.store import put, set_ref
@@ -151,6 +182,7 @@ def publish(meta: list[dict], measured: list[dict]) -> dict:
     for r in measured:
         set_ref(ARRAYS_REF.format(label=r["label"]), r["arrays"])
         rows.append(by_label[r["label"]] | {k: v for k, v in r.items() if k != "arrays"})
+    set_ref(FITS_REF, fitted["arrays"])
     body = {"design": design(), "runs": rows}
     set_ref(RESULTS_REF, put(json.dumps(body).encode(), name="edit-effects-results.json"))
     return {"n_runs": len(rows)}
@@ -166,7 +198,8 @@ def main(ctx: Ctx) -> dict:
         [m["label"] for m in meta],
         role="measure",
     )
-    return ctx.run(publish, meta, measured, role="prep")
+    fitted = ctx.run(fits, resolved["checkpoints"][meta[0]["ref"]], resolved["holdout"], role="prep")
+    return ctx.run(publish, meta, measured, fitted, role="prep")
 
 
 COMPUTE = {
