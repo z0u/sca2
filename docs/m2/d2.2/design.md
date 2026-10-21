@@ -186,7 +186,7 @@ The blog post on D2.2 should show what anchoring adds over methods that do not p
 
 - Post-hoc directions on the controls. Fit a direction for `difference` on the states of the un-anchored controls at seeds 704 to 711 (diff-in-means, a ridge probe, and LEACE, the linear eraser), with the same scarce labels, and edit along it. No training. On *red*, in ex-2.2.1, these directions cost the lines with no red about as much as they removed from red, since the un-anchored model keeps red on directions the mix also uses.
 - A filtered corpus: the model trained with no `difference` contexts, the same runs as the reference model above.
-- SGTM, a training-time method that masks gradients so that labelled examples update only parameters set aside for the concept, which are then removed. Its own experiment, on the same labels.
+- Gradient routing, a training-time method that masks gradients so that labelled examples update only parameters set aside for the concept, which are then removed. We would run it in its SGTM form (selective gradient masking), which made it more robust to label noise. Its own experiment, on the same labels.
 
 RMU, SAE and LUNAR rows wait for D2.3. In the [backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md).
 
