@@ -619,10 +619,10 @@ rf"""
 
 /// tip |
 <!-- lede -->
-We trained 32 new seeds each of `falloff` and the soft start, stopped each run early, and called it from whether the example answers had come onto e₁. `falloff` lost the anchor on one seed of 40, and the soft start on none. A few `falloff` runs came onto e₁ only late in training, which the soft start never did.
+We trained 32 new seeds each of `falloff` and the soft start, stopped each run early, and judged it by whether the example answers had come onto e₁. `falloff` lost the anchor on one seed of 40, and the soft start on none. A few `falloff` runs came onto e₁ only late in training, which the soft start never did.
 ///
 
-The recipe of record, `falloff` from [the split-anti-seeds experiment](/docs/m2/split-anti-seeds/report.py), had run at eight seeds and kept the anchor on all of them. That fits a loss rate as high as three in ten. Several of its close variants lost the anchor on one to three seeds of eight, in split-anti-seeds, [anchor-ramp](/docs/m2/anchor-ramp/report.py) and [soft-pool](/docs/m2/soft-pool/report.py), and the soft start of soft-pool (`step, soft τ`) kept it on all eight of its own. With the recipe known this loosely, an arm that loses one seed in eight couldn't be told apart from it.
+The recipe of record, `falloff` from [the split-anti-seeds experiment](/docs/m2/split-anti-seeds/report.py), had run at eight seeds and kept the anchor on all of them. That fits a loss rate as high as three in ten. Several of its close variants lost the anchor on one to three seeds of eight, in split-anti-seeds, [anchor-ramp](/docs/m2/anchor-ramp/report.py), and [soft-pool](/docs/m2/soft-pool/report.py). The soft start of soft-pool (`step, soft τ`) kept it on all eight of its own. With the recipe known this loosely, an arm that loses one seed in eight couldn't be told apart from it.
 
 Full runs at the seed counts that would narrow this are costly. But in those three experiments the runs that lost the anchor had parted from the kept ones within the first sixty or so epochs. So we first check, on the {N_STORED} stored runs whose outcome we know, whether an early call made from the alignment agrees with the full edit. Then we train {len(SEEDS)} new seeds each of `falloff` and the soft start on the full-length schedule, stop them at epoch {ex.STOP_EPOCH}, and call each one. The runs the call can't settle are trained to the end and scored.
 """
@@ -632,19 +632,19 @@ Full runs at the seed counts that would narrow this are costly. But in those thr
 rf"""
 ## Observations
 
-- [The early call on the stored runs (E1)](#the-early-call-on-the-stored-runs-e1): how well the example answers had come onto e₁ by epochs {ex.WINDOW[0]} to {ex.WINDOW[1]} sorts every stored run the way the full edit does, with a clear gap between the lost runs and the kept ones, and it still does when each experiment is held out of choosing the cut, though one slow run then lands close to the cut.
-- [How often each arm loses the anchor (E2)](#how-often-each-arm-loses-the-anchor-e2): `falloff` lost the anchor on one seed of {N}, and the soft start on none, which puts the loss rate of `falloff` under about one in nine and that of the soft start under about one in fourteen. The two can't be told apart on losses alone.
-- [The slow runs (E3)](#the-slow-runs-e3): under the soft start the example answers came onto e₁ within a few epochs of each other on every seed. Under `falloff` most runs were a little quicker, but three hung partway until after epoch 200 and then came up, once the anti weight had fallen to about half, and kept the anchor.
+- [The early call on the stored runs (E1)](#the-early-call-on-the-stored-runs-e1): how well the example answers had come onto e₁ by epochs {ex.WINDOW[0]} to {ex.WINDOW[1]} sorts every stored run the way the full edit does, with a clear gap between the lost runs and the kept ones. It still does when each experiment is held out of choosing the cut, though one slow run then lands close to the cut.
+- [How often each arm loses the anchor (E2)](#how-often-each-arm-loses-the-anchor-e2): `falloff` lost the anchor on one seed of {N}, and the soft start on none. That puts the loss rate of `falloff` under about one in nine and that of the soft start under about one in fourteen. The two can't be told apart on losses alone.
+- [The slow runs (E3)](#the-slow-runs-e3): under the soft start the example answers came onto e₁ within a few epochs of each other on every seed. Under `falloff` most runs were a little quicker, but three hung partway until after epoch 200. They came up once the anti weight had fallen to about half, and kept the anchor.
 
 ## Scope
 
-This is an exploratory study, with no preregistration and no gate. It covers two arms, both with the step pull on slices 2 to 4 and the `falloff` anti weight on every slice: `falloff` itself, at a fixed pooling temperature $\tau_p$ = 0.1, and the soft start, where $\tau_p$ sharpens from 1 to 0.1 over the 40-epoch warm-up of the anchor weight. Everything else is the training of split-anti-seeds.
+This is an exploratory study, with no preregistration and no gate. It covers two arms. Both have the step pull on slices 2 to 4 and the `falloff` anti weight on every slice. They are `falloff` itself, at a fixed pooling temperature $\tau_p$ = 0.1, and the soft start, where $\tau_p$ sharpens from 1 to 0.1 over the 40-epoch warm-up of the anchor weight. Everything else is the training of split-anti-seeds.
 
 The new runs are at seeds {SEEDS[0]} to {SEEDS[-1]}, the same {len(SEEDS)} seeds for both arms, so the two are paired by initialization, batches and label draws. Each trains on the full 400-epoch schedule (the learning rate and both term weights as in a full run) and stops at epoch {ex.STOP_EPOCH}. With the stored runs at seeds {OLD_SEEDS[0]} to {OLD_SEEDS[-1]}, each arm has {N} seeds.
 
 Two seeds of each arm ({" and ".join(map(str, ex.REPRO_SEEDS))}) were also trained again and stopped at epoch {ex.STOP_EPOCH}, to check that stopping early leaves the run up to the stop as it was in the stored full run. It does: α at every recorded epoch up to the stop matches the stored run to the last digit in all four (largest difference {REPRO_MAX:g}).
 
-The call is calibrated on the same stored runs it is then checked on, so E1 also holds out each experiment in turn. A screen run that is not firmly kept (called lost, or between the stored lost and kept runs) was trained again to the end and scored with the full edit, so every loss counted is a measured one. A kept call is not checked this way. It rests on the timing of the stored losses: the late loss of soft-pool brought its example answers back to about 0.4 by epoch 100 and still removed almost nothing, so a run that came back by epochs {ex.WINDOW[0]} to {ex.WINDOW[1]} would be called kept wrongly. No stored run did.
+The call is calibrated on the same stored runs it is then checked on, so E1 also holds out each experiment in turn. A screen run that is not firmly kept (called lost, or between the stored lost and kept runs) was trained again to the end and scored with the full edit, so every loss counted is a measured one. A kept call is not checked this way. It rests on the timing of the stored losses. The late loss of soft-pool brought its example answers back to about 0.4 by epoch 100 and still removed almost nothing. So a lost run whose example answers came back by epochs {ex.WINDOW[0]} to {ex.WINDOW[1]} would be wrongly called kept. No stored run did that.
 
 The finished runs have no control at their seed, so their removal is netted against the seed mean of the eight controls of ex-2.2.23. The controls differ by up to about an eighth in removal, which matters only for a run near the half-removal line, and no finished run came near it.
 
@@ -666,7 +666,7 @@ Does the window mean tell the runs that lost the anchor from those that kept it?
 
 {calib_figure()}
 
-It does, with room to spare. Every lost run sits near zero on the window mean, every kept run well above it, and the gap between them holds no run. Most lost runs ended with almost no removal; the one near the half-removal line (seed 710 of `ramp from 1`, which the anchor-ramp report counted as borderline) sits with the other lost runs on the window mean. The kept run nearest the gap is seed {SLOWEST["seed"]} of `ramp from emb`, a run whose example answers climbed slowly and came onto e₁ only after epoch 200.
+It does, with room to spare. Every lost run sits near zero on the window mean, every kept run well above it, and the gap between them holds no run. Most lost runs ended with almost no removal. The one near the half-removal line is seed 710 of `ramp from 1`, which the anchor-ramp report counted as borderline, and on the window mean it sits with the other lost runs. The kept run nearest the gap is seed {SLOWEST["seed"]} of `ramp from emb`, a run whose example answers climbed slowly and came onto e₁ only after epoch 200.
 
 A cut chosen on the same runs it sorts could fit them by chance, so we chose it on two experiments and sorted the third:
 
@@ -686,11 +686,11 @@ How many of the {N} seeds of each arm lost the anchor, how high could the loss r
 
 {count_table()}
 
-`falloff` lost the anchor on one seed, {LOST[FALLOFF][0]}. That run lost it the way the anchor-ramp losses and the uniform holds of split-anti-seeds did: its query answer came onto e₁ by epoch 20 and stayed there, while its example answers never left zero, and the full edit removed nothing. The soft start kept the anchor on the same seed, and on every other.
+`falloff` lost the anchor on one seed, {LOST[FALLOFF][0]}. That run lost it the way the anchor-ramp losses and the uniform holds of split-anti-seeds did. Its query answer came onto e₁ by epoch 20 and stayed there. Its example answers never left zero, and the full edit removed nothing. The soft start kept the anchor on the same seed, and on every other.
 
 So with 40 seeds each, the loss rate of `falloff` is under about {upper(len(LOST[FALLOFF]), N):.0%} and that of the soft start under about {upper(len(LOST[SOFT]), N):.0%}. One seed where only one arm lost is far from enough to say which loses more (p = {SIGN_P:.2g}).
 
-Three more `falloff` runs fell between the stored lost and kept runs, and all three kept the anchor when finished, with removal close to that of the other kept runs ({fmt([o["removal"] for o in SLOW])}). Two of them sat below the middle of the gap, so a single cut there would have counted them as losses, three losses in place of one. The band of finished runs was what kept the count right.
+Three more `falloff` runs fell between the stored lost and kept runs, and all three kept the anchor when finished, with removal close to that of the other kept runs ({fmt([o["removal"] for o in SLOW])}). Two of them sat below the middle of the gap, so a single cut there would have counted them as losses, giving three losses in place of one. Finishing the runs in the band is what kept the count right.
 """
 
 # %%
@@ -698,13 +698,17 @@ Three more `falloff` runs fell between the stored lost and kept runs, and all th
 rf"""
 ## The slow runs (E3)
 
-What set those three `falloff` runs apart, and does the soft start have runs like them? The measures are the window mean, and the first recorded epoch at which α at the example answers goes over {RISE:g}, as in soft-pool.
+What set those three `falloff` runs apart, and does the soft start have runs like them? We look at the window mean and at the first recorded epoch at which α at the example answers goes over {RISE:g}, as in soft-pool.
 
 {settle_figure()}
 
 {settle_table()}
 
-Under the soft start the example answers came onto e₁ within a few epochs of each other on every seed, between epochs {np.nanmin(RISES[SOFT]):.0f} and {np.nanmax(RISES[SOFT]):.0f}, as in soft-pool. Under `falloff` most runs got there a few epochs sooner, but the spread is wider: one run jumped up only at epoch 44, and {len(LATE[FALLOFF])} had not got there by the stop, the lost run and the three slow ones. All four are seeds where the soft start got there on time. A split of four seeds to none would come up about one time in sixteen by chance if the two arms didn't differ (p = {LATE_P:.2g}), and we chose this measure after seeing the runs, so this fits the soft start being more even without showing it. These are the same four runs that E2 finished, so the split restates that result by timing rather than adding to it. The evenness is in when the example answers arrive: the level they hold through the window spreads about as widely under the soft start, whose lowest run dips into the band at single records.
+Under the soft start the example answers came onto e₁ within a few epochs of each other on every seed, between epochs {np.nanmin(RISES[SOFT]):.0f} and {np.nanmax(RISES[SOFT]):.0f}, as in soft-pool. Under `falloff` most runs got there a few epochs sooner, but the spread is wider: one run jumped up only at epoch 44, and {len(LATE[FALLOFF])} had not got there by the stop, the lost run and the three slow ones.
+
+All four are seeds where the soft start got there on time. If the two arms didn't differ, a split of four seeds to none would come up about one time in sixteen by chance (p = {LATE_P:.2g}). We also chose this measure after seeing the runs. So this fits the soft start being more even, without showing it. These are the same four runs that E2 finished, so the split restates that result by timing rather than adding to it.
+
+The evenness is only in when the example answers arrive. The level they hold through the window spreads about as widely under the soft start, whose lowest run dips into the band at single records.
 
 Seeds that were slow under one arm tended to be a little slow under the other (the window means of the two arms are correlated over seeds, r = {WINDOW_R:.2f}). The soft start run with the lowest window mean is seed 724, one of the slow `falloff` runs.
 
@@ -712,7 +716,7 @@ The finished runs show what the slow ones did after the stop:
 
 {finished_figure()}
 
-The three slow runs held their example answers about a third of the way to the level of the other runs until after epoch 200. Each then jumped up within a few epochs, at different times between epochs 200 and 280, and kept the anchor. The jumps come once the anti weight on slice {SL} has fallen to about half its plateau, which fits the anti term holding them back. But it falls over most of training, so the timing alone doesn't single it out, nothing here tests it, and the jumps are abrupt where the fall is smooth. The lost run stayed off e₁ to the end.
+The three slow runs held their example answers about a third of the way to the level of the other runs until after epoch 200. Each then jumped up within a few epochs, at different times between epochs 200 and 280, and kept the anchor. The jumps come once the anti weight on slice {SL} has fallen to about half its plateau, which fits the anti term holding them back. But the anti weight falls over most of training, so the timing alone doesn't single it out. The jumps are also abrupt where the fall is smooth, and nothing here tests the idea. The lost run stayed off e₁ to the end.
 """
 
 # %%
@@ -720,9 +724,9 @@ The three slow runs held their example answers about a third of the way to the l
 r"""
 ## Discussion
 
-The screen bounds the loss rate of `falloff` at about one in nine, where eight seeds left it at three in ten, and it found one loss, of the kind seen before: the query answer takes the pull and the example answers never come onto e₁. The soft start lost none of its 40 seeds, which bounds its rate at about one in fourteen. On losses alone the two arms can't be told apart, and telling apart rates this low would take several times as many seeds.
+The screen bounds the loss rate of `falloff` at about one in nine, down from three in ten with eight seeds. It found one loss, of the kind seen before: the query answer takes the pull and the example answers never come onto e₁. The soft start lost none of its 40 seeds, which bounds its rate at about one in fourteen. On losses alone the two arms can't be told apart, and telling apart rates this low would take several times as many seeds.
 
-The soft start was more even in how the example answers came onto e₁, and every `falloff` seed that was slow or lost was on time under it. That fits the reading in soft-pool, that a soft pool holds the pull back until the example answers can share it, and the slow runs and the losses of `falloff` may be two degrees of one thing. If so, the slow runs would be the cheaper measure of it, since there are more of them than losses.
+The soft start was more even in how the example answers came onto e₁, and every `falloff` seed that was slow or lost was on time under it. That fits the explanation offered in soft-pool: a soft pool holds the pull back until the example answers can share it. The slow runs and the losses of `falloff` may also be two degrees of one thing. If so, the slow runs would be the cheaper measure of it, since there are more of them than losses.
 
-The early call held up on the screen as far as we checked it: every run it was unsure of was finished, and the finished ones sorted cleanly by removal. But the slow `falloff` runs sat in the band, where the stored runs had only one run nearby, so a call with a single cut would have overcounted the losses of `falloff` threefold. A call made from this window with a single cut would miscount slow runs as losses, and a later window would let a late loss like the one in soft-pool pass as kept.
+The early call held up on the screen as far as we checked it: every run it was unsure of was finished, and the finished ones sorted cleanly by removal. But the slow `falloff` runs sat in the band, where the stored runs had only one run nearby. A call from this window with a single cut would have counted three losses of `falloff` in place of one. And a later window would let a late loss like the one in soft-pool pass as kept.
 """
