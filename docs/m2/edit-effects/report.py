@@ -159,7 +159,9 @@ TURN = {
 
 
 def seed_mean(arm: str, key: str, sub: str | None = None) -> np.ndarray:
-    return np.mean([TURN[label_of(arm, s)][key] if sub is None else TURN[label_of(arm, s)][key][sub] for s in SEEDS], axis=0)
+    return np.mean(
+        [TURN[label_of(arm, s)][key] if sub is None else TURN[label_of(arm, s)][key][sub] for s in SEEDS], axis=0
+    )
 
 
 def angle(alpha) -> np.ndarray:
@@ -178,7 +180,10 @@ OVER = [
     for s in SEEDS
     for sl in range(1, 5)
     for p in range(N_POS)
-    if (r := np.arcsin(TURN[label_of(FALLOFF, s)]["write"][sl, p]) / np.arcsin(TURN[label_of(FALLOFF, s)]["bound"][sl, p]))
+    if (
+        r := np.arcsin(TURN[label_of(FALLOFF, s)]["write"][sl, p])
+        / np.arcsin(TURN[label_of(FALLOFF, s)]["bound"][sl, p])
+    )
     > TOLERANCE
 ]
 OVER_BOUND_MAX = max((o[4] for o in OVER), default=0.0)
@@ -323,6 +328,26 @@ N_BIN_D = [int(((BIN == b) & IS_D).sum()) for b in range(len(BIN_LABEL))]
 SHARE = {
     s: np.array([NET[s][(BIN == b) & IS_D].mean() / DEPM[s][(BIN == b) & IS_D].mean() for b in range(5)]) for s in SEEDS
 }
+# The same, without subtracting the control: the share of the way to the target null the edit takes on its own.
+RAW_SHARE = {
+    s: np.array(
+        [
+            (DOSE[label_of(FALLOFF, s)]["clean_eem"] - DOSE[label_of(FALLOFF, s)]["eem"][-1])[(BIN == b) & IS_D].mean()
+            / DEPM[s][(BIN == b) & IS_D].mean()
+            for b in range(5)
+        ]
+    )
+    for s in SEEDS
+}
+RAW_SHARE_ALL = {
+    s: (DOSE[label_of(FALLOFF, s)]["clean_eem"] - DOSE[label_of(FALLOFF, s)]["eem"][-1])[IS_D].mean()
+    / DEPM[s][IS_D].mean()
+    for s in SEEDS
+}
+RAW_SHARE_MEAN = np.mean([RAW_SHARE[s] for s in SEEDS], axis=0)
+CONTROL_DROP_D = np.mean(
+    [(DOSE[label_of(CONTROL, s)]["clean_eem"] - DOSE[label_of(CONTROL, s)]["eem"][-1])[IS_D].mean() for s in SEEDS]
+)
 SHARE_ALL = {s: NET[s][IS_D].mean() / DEPM[s][IS_D].mean() for s in SEEDS}
 R_BAYES = {s: float(np.corrcoef(NET[s][IS_D], DEP_BAYES[IS_D])[0, 1]) for s in SEEDS}
 SHARE_MEAN = np.mean([SHARE[s] for s in SEEDS], axis=0)
@@ -425,6 +450,13 @@ def grading_table() -> str:
         ]
     )
     rows.append(["share removed", *[span([SHARE[s][b] for s in SEEDS]) for b in range(5)], span(SHARE_ALL.values())])
+    rows.append(
+        [
+            "not net of the control",
+            *[span([RAW_SHARE[s][b] for s in SEEDS]) for b in range(5)],
+            span(RAW_SHARE_ALL.values()),
+        ]
+    )
     return table_html(
         [f"posterior on `{ex.ANCHORED_OP}`", *BIN_LABEL, "all"],
         rows,
@@ -646,7 +678,7 @@ The edit is the full edit of the recipe: the whole e₁ component taken out of t
 - Whether an example *fits* `difference`: its answer is one that `difference` gives on its operands. In a context of another op, a fitting example is usually one where the replacement op noise showed the answer of `difference`.
 - The *bound* at a slice and position: arcsin of the 99th percentile of the clean |α| over the contexts of the six other ops, as in H4 of [ex-2.2.1](/docs/m2/ex-2.2.1/report.py), set before any edit from the clean geometry. At the example answers it counts only the answers that do not fit `difference`: the ones that fit are evidence for the op, and the anchor is meant to put them on e₁ (the [example-evidence report](/docs/m2/example-evidence/report.py) found it does). The write stays within the bound when its 99th percentile over the same states is no larger. Ex-2.2.1 allowed a quarter over (a ratio of {TOLERANCE}) as a tolerance; we quote the ratio.
 - *Dependence*: how much a context needed `difference`, as the expected exact match of the clean model less that of the target null on the same context. It is the most the edit could take off without going past the target null.
-- The *drop* on a context: its expected exact match on the clean pass less that under the edit, net of the drop the same edit causes on the control at the same context. The share removed in a group of contexts is the mean drop over the mean dependence.
+- The *drop* on a context: its expected exact match on the clean pass less that under the edit, net of the drop the same edit causes on the control at the same context. The share removed in a group of contexts is the mean drop over the mean dependence. The control loses more on `difference` contexts under the same edit than on any other op ({CONTROL_DROP_D:.2f} in expected exact match), so the net share is the part of the removal beyond what taking out an arbitrary axis costs, and sits below the share the edit takes on its own.
 - The *landing* and the distance left: the total variation distance between the edited answers and the target null, on `difference` contexts, and the share of the clean distance that the edit covers, as a ratio of the means over those contexts, the number split-anti-seeds quotes.
 """
 
@@ -665,7 +697,7 @@ The figure shows the bound and the write at every position of a context, slice b
 
 The write stays within the bound past the embedding, give or take the tolerance of ex-2.2.1. At the seed mean the largest ratio of write to bound is {RATIO_MAX:.2f}, at block {RATIO_WORST[0] + 1}, position `{POS_LABEL[RATIO_WORST[1]]}` of the {["first", "second", "third", "query"][RATIO_WORST[1] // UNIT]} equation. Seed by seed, a few sites go past the tolerance of ex-2.2.1 ({len(OVER)} of the {len(SEEDS) * 4 * N_POS} sites past the embedding), all where the bound itself is tiny, at most {OVER_BOUND_MAX:.0f}°. At block 1 the write is about the bound, since only the embedding has been edited before it, and the embedding holds little. From block 2 on it falls well below: at the example answers that do not fit, block 2 turns them by {ANS_RATIO[2]:.0%} of their bound and block 4 by {ANS_RATIO[4]:.0%}. So the blocks after an edit do not put e₁ back on the other ops; they leave less there than the clean model had.
 
-The bound is widest at the answers. At the example answers it is widest at block 1, as we expected: there the answers of the other ops come partway onto e₁, about twice as far as in the control. At the query answer it widens with depth instead, to {angle(BOUND[4, QUERY_ANSWER]):.0f}° at block 4. That comes from a small tail: a few contexts of another op in a hundred have their query answer close to e₁ at blocks 2 to 4, while the median stays a few degrees. We found nothing in the examples that sets those contexts apart (their posterior on `difference` is about as low as in the rest), so this is unexplained.
+The bound is widest at the answers. At the example answers it is widest at block 1, as we expected: there the answers of the other ops come partway onto e₁, about twice as far as in the control. At the query answer it stays wide with depth, from {angle(BOUND[1, QUERY_ANSWER]):.0f}° at block 1 to {angle(BOUND[4, QUERY_ANSWER]):.0f}° at block 4, while at the example answers it narrows. That comes from a small tail: a few contexts of another op in a hundred have their query answer close to e₁ at blocks 2 to 4, while the median stays a few degrees. We found nothing in the examples that sets those contexts apart (their posterior on `difference` is about as low as in the rest), so this is unexplained.
 <!-- REVIEW: "about one in a hundred" and "no higher" were sized from the 99th percentile alone; counting |α| > 0.5 at the query answer of the other ops gives 4% at block 2 and 2% at blocks 3 and 4, and the posterior on `difference` in that tail is 0.05 against 0.04 in the rest (claims review). -->
  The edit takes them off before they get there. At the other roles the bound is a few degrees at every slice, smaller than in the control at the colors and about the same at the syntax.
 
@@ -691,11 +723,14 @@ The share removed is about level across the posterior: between {SHARE_MEAN.min()
 
 {grading_table()}
 
-On the contexts of other ops the edit helps where their examples point at `difference`, and by more the more they point at it, close to what the target null predicts. Where the posterior on `difference` is {OTHER_LABEL[3]} the edit gains {GAIN_EDIT_MEAN[3]:.2f} against {GAIN_NULL[3]:.2f} for the target null; in the two low bins it gains a little more than the target null, {GAIN_EDIT_MEAN[1]:.2f} against {GAIN_NULL[1]:.2f} at {OTHER_LABEL[1]}. Part of that excess comes from subtracting the control, which loses a little on every op under the edit, though on the contexts whose examples point at `difference` it gains a little instead, on every seed: without subtracting it, the gains are {num(RAW_GAIN_MEAN[1])} and {num(RAW_GAIN_MEAN[3])}.
+On the contexts of other ops the edit helps where their examples point at `difference`, and by more the more they point at it: in the direction the target null predicts, and most of the way. Where the posterior on `difference` is {OTHER_LABEL[3]} the edit gains {GAIN_EDIT_MEAN[3]:.2f} against {GAIN_NULL[3]:.2f} for the target null; in the two low bins it gains a little more than the target null, {GAIN_EDIT_MEAN[1]:.2f} against {GAIN_NULL[1]:.2f} at {OTHER_LABEL[1]}. Part of that excess comes from subtracting the control, which loses a little on every op under the edit, though on the contexts whose examples point at `difference` it gains a little instead, on every seed: without subtracting it, the gains are {num(RAW_GAIN_MEAN[1])} and {num(RAW_GAIN_MEAN[3])}.
 <!-- REVIEW: the control's drop by bin on the other ops is +0.03 below a posterior of 0.2 and −0.03 at ≥ 0.5 (a gain), so the earlier wording, which had it losing everywhere, did not fit the raw gain of 0.26 being above the net 0.23 (claims review). -->
  Most contexts of other ops have almost no posterior on `difference` ({N_OBIN[0]:,} of {int((~IS_D).sum()):,} below 0.05), and there the target null predicts almost no change.
 
-So the drop is graded the way claim (b) asks: in proportion to what each context needed. The middle bins, where the examples disagree, lose a little less than the confident ones, so the edit is a little shy where the evidence is split. The gain on the other ops fits the anchor holding what the examples show about `difference`, wherever it appears, rather than what the label marks.
+Without subtracting the control the share is level too, and higher: between {RAW_SHARE_MEAN.min():.2f} and {RAW_SHARE_MEAN.max():.2f} by bin. The shape of the net share across bins comes from the control, whose own drop under the edit varies by bin, so it says where an arbitrary edit costs the most rather than anything about the anchor.
+<!-- REVIEW: cut "the edit is a little shy where the evidence is split" (claims review). Without the control subtraction the share by bin is level near 0.9 to 0.97; the dip in the net share is the control's own drop by bin. Verify: the "not net of the control" row of the table. -->
+
+So the drop is graded the way claim (b) asks: in proportion to what each context needed. The gain on the other ops fits the anchor holding what the examples show about `difference`, wherever it appears, rather than what the label marks.
 """
 
 # %%
