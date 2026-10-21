@@ -563,6 +563,109 @@ PEAK_SPILL_R = float(
 )
 
 
+def transient_figure() -> str:
+    data = {
+        "window": list(WINDOW),
+        "criterion": CRITERION,
+        "arms": [
+            {
+                "arm": a,
+                "name": NAME[a],
+                "schedule": schedule_of(a),
+                "runs": [
+                    {
+                        "epoch": other_track(a, s)[0].tolist(),
+                        "alpha": other_track(a, s)[1].tolist(),
+                        "peak": OTHER_PEAK[a][s],
+                        "spill": WORST_SPILL[a][s],
+                    }
+                    for s in SEEDS
+                ],
+            }
+            for a in ARMS
+        ],
+    }
+    alt = """
+        Left, five columns of α on the other ops against epoch, 0 to 100, one per arm, with the pool temperature in a
+        strip underneath. Under falloff and the fixed ramp the runs rise to about 0.03 around epoch 20 and settle near
+        0.02. Under the soft step and soft ramp they rise to about 0.04, and under the soft pool over slices 1 to 3 to
+        about 0.06, all falling back to about 0.02 by epoch 40, when the temperature reaches 0.1. Right, a scatter of
+        the peak against the spill, one point per run: the soft pool's points sit furthest right and include the
+        highest spill, 0.07; the fixed arms sit left and low; the spread within each arm is wide.
+    """
+    return transient_draw(data, alt)
+
+
+@memo
+def transient_draw(data: dict, alt_text: str) -> str:
+    w0, w1 = data["window"]
+
+    @themed(
+        name="soft-pool-transient",
+        alt_text=alt_text,
+        caption=f"""
+            **The other ops during the rise.** Left: α on the probe contexts of the other ops along the first hundred
+            epochs, the mean over their positions and slices 1 to 3, one column per arm; one hairline per run, the
+            seed mean bold, and the other arms as ghosts. The shaded band is epochs {w0} to {w1}, and the strip
+            underneath is the position pool temperature $\tau_p$ (log scale). Right: the highest α in that band
+            against the spill of E1 at any dose, one point per run; the dashed rule is the selectivity criterion.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        arms = data["arms"]
+        fig = plt.figure(figsize=(7.4, 2.9), layout="constrained")
+        left, right = fig.subfigures(1, 2, width_ratios=[3.2, 1.3])
+        axes = left.subplots(2, len(arms), sharex=True, sharey="row", height_ratios=[3, 0.8], squeeze=False)
+        for col, arm in enumerate(arms):
+            ax, tax = axes[:, col]
+            ink = INK[arm["arm"]]
+            ax.axvspan(w0, w1, color=GHOST, alpha=0.15, lw=0, zorder=0)
+            for other in arms:
+                if other is not arm:
+                    for r in other["runs"]:
+                        ax.plot(r["epoch"], r["alpha"], color=GHOST, lw=0.4, alpha=0.4, zorder=1)
+            for r in arm["runs"]:
+                ax.plot(r["epoch"], r["alpha"], color=ink, lw=0.6, alpha=0.8, zorder=2)
+            ep = np.asarray(arm["runs"][0]["epoch"])
+            mean = np.mean([r["alpha"] for r in arm["runs"]], axis=0)
+            keep = ep <= 100
+            ax.plot(ep[keep], mean[keep], color=ink, lw=1.6, marker=MARK[arm["arm"]], ms=3, markevery=4, zorder=3)
+            ax.set_title(arm["name"], fontsize=7)
+            ax.set_ylim(0, 0.09)
+            sch = arm["schedule"]
+            tax.plot(sch["epoch"], sch["tau"], color=ink, lw=1.1)
+            tax.set_yscale("log")
+            tax.set_ylim(0.07, 1.4)
+            tax.set_yticks([0.1, 1], ["0.1", "1"])
+            tax.minorticks_off()
+            tax.set_xlim(0, 100)
+            tax.set_xlabel("epoch", fontsize=8)
+            for a_ in (ax, tax):
+                a_.tick_params(labelsize=7)
+        axes[0, 0].set_ylabel("α, other ops", fontsize=8)
+        axes[1, 0].set_ylabel("$\\tau_p$", fontsize=8)
+        sax = right.subplots()
+        sax.axhline(data["criterion"], color=RULE, lw=0.8, ls="--", zorder=1)
+        sax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+        for arm in arms:
+            sax.scatter(
+                [r["peak"] for r in arm["runs"]],
+                [r["spill"] for r in arm["runs"]],
+                color=INK[arm["arm"]],
+                marker=MARK[arm["arm"]],
+                s=16,
+                label=arm["name"],
+                zorder=2,
+            )
+        sax.set_xlabel(f"peak α, other ops, epochs {w0}–{w1}", fontsize=8)
+        sax.set_ylabel("spill, any dose", fontsize=8)
+        sax.tick_params(labelsize=7)
+        sax.legend(fontsize=6, frameon=False, loc="upper left")
+        return fig
+
+    return _plot()
+
+
 def transient_table() -> str:
     rows = [
         [
@@ -577,7 +680,7 @@ def transient_table() -> str:
         ["arm", f"α other ops, epochs {WINDOW[0]}–{WINDOW[1]}, peak", "α other ops, end", "spill, any dose"],
         rows,
         f"""
-        **The other ops during the rise.** α on the probe contexts of the other ops, the mean over their positions
+        **The lift on the other ops, by arm.** α on the probe contexts of the other ops, the mean over their positions
         and slices 1 to 3: its highest value over epochs {WINDOW[0]} to {WINDOW[1]}, and its value at the end of
         training, with the spill of E1 beside them; seed mean and range over every run. Over all
         {len(ARMS) * len(SEEDS)} runs, the correlation of the peak with the spill is r = {PEAK_SPILL_R:.2f}.
@@ -778,6 +881,8 @@ The pool over slices 1 to 3 settles much as the ramp does, a little higher at sl
 The syntax embeddings stay off e₁ in every arm, within a few hundredths, so the spill of E1 does not come from the route the τ×λ_a sweep found. The other ops end about as aligned in the step pair, and a little more aligned under the soft ramp than under the fixed one, though not by enough to account for the spill.
 
 The trajectories hold a lead. While the pool is soft, its pull reaches every position from the op word on, and during the rise the other ops come partway onto e₁ with it.
+
+{transient_figure()}
 
 {transient_table()}
 
