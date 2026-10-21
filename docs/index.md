@@ -180,7 +180,7 @@ D2.1 asked whether SCA works in a transformer at all. We designed a task where a
 
 ## D2.2: anchoring an operation
 
-D2.2 anchors an operation rather than a color. Since the [pivot](./m2/d2.2/pivot.md), the model infers which op a line uses from a few solved examples, so the op has no word of its own, like the abstract concepts we care about in language models. The anchor lands at little cost to the task, and removing the anchor direction takes the op out gradually. Under the edit, the model moves its answers onto the other ops about as much as an ideal predictor would, though context by context it doesn't always pick the same ones. On the recipe of record, chosen at fresh seeds, the edit removes most of the op and leaves the other ops within the selectivity criterion on every seed. What is left is a pull that grows with depth, a bound on what an edit can write into the inferred op, and where the edited model lands against the target null. The [design doc](./m2/d2.2/design.md) has the current setup, the claims, and what comes next.
+D2.2 anchors an operation rather than a color. Since the [pivot](./m2/d2.2/pivot.md), the model infers which op a line uses from a few solved examples, so the op has no word of its own, like the abstract concepts we care about in language models. The anchor lands at little cost to the task, and removing the anchor direction takes the op out gradually. Under the edit, the model moves its answers onto the other ops about as much as an ideal predictor would, though context by context it doesn't always pick the same ones. On the recipe of record, chosen at fresh seeds, the edit removes most of the op and leaves the other ops within the selectivity criterion on every seed. Nearby recipes sometimes lose the anchor during the pull warm-up, and a pool that starts soft keeps it at some cost in spill. What is left to show is a bound on what an edit can write into the inferred op, that the removal on each context follows how much it depended on the op, and where the edited model lands against the target null. The [design doc](./m2/d2.2/design.md) has the current setup, the claims, and what comes next.
 
 ### Removing *red*
 
@@ -404,7 +404,7 @@ Once the op had no word, the first question was whether an un-anchored model cou
 
 ### Anchoring and removing the inferred op
 
-With the control near its best, we anchored `difference` on the new grammar. The anchor settles on the example answers, where the context shows the most about the op. Removing the anchor direction everywhere takes `difference` out gradually. At first the edit spilled onto the other ops on most fully trained runs. The spill came from a stand-in for the op in the color embedding table, where there is no context yet to infer it from. With the pull kept off the first two slices and the anti-subspace weight held high there, the edit removes `difference` and leaves the other ops within the criterion on every fresh seed.
+With the control near its best, we anchored `difference` on the new grammar. The anchor settles on the example answers, where the context shows the most about the op. Removing the anchor direction everywhere takes `difference` out gradually. At first the edit spilled onto the other ops on most fully trained runs. The spill came from a stand-in for the op in the color embedding table, where there is no context yet to infer it from. With the pull kept off the first two slices and the anti-subspace weight held high there, the edit removes `difference` and leaves the other ops within the criterion on every fresh seed. A pull that ramps with depth, and a pool that starts soft, each traded one of those for the other: the ramps lost the anchor on more seeds, and the soft pool kept it on every seed but spilled more.
 
 <details markdown="1" open="true"><summary>Reports</summary>
 
@@ -495,5 +495,21 @@ With the control near its best, we anchored `difference` on the new grammar. The
     <span class="tags">`preregistration` `in-context` `anchoring` `intervention`</span>
 
     <!-- mini:figures ./m2/split-anti-seeds/report.py -->
+
+- [An anchor weight that ramps with depth](./m2/anchor-ramp/report.py)
+
+    A pull weight that rises in a straight line with depth, in place of the step at slice 2, to mirror the falloff of the anti weight. With the slice-4 weight of the step, the ramps lost the anchor on two or three of eight seeds, where the step lost none. Scaled up to the total of the step, the ramp from the embedding kept it on every seed but spilled a little more. The losses split off during the pull warm-up and followed how little pull the earlier slices got, so the step stays.
+
+    <span class="tags">`scout` `in-context` `anchoring` `intervention`</span>
+
+    <!-- mini:figures ./m2/anchor-ramp/report.py -->
+
+- [A soft pool while the anchor settles](./m2/soft-pool/report.py)
+
+    A pooling temperature that starts soft and sharpens over the pull warm-up, crossed with a pull on slices 1 to 3 only. Every arm with the soft start kept the anchor on every seed, but each spilled more than its twin at the fixed temperature, perhaps because the other ops come partway onto e₁ while the pool is soft. The ramp at the fixed temperature lost the anchor on one seed in a new way: the alignment came back late, and the removal did not. The step and the fixed temperature stay.
+
+    <span class="tags">`scout` `in-context` `anchoring` `intervention` `schedules`</span>
+
+    <!-- mini:figures ./m2/soft-pool/report.py -->
 
 </details>

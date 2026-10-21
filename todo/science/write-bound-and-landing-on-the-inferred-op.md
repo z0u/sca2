@@ -12,3 +12,7 @@ With a recipe of record that holds at fresh seeds (split-anti-seeds, `falloff`),
 - Where the edited model lands, claim (c): the full edit covers about half of the distance to the target null, context by context (landing 0.52 on `falloff`). Is that enough, or is a trained fallback wanted to close the rest?
 
 The design doc has the plan for both under "What comes next"; this item is the backlog entry for them, so the shortlist names what D2.2 still has to show beside the recipe sweep.
+
+## Notes
+
+**2026-10-21, design refresh** — The design doc now proposes this as a re-analysis of the stored `falloff` runs at seeds 704 to 711, with no new training, and adds the per-context grading of claim (b) to it: whether the drop on each context follows how much its answer depended on `difference`. A review on the stored late-pull runs measured that informally (unpublished), so the measurement exists in sketch. The landing half splits into the measurement here and the follow-ups in [the reference model](./reference-model-without-the-anchored-op.md) and [fallback control](./fallback-control-on-the-untied-recipe.md).
