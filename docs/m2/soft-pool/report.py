@@ -627,7 +627,7 @@ def settle_table() -> str:
         f"""
         **How the runs settle.** α at slice {TRACK_SLICE} on the `{ex.ANCHORED_OP}` probe contexts, seed mean and
         range over every run: at the query answer and the example answers at epoch {EARLY}, the first recorded epoch
-        at which the example answers go over {RISE:g} (records are every four epochs), and the example answers at
+        at which the example answers go over {RISE:g} (α is recorded every four epochs), and the example answers at
         epoch 48, just after the warm-up.
         """,
     )
@@ -732,7 +732,7 @@ Does the soft pool carry the example answers onto e₁ with the query answer thr
 
 {track_figure()}
 
-A soft pool slows the start. In the step pair at epoch {EARLY}, the query answer under `falloff` is already partway onto e₁ with the example answers following, while under the soft start both are still near zero. By epoch 24 the example answers come up on every seed of `{NAME[STEP_SOFT]}`, all crossing {RISE:g} at that record.
+A soft pool slows the start. In the step pair at epoch {EARLY}, the query answer under `falloff` is already partway onto e₁ with the example answers following, while under the soft start both are still near zero. By epoch 24 the example answers have come up on every seed of `{NAME[STEP_SOFT]}`, all crossing {RISE:g} at that epoch.
 
 The ramp starts slowly at slice {TRACK_SLICE} at either temperature, since it pulls that slice at two thirds of the step weight. With the soft start its runs cross {RISE:g} within eight epochs of one another; at the fixed temperature one run is left behind.
 
