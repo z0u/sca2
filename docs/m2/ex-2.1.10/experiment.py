@@ -1060,7 +1060,7 @@ def publish_results(results: list[dict], stats: dict, readability: dict, checkpo
     for label, profile in readability.items():
         arrays[f"{label}/readability"] = np.asarray(profile, dtype=np.float32)
     buf = io.BytesIO()
-    np.savez_compressed(buf, **arrays)
+    np.savez_compressed(buf, allow_pickle=False, **arrays)
     set_ref(ARRAYS_REF, put(buf.getvalue(), name="ex-2.1.10-arrays.npz"))
     return {"n_cells": len(results)}
 
