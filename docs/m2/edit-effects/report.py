@@ -235,6 +235,94 @@ def geometry_figure() -> str:
     return geometry_draw(alt)
 
 
+@memo
+def depth_draw(alt_text: str) -> str:
+    @themed(
+        name="edit-effects-depth",
+        alt_text=alt_text,
+        caption="""
+            **Where the write is taken, along the depth of the model**, drawn schematically for one position. Each
+            small arrow is a state, with e₁ pointing up. Clean, on the left, each block takes in the state of the
+            slice below and gives the state of its own slice. Under the full edit, on the right, the edit takes e₁
+            out at every slice (dashed boxes), so each block reads a state with none; the e₁ a state arrives with at
+            the next slice is what that block puts back. That is the write, and the edit there takes it out again.
+            The clean bound is the clean α at the same slice. The write is within the bound when a block puts back no
+            more than the clean model has there.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, ax = plt.subplots(figsize=(6.4, 4.2), layout="constrained")
+        cols = {"clean": 1.0, "edit": 3.2}
+
+        k = 2.2  # a unit of y is drawn about this much shorter than a unit of x; keeps the angles true
+
+        def state(x: float, y: float, deg: float, color: str) -> None:
+            ax.plot([x, x + 0.55], [y, y], color=rule(), lw=0.4)
+            ax.plot([x, x], [y, y + 0.45 * k], color=rule(), lw=0.4)
+            t = np.radians(deg)
+            ax.annotate(
+                "",
+                xy=(x + 0.5 * np.cos(t), y + 0.5 * np.sin(t) * k),
+                xytext=(x, y),
+                arrowprops=dict(arrowstyle="-|>", color=color, lw=1.3),
+            )
+
+        def box(x: float, y: float, h: float, name: str, color: str, ls: str = "-") -> None:
+            ax.add_patch(plt.Rectangle((x - 0.6, y - h / 2), 1.2, h, fill=False, ec=color, lw=0.9, ls=ls))
+            ax.text(x, y, name, ha="center", va="center", fontsize=7, color=color)
+
+        blocks = ((1.0, "block ℓ"), (5.0, "block ℓ+1"), (9.0, "block ℓ+2"))
+        edits = (3.0, 7.0)
+        for name, x in cols.items():
+            stops = [(y - 0.25, y + 0.25) for y, _ in blocks] + (
+                [(y - 0.18, y + 0.18) for y in edits] if name == "edit" else []
+            )
+            stops.sort()
+            for (_, lo), (hi, _) in zip(stops[:-1], stops[1:], strict=True):
+                ax.plot([x, x], [lo, hi], color=rule(), lw=0.6, zorder=0)
+            ax.plot([x, x], [stops[-1][1], 9.6], color=rule(), lw=0.6, zorder=0)
+            for y, label in blocks:
+                box(x, y, 0.5, label, rule())
+        for y in edits:
+            box(cols["edit"], y, 0.36, "edit: e₁ out", write_ink(), "--")
+        state(cols["clean"], 2.5, 30, ink())
+        state(cols["clean"], 6.5, 34, ink())
+        state(cols["edit"], 1.6, 30, write_ink())
+        state(cols["edit"], 3.6, 0, write_ink())
+        state(cols["edit"], 5.6, 12, write_ink())
+        state(cols["edit"], 7.6, 0, write_ink())
+        ax.text(cols["clean"], 9.8, "clean", ha="center", fontsize=8, color=ink())
+        ax.text(cols["edit"], 9.8, "under the edit", ha="center", fontsize=8, color=write_ink())
+        for y, name in ((2.9, "slice ℓ"), (6.9, "slice ℓ+1")):
+            ax.text(0.0, y, name, ha="right", va="center", fontsize=7)
+        notes = (
+            (1.9, "arriving at slice ℓ"),
+            (3.8, "edited: no e₁"),
+            (5.9, "arriving at slice ℓ+1: block ℓ+1\nputs some e₁ back (the write)"),
+            (7.8, "edited again"),
+        )
+        for y, text in notes:
+            ax.text(cols["edit"] + 0.75, y, text, fontsize=6.5, va="center", color=write_ink())
+        ax.text(cols["clean"] + 0.75, 6.9, "clean α at\nslice ℓ+1:\nsets the bound", fontsize=6.5, va="center")
+        ax.set_xlim(-0.9, 5.8)
+        ax.set_ylim(0.6, 10.1)
+        ax.axis("off")
+        return fig
+
+    return _plot()
+
+
+def depth_figure() -> str:
+    alt = (
+        "Two columns of three stacked blocks, labeled clean and under the edit, with small arrows for the state "
+        "between blocks. Clean, the arrows point about 30 degrees above the horizontal at slices l and l+1. Under the "
+        "edit, the arrow arriving at slice l points 30 degrees up, a dashed edit box flattens it to the horizontal, "
+        "block l+1 lifts it to about 12 degrees at slice l+1 (marked as the write), and a second edit box flattens "
+        "it again. A note beside the clean arrow at slice l+1 says it sets the bound."
+    )
+    return depth_draw(alt)
+
+
 # --- E1: the write and the bound -----------------------------------------------------------------------------
 
 
@@ -842,7 +930,7 @@ We looked at what the edit does on the recipe of record: how far it turns the st
 
 The [D2.2 design doc](/docs/m2/d2.2/design.md) lists three claims that the recipe of record has no measurement for yet. None needs new training.
 
-- (d) The side effects are bounded by construction: because we placed the axis, we can say in advance how far an edit turns each state. This is the write bound.
+- (d) The side effects are bounded, and the bound can be stated in advance from the clean model. That the edit turns a state by arcsin of its alignment holds by construction. What has to be shown is downstream: the blocks after an edit put no more e₁ back on the other ops than the clean model has there. This is the write bound.
 - (b) Removing the op is graded: the drop on each context follows how much its answer depended on `difference`, as the target null predicts context by context.
 - (c) The edited model answers in a predictable way: once `difference` is removed, it answers as the target null does, weighing the other ops by how well they fit the examples.
 
@@ -868,9 +956,11 @@ With eight runs, a pattern seen on every seed is one we can lean on; a differenc
 
 ## Method
 
-The states are unit vectors, and the edit takes the e₁ component out of each one and renormalizes. That turns each state by an angle set by its alignment, arcsin |α|, so how far the edit moves a state can be read off the clean geometry before any edit is made. The figure draws this, with the bound and the write of E1. The terms are defined in the glossary at the end, and each shows in the margin at its first use in a section.
+The states are unit vectors, and the edit takes the e₁ component out of each one and renormalizes. That turns each state by an angle set by its alignment, arcsin |α|, so how far the edit moves a state can be read off the clean geometry before any edit is made. The first figure draws this, with the bound and the write of E1. That part holds by construction; the second figure shows the part that does not, where the write is taken along the depth of the model. The terms are defined in the glossary at the end, and each shows in the margin at its first use in a section.
 
 {geometry_figure()}
+
+{depth_figure()}
 
 In this grammar the op is not held at one token. The model infers it from the examples, and the anchor puts that evidence on e₁ at the example answers: an answer that `difference` could give comes onto e₁ in a context of any op (the [example-evidence report](/docs/m2/example-evidence/report.py) found this). In a context of another op, about one example answer in {1 / (N_FIT / (N_FIT + N_NOFIT)):.0f} [fits](term:fit) `difference`. Most of these come from the replacement op noise, which drew `difference` for that example; in {FIT_COINCIDE:.0%} the true op gives the same answer. Either way the model sees evidence for `difference` there, so turning those states is the removal at work rather than a side effect.
 
@@ -884,7 +974,7 @@ rf"""
 
 We measure the turn on the contexts of the other ops, since that is where a turn is a side effect. On `difference` contexts the edit is meant to turn the states, and E2 and E3 score what that does.
 
-The anti-subspace term keeps the states of other ops off e₁, so we expect the edit to turn them only a little. We expect the turn to be largest at slice 1, where [split-anti-seeds](/docs/m2/split-anti-seeds/report.py) found the other ops closest to e₁ at the end of training. It should be smaller at the pulled slices, where they are lower.
+The anti-subspace term is meant to keep the states of other ops off e₁, so we expect the edit to turn them only a little. We expect the turn to be largest at slice 1, where [split-anti-seeds](/docs/m2/split-anti-seeds/report.py) found the other ops closest to e₁ at the end of training. It should be smaller at slices 2 to 4, where they sat lower. Those are the slices the pull acts on, and they are also deeper; the control sits a little lower with depth too, so this study cannot say which matters.
 
 Does the turn under the edit stay within the clean bound, at every slice and role? Or does a later block put e₁ back onto the other ops after the edit has taken it out at the slices before?
 <!-- REVIEW: the first draft of the plan gave "where the anti weight is low but the pull has room" as the reason for the smallest turn at the pulled blocks; a low hold leaves more room on e₁, not less, so the reason now cites where the other ops were measured to sit. Verify: the alignment-by-slice figure of split-anti-seeds (H2), right panel. -->
@@ -896,7 +986,7 @@ The figure shows the bound and the write at every position of a context, slice b
 
 The write stays within the bound past the embedding. At the seed mean, the largest ratio of write to bound is {RATIO_MAX:.2f}, at slice {RATIO_WORST[0] + 1}, position `{POS_LABEL[RATIO_WORST[1]]}` of the {["first", "second", "third", "query"][RATIO_WORST[1] // UNIT]} equation, where the bound is {angle(BOUND[1:][RATIO_WORST]):.1f}°. Run by run, {len(OVER)} of the {len(SEEDS) * 4 * N_POS} sites past the embedding go over the tolerance of ex-2.2.1, all where the bound is at most {OVER_BOUND_MAX:.0f}°, and none by more than {OVER_EXCESS_MAX:.1f}°.
 
-At slice 1 the write is about the bound. Only the embedding has been edited before it, and the embedding holds little. From slice 2 on, the other ops arrive with much less e₁ than the clean model gives them, because each block reads states that the edit at the slices before has already turned. At the example answers that do not fit, the write is {ANS_RATIO[2]:.0%} of the bound at slice 2 and {ANS_RATIO[4]:.0%} at slice 4.
+At slice 1 the write is about the bound. Only the embedding has been edited before it, and the embedding holds little. From slice 2 on, the other ops arrive with much less e₁ than the clean model gives them. The only difference from the clean pass is the edits at the slices before, so the drop comes from those. In this model each block moves the state a quarter of the way toward the output of its attention and again toward its MLP, so about half of the incoming state carries through. On the clean pass that carried part brings its e₁ along; under the edit it has none, and what arrives is only what the block adds. At the example answers that do not fit, the write is {ANS_RATIO[2]:.0%} of the bound at slice 2 and {ANS_RATIO[4]:.0%} at slice 4.
 
 That is below the control too, which has no anchor. From slice 2 on, the write at those answers is {angle(seed_mean(FALLOFF, "nofit", "q_arriving")[2]):.0f}° to {angle(seed_mean(FALLOFF, "nofit", "q_arriving")[4]):.0f}°, against {angle(seed_mean(CONTROL, "nofit", "q_clean")[2]):.0f}° to {angle(seed_mean(CONTROL, "nofit", "q_clean")[4]):.0f}° on the clean pass of the control. So the blocks after an edit do not put e₁ back on the other ops; they leave less there than either model has without the edit.
 
@@ -913,7 +1003,7 @@ The table puts the example answers in degrees. On the clean pass, the answers th
 
 Turning these states is the edit doing its job (see the Method): they are the evidence for `difference` in a context that otherwise points elsewhere, and E2 finds that removing them helps the contexts of other ops whose examples point at `difference`.
 
-So on the recipe of record the bound holds in the sense of ex-2.2.1. The anchor gives a turn we can state in advance from the clean map, and nothing downstream adds to it.
+So on the recipe of record the bound holds in the sense of ex-2.2.1. The anchor gives a turn we can state in advance from the clean map, and the blocks downstream put back less than that.
 
 The bound does not cover what the later blocks make of a state that was turned at slice 1; that is what the spill measures. At slice 1 the other ops are closer to e₁ than in a model with no anchor, so that is where any spill would start.
 """
@@ -995,7 +1085,7 @@ rf"""
 
 On the recipe of record, the edit behaves the way the anchor says it should on all three claims, to a first approximation. The turn on the states of other ops is bounded by the clean map, slice by slice, and the blocks downstream of an edit leave less on e₁ than they found. The loss on each `difference` context follows how much that context needed the op, with no sign of an unintended, coarser feature.
 
-The contexts of other ops whose examples point at `difference` recover as the target null predicts. That fits the anchor holding the evidence for the op, wherever it appears, and the edit removing that evidence. In this grammar the op seems to be carried that way, spread over the example answers rather than held at one token. Whether part of it also lives in the attention, in what the heads match on (their query and key spaces) or what they carry (their value space), is open; we have put it in the [backlog](/todo/science/is-the-inferred-op-held-in-attention.md).
+The contexts of other ops whose examples point at `difference` recover as the target null predicts. That fits the anchor holding the evidence for the op, wherever it appears, and the edit removing that evidence. In this grammar the op seems to be carried that way, spread over the example answers in the residual stream rather than held at one token. Whether part of it also lives in the attention, in what the heads match on (their query and key spaces) or what they carry (their value space), is open; we have put it in the [backlog](/todo/science/is-the-inferred-op-held-in-attention.md).
 
 The shortfall is in where the answers land. The edit sends the mass to the right ops overall. But within a context, it shares the mass among them only partly by how well each fits the examples.
 
