@@ -11,6 +11,13 @@ the margin shows until hover, and all the PDF shows. A term that is also an ever
 word takes {.manual}, so it is only marked where written as [text](term:band).
 -->
 
+Alignment
+α
+:   How far a state points along e₁: the cosine between the state and e₁, which for a unit-length state is its component along e₁; 1 on the anchor direction and 0 off it.
+
+Bayes predictor
+:   The best answer given the examples: it weighs the answers of each op by the posterior over ops, the probability of each op given the examples.
+
 Expected exact match
 :   The task score, as the chance that a drawn answer agrees with a true one. With drawn answers, the correct answer to a line is spread over two or more colors, so we take the chance that an answer drawn from the model agrees with one drawn from the true distribution. Its ceiling is that same chance for the true distribution against itself (Σq²), below 1 on the ops that round.
 
