@@ -1,0 +1,14 @@
+---
+status: open
+tags: [D2.2, anchoring, representations]
+opened: 2026-10-22
+---
+# Is the inferred op held in attention as well as in the residual stream?
+
+When D2.2 began, the plan was to anchor an abstract concept that still sat at one token, the op word. On the in-context grammar there is no op word, and the [example-evidence report](/docs/m2/example-evidence/report.py) found the anchor on the example answers, where each answer that `difference` could give comes onto e₁ as evidence. The [edit-effects report](/docs/m2/edit-effects/report.py) fits that picture: the edit removes the evidence, and the contexts of other ops whose examples point at `difference` recover as the target null predicts. So the op may not be held at any one place in the residual stream; the query reads it from the evidence.
+
+That leaves open whether part of the op lives in the attention itself: in what the heads match on (the query and key projections, which decide which positions a head reads) or in what they carry (the value projection). If it does, projecting e₁ out of the residual stream would leave that part in place, and a full removal might need an anchor in the query–key or value space too, or an anchor on one attention head. Gradient routing, which assigns a concept to chosen parameters during training, may suit a head-level anchor better than a direction in the residual stream.
+
+In this model the query and key of each head are unit-normalized after the rotary encoding, so they lie on a sphere per head, as the residual states do, and their dot product is a cosine. So a direction in query–key space is as natural a place for an anchor as e₁ is in the residual stream. Two things set it apart. The score is a product of a query and a key, so a direction only matters as a pair: a key direction marking "evidence for `difference`" and a query direction that seeks it (one direction shared by both would do, since the head matches like with like). And the rotary encoding turns each pair of dimensions by an angle set by the position, so a fixed direction after it would mean something different at each position; the anchor would have to sit before the rotation, where the match then depends on the distance between the two positions, or in the slowest-turning pairs, which barely rotate over a context this short. The edit would project the direction out of the keys (or the queries) of that head. The values are not normalized here, so an anchor there would be a direction without the sphere geometry.
+
+A first look needs no training: on the stored `falloff` runs, check whether the attention pattern from the query `=` to the example answers changes under the edit, and whether the values written from the example answers still separate `difference` contexts after it. Raised in the paper review of edit-effects, as a possibility rather than a finding.

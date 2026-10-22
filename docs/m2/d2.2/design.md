@@ -6,7 +6,7 @@ Each line of the corpus is one context: three solved examples of one op, then a 
 
 On the recipe of record, the anchor holds at a small cost to the task. Turning the edit up takes `difference` out gradually, and at eight fresh seeds the other ops stayed within the selectivity criterion on every run. Close variants of the recipe sometimes lose the anchor in the first tens of epochs, so how often the recipe itself keeps it is known only roughly.
 
-Still to show: that the removal follows how strongly each context indicates the op, the write bound on the inferred op, and where the edited model lands against the target null. None of these needs new training; the stored runs of the recipe have what they need.
+A re-analysis of the recipe of record, the [edit-effects report](../edit-effects/report.py), measured the rest: the removal follows how much each context needed the op, the write stays within the bound, and the edited model sends the mass to the right ops overall but weighs them differently from the target null context by context.
 
 How we got here is in the [index](/docs/index.md#d22-anchoring-an-operation). The [pivot](pivot.md) explains why we took the op words out of the grammar.
 
@@ -120,7 +120,7 @@ On that recipe, with the anti weight falling off with depth, the full edit remov
 
 A pool that starts soft makes the edit less selective, at least on its own, with no other change such as a lower $\lambda_a$ or a higher $\lambda_{\bar s}$. Each soft arm went over the criterion on two to four seeds of eight, where the two arms at the fixed temperature stayed within it on every seed. While the pool is soft its pull reaches every position, and the other ops come partway onto e₁ during the rise; that lift is gone by the end of training, but it goes loosely with the spill. The [τ × λ_a sweep](../tau-lambda-sweep/report.py) found the same for a fixed temperature that is softer throughout.
 
-Still to show: that the damage on each context follows how much its answer depended on `difference`, which the target null predicts context by context.
+On the recipe of record the drop on each context follows how much it needed `difference`: the full edit takes about the same share of the way to the target null whatever the posterior on `difference` (0.75 to 0.88 by bin, net of the control). The contexts of other ops whose examples point at `difference` gain, most of the way the target null predicts ([edit-effects](../edit-effects/report.py)).
 
 From [ex-2.2.1](../ex-2.2.1/report.py), [ex-2.2.7](../ex-2.2.7/report.py), and [ex-2.2.11](../ex-2.2.11/report.py) (*red*); [ex-2.2.21](../ex-2.2.21/report.py) (E2), [ex-2.2.22](../ex-2.2.22/report.py) (E1, E2), [ex-2.2.23](../ex-2.2.23/report.py), [spill-by-position](../spill-by-position/report.py), [embedding-lean](../embedding-lean/report.py), [late-pull](../late-pull/report.py), [slice-terms](../slice-terms/report.py), [split-anti-seeds](../split-anti-seeds/report.py) (H1, H2), and [soft-pool](../soft-pool/report.py) (E1, E3).
 
@@ -130,15 +130,15 @@ Once `difference` is removed, the model should answer as an ideal predictor that
 
 **Observations.** Looked at after the fact, the edited `hinge` runs answered `difference` contexts much as that predictor does: the mass leaves the `difference` answer and goes to the other ops in about the proportions the posterior gives. On three fresh runs, counted by op over all contexts, the mass goes about where the target null puts it. Context by context the match is looser: the edit moved each run a little under half of the way to the target null, short of the half we flat-out guessed at. Most of the distance that remains is on answers another op could give, shared among them differently from the target null; the edit moves little mass onto colors no op gives.
 
-On the recipe of record the full edit lands about half of the way (0.52 on average at eight fresh seeds).
+On the recipe of record the full edit lands about half of the way (0.52 on average at eight fresh seeds). The edited answers are close to a mixture of the answers of the other ops, in about the right overall proportions, but within a context they weigh those ops differently from the target null, with no common tilt toward flatter or sharper weights. The distance left is about 2.4× the distance from the clean model to the Bayes predictor ([edit-effects](../edit-effects/report.py)).
 
 So the anchor alone gives the edit a direction and not the whole distance. Whether a trained fallback, a designed response to the edit, would close the rest, or whether the recipe can be improved so that it does, is open.
 
 From [ex-2.2.21](../ex-2.2.21/report.py) (E2, post hoc), [ex-2.2.22](../ex-2.2.22/report.py) (H2, E4), and [split-anti-seeds](../split-anti-seeds/report.py).
 
-### (d) The side-effects are bounded by construction, and we know at which layers the op is held
+### (d) The side-effects are bounded in advance, and we know at which layers the op is held
 
-Because we placed the axis, we can say in advance how far an edit moves each state: the write bound.
+Because we placed the axis, the clean model tells us in advance how far an edit can move the states of other concepts. That the edit turns a state by an angle set by its alignment holds by construction. What has to be shown is downstream of the edit: the blocks after an edit put no more of the axis back on the states of other concepts than the clean model has there. That is the write bound.
 
 **Observations.** The write bound held on *red*: at every slice past the embedding, the move on lines with no red in them stayed within the bound, or at most a quarter over it, as we allowed in advance. *Red* was read in the first two blocks. For the inferred op, the alignment on `difference` contexts rises through the stack.
 
@@ -146,9 +146,9 @@ With the pull on blocks 2 to 4, editing block 1 alone removes most of the op on 
 
 On the runs that keep the anchor, where it sits by depth hardly depends on how the pull is spread over blocks 2 to 4. Under the step and under every ramp, the alignment at the example answers rises to about 0.64 at block 4. With nothing pulling block 4, it falls back there to about three quarters of its level at block 3, and the edit still finds it, since it acts on every slice.
 
-The states are unit vectors, and the edit takes out the e₁ component and renormalizes, so it turns each state by an angle set by its alignment, arcsin α. On *red*, the bound at each slice and position was the angle at the 99th percentile of the clean α over lines with no red, and the write was the angle of the α arriving at the edit, which can differ from the clean α once an earlier slice has been edited. For the inferred op the same map runs over slices and over the roles of every equation in the context, on contexts of the other ops. The anti term is what keeps it small, so we expect the bound to be loosest at block 1, where the other ops sit closest to e₁ (α about 0.18 at the example answers on `falloff`, seed mean). The bound covers the immediate write only; what the later blocks do with a turned state is what the spill measures.
+The states are unit vectors, and the edit takes out the e₁ component and renormalizes, so it turns each state by an angle set by its alignment, arcsin α. On *red*, the bound at each slice and position was the angle at the 99th percentile of the clean α over lines with no red, and the write was the angle of the α arriving at the edit, which can differ from the clean α once an earlier slice has been edited. For the inferred op the same map runs over slices and over the roles of every equation in the context, on contexts of the other ops. The anti term is what keeps it small, so we expect the bound to be loosest at block 1, where the other ops sit closest to e₁ (α about 0.18 at the example answers on `falloff`, seed mean). The write at a slice is the alignment a state arrives with there, after the block before it has read the states the earlier edits turned, so the bound tests what each block puts back. What the later blocks do with a turned state beyond that, in the answers, is what the spill measures.
 
-Still to show: the write bound on the inferred op.
+On the recipe of record the write stays within the bound at every slice past the embedding, at most 1.08 times it, and from slice 2 on the other ops arrive with less e₁ than either the clean model or the control has ([edit-effects](../edit-effects/report.py)).
 
 From [ex-2.2.1](../ex-2.2.1/report.py) (H4), [ex-2.2.22](../ex-2.2.22/report.py) (E1), [late-pull](../late-pull/report.py) (E2), [slice-terms](../slice-terms/report.py) (E1, E3), [split-anti-seeds](../split-anti-seeds/report.py) (E1), [anchor-ramp](../anchor-ramp/report.py) (E3), and [soft-pool](../soft-pool/report.py) (E3).
 
@@ -168,7 +168,7 @@ The recipe of record is settled enough to measure the claims on. The open work i
 
 ### The claims still to show
 
-*The write bound, the grading, and the landing.* A re-analysis of the stored `falloff` runs at seeds 704 to 711, with no new training. It would measure how far the edit turns each state against the bound the axis sets in advance, slice by slice and role by role (d); whether the drop on each context follows how much its answer depended on `difference` (b); and where the answers of the edited model fall short of the target null, op by op (c). D2.2 needs these whichever recipe it ends with, and they are cheap to repeat on a later one. In the [backlog](/todo/science/write-bound-and-landing-on-the-inferred-op.md).
+*The write bound, the grading, and the landing.* Done in the [edit-effects report](../edit-effects/report.py), a re-analysis of the stored `falloff` runs; the results are under (b), (c) and (d). It is cheap to repeat on a later recipe.
 
 *How far an edit could land.* The full edit covers about half of the distance to the target null. A model trained with no `difference` contexts would show how close any model comes, and so whether half is short. It is also the filtered-corpus baseline below. If half is short, a fallback trained toward the target null is the designed response from M1, to be tried again on the current recipe. In the backlog: [a reference model](/todo/science/reference-model-without-the-anchored-op.md) and [fallback control](/todo/science/fallback-control-on-the-untied-recipe.md).
 
@@ -214,6 +214,6 @@ The verification measurements (D2.3), though verification lines are allowed in t
 
 <details markdown="1"><summary>About this page</summary>
 
-Rewritten 2026-10-06, to say where D2.2 stands in one sitting. The plan as it stood through ex-2.2.22, with its route, risk table, and decisions, is [archived](design-2026-10.md) and in git. Updated 2026-10-07 with the [ex-2.2.22](../ex-2.2.22/report.py) decision: no cap, every slice, three examples per context. Updated 2026-10-13 for the work since: 400 epochs (ex-2.2.23), the lean and the pull on blocks 2 to 4 (embedding-lean, late-pull), and the anti weight by slice with the falloff as the recipe of record (slice-terms, split-anti-seeds). Updated 2026-10-21 for the anchor-ramp and soft-pool experiments (the step pull and fixed τ_p stay; lost anchors and the spill of a soft pool), with the next steps rewritten as open choices. Revised the same day after review: lost anchors as a gap in claim (a), the scoring as its own section, what the write bound is in this grammar, a loss-rate screen, and the comparisons with other methods.
+Rewritten 2026-10-06, to say where D2.2 stands in one sitting. The plan as it stood through ex-2.2.22, with its route, risk table, and decisions, is [archived](design-2026-10.md) and in git. Updated 2026-10-07 with the [ex-2.2.22](../ex-2.2.22/report.py) decision: no cap, every slice, three examples per context. Updated 2026-10-13 for the work since: 400 epochs (ex-2.2.23), the lean and the pull on blocks 2 to 4 (embedding-lean, late-pull), and the anti weight by slice with the falloff as the recipe of record (slice-terms, split-anti-seeds). Updated 2026-10-21 for the anchor-ramp and soft-pool experiments (the step pull and fixed τ_p stay; lost anchors and the spill of a soft pool), with the next steps rewritten as open choices. Revised the same day after review: lost anchors as a gap in claim (a), the scoring as its own section, what the write bound is in this grammar, a loss-rate screen, and the comparisons with other methods. Claim (d) restated 2026-10-22, in review of the [edit-effects report](../edit-effects/report.py): the turn being set by the alignment holds by construction, so the claim now rests on what the blocks after an edit put back.
 
 </details>
