@@ -553,6 +553,7 @@ def train_one(
     clean_rows=None,
     alpha_map: bool = False,
     stop_epoch: int | None = None,
+    record_extra=None,
 ) -> dict:
     """Train one run over the op set *ops*: ex-2.2.16's context-keyed anchor (crop policy `whole`, the label variant
     and slices given), recording every *traj_stride* steps both ex-2.2.16's trajectory on the probe set (the op
@@ -568,6 +569,10 @@ def train_one(
     would show.
 
     *stop_epoch* stops training early on the unchanged schedule (`train_anchored`); `None` trains to the end.
+
+    *record_extra*, if given, is called once before training as `record_extra(config, ops, k, holdout, workdir)` and
+    returns a measurement `model -> dict`; each record appends every value it returns to the trajectory under its key
+    (a later experiment's measurements along training, without a copy of this function).
     """
     from sca.anchoring import AnchorSpec, AntiSpec, LabelSpec, alignment
     from sca.compute.training import train_anchored
@@ -636,6 +641,8 @@ def train_one(
             "emb_axis_syntax": [],
         }
 
+    more = record_extra(config, ops, k, holdout, workdir) if record_extra is not None else None
+
     def on_record(_index: int, model) -> None:
         cos = alignment(model, probe_tokens)  # (L1, N, T)
         extra["m_context"].append(ex2216.context_margin(cos, weights))
@@ -664,6 +671,9 @@ def train_one(
             )
             table_ = np.asarray(model.transformer.wte)[syntax_ids]
             extra["emb_axis_syntax"].append((table_[:, 0] / np.linalg.norm(table_, axis=1)).tolist())
+        if more is not None:
+            for key, value in more(model).items():
+                extra.setdefault(key, []).append(value)
 
     _, metrics, traj = train_anchored(
         config,
