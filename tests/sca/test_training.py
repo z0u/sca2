@@ -1,6 +1,8 @@
 """End-to-end training: the loop runs, checkpoints, and reports progress."""
 
 import math
+
+import equinox as eqx
 import queue
 
 import jax.numpy as jnp
@@ -101,3 +103,31 @@ def test_progress_emitted_during_training(data_dir):
     # Through the metrics dict, not the message string: that's the field the memo
     # record keeps and the status flags read.
     assert messages[-1].metrics["loss"] > 0
+
+
+def test_rotated_basis_trains_and_matches_identity(data_dir):
+    """`basis_seed` trains to a finite loss, and the rotation with the identity basis is Adam step for step."""
+    import jax.random as jr
+    from sca.model import build_model
+    from sca.training.loop import make_train_step
+    from sca.training.optimizer import configure_optimizer, rotated
+
+    config = make_training_config()
+    assert "basis_seed" not in config.optimizer.model_dump(), "unset, the field stays out of the memo key"
+    config.optimizer.basis_seed = 7
+    assert config.optimizer.model_dump()["basis_seed"] == 7
+    model, _ = train_model(config, data_dir, checkpoint_every=1)
+    assert jnp.isfinite(model.s_z()).all()
+
+    model = build_model(config.model, key=jr.key(0))
+    plain = configure_optimizer(model, OptimizerConfig(weight_decay=0, learning_rate=1e-3, betas=(0.9, 0.95)), 1e-3)
+    same = rotated(plain, np.eye(config.model.n_embd))
+    x = jnp.asarray(np.random.default_rng(0).integers(1, 26, size=(4, 16)))
+    outs = []
+    for opt in (plain, same):
+        step = make_train_step(opt)
+        m, st = model, opt.init(eqx.filter(model, eqx.is_inexact_array))
+        for _ in range(3):
+            m, st, _ = step(m, st, x[:, :-1], x[:, 1:])
+        outs.append(np.asarray(m.transformer.wte))
+    np.testing.assert_allclose(outs[0], outs[1], atol=1e-6)

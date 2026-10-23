@@ -114,6 +114,12 @@ class OptimizerConfig(BaseModel, validate_assignment=True):
     betas: tuple[ZeroToOne, ZeroToOne]
     """Betas for the Adam optimizer"""
 
+    basis_seed: int | None = Field(default=None, exclude_if=lambda v: v is None)
+    """Apply Adam's per-coordinate scaling in a random rotation of the residual coordinates, drawn from this seed, so
+    that the coordinate axes are no longer the basis the optimizer favors (`sca.training.optimizer.rotated`). `None`
+    is Adam as is. Left out of the serialized config when unset, so configs from before the field existed keep their
+    memo keys."""
+
 
 class SchedulerConfig(BaseModel, validate_assignment=True):
     epochs: PositiveInt
