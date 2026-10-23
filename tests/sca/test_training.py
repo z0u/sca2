@@ -131,3 +131,51 @@ def test_rotated_basis_trains_and_matches_identity(data_dir):
             m, st, _ = step(m, st, x[:, :-1], x[:, 1:])
         outs.append(np.asarray(m.transformer.wte))
     np.testing.assert_allclose(outs[0], outs[1], atol=1e-6)
+
+
+@pytest.mark.parametrize("kind", ["adam-pooled", "muon", "sgd"])
+def test_rotation_equivariant_optimizers(kind):
+    """The optimizers meant to have no privileged basis give the same weights whether or not Adam's trick of a
+    rotated basis is applied to them, up to float error; Adam itself does not."""
+    import jax.random as jr
+    from sca.model import build_model
+    from sca.training.loop import make_train_step
+    from sca.training.optimizer import configure_optimizer, rotated
+
+    config = make_training_config()
+    model = build_model(config.model, key=jr.key(0))
+    opt = configure_optimizer(
+        model, OptimizerConfig(weight_decay=0, learning_rate=1e-2, betas=(0.9, 0.95), kind=kind), 1e-2
+    )
+    R = np.linalg.qr(np.random.default_rng(3).standard_normal((config.model.n_embd,) * 2))[0]
+    x = jnp.asarray(np.random.default_rng(0).integers(1, 26, size=(4, 16)))
+    outs = []
+    for o in (opt, rotated(opt, R)):
+        step = make_train_step(o)
+        m, st = model, o.init(eqx.filter(model, eqx.is_inexact_array))
+        for _ in range(3):
+            m, st, loss = step(m, st, x[:, :-1], x[:, 1:])
+        assert jnp.isfinite(loss)
+        outs.append(np.asarray(m.transformer.wte))
+    np.testing.assert_allclose(outs[0], outs[1], atol=1e-4)
+
+
+def test_adam_is_not_rotation_equivariant():
+    import jax.random as jr
+    from sca.model import build_model
+    from sca.training.loop import make_train_step
+    from sca.training.optimizer import configure_optimizer, rotated
+
+    config = make_training_config()
+    model = build_model(config.model, key=jr.key(0))
+    opt = configure_optimizer(model, OptimizerConfig(weight_decay=0, learning_rate=1e-2, betas=(0.9, 0.95)), 1e-2)
+    R = np.linalg.qr(np.random.default_rng(3).standard_normal((config.model.n_embd,) * 2))[0]
+    x = jnp.asarray(np.random.default_rng(0).integers(1, 26, size=(4, 16)))
+    outs = []
+    for o in (opt, rotated(opt, R)):
+        step = make_train_step(o)
+        m, st = model, o.init(eqx.filter(model, eqx.is_inexact_array))
+        for _ in range(3):
+            m, st, _ = step(m, st, x[:, :-1], x[:, 1:])
+        outs.append(np.asarray(m.transformer.wte))
+    assert np.abs(outs[0] - outs[1]).max() > 1e-3
