@@ -178,8 +178,8 @@ def basis_one(checkpoint, holdout, label: str, model_seed: int, n_ctx: int = 400
         h = stream[s].reshape(-1, C)
         energy_axes.append((h**2).mean(0))
         energy_rot.append(((h @ R) ** 2).mean(0))
-        kurt_axes.append(kurt(h).mean())
-        kurt_rot.append(kurt(h @ R).mean())
+        kurt_axes.append(float(kurt(h).mean()))
+        kurt_rot.append(float(kurt(h @ R).mean()))
 
     every = tuple(range(stream.shape[0]))
     mask = ex2216.site_positions("every position", K)
