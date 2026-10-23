@@ -85,13 +85,15 @@ def dose_curves(which: str, seed: int) -> dict[str, list[float]]:
     get = new_dose if which == NEW else old_dose
     d, c = get(FALLOFF, seed), get(CONTROL, seed)
     span = d["clean"]["eem"][D] - d["null"]["eem"][D]
-    out: dict[str, list[float]] = {k: [] for k in ("removal", "raw_removal", "control_drop", "spill", "raw_spill")}
+    keys = ("removal", "raw_removal", "control_drop", "control_other", "spill", "raw_spill")
+    out: dict[str, list[float]] = {k: [] for k in keys}
     for e, ec in zip(d["edits"], c["edits"], strict=True):
         drop, cdrop = np.array(e["drop"]), np.array(ec["drop"])
         net = drop - cdrop
         out["removal"].append(float(net[D] / span))
         out["raw_removal"].append(float(drop[D] / span))
         out["control_drop"].append(float(cdrop[D] / span))
+        out["control_other"].append(float(cdrop[OTHER].max()))
         out["spill"].append(float(net[OTHER].max()))
         out["raw_spill"].append(float(drop[OTHER].max()))
     return out
@@ -180,6 +182,7 @@ LOST_BY_RAW = [s for s in SEEDS if RAW[NEW][s] < 0.5]
 # Where the control's own e₁ overlaps its syntax direction, the paired baseline drops on the anchored op too.
 COS = {a: {s: cos_e1(s, ex.label_of(a, s)) for s in SEEDS} for a in (FALLOFF, CONTROL)}
 E1_COST = {a: {s: float(mean_cost(ex.label_of(a, s), "cost_axes")[0]) for s in SEEDS} for a in (FALLOFF, CONTROL)}
+CTRL_OTHER = {w: {s: CURVES[w][s]["control_other"][-1] for s in SEEDS} for w in (NEW, OLD)}
 SHORTFALL = {s: FULL[OLD][s] - FULL[NEW][s] for s in SEEDS}
 R_SHORTFALL = float(np.corrcoef([SHORTFALL[s] for s in SEEDS], [COS[CONTROL][s] for s in SEEDS])[0, 1])
 OVERLAP_SEEDS = sorted(SEEDS, key=lambda s: -COS[CONTROL][s])[:2]
@@ -314,7 +317,7 @@ With the basis rotated, is e₁ still held through training at every seed, and a
 
 {depth_figure()}
 
-The one visible difference is at the embedding, where the new runs sit at about {num(EMB_NEW)} against {num(EMB_OLD)} in the stored runs. That is where the anti weight is highest, and under the rotation the syntax tokens no longer have a coordinate of their own to sit on, orthogonal to e₁ for free; the few hundredths may be what it costs the anti term to keep them off e₁ when e₁ is an ordinary direction. The anchored op's alignment in the contexts of the other ops is unchanged. So the anchor does not need e₁ to be a privileged axis: the pull finds and holds an ordinary direction as well as it held an axis.
+The one visible difference is at the embedding, where the new runs sit at about {num(EMB_NEW)} against {num(EMB_OLD)} in the stored runs. That is where the anti weight is highest, and under the rotation the syntax tokens no longer have a coordinate of their own to sit on, orthogonal to e₁ for free; the few hundredths may be what it costs the anti term to keep them off e₁ when e₁ is an ordinary direction. The same uplift shows in the contexts of the other ops, which fits a second reading at least as well: under the rotation e₁ is a generic direction at the embedding, so every embedding has a small share of it. Past the embedding, the alignment in the contexts of the other ops is unchanged. So the anchor does not need e₁ to be a privileged axis: the pull finds and holds an ordinary direction as well as it held an axis.
 """
 
 # %%
@@ -444,10 +447,12 @@ But the removal net of the control, the measurement the earlier reports quote, f
 
 {seed_table()}
 
-So the kept/lost rule, applied as written, would count {len(LOST_BY_NET)} of 8 new runs as having lost the anchor, while the raw removal and the alignment say that none did ({len(LOST_BY_RAW)} are below half by the raw drop). We read this as a property of the paired baseline rather than of the anchor: netting against the control assumes the edit on the control touches nothing much, which held when e₁ was a quiet axis and does not hold for a direction that overlaps the control's spike. The anchored run at those seeds has moved its own syntax spike to a rotated axis away from e₁ (E3), which is the anti term doing its job, so the anchored run's e₁ is clean and the control's is not.
+So the kept/lost rule, applied as written, would count {len(LOST_BY_NET)} of 8 new runs as having lost the anchor (inside chance by the Scope's reckoning, and not losses by the raw drop in any case), while the raw removal and the alignment say that none did ({len(LOST_BY_RAW)} are below half by the raw drop). What the edit takes from each run says the same: on seeds {" and ".join(str(s) for s in OVERLAP_SEEDS)} the control loses on every op, up to {fmt((CTRL_OTHER[NEW][s] for s in OVERLAP_SEEDS))} in score on an op other than `{ex.ANCHORED_OP}`, while the anchored run at the same seeds loses {fmt((CURVES[NEW][s]["raw_spill"][-1] for s in OVERLAP_SEEDS), ".3f")} at most on any other op; the stored controls lose at most {num(max(CTRL_OTHER[OLD].values()))} on any other op. So the edit on the rotated control takes syntax, spread over the task, and the edit on the anchored run takes the anchored concept and little else. This is a property of the paired baseline rather than of the anchor: netting against the control assumes the edit on the control touches nothing much, which held when e₁ was a quiet axis and does not hold for a direction that overlaps the control's spike. The anchored run at those seeds holds its own syntax spike on a rotated axis away from e₁ (E3), which fits the anti term steering it there, so the anchored run's e₁ is clean where the control's is not.
 <!-- REVIEW: the raw removal is reported beside the net removal here because the net measurement's baseline
   changed meaning under the rotation. Verify: the control drop on the anchored op (table) is 0.5 or more on the seeds
-  where net removal falls short, and about 0.1 elsewhere and on every stored seed. -->
+  where net removal falls short, and about 0.1 elsewhere and on every stored seed. The claims review added the
+  per-op comparison: the control's drop on the overlap seeds is spread over every op, the anchored run's is on the
+  anchored op alone (dose arrays, edits[-1]["drop"]). -->
 """
 
 # %%
@@ -630,7 +635,7 @@ The syntax tokens sit on that rotated spike: the `?`, `,`, ⏎ and `=` embedding
 
 {home_table()}
 
-e₁ now costs what a direction costs, with the spike's overlap on top. In the controls, the 63 other coordinate axes cost {num(AXIS_MEDIAN)} at the median, about what the memo's random directions cost, while a rotated axis off the spike costs {num(ROT_MEDIAN)}, the memo's ordinary-axis figure; the cheap directions are the rotated axes now. e₁ costs {fmt(E1_CTRL_QUIET)} on the six seeds where its cosine with the spike is a tenth or less and {fmt(E1_CTRL_OVERLAP)} on the two where it is about a quarter, and that overlap is what E2 found in the net removal. In the `falloff` runs e₁ costs {fmt(E1_COST[FALLOFF].values())} on every seed: the anchored op's removal, which the cost spreads over the ops, with nothing of the spike in it.
+e₁ now costs what a direction costs, with the spike's overlap on top. In the controls, the 63 other coordinate axes cost {num(AXIS_MEDIAN)} at the median, about what the memo's random directions cost, while a rotated axis off the spike costs {num(ROT_MEDIAN)}, the memo's ordinary-axis figure; the cheap directions are the rotated axes now. e₁ costs {fmt(E1_CTRL_QUIET)} on the six seeds where its cosine with the spike is about a tenth or less and {fmt(E1_CTRL_OVERLAP)} on the two where it is about a quarter, and that overlap is what E2 found in the net removal. In the `falloff` runs e₁ costs {fmt(E1_COST[FALLOFF].values())} on every seed: the anchored op's removal, which the cost spreads over the ops, with nothing of the spike in it.
 
 {cost_figure()}
 """
@@ -644,5 +649,5 @@ The anchor did not need a privileged axis. Pulled toward an ordinary direction, 
 
 What the rotation did change is the control. The removal and spill measurements are net of an un-anchored twin, and that netting assumes the edit on the twin touches nothing much. When e₁ was an axis, the twin's syntax tokens sat on another axis, orthogonal to e₁ for free, and the assumption held. When e₁ is a direction, it overlaps the twin's spike by a random cosine, and on two of eight seeds that cosine was large enough for the edit to take half the op from the control. The net measurement then counts a loss that the anchored run never had. A reader of an earlier report need not revise anything, since every stored comparison kept e₁ as an axis in both runs, but the sham guidance follows the same line: a sham direction compared with e₁ should be another coordinate axis off the two syntax coordinates, and a random direction overstates the baseline by whatever it takes from the spike.
 
-The anchored runs also show the anti term at work in a way the stored runs could not. With the coordinates privileged, keeping the syntax off e₁ cost nothing, because the model parked it on a different coordinate anyway. Here, on three seeds, the anchored run holds its syntax on a different rotated axis from the one the control chose, which fits the anti term steering the model's choice among the optimizer's cheap directions. If this holds, the anti term's job in a model with no privileged basis at all would be larger still, since there would be no cheap direction to steer the syntax onto; the optimizer scout beside this report looks at what such a model's stream looks like, without an anchor.
+The anchored runs also show the anti term at work in a way the stored runs could not. With the coordinates privileged, keeping the syntax off e₁ cost nothing, because the model parked it on a different coordinate anyway. Here, on three seeds, the anchored run holds its syntax on a different rotated axis from the one the control chose, which fits the anti term steering the model's choice among the optimizer's cheap directions, though one of the three is a seed where e₁ overlaps nothing and the two runs may have settled differently for reasons of their own. If this holds, the anti term's job in a model with no privileged basis at all would be larger still, since there would be no cheap direction to steer the syntax onto. [The optimizer scout](../optimizer-scout/report.py) shows what such a model's stream looks like without an anchor.
 """
