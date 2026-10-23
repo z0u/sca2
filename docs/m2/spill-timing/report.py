@@ -327,8 +327,8 @@ def track_figure() -> str:
     }
     alt = """
         Eight lines of sham-netted spill against epoch, near zero for the first 20 epochs. Three red lines (seeds 707,
-        708 and 711) rise between epochs 24 and 32 and stay mostly over the criterion through epoch 100, swinging by a
-        few hundredths from record to record and twice reaching 0.1; 708 falls back to about 0.01 later. The fourth red line (710) stays
+        708 and 711) rise between epochs 24 and 48 and stay mostly over the criterion through epoch 100, swinging by a
+        few hundredths from record to record and twice reaching 0.1; 708 falls back to about 0.01 after epoch 70. The fourth red line (710) stays
         below zero until about epoch 150, then rises to about 0.02. The blue lines stay within about 0.01 of zero,
         except 705, which drifts up to about 0.02 after epoch 100. The strips show the anchor weight rising to 0.1 by
         epoch 40 and dropping after epoch 360, the pooling temperature falling from 1 to 0.1 by epoch 40, and the anti
@@ -430,8 +430,8 @@ def probe_figure() -> str:
         Left: R² of the e₁-alone probe at the example answers. On the other ops it starts near 0.1 in the first
         epochs and settles by epoch 30 at about 0.01, the red and blue seeds intermixed; on difference (ghosted)
         it sits higher, around 0.03 to 0.05. Right: R² of the whole-state probe on the other ops, falling slowly from
-        about 0.94 to about 0.85 over training on most seeds; two seeds fall further, to about 0.77: 711 (red) from
-        the start, and 706 (blue) after about epoch 60.
+        about 0.94 to about 0.85 over training on most seeds; two seeds fall further, to about 0.75 and 0.77: 706 (blue) after about epoch 60, and 711 (red) from
+        the start.
     """
     return probe_draw(data, alt)
 
@@ -480,7 +480,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-We trained `pool 1–3, soft τ` again at its eight seeds and applied the edit at every record along training, to see when its spill onto other ops appears. On three of the four seeds that end over the criterion it appears during the rise, by about epoch 30, and on the fourth only after epoch 150. A color probe on the other ops showed nothing that tracks it.
+We trained `pool 1–3, soft τ` again at its eight seeds and applied the edit at every record along training, to see when its spill onto other ops appears. On three of the four seeds that end over the criterion it appears during the rise, by about epoch 45, and on the fourth only after epoch 150. A color probe on the other ops showed nothing that tracks it.
 ///
 
 `pool 1–3, soft τ` from [soft-pool](/docs/m2/soft-pool/report.py) kept the anchor on all eight of its seeds, but only four of its edits stayed within the spill criterion. A cheap early test for spill would let it, or arms tuned from it, run at many seeds, as [the loss-rate screen](/docs/m2/loss-rate/report.py) did for losing the anchor. Nothing in the stored trajectories up to epoch {STOP_EPOCH} predicted the end spill, and the stored runs keep only their end checkpoints, so we couldn't tell when the spill appears.
@@ -493,8 +493,8 @@ So we trained the condition again at its seeds ({SEEDS[0]} to {SEEDS[-1]}) with 
 rf"""
 ## Observations
 
-- [The sham beside the control (E1)](#the-sham-beside-the-control-e1): the reruns match the stored runs. At the end of training, netting the edit against the sham sorts the eight seeds much as netting it against the control does. On the controls themselves, the e₁ edit costs some ops more than the sham does, so the control adds a seed-to-seed term of its own.
-- [Spill along training (E2)](#spill-along-training-e2): spill appears in two ways. On three seeds it appears during the rise, as the pool sharpens and the anchor weight reaches its plateau, and stays. On two seeds it grows after epoch 100 on `value-hsv`, while the anti weight anneals. A window around epoch {STOP_EPOCH} sorts the seeds roughly as the end does, missing the late one; the full order settles only after epoch 200.
+- [The sham beside the control (E1)](#the-sham-beside-the-control-e1): the reruns match the stored runs. At the end of training, netting the edit against the sham sorts the eight seeds much as netting it against the control does. On the controls themselves, the e₁ edit costs some ops a few hundredths more than the sham does and others less, so the control adds a seed-to-seed term of its own.
+- [Spill along training (E2)](#spill-along-training-e2): spill appears in two ways. On three seeds it appears during the rise, as the pool sharpens and the anchor weight reaches its plateau, and on two of them it stays. On two seeds it grows after epoch 100 on `value-hsv`, while the anti weight anneals. A window around epoch {STOP_EPOCH} sorts the seeds roughly as the end does, missing the late one; the full order settles only after epoch 200.
 - [Color on e₁ at the other ops (E3)](#color-on-e1-at-the-other-ops-e3): e₁ holds almost no color information at the other ops, from about epoch 30 on, on every seed, and removing it doesn't change how well the color can be read from the rest of the state. The fit from the whole state doesn't follow the spill either.
 
 ## Scope
@@ -503,7 +503,7 @@ This is an exploratory study, with no preregistration and no gate. It covers one
 
 Eight seeds is few for correlations: a rank correlation of 0.6 over eight seeds comes up by chance about one time in ten. The seeds also split unevenly, with one seed (711) spilling far more than the rest and the other three over the criterion only just over it. We looked at several measurements, windows and slices after the runs came in, so a single strong correlation here is a lead, not a finding.
 
-The epoch-{STOP_EPOCH} checkpoints are those of `falloff` and `step, soft τ` from the loss-rate screen, {N_EARLY} in all. Eleven of them belong to runs trained to the end, so their end spill is known; these two conditions barely spill, so they can show an early edit finding spill that isn't there at the end, but not the opposite.
+The epoch-{STOP_EPOCH} checkpoints are those of `falloff` and `step, soft τ` from the loss-rate screen, {N_EARLY} in all. Eleven of them belong to runs trained to the end, so their end spill is known; these two conditions spill little, and three of the eleven end at or over the criterion, so they can show an early edit finding spill that isn't there at the end, and whether it misses spill that is.
 
 ## The measurements
 
@@ -514,6 +514,8 @@ The epoch-{STOP_EPOCH} checkpoints are those of `falloff` and `step, soft τ` fr
 
 # %%
 
+# REVIEW: E1 now also says the early edit misses the spill three of the eleven known-end checkpoints end with
+# (step-soft 705, falloff 714 and 704, all under 0.01 at epoch 64), from the claims review. Verify: KNOWN.
 rf"""
 ## The sham beside the control (E1)
 
@@ -527,13 +529,17 @@ We first tried a random direction orthogonal to e₁ as the sham, as planned. On
 
 The two scores sort the eight seeds alike (r = {END_R:.2f}), and in most seeds they name the same op. The sham-netted score runs a little lower, so the criterion would need restating for it, and the seeds over the criterion stay at or over it apart from 708, which falls under it.
 
-On the controls, the e₁ edit costs some op up to a few hundredths more than the sham does, differently on each seed. So e₁ on an unanchored model isn't quite a typical direction, and netting against the control at the same seed adds that seed-to-seed term to the spill score. That may be part of why quiet runs scored as high as 0.018 in earlier reports.
+On the controls, the e₁ edit costs some ops up to a few hundredths more than the sham does and others as much less, differently on each seed (the table shows only the largest). So e₁ on an unanchored model isn't quite a typical direction, and netting against the control at the same seed adds that seed-to-seed term to the spill score. That may be part of why quiet runs scored as high as 0.018 in earlier reports.
 
-On the epoch-{STOP_EPOCH} checkpoints of the two low-spill conditions the edit costs the other ops a little less than the sham, as it should when the anti term keeps them off e₁. Only {N_EARLY_OVER} of the {N_EARLY} goes over the criterion, and on the eleven with a known end spill the early score stays below {max(k["early"] for k in KNOWN):.2f}. So an early edit doesn't seem to invent spill.
+On the epoch-{STOP_EPOCH} checkpoints of the two low-spill conditions the edit costs the other ops a little less than the sham, as it should when the anti term keeps them off e₁. Only {N_EARLY_OVER} of the {N_EARLY} goes over the criterion, and on the eleven with a known end spill the early score stays below {max(k["early"] for k in KNOWN):.2f}. So an early edit doesn't seem to invent spill. But it also misses the spill that three of the eleven end with, at or over the criterion, which is the late kind of E2 seen in two other conditions.
 """
 
 # %%
 
+# REVIEW: the early rise was dated "between epochs 24 and 32" on all three seeds; the record shows 708 first over
+# the criterion at epoch 24 and 711 at 32, but 707 at 44 (it sits at −0.012 at epoch 40 and 0.097 at 48). The lede
+# and this section now say 707 rises at about epoch 44, just after the warm-up. Verify: TRACK[707] around at(40)
+# to at(48).
 rf"""
 ## Spill along training (E2)
 
@@ -543,7 +549,7 @@ When does the spill appear, and from when does it sort the seeds as the end does
 
 {window_table()}
 
-Spill appears in two ways. On seeds 707, 708 and 711 it rises between epochs 24 and 32, as the pool temperature reaches its sharp value and the anchor weight its plateau, mostly on `darken` and `hue-hsv`, and stays up through epoch 100. On 711 it stays to the end, on `darken`. On 707 it moves to `mix` and settles near the criterion, and on 708 it falls back to about half.
+Spill appears in two ways. On seeds 708 and 711 it rises between epochs 24 and 32, as the pool temperature reaches its sharp value and the anchor weight its plateau, and on 707 at about epoch 44, just after; mostly on `darken` and `hue-hsv`, and it stays up past the stop of the loss-rate screen. On 711 it stays to the end, on `darken`. On 707 it moves to `mix` and settles near the criterion, and on 708 it falls back to about half.
 
 On seeds 705 and 710 the spill grows later, from about epoch 120 and 150, on `value-hsv`, while the anti weight on slice {SL} falls through its slow anneal. It ends just under the criterion on 705 and just over it on 710.
 
@@ -575,7 +581,7 @@ So the probe doesn't see the spill. The edit takes away e₁, but what the other
 r"""
 ## Discussion
 
-The edit spills in two ways in this condition. The early kind appears during the rise, when the pool is still sharpening and the anchor weight reaches its plateau, which fits the reading of soft-pool that the soft pool lifts the other ops toward e₁ at that time. The late kind appears as the anti term anneals, on `value-hsv`, which fits the anti term holding the other ops off e₁ until it lets go. Neither reading is tested here; each would need an arm that changes the schedule at that time.
+The edit spills in two ways in this condition. The early kind appears during the rise, when the pool is still sharpening and the anchor weight reaches its plateau, which fits the reading of soft-pool that the soft pool lifts the other ops toward e₁ at that time. The late kind appears as the anti term begins its slow anneal, on `value-hsv`, which fits the anti term holding the other ops off e₁ until it lets go. Neither reading is tested here; each would need an arm that changes the schedule at that time.
 
 A screen that edits a checkpoint around epoch 64 would see the early kind and not the late kind. On these seeds the late kind was the smaller, but it put one run over the criterion and another just under it, so a screen at epoch 64 would undercount. A screen late enough to see both, around epoch 200, would cost half a full run.
 
