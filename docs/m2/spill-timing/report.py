@@ -1,7 +1,7 @@
 # ruff: noqa: B018
 # title: When the spill appears
 
-# An exploratory report: `pool 1–3, soft τ` trained again at its eight soft-pool seeds, with the full edit, a sham
+# An exploratory report: `pool 1–3, soft τ` trained again at its eight soft-pool seeds, with the full edit, a reference edit
 # edit and an RGB probe scored at every record, to see when along training the spill of the edit appears and whether
 # an early measurement sorts the seeds as the end does. `experiment.py` beside this script trains and scores the runs.
 import json
@@ -92,7 +92,7 @@ GHOST = light_dark("#bbb", "#555")
 RULE = light_dark("#333", "#ddd")
 ZERO = light_dark("#aaa", "#555")
 
-# --- Spill, as the earlier reports score it and as the sham scores it --------------------------------------------
+# --- Spill, as the earlier reports score it and as the reference edit scores it --------------------------------------------
 
 
 def control_spill(dose: dict, controls: list[dict]) -> tuple[float, str]:
@@ -104,14 +104,14 @@ def control_spill(dose: dict, controls: list[dict]) -> tuple[float, str]:
     return float(net.max()), OPS[OTHER[int(np.unravel_index(net.argmax(), net.shape)[1])]]
 
 
-def sham_net(clean, edited, sham) -> np.ndarray:
-    """The drop on each op under the edit, less the median drop under the sham edits: the median sham score less the
-    edit score. The last axis is the op; *sham* has the draws on the axis before it.
+def reference_net(clean, edited, ref) -> np.ndarray:
+    """The drop on each op under the edit, less the median drop under the reference edits: the median reference score less the
+    edit score. The last axis is the op; *ref* has the draws on the axis before it.
     """
-    return np.median(np.asarray(sham), axis=-2) - np.asarray(edited)
+    return np.median(np.asarray(ref), axis=-2) - np.asarray(edited)
 
 
-def sham_spill(net: np.ndarray) -> np.ndarray:
+def reference_spill(net: np.ndarray) -> np.ndarray:
     """The largest net drop on another op, on the last axis."""
     return net[..., OTHER].max(axis=-1)
 
@@ -121,8 +121,8 @@ def traj_of(seed: int) -> dict:
 
 
 EPOCH = np.asarray(traj_of(SEEDS[0])["epoch"])
-NET = {s: sham_net(traj_of(s)["es_clean"], traj_of(s)["es_edit"], traj_of(s)["es_sham"]) for s in SEEDS}
-TRACK = {s: sham_spill(NET[s]) for s in SEEDS}  # the sham-netted spill at every record
+NET = {s: reference_net(traj_of(s)["es_clean"], traj_of(s)["es_edit"], traj_of(s)["es_sham"]) for s in SEEDS}
+TRACK = {s: reference_spill(NET[s]) for s in SEEDS}  # the reference-netted spill at every record
 WORST_OP = {s: [OPS[OTHER[i]] for i in NET[s][:, OTHER].argmax(axis=1)] for s in SEEDS}
 END = {s: control_spill(DOSE[ex.label_of(s)], [CONTROL_DOSE[f"control-s{s}"]]) for s in SEEDS}
 OLD_END = {s: control_spill(OLD_DOSE[ex.label_of(s)], [CONTROL_DOSE[f"control-s{s}"]])[0] for s in SEEDS}
@@ -144,7 +144,7 @@ def at(epoch: float) -> int:
 
 
 def window(seed: int, lo: float, hi: float) -> float:
-    """The sham-netted spill averaged over the records from *lo* to *hi* (each epoch once)."""
+    """The reference-netted spill averaged over the records from *lo* to *hi* (each epoch once)."""
     keep = (EPOCH >= lo - 1e-6) & (EPOCH <= hi + 1e-6)
     _, first = np.unique(np.round(EPOCH[keep], 3), return_index=True)
     return float(TRACK[seed][keep][first].mean())
@@ -155,19 +155,19 @@ WIN = {w: np.array([window(s, *w) for s in SEEDS]) for w in WINDOWS}
 WIN_RHO = {w: float(stats.spearmanr(WIN[w], END_SPILL)[0]) for w in WINDOWS}
 LATE_SD = float(np.mean([TRACK[s][EPOCH >= 300].std() for s in SEEDS]))
 
-# The sham beside the control at the end of training, on the eight runs.
-END_SHAM = np.array([TRACK[s][-1] for s in SEEDS])
-END_RHO = float(stats.spearmanr(END_SHAM, END_SPILL)[0])
+# The reference edit beside the control at the end of training, on the eight runs.
+END_REF = np.array([TRACK[s][-1] for s in SEEDS])
+END_RHO = float(stats.spearmanr(END_REF, END_SPILL)[0])
 
 # The same scoring, once, on the controls and on the loss-rate screen's epoch-64 checkpoints.
 
 
 def scored_spill(label: str) -> float:
     r = SCORED[label]
-    return float(sham_spill(sham_net(r["es_clean"], r["es_edit"], r["es_sham"])))
+    return float(reference_spill(reference_net(r["es_clean"], r["es_edit"], r["es_sham"])))
 
 
-CTL_SHAM = {s: scored_spill(f"control-s{s}") for s in SEEDS}
+CTL_REF = {s: scored_spill(f"control-s{s}") for s in SEEDS}
 EARLY = {
     arm: {lab: scored_spill(lab) for lab in SCORED if lab.startswith(f"{arm}-s") and lab.endswith(f"-e{STOP_EPOCH}")}
     for arm in ("falloff", "step-soft")
@@ -223,39 +223,39 @@ ALONE_RHO = {
     for e in (32, 64, 200, 400)
 }
 
-# --- E1: the sham beside the control ----------------------------------------------------------------------------
+# --- E1: the reference edit beside the control ----------------------------------------------------------------------------
 
 
-def sham_figure() -> str:
+def reference_figure() -> str:
     data = {
         "runs": [
-            {"seed": s, "control": END[s][0], "sham": float(END_SHAM[i]), "over": s in OVER}
+            {"seed": s, "control": END[s][0], "reference": float(END_REF[i]), "over": s in OVER}
             for i, s in enumerate(SEEDS)
         ],
-        "controls": list(CTL_SHAM.values()),
+        "controls": list(CTL_REF.values()),
         "early": {arm: list(v.values()) for arm, v in EARLY.items()},
         "criterion": CRITERION,
     }
     alt = """
-        Left: eight points, the sham-netted spill against the control-netted spill at the end of training, lying close
+        Left: eight points, the reference-netted spill against the control-netted spill at the end of training, lying close
         to the diagonal and a little below it; seed 711 sits far up and right of the rest. Right: three columns of
         dots. The controls spread from about zero to 0.05. The epoch-64 checkpoints of falloff and step, soft τ sit
         mostly just below zero, with one step, soft τ dot just over the criterion.
     """
-    return sham_draw(data, alt)
+    return reference_draw(data, alt)
 
 
 @memo
-def sham_draw(data: dict, alt_text: str) -> str:
+def reference_draw(data: dict, alt_text: str) -> str:
     @themed(
-        name="spill-timing-sham",
+        name="spill-timing-reference",
         alt_text=alt_text,
         caption=f"""
-            **The sham beside the control.** Left: one point per rerun at the end of training. Vertical: the spill
-            at the full dose, netted against the median of the eight sham edits. Horizontal: the spill as earlier
+            **The reference edit beside the control.** Left: one point per rerun at the end of training. Vertical: the spill
+            at the full dose, netted against the median of the eight reference edits. Horizontal: the spill as earlier
             reports score it, netted against the control at the same seed. Red where the run ends over the
             criterion, blue where it ends within it. The dashed lines are the criterion, and the dotted line is
-            equality. Right: the sham-netted spill of the e₁ edit on other models, one small mark each, with the
+            equality. Right: the reference-netted spill of the e₁ edit on other models, one small mark each, with the
             mean as a large mark and the range as a gray bar: the controls of ex-2.2.23 at seeds {SEEDS[0]} to
             {SEEDS[-1]}, and the checkpoints of the loss-rate screen at epoch {STOP_EPOCH}.
         """,
@@ -268,14 +268,14 @@ def sham_draw(data: dict, alt_text: str) -> str:
             f(data["criterion"], color=RULE, lw=0.6, ls="--", zorder=0)
         for r in data["runs"]:
             ink = OVER_INK if r["over"] else WITHIN_INK
-            ax.plot(r["control"], r["sham"], "o", color=ink, ms=4.5, zorder=2)
-            ax.annotate(str(r["seed"]), (r["control"], r["sham"]), xytext=(3, 2), textcoords="offset points",
+            ax.plot(r["control"], r["reference"], "o", color=ink, ms=4.5, zorder=2)
+            ax.annotate(str(r["seed"]), (r["control"], r["reference"]), xytext=(3, 2), textcoords="offset points",
                         fontsize=6, color=RULE)  # fmt: skip
         ax.set_xlim(lim)
         ax.set_ylim(lim)
         ax.set_aspect("equal")
         ax.set_xlabel("spill, net of control", fontsize=8)
-        ax.set_ylabel("spill, net of sham", fontsize=8)
+        ax.set_ylabel("spill, net of reference", fontsize=8)
         cols = [("controls", data["controls"], CTL_INK, "s")] + [
             (f"{name}\nepoch {STOP_EPOCH}", data["early"][arm], ARM_INK[arm], m)
             for arm, name, m in (("falloff", "falloff", "D"), ("step-soft", "step, soft τ", "v"))
@@ -292,7 +292,7 @@ def sham_draw(data: dict, alt_text: str) -> str:
         bx.set_xticks(range(len(cols)), [c[0] for c in cols], fontsize=7)
         bx.set_xlim(-0.6, len(cols) - 0.4)
         bx.set_ylim(lim)
-        bx.set_ylabel("spill, net of sham", fontsize=8)
+        bx.set_ylabel("spill, net of reference", fontsize=8)
         for a_ in (ax, bx):
             a_.tick_params(labelsize=7)
         return fig
@@ -300,27 +300,27 @@ def sham_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
-def sham_table() -> str:
+def reference_table() -> str:
     rows = [
         [
             str(s),
             num(OLD_END[s]),
             num(END[s][0]),
             END[s][1],
-            num(float(END_SHAM[i])),
+            num(float(END_REF[i])),
             WORST_OP[s][-1],
-            num(CTL_SHAM[s]),
+            num(CTL_REF[s]),
         ]
         for i, s in enumerate(SEEDS)
     ]
     return table_html(
-        ["seed", "stored ↓", "rerun ↓", "op", "net of sham ↓", "op", "control, net of sham"],
+        ["seed", "stored ↓", "rerun ↓", "op", "net of reference ↓", "op", "control, net of reference"],
         rows,
         f"""
         **Spill at the end of training, by seed.** Stored and rerun: the stored run of soft-pool and the rerun, each
         netted against the control at the same seed (the largest net drop on another op at any dose), then the op
-        that drop falls on. Net of sham: the rerun netted against the median sham edit at the full dose, then its op.
-        Last column: the e₁ edit on the control, netted against the median sham edit on that control. The criterion
+        that drop falls on. Net of reference: the rerun netted against the median reference edit at the full dose, then its op.
+        Last column: the e₁ edit on the control, netted against the median reference edit on that control. The criterion
         is {CRITERION:g}.
         """,
     )
@@ -352,7 +352,7 @@ def track_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption=f"""
             **Spill along training.** The largest drop on another op under the full edit, less the median drop under
-            the eight sham edits, at every record (every four epochs), one line per seed: red for the seeds whose
+            the eight reference edits, at every record (every four epochs), one line per seed: red for the seeds whose
             run ends over the criterion, blue for those within it. The dotted line marks where the
             loss-rate screen stopped. The strips underneath are the anchor weight $\\lambda_a$, the position pool temperature
             $\\tau_p$ (log scale), and the anti weight at slice {SL}, $\\lambda_{{\\bar s}}$.
@@ -376,7 +376,7 @@ def track_draw(data: dict, alt_text: str) -> str:
             ax.annotate(str(r["seed"]), (ep[-1], y), xytext=(3, 0), textcoords="offset points",
                         fontsize=6, color=ink, va="center")  # fmt: skip
         ax.set_ylim(-0.03, 0.1)
-        ax.set_ylabel("spill, net of sham", fontsize=8)
+        ax.set_ylabel("spill, net of reference", fontsize=8)
         sch = data["schedule"]
         wax.plot(ep, sch["weight"], color=RULE, lw=1.0)
         wax.set_ylim(0, 0.12)
@@ -411,8 +411,8 @@ def window_table() -> str:
         ["seed", *(f"epochs {a}–{b}" for a, b in WINDOWS), "end, net of control ↓", "op at 64", "op at 400"],
         rows,
         f"""
-        **Spill along training, by window.** The sham-netted spill averaged over the records in each window, the
-        spill at the end as earlier reports score it (net of the control), and the op the sham-netted spill falls
+        **Spill along training, by window.** The reference-netted spill averaged over the records in each window, the
+        spill at the end as earlier reports score it (net of the control), and the op the reference-netted spill falls
         on at epochs {STOP_EPOCH} and 400. The last line is the rank (Spearman) correlation of each window with the
         end spill over the eight seeds.
         """,
@@ -498,7 +498,7 @@ We trained `pool 1–3, soft τ` again at its eight seeds and applied the edit e
 
 `pool 1–3, soft τ` from [soft-pool](/docs/m2/soft-pool/report.py) kept the anchor on all eight of its seeds, but only four of its edits stayed within the spill criterion. A cheap early test for spill would let it, or arms tuned from it, run at many seeds, as [the loss-rate screen](/docs/m2/loss-rate/report.py) did for losing the anchor. But nothing in the stored trajectories up to epoch {STOP_EPOCH} predicted the end spill. The stored runs keep only their end checkpoints, so we couldn't tell when the spill appears.
 
-So we trained the condition again at its seeds ({SEEDS[0]} to {SEEDS[-1]}), with three measurements at every record:[^record] the edit itself, a sham edit along another direction as its baseline, and a probe for the colors at the other ops. The sham replaces the control as the baseline, since there is no control trajectory to net against. We also scored the edit and the sham on the controls, and on the epoch-{STOP_EPOCH} checkpoints the loss-rate screen left.
+So we trained the condition again at its seeds ({SEEDS[0]} to {SEEDS[-1]}), with three measurements at every record:[^record] the edit itself, a reference edit along another direction as its baseline, and a probe for the colors at the other ops. The reference edit replaces the control as the baseline, since there is no control trajectory to net against. We also scored the edit and the reference edit on the controls, and on the epoch-{STOP_EPOCH} checkpoints the loss-rate screen left.
 
 [^record]: Record: a point along training where the measurements are taken, every four epochs.
 """
@@ -508,7 +508,7 @@ So we trained the condition again at its seeds ({SEEDS[0]} to {SEEDS[-1]}), with
 rf"""
 ## Observations
 
-- [The sham beside the control (E1)](#the-sham-beside-the-control-e1): the reruns match the stored runs. At the end of training, netting the edit against the sham sorts the eight seeds much as netting it against the control does. On the controls themselves, the e₁ edit costs some ops a few hundredths more than the sham does and others less, so the control adds a seed-to-seed term of its own. An edit at epoch 64 on two low-spill conditions finds no spill that isn't there at the end, but misses some that is.
+- [The reference edit beside the control (E1)](#the-reference-edit-beside-the-control-e1): the reruns match the stored runs. At the end of training, netting the edit against the reference edit sorts the eight seeds much as netting it against the control does. On the controls themselves, the e₁ edit costs some ops a few hundredths more than the reference edit does and others less, so the control adds a seed-to-seed term of its own. An edit at epoch 64 on two low-spill conditions finds no spill that isn't there at the end, but misses some that is.
 - [Spill along training (E2)](#spill-along-training-e2): spill appears in two ways. On three seeds it appears during the rise, as the pool sharpens and the anchor weight reaches its plateau, and on two of them it stays. On two seeds it grows after epoch 100 on `value-hsv`, while the anti weight anneals. A window around epoch {STOP_EPOCH} sorts the seeds roughly as the end does, missing the late one; the full order settles only after epoch 200.
 - [Color on e₁ at the other ops (E3)](#color-on-e1-at-the-other-ops-e3): e₁ holds almost no color information at the other ops, from about epoch 30 on, on every seed, and removing it barely changes how well the color can be read from the rest of the state. The fit from the whole state doesn't follow the spill either.
 
@@ -523,7 +523,7 @@ The epoch-{STOP_EPOCH} checkpoints are those of `falloff` and `step, soft τ` fr
 ## The measurements
 
 - Spill, net of control (at the end, as earlier reports score it): the largest drop on another op under the edit, less the drop on that op under the same edit on the control at the same seed, taken over the four doses. The edit projects e₁ out at every position and slice. A run is within the criterion when its spill is at most {CRITERION:g}.
-- Spill, net of sham (along training): the largest drop on another op under the full edit, less the median drop on that op under eight sham edits. Each sham edit projects out one other basis direction (e₂, e₃, …), chosen at random, and the same eight are used throughout. We use the median because on some seeds one of the eight directions costs every op far more than the rest: Adam gives the residual stream a privileged basis, with the separator tokens on one coordinate that holds about half the stream's energy and `=` on another, and our draw includes the separator coordinate of three seeds (704, 705 and 708). A label-free rule for later experiments is to draw the sham axes from outside the stream's highest-energy coordinates. Each drop is measured in expected exact match over the whole held-out set, so the noise from the choice of contexts is small (a standard error of about {SAMPLE_SE:.3f} per op).
+- Spill, net of reference (along training): the largest drop on another op under the full edit, less the median drop on that op under eight reference edits. Each reference edit projects out one other basis direction (e₂, e₃, …), chosen at random, and the same eight are used throughout. We use the median because on some seeds one of the eight directions costs every op far more than the rest: Adam gives the residual stream a privileged basis, with the separator tokens on one coordinate that holds about half the stream's energy and `=` on another, and our draw includes the separator coordinate of three seeds (704, 705 and 708). A label-free rule for later experiments is to draw the reference axes from outside the stream's highest-energy coordinates. Each drop is measured in expected exact match over the whole held-out set, so the noise from the choice of contexts is small (a standard error of about {SAMPLE_SE:.3f} per op).
 - The probe: a ridge regression (a linear fit with a small penalty on the weights) from the state at a position to the RGB of the color there. It is fitted on half of the held-out contexts and scored on the other half as $R^2$ (the share of the variance of the color it predicts). It is fitted at every color position and at slices 2 to 4, on the contexts of the other ops and on `{ex.ANCHORED_OP}` contexts. Each fit uses one of three versions of the state: the whole state, the state without its e₁ coordinate, or the e₁ coordinate alone.
 """
 
@@ -532,21 +532,21 @@ The epoch-{STOP_EPOCH} checkpoints are those of `falloff` and `step, soft τ` fr
 # REVIEW: E1 now also says the early edit misses the spill three of the eleven known-end checkpoints end with
 # (step-soft 705, falloff 714 and 704, all under 0.01 at epoch 64), from the claims review. Verify: KNOWN.
 rf"""
-## The sham beside the control (E1)
+## The reference edit beside the control (E1)
 
-Can the sham stand in for the control as the baseline the spill is netted against? At the end of training we have both, so the figure (left) and the table compare them on the eight reruns. We also apply the edit and the sham to the controls and to the epoch-{STOP_EPOCH} checkpoints, where the edit should have little to act on (right).
+Can the reference edit stand in for the control as the baseline the spill is netted against? At the end of training we have both, so the figure (left) and the table compare them on the eight reruns. We also apply the edit and the reference edit to the controls and to the epoch-{STOP_EPOCH} checkpoints, where the edit should have little to act on (right).
 
-We first tried a random direction orthogonal to e₁ as the sham, as planned. On a control it cost every op far more than the e₁ edit does, so a random direction is no baseline for e₁. A single other basis direction behaves much more like e₁ on a control, though, so we used eight of those as the sham. The gap comes from the few high-energy coordinates: a random direction touches all of them, and a random direction kept off them costs about what an ordinary axis does.
+We first tried a random direction orthogonal to e₁ as the reference edit, as planned. On a control it cost every op far more than the e₁ edit does, so a random direction is no baseline for e₁. A single other basis direction behaves much more like e₁ on a control, though, so we used eight of those as the reference edits. The gap comes from the few high-energy coordinates: a random direction touches all of them, and a random direction kept off them costs about what an ordinary axis does.
 
-{sham_figure()}
+{reference_figure()}
 
-{sham_table()}
+{reference_table()}
 
-The two scores rank the eight seeds alike (rank correlation {END_RHO:.2f}), though they often name different ops. The sham-netted score runs a little lower, so the criterion would need restating for it. The seeds over the criterion stay at or over it, apart from 708, which falls under it.
+The two scores rank the eight seeds alike (rank correlation {END_RHO:.2f}), though they often name different ops. The reference-netted score runs a little lower, so the criterion would need restating for it. The seeds over the criterion stay at or over it, apart from 708, which falls under it.
 
-On the controls, the e₁ edit costs some ops up to a few hundredths more than the sham does, and others as much less, differently on each seed (the table shows only the largest). So e₁ on an unanchored model isn't quite a typical direction, and netting against the control at the same seed adds that seed-to-seed term to the spill score. That may be part of why quiet runs scored as high as 0.018 in earlier reports.
+On the controls, the e₁ edit costs some ops up to a few hundredths more than the reference edit does, and others as much less, differently on each seed (the table shows only the largest). So e₁ on an unanchored model isn't quite a typical direction, and netting against the control at the same seed adds that seed-to-seed term to the spill score. That may be part of why quiet runs scored as high as 0.018 in earlier reports.
 
-On the epoch-{STOP_EPOCH} checkpoints of the two low-spill conditions, the edit costs the other ops a little less than the sham, as it should when the anti term keeps them off e₁. Only {N_EARLY_OVER} of the {N_EARLY} goes over the criterion, and on the eleven with a known end spill the early score stays below {max(k["early"] for k in KNOWN):.2f}. So an early edit doesn't seem to invent spill. But it also misses the spill that three of the eleven end with (at or over the criterion). That is the late kind of spill from E2, seen here in two other conditions.
+On the epoch-{STOP_EPOCH} checkpoints of the two low-spill conditions, the edit costs the other ops a little less than the reference edit, as it should when the anti term keeps them off e₁. Only {N_EARLY_OVER} of the {N_EARLY} goes over the criterion, and on the eleven with a known end spill the early score stays below {max(k["early"] for k in KNOWN):.2f}. So an early edit doesn't seem to invent spill. But it also misses the spill that three of the eleven end with (at or over the criterion). That is the late kind of spill from E2, seen here in two other conditions.
 """
 
 # %%
@@ -558,7 +558,7 @@ On the epoch-{STOP_EPOCH} checkpoints of the two low-spill conditions, the edit 
 rf"""
 ## Spill along training (E2)
 
-When does the spill appear, and from when does it sort the seeds as the end does? The figure shows the sham-netted spill at every record, and the table its mean over a few windows.
+When does the spill appear, and from when does it sort the seeds as the end does? The figure shows the reference-netted spill at every record, and the table its mean over a few windows.
 
 {track_figure()}
 
@@ -600,5 +600,5 @@ The edit spills in two ways in this condition. The early kind appears during the
 
 A screen that edits a checkpoint around epoch 64 would see only the early kind (E2). On these seeds the late kind was the smaller, but it put one run over the criterion and another just under it, so such a screen would undercount. A screen late enough to see both, around epoch 200, would cost half a full run.
 
-Netting against a sham works about as well as netting against a control at the end of training, and it needs no control run. The controls showed that e₁ isn't a neutral direction on an unanchored model either, so some of the noise in the earlier spill scores may come from the control rather than from the anchored run.
+Netting against a reference edit works about as well as netting against a control at the end of training, and it needs no control run. The controls showed that e₁ isn't a neutral direction on an unanchored model either, so some of the noise in the earlier spill scores may come from the control rather than from the anchored run.
 """
