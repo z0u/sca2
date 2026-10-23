@@ -57,6 +57,15 @@ ANSWER_POS = [i for i, p in enumerate(POSITIONS) if p.startswith("c")]  # the ex
 STOP_EPOCH = 64  # where the loss-rate screen stopped its runs
 
 
+def spread(ys: list[float], gap: float) -> list[float]:
+    """*ys* nudged apart, in order, so neighbors are at least *gap* apart: where a column of line labels goes."""
+    order = np.argsort(ys)
+    out = np.asarray(ys, float).copy()
+    for a, b in zip(order[:-1], order[1:], strict=True):
+        out[b] = max(out[b], out[a] + gap)
+    return out.tolist()
+
+
 def num(v: float, spec: str = ".3f") -> str:
     """A number with a typographic minus."""
     return f"{v:{spec}}".replace("-", "−")
@@ -148,7 +157,7 @@ LATE_SD = float(np.mean([TRACK[s][EPOCH >= 300].std() for s in SEEDS]))
 
 # The sham beside the control at the end of training, on the eight runs.
 END_SHAM = np.array([TRACK[s][-1] for s in SEEDS])
-END_R = float(np.corrcoef(END_SHAM, END_SPILL)[0, 1])
+END_RHO = float(stats.spearmanr(END_SHAM, END_SPILL)[0])
 
 # The same scoring, once, on the controls and on the loss-rate screen's epoch-64 checkpoints.
 
@@ -361,7 +370,10 @@ def track_draw(data: dict, alt_text: str) -> str:
         for r in data["runs"]:
             ink, mark = (OVER_INK, "o") if r["over"] else (WITHIN_INK, "s")
             ax.plot(ep, r["spill"], color=ink, lw=0.8, alpha=0.85, marker=mark, ms=1.6, zorder=2)
-            ax.annotate(str(r["seed"]), (ep[-1], r["spill"][-1]), xytext=(3, 0), textcoords="offset points",
+        ys = spread([r["spill"][-1] for r in data["runs"]], 0.0045)
+        for r, y in zip(data["runs"], ys, strict=True):
+            ink = OVER_INK if r["over"] else WITHIN_INK
+            ax.annotate(str(r["seed"]), (ep[-1], y), xytext=(3, 0), textcoords="offset points",
                         fontsize=6, color=ink, va="center")  # fmt: skip
         ax.set_ylim(-0.03, 0.1)
         ax.set_ylabel("spill, net of sham", fontsize=8)
@@ -456,8 +468,10 @@ def probe_draw(data: dict, alt_text: str) -> str:
             ax.plot(ep, r["alone_anchored"], color=GHOST, lw=0.6, zorder=1)
             ax.plot(ep, r["alone_other"], color=ink, lw=0.8, alpha=0.85, zorder=2)
             bx.plot(ep, r["whole_other"], color=ink, lw=0.8, alpha=0.85, zorder=2)
-            bx.annotate(str(r["seed"]), (ep[-1], r["whole_other"][-1]), xytext=(3, 0), textcoords="offset points",
-                        fontsize=6, color=ink, va="center")  # fmt: skip
+        ys = spread([r["whole_other"][-1] for r in data["runs"]], 0.011)
+        for r, y in zip(data["runs"], ys, strict=True):
+            bx.annotate(str(r["seed"]), (ep[-1], y), xytext=(3, 0), textcoords="offset points", fontsize=6,
+                        color=OVER_INK if r["over"] else WITHIN_INK, va="center")  # fmt: skip
         for a_ in (ax, bx):
             a_.axvline(data["stop"], color=ZERO, lw=0.6, ls=":", zorder=0)
             a_.set_xlabel("epoch", fontsize=8)
@@ -479,7 +493,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-We trained `pool 1–3, soft τ` again at its eight seeds and applied the edit every four epochs along training, to see when its spill onto other ops appears. On three of the four seeds that end over the spill criterion it appears early, by about epoch 45, and on the fourth only after epoch 150. A color probe on the other ops showed nothing that tracks it.
+We trained `pool 1–3, soft τ` again at its eight seeds and applied the edit every four epochs along training, to see when its spill onto other ops appears. On three of the four seeds that end over the spill criterion it appears early in training, and on the fourth only late. A color probe on the other ops showed nothing that tracks it.
 ///
 
 `pool 1–3, soft τ` from [soft-pool](/docs/m2/soft-pool/report.py) kept the anchor on all eight of its seeds, but only four of its edits stayed within the spill criterion. A cheap early test for spill would let it, or arms tuned from it, run at many seeds, as [the loss-rate screen](/docs/m2/loss-rate/report.py) did for losing the anchor. But nothing in the stored trajectories up to epoch {STOP_EPOCH} predicted the end spill. The stored runs keep only their end checkpoints, so we couldn't tell when the spill appears.
@@ -494,9 +508,9 @@ So we trained the condition again at its seeds ({SEEDS[0]} to {SEEDS[-1]}), with
 rf"""
 ## Observations
 
-- [The sham beside the control (E1)](#the-sham-beside-the-control-e1): the reruns match the stored runs. At the end of training, netting the edit against the sham sorts the eight seeds much as netting it against the control does. On the controls themselves, the e₁ edit costs some ops a few hundredths more than the sham does and others less, so the control adds a seed-to-seed term of its own.
+- [The sham beside the control (E1)](#the-sham-beside-the-control-e1): the reruns match the stored runs. At the end of training, netting the edit against the sham sorts the eight seeds much as netting it against the control does. On the controls themselves, the e₁ edit costs some ops a few hundredths more than the sham does and others less, so the control adds a seed-to-seed term of its own. An edit at epoch 64 on two low-spill conditions finds no spill that isn't there at the end, but misses some that is.
 - [Spill along training (E2)](#spill-along-training-e2): spill appears in two ways. On three seeds it appears during the rise, as the pool sharpens and the anchor weight reaches its plateau, and on two of them it stays. On two seeds it grows after epoch 100 on `value-hsv`, while the anti weight anneals. A window around epoch {STOP_EPOCH} sorts the seeds roughly as the end does, missing the late one; the full order settles only after epoch 200.
-- [Color on e₁ at the other ops (E3)](#color-on-e1-at-the-other-ops-e3): e₁ holds almost no color information at the other ops, from about epoch 30 on, on every seed, and removing it doesn't change how well the color can be read from the rest of the state. The fit from the whole state doesn't follow the spill either.
+- [Color on e₁ at the other ops (E3)](#color-on-e1-at-the-other-ops-e3): e₁ holds almost no color information at the other ops, from about epoch 30 on, on every seed, and removing it barely changes how well the color can be read from the rest of the state. The fit from the whole state doesn't follow the spill either.
 
 ## Scope
 
@@ -528,7 +542,7 @@ We first tried a random direction orthogonal to e₁ as the sham, as planned. On
 
 {sham_table()}
 
-The two scores sort the eight seeds alike (r = {END_R:.2f}), and in most seeds they name the same op. The sham-netted score runs a little lower, so the criterion would need restating for it. The seeds over the criterion stay at or over it, apart from 708, which falls under it.
+The two scores rank the eight seeds alike (rank correlation {END_RHO:.2f}), though they often name different ops. The sham-netted score runs a little lower, so the criterion would need restating for it. The seeds over the criterion stay at or over it, apart from 708, which falls under it.
 
 On the controls, the e₁ edit costs some ops up to a few hundredths more than the sham does, and others as much less, differently on each seed (the table shows only the largest). So e₁ on an unanchored model isn't quite a typical direction, and netting against the control at the same seed adds that seed-to-seed term to the spill score. That may be part of why quiet runs scored as high as 0.018 in earlier reports.
 
