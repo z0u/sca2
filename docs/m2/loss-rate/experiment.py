@@ -84,6 +84,9 @@ KEPT_MIN = 0.28
 """The lowest window mean on a stored run that kept it (rounded down). A screen run below it is finished."""
 CALL_AT = 0.22
 """Below this window mean a screen run is called lost: the middle of the gap."""
+FINISH_ALSO = (("step-soft", 724), ("step-soft", 732), ("step-soft", 734))
+"""Runs called kept that were finished anyway, at the review's request: the soft-start runs with the lowest window
+means (all under 0.42), to check the kept call where it is least sure."""
 
 BUDGET_USD = 8
 """Soft-pool cost about \\$0.35 per 400-epoch run with its measurements. A run stopped at epoch 64 trains for a sixth
@@ -195,6 +198,7 @@ def design() -> dict[str, Any]:
         "track_slice": TRACK_SLICE,
         "lost_max": LOST_MAX,
         "kept_min": KEPT_MIN,
+        "finish_also": FINISH_ALSO,
         "call_at": CALL_AT,
         "arms": [asdict(a) | {"anchor": a.anchor(st.schedules()[0])} for a in ARMS],
         "anti_holds": list(FALLOFF_HOLDS),
@@ -258,7 +262,7 @@ def run(ctx: Ctx, epochs: int = EPOCHS, stop: int = STOP_EPOCH, seeds: tuple[int
         return {"labels": [t["label"] for t in trained]}
     calls = ctx.run(publish_screen, rows, trained, role="prep")
     # Every run not firmly kept is finished, so each loss counted is a measured one.
-    unsure = {(c["arm"], c["model_seed"]) for c in calls if c["call"] != "kept"}
+    unsure = {(c["arm"], c["model_seed"]) for c in calls if c["call"] != "kept"} | set(FINISH_ALSO)
     full = [r for r in rows_of(resolved["meta"], seeds, None, epochs) if (r["arm"]["name"], r["model_seed"]) in unsure]
     out = {"n_screen": len(calls), "n_unsure": len(full)}
     if not full:

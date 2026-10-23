@@ -1,7 +1,8 @@
 ---
-status: open
+status: done
 tags: [D2.2, anchoring, seeds]
 opened: 2026-10-21
+closed: 2026-10-23
 ---
 # How often the anchor is lost
 
@@ -13,3 +14,7 @@ With no losses, the 95% upper bound falls to about 17% at 16 seeds, 12% at 24, 9
 - Train fresh seeds on the full-length schedule, stopping at about epoch 60, for `falloff` and for the soft start (`step, soft τ`), about 32 seeds each. That is about ten full runs of compute (under $5 at the rate of the last scouts), needs no controls, and compares the two loss rates as well as bounding them.
 
 Training that stops early on an unchanged schedule may need a small change to the experiment code. A short exploratory report of its own, as asked in review of the design doc (2026-10-21).
+
+## Notes
+
+**2026-10-23, loss-rate** — Done in [the loss-rate report](/docs/m2/loss-rate/report.py): an early call from α at the example answers (epochs 44 to 64) sorted all 96 stored runs, and 32 new seeds of each condition stopped at epoch 64 put `falloff` at one loss in 40 (95% bound about 11%) and `step, soft τ` at none (about 7%). Runs the call could not settle, and the lowest kept calls of `step, soft τ`, were finished and scored.
