@@ -203,10 +203,10 @@ r"""
 
 /// tip |
 <!-- lede -->
-Adam scales each coordinate of the residual stream separately, so the coordinate axes are a privileged basis: they are directions the optimizer makes cheap to hold, and e₁ is one of them. We trained the recipe of record and its control again with Adam's scaling applied in a random rotation of the coordinates, so that e₁ is an ordinary direction. The anchor held on every seed, and the edit removed the op and spilled as before. What changed is the control. On some seeds e₁ now overlaps the direction where the un-anchored model puts its syntax tokens, so the edit costs the control something too, and the removal net of the control is low there.
+Adam scales each coordinate of the residual stream separately, so the coordinate axes are a privileged basis: they are directions the optimizer makes cheap to hold, and e₁, the direction the anchor targets, is one of them. We trained the recipe of record and its control again with Adam's scaling applied in a random rotation of the coordinates, so that e₁ is an ordinary direction. The anchor held on every seed, and the edit removed the anchored op (`difference`) and spilled as little as before. What changed is the control. On some seeds e₁ now overlaps the direction where the un-anchored model puts its syntax tokens, so the edit costs the control something too, and the removal net of the control is low there.
 ///
 
-The question comes from the memo of 2026-10-23 on whether the coordinate axes are special (in the project files, not on the site). On stored checkpoints, the memo found that every run parks its syntax tokens one-hot on a coordinate of its own, and that a coordinate axis is cheaper to project out than a random direction. In short training runs, Adam built this basis, and Adam in a rotated basis built the same thing on the rotated axes.
+The question comes from the memo of 2026-10-23 on whether the coordinate axes are special (in the project files, not on the site). On stored checkpoints, the memo found that every run parks its separators (`?`, `,` and ⏎) one-hot on a coordinate of their own and `=` on a second, and that a coordinate axis is cheaper to project out than a random direction. In short training runs, Adam built this basis, and Adam in a rotated basis built the same thing on the rotated axes.
 
 The anchoring design had taken e₁ for an arbitrary direction. This report trains sixteen new runs, with the basis of the optimizer rotated and nothing else changed: `falloff` (the recipe of record of [split-anti-seeds](../split-anti-seeds/report.py)) and the un-anchored control, at the eight seeds where both are stored.
 """
@@ -473,7 +473,7 @@ So the kept/lost rule, applied as written, would count {len(LOST_BY_NET)} of 8 n
 
 What the edit takes from each run agrees. On seeds {" and ".join(str(s) for s in OVERLAP_SEEDS)} the control loses on every op, up to {fmt((CTRL_OTHER[NEW][s] for s in OVERLAP_SEEDS))} in score on an op other than `{ex.ANCHORED_OP}`, while the anchored run at the same seeds loses {fmt((CURVES[NEW][s]["raw_spill"][-1] for s in OVERLAP_SEEDS), ".3f")} at most on any other op. The stored controls lose at most {num(max(CTRL_OTHER[OLD].values()))} on any other op.
 
-So the edit on the rotated control takes syntax, spread over the task, while the edit on the anchored run takes the anchored concept and little else. This is a property of the paired baseline, not of the anchor. Netting against the control assumes the edit on the control touches nothing much, which held when e₁ was a quiet axis and does not hold for a direction that overlaps the spike of the control.
+So the edit on the rotated control takes syntax, spread over the task, while the edit on the anchored run takes the anchored concept and little else. Netting against the control assumes the edit on the control touches nothing much, which held when e₁ was a quiet axis and does not hold for a direction that overlaps the spike of the control.
 
 At those seeds the anchored run holds its own syntax spike on a rotated axis away from e₁ (E3), which fits the anti term steering it there. So e₁ is clean in the anchored run where it is not in the control.
 <!-- REVIEW: the raw removal is reported beside the net removal here because the net measurement's baseline
@@ -620,6 +620,7 @@ def home_table() -> str:
                 num(TOP_AXIS[lab]),
                 ", ".join(num(token_cos(lab, t)) for t in SYNTAX),
                 num(COS[a][s]),
+                "same" if spike_axis(ex.label_of(a, s)) == spike_axis(ex.label_of(CONTROL, s)) else "moved",
             ]
         rows.append(row)
     return table_html(
@@ -633,6 +634,7 @@ def home_table() -> str:
             "top axis share, `falloff`",
             "syntax on a rotated axis, `falloff`",
             "cos(e₁, spike), `falloff`",
+            "spike axis, `falloff`",
         ],
         rows,
         f"""
@@ -640,7 +642,7 @@ def home_table() -> str:
         rotated basis vector at the last slice, and the top axis share the largest held by any coordinate axis. The
         syntax columns give the largest cosine between each syntax embedding ({", ".join(SHOWN[t] for t in SYNTAX)})
         and any rotated basis vector; under Adam in the coordinate basis these are 0.86 to 1.0 against a coordinate
-        axis (the memo). The last column of each half is the cosine between e₁ and the spike direction of that run.
+        axis (the memo). The cosine columns give the cosine between e₁ and the spike direction of that run, and the last column says whether `falloff` holds its spike on the same rotated basis vector as the control at that seed.
         """,
     )
 
@@ -667,7 +669,7 @@ Kurtosis runs the reverse of the stored runs: near the Gaussian value of 3 along
 
 The syntax tokens sit on that rotated spike: the `?`, `,`, ⏎ and `=` embeddings have a cosine of {fmt((token_cos(ex.label_of(a, s), t) for a in (CONTROL, FALLOFF) for s in SEEDS for t in SYNTAX))} with a rotated basis vector, and on most seeds all four share the vector that holds the spike (the table). Against the coordinate axes their largest cosine is about a third, what a random unit vector in 64 dimensions gives.
 
-On {len(MOVED)} of 8 seeds the spike of the anchored run sits on a different rotated axis from that of the control, and on the others on the same one. In the stored runs the memo found the spike on the same coordinate in the control and the anchored run at every seed it checked. So a move here fits the anti term steering the choice, but the two runs also differ in their loss terms, and could settle differently for that reason alone.
+On {len(MOVED)} of 8 seeds ({", ".join(str(s) for s in MOVED)}) the spike of the anchored run sits on a different rotated axis from that of the control, and on the others on the same one. In the stored runs the memo found the spike on the same coordinate in the control and the anchored run at every seed it checked. So a move here fits the anti term steering the choice, but the two runs also differ in their loss terms, and could settle differently for that reason alone.
 
 {home_table()}
 
