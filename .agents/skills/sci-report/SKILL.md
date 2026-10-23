@@ -27,7 +27,7 @@ The two shapes differ in these ways:
 | Guide | the example-evidence [exemplar](references/exemplar-example-evidence.md) | [preregistration.md](references/preregistration.md), and [surveys.md](references/surveys.md) for a survey |
 | Opening | lede, then one paragraph on where the question came from and what the report reads or runs | lede and intro |
 | Index | `Observations`: one line per E section, what we saw | `Findings`: one line per H or S section, with its verdict |
-| Context | `Scope`: the runs and data, how far a difference can be trusted, what was left out; then the measurements | `Why this experiment`, the runs, and the measurements |
+| Context | `Scope and method`: the runs and data, how they were made, how far a difference can be trusted, what was left out; then the measurements | `Why this experiment`, the runs, and the measurements |
 | Sections | three or so E sections | one per H or S, with E sections for planned exploratory analyses |
 | Verdicts and `Decision` | none | a verdict per H; `Decision` if the experiment chooses something |
 | Method | only detail that changes how a reader takes a result | last |

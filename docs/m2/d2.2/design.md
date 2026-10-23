@@ -88,6 +88,11 @@ Landing
 Lost anchor
 : A run has lost the anchor when the full edit removes less than half of the op.
 
+The anchor direction and the baseline
+: e₁ is a coordinate axis, and under Adam the coordinate axes are a privileged basis: the model puts its separators one-hot on one axis and `=` on another, and leaves most of the rest quiet, so e₁ in a control is usually a quiet axis. The anchor does not need this. With the basis of the optimizer rotated, so that e₁ is an ordinary direction, `falloff` held and removed as before on all eight seeds. The baseline does need it: netting against the control assumes the edit takes little from the control, which fails on seeds where e₁ overlaps the syntax spike of the control. So a reference edit compared with e₁ is another coordinate axis off the syntax axes, not a random direction, and raw removal is reported beside net removal whenever the basis of the optimizer changes. The spike itself is there under every optimizer tried; an optimizer with no privileged basis only moves it off the axes, which makes a typical direction dearer to remove.
+
+    From [rotated-basis](../rotated-basis/report.py) and the [optimizer scout](../optimizer-scout/report.py).
+
 From [ex-2.2.16](../ex-2.2.16/report.py), [ex-2.2.21](../ex-2.2.21/report.py), [ex-2.2.22](../ex-2.2.22/report.py), and [split-anti-seeds](../split-anti-seeds/report.py) (task gate and lost anchors).
 
 ## What we want to be able to say
@@ -164,7 +169,7 @@ From [ex-2.2.14](../ex-2.2.14/report.py) (the label arms) and [ex-2.2.21](../ex-
 
 ## What comes next
 
-The recipe of record is settled enough to measure the claims on. The open work is of five kinds: measuring what D2.2 still has to show, making the anchor land on every run, comparing with other methods, tuning the recipe, and understanding where the op is held. Every change to training below uses only what a real corpus would give us: a label per context, term weights, schedules, and temperatures. None is keyed to the role of a position, such as the example answers, since real text has no roles marked.
+The recipe of record is settled enough to measure the claims on. The open work is of six kinds: measuring what D2.2 still has to show, making the anchor land on every run, comparing with other methods, choosing the baseline with the basis in mind, tuning the recipe, and understanding where the op is held. Every change to training below uses only what a real corpus would give us: a label per context, term weights, schedules, and temperatures. None is keyed to the role of a position, such as the example answers, since real text has no roles marked.
 
 ### The claims still to show
 
@@ -190,6 +195,12 @@ The blog post on D2.2 should show what anchoring adds over methods that do not p
 
 RMU, SAE and LUNAR rows wait for D2.3. In the [backlog](/todo/science/baseline-comparisons-sca-plan-related-work-delta.md).
 
+### The baseline and the basis
+
+*A baseline that does not depend on where e₁ sits in the control.* Net removal subtracts what the e₁ edit does to the control, a single draw: in the Adam controls e₁ is among the quietest axes at one seed and among the busiest few at another. The median over edits along several coordinate axes off the syntax axes, like the reference edit of the spill-timing experiment, would not depend on that draw. It is a re-scoring of stored runs, and would change the net numbers quoted so far only a little.
+
+*An anchored arm under Muon* (low priority). Muon learns the task as well as Adam at three times the rate its finder suggests, with no privileged basis. An anchor there would have no quiet axis to take, so it would need its own term weights, and a finer rate ladder first. Worth running if the project moves toward models trained without Adam, or to see whether an anchored color grades differently.
+
 ### Tuning the recipe
 
 *The full recipe sweep around `falloff`.* The weights and schedules have changed one at a time since the D2.1 survey and have not been tuned together. As in [ex-2.1.11](../ex-2.1.11/report.py): replace each schedule with flat levels to see which can go, then survey what is left (the anchor weight, the two ends of the anti falloff, $\tau_p$, the peak learning rate) with about 32 trials at one seed, spread evenly over the space by a Sobol sequence, and confirm the best few at three seeds. One seed per trial will rarely show a loss rate of one in eight, so the survey scores removal on every trial and leaves the loss rate to the confirmation. The sweep could also tune the falloff for its one task-gate miss, on `hue-hsv`, and the anchor-ramp losses suggest the pull on the early blocks as a dimension of its own. In the [backlog](/todo/science/full-recipe-sweep-after-the-lean-fix.md).
@@ -214,6 +225,6 @@ The verification measurements (D2.3), though verification lines are allowed in t
 
 <details markdown="1"><summary>About this page</summary>
 
-Rewritten 2026-10-06, to say where D2.2 stands in one sitting. The plan as it stood through ex-2.2.22, with its route, risk table, and decisions, is [archived](design-2026-10.md) and in git. Updated 2026-10-07 with the [ex-2.2.22](../ex-2.2.22/report.py) decision: no cap, every slice, three examples per context. Updated 2026-10-13 for the work since: 400 epochs (ex-2.2.23), the lean and the pull on blocks 2 to 4 (embedding-lean, late-pull), and the anti weight by slice with the falloff as the recipe of record (slice-terms, split-anti-seeds). Updated 2026-10-21 for the anchor-ramp and soft-pool experiments (the step pull and fixed τ_p stay; lost anchors and the spill of a soft pool), with the next steps rewritten as open choices. Revised the same day after review: lost anchors as a gap in claim (a), the scoring as its own section, what the write bound is in this grammar, a loss-rate screen, and the comparisons with other methods. Claim (d) restated 2026-10-22, in review of the [edit-effects report](../edit-effects/report.py): the turn being set by the alignment holds by construction, so the claim now rests on what the blocks after an edit put back.
+Rewritten 2026-10-06, to say where D2.2 stands in one sitting. The plan as it stood through ex-2.2.22, with its route, risk table, and decisions, is [archived](design-2026-10.md) and in git. Updated 2026-10-07 with the [ex-2.2.22](../ex-2.2.22/report.py) decision: no cap, every slice, three examples per context. Updated 2026-10-13 for the work since: 400 epochs (ex-2.2.23), the lean and the pull on blocks 2 to 4 (embedding-lean, late-pull), and the anti weight by slice with the falloff as the recipe of record (slice-terms, split-anti-seeds). Updated 2026-10-21 for the anchor-ramp and soft-pool experiments (the step pull and fixed τ_p stay; lost anchors and the spill of a soft pool), with the next steps rewritten as open choices. Revised the same day after review: lost anchors as a gap in claim (a), the scoring as its own section, what the write bound is in this grammar, a loss-rate screen, and the comparisons with other methods. Claim (d) restated 2026-10-22, in review of the [edit-effects report](../edit-effects/report.py): the turn being set by the alignment holds by construction, so the claim now rests on what the blocks after an edit put back. Updated 2026-10-24 for the [rotated-basis](../rotated-basis/report.py) experiment and the [optimizer scout](../optimizer-scout/report.py): e₁ is a privileged axis under Adam, the anchor does not depend on it, and the baseline does.
 
 </details>

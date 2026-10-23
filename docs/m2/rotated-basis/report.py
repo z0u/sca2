@@ -206,9 +206,9 @@ r"""
 Adam scales each coordinate of the residual stream separately, so the coordinate axes are a privileged basis: they are directions the optimizer makes cheap to hold, and e₁, the direction the anchor targets, is one of them. We trained the recipe of record and its control again with Adam's scaling applied in a random rotation of the coordinates, so that e₁ is an ordinary direction. The anchor held on every seed, and the edit removed the anchored op (`difference`) and spilled as little as before. What changed is the control. On some seeds e₁ now overlaps the direction where the un-anchored model puts its syntax tokens, so the edit costs the control something too, and the removal net of the control is low there.
 ///
 
-The question comes from the memo of 2026-10-23 on whether the coordinate axes are special (in the project files, not on the site). On stored checkpoints, the memo found that every run parks its separators (`?`, `,` and ⏎) one-hot on a coordinate of their own and `=` on a second, and that a coordinate axis is cheaper to project out than a random direction. In short training runs, Adam built this basis, and Adam in a rotated basis built the same thing on the rotated axes.
+On stored checkpoints, we found that every run parks its separators (`?`, `,` and ⏎) one-hot on a coordinate of their own and `=` on a second, and that a coordinate axis is cheaper to project out than a random direction. In short training runs, Adam built this basis, and Adam in a rotated basis built the same thing on the rotated axes.
 
-The anchoring design had taken e₁ for an arbitrary direction. This report trains sixteen new runs, with the basis of the optimizer rotated and nothing else changed: `falloff` (the recipe of record of [split-anti-seeds](../split-anti-seeds/report.py)) and the un-anchored control, at the eight seeds where both are stored.
+The anchoring design had taken e₁ for an arbitrary direction. If it is not, the results that rest on e₁ might lean on it being a cheap axis: the anchor itself, or the comparisons around it, or both. This study trains sixteen new runs, with the basis of the optimizer rotated and nothing else changed: `falloff` (the recipe of record of [split-anti-seeds](../split-anti-seeds/report.py)) and the un-anchored control, at the eight seeds where both are stored.
 """
 
 # %%
@@ -216,15 +216,15 @@ The anchoring design had taken e₁ for an arbitrary direction. This report trai
 rf"""
 ## Observations
 
-- [Does the anchor hold? (E1)](#does-the-anchor-hold-e1): on every seed. The alignment at the example answers rises with depth as in the stored runs, and the profiles of the new and stored runs lie on top of each other.
+- [Does the anchor hold? (E1)](#does-the-anchor-hold-e1): yes, on every seed. The alignment at the example answers rises with depth as in the stored runs, and the profiles of the new and stored runs lie on top of each other.
 - [Removal, spill and landing (E2)](#removal-spill-and-landing-e2): on every seed the edit removes nearly all of the op and spills within the criterion, as before. The removal net of the control falls short on {len(LOST_BY_NET)} seeds, and all of the shortfall comes from the control: where the rotation puts e₁ near the syntax direction of the control, the edit removes part of the op from the control as well.
 - [Where the privileged basis went (E3)](#where-the-privileged-basis-went-e3): to the rotated axes. The energy spectrum is flat along the coordinate axes and spiked along one rotated axis, which holds the syntax tokens. In a control, e₁ costs what an ordinary direction costs, and more where it overlaps that spike.
 
-## Scope
+## Scope and method
 
-This is an exploratory study, with no preregistration and no gate. It covers `falloff` and the control at model seeds 704 to 711, trained for 400 epochs with Adam's per-coordinate scaling applied in a random orthogonal rotation of the residual coordinates (one rotation per seed, drawn from the model seed).
+This is an exploratory study, with no preregistration and no gate. It covers `falloff` (the recipe of record) and the control at model seeds 704 to 711, trained for 400 epochs with Adam's per-coordinate scaling applied in a random orthogonal rotation of the residual coordinates (one rotation per seed, drawn from the model seed).
 
-Each new run pairs with a stored twin at the same seed (the `falloff` run from split-anti-seeds or the 400-epoch control from ex-2.2.23). The pair shares its initialization, batches and label draws, and differs only in the basis of the optimizer. The model, schedules, anchoring code, measurements and dose scoring are those of split-anti-seeds, unchanged.
+Each new run pairs with a stored twin at the same seed (the `falloff` run from split-anti-seeds or the 400-epoch control from ex-2.2.23). The pair shares its initialization, batches and label draws, and differs only in the basis of the optimizer. The model, schedules, anchoring code, measurements and dose scoring are those of [split-anti-seeds](../split-anti-seeds/report.py), unchanged.
 
 A difference between a new run and its twin is compared with the seed range of the stored arm. Split-anti-seeds found `falloff` within 0.002 of `split-anti` on removal, with every seed within the spill criterion.
 
@@ -236,7 +236,7 @@ The loss-rate screen put the loss rate near one in forty, so one loss in eight h
 - Whether the anchor held: α at the example answers at the end of training, per slice, measured as in split-anti-seeds. A run that lost the anchor sits near zero on the pulled slices. It counts as lost when the full edit removes less than half of `difference`, net of the control (the rule of split-anti-seeds and the loss-rate screen).
 - Removal, spill, and landing: the dose scoring of ex-2.2.22 (the projection at every slice and position, at four doses), net of the control at the same seed. Removal is the net drop on `difference` over its clean-to-null span, spill the largest net drop on another op, and landing the fraction of the distance to the target null that the full edit covers. E2 also shows removal without subtracting the control, since the control turns out to matter here.
 - The task scores of every op before any edit, compared with those of the control.
-- The basis measurement, new here: the share of the energy of the stream[^energy] that each direction holds, along the coordinate axes and along the rotated basis, and the mean kurtosis[^kurtosis] along each. It also records the cost of projecting out one direction at full dose, for e₁, each coordinate axis, each rotated axis, and sixteen random directions. The stored runs in the memo give the reference: one coordinate holds about half of the energy, a typical axis costs 0.03, and a random direction 0.08 to 0.13.
+- The basis measurement, new here: the share of the energy of the stream[^energy] that each direction holds, along the coordinate axes and along the rotated basis, and the mean kurtosis[^kurtosis] along each. It also records the cost of projecting out one direction at full dose, for e₁, each coordinate axis, each rotated axis, and sixteen random directions. The stored runs give the reference, from our check on their checkpoints: one coordinate holds about half of the energy, a typical axis costs 0.03, and a random direction 0.08 to 0.13.
 
 [^energy]: Energy: the sum of the squared projections of the states onto a direction. The share of a direction is its energy over the total.
 
@@ -411,6 +411,8 @@ def seed_table() -> str:
             num(RAW[OLD][s]),
             num(CDROP[NEW][s]),
             num(CDROP[OLD][s]),
+            num(CTRL_OTHER[NEW][s]),
+            num(CTRL_OTHER[OLD][s]),
             num(FULL[NEW][s]),
             num(FULL[OLD][s]),
             num(WORST_SPILL[NEW][s], ".3f"),
@@ -429,6 +431,8 @@ def seed_table() -> str:
             "raw removal, stored ↑",
             "control drop, rotated",
             "control drop, stored",
+            "control, other ops, rotated",
+            "control, other ops, stored",
             "net removal, rotated ↑",
             "net removal, stored ↑",
             "spill, rotated ↓",
@@ -442,7 +446,8 @@ def seed_table() -> str:
         f"""
         **Removal, spill, landing and task by seed**, at the full dose. The raw removal is the anchored run's own
         drop on `{ex.ANCHORED_OP}` as a share of its clean-to-null span; the control drop is the same for the
-        un-anchored control at that seed, under the same edit; the net removal is their difference, the usual
+        un-anchored control at that seed, under the same edit, and "control, other ops" is the largest drop the same edit
+        causes the control on any other op (the spill of the control, before any netting); the net removal is their difference, the usual
         measurement. "Stored" is the twin from split-anti-seeds and ex-2.2.23. Spill is the largest net drop on
         another op over the four doses, the raw spill the largest drop on another op at the full dose without
         subtracting the control, and the task change is the mean score over ops less that of the control. The
@@ -471,9 +476,9 @@ Under the rotation e₁ is an ordinary direction instead, which is not orthogona
 
 So the kept/lost rule, applied as written, would count {len(LOST_BY_NET)} of 8 new runs as having lost the anchor. That is inside chance by the reckoning in Scope, and the raw removal and the alignment both say that no run lost the anchor ({len(LOST_BY_RAW)} are below half by the raw drop).
 
-What the edit takes from each run agrees. On seeds {" and ".join(str(s) for s in OVERLAP_SEEDS)} the control loses on every op, up to {fmt((CTRL_OTHER[NEW][s] for s in OVERLAP_SEEDS))} in score on an op other than `{ex.ANCHORED_OP}`, while the anchored run at the same seeds loses {fmt((CURVES[NEW][s]["raw_spill"][-1] for s in OVERLAP_SEEDS), ".3f")} at most on any other op. The stored controls lose at most {num(max(CTRL_OTHER[OLD].values()))} on any other op.
+The drops on the other ops show the same thing from the other side. On seeds {" and ".join(str(s) for s in OVERLAP_SEEDS)} the control loses on every op, up to {fmt((CTRL_OTHER[NEW][s] for s in OVERLAP_SEEDS))} in score on an op other than `{ex.ANCHORED_OP}`, while the anchored run at the same seeds loses {fmt((CURVES[NEW][s]["raw_spill"][-1] for s in OVERLAP_SEEDS), ".3f")} at most on any other op. The stored controls lose at most {num(max(CTRL_OTHER[OLD].values()))} on any other op.
 
-So the edit on the rotated control takes syntax, spread over the task, while the edit on the anchored run takes the anchored concept and little else. Netting against the control assumes the edit on the control touches nothing much, which held when e₁ was a quiet axis and does not hold for a direction that overlaps the spike of the control.
+So the edit on the rotated control takes syntax, spread over the whole task, while the edit on the anchored run takes the anchored concept and little else. Netting against the control assumes the edit on the control touches nothing much, which held when e₁ was a quiet axis and does not hold for a direction that overlaps the spike of the control.
 
 At those seeds the anchored run holds its own syntax spike on a rotated axis away from e₁ (E3), which fits the anti term steering it there. So e₁ is clean in the anchored run where it is not in the control.
 <!-- REVIEW: the raw removal is reported beside the net removal here because the net measurement's baseline
@@ -502,7 +507,7 @@ def spectrum_figure() -> str:
         The share of the energy of the stream held by each direction at the last slice, sorted from the largest, for the
         control (left) and falloff (right). Along the rotated basis (red) one direction holds nearly half and the
         rest fall away quickly; along the coordinate axes (grey) the largest holds under a tenth and the spectrum is
-        nearly flat. The same on every seed.
+        much flatter, though it still spans about an order of magnitude. The same on every seed.
     """
     return spectrum_draw(data, alt)
 
@@ -642,7 +647,7 @@ def home_table() -> str:
         rotated basis vector at the last slice, and the top axis share the largest held by any coordinate axis. The
         syntax columns give the largest cosine between each syntax embedding ({", ".join(SHOWN[t] for t in SYNTAX)})
         and any rotated basis vector; under Adam in the coordinate basis these are 0.86 to 1.0 against a coordinate
-        axis (the memo). The cosine columns give the cosine between e₁ and the spike direction of that run, and the last column says whether `falloff` holds its spike on the same rotated basis vector as the control at that seed.
+        axis (the stored runs). The cosine columns give the cosine between e₁ and the spike direction of that run, and the last column says whether `falloff` holds its spike on the same rotated basis vector as the control at that seed.
         """,
     )
 
@@ -661,7 +666,7 @@ In the anchored runs e₁ holds the anchored op, so its cost there is the remova
 
 The basis measurement also records where each token embedding sits (its largest cosine with a coordinate axis and with a rotated axis), so the published data show whether the syntax tokens moved to a rotated axis.
 
-**What we saw.** The privileged basis moved with the optimizer. Along the rotated basis one direction holds {fmt((TOP_ROT[ex.label_of(a, s)] for a in (CONTROL, FALLOFF) for s in SEEDS))} of the energy of the stream at the last slice (the spike of the memo). Along the coordinate axes the largest share is {fmt((TOP_AXIS[ex.label_of(a, s)] for a in (CONTROL, FALLOFF) for s in SEEDS))}, and the spectrum is nearly flat.
+**What we saw.** The privileged basis moved with the optimizer. Along the rotated basis one direction holds {fmt((TOP_ROT[ex.label_of(a, s)] for a in (CONTROL, FALLOFF) for s in SEEDS))} of the energy of the stream at the last slice, as the one coordinate did in the stored runs. Along the coordinate axes the largest share is {fmt((TOP_AXIS[ex.label_of(a, s)] for a in (CONTROL, FALLOFF) for s in SEEDS))}, and the spectrum is much flatter, though it still spans about an order of magnitude from the largest direction to the smallest.
 
 Kurtosis runs the reverse of the stored runs: near the Gaussian value of 3 along the axes ({fmt((KURT[ex.label_of(CONTROL, s)][0] for s in SEEDS), ".1f")} in the controls), and above it along the rotated basis ({fmt((KURT[ex.label_of(CONTROL, s)][1] for s in SEEDS), ".1f")}).
 
@@ -669,11 +674,11 @@ Kurtosis runs the reverse of the stored runs: near the Gaussian value of 3 along
 
 The syntax tokens sit on that rotated spike: the `?`, `,`, ⏎ and `=` embeddings have a cosine of {fmt((token_cos(ex.label_of(a, s), t) for a in (CONTROL, FALLOFF) for s in SEEDS for t in SYNTAX))} with a rotated basis vector, and on most seeds all four share the vector that holds the spike (the table). Against the coordinate axes their largest cosine is about a third, what a random unit vector in 64 dimensions gives.
 
-On {len(MOVED)} of 8 seeds ({", ".join(str(s) for s in MOVED)}) the spike of the anchored run sits on a different rotated axis from that of the control, and on the others on the same one. In the stored runs the memo found the spike on the same coordinate in the control and the anchored run at every seed it checked. So a move here fits the anti term steering the choice, but the two runs also differ in their loss terms, and could settle differently for that reason alone.
+On {len(MOVED)} of 8 seeds ({", ".join(str(s) for s in MOVED)}) the spike of the anchored run sits on a different rotated axis from that of the control, and on the others on the same one. In the stored runs we found the spike on the same coordinate in the control and the anchored run at every seed we checked. So a move here fits the anti term steering the choice, but the two runs also differ in their loss terms, and could settle differently for that reason alone.
 
 {home_table()}
 
-e₁ now costs what a direction costs, plus the cost of its overlap with the spike. In the controls, the 63 other coordinate axes cost {num(AXIS_MEDIAN)} at the median, about what the random directions in the memo cost, and a rotated axis off the spike costs {num(ROT_MEDIAN)}, the ordinary-axis figure from the memo. So the cheap directions are now the rotated axes.
+e₁ now costs what a direction costs, plus the cost of its overlap with the spike. In the controls, the 63 other coordinate axes cost {num(AXIS_MEDIAN)} at the median, about what a random direction costs in the stored controls, and a rotated axis off the spike costs {num(ROT_MEDIAN)}, what an ordinary axis costs in the stored runs. So the cheap directions are now the rotated axes.
 
 In the controls, e₁ costs {fmt(E1_CTRL_QUIET)} on the six seeds where its cosine with the spike is about a tenth or less, and {fmt(E1_CTRL_OVERLAP)} on the two where it is about a quarter, the overlap E2 found in the net removal. In the `falloff` runs e₁ costs {fmt(E1_COST[FALLOFF].values())} on every seed: the removal of the anchored op, which the cost spreads over the ops, with nothing of the spike in it.
 
@@ -685,11 +690,13 @@ In the controls, e₁ costs {fmt(E1_CTRL_QUIET)} on the six seeds where its cosi
 rf"""
 ## Discussion
 
-The anchor did not need a privileged axis. Pulled toward an ordinary direction, `falloff` aligned, removed and stayed selective as it did on the coordinate axis on all eight seeds, apart from a few hundredths of alignment at the embedding. So the assumption of the design, that e₁ stands in for any direction, holds for the anchor itself. The finding of the memo changes how we should interpret the comparisons around the anchor, not what the anchor does.
+The anchor did not need a privileged axis. Pulled toward an ordinary direction, `falloff` aligned, removed and stayed selective as it did on the coordinate axis on all eight seeds, apart from a few hundredths of alignment at the embedding. So the assumption of the design, that e₁ stands in for any direction, holds for the anchor itself. The privileged basis changes how we should interpret the comparisons around the anchor, not what the anchor does.
 
-What the rotation did change is the control, which the removal and spill measurements are netted against. When e₁ was an axis, the syntax tokens of the control sat on another axis, orthogonal to e₁ for free. When e₁ is a direction, it overlaps the spike of the control by a random cosine, and on two of eight seeds that was enough for the edit to take half the op from the control, so the net measurement counts a loss the anchored run never had.
+What the rotation did change is the control, which the removal and spill measurements are netted against. When e₁ was an axis, the syntax tokens of the control sat on another axis, orthogonal to e₁ for free (in the anchored runs of earlier designs the anchor pulled a syntax token onto e₁ instead, the latch of [spill-by-position](../spill-by-position/report.py)). When e₁ is a direction, it overlaps the spike of the control by a random cosine, and on two of eight seeds that was enough for the edit to take half the op from the control, so the net measurement counts a loss the anchored run never had. Where the edit damages every op of the control, as on those two seeds, subtracting it no longer isolates the anchored op.
 
-A reader of an earlier report need not revise anything, since every stored comparison kept e₁ as an axis in both runs. But the same logic applies to sham directions: a sham compared with e₁ should be another coordinate axis off the two syntax coordinates, since a random direction overstates the baseline by whatever it takes from the spike.
+So the baseline needs choosing with the basis in mind, whatever the optimizer. One that does not depend on where e₁ happens to sit is the median drop over edits along several other directions, like the reference edit of the spill-timing experiment: coordinate axes off the two syntax coordinates under Adam, and any directions under an optimizer with no privileged basis. Raw removal beside it shows what the anchored run itself gives up.
+
+A reader of an earlier report need not revise anything, since every stored comparison kept e₁ as an axis in both runs. But the same logic applies to reference directions: a reference direction compared with e₁ should be another coordinate axis off the two syntax coordinates, since a random direction overstates the baseline by whatever it takes from the spike.
 
 The anchored runs also show the anti term at work in a way the stored runs could not. With the coordinates privileged, keeping the syntax off e₁ cost nothing, because the model parked it on a different coordinate anyway. Here, on {len(MOVED)} seeds, the anchored run holds its syntax on a different rotated axis from the one the control chose.
 

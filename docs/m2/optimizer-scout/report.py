@@ -37,6 +37,7 @@ BASIS_BODY = fetch_json(ex.BASIS_REF)
 BASIS = {r["label"]: r for r in BASIS_BODY["runs"]}
 DESIGN = BASIS_BODY["design"]
 PRINCIPAL = {r["label"]: r for r in fetch_json(ex.PRINCIPAL_REF)["runs"]}
+PALETTE = {r["label"]: r for r in fetch_json(ex.PALETTE_REF)["runs"]}
 # The validation loss of ex-2.2.23's Adam controls at the same seeds, for the reference line in E1.
 ADAM_LOSS = {
     s: fetch_json(ex.ex2223.TRAJ_REF)[ex.ex2223.label_of("control", ex.EPOCHS, s)]["val_loss"] for s in ex.SEEDS
@@ -55,7 +56,7 @@ SYNTAX = ["?", ",", "\n", "="]
 SEPARATORS = ["?", ",", "\n"]
 SHOWN = {"?": "`?`", ",": "`,`", "\n": "⏎", "=": "`=`"}
 SEED_RANGE = 0.02  # The seed range of the stored Adam controls in the task score (split-anti-seeds).
-MEMO_SGD_LR = 0.3  # The lowest rate the short SGD runs of the memo used.
+MEMO_SGD_LR = 0.3  # The lowest rate of the short SGD runs we tried on stored checkpoints.
 
 
 def label_of(arm: str, factor: float, seed: int) -> str:
@@ -93,6 +94,12 @@ def kurtosis(arm: str, factor: float, seed: int, key: str = "kurt_axes") -> floa
 def axis_costs(arm: str, factor: float, seed: int) -> np.ndarray:
     """The cost of projecting out each coordinate axis at full dose, as the mean drop over ops."""
     return np.array(basis(arm, factor, seed)["cost_axes"]).mean(axis=1)
+
+
+def iqr(r: tuple[str, float, int]) -> float:
+    """The spread of the axis costs of a run: the width of their middle half."""
+    lo, hi = np.percentile(axis_costs(*r), [25, 75])
+    return float(hi - lo)
 
 
 def random_costs(arm: str, factor: float, seed: int) -> np.ndarray:
@@ -226,6 +233,19 @@ FINDER_LOW_AT_TOP = all(
 assert TOP_BEST and FINDER_LOW_AT_TOP and LOWEST == ("muon", TOP)
 SGD_TOP_LR = FOUND["sgd"] * TOP
 
+
+def early_lead(arm: str) -> tuple[float, int]:
+    """How far the finder's rate leads the top rung early in training: the largest gap in smoothed validation loss
+    (seed mean), and the last epoch at which the finder's rate is still ahead.
+    """
+    gap = smooth(np.mean([val_loss(arm, TOP, s) for s in SEEDS], 0)) - smooth(
+        np.mean([val_loss(arm, 1.0, s) for s in SEEDS], 0)
+    )
+    return float(gap.max()), int(np.nonzero(gap > 0)[0].max()) + 1
+
+
+EARLY = {a: early_lead(a) for a in ("muon", "adam-pooled")}
+
 EQUIVARIANT = [(a, f, s) for a in ARMS for f in FACTORS for s in SEEDS]
 ADAM_RUNS = [("adam", 1.0, s) for s in SEEDS]
 
@@ -283,11 +303,11 @@ r"""
 Adam scales its update per coordinate, which makes the coordinate axes of the residual stream a privileged basis, and the model parks its syntax tokens one-hot on them. This scout trains the un-anchored control under three optimizers whose update is the same in every orthonormal basis of the residual coordinates. Under all three the axes became ordinary directions, but the stream was no more isotropic for it. Muon learned the task as well as Adam once its rate was raised.
 ///
 
-Along the principal directions of the stream there is still one large direction, a spike that holds about two fifths or more of the energy at the last slice, as under Adam, and in most runs the separator tokens sit on it. Pooled Adam came close to Adam on the task, and SGD was never tried at a rate high enough to judge.
+Along the principal directions of the stream there is still one large direction, a spike that holds about two fifths or more of the energy at the last slice, as under Adam, and in most runs the separator tokens sit on it (E3 has the cosines between them). Pooled Adam came close to Adam on the task, and SGD was never tried at a rate high enough to judge.
 
-The question comes from the memo of 2026-10-23 on whether the coordinate axes are special (in the project files), and from the discussion after it. Our prior is that an isotropic stream would be easier to reason about; the open question is what it costs. There are no anchored runs. An optimizer that keeps the stream free of a privileged basis, and learns the task as well, is a candidate for an anchored arm later, with its own tuning of the term weights.
+The question comes from the spill-timing experiment (PR #285): there, reference edits along random directions cost every op far more than the edit along e₁, which led us to check whether the coordinate axes are special. Our prior is that an isotropic stream would be easier to reason about; the open question is what it costs. There are no anchored runs. An optimizer that keeps the stream free of a privileged basis, and learns the task as well, is a candidate for an anchored arm later, with its own tuning of the term weights.
 
-The spike looks like a property of the model and the task, with the optimizer deciding whether it sits on a coordinate axis; its size moves with the rate, though. That has a cost: under the two optimizers that learned the task, projecting out a typical coordinate axis costs more than it does under Adam.
+We find that the spike looks like a property of the model and the task, with the optimizer deciding whether it sits on a coordinate axis; its size moves with the rate, though. That matters for reference edits, which project out a typical direction rather than the anchored one: under the two optimizers that learned the task, projecting out a typical coordinate axis costs more than it does under Adam.
 <!-- REVIEW (claims round): "the separators lie on it in every run" narrowed to the top rung, and "the optimizer decides only whether it sits on an axis" lowered to "deciding whether", with the size caveat. The stored `syntax_on_top` has `,` at 0.11 and ⏎ at 0.30 to 0.41 at pooled Adam ⅓×, and `,` at 0.33 to 0.36 at pooled Adam 1×, so the separators are not on the top direction there; and the top share runs from 0.38 at the top rungs to 0.67 at Muon ⅓×, so the optimizer and rate set its size too. The cost sentence is restricted to pooled Adam and Muon because under SGD a median axis costs 0.02 to 0.03, under Adam 0.03. Verify: the per-run `syntax_on_top` and `shares` in the principal results, and `cost_axes` in the basis results. -->
 <!-- REVIEW: the plan asked whether the stream comes out isotropic. The basis measurement (energy and kurtosis along the axes and along one random basis, the removal cost of axes and random directions) can show a privileged basis but not a spike off both bases: Adam's spectrum along the random basis, a known spike seen from a basis it is not aligned with, looks even. So a spectrum along the stream's own principal directions was added to the experiment after the first draft, and the isotropy claims rest on it. Verify: `principal_one` in experiment.py; E2's second figure and the last column of its table. -->
 """
@@ -297,15 +317,16 @@ The spike looks like a property of the model and the task, with the optimizer de
 rf"""
 ## Observations
 
-- [Does the task suffer? (E1)](#does-the-task-suffer-e1): Muon at three times the finder's rate matches Adam within the seed range, and pooled Adam at that rate trails by about a hundredth. Both did best at the top rung (the highest of the three learning rates) on both seeds, so the bracket may fall short of their best rates. SGD trails by most of the score at every rate, and was still improving with the rate at the top of the bracket.
+- [Does the task suffer? (E1)](#does-the-task-suffer-e1): Muon at three times the finder's rate matches Adam within the seed range. Pooled Adam at that rate matches too by the same rule, though less closely: it is a hundredth behind at both seeds. Both did best at the top rung (the highest of the three learning rates) on both seeds, so the bracket may fall short of their best rates. SGD trails by most of the score at every rate, and was still improving with the rate at the top of the bracket.
 - [Is the stream isotropic? (E2)](#is-the-stream-isotropic-e2): no coordinate holds much more of the energy than the largest direction of a random basis does, and the kurtosis and the removal cost are about the same along the axes as along random directions, so the axes are ordinary directions. Along the principal directions of the stream, though, the top direction holds {span(EQ_P_TOP)} of the energy at the last slice, about as much as under Adam ({span(ADAM_P_TOP)}). The spike has moved off the axes, and the stream is not isotropic. Removing a typical axis now costs what a random direction does, which under Muon at the top rung is two to three times what a typical axis costs under Adam.
 - [Where the syntax tokens go (E3)](#where-the-syntax-tokens-go-e3): the syntax tokens leave the axes; their largest cosine with any axis is what a random unit vector gives. The separators `,` and ⏎ still share a direction, at a cosine of {span(v for a in ARMS for v in SEP_PAIR[a])} in every run. At the top rung it is the top principal direction, but at the lower rungs of pooled Adam the separators drift off it. Under Muon `=` leans on it too; under Adam and pooled Adam `=` sits apart.
+- [How the colors spread (E4)](#how-the-colors-spread-e4): under pooled Adam and Muon the color embeddings spread over about as many directions as under Adam, and keep about as much of the RGB order. Nothing here suggests colors are graded better under Muon.
 
-## Scope
+## Scope and method
 
-This is an exploratory scout, with no preregistration and no gate. We train three optimizers, each on the control at model seeds 704 and 705 for the full 400-epoch schedule. Each runs at three learning rates, which we call rungs: the rate the finder of ex-2.2.17 suggests for that optimizer at seed 704, three times it, and a third of it.
+This is an exploratory scout, with no preregistration and no gate. We train with three optimizers, each on the control at model seeds 704 and 705 for the full 400-epoch schedule. Each runs at three learning rates, which we call rungs: the rate the finder of ex-2.2.17 suggests for that optimizer at seed 704, three times it, and a third of it.
 
-The bracket reaches both ways because the finder could be off in either direction. Its 300-step suggestion sat above the rate the learning-rate ladders of ex-2.2.21 chose for Adam, and for SGD it may sit below the rate a long run wants (the short SGD runs of the memo used rates of 0.3 to 1.0). The three rungs also say how sensitive each optimizer is to the rate.
+The bracket reaches both ways because the finder could be off in either direction. Its 300-step suggestion sat above the rate the learning-rate ladders of ex-2.2.21 chose for Adam, and for SGD it may sit below the rate a long run wants (short SGD runs we tried earlier, on the setup of the stored checkpoints, used rates of 0.3 to 1.0). The three rungs also say how sensitive each optimizer is to the rate.
 
 That makes eighteen runs in all, plus three learning-rate finder runs. They are compared with the two Adam controls of ex-2.2.23 at the same seeds, which share the initialization, the batches, and the model. With two seeds, we can tell an optimizer from Adam only where the difference is larger than the seed range of the stored controls (about 0.02 in the task score; see the control columns of split-anti-seeds). So the scout can rule optimizers in or out, but it cannot rank close ones.
 
@@ -315,16 +336,19 @@ The three optimizers:
 - Muon: before each step, the momentum of each matrix is orthogonalized, by a Newton–Schulz iteration toward the nearest orthogonal matrix. This is equivariant to a rotation on either side of the matrix. Every matrix gets this, the embedding and readout tables included; the usual Muon recipe leaves the tables to Adam. The gains are updated with Adam at the learning rate of the Adam recipe, following the same schedule.
 - SGD with momentum 0.9, the plain reference, with no per-coordinate scaling at all.
 
-A test in the repo checks that training in a rotated basis changes nothing for these three, and does change Adam.
+A test in the repo checks that training in a rotated basis changes nothing for these three, and does change Adam. None of them makes training much dearer here: in a quick timing of one update against one forward and backward pass of this model, the Muon update took a few percent of the step, and pooled Adam took about what Adam takes.
+
+[^participation]: Participation ratio: the number of directions a set of vectors effectively spreads over, from the variance along each principal direction: 1 when all of it is on one, 64 when it is even over all 64.
 
 [^second-moment]: Second moment: the running average of the squared gradient that Adam keeps for each parameter, and divides its step by.
 
 ## The measurements
 
 - The task: the expected exact match of each op before any edit, as the basis measurement takes it on held-out contexts, compared with the Adam control at the same seed. Also the validation loss along training.
-- Isotropy, from the basis measurement of rotated-basis: the share of the stream energy that each coordinate axis holds, sorted, against the same along a random orthonormal basis; the mean kurtosis along each basis, higher along the axes than along random directions for a privileged basis; and the cost of projecting out one direction at full dose, for each coordinate axis and for sixteen random directions. The Adam reference from the memo: one coordinate at about half of the energy, a kurtosis of 4 to 5 along the axes against 3 along random directions, and a typical axis at a cost of 0.03 against 0.08 to 0.13 for a random direction.
+- Isotropy, from the basis measurement of rotated-basis: the share of the stream energy that each coordinate axis holds, sorted, against the same along a random orthonormal basis; the mean kurtosis along each basis, higher along the axes than along random directions for a privileged basis; and the cost of projecting out one direction at full dose, for each coordinate axis and for sixteen random directions. On the Adam controls, measured here, one coordinate holds {span(top_share(*r) for r in ADAM_RUNS)} of the energy, the kurtosis is {span((kurtosis(*r) for r in ADAM_RUNS), ".1f")} along the axes against {span((kurtosis(*r, key="kurt_rotated") for r in ADAM_RUNS), ".1f")} along random directions, and a typical axis costs {span(float(np.median(axis_costs(*r))) for r in ADAM_RUNS)} against {span(float(random_costs(*r).mean()) for r in ADAM_RUNS)} for a random direction.
 - Where the tokens sit: the largest cosine of each token embedding with a coordinate axis, and which axis that is. Under Adam the syntax tokens `?`, `,` and ⏎ sit at a cosine near 1 on one coordinate and `=` on another.
-- The spectrum along the principal directions of the stream, added for this report: the eigenvalues of the second-moment matrix of the states at each slice, over the positions of 1000 held-out contexts, as shares of the total. A spike shows here whichever direction it sits on. Alongside it, we take the cosine of each syntax token embedding with the top direction at the last slice, and the pairwise cosines among the syntax embeddings.
+- How the color embeddings spread: over how many directions the 216 color embeddings spread (their participation ratio[^participation]), how much of their spread a linear map from the RGB channels explains, the rank correlation between their distances and the RGB distances, and their mean cosine with each other and with the separator direction (the mean of the `,` and ⏎ embeddings).
+- The spectrum along the principal directions of the stream: the eigenvalues of the second-moment matrix of the states at each slice, over the positions of 1000 held-out contexts, as shares of the total. A spike shows here whichever direction it sits on. Alongside it, we take the cosine of each syntax token embedding with the top direction at the last slice, and the pairwise cosines among the syntax embeddings.
 <!-- REVIEW: the task score was planned as embedding-lean's measurement, but the published results of `measure_one` (edits off) hold no task score, so the report takes the basis measurement's `clean`, the same expected exact match on held-out contexts, for the new runs and the Adam controls alike. Verify: `clean` in `basis_one` of rotated-basis. -->
 """
 
@@ -435,7 +459,7 @@ The main measure is the task change: the expected exact match averaged over the 
 
 {task_table()}
 
-Muon at three times the finder's rate matches Adam: the change is within a hundredth at both seeds, and no op falls by more than the seed range. It also ends with the lowest validation loss of any run here, though only by a few thousandths. At the finder's rate it is nearly as close, and at a third of it, it trails clearly.
+Muon at three times the finder's rate matches Adam: the change is within a hundredth at both seeds, and no op falls by more than the seed range. It also ends with the lowest validation loss of any run here, though only by a few thousandths. At the finder's rate it is nearly as close, and at a third of it, it trails clearly. The finder's rate leads for most of training, though: its validation loss is up to {num(EARLY["muon"][0], ".2f")} below that of the top rung under Muon and up to {num(EARLY["adam-pooled"][0], ".2f")} under pooled Adam, and the top rung passes it only after epoch {EARLY["muon"][1]} and {EARLY["adam-pooled"][1]} respectively, as the rate decays.
 
 Pooled Adam trails a little at the top rung, by about a hundredth on the mean and twice that on its worst op, more at the finder's rate, and far more at a third of it. By the rule above it is a candidate, since a hundredth is inside the seed range, though a weaker one than Muon. SGD trails by most of the score at every rate.
 <!-- REVIEW (claims round): "about half of the score" corrected to "most of the score": the Adam controls' mean `clean` is 0.57 to 0.58 and the SGD runs trail by 0.41 to 0.50, so they keep a seventh to a third of it. Verify: `clean` of the Adam controls and the SGD rows of the table. -->
@@ -444,9 +468,9 @@ For all three optimizers the top rung did best at both seeds, so by the rule abo
 
 But a finder ramps the rate up over one short run, so the later, higher rates have also had more steps. That alone could put the lowest loss at the top, so the finder cannot place the best rate by itself. It does say that the suggestion was low for every optimizer here; for pooled Adam it was {FOUND["adam-pooled"]:.2g}, against the {ex.ADAM_LR:.2g} the recipe uses for plain Adam.
 
-For pooled Adam and Muon this changes little in a scout. Muon already matches Adam, and pooled Adam is close enough that a higher rate might make up the difference, which these runs do not test.
+For pooled Adam and Muon this changes little in a scout. Muon already matches Adam, and pooled Adam is close enough that a higher rate might make up the difference, which these runs do not test. With rungs a factor of three apart, the best rate could also sit between the finder's rate and the top rung; a finer ladder would place it, and is worth running only once an optimizer is chosen for an anchored arm.
 
-For SGD it matters more. The validation loss falls steadily as the rate rises (see the table), and the top rung, at {SGD_TOP_LR:.2g}, is still about a tenth of the lowest rate the short SGD runs of the memo used. So SGD was not tested at a useful rate, and these runs say nothing against it. They do mean that the SGD runs in E2 and E3 are models that learned little of the task.
+For SGD it matters more. The validation loss falls steadily as the rate rises (see the table), and the top rung, at {SGD_TOP_LR:.2g}, is still about a tenth of the lowest rate of those earlier short SGD runs. So SGD was not tested at a useful rate, and these runs say nothing against it. They do mean that the SGD runs in E2 and E3 are models that learned little of the task.
 """
 
 # %%
@@ -680,9 +704,9 @@ Under Adam one coordinate holds nearly half of the energy at the last slice, and
 
 {isotropy_table()}
 
-The cost of projecting out one direction says the same. Under Adam a typical axis is cheap, and a random direction costs a few times more because every random direction touches the spike. Under pooled Adam and Muon a typical axis costs about what a random direction costs. Under SGD both are cheap, but SGD learned little, so there is little to lose. So the axes are ordinary directions under all three optimizers.
+The cost of projecting out one direction says the same. Under Adam a typical axis is cheap, and a random direction costs a few times more because every random direction touches the spike. Under pooled Adam and Muon a typical axis costs about what a random direction costs. The axis costs spread wider under Muon than under pooled Adam at the top rung: the middle half of them spans {span(iqr(r) for r in runs_of("muon", (TOP,)))} against {span(iqr(r) for r in runs_of("adam-pooled", (TOP,)))}. Under SGD both are cheap, but SGD learned little, so there is little to lose. So the axes are ordinary directions under all three optimizers.
 
-Ordinary axes are less than isotropy, though. Seen from the random basis, which it is not aligned with, the large spike of the Adam controls looks like the new spectra: the top direction holds {span(ADAM_TOP_ROT)} under Adam, in the same range as the new runs along either basis. So the measurements above cannot separate an even stream from a spike that has moved off the axes.
+Ordinary axes do not make the stream isotropic, though. Seen from the random basis, which it is not aligned with, the large spike of the Adam controls looks like the new spectra: the top direction holds {span(ADAM_TOP_ROT)} under Adam, in the same range as the new runs along either basis. So the measurements above cannot separate an even stream from a spike that has moved off the axes.
 
 The spectrum along the principal directions of the stream can. They are the directions where the energy sits, so a spike shows there wherever it points.
 
@@ -801,14 +825,68 @@ So option 2 holds: the syntax tokens sit on a direction of their own, which is w
 
 # %%
 
+
+def palette_table() -> str:
+    keys = ("participation", "rgb_r2", "rgb_rho", "mean_cos", "cos_separators")
+    rows = []
+    for a in ("adam", *ARMS):
+        for i, f in enumerate((1.0,) if a == "adam" else FACTORS):
+            rs = runs_of(a, (f,)) if a != "adam" else ADAM_RUNS
+            cells = [NAME[a] if i == 0 else "", "" if a == "adam" else FACTOR_SHOWN[f]]
+            cells += [
+                fmt((PALETTE[label_of(*r)][k] for r in rs), ".1f" if k == "participation" else ".2f") for k in keys
+            ]
+            rows.append(cells)
+    return table_html(
+        [
+            "optimizer",
+            "rate",
+            "participation ratio",
+            "RGB, share explained ↑",
+            "RGB, rank correlation ↑",
+            "mean cosine",
+            "cosine with separators",
+        ],
+        rows,
+        """
+        **How the color embeddings spread**, seed mean and range over the two seeds. The participation ratio is the
+        number of directions the 216 unit-normalized color embeddings effectively spread over, after taking out
+        their mean. The share explained is the share of that spread a linear map from the three RGB channels
+        accounts for, and the rank correlation is the Spearman correlation between the cosine distance of two
+        colors and their distance in RGB. The last two columns are the mean cosine between colors, and their mean
+        absolute cosine with the separator direction.
+        """,
+    )
+
+
+def palette_of(arms, factors=(TOP,), key: str = "participation") -> list[float]:
+    return [PALETTE[label_of(*r)][key] for a in arms for r in (ADAM_RUNS if a == "adam" else runs_of(a, factors))]
+
+
+rf"""
+## How the colors spread (E4)
+
+Does an optimizer with no privileged basis lay the colors out differently? If it spreads them over more directions, or orders them more like RGB, an anchored color concept might grade more smoothly under it. These are the color token embeddings only, which the edits do not touch, so this says how the vocabulary is laid out, not how the stream carries a color.
+
+{palette_table()}
+
+Under pooled Adam and Muon the colors spread over about as many directions as under Adam ({span(palette_of(("adam-pooled", "muon"), FACTORS[:2]), ".0f")} against {span(palette_of(("adam",)), ".0f")}), and a linear map from RGB explains about as much of their spread ({span(palette_of(("adam-pooled", "muon"), FACTORS[:2], "rgb_r2"))} against {span(palette_of(("adam",), key="rgb_r2"))}). The rank correlation with RGB distance is about the same too, a little lower for Muon at seed 705. SGD spreads them over more directions and keeps less of the RGB order, as fits a model that learned little of the task.
+
+One run stands apart: under Muon at seed 705 the colors lean toward the separator direction, at a mean cosine of {span(PALETTE[label_of("muon", f, 705)]["cos_separators"] for f in FACTORS[:2])} against {span(palette_of(("adam", "adam-pooled"), FACTORS[:2], "cos_separators"))} under Adam and pooled Adam, and they sit closer to each other. That is one seed of two, at both rates, so it may be chance, and it says nothing yet about grading.
+
+So on this measure the colors are laid out under Muon much as under Adam. Whether an anchored color, such as red, grades better under Muon is a question for anchored runs.
+"""
+
+# %%
+
 r"""
 ## Discussion
 
-Muon is a candidate for an anchored arm. At three times the finder's rate it learns the task as well as Adam, at both seeds, and its coordinate axes are ordinary directions. Pooled Adam is close behind, and since its best rung was also the top one, it may match Adam at a higher rate than this bracket reached. SGD was not tested at a useful rate, so the scout says nothing against it.
+Muon is a candidate for an anchored arm. At three times the finder's rate it learns the task as well as Adam, at both seeds, and its coordinate axes are ordinary directions. Pooled Adam also matches within the seed range, a hundredth behind at both seeds, and since its best rung was also the top one, it may match Adam at a higher rate than this bracket reached. SGD was not tested at a useful rate, so the scout says nothing against it.
 
-All three optimizers show that the privileged basis under Adam comes from the optimizer, as the memo proposed. The spike does not: along the principal directions of the stream it is about as large under every optimizer here as under Adam, and in most runs the separators sit on it. That fits a spike that belongs to the model and the task, where the part Adam plays is to turn it onto an axis.
+All three optimizers show that the privileged basis under Adam comes from the optimizer, as the stored runs suggested. The spike does not: along the principal directions of the stream it is about as large under every optimizer here as under Adam, and in most runs the separators sit on it. That fits a spike that belongs to the model and the task, where the part Adam plays is to turn it onto an axis.
 
-The stream is not isotropic under any of these optimizers, so an optimizer is not the lever for making it so. What makes the model put the separators on one large direction (the syntax of the task, the unit-norm stream, the width) is a question for a different experiment.
+The stream is not isotropic under any of these optimizers, so an optimizer is not the lever for making it so. What makes the model put the separators on one large direction (the syntax of the task, the unit-norm stream, the width) is a question for a different experiment. So is whether the optimizer matters more in a model that holds many more concepts, where quiet directions may be scarcer.
 
 The cost of a direction rises when no direction is privileged. Under Adam most axes are quiet, and an anchor on e₁ takes one of them at small cost to the task. Under Muon a typical axis costs two to three times as much, which fits each axis touching the spike, though the cheapest Muon axes are about as quiet as a typical Adam one.
 

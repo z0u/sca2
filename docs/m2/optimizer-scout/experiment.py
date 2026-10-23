@@ -1,7 +1,7 @@
 """Optimizers with no privileged basis, on the control: pooled Adam, Muon and SGD at two seeds and three rates.
 
 The coordinate axes of the residual stream are a privileged basis because Adam's per-coordinate scaling is written in
-them (the memo of 2026-10-23 in the project files). This scout asks what the stream looks like, and how well the
+them (found on stored checkpoints after the spill-timing experiment, PR #285). This scout asks what the stream looks like, and how well the
 task is learned, under optimizers whose update is the same in every orthonormal basis of the residual coordinates:
 `adam-pooled` (Adam with its second moment pooled over the residual axis of each matrix that reads or writes the
 stream), `muon` (orthogonalized updates on the matrices, Adam on the gains), and `sgd` with momentum. Each arm first
@@ -10,8 +10,8 @@ schedule at the finder's rate, three times it and a third of it, at model seeds 
 controls are stored as the reference. Every run gets embedding-lean's measurements, the basis measurement of
 rotated-basis (the energy spectrum and kurtosis along the coordinate axes and along a random basis, and the removal
 cost of each axis and of random directions), and a principal-direction measurement (the energy spectrum along the
-stream's own principal directions, which sees a spike wherever it sits); the stored Adam controls get both too. No
-anchored runs: an
+stream's own principal directions, which sees a spike wherever it sits), and a measurement of how the color embeddings
+are spread; the stored Adam controls get these too. No anchored runs: an
 optimizer that keeps the stream isotropic and learns the task as well is a candidate for an anchored arm later.
 
     bin/mini run docs/m2/optimizer-scout/experiment.py --app modal --max-containers 16 --budget 4h
@@ -190,6 +190,46 @@ def principal_one(checkpoint, holdout, label: str, n_ctx: int = 1000) -> dict:
     }
 
 
+PALETTE_REF = PREFIX + "/palette"
+
+
+def palette_one(checkpoint, label: str) -> dict:
+    """How the color token embeddings are spread: the participation ratio of their centered (unit-normalized)
+    embeddings, the share of their variance on the top three principal directions, the share a linear map from the
+    RGB channels explains, the rank correlation between embedding distance and RGB distance, their mean pairwise
+    cosine, and their mean absolute cosine with the separator direction (the mean of the `,` and ⏎ embeddings).
+    """
+    from scipy.stats import spearmanr
+
+    from sca.data.ops import PALETTE
+
+    workdir = get_data_dir() / "palette" / label
+    model, tok, color_ids, _ = ex2216._load_run(checkpoint, workdir)
+    table = np.asarray(model.transformer.wte, dtype=np.float64)
+    emb = table[color_ids]
+    emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+    centered = emb - emb.mean(0)
+    var = np.linalg.svd(centered, compute_uv=False) ** 2
+    rgb = np.array([[int(name[1 + i], 16) for i in range(3)] for name in PALETTE], dtype=np.float64)
+    design_matrix = np.c_[rgb, np.ones(len(rgb))]
+    beta, *_ = np.linalg.lstsq(design_matrix, centered, rcond=None)
+    explained = 1 - float(((centered - design_matrix @ beta) ** 2).sum() / (centered**2).sum())
+    cos = emb @ emb.T
+    upper = np.triu_indices(len(emb), 1)
+    d_rgb = np.linalg.norm(rgb[:, None] - rgb[None], axis=-1)[upper]
+    sep = table[[tok.stoi[t] for t in (",", "\n")]].mean(0)
+    sep = sep / np.linalg.norm(sep)
+    return {
+        "label": label,
+        "participation": float(var.sum() ** 2 / (var**2).sum()),
+        "top3": float(var[:3].sum() / var.sum()),
+        "rgb_r2": explained,
+        "rgb_rho": float(spearmanr(1 - cos[upper], d_rgb).statistic),
+        "mean_cos": float(cos[upper].mean()),
+        "cos_separators": float(np.abs(emb @ sep).mean()),
+    }
+
+
 def resolve_controls(seeds: tuple[int, ...]) -> dict:
     """The checkpoints of ex-2.2.23's 400-epoch Adam controls at *seeds*, by ref."""
     from mini.store import get_ref
@@ -224,6 +264,7 @@ def publish(
     scored: list[dict],
     based: list[dict],
     principal: list[dict],
+    palette: list[dict],
 ) -> dict:
     import json
 
@@ -254,7 +295,9 @@ def publish(
     set_ref(BASIS_REF, put(json.dumps(basis).encode(), name="optimizer-scout-basis.json"))
     pca = {"design": design(), "runs": [meta[p["label"]] | p for p in principal]}
     set_ref(PRINCIPAL_REF, put(json.dumps(pca).encode(), name="optimizer-scout-principal.json"))
-    return {"n_runs": len(scored), "n_based": len(based), "n_principal": len(principal)}
+    colors = {"design": design(), "runs": [meta[c["label"]] | c for c in palette]}
+    set_ref(PALETTE_REF, put(json.dumps(colors).encode(), name="optimizer-scout-palette.json"))
+    return {"n_runs": len(scored), "n_based": len(based), "n_principal": len(principal), "n_palette": len(palette)}
 
 
 def run(ctx: Ctx, epochs: int = EPOCHS, seeds: tuple[int, ...] = SEEDS, publishes: bool = True) -> dict:
@@ -324,9 +367,10 @@ def run(ctx: Ctx, epochs: int = EPOCHS, seeds: tuple[int, ...] = SEEDS, publishe
         labels,
         role="measure",
     )
+    palette = ctx.map(palette_one, [checkpoints[label] for label in labels], labels, role="measure")
     if not publishes:
         return {"found": found, "labels": [s["label"] for s in scored], "based": [b["label"] for b in based]}
-    return ctx.run(publish, rows, finder, trained, scored, based, principal, role="prep")
+    return ctx.run(publish, rows, finder, trained, scored, based, principal, palette, role="prep")
 
 
 def main(ctx: Ctx) -> dict:

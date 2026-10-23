@@ -269,6 +269,10 @@ The readout puts it there, to predict `=` after a red operand, and the tied tabl
 Untying costs nothing on task or placement, and brings the non-red cost of the projection down toward the cost of the operand-only edit. The pilot proposes it for the handover, since it needs nothing from the grammar. Under the whole-line labeller a few seeds lose selectivity, so that labeller should go in with a check rather than by default.
 ///
 
+/// note | A later finding
+The controls here move the embeddings along a random direction. Under Adam the coordinate axes of the residual stream are a privileged basis, with the syntax tokens one-hot on one of them, and a random direction touches that axis, so a random-direction control may cost more than a quiet direction would. A reference direction compared with e₁ is better taken as another coordinate axis off the syntax axes; the [rotated-basis](/docs/m2/rotated-basis/report.py) experiment has the measurements.
+///
+
 ## Observations
 
 - **Where the component works.** On the stored `{ex.REFERENCE}` checkpoints, stripping it from the readout side costs the `=` prediction on the red lines ({eq_acc("recipe-short", "clean"):.2f} to {eq_acc("recipe-short", "output"):.2f}; {eq_acc("t00", "output"):.2f} on `t00`) and nothing else. Stripping it from the embedding side costs the answer instead ({ans_acc("recipe-short", "clean", "red"):.2f} to {ans_acc("recipe-short", "input", "red"):.2f} on the red lines, {ans_acc("recipe-short", "input", "nonred"):.2f} on the non-red). But turning the embeddings by the same angle in a random direction costs at least as much ({ans_acc("recipe-short", "input-control", "red"):.2f}), so on that side the blocks seem to have learned where the `=` embedding sits. The pilot arms repeat the pattern. On `untied`, stripping the readout side costs the `=` prediction ({eq_acc("untied", "output"):.2f}) and stripping the embedding side costs little ({ans_acc("untied", "input", "red"):.2f} on the answer). On `syntax-off-axis` and `untied-line`, no strip changes anything ([figures](#where-the-component-works)).
