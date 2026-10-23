@@ -58,9 +58,10 @@ TRAJ_STRIDE_EPOCHS = rb.TRAJ_STRIDE_EPOCHS
 SEEDS: tuple[int, ...] = (704, 705)
 """Two of the seeds where ex-2.2.23's 400-epoch Adam controls are stored."""
 FINDER_SEED = SEEDS[0]
-RATE_FACTORS: tuple[float, ...] = (1.0, 1 / 3)
-"""Each arm trains at the finder's rate and at a third of it: the finder's steepest-descent suggestion has sat
-above the rate the ladders chose for Adam (ex-2.2.17, ex-2.2.19), so the lower rung is the safer one."""
+RATE_FACTORS: tuple[float, ...] = (3.0, 1.0, 1 / 3)
+"""Each arm trains at the finder's rate, at three times it and at a third of it: the finder's 300-step suggestion
+has sat above the rate the ladders chose for Adam (ex-2.2.17, ex-2.2.19), and for SGD it may sit below the rate a
+long run wants (the memo's short SGD runs used 0.3 to 1.0), so the bracket reaches both ways."""
 ADAM_LR = ex2221.PEAK_LR
 """The recipe's Adam rate, which `muon` keeps for the gains it updates with Adam."""
 

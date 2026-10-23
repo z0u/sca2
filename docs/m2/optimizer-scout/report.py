@@ -9,7 +9,7 @@ r"""
 Adam's per-coordinate scaling makes the coordinate axes of the residual stream a privileged basis, and the model parks its syntax tokens one-hot on them. This scout trains the un-anchored control under three optimizers whose update is the same in every orthonormal basis of the residual coordinates, and asks whether the stream comes out isotropic and whether the task is learned as well. TODO: which way it came out.
 ///
 
-The question comes from the memo of 2026-10-23 on whether the coordinate axes are special (in the project files), and from the discussion after it: the prior is that an isotropic stream would be easier to reason about, and the open question is what it costs. The scout runs twelve new 400-epoch control runs and three learning-rate finder runs, at the two seeds where ex-2.2.23's Adam controls are stored as the reference. No anchored runs: an optimizer that keeps the stream isotropic and learns the task as well is a candidate for an anchored arm later, which would need its own tuning of the term weights.
+The question comes from the memo of 2026-10-23 on whether the coordinate axes are special (in the project files), and from the discussion after it: the prior is that an isotropic stream would be easier to reason about, and the open question is what it costs. The scout runs eighteen new 400-epoch control runs and three learning-rate finder runs, at the two seeds where ex-2.2.23's Adam controls are stored as the reference. No anchored runs: an optimizer that keeps the stream isotropic and learns the task as well is a candidate for an anchored arm later, which would need its own tuning of the term weights.
 """
 
 # %%
@@ -23,12 +23,12 @@ r"""
 
 ## Scope
 
-This is an exploratory scout, with no preregistration and no gate. Three optimizers, each on the control at model seeds 704 and 705 for the full 400-epoch schedule, at two learning rates: the rate the finder of ex-2.2.17 suggests for that optimizer at seed 704, and a third of it. The finder's steepest-descent suggestion sat above the rate the ladders chose for Adam, so the lower rung is the safer one, and the pair says how sensitive each optimizer is. Twelve runs in all, against ex-2.2.23's two Adam controls at the same seeds, which share the initialization, the batches, and the model. Two seeds separate an optimizer from Adam only where the gap is larger than the seed range of the stored controls (about 0.02 in the task score; see split-anti-seeds' control columns); the scout is for ruling optimizers in or out, not for ranking close ones.
+This is an exploratory scout, with no preregistration and no gate. Three optimizers, each on the control at model seeds 704 and 705 for the full 400-epoch schedule, at three learning rates: the rate the finder of ex-2.2.17 suggests for that optimizer at seed 704, three times it, and a third of it. The finder's 300-step suggestion sat above the rate the ladders chose for Adam, and for SGD it may sit below the rate a long run wants (the memo's short SGD runs used rates of 0.3 to 1.0), so the bracket reaches both ways and the three rungs say how sensitive each optimizer is. Eighteen runs in all, against ex-2.2.23's two Adam controls at the same seeds, which share the initialization, the batches, and the model. Two seeds separate an optimizer from Adam only where the gap is larger than the seed range of the stored controls (about 0.02 in the task score; see split-anti-seeds' control columns); the scout is for ruling optimizers in or out, not for ranking close ones.
 
 The three optimizers:
 
 - Pooled Adam: Adam with its second moment pooled over the residual axis of each matrix that reads or writes the stream, so the scaling is one number per row (of a reading matrix) or column (of a writing matrix) and the same whichever orthonormal basis the residual coordinates are written in. The gains and the other axis of each matrix are scaled per coordinate as in Adam.
-- Muon: each matrix's momentum is orthogonalized (a Newton–Schulz iteration toward the nearest orthogonal matrix) before the step, which is equivariant to a rotation on either side of the matrix; the gains are updated with Adam at the recipe's rate.
+- Muon: each matrix's momentum is orthogonalized (a Newton–Schulz iteration toward the nearest orthogonal matrix) before the step, which is equivariant to a rotation on either side of the matrix. Every matrix gets this, the embedding and readout tables included, where the usual Muon recipe leaves the tables to Adam; the gains are updated with Adam at the recipe's rate.
 - SGD with momentum 0.9, the plain reference, with no per-coordinate scaling at all.
 
 A test in the repo checks that the rotated-basis trick changes nothing for these three and does change Adam.
@@ -45,7 +45,7 @@ A test in the repo checks that the rotated-basis trick changes nothing for these
 r"""
 ## Does the task suffer? (E1)
 
-Is the task learned as well without a privileged basis, at either rate? If an optimizer trails Adam by more than the seed range at both rates, it is out for now; if it matches at one rate, it is a candidate.
+Is the task learned as well without a privileged basis, at any of the three rates? If an optimizer trails Adam by more than the seed range at every rate, it is out for now; if it matches at one rate, it is a candidate. One case to keep apart: if an end rung does best at both seeds, the bracket may have missed the rate rather than the optimizer, and the finder's history (whether the loss was still falling at the end of its range) says which.
 
 <!-- Figure: validation loss along training per optimizer and rate, with the Adam control; a table of the task score per op at the end. -->
 

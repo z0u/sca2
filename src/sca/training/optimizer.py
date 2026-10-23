@@ -25,7 +25,15 @@ def configure_optimizer(
             optimizer = pooled_adam(learning_rate, b1=b1, b2=b2)
         case "muon":
             assert config.weight_decay == 0, "Muon here has no weight decay"
-            aux = learning_rate if config.aux_learning_rate is None else config.aux_learning_rate
+            if config.aux_learning_rate is None:
+                aux = learning_rate
+            elif callable(learning_rate):
+                # The gains follow the schedule's shape at their own peak.
+                ratio = config.aux_learning_rate / config.learning_rate
+                schedule = learning_rate
+                aux = lambda count: jnp.asarray(schedule(count)) * ratio  # noqa: E731
+            else:
+                aux = config.aux_learning_rate
             optimizer = optax.contrib.muon(learning_rate, adam_learning_rate=aux, adam_b1=b1, adam_b2=b2)
         case "sgd":
             optimizer = optax.sgd(learning_rate, momentum=b1)
