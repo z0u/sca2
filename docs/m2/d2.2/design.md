@@ -197,9 +197,9 @@ RMU, SAE and LUNAR rows wait for D2.3. In the [backlog](/todo/science/baseline-c
 
 ### The baseline and the basis
 
-*A baseline that does not depend on where e₁ sits in the control.* Net removal subtracts what the e₁ edit does to the control, a single draw: in the Adam controls e₁ is among the quietest axes at one seed and among the busiest few at another. The median over edits along several coordinate axes off the syntax axes, like the reference edit of the spill-timing experiment, would not depend on that draw. It is a re-scoring of stored runs, and would change the net numbers quoted so far only a little.
+*A baseline that does not depend on where e₁ sits in the control.* Net removal subtracts what the e₁ edit does to the control, a single draw: in the Adam controls e₁ is among the quietest axes at one seed and among the busiest few at another. The median over edits along several coordinate axes off the syntax axes, like the reference edit of the spill-timing experiment, would not depend on that draw. It is a re-scoring of stored runs, and would likely change the net numbers quoted so far only a little. In the [backlog](/todo/science/baseline-that-does-not-depend-on-e1-in-the-control.md).
 
-*An anchored arm under Muon* (low priority). Muon learns the task as well as Adam at three times the rate its finder suggests, with no privileged basis. An anchor there would have no quiet axis to take, so it would need its own term weights, and a finer rate ladder first. Worth running if the project moves toward models trained without Adam, or to see whether an anchored color grades differently.
+*An anchored arm under Muon* (low priority). Muon learns the task as well as Adam at three times the rate its finder suggests, with no privileged basis. An anchor there would have no quiet axis to take, so it would need its own term weights, and a finer rate ladder first. Worth running if the project moves toward models trained without Adam, or to see whether an anchored color grades differently. In the [backlog](/todo/science/anchored-arm-under-muon.md).
 
 ### Tuning the recipe
 
