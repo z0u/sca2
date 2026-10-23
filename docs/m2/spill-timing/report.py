@@ -509,7 +509,7 @@ The epoch-{STOP_EPOCH} checkpoints are those of `falloff` and `step, soft τ` fr
 ## The measurements
 
 - Spill, net of control (at the end, as earlier reports score it): the largest drop on another op under the edit, less the drop on that op under the same edit on the control at the same seed, taken over the four doses. The edit projects e₁ out at every position and slice. A run is within the criterion when its spill is at most {CRITERION:g}.
-- Spill, net of sham (along training): the largest drop on another op under the full edit, less the median drop on that op under eight sham edits. Each sham edit projects out one other basis direction (e₂, e₃, …), chosen at random, and the same eight are used throughout. We use the median because on some seeds one of the eight directions costs every op far more than the rest. Each drop is in expected exact match over the whole held-out set, so the noise from the choice of contexts is small (a standard error of about {SAMPLE_SE:.3f} per op).
+- Spill, net of sham (along training): the largest drop on another op under the full edit, less the median drop on that op under eight sham edits. Each sham edit projects out one other basis direction (e₂, e₃, …), chosen at random, and the same eight are used throughout. We use the median because on some seeds one of the eight directions costs every op far more than the rest. Each drop is measured in expected exact match over the whole held-out set, so the noise from the choice of contexts is small (a standard error of about {SAMPLE_SE:.3f} per op).
 - The probe: a ridge regression (a linear fit with a small penalty on the weights) from the state at a position to the RGB of the color there. It is fitted on half of the held-out contexts and scored on the other half as $R^2$ (the share of the variance of the color it predicts). It is fitted at every color position and at slices 2 to 4, on the contexts of the other ops and on `{ex.ANCHORED_OP}` contexts. Each fit uses one of three versions of the state: the whole state, the state without its e₁ coordinate, or the e₁ coordinate alone.
 """
 
@@ -550,7 +550,7 @@ When does the spill appear, and from when does it sort the seeds as the end does
 
 {window_table()}
 
-Spill appears in two ways. The early kind rises on seeds 708 and 711 between epochs 24 and 32, as the pool temperature reaches its sharp value and the anchor weight its plateau, and on 707 at about epoch 44, just after. It falls mostly on `darken` and `hue-hsv`, and it stays up past the stop of the loss-rate screen. After that the three seeds differ. On 711 it stays to the end, on `darken`. On 707 it moves to `mix` and settles near the criterion, and on 708 it falls back to about half.
+Spill appears in two ways. The early kind rises on seeds 708 and 711 between epochs 24 and 32, as the pool temperature reaches its sharp value and the anchor weight its plateau, and on 707 at about epoch 44, just after. It falls mostly on `darken` and `hue-hsv`, and it stays up past where the loss-rate screen stopped. After that the three seeds differ. On 711 it stays to the end, on `darken`. On 707 it moves to `mix` and settles near the criterion, and on 708 it falls back to about half.
 
 The late kind grows on seeds 705 and 710, from about epoch 120 and 150 respectively, on `value-hsv`, while the anti weight on slice {SL} falls through its slow anneal. It ends just under the criterion on 705 and just over it on 710.
 
