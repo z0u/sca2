@@ -10,3 +10,7 @@ We score the edited model against the *target null*: the answers of an ideal pre
 So we don't know how much of the remaining distance a model could close at all. A model trained on the same corpus with no `difference` contexts would answer them as a model that never learned the op, and its distance from the target null would be a reference for the edit: a landing near that model, rather than near the ideal, may be as far as an edit could go. It would also show whether such a model behaves like the target null itself, which is the assumption behind using the target null as the destination.
 
 It needs one condition (the control recipe on a corpus without `difference`, at a few seeds) and the landing measurements of ex-2.2.22, scored on its held-out `difference` contexts. Raised in review of ex-2.2.22.
+
+## Notes
+
+**2026-10-22, edit-effects review** — The [edit-effects report](/docs/m2/edit-effects/report.py) measured the landing on the recipe of record: the distance left is about 2.4× the distance from the clean model to the Bayes predictor, nearly all of it in how the edited model weighs the other ops context by context, with no systematic tilt toward flatter or sharper weights. Its Discussion names two readings (the edit blurs evidence the model uses to weigh the other ops, or the model never learned to weigh them on `difference` contexts) and this model is what would tell them apart. The paper review of that report asked for it.

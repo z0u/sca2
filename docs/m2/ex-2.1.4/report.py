@@ -641,7 +641,10 @@ def answer_schedule_plot(arrays: dict, metrics: dict, hex_margins: dict | None) 
             for c in range(3):
                 smooth_step(ax, offsets, np.clip(m[:, c], 0, 1), color=cols[c], lw=lws[c], ramp=0.5)
             ax.set(xlabel="offset from answer start", ylim=(-0.05, 1.05))
-            ax.set_title(title, **({"style": "italic", "color": "grey"} if ref else {}))
+            if ref:
+                ax.set_title(title, style="italic", color="grey")
+            else:
+                ax.set_title(title)
             ax.set_xlim(offsets[0] - 0.5, offsets[-1] + 0.5)
             ax.set_xticks(offsets)
             ax.grid(alpha=0.1)

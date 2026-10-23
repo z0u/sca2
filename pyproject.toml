@@ -27,6 +27,7 @@ dependencies = [
     "modal[api-proxy-support]>=1.5.1",  # remote (cloud) GPU compute; the extra (new in 1.5.1) lets its gRPC tunnel via HTTPS_PROXY (cloud sandboxes)
     "numpy>=2.2.3",  # numerical computing (multi-dimensional arrays)
     "optax>=0.2.4",  # gradient transformations and optimizers for JAX
+    "pillow>=13",  # figure thumbnails in mini.reports; 13.0 clears 28 advisories in 12.x
     "pandas>=2.2.3",  # tabular data manipulation
     "pydantic>=2.13.4",  # data validation
     "pymdown-extensions>=10.21",
