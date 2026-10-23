@@ -1,4 +1,4 @@
-"""Optimizers with no privileged basis, on the control: pooled Adam, Muon and SGD at two seeds.
+"""Optimizers with no privileged basis, on the control: pooled Adam, Muon and SGD at two seeds and three rates.
 
 The coordinate axes of the residual stream are a privileged basis because Adam's per-coordinate scaling is written in
 them (the memo of 2026-10-23 in the project files). This scout asks what the stream looks like, and how well the
@@ -6,10 +6,12 @@ task is learned, under optimizers whose update is the same in every orthonormal 
 `adam-pooled` (Adam with its second moment pooled over the residual axis of each matrix that reads or writes the
 stream), `muon` (orthogonalized updates on the matrices, Adam on the gains), and `sgd` with momentum. Each arm first
 runs the learning-rate finder of ex-2.2.17 at one seed, then trains the un-anchored control for the full 400-epoch
-schedule at the finder's rate and at a third of it, at model seeds 704 and 705, where ex-2.2.23's Adam controls are
-stored as the reference. Every run gets embedding-lean's measurements and the basis measurement of rotated-basis
-(the energy spectrum and kurtosis along the coordinate axes and along a random basis, and the removal cost of each
-axis and of random directions); the stored Adam controls get the basis measurement too. No anchored runs: an
+schedule at the finder's rate, three times it and a third of it, at model seeds 704 and 705, where ex-2.2.23's Adam
+controls are stored as the reference. Every run gets embedding-lean's measurements, the basis measurement of
+rotated-basis (the energy spectrum and kurtosis along the coordinate axes and along a random basis, and the removal
+cost of each axis and of random directions), and a principal-direction measurement (the energy spectrum along the
+stream's own principal directions, which sees a spike wherever it sits); the stored Adam controls get both too. No
+anchored runs: an
 optimizer that keeps the stream isotropic and learns the task as well is a candidate for an anchored arm later.
 
     bin/mini run docs/m2/optimizer-scout/experiment.py --app modal --max-containers 16 --budget 4h
@@ -23,7 +25,9 @@ import sys
 from dataclasses import asdict, dataclass, replace
 from typing import Any
 
-from mini import Ctx, Experiment
+import numpy as np
+
+from mini import Ctx, Experiment, get_data_dir
 
 
 def _load_sibling(name: str, alias: str):
@@ -44,6 +48,7 @@ def _load_sibling(name: str, alias: str):
 
 rb = _load_sibling("rotated-basis", "optimizer_scout_rb")
 lean = rb.lean
+ex2216 = rb.ex2216
 ex2223 = rb.ex2223
 ex2222 = rb.ex2222
 ex2221 = rb.ex2221
@@ -79,9 +84,9 @@ ARMS: tuple[Arm, ...] = (
     Arm("sgd", "sgd", "SGD with momentum"),
 )
 
-BUDGET_USD = 6
-"""Twelve 400-epoch control runs at about \\$0.3 each, three finder runs, and the basis measurement of fourteen
-checkpoints."""
+BUDGET_USD = 8
+"""Eighteen 400-epoch control runs at about \\$0.3 each, three finder runs, and the basis and principal-direction
+measurements of twenty checkpoints."""
 
 
 def label_of(arm: str, factor: float, model_seed: int) -> str:
@@ -140,6 +145,49 @@ TRAJ_REF = PREFIX + "/trajectories"
 CHECKPOINT_REF = PREFIX + "/checkpoints/{label}"
 RESULTS_REF = PREFIX + "/results"
 BASIS_REF = PREFIX + "/basis"
+PRINCIPAL_REF = PREFIX + "/principal"
+
+
+def principal_one(checkpoint, holdout, label: str, n_ctx: int = 1000) -> dict:
+    """The energy spectrum of the stream along its own principal directions, per slice, on *n_ctx* held-out
+    contexts: the eigenvalues of the second-moment matrix of the states (uncentered, so the shares compare with the
+    basis measurement's, and centered), as shares of the total. A spike shows here whichever direction it sits on,
+    where the basis measurement sees it only when it sits on a coordinate axis or a random basis vector. Also the
+    cosine of each syntax embedding with the top principal direction at the last slice, and the pairwise cosines
+    among the syntax embeddings.
+    """
+    from mini.store import get
+
+    workdir = get_data_dir() / "principal" / label
+    model, tok, _, _ = ex2216._load_run(checkpoint, workdir)
+    ho = ex2216.load_holdout(get(holdout, workdir / "holdout.npz"), K)
+    rng = np.random.default_rng(0)
+    pick = np.sort(rng.choice(len(ho.tokens), min(n_ctx, len(ho.tokens)), replace=False))
+    stream = np.asarray(model.residual_stream(ho.tokens[pick]))  # (L1, N, T, C)
+    shares, shares_centered, tops = [], [], []
+    for s in range(stream.shape[0]):
+        h = stream[s].reshape(-1, stream.shape[-1]).astype(np.float64)
+        for centered, out in ((False, shares), (True, shares_centered)):
+            x = h - h.mean(0) if centered else h
+            w, v = np.linalg.eigh(x.T @ x / len(x))
+            w, v = w[::-1], v[:, ::-1]
+            out.append((w / w.sum()).tolist())
+            if not centered:
+                tops.append(v[:, 0])
+    emb = np.asarray(model.transformer.wte, dtype=np.float64)
+    emb = emb / np.linalg.norm(emb, axis=1, keepdims=True)
+    syntax = ["?", ",", "\n", "="]
+    ids = [tok.stoi[t] for t in syntax]
+    gram = emb[ids] @ emb[ids].T
+    return {
+        "label": label,
+        "n_ctx": int(len(pick)),
+        "shares": shares,  # (L1, C): the share of the energy on each principal direction, largest first
+        "shares_centered": shares_centered,
+        "syntax": syntax,
+        "syntax_on_top": [float(abs(emb[i] @ tops[-1])) for i in ids],  # at the last slice
+        "syntax_gram": gram.tolist(),
+    }
 
 
 def resolve_controls(seeds: tuple[int, ...]) -> dict:
@@ -169,7 +217,14 @@ def design() -> dict[str, Any]:
     }
 
 
-def publish(rows: list[dict], finder: list[dict], trained: list[dict], scored: list[dict], based: list[dict]) -> dict:
+def publish(
+    rows: list[dict],
+    finder: list[dict],
+    trained: list[dict],
+    scored: list[dict],
+    based: list[dict],
+    principal: list[dict],
+) -> dict:
     import json
 
     from mini.store import put, set_ref
@@ -197,7 +252,9 @@ def publish(rows: list[dict], finder: list[dict], trained: list[dict], scored: l
     set_ref(RESULTS_REF, put(json.dumps(body).encode(), name="optimizer-scout-results.json"))
     basis = {"design": design(), "runs": [meta[b["label"]] | b for b in based]}
     set_ref(BASIS_REF, put(json.dumps(basis).encode(), name="optimizer-scout-basis.json"))
-    return {"n_runs": len(scored), "n_based": len(based)}
+    pca = {"design": design(), "runs": [meta[p["label"]] | p for p in principal]}
+    set_ref(PRINCIPAL_REF, put(json.dumps(pca).encode(), name="optimizer-scout-principal.json"))
+    return {"n_runs": len(scored), "n_based": len(based), "n_principal": len(principal)}
 
 
 def run(ctx: Ctx, epochs: int = EPOCHS, seeds: tuple[int, ...] = SEEDS, publishes: bool = True) -> dict:
@@ -260,9 +317,16 @@ def run(ctx: Ctx, epochs: int = EPOCHS, seeds: tuple[int, ...] = SEEDS, publishe
         [seeds_of[label] for label in labels],
         role="measure",
     )
+    principal = ctx.map(
+        principal_one,
+        [checkpoints[label] for label in labels],
+        [resolved["holdout"]] * len(labels),
+        labels,
+        role="measure",
+    )
     if not publishes:
         return {"found": found, "labels": [s["label"] for s in scored], "based": [b["label"] for b in based]}
-    return ctx.run(publish, rows, finder, trained, scored, based, role="prep")
+    return ctx.run(publish, rows, finder, trained, scored, based, principal, role="prep")
 
 
 def main(ctx: Ctx) -> dict:
