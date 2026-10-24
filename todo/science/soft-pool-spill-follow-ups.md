@@ -3,11 +3,15 @@ status: open
 tags: [anchoring, D2.2]
 opened: 2026-10-21
 ---
-# Keep the spill of a soft pool down
+# Could `pool 1–3, soft τ` be the recipe of record?
+
+The pull of `pool 1–3, soft τ` pools over slices 1 to 3 together, so nobody has to choose which blocks the op goes on, where the step and the ramp set that by hand. That makes it the easier recipe to explain and to carry to other models, since it asks for less prior knowledge of where a concept sits in the stream. So it could be worth adopting even if it ends up a little weaker than the strongest recipe, as long as it is compared against that recipe. What stands in the way is its spill, and the rest of this item is about keeping it down.
+
+The first step is the side-by-side of [step, soft τ as the recipe of record](./step-soft-as-recipe-of-record.md), with this condition added to it. It needs no training, and it settles which recipe the pool is compared against. It should also show which slice the pool settles on at each seed, since in [slice-terms](/docs/m2/slice-terms/report.py) a pull pooled over blocks 1 to 4 at a fixed temperature settled on block 4 on three seeds and lost one seed to the query answer.
 
 In the [soft-pool experiment](/docs/m2/soft-pool/report.py), a pooling temperature τ_p that starts soft kept the anchor on every seed in every arm that had it, and the soft ramp over slices 1 to 3 did so without the step between slices 1 and 2. Each soft arm spilled more than its fixed twin, though. The trajectories suggest why: while the pool is soft its pull reaches every position from the op word on, and during the rise the other ops come partway onto e₁ (peak α 0.04 to 0.06 against 0.03 at the fixed temperature). That lift has gone by the end of training, but it goes with the spill (r ≈ 0.47 over 40 runs).
 
-Arms that would test it, each beside the soft ramp:
+The original arms, written before the pool became the candidate, were each to run beside the soft ramp:
 
 - A stronger anti term while the pool is soft, so the lift on the other ops during the rise stays small. (A soft pool over the answer positions alone would also aim at it, but it needs role labels that real text won't have, so it is out.)
 - The anti term off on slice 4 for the arms that don't pull there. The anti term acts on every position, the `difference` answers included, and nothing on slice 4 counters it under the ramp. That may be why α falls there (0.46 against 0.64 under the step). The review wondered whether the model's work to meet a balanced pull on slice 3 and an unbalanced anti term on slice 4 could feed the spill indirectly. The arms so far argue against a large effect: the fixed ramp has that imbalance and the least spill of any arm, and the soft ramp spills about as much as the soft step, which has no imbalance. It may cost removal instead, since both ramps remove a few hundredths less than the step.
