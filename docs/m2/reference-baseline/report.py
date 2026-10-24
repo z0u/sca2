@@ -269,10 +269,12 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Removal and spill have been measured net of what the same edit does to the control at the same seed, so they depend on where e₁ happens to sit in that control. We scored the stored runs of the recipe of record again, against a baseline that does not depend on it: the median drop over edits along the other quiet coordinate axes. The numbers quoted so far barely move. On the rotated-basis runs, where the old baseline fell short, the new one brings the short seeds back up beside the rest.
+Removal and spill have been measured net of what the same edit does to the control at the same seed, so they depend on where e₁ happens to sit in that control. We re-scored the stored runs of the recipe of record against a baseline that does not depend on it: the median drop over edits along the other quiet coordinate axes. The numbers quoted so far barely move. On the rotated-basis runs, where the old baseline fell short, the new one brings the short seeds back up beside the rest.
 ///
 
-The question comes from [rotated-basis](../rotated-basis/report.py). In that experiment, Adam acted in a rotated basis.[^adam] On two seeds e₁ overlapped the syntax direction of the control, so the edit took half of the op from the control as well. Removal net of the control then fell short, although the anchored runs removed the op as before. That report and the [D2.2 design](../d2.2/design.md) proposed a different baseline: the median over reference edits along other coordinate axes, leaving out the syntax axes, as in the spill-timing experiment.
+The question comes from [rotated-basis](../rotated-basis/report.py), where Adam acted in a rotated basis.[^adam] On two seeds e₁ overlapped the syntax direction of the control, so the edit took half of the op from the control as well. Removal net of the control then fell short, although the anchored runs removed the op as before.
+
+That report and the [D2.2 design](../d2.2/design.md) proposed a different baseline: the median over reference edits along other coordinate axes, leaving out the syntax axes, as in the spill-timing experiment.
 
 [^adam]: Adam and the basis: Adam scales the update of each coordinate separately, so the coordinate axes are special to it. Rotated-basis ran it in a rotated basis instead.
 
@@ -286,24 +288,27 @@ This report trains nothing. It scores stored runs: the eight `falloff` runs (the
 
 ## Scope and method
 
-This is an exploratory re-scoring of stored runs, with no preregistration and no gate. It covers `falloff` and the 400-epoch control at model seeds 704 to 711, as published by split-anti-seeds and ex-2.2.23, and the `falloff` and control runs of rotated-basis at the same seeds. Each anchored run pairs with the control at its seed, which shares its initialization, batches, and label draws.
+This is an exploratory re-scoring, with no preregistration and no gate. The model seeds are 704 to 711, and the controls are the 400-epoch ones. Each anchored run pairs with the control at its seed, which shares its initialization, batches, and label draws.
 
-The edit is the dose edit of ex-2.2.22, unchanged. It projects a direction out of the state at every position and slice, removing a quarter, a half, three quarters, or all of the component along it. It is scored on the whole held-out set of every op, as before. For e₁ these drops reproduce the published dose scoring to rounding. What is new is the same edit along every other coordinate axis, and, for the rotated-basis runs, along every axis of the rotated basis Adam acted in.
+The edit is the dose edit of ex-2.2.22, unchanged. It projects a direction out of the state at every position and slice, removing a quarter, a half, three quarters, or all of the component along it. It is scored on the whole held-out set of every op, as before.
 
-A reference axis is any coordinate axis other than e₁ and the two that hold the most energy[^energy] of the stream, averaged over slices. Those two are where the model puts its syntax tokens. One coordinate holds about {num(np.mean(list(TOP_SHARE.values())), ".1f")} of the energy in every control. Projecting it out takes most of the score of every op, and on some seeds all of it. For the rotated-basis runs
-<!-- REVIEW: "costs every op about half its score" read the cost of the top axis (about 0.5, the drop averaged over ops) as a share of the score; the mean clean score over ops is about 0.58, so that drop is most to all of it. Verify: `drop[top][FULL_DOSE]` over `clean` per op in the control axes data is 0.7 to 1.0 on every seed, and 1.0 on 707 and 708. -->
+For e₁ these drops reproduce the published dose scoring to rounding. New here is the same edit along every other coordinate axis, and, for the rotated-basis runs, along every axis of the rotated basis Adam acted in.
+
+A reference axis is any coordinate axis other than e₁ and the two that hold the most energy[^energy] of the stream, averaged over slices. Those two are where the model puts its syntax tokens. For the rotated-basis runs the reference axes are the rotated axes, with the two highest in energy left out the same way.
 <!-- REVIEW: "Those two are where the model puts its syntax tokens" is the rule's intent; E1 shows the second axis by energy is a mild one on 707 and 708, where no other axis costs more than about 0.2. -->
- the reference axes are the rotated axes, with the two highest in energy left out the same way.
+
+One coordinate holds about {num(np.mean(list(TOP_SHARE.values())), ".1f")} of the energy in every control. Projecting it out takes most of the score of every op, and on some seeds all of it.
+<!-- REVIEW: "costs every op about half its score" read the cost of the top axis (about 0.5, the drop averaged over ops) as a share of the score; the mean clean score over ops is about 0.58, so that drop is most to all of it. Verify: `drop[top][FULL_DOSE]` over `clean` per op in the control axes data is 0.7 to 1.0 on every seed, and 1.0 on 707 and 708. -->
 
 [^energy]: Energy: the sum of the squared projections of the states onto a direction. The share of a direction is its energy over the total.
 
-## The measurements
+## Measurements
 
 - Removal: the net drop in score on `difference` under the full edit along e₁, as a share of the way from the clean score to the target null. Higher is better.
 - Spill: the largest net drop on another op under the e₁ edit, over the four doses. A run is within the criterion when it is at most {CRITERION:g}. Lower is better.
 - The cost of an axis: the drop under the full edit along it, averaged over the ops.
 
-Each of these is net of a baseline. We compare these baselines, each taken per op and per dose:
+Each of these is net of a baseline. We compare three, each taken per op and per dose:
 
 - e₁ in the control: the drop the same e₁ edit causes in the control at the same seed. This is the measurement quoted so far.
 - Reference axes, control: the median drop over the reference axes of the control.
@@ -410,12 +415,16 @@ How typical an axis is e₁ in a control? If it is always among the quiet ones, 
 
 {rank_table()}
 
-The axis with the most energy takes most of the score of every op on every seed, and all of it on 707 and 708. The second costs as much on most seeds, but on {" and ".join(str(s) for s in MILD_SECOND)} it is a milder axis, and on 706 two reference axes cost more than it does. So ranking by energy only roughly finds the costly axes. Leaving them out of the reference set hardly matters either way: the median over all 63 axes other than e₁ gives a removal within {num(NO_EXCL, ".3f")} of the median without them, on every seed. A median of a few dozen axes is not swayed by two.
+The axis with the most energy takes most of the score of every op on every seed, and all of it on 707 and 708. The second costs as much on most seeds, but on {" and ".join(str(s) for s in MILD_SECOND)} it is a milder axis, and on 706 two reference axes cost more than it does. So ranking by energy only roughly finds the costly axes.
 
-One detail differs from what rotated-basis expected of the stored runs. On {len(SPIKE_MOVED)} of 8 seeds ({", ".join(str(s) for s in SPIKE_MOVED)}) the `falloff` run puts its most energetic axis on a different coordinate from the control at the same seed, at every slice, and that coordinate holds almost nothing in the control. Rotated-basis found this spike on the same coordinate in both runs on the seeds it checked, and took a move under the rotated basis as a sign that the anti term steers it. The moves seen here under plain Adam suggest the spike can move without the rotation, so a change of loss alone may be enough to move it.
-<!-- REVIEW: rotated-basis E3 says "In the stored runs we found the spike on the same coordinate in the control and the anchored run at every seed we checked." Here the top-energy coordinate differs on the seeds listed. Verify: `energy` of `falloff-s<seed>` and `control-s<seed>` in the axes data, averaged over slices; the result holds at the last slice too. Checked against the axes data: on 706, 707 and 708 the top-energy coordinate of `falloff` differs from that of the control at each of the five slices, and the control holds under 0.02 of its energy on that coordinate; on the other five seeds it is the same coordinate at every slice. -->
+Leaving the syntax axes out of the reference set hardly matters: the median over all 63 axes other than e₁ gives a removal within {num(NO_EXCL, ".3f")} of the median without them, on every seed. A median of a few dozen axes is not swayed by two.
 
 So the paired baseline is one draw from the axes of the control, and that draw ranges from the quietest axis to one of the busiest few.
+
+On {len(SPIKE_MOVED)} of 8 seeds ({", ".join(str(s) for s in SPIKE_MOVED)}) the `falloff` run puts its most energetic axis (the spike) on a different coordinate from the control at the same seed, at every slice, and that coordinate holds almost nothing in the control. Rotated-basis expected otherwise: it found the spike on the same coordinate in both runs on the seeds it checked, and took a move under the rotated basis as a sign that the anti term steers it.
+<!-- REVIEW: rotated-basis E3 says "In the stored runs we found the spike on the same coordinate in the control and the anchored run at every seed we checked." Here the top-energy coordinate differs on the seeds listed. Verify: `energy` of `falloff-s<seed>` and `control-s<seed>` in the axes data, averaged over slices; the result holds at the last slice too. Checked against the axes data: on 706, 707 and 708 the top-energy coordinate of `falloff` differs from that of the control at each of the five slices, and the control holds under 0.02 of its energy on that coordinate; on the other five seeds it is the same coordinate at every slice. -->
+
+The moves seen here under plain Adam suggest the spike can move without the rotation, so a change of loss alone may be enough to move it.
 """
 
 # %%
@@ -545,15 +554,17 @@ The one seed that moves by more than a few hundredths is {BUSIEST}, where e₁ w
 
 {seed_table(COORD)}
 
-The two medians agree with each other on every seed, within {num(OWN_VS_CTRL[COORD])} of removal. So in these runs the quiet axes of an anchored run cost about what the quiet axes of its control cost, and the anchor hardly touches them. A baseline
+The two medians agree on every seed, within {num(OWN_VS_CTRL[COORD])} of removal. So in these runs the quiet axes of an anchored run cost about what the quiet axes of its control cost, and the anchor hardly touches them.
 <!-- REVIEW: "leaves them alone" softened to "hardly touches them": the median cost of the reference axes is a few thousandths higher in `falloff` than in the control on 7 of 8 seeds (0.031 to 0.040 against 0.029 to 0.036). Verify: `np.median(cost(FALLOFF, s)[reference_dirs(FALLOFF, s)])` against `REF_COST[s]`. -->
- taken in the anchored run itself would then need no control.
 
-Spill falls slightly under both medians. On most seeds, e₁ in the control costs a little less on the other ops than the median does, so the paired baseline subtracts less. The raw spill
+Spill falls slightly under both medians. On most seeds, e₁ in the control costs a little less on the other ops than the median does, so the paired baseline subtracts less.
 <!-- REVIEW: the reason had its direction reversed ("costs a little more than the median"). Net spill is the drop on the anchored run less the baseline, so a higher spill under the paired baseline means that baseline is the smaller one. Verify: `e1_drop(CONTROL, s)[FULL_DOSE, OTHER] - baseline(CTRL_MED, s)[FULL_DOSE, OTHER]` is negative on most ops of most seeds; 705 is the exception. -->
-, with nothing subtracted, is higher (up to {num(max(RAW[COORD][s]["worst_spill"] for s in SEEDS), ".3f")}), so some baseline is still needed to separate the anchored op from the general cost of an edit.
 
-The median of eight reference axes drawn at random, as spill-timing takes it, varies with the draw. Over many draws at each seed the middle nine tenths of the removal spans at most {num(DRAW_WIDTH[COORD])}, and the spill stays at or below {num(DRAW_SPILL_HI[COORD], ".3f")} on nineteen draws in twenty. That is about half the seed range of removal, so eight axes are enough to tell a removable run from a weak one. The median over all the reference axes needs no draw, and costs a few minutes more of scoring.
+The raw spill, with nothing subtracted, is higher (up to {num(max(RAW[COORD][s]["worst_spill"] for s in SEEDS), ".3f")}), so some baseline is still needed to separate the anchored op from the general cost of an edit.
+
+The median of eight reference axes drawn at random, as spill-timing takes it, varies with the draw. Over many draws at each seed, the middle nine tenths of the removal spans at most {num(DRAW_WIDTH[COORD])}, about half the seed range of removal, so eight axes are enough to tell a removable run from a weak one.
+
+Over the same draws, spill stays at or below {num(DRAW_SPILL_HI[COORD], ".3f")} on nineteen draws in twenty. The median over all the reference axes needs no draw.
 """
 
 # %%
@@ -561,7 +572,7 @@ The median of eight reference axes drawn at random, as spill-timing takes it, va
 rf"""
 ## The rotated-basis runs (E3)
 
-The problem rotated-basis found was a control in which e₁ overlaps the syntax direction. In those runs Adam put the cheap directions along the rotated axes. With the median taken along those axes, does the baseline put the short seeds back beside the rest?
+In the rotated-basis runs, Adam put the cheap directions along the rotated axes. With the median taken along those axes, does the baseline put the short seeds back beside the rest?
 
 **What we saw.** Yes. Against e₁ in the control, removal falls below half on seeds {" and ".join(str(s) for s in LOST_PAIRED_ROT)}, and to about six tenths on 707. Against either median it sits near nine tenths on every seed, with every run within the spill criterion.
 
@@ -573,7 +584,9 @@ The problem rotated-basis found was a control in which e₁ overlaps the syntax 
 
 Again the two medians agree, within {num(OWN_VS_CTRL[ROT])} of removal. The median of eight drawn axes spans at most {num(DRAW_WIDTH[ROT])} in removal over the middle nine tenths of draws, a little wider than under plain Adam.
 
-The reference axes have to be the cheap ones for the basis the model trained in. Under the rotated basis a coordinate axis is an ordinary direction and costs more, as rotated-basis found, so a median over coordinate axes would overstate the baseline there. With an optimizer that has no privileged basis at all, every direction touches the spike, and no set of cheap reference directions exists in the same sense.
+The reference axes have to be the cheap ones for the basis the model trained in. Under the rotated basis a coordinate axis is an ordinary direction and costs more, as rotated-basis found, so a median over coordinate axes would overstate the baseline there.
+
+With an optimizer that has no privileged basis at all, every direction touches the spike, and no set of cheap reference directions exists in the same sense.
 """
 
 # %%
@@ -585,5 +598,7 @@ For the stored runs the paired baseline was sound, in that it rarely moved the r
 
 The median over the quiet axes removes that dependence on the draw, and it costs a few minutes more of scoring per run. Where the draw goes badly, as in the rotated-basis runs, it is the difference between a run read as having lost the anchor and one read as removing nine tenths of the op.
 
-The agreement of the two medians suggests a baseline needs no control at all: the quiet axes of the anchored run serve. That would matter for a recipe meant for real models, where a matched control is costly or impossible, and it is what spill-timing already does along training. But the agreement rests on these sixteen pairs, and a recipe that disturbed the quiet axes of the anchored run would break it. So a control is still the way to check that a run-internal baseline is sound.
+The agreement of the two medians suggests a baseline needs no control at all: the quiet axes of the anchored run serve. That would matter for a recipe meant for real models, where a matched control is costly or impossible, and it is what spill-timing already does along training.
+
+But the agreement rests on these sixteen pairs, and a recipe that disturbed the quiet axes of the anchored run would break it. So a control is still the way to check that a run-internal baseline is sound.
 """
