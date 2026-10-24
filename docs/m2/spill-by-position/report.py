@@ -176,6 +176,10 @@ r"""
 <!-- lede -->
 Ex-2.2.23 found that removing the anchored direction from every position also lowers the task score on other ops. Editing one set of positions at a time shows that, on most runs, the removal of `difference` and the spill onto other ops come from the same place, the example answers, so no set of positions gives one without the other. The other positions add spill of their own.
 ///
+
+/// note | A later finding
+The latch has an explanation now. Under Adam the coordinate axes of the residual stream are a privileged basis: an un-anchored model puts its separators one-hot on a coordinate of its own. e₁ is a coordinate axis too, so on these runs the anchor caught that habit, and a separator landed on e₁. The [rotated-basis](/docs/m2/rotated-basis/report.py) experiment, with the basis of the optimizer rotated so that e₁ is an ordinary direction, found that the anchor holds there as well.
+///
 """
 
 rf"""

@@ -136,6 +136,10 @@ rf"""
 On the runs of ex-2.2.23, the edit that removes `{ex.ANCHORED_OP}` spills onto other ops, and the spill comes from the first two slices. At those slices the model has not yet read the context, so it meets the pull with a stand-in: either lightness loaded onto e₁ in the color embedding table, or a syntax token latched to e₁. The edit at those slices then takes the lightness away from every op. Editing only the later blocks removes `{ex.ANCHORED_OP}` with almost no spill.
 ///
 
+/// note | A later finding
+Part of the stand-in here comes from e₁ being a coordinate axis. Under Adam the coordinate axes of the residual stream are a privileged basis, and an un-anchored model parks its syntax tokens one-hot on them, so a syntax token latched to e₁ is that habit landing on the anchored axis. The anchor does not depend on it: the [rotated-basis](/docs/m2/rotated-basis/report.py) experiment, with the basis of the optimizer rotated so that e₁ is an ordinary direction, found that the anchor holds there as well.
+///
+
 [Spill-by-position](/docs/m2/spill-by-position/report.py) found that the removal and the spill share the example answers, and that a syntax token latched onto e₁ shapes the spill. The [τ × λ_a sweep](https://github.com/z0u/sca2/pull/260) found that the spill persists with no latch at all. That left two questions: what causes the spill when there is no latch, and why the anti-subspace term does nothing about it.
 
 This report re-analyzes the stored checkpoints of [ex-2.2.23](/docs/m2/ex-2.2.23/report.py) ({len(ANCHORED)} anchored and {len(CONTROLS)} control runs, at {SHORT} and {LONG} epochs) and the no-emb trials of the sweep near the recipe τ ({len(SWEEP_NO_EMB)} trials), with no new training.

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from ftfy import ExplanationStep
 from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt, PositiveFloat, PositiveInt
 
@@ -113,6 +115,22 @@ class OptimizerConfig(BaseModel, validate_assignment=True):
 
     betas: tuple[ZeroToOne, ZeroToOne]
     """Betas for the Adam optimizer"""
+
+    kind: Literal["adam", "adam-pooled", "muon", "sgd"] = Field(default="adam", exclude_if=lambda v: v == "adam")
+    """Which optimizer (`sca.training.optimizer`): `adam` is AdamW as every stored run trained; `adam-pooled` is Adam
+    with its second moment pooled over the residual axis of each matrix that reads or writes the stream, so the
+    scaling is one number per row or column and rotation-equivariant; `muon` orthogonalizes each matrix's update
+    (optax's Muon, with Adam on the gains at `aux_learning_rate`); `sgd` is SGD with momentum `betas[0]`. Left out of
+    the serialized config when `adam`, so configs from before the field existed keep their memo keys."""
+
+    aux_learning_rate: float | None = Field(default=None, exclude_if=lambda v: v is None)
+    """The learning rate of the gains under `muon`, which updates them with Adam; `None` is `learning_rate`."""
+
+    basis_seed: int | None = Field(default=None, exclude_if=lambda v: v is None)
+    """Apply Adam's per-coordinate scaling in a random rotation of the residual coordinates, drawn from this seed, so
+    that the coordinate axes are no longer the basis the optimizer favors (`sca.training.optimizer.rotated`). `None`
+    is Adam as is. Left out of the serialized config when unset, so configs from before the field existed keep their
+    memo keys."""
 
 
 class SchedulerConfig(BaseModel, validate_assignment=True):
