@@ -2,6 +2,7 @@
 status: open
 tags: [experiments, storage, measurement]
 opened: 2026-10-24
+priority: high
 ---
 # Keep a few checkpoints along training
 

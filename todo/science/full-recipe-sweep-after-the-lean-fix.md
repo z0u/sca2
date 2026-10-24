@@ -2,7 +2,6 @@
 status: open
 tags: [D2.2, anchoring, schedules, sobol-search]
 opened: 2026-10-09
-priority: high
 ---
 # A full sweep of the recipe around `falloff`
 
@@ -18,4 +17,4 @@ The shape that worked in D2.1: ablate, then search. First replace each schedule 
 
 **2026-10-20, housekeeping** — The [anchor ramp](/docs/m2/anchor-ramp/report.py) is in, and the step pull stays. Its one lead for this sweep: lost anchors followed the pull on slices 1 to 3 (a post hoc sum, eight seeds per arm), so the pull on the early slices may be worth a dimension of its own if the sweep goes past a single anchor weight.
 
-**2026-10-24, backlog refresh** — Three results make the sweep cheaper than planned. The D2.2 baseline is now the median over the other coordinate axes taken in the run itself ([reference-baseline](/docs/m2/reference-baseline/report.py)), so a trial needs no control of its own, and controls can run now and then to check the agreement. The early call of [the loss-rate screen](/docs/m2/loss-rate/report.py) settles a lost anchor by about epoch 64. And in [spill-timing](/docs/m2/spill-timing/report.py) the spill averaged over a condition at epoch 64 separated the condition that spills early from the two that don't, so the survey could stop trials that spill early at about a sixth of the cost; the late kind of spill still needs the confirmation runs to go to the end. Which condition the sweep centers on may change first: [step, soft τ as the recipe of record](./step-soft-as-recipe-of-record.md).
+**2026-10-24, backlog refresh** — Three results make the sweep cheaper than planned. The D2.2 baseline is now the median over the other coordinate axes taken in the run itself ([reference-baseline](/docs/m2/reference-baseline/report.py)), so a trial needs no control of its own, and controls can run now and then to check the agreement. The early call of [the loss-rate screen](/docs/m2/loss-rate/report.py) settles a lost anchor by about epoch 64. And in [spill-timing](/docs/m2/spill-timing/report.py) the spill averaged over a condition at epoch 64 separated the condition that spills early from the two that don't, so the survey could stop trials that spill early at about a sixth of the cost; the late kind of spill still needs the confirmation runs to go to the end. Which condition the sweep centers on may change first: [step, soft τ as the recipe of record](./step-soft-as-recipe-of-record.md). Off the shortlist for now, to make room for [checkpoints along training](/todo/eng/keep-checkpoints-along-training.md): the sweep waits on the recipe-of-record question above to know which condition it centers on, and goes back on once that is settled.
