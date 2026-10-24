@@ -272,6 +272,17 @@ SOFT_OVER = {w: {k: [s for s in SEEDS if SOFT_SPILL[w][k][s] > CRITERION] for k 
 SOFT_REM = {w: {k: float(np.mean([scored(k, s, w)["removal"] for s in SEEDS])) for k in BASELINES} for w in SOFT}
 STEP, POOL = SOFT
 
+
+# The rule the D2.2 design adopts from this report: the median over every coordinate axis but e₁, in the anchored run.
+def d22_spill(arm: str, seed: int, which: str) -> float:
+    dirs = [i for i in range(drops(arm, seed, which).shape[0]) if i != E1]
+    return scores(median_drop(arm, seed, which, dirs), seed, which)["worst_spill"]
+
+
+D22_OVER = {w: [s for s in SEEDS if d22_spill(FALLOFF, s, w) > CRITERION] for w in SOFT}
+# How much lower the own-run median puts spill than the median of the control does, under that rule, at most.
+OWN_SPILL_GAP = max(d22_spill(CONTROL, s, w) - d22_spill(FALLOFF, s, w) for w in (COORD, *SOFT) for s in SEEDS)
+
 # Light and dark inks, picked with `light_dark` inside the plot functions, where the theme is set.
 INK = {
     PAIRED: ("#888", "#999"),
@@ -727,9 +738,9 @@ def soft_table() -> str:
 rf"""
 ## Runs near the spill criterion (E4)
 
-The stored `falloff` runs are all well within the spill criterion, so a change of baseline could not move a run across it. Two arms of [soft-pool](../soft-pool/report.py), `step, soft τ` and `pool 1–3, soft τ`, come close to it at the same seeds: against e₁ in the control, {len(SOFT_OVER[STEP][PAIRED])} and {len(SOFT_OVER[POOL][PAIRED])} of their 8 runs spill over it. Do those counts hold against the medians? We compare the spill of each run, the largest over the four doses, under each baseline.
+The stored `falloff` runs are all well within the spill criterion, so a change of baseline could not move a run across it. Two arms of [soft-pool](../soft-pool/report.py), `step, soft τ` and `pool 1–3, soft τ`, come close to it at the same seeds: against e₁ in the control, {len(SOFT_OVER[STEP][PAIRED])} and {len(SOFT_OVER[POOL][PAIRED])} of their 8 runs spill over it. How do those counts change against the medians? We compare the spill of each run, the largest over the four doses, under each baseline.
 
-**What we saw.** For `step, soft τ` they do not: both runs over the criterion fall under it against either median. For `pool 1–3, soft τ` the count barely changes ({len(SOFT_OVER[POOL][PAIRED])} against e₁ in the control, {len(SOFT_OVER[POOL][CTRL_MED])} against the median of the control, {len(SOFT_OVER[POOL][SELF_MED])} against the median of the run), but which runs are over it changes. Seeds {" and ".join(str(s) for s in SOFT_OVER[POOL][PAIRED] if s not in SOFT_OVER[POOL][CTRL_MED])} fall under the criterion, and seed 705 rises to it: just over against the median of the control, and over by less than a thousandth against the median of the run (the bold 0.020 in the table). The figure shows each run under each baseline and, for scale, with no baseline subtracted.
+**What we saw.** For `step, soft τ` the count drops to none: both runs that were over the criterion fall under it against either median. For `pool 1–3, soft τ` the count barely changes ({len(SOFT_OVER[POOL][PAIRED])} against e₁ in the control, {len(SOFT_OVER[POOL][CTRL_MED])} against the median of the control, {len(SOFT_OVER[POOL][SELF_MED])} against the median of the run), but which runs are over it changes. Seeds {" and ".join(str(s) for s in SOFT_OVER[POOL][PAIRED] if s not in SOFT_OVER[POOL][CTRL_MED])} fall under the criterion, and seed 705 rises to it: just over against the median of the control, and over by less than a thousandth against the median of the run (the bold 0.020 in the table). The figure shows each run under each baseline and, for scale, with no baseline subtracted.
 <!-- REVIEW: "seed 705 rises just over it" now says it rises to the criterion. Against the own-run median it is 0.0205, and against the median over all 63 other axes (the D2.2 rule) in the run it is 0.0198, so which side it lands on is a matter of rounding. Verify: `SOFT_SPILL[POOL][SELF_MED][705]`, and `scores(median_drop(FALLOFF, 705, POOL, [i for i in range(64) if i != E1]), 705, POOL)["worst_spill"]`. -->
 
 {soft_figure()}
@@ -742,13 +753,13 @@ Which way a run moves depends on the op that spills. On every run over the crite
 
 Removal moves as little as it did for `falloff`, within a hundredth or two on average.
 
-So the soft-pool spill counts depend on the baseline at the edge: a run within about a hundredth of the criterion can fall on either side. The counts against the median of the control are the ones to compare with later experiments, since the D2.2 design now scores that way. That design takes its median with the syntax axes in, which leaves the counts against the median of the control as they are.
-<!-- REVIEW: "The counts against the median" narrowed to the median of the control, and a clause added on the design's rule, which takes the median over all 63 other axes rather than the 61 reference axes here. Under that rule the control-median counts and seeds are the same (none, and 705, 707, 711); the own-run count for `pool 1–3, soft τ` drops to 2 because 705 lands at 0.0198. Verify: `scores(median_drop(arm, s, w, [i for i in range(64) if i != E1]), s, w)["worst_spill"]` for arm in (CONTROL, FALLOFF). -->
+So the soft-pool spill counts depend on the baseline at the edge: a run within about a hundredth of the criterion can fall on either side. The counts against the median of the run are the ones to compare with later experiments, since the D2.2 design now scores that way. That design takes its median with the syntax axes in, which puts seed 705 just under the criterion, so `pool 1–3, soft τ` has {len(D22_OVER[POOL])} runs over it on that rule (seeds {" and ".join(str(s) for s in D22_OVER[POOL])}) and `step, soft τ` has {len(D22_OVER[STEP]) or "none"}.
+<!-- REVIEW: paper round 2 adopted the own-run median as the D2.2 default, so this paragraph now points at the counts against the median of the run. Under the design rule (all 63 other axes) the own-run count for `pool 1–3, soft τ` is 2 (707, 711), because 705 lands at 0.0198; `step, soft τ` stays at none. Verify: `D22_OVER`, and `d22_spill(FALLOFF, 705, POOL)`. -->
 """
 
 # %%
 
-r"""
+rf"""
 ## Discussion
 
 For the stored runs of `falloff` the paired baseline was sound, in that it rarely moved the result. On most seeds e₁ happened to be a quiet axis of the control. Where it was not, the error was a tenth of removal, on one seed. The numbers that split-anti-seeds quoted stand. The paired baseline moved a spill count only for runs at the edge of the criterion, as in the soft-pool runs of E4.
@@ -759,5 +770,5 @@ The agreement of the two medians suggests a baseline needs no control at all: th
 
 But the agreement rests on these sixteen pairs, and a recipe that disturbed the quiet axes of the anchored run would break it. So a control is still the way to check that a run-internal baseline is sound.
 
-For later experiments this suggests a simpler scoring rule. Leaving the syntax axes in barely moves the median, so the baseline could be the median over every coordinate axis but e₁, with no ranking by energy. If it is taken in the anchored run, an experiment would need controls only now and then, to confirm that the two medians still agree, rather than one per seed. All of this assumes an optimizer like Adam, which keeps most axes quiet. Under one with no privileged basis, any reference direction touches the spike, so the baseline would be larger and an edit of any one direction dearer.
+For later experiments the D2.2 design now takes a simpler scoring rule from this report. Leaving the syntax axes in barely moves the median, so the baseline is the median over every coordinate axis but e₁, with no ranking by energy, taken in the anchored run. An experiment then needs controls only now and then, to confirm that the two medians still agree, rather than one per seed. The one difference to watch is that the median of the run puts spill a little lower than the median of the control (by up to {OWN_SPILL_GAP:.3f} here, on one seed). All of this assumes an optimizer like Adam, which keeps most axes quiet. Under one with no privileged basis, any reference direction touches the spike, so the baseline would be larger and an edit of any one direction dearer.
 """
