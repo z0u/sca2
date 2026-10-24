@@ -676,6 +676,10 @@ The syntax tokens sit on that rotated spike: the `?`, `,`, ⏎ and `=` embedding
 
 On {len(MOVED)} of 8 seeds ({", ".join(str(s) for s in MOVED)}) the spike of the anchored run sits on a different rotated axis from that of the control, and on the others on the same one. In the stored runs we found the spike on the same coordinate in the control and the anchored run at every seed we checked. So a move here fits the anti term steering the choice, but the two runs also differ in their loss terms, and could settle differently for that reason alone.
 
+/// note | A later finding
+The stored runs move their spike too. Scoring every coordinate axis of the stored `falloff` runs and controls, [reference-baseline](/docs/m2/reference-baseline/report.py) (E1) found the spike of `falloff` on a different coordinate from the control on 3 of 8 seeds, under plain Adam. So a move under the rotation is no sign of the anti term in particular: a change of loss alone may be enough.
+///
+
 {home_table()}
 
 e₁ now costs what a direction costs, plus the cost of its overlap with the spike. In the controls, the 63 other coordinate axes cost {num(AXIS_MEDIAN)} at the median, about what a random direction costs in the stored controls, and a rotated axis off the spike costs {num(ROT_MEDIAN)}, what an ordinary axis costs in the stored runs. So the cheap directions are now the rotated axes.

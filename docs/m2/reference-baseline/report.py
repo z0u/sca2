@@ -291,7 +291,7 @@ This report trains nothing. It scores stored runs: the eight `falloff` runs (the
 
 This is an exploratory re-scoring, with no preregistration and no gate. The model seeds are 704 to 711, and the controls are the 400-epoch ones. Each anchored run pairs with the control at its seed, which shares its initialization, batches, and label draws.
 
-The edit is the dose edit of ex-2.2.22, unchanged. It projects a direction out of the state at every position and slice, removing a quarter, a half, three quarters, or all of the component along it. It is scored on the whole held-out set of every op, as before.
+The edit is the dose edit of ex-2.2.22, unchanged. It projects a fixed direction out of the state at every position and slice, removing a quarter, a half, three quarters, or all of the component along it. It is scored on the whole held-out set of every op, as before.
 
 Along e₁ the drops this edit causes reproduce the published dose scoring to rounding. New here is the same edit along every other coordinate axis, and, for the rotated-basis runs, along every axis of the rotated basis Adam acted in.
 
@@ -613,4 +613,6 @@ The median over the quiet axes removes that dependence on the draw, and it takes
 The agreement of the two medians suggests a baseline needs no control at all: the quiet axes of the anchored run serve. That would matter for a recipe meant for real models, where a matched control is costly or impossible, and it is what spill-timing already does along training.
 
 But the agreement rests on these sixteen pairs, and a recipe that disturbed the quiet axes of the anchored run would break it. So a control is still the way to check that a run-internal baseline is sound.
+
+For later experiments this suggests a simpler scoring rule. Leaving the syntax axes in barely moves the median, so the baseline could be the median over every coordinate axis but e₁, with no ranking by energy. If it is taken in the anchored run, an experiment would need controls only now and then, to confirm that the two medians still agree, rather than one per seed. All of this assumes an optimizer like Adam, which keeps most axes quiet. Under one with no privileged basis, any reference direction touches the spike, so the baseline would be larger and an edit of any one direction dearer.
 """
