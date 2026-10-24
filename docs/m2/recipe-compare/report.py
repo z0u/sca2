@@ -831,12 +831,11 @@ def e3_table() -> str:
                 f"`{SHOWN[c]}`",
                 ", ".join(f"slice {k}: {v}" for k, v in peaks.items()),
                 *(fmt(SLICE_REMOVAL[c][n]) for n in SLICE_SETS),
-                fmt(SLICE_SPILL[c]["block 1"], ".3f"),
-                fmt(SLICE_SPILL[c]["blocks 2 to 4"], ".3f"),
+                *(fmt(SLICE_SPILL[c][n], ".3f") for n in ("embedding", "block 1", "blocks 2 to 4", "blocks 1 to 4")),
                 fmt(LEAN_R[c]),
             ]
         )
-    rows.append(["control", "", "", "", "", "", "", fmt(LEAN_R[CONTROL])])
+    rows.append(["control", *[""] * 8, fmt(LEAN_R[CONTROL])])
     return table_html(
         [
             "condition",
@@ -844,8 +843,10 @@ def e3_table() -> str:
             "removal, block 1 alone ↑",
             "removal, blocks 2 to 4 ↑",
             "removal, block 4 alone",
+            "spill, embedding alone ↓",
             "spill, block 1 alone ↓",
             "spill, blocks 2 to 4 ↓",
+            "spill, blocks 1 to 4 ↓",
             "lightness on e₁, embedding table",
         ],
         rows,
@@ -890,7 +891,7 @@ e3_seed_table()
 # %%
 
 rf"""
-The same restricted edits show where the spill of E1 comes in. The edit at blocks 2 to 4 costs the other ops nothing under any recipe. The edit at block 1 alone costs them a little under `falloff`, more under `step, soft τ`, and most under the pool, where the seeds over the criterion in E1 are the ones whose block-1 edit costs most (707 and 711), along with 708. Two edits not in the table close the account: the edit at the embedding alone costs the other ops nothing under any recipe (under the pool, {num(SLICE_SPILL[POOL]["embedding"].mean(), ".3f")} on average and {num(SLICE_SPILL[POOL]["embedding"].max(), ".3f")} at most), and the edit at blocks 1 to 4 costs what the edit at every slice does. So under the pool the spill enters with block 1. The restricted edits are not the full edit taken apart (each later block reads what the earlier ones were given), and the block-1 edit on its own overstates the cost: under `step, soft τ` it goes over the criterion on {int((SLICE_SPILL[STEP_SOFT]["block 1"] > CRITERION).sum())} seeds whose full edit spills nothing. So it says where the other ops are open to the edit, and not how much the full edit will cost them.
+The same restricted edits show where the spill of E1 comes in. The edit at blocks 2 to 4 costs the other ops nothing under any recipe. The edit at block 1 alone costs them a little under `falloff`, more under `step, soft τ`, and most under the pool, where the seeds over the criterion in E1 are the ones whose block-1 edit costs most (707 and 711), along with 708. Two more edits close the account: the edit at the embedding alone costs the other ops nothing under any recipe, and the edit at blocks 1 to 4 costs what the edit at every slice does. So under the pool the spill enters with block 1. The restricted edits are not the full edit taken apart (each later block reads what the earlier ones were given), and the block-1 edit on its own overstates the cost: under `step, soft τ` it goes over the criterion on {int((SLICE_SPILL[STEP_SOFT]["block 1"] > CRITERION).sum())} seeds whose full edit spills nothing. So it says where the other ops are open to the edit, and not how much the full edit will cost them.
 <!-- REVIEW: added the embedding-only and blocks-1-to-4 edits, and the step's block-1 spill, so the block-1 reading rests on an elimination rather than on the block-1 edit alone. Verify: SLICE_SPILL["embedding"] and ["blocks 1 to 4"] against ["every slice"] in the stored `edits`. -->
 
 The embedding table leans the same way, but it does not account for the spill on its own. Under the pool the e₁ components of the color embeddings follow lightness more closely than under the step on average, and closely on every seed, where under the step it varies from seed to seed: darker colors sit further along e₁. That is the lean of [embedding-lean](/docs/m2/embedding-lean/report.py), the stand-in the model offers for `difference` before it has read the context, and the reason the step leaves block 1 out of the pull. In the control the same correlation scatters around zero. So the pool, by pulling slice 1, seems to bring back part of the lean. But the edit at the embedding alone, which takes that lean out, spills nothing, and in the states at slice 1 the lean has faded to about the same level under all three recipes ({num(LEAN_STATES[POOL][:, 1].mean())} under the pool against {num(LEAN_STATES[STEP_SOFT][:, 1].mean())} under `step, soft τ`). So what the block-1 edit removes is what block 1 writes onto e₁ for the other ops, which these measurements do not resolve, and the lean in the table is a sign of the pull reaching slice 1 rather than the thing the edit takes away. Within the pool the lean is about the same on every seed, so it does not say why 707 and 711 spill and 704 does not either.
