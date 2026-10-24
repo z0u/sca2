@@ -395,7 +395,7 @@ r"""
 
 /// tip |
 <!-- lede -->
-We scored the recipe of record and two soft-start recipes the same way, on the runs we already had. The soft start on the step stayed close to the recipe of record on every measurement. The pool over slices 1 to 3 removed about as much and cost the task least, but its edit still spilled past the criterion on two seeds of eight. That spill enters with the edit at block 1, the one slice the pool pulls and the step leaves alone.
+We scored the recipe of record and two soft-start recipes the same way, on the runs we already had. The soft start on the step stayed close to the recipe of record on every measurement. The pool over slices 1 to 3 removed about as much and cost the task least, but its edit still spilled past the criterion on some seeds. That spill enters with the edit at block 1, the one slice the pool pulls and the step leaves alone.
 ///
 <!-- REVIEW: "matched ... on every measurement" became "stayed close to": the soft start removes less than `falloff` on seven seeds of eight (paired), by a couple of hundredths on the mean. Verify: the paired column of the E1 table. "the spill comes in at block 1" became "enters with the edit at block 1", which is what the restricted edits of E3 show. -->
 
@@ -886,6 +886,54 @@ Each recipe settles in one place on every seed. Under the step, α at the exampl
 The edit finds the op wherever it settles. The edit at blocks 2 to 4 alone removes most of it under every recipe, except at seed 710. There it falls short under all three, as it did in every arm of split-anti-seeds, and the edit at block 1 alone removes nearly all of it. The edit at block 4 alone removes nothing in any recipe, the pool included. Under the pool the edit at block 1 alone removes more, and more evenly across seeds, than under the step, which fits the pool pulling there.
 """
 
+
+@memo
+def e3_spill_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="recipe-compare-slice-spill",
+        alt_text=alt_text,
+        caption=f"""
+            **Spill under the edit restricted to a set of slices**, by condition: the largest drop on another op
+            under the full edit at every position of those slices only, net of the same edit on the control at the
+            seed. One panel per slice set, the {len(SEEDS)} seeds as faded dots over their range and the seed mean
+            in the marker of the condition; the dashed rule is the selectivity criterion, with the side that misses
+            it hatched. The restricted edits are not the full edit taken apart, so their spill does not add up to it.
+            The baseline here is the control, not the median of E1, and against the control the full edit puts two
+            `step, soft τ` runs over the criterion too (E4 of reference-baseline), so compare the panels with one
+            another rather than with E1.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        fig, axes = plt.subplots(1, 4, figsize=(6.4, 2.5), layout="constrained", sharey=True)
+        axes = cast(AxesRow, axes)
+        rng = np.random.default_rng(0)
+        for ax, name in zip(axes, data["sets"], strict=True):
+            for i, c in enumerate(ex.CONDITIONS):
+                dots(ax, i, data["spill"][c][name], c, rng)
+            ax.set_ylim(-0.02, 0.1)
+            ax.set_title(name, fontsize=8)
+            condition_ticks(ax)
+            gate_line(ax, CRITERION, "above")
+        axes[0].set_ylabel("spill", fontsize=8)
+        return fig
+
+    return _plot()
+
+
+def e3_spill_figure() -> str:
+    alt = (
+        "Spill stays near zero under every recipe when only the embedding or only blocks 2 to 4 are edited. Edited "
+        "at block 1 alone, or at blocks 1 to 4, the pool spills most, with a few seeds over the criterion and one "
+        "far over it; step, soft tau has a few seeds just over it at block 1 alone and at blocks 1 to 4."
+    )
+    sets = ("embedding", "block 1", "blocks 2 to 4", "blocks 1 to 4")
+    return e3_spill_draw({"sets": sets, "spill": SLICE_SPILL}, alt)
+
+
+# %%
+
+e3_spill_figure()
+
 # %%
 
 e3_seed_table()
@@ -917,10 +965,10 @@ The measure that could still set them apart is how often each loses the anchor, 
 
 `pool 1–3, soft τ` is close behind on removal and ahead on the task, and the op settles in the same place on every seed, which is what one would want of a recipe that chooses the slice for itself. Its shortfall is spill.
 
-If the reading of E3 holds, that spill comes from what the pool asks of block 1, and not from pooling over slices as such. Block 1 is the one slice the pool pulls and the step leaves alone, and the edit there is where the spill enters. What block 1 writes onto e₁ for the other ops is not resolved here, though.
+The edit at block 1 is where that spill enters, and block 1 is the one slice the pool pulls and the step leaves alone. So the measurements point at the edge of its range rather than at pooling over slices as such, though no run here separates the two, and what block 1 writes onto e₁ for the other ops is not resolved.
 
 A pool over slices 2 to 4 would separate the two while still leaving the slice for the pull to choose. These runs do not say whether the op would then settle on block 3 or 4, or whether it would keep the anchor on every seed as the soft start did here.
 
-The pool is the easier recipe to explain because it needs no choice of block within its range. It still has a range, slices 1 to 3, and the measurements here point at the edge of that range rather than at the pooling, though no run here separates the two.
-<!-- REVIEW: "suggest the edge of that range matters more than the pooling" became "point at the edge ... though no run here separates the two": the scope says a gap between the pool and the step cannot be put down to either change alone, and the discussion should not claim more. The lean sentence in the paragraph above now follows the lowered reading in E3. -->
+The pool is the easier recipe to explain because it needs no choice of block within its range. It still has a range, slices 1 to 3, and the choice of that range is what the spill points at.
+<!-- REVIEW: "suggest the edge of that range matters more than the pooling" became "point at the edge ... though no run here separates the two": the scope says a gap between the pool and the step cannot be put down to either change alone, and the discussion should not claim more. The style review merged the two places that said it, so the hedge now sits once, in the paragraph on block 1. -->
 """
