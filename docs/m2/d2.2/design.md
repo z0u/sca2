@@ -71,7 +71,7 @@ Edit
 
 ### Scoring
 
-Every run is scored on held-out contexts against the control, a model trained without the anchor at the same seed.
+Every run is scored on held-out contexts against the control, a model trained without the anchor at the same seed, and against a baseline of edits along other axes (below).
 
 Task
 : The probability the model puts on the right answer (expected exact match), beside the Bayes ceiling, which is the best any model could do given the examples. The task gate fails if the mean change against the control falls below −0.02, or the change on any one op below −0.05.
@@ -80,7 +80,7 @@ Removal
 : The drop on `difference` under the edit, as a share of the way to the *target null*: what an ideal predictor that had lost `difference` and nothing else would answer. It has to grow with the dose.
 
 Selectivity
-: No other op may drop by more than 0.02 at any dose (the *selectivity criterion*). The largest such drop is the *spill*. Both drops, here and under removal, are net of what the same edit does to the control.
+: No other op may drop by more than 0.02 at any dose (the *selectivity criterion*). The largest such drop is the *spill*. Both drops, here and under removal, are net of the baseline below.
 
 Landing
 : The share of the distance to the target null that the full edit covers, context by context.
@@ -92,6 +92,11 @@ The anchor direction and the baseline
 : e₁ is a coordinate axis, and under Adam the coordinate axes are a privileged basis: the model puts its separators one-hot on one axis and `=` on another, and leaves most of the rest quiet, so e₁ in a control is usually a quiet axis. The anchor does not need this. With the basis of the optimizer rotated, so that e₁ is an ordinary direction, `falloff` held and removed as before on all eight seeds. The baseline does need it: netting against the control assumes the edit takes little from the control, which fails on seeds where e₁ overlaps the syntax spike of the control. So a reference edit compared with e₁ is another coordinate axis off the syntax axes, not a random direction, and raw removal is reported beside net removal whenever the basis of the optimizer changes. The spike itself is there under every optimizer tried; an optimizer with no privileged basis only moves it off the axes, which makes a typical direction dearer to remove.
 
     From [rotated-basis](../rotated-basis/report.py) and the [optimizer scout](../optimizer-scout/report.py).
+
+Baseline
+: The median drop over the same edit along every other coordinate axis (all but e₁), per op and dose, in the control at the same seed. It replaces the drop the e₁ edit causes in the control, which depends on where e₁ happens to sit there, from among the quietest axes to among the busiest few. The same median taken in the anchored run itself is reported beside it, and so is raw removal, with nothing subtracted. On the stored runs of `falloff` the two medians agree within 0.02 of removal, and the numbers quoted before the change barely move (mean removal 0.85 against 0.87); on the rotated-basis runs the median brings the two seeds where the paired baseline fell short back beside the rest. Where the optimizer acts in another basis, the axes are those of that basis. Experiments from before this rule quote the paired baseline.
+
+    From [reference-baseline](../reference-baseline/report.py).
 
 From [ex-2.2.16](../ex-2.2.16/report.py), [ex-2.2.21](../ex-2.2.21/report.py), [ex-2.2.22](../ex-2.2.22/report.py), and [split-anti-seeds](../split-anti-seeds/report.py) (task gate and lost anchors).
 
@@ -197,7 +202,7 @@ RMU, SAE and LUNAR rows wait for D2.3. In the [backlog](/todo/science/baseline-c
 
 ### The baseline and the basis
 
-*A baseline that does not depend on where e₁ sits in the control.* Net removal subtracts what the e₁ edit does to the control, a single draw: in the Adam controls e₁ is among the quietest axes at one seed and among the busiest few at another. The median over edits along several coordinate axes off the syntax axes, like the reference edit of the spill-timing experiment, would not depend on that draw. It is a re-scoring of stored runs, and would likely change the net numbers quoted so far only a little. In the [backlog](/todo/science/baseline-that-does-not-depend-on-e1-in-the-control.md).
+*A baseline without a control.* The median over the quiet axes is now the baseline (Scoring). Taken in the anchored run itself, it agreed with the one taken in the control on every stored run of `falloff` and of rotated-basis ([reference-baseline](../reference-baseline/report.py)). If that keeps holding, an experiment could train controls only now and then, to check the agreement, rather than one per seed.
 
 *An anchored arm under Muon* (low priority). Muon learns the task as well as Adam at three times the rate its finder suggests, with no privileged basis. An anchor there would have no quiet axis to take, so it would need its own term weights, and a finer rate ladder first. Worth running if the project moves toward models trained without Adam, or to see whether an anchored color grades differently. In the [backlog](/todo/science/anchored-arm-under-muon.md).
 
@@ -225,6 +230,6 @@ The verification measurements (D2.3), though verification lines are allowed in t
 
 <details markdown="1"><summary>About this page</summary>
 
-Rewritten 2026-10-06, to say where D2.2 stands in one sitting. The plan as it stood through ex-2.2.22, with its route, risk table, and decisions, is [archived](design-2026-10.md) and in git. Updated 2026-10-07 with the [ex-2.2.22](../ex-2.2.22/report.py) decision: no cap, every slice, three examples per context. Updated 2026-10-13 for the work since: 400 epochs (ex-2.2.23), the lean and the pull on blocks 2 to 4 (embedding-lean, late-pull), and the anti weight by slice with the falloff as the recipe of record (slice-terms, split-anti-seeds). Updated 2026-10-21 for the anchor-ramp and soft-pool experiments (the step pull and fixed τ_p stay; lost anchors and the spill of a soft pool), with the next steps rewritten as open choices. Revised the same day after review: lost anchors as a gap in claim (a), the scoring as its own section, what the write bound is in this grammar, a loss-rate screen, and the comparisons with other methods. Claim (d) restated 2026-10-22, in review of the [edit-effects report](../edit-effects/report.py): the turn being set by the alignment holds by construction, so the claim now rests on what the blocks after an edit put back. Updated 2026-10-24 for the [rotated-basis](../rotated-basis/report.py) experiment and the [optimizer scout](../optimizer-scout/report.py): e₁ is a privileged axis under Adam, the anchor does not depend on it, and the baseline does.
+Rewritten 2026-10-06, to say where D2.2 stands in one sitting. The plan as it stood through ex-2.2.22, with its route, risk table, and decisions, is [archived](design-2026-10.md) and in git. Updated 2026-10-07 with the [ex-2.2.22](../ex-2.2.22/report.py) decision: no cap, every slice, three examples per context. Updated 2026-10-13 for the work since: 400 epochs (ex-2.2.23), the lean and the pull on blocks 2 to 4 (embedding-lean, late-pull), and the anti weight by slice with the falloff as the recipe of record (slice-terms, split-anti-seeds). Updated 2026-10-21 for the anchor-ramp and soft-pool experiments (the step pull and fixed τ_p stay; lost anchors and the spill of a soft pool), with the next steps rewritten as open choices. Revised the same day after review: lost anchors as a gap in claim (a), the scoring as its own section, what the write bound is in this grammar, a loss-rate screen, and the comparisons with other methods. Claim (d) restated 2026-10-22, in review of the [edit-effects report](../edit-effects/report.py): the turn being set by the alignment holds by construction, so the claim now rests on what the blocks after an edit put back. Updated 2026-10-24 for the [rotated-basis](../rotated-basis/report.py) experiment and the [optimizer scout](../optimizer-scout/report.py): e₁ is a privileged axis under Adam, the anchor does not depend on it, and the baseline does. Updated the same day for [reference-baseline](../reference-baseline/report.py): the baseline is now the median over the other coordinate axes.
 
 </details>

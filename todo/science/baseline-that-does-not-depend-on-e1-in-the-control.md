@@ -1,5 +1,6 @@
 ---
-status: partial
+status: done
+closed: 2026-10-24
 tags: [D2.2, scoring, methodology]
 opened: 2026-10-24
 ---
@@ -11,4 +12,4 @@ The candidate is the median drop over edits along several coordinate axes off th
 
 ## Notes
 
-**2026-10-24, reference-baseline** — The re-scoring is done in [reference-baseline](/docs/m2/reference-baseline/report.py), and also covers the rotated-basis runs. Against the median of the reference axes, removal of `falloff` moves from 0.85 to 0.87 on average (a tenth on seed 705 only), and every run stays within the spill criterion; on the rotated-basis runs the median puts the short seeds back beside the rest. The median taken in the anchored run itself agrees with the one taken in the control. Left open: whether to adopt the median as the scoring rule in the D2.2 design, and whether in the control or in the anchored run.
+**2026-10-24, reference-baseline** — The re-scoring is done in [reference-baseline](/docs/m2/reference-baseline/report.py), and also covers the rotated-basis runs. Against the median of the reference axes, removal of `falloff` moves from 0.85 to 0.87 on average (a tenth on seed 705 only), and every run stays within the spill criterion; on the rotated-basis runs the median puts the short seeds back beside the rest. The median taken in the anchored run itself agrees with the one taken in the control. Adopted after the paper review: the D2.2 design now scores against the median over every coordinate axis but e₁, in the control, with the own-run median beside it. Shared scoring code for it is a separate item, [median-baseline-in-the-shared-scoring](/todo/eng/median-baseline-in-the-shared-scoring.md).
