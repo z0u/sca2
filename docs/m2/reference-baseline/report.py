@@ -252,14 +252,15 @@ DRAW_WIDTH = {
 DRAW_SPILL_HI = {w: max(float(np.percentile(d[:, 1], 95)) for d in DRAWS[w].values()) for w in (COORD, ROT)}
 LOST_PAIRED_ROT = [s for s in SEEDS if REM[ROT][PAIRED][s] < 0.5]
 
+# Light and dark inks, picked with `light_dark` inside the plot functions, where the theme is set.
 INK = {
-    PAIRED: light_dark("#888", "#999"),
-    CTRL_MED: light_dark("#0b3c73", "#cfe6ff"),
-    SELF_MED: light_dark("#2a9d8f", "#7fd8c8"),
-    "raw": light_dark("#c0392b", "#ff8a76"),
+    PAIRED: ("#888", "#999"),
+    CTRL_MED: ("#0b3c73", "#cfe6ff"),
+    SELF_MED: ("#2a9d8f", "#7fd8c8"),
+    "raw": ("#c0392b", "#ff8a76"),
 }
 MARK = {PAIRED: "o", CTRL_MED: "s", SELF_MED: "D", "raw": "^"}
-GHOST = light_dark("#bbb", "#555")
+GHOST = ("#bbb", "#555")
 
 
 # %%
@@ -269,7 +270,7 @@ rf"""
 
 /// tip |
 <!-- lede -->
-Removal and spill have been measured net of what the same edit does to the control at the same seed, so they depend on where e₁ happens to sit in that control. We re-scored the stored runs of the recipe of record against a baseline that does not depend on it: the median drop over edits along the other quiet coordinate axes. The numbers quoted so far barely move. On the rotated-basis runs, where the old baseline fell short, the new one brings the short seeds back up beside the rest.
+Removal and spill have been measured net of what the same edit does to the control at the same seed, so they depend on where the anchored axis, e₁, happens to sit in that control. We re-scored the stored runs of the recipe of record against a baseline that does not depend on it: the median drop over edits along the other quiet coordinate axes. The numbers quoted so far barely move, and on the rotated-basis runs the new baseline brings the short seeds back up beside the rest.
 ///
 
 The question comes from [rotated-basis](../rotated-basis/report.py), where Adam acted in a rotated basis.[^adam] On two seeds e₁ overlapped the syntax direction of the control, so the edit took half of the op from the control as well. Removal net of the control then fell short, although the anchored runs removed the op as before.
@@ -282,9 +283,9 @@ This report trains nothing. It scores stored runs: the eight `falloff` runs (the
 
 ## Observations
 
-- [Where e₁ sits in the control (E1)](#where-e-sits-in-the-control-e1): it varies by seed. On some seeds e₁ is among the quietest axes of the control, and on one it is among the five costliest. The median over the reference axes is steady across seeds.
+- [Where e₁ sits in the control (E1)](#where-e-sits-in-the-control-e1): it varies by seed. On some seeds e₁ is among the quietest axes of the control, and on one it is among the five costliest. The median over the reference axes is steady across seeds. Separately, on three seeds the anchored run keeps its spike of energy on a different coordinate from the control.
 - [Net removal and spill against the new baseline (E2)](#net-removal-and-spill-against-the-new-baseline-e2): little changes. The mean removal rises by a hundredth or two, mostly on the one seed where e₁ was a busy axis of the control. Every run stays within the spill criterion. The median taken in the anchored run itself, with no control, agrees with the one taken in the control.
-- [The rotated-basis runs (E3)](#the-rotated-basis-runs-e3): the new baseline, taken along the rotated axes, brings the removal on the two short seeds up to the level of the rest.
+- [The rotated-basis runs (E3)](#the-rotated-basis-runs-e3): the new baseline, taken along the rotated axes, brings the removal on the two seeds below half, and a third at six tenths, up to the level of the rest.
 
 ## Scope and method
 
@@ -292,13 +293,12 @@ This is an exploratory re-scoring, with no preregistration and no gate. The mode
 
 The edit is the dose edit of ex-2.2.22, unchanged. It projects a direction out of the state at every position and slice, removing a quarter, a half, three quarters, or all of the component along it. It is scored on the whole held-out set of every op, as before.
 
-For e₁ these drops reproduce the published dose scoring to rounding. New here is the same edit along every other coordinate axis, and, for the rotated-basis runs, along every axis of the rotated basis Adam acted in.
+Along e₁ the drops this edit causes reproduce the published dose scoring to rounding. New here is the same edit along every other coordinate axis, and, for the rotated-basis runs, along every axis of the rotated basis Adam acted in.
 
 A reference axis is any coordinate axis other than e₁ and the two that hold the most energy[^energy] of the stream, averaged over slices. Those two are where the model puts its syntax tokens. For the rotated-basis runs the reference axes are the rotated axes, with the two highest in energy left out the same way.
 <!-- REVIEW: "Those two are where the model puts its syntax tokens" is the rule's intent; E1 shows the second axis by energy is a mild one on 707 and 708, where no other axis costs more than about 0.2. -->
 
-One coordinate holds about {num(np.mean(list(TOP_SHARE.values())), ".1f")} of the energy in every control. Projecting it out takes most of the score of every op, and on some seeds all of it.
-<!-- REVIEW: "costs every op about half its score" read the cost of the top axis (about 0.5, the drop averaged over ops) as a share of the score; the mean clean score over ops is about 0.58, so that drop is most to all of it. Verify: `drop[top][FULL_DOSE]` over `clean` per op in the control axes data is 0.7 to 1.0 on every seed, and 1.0 on 707 and 708. -->
+One coordinate holds about {num(np.mean(list(TOP_SHARE.values())), ".1f")} of the energy in every control, and E1 shows what projecting it out costs.
 
 [^energy]: Energy: the sum of the squared projections of the states onto a direction. The share of a direction is its energy over the total.
 
@@ -306,7 +306,7 @@ One coordinate holds about {num(np.mean(list(TOP_SHARE.values())), ".1f")} of th
 
 - Removal: the net drop in score on `difference` under the full edit along e₁, as a share of the way from the clean score to the target null. Higher is better.
 - Spill: the largest net drop on another op under the e₁ edit, over the four doses. A run is within the criterion when it is at most {CRITERION:g}. Lower is better.
-- The cost of an axis: the drop under the full edit along it, averaged over the ops.
+- The cost of an axis: the drop under the full edit along it, averaged over the ops. A quiet axis is one that costs little.
 
 Each of these is net of a baseline. We compare three, each taken per op and per dose:
 
@@ -328,10 +328,9 @@ def cost_figure() -> str:
         "median": [REF_COST[s] for s in SEEDS],
     }
     alt = f"""
-        The cost of projecting out each coordinate axis of the control, one column per seed. Most axes sit in a
-        band from about 0.01 to 0.06, the median of the reference axes is near 0.03 on every seed, and the two
-        syntax axes sit apart, near 0.5 on most seeds. e₁, drawn as a square, falls low in the band on most seeds
-        and near its top at seed {BUSIEST}.
+        On every seed most axes cost between about 0.01 and 0.06, around a steady median near 0.03, and the two
+        syntax axes stand far above them. e₁ falls low in that band on most seeds, and near its top at seed
+        {BUSIEST}.
     """
     return cost_draw(data, alt)
 
@@ -354,11 +353,18 @@ def cost_draw(data: dict, alt_text: str) -> str:
             c = np.asarray(c)
             ref = [j for j in range(len(c)) if j != E1 and j not in syn]
             ax.scatter(
-                i + rng.uniform(-0.18, 0.18, len(ref)), np.maximum(c[ref], 1e-2), s=6, color=GHOST, lw=0, zorder=1
+                i + rng.uniform(-0.18, 0.18, len(ref)),
+                np.maximum(c[ref], 1e-2),
+                s=6,
+                color=light_dark(*GHOST),
+                lw=0,
+                zorder=1,
             )
-            ax.plot([i - 0.28, i + 0.28], [med, med], color=INK[CTRL_MED], lw=1.8, zorder=2)
-            ax.scatter([i] * len(syn), c[syn], s=22, facecolor="none", edgecolor=INK["raw"], lw=0.9, zorder=3)
-            ax.scatter([i], [c[E1]], s=26, marker="s", color=INK[PAIRED], edgecolor=light_dark("#000", "#fff"),
+            ax.plot([i - 0.28, i + 0.28], [med, med], color=light_dark(*INK[CTRL_MED]), lw=1.8, zorder=2)
+            ax.scatter(
+                [i] * len(syn), c[syn], s=22, facecolor="none", edgecolor=light_dark(*INK["raw"]), lw=0.9, zorder=3
+            )
+            ax.scatter([i], [c[E1]], s=26, marker="s", color=light_dark(*INK[PAIRED]), edgecolor=light_dark("#000", "#fff"),
                        lw=0.6, zorder=4)  # fmt: skip
         ax.set_yscale("log")
         ax.set_ylim(1e-2, 1)
@@ -387,7 +393,7 @@ def rank_table() -> str:
     return table_html(
         [
             "seed",
-            "e₁ by cost, control",
+            "e₁ rank by cost, control",
             "e₁ cost, control",
             "reference median, control",
             "syntax axes cost, control",
@@ -409,17 +415,19 @@ rf"""
 
 How typical an axis is e₁ in a control? If it is always among the quiet ones, the paired baseline and the median of the quiet axes should agree, and nothing quoted so far would move. If its place varies by seed, so does the paired baseline.
 
-**What we saw.** Its place varies. On two seeds e₁ is the second quietest axis of the control. At seed {BUSIEST} it is the {ordinal(RANK[BUSIEST])} costliest of 64, with about twice the cost of the median reference axis. The median itself is steady across seeds.
+**What we saw.** Its place varies. On two seeds e₁ is the second quietest axis of the control. At seed {BUSIEST} it is the {ordinal(RANK[BUSIEST])} costliest of 64 (the high square in the figure below), with about twice the cost of the median reference axis. The median itself is steady across seeds.
 
 {cost_figure()}
 
 {rank_table()}
 
-The axis with the most energy takes most of the score of every op on every seed, and all of it on 707 and 708. The second costs as much on most seeds, but on {" and ".join(str(s) for s in MILD_SECOND)} it is a milder axis, and on 706 two reference axes cost more than it does. So ranking by energy only roughly finds the costly axes.
+So the paired baseline is one draw from the axes of the control, and that draw ranges from one of the quietest axes to one of the busiest few.
+
+The axis with the most energy takes most of the score of every op on every seed, and all of it on 707 and 708.
+<!-- REVIEW: "costs every op about half its score" read the cost of the top axis (about 0.5, the drop averaged over ops) as a share of the score; the mean clean score over ops is about 0.58, so that drop is most to all of it. Verify: `drop[top][FULL_DOSE]` over `clean` per op in the control axes data is 0.7 to 1.0 on every seed, and 1.0 on 707 and 708. -->
+ The second (the lower open circle) costs as much on most seeds, but on {" and ".join(str(s) for s in MILD_SECOND)} it is a milder axis, and on 706 two reference axes cost more than it does. So ranking by energy only roughly finds the costly axes.
 
 Leaving the syntax axes out of the reference set hardly matters: the median over all 63 axes other than e₁ gives a removal within {num(NO_EXCL, ".3f")} of the median without them, on every seed. A median of a few dozen axes is not swayed by two.
-
-So the paired baseline is one draw from the axes of the control, and that draw ranges from the quietest axis to one of the busiest few.
 
 On {len(SPIKE_MOVED)} of 8 seeds ({", ".join(str(s) for s in SPIKE_MOVED)}) the `falloff` run puts its most energetic axis (the spike) on a different coordinate from the control at the same seed, at every slice, and that coordinate holds almost nothing in the control. Rotated-basis expected otherwise: it found the spike on the same coordinate in both runs on the seeds it checked, and took a move under the rotated basis as a sign that the anti term steers it.
 <!-- REVIEW: rotated-basis E3 says "In the stored runs we found the spike on the same coordinate in the control and the anchored run at every seed we checked." Here the top-energy coordinate differs on the seeds listed. Verify: `energy` of `falloff-s<seed>` and `control-s<seed>` in the axes data, averaged over slices; the result holds at the last slice too. Checked against the axes data: on 706, 707 and 708 the top-energy coordinate of `falloff` differs from that of the control at each of the five slices, and the control holds under 0.02 of its energy on that coordinate; on the other five seeds it is the same coordinate at every slice. -->
@@ -441,18 +449,15 @@ def scoring_figure(which: str) -> str:
     }
     if which == COORD:
         alt = f"""
-            Removal (top) and spill (bottom) per seed, under each baseline and with nothing subtracted. Removal sits
-            between about 0.77 and 0.91 under all three baselines, the three markers close together on every seed
-            but {BUSIEST}, where the paired baseline sits about a tenth below the two medians. Raw removal sits
-            above, near 0.97. Spill sits near zero under all three baselines, below the criterion; the raw spill is
-            higher, up to about 0.04.
+            The three baselines give nearly the same removal, about 0.8 to 0.9, on every seed but {BUSIEST}, where
+            the paired one is about a tenth lower. Spill stays below the criterion under all three, and only the raw
+            spill crosses it.
         """
     else:
         alt = f"""
-            The same for the rotated-basis runs. Under the paired baseline removal falls to about 0.5 and 0.3 on
-            seeds {" and ".join(str(s) for s in LOST_PAIRED_ROT)} and is lower on 707; under both medians it sits
-            near 0.85 to 0.9 on every seed. Raw removal is near 0.97 throughout. Spill is near zero under every
-            baseline.
+            Under the paired baseline removal drops below half on seeds {" and ".join(str(s) for s in LOST_PAIRED_ROT)}
+            and to about 0.6 on 707, while under both medians it sits near 0.9 on every seed. Spill stays near zero
+            under every baseline.
         """
     return scoring_draw(data, alt)
 
@@ -465,11 +470,9 @@ def scoring_draw(data: dict, alt_text: str) -> str:
         name=f"reference-baseline-{which}",
         alt_text=alt_text,
         caption=f"""
-            **Removal and spill under each baseline**, {"the stored runs" if which == COORD else "the rotated-basis runs"},
-            per seed: net of e₁ in the control (the measurement quoted so far), net of the median over the reference
-            axes of the control, net of the median over the reference axes of the anchored run, and with nothing
-            subtracted. Removal is at the full dose; spill is the largest over the four doses. The dashed rule is the
-            spill criterion.
+            **Removal and spill under each baseline**, {"the stored `falloff` runs" if which == COORD else "the rotated-basis `falloff` runs"},
+            per seed. The gray circles (e₁ in the control) are the measurement quoted so far. Removal is at the full
+            dose; spill is the largest over the four doses. The dashed rule is the spill criterion.
         """,
     )
     def _plot() -> plt.Figure:
@@ -481,7 +484,15 @@ def scoring_draw(data: dict, alt_text: str) -> str:
         for ax, key in zip(axes, ("removal", "spill"), strict=True):
             ax.axhline(0, color=light_dark("#aaa", "#555"), lw=0.5, zorder=0)
             for k in kinds:
-                ax.scatter(x + offset[k], data[key][k], marker=MARK[k], s=18, color=INK[k], zorder=2, label=names[k])
+                ax.scatter(
+                    x + offset[k],
+                    data[key][k],
+                    marker=MARK[k],
+                    s=18,
+                    color=light_dark(*INK[k]),
+                    zorder=2,
+                    label=names[k],
+                )
             if key == "spill":
                 ax.axhline(CRITERION, color=light_dark("#333", "#ddd"), lw=0.9, ls="--", zorder=1)
                 ax.set_ylim(-0.02, 0.05)
@@ -534,7 +545,8 @@ def seed_table(which: str) -> str:
         ["seed", *[f"removal, {SHOWN[k]} ↑" for k in BASELINES], "removal, nothing subtracted ↑"],
         rows,
         f"""
-        **Removal at the full dose by seed**, under each baseline, {"the stored runs" if which == COORD else "the rotated-basis runs"}.
+        **Removal at the full dose by seed**, under each baseline, {"the stored `falloff` runs" if which == COORD else "the rotated-basis `falloff` runs"}.
+        These are the values in the top panel of the figure above.
         """,
     )
 
@@ -544,13 +556,13 @@ rf"""
 
 When netted against the median of the reference axes, do the removal and spill of `falloff` change from the numbers that split-anti-seeds quoted? The main measurement is removal at the full dose per seed, shown beside spill over the four doses.
 
-**What we saw.** Hardly at all. The mean removal is {num(MEAN_REM[COORD][PAIRED])} against e₁ in the control, {num(MEAN_REM[COORD][CTRL_MED])} against the median of the control, and {num(MEAN_REM[COORD][SELF_MED])} against the median of the anchored run. Every run stays within the spill criterion under every baseline.
+**What we saw.** Hardly at all. The mean removal goes from {num(MEAN_REM[COORD][PAIRED])} against e₁ in the control to {num(MEAN_REM[COORD][CTRL_MED])} against the median of the control, and {num(MEAN_REM[COORD][SELF_MED])} against the median of the anchored run. Every run stays within the spill criterion under every baseline.
 
 {scoring_figure(COORD)}
 
 {summary_table(COORD)}
 
-The one seed that moves by more than a few hundredths is {BUSIEST}, where e₁ was among the busiest axes of the control. There the paired baseline gives a removal about a tenth lower than the medians do. Elsewhere the three baselines agree within a few hundredths, about the spread that a seed range shows anyway.
+The one seed that moves by more than a few hundredths is {BUSIEST}, where e₁ was among the busiest axes of the control. There the paired baseline (the gray circle in the figure above) gives a removal about a tenth lower than the medians do. Elsewhere the three baselines agree within a few hundredths, small next to the spread of removal across seeds.
 
 {seed_table(COORD)}
 
@@ -596,7 +608,7 @@ r"""
 
 For the stored runs the paired baseline was sound, in that it rarely moved the result. On most seeds e₁ happened to be a quiet axis of the control. Where it was not, the error was a tenth of removal, on one seed. The numbers that split-anti-seeds quoted stand.
 
-The median over the quiet axes removes that dependence on the draw, and it costs a few minutes more of scoring per run. Where the draw goes badly, as in the rotated-basis runs, it is the difference between a run read as having lost the anchor and one read as removing nine tenths of the op.
+The median over the quiet axes removes that dependence on the draw, and it takes a few minutes more of scoring per run. Where the draw goes badly, as in the rotated-basis runs, it is the difference between a run that seems to have lost the anchor and one that removes nine tenths of the op.
 
 The agreement of the two medians suggests a baseline needs no control at all: the quiet axes of the anchored run serve. That would matter for a recipe meant for real models, where a matched control is costly or impossible, and it is what spill-timing already does along training.
 
