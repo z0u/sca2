@@ -43,6 +43,7 @@ def _load_sibling(name: str, alias: str):
 
 sas = _load_sibling("split-anti-seeds", "reference_baseline_sas")
 rb = _load_sibling("rotated-basis", "reference_baseline_rb")
+sp = _load_sibling("soft-pool", "reference_baseline_sp")
 lean = sas.lean
 ex2222 = sas.ex2222
 ex2216 = lean.ex2216
@@ -138,19 +139,28 @@ PREFIX = "reports/m2/reference-baseline"
 AXES_REF = PREFIX + "/axes"
 
 
+SOFT_POOL = "soft-pool-"
+"""The label prefix of soft-pool's runs here."""
+SOFT_POOL_ARMS = ("step-soft", "pool-123-soft")
+"""Soft-pool's arms near the spill criterion (2 and 4 of 8 runs over it, against e₁ in the control)."""
 ROTATED = "rotated-"
 """The label prefix of rotated-basis' runs here, which share their labels with the stored runs there."""
 
 
 def resolve_checkpoints(seeds: tuple[int, ...]) -> dict:
     """The stored `falloff` checkpoints of split-anti-seeds and ex-2.2.23's controls at *seeds*, and the rotated-basis
-    runs of both at the same seeds, by ref.
+    runs of both and soft-pool's two arms near the spill criterion at the same seeds, by ref.
     """
     from mini.store import get_ref
 
     refs = {label_of(ARM, s): sas.CHECKPOINT_REF.format(label=label_of(ARM, s)) for s in seeds} | {
         ROTATED + rb.label_of(a, s): rb.CHECKPOINT_REF.format(label=rb.label_of(a, s))
         for a in (ARM, "control")
+        for s in seeds
+    }
+    refs |= {
+        SOFT_POOL + sp.label_of(a, s): sp.CHECKPOINT_REF.format(label=sp.label_of(a, s))
+        for a in SOFT_POOL_ARMS
         for s in seeds
     }
     found = {label: get_ref(ref) for label, ref in refs.items()}
@@ -172,6 +182,8 @@ def design() -> dict[str, Any]:
         "arm": ARM,
         "seeds": list(SEEDS),
         "rotated_prefix": ROTATED,
+        "soft_pool_prefix": SOFT_POOL,
+        "soft_pool_arms": list(SOFT_POOL_ARMS),
         "dose_gammas": list(DOSE_GAMMAS),
         "n_energy_ctx": N_ENERGY_CTX,
     }
