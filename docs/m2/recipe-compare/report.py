@@ -62,9 +62,10 @@ def fetch_arrays(refs: dict[str, str], keep: tuple[str, ...]) -> dict[str, dict[
     got = store.get_refs(list(refs.values()))
     missing = [r for r, a in got.items() if a is None]
     assert not missing, f"not published: {missing}"
+    arts = {r: a for r, a in got.items() if a is not None}
     out = {}
     with tempfile.TemporaryDirectory() as tmp:
-        paths = store.get_many([(got[r], Path(tmp) / f"{lbl}.npz") for lbl, r in refs.items()])
+        paths = store.get_many([(arts[r], Path(tmp) / f"{lbl}.npz") for lbl, r in refs.items()])
         for lbl, p in zip(refs, paths, strict=True):
             with np.load(p) as z:
                 out[lbl] = {k: z[k] for k in keep}
