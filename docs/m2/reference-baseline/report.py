@@ -306,7 +306,7 @@ This report trains nothing. It scores stored runs: the eight `falloff` runs (the
 - [Where e₁ sits in the control (E1)](#where-e-sits-in-the-control-e1): it varies by seed. On some seeds e₁ is among the quietest axes of the control, and on one it is among the five costliest. The median over the reference axes is steady across seeds. Separately, on three seeds the anchored run keeps its spike of energy on a different coordinate from the control.
 - [Net removal and spill against the new baseline (E2)](#net-removal-and-spill-against-the-new-baseline-e2): little changes. The mean removal rises by a hundredth or two, mostly on the one seed where e₁ was a busy axis of the control. Every run stays within the spill criterion. The median taken in the anchored run itself, with no control, agrees with the one taken in the control.
 - [The rotated-basis runs (E3)](#the-rotated-basis-runs-e3): the new baseline, taken along the rotated axes, brings the removal on the two seeds below half, and a third at six tenths, up to the level of the rest.
-- [Runs near the spill criterion (E4)](#runs-near-the-spill-criterion-e4): on two arms of soft-pool that sit near the criterion, the count of runs over it changes at the edge. `step, soft τ` goes from {len(SOFT_OVER[STEP][PAIRED])} runs over to none, and `pool 1–3, soft τ` keeps about as many but not the same ones.
+- [Runs near the spill criterion (E4)](#runs-near-the-spill-criterion-e4): on two arms of soft-pool that come close to the criterion, the median moves runs across it. `step, soft τ` goes from {len(SOFT_OVER[STEP][PAIRED])} runs over to none, and `pool 1–3, soft τ` keeps about as many, but not the same ones.
 
 ## Scope and method
 
@@ -517,6 +517,16 @@ def scoring_draw(data: dict, alt_text: str) -> str:
             if key == "spill":
                 ax.axhline(CRITERION, color=light_dark("#333", "#ddd"), lw=0.9, ls="--", zorder=1)
                 ax.set_ylim(-0.02, 0.05)
+                ax.axhspan(
+                    CRITERION,
+                    0.05,
+                    facecolor="none",
+                    edgecolor=light_dark("#333", "#ddd"),
+                    hatch="//",
+                    lw=0,
+                    alpha=0.15,
+                    zorder=0,
+                )
                 ax.set_ylabel("spill", fontsize=8)
             else:
                 ax.set_ylim(0, 1.05)
@@ -638,12 +648,9 @@ def soft_figure() -> str:
         "seeds": SEEDS,
     }
     alt = f"""
-        Spill per seed for the two soft-pool arms, under each baseline and with nothing subtracted. For step, soft
-        τ, the two runs over the criterion against e₁ in the control (seeds {" and ".join(str(s) for s in SOFT_OVER[STEP][PAIRED])})
-        fall under it against either median. For pool 1–3, soft τ, the runs over the criterion change: seeds
-        {" and ".join(str(s) for s in SOFT_OVER[POOL][PAIRED] if s not in SOFT_OVER[POOL][CTRL_MED])} fall under it,
-        seed 705 rises just over it, and seeds 707 and 711 stay over under every baseline. The raw spill is above
-        the criterion on most runs.
+        Against either median, both step, soft τ runs over the criterion (seeds {" and ".join(str(s) for s in SOFT_OVER[STEP][PAIRED])})
+        fall under it. For pool 1–3, soft τ, seeds {" and ".join(str(s) for s in SOFT_OVER[POOL][PAIRED] if s not in SOFT_OVER[POOL][CTRL_MED])}
+        fall under it, 705 rises to it, and 707 and 711 stay over.
     """
     return soft_draw(data, alt)
 
@@ -654,9 +661,9 @@ def soft_draw(data: dict, alt_text: str) -> str:
         name="reference-baseline-soft-pool",
         alt_text=alt_text,
         caption="""
-            **Spill under each baseline, soft-pool runs**, per seed, for the two arms of soft-pool that sit near the
-            criterion. Spill is the largest net drop on another op over the four doses. The dashed rule is the
-            spill criterion.
+            **Spill under each baseline, soft-pool runs**, per seed, for the two arms of soft-pool that come close
+            to the criterion. Spill is the largest net drop on another op over the four doses; the triangles
+            subtract no baseline. The dashed rule is the spill criterion.
         """,
     )
     def _plot() -> plt.Figure:
@@ -679,6 +686,17 @@ def soft_draw(data: dict, alt_text: str) -> str:
             ax.tick_params(labelsize=7)
         axes[0].set_ylabel("spill", fontsize=8)
         axes[0].set_ylim(-0.02, 0.1)
+        for ax in axes:
+            ax.axhspan(
+                CRITERION,
+                0.1,
+                facecolor="none",
+                edgecolor=light_dark("#333", "#ddd"),
+                hatch="//",
+                lw=0,
+                alpha=0.15,
+                zorder=0,
+            )
         handles, labels = axes[0].get_legend_handles_labels()
         fig.legend(handles, labels, loc="outside upper center", ncols=4, frameon=False, fontsize=7)
         return fig
@@ -709,22 +727,22 @@ def soft_table() -> str:
 rf"""
 ## Runs near the spill criterion (E4)
 
-The stored `falloff` runs are all well within the spill criterion, so a change of baseline could not move a run across it. Two arms of [soft-pool](../soft-pool/report.py), `step, soft τ` and `pool 1–3, soft τ`, sit near it at the same seeds: against e₁ in the control, {len(SOFT_OVER[STEP][PAIRED])} and {len(SOFT_OVER[POOL][PAIRED])} of their 8 runs spill over it. Do those counts hold against the median? The main number is the spill over the four doses, run by run.
+The stored `falloff` runs are all well within the spill criterion, so a change of baseline could not move a run across it. Two arms of [soft-pool](../soft-pool/report.py), `step, soft τ` and `pool 1–3, soft τ`, come close to it at the same seeds: against e₁ in the control, {len(SOFT_OVER[STEP][PAIRED])} and {len(SOFT_OVER[POOL][PAIRED])} of their 8 runs spill over it. Do those counts hold against the medians? We compare the spill of each run, the largest over the four doses, under each baseline.
 
-**What we saw.** For `step, soft τ` they do not: both runs over the criterion fall under it against either median. For `pool 1–3, soft τ` the count barely changes ({len(SOFT_OVER[POOL][PAIRED])} against e₁ in the control, {len(SOFT_OVER[POOL][CTRL_MED])} against the median of the control, {len(SOFT_OVER[POOL][SELF_MED])} against the median of the run), but the runs in it change. Seeds {" and ".join(str(s) for s in SOFT_OVER[POOL][PAIRED] if s not in SOFT_OVER[POOL][CTRL_MED])} fall under the criterion, and seed 705 rises to it: just over against the median of the control, and over by less than a thousandth against the median of the run (the bold 0.020 in the table).
+**What we saw.** For `step, soft τ` they do not: both runs over the criterion fall under it against either median. For `pool 1–3, soft τ` the count barely changes ({len(SOFT_OVER[POOL][PAIRED])} against e₁ in the control, {len(SOFT_OVER[POOL][CTRL_MED])} against the median of the control, {len(SOFT_OVER[POOL][SELF_MED])} against the median of the run), but which runs are over it changes. Seeds {" and ".join(str(s) for s in SOFT_OVER[POOL][PAIRED] if s not in SOFT_OVER[POOL][CTRL_MED])} fall under the criterion, and seed 705 rises to it: just over against the median of the control, and over by less than a thousandth against the median of the run (the bold 0.020 in the table). The figure shows each run under each baseline and, for scale, with no baseline subtracted.
 <!-- REVIEW: "seed 705 rises just over it" now says it rises to the criterion. Against the own-run median it is 0.0205, and against the median over all 63 other axes (the D2.2 rule) in the run it is 0.0198, so which side it lands on is a matter of rounding. Verify: `SOFT_SPILL[POOL][SELF_MED][705]`, and `scores(median_drop(FALLOFF, 705, POOL, [i for i in range(64) if i != E1]), 705, POOL)["worst_spill"]`. -->
 
 {soft_figure()}
 
 {soft_table()}
 
-Which way a run moves depends on the op that spills. On every run over the criterion, the e₁ edit costs the spilling op less in the control than the median axis does, so the paired baseline subtracts less, and most runs that sat just over the criterion fall under it. On seed 705 of `pool 1–3, soft τ` it goes the other way: e₁ in that control (among its busiest axes, E1) costs `value-hsv` more than the median does, so the paired baseline hides the spill on that op. That fits the spill-timing experiment, which tracked this run against a reference edit and saw its spill grow late on `value-hsv`, ending near the criterion. The run that spills well over it (seed 711 of `pool 1–3, soft τ`) stays over under every baseline. So does seed 707, which sat as close to the criterion as 708 and 710: against the median its largest spill is on another op, `mix`, which e₁ in the control costs more than the median axis does.
+Which way a run moves depends on the op that spills. On every run over the criterion against e₁ in the control, the e₁ edit costs the spilling op less in the control than the median axis does. So the median subtracts more, and most of the runs that were just over the criterion fall under it. On seed 705 of `pool 1–3, soft τ` it goes the other way. There e₁ is among the busiest axes of the control (E1), and it costs `value-hsv` more than the median does, so the paired baseline hides the spill on that op. That fits the spill-timing experiment, which tracked this run against a reference edit and saw its spill grow late on `value-hsv`, ending near the criterion. The run that spills well over it (seed 711 of `pool 1–3, soft τ`) stays over under every baseline. So does seed 707, though it was as close to the criterion as 708 and 710. Against the median its largest spill moves to another op, `mix`, which e₁ in the control costs more than the median axis does.
 <!-- REVIEW: "The runs that spill well over it (seeds 707 and 711)" split into two. Seed 707 is at 0.028 against e₁ in the control, beside 708 (0.025) and 710 (0.027), and it stays over because the op that spills changes: `darken` against e₁ in the control (baseline 0.024 against a median of 0.037), `mix` against either median (0.018 against 0.014). "most runs over the criterion" became "every run": the paired baseline is below the median on the spilling op for all six. Verify: for each seed over the criterion, the argmax over doses and other ops of `e1_drop(FALLOFF, s, w) - baseline(k, s, w)`, and `baseline(PAIRED, s, w)` against `baseline(CTRL_MED, s, w)` at that op and dose. -->
 <!-- REVIEW: the spill-timing sentence said netting against the control "hid a spill on `value-hsv` that the run has on its own". That report (PR #285, not on this branch) nets against eight reference axes, finds the late spill on `value-hsv` at 705, and says it ends just under the criterion; it does not say the control hid it. Reworded to what it saw. Verify: spill-timing E2, "The late kind grows on seeds 705 and 710 ... It ends just under the criterion on 705". -->
 
-Removal moves as little as for `falloff`, within a hundredth or two on average.
+Removal moves as little as it did for `falloff`, within a hundredth or two on average.
 
-So the spill counts of soft-pool depend on the baseline at the edge: a run within about a hundredth of the criterion can land on either side. The counts against the median of the control are the ones to compare with later experiments, since the D2.2 design now scores that way. The median there keeps the syntax axes in, which leaves these counts as they are.
+So the soft-pool spill counts depend on the baseline at the edge: a run within about a hundredth of the criterion can fall on either side. The counts against the median of the control are the ones to compare with later experiments, since the D2.2 design now scores that way. That design takes its median with the syntax axes in, which leaves the counts against the median of the control as they are.
 <!-- REVIEW: "The counts against the median" narrowed to the median of the control, and a clause added on the design's rule, which takes the median over all 63 other axes rather than the 61 reference axes here. Under that rule the control-median counts and seeds are the same (none, and 705, 707, 711); the own-run count for `pool 1–3, soft τ` drops to 2 because 705 lands at 0.0198. Verify: `scores(median_drop(arm, s, w, [i for i in range(64) if i != E1]), s, w)["worst_spill"]` for arm in (CONTROL, FALLOFF). -->
 """
 
@@ -733,7 +751,7 @@ So the spill counts of soft-pool depend on the baseline at the edge: a run withi
 r"""
 ## Discussion
 
-For the stored runs of `falloff` the paired baseline was sound, in that it rarely moved the result. Only at the edge of the spill criterion, as in the soft-pool runs of E4, did it move a count. On most seeds e₁ happened to be a quiet axis of the control. Where it was not, the error was a tenth of removal, on one seed. The numbers that split-anti-seeds quoted stand.
+For the stored runs of `falloff` the paired baseline was sound, in that it rarely moved the result. On most seeds e₁ happened to be a quiet axis of the control. Where it was not, the error was a tenth of removal, on one seed. The numbers that split-anti-seeds quoted stand. The paired baseline moved a spill count only for runs at the edge of the criterion, as in the soft-pool runs of E4.
 
 The median over the quiet axes removes that dependence on the draw, and it takes a few minutes more of scoring per run. Where the draw goes badly, as in the rotated-basis runs, it is the difference between a run that seems to have lost the anchor and one that removes nine tenths of the op.
 
