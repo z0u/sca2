@@ -2,6 +2,7 @@
 status: open
 tags: [D2.2, anchoring, representations, ex-2.2.23]
 opened: 2026-10-08
+priority: high
 ---
 # A map of what e₁ holds along the context
 
@@ -22,3 +23,5 @@ Split from the withdrawn ex-2.2.24 draft (its E1, H1, H3, and E3; see [PR #255](
 **2026-10-11, housekeeping** — The [equals-evidence](/docs/m2/equals-evidence/experiment.py) pass (PR #266) stores the alignment with e₁ at every position and slice of the held-out contexts, on every run of ex-2.2.23. So the alignment rows of the map are already in the store, and the map would need only the op and color probes on top.
 
 **2026-10-13, holiday tidy-up** — Retitled to the map, the one part not yet done, and pointed at the `falloff` runs, where the block-1 question gives it a use. Status back to `open`, since none of the map has been made. As with ex-2.2.23 (the 10-11 note), the split-anti-seeds trajectories keep the alignment at every slice and position of the probe set, so the `falloff` runs need only the probes.
+
+**2026-10-24, backlog refresh** — On the shortlist, as the one item that would bear on why editing block 1 alone removes most of the op. [Spill-timing](/docs/m2/spill-timing/report.py) E4 is a first piece of the color half of the map, on `pool 1–3, soft τ`: at the example answers of the other ops e₁ holds almost no color, and removing it barely changes how well the color can be fitted from the state. The op probe is the part still missing.

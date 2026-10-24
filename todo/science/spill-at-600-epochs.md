@@ -14,3 +14,5 @@ Split from the withdrawn ex-2.2.24 draft (its H4; see [PR #255](https://github.c
 ## Notes
 
 **2026-10-13, holiday tidy-up** — Reworded for the recipe of record. The two items this waited on are done ([spill-by-position](/docs/m2/spill-by-position/report.py), and the lean review for what e₁ holds), and the question was first asked of a recipe that spilled at 400 epochs already.
+
+**2026-10-24, backlog refresh** — [Spill-timing](/docs/m2/spill-timing/report.py) bears on this. The late spill it found grew while a seed learned `value-hsv`, after about epoch 100, and settled after epoch 200 on every seed; `falloff` learned `value-hsv` as late on some seeds and barely spilled on it. If spill comes mostly while ops are being learned, 200 more epochs would add little, but the lean in the embedding table grew between 200 and 400 epochs on the old recipe, so the question stays open at low priority.

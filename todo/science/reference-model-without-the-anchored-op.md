@@ -2,6 +2,7 @@
 status: open
 tags: [D2.2, intervention, in-context, ex-2.2.22]
 opened: 2026-10-06
+priority: high
 ---
 # How close does a model trained without `difference` come to the target null?
 
@@ -14,3 +15,5 @@ It needs one condition (the control recipe on a corpus without `difference`, at 
 ## Notes
 
 **2026-10-22, edit-effects review** — The [edit-effects report](/docs/m2/edit-effects/report.py) measured the landing on the recipe of record: the distance left is about 2.4× the distance from the clean model to the Bayes predictor, nearly all of it in how the edited model weighs the other ops context by context, with no systematic tilt toward flatter or sharper weights. Its Discussion names two readings (the edit blurs evidence the model uses to weigh the other ops, or the model never learned to weigh them on `difference` contexts) and this model is what would tell them apart. The paper review of that report asked for it.
+
+**2026-10-24, backlog refresh** — On the shortlist. Claim (c) of the D2.2 design (the edited model answers in a predictable way) needs it to say whether half of the distance is short, and it is also the filtered-corpus comparison of the design. It trains controls only, so with the median baseline ([reference-baseline](/docs/m2/reference-baseline/report.py)) it can be scored without a paired control of its own.
