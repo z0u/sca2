@@ -274,6 +274,40 @@ VALUE_RHO = float(stats.spearmanr([LEARNED[s] for s in SEEDS], [VALUE_NET[s][-1]
 HUE_LEARNED = {s: learned(s, OPS.index("hue-hsv")) for s in SEEDS}
 DARKEN_LEARNED = {s: learned(s, OPS.index("darken")) for s in SEEDS}
 
+
+# When `value-hsv` is learned under other conditions at the same seeds, from their stored trajectories (the task
+# score per op on a subset of the held-out contexts), beside the spill on it at the end, net of the control.
+
+
+def learned_in(traj: dict, op: int) -> float:
+    epoch = np.asarray(traj["epoch"], float)
+    _, once = np.unique(np.round(epoch, 3), return_index=True)
+    score = gaussian_filter1d(np.asarray(traj["eem_per_op"], float)[once, op], 1, mode="nearest")
+    return float(epoch[once][np.argmax(score >= 0.5 * score[-10:].mean())])
+
+
+def value_spill(dose: dict, seed: int) -> float:
+    """The largest net drop on `value-hsv` at any dose, net of the control at the same seed."""
+    ctl = np.array([e["drop"] for e in CONTROL_DOSE[f"control-s{seed}"]["edits"]])
+    return float((np.array([e["drop"] for e in dose["edits"]]) - ctl)[:, VALUE].max())
+
+
+OTHER_TRAJ = {**fetch_json(ex.sas.TRAJ_REF), **fetch_json(ex.sp.TRAJ_REF), **fetch_json(ex.ex2223.TRAJ_REF)}
+CONTROL_LEARNED = {s: learned_in(OTHER_TRAJ[f"control-e400-s{s}"]["traj"], VALUE) for s in SEEDS}
+VALUE_ACROSS = [  # name, epoch learned by seed, spill on `value-hsv` at the end by seed
+    ("control", CONTROL_LEARNED, None),
+    *(
+        (
+            name,
+            {s: learned_in(OTHER_TRAJ[f"{arm}-s{s}"]["traj"], VALUE) for s in SEEDS},
+            {s: value_spill(dose[f"{arm}-s{s}"], s) for s in SEEDS},
+        )
+        for name, arm, dose in (("`falloff`", "falloff", FALLOFF_DOSE), ("`step, soft τ`", "step-soft", OLD_DOSE))
+    ),  # fmt: skip
+    ("`pool 1–3, soft τ`", LEARNED, {s: value_spill(DOSE[ex.label_of(s)], s) for s in SEEDS}),
+]
+VALUE_SPILL_MIN = 0.01  # a run counts as spilling on `value-hsv` above this, half the criterion
+
 # The three conditions at epoch 64, pooled over seeds, beside how many of their runs end over the criterion.
 
 
@@ -572,6 +606,31 @@ def value_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
+def value_table() -> str:
+    rows = []
+    for name, when, spill in VALUE_ACROSS:
+        rho = stats.spearmanr([when[s] for s in SEEDS], [CONTROL_LEARNED[s] for s in SEEDS])[0]
+        rows.append([
+            name,
+            *(f"{when[s]:.0f}" for s in SEEDS),
+            "" if spill is None else num(float(rho), ".2f"),
+            "" if spill is None else ", ".join(str(s) for s in SEEDS if spill[s] > VALUE_SPILL_MIN) or "none",
+        ])  # fmt: skip
+    return table_html(
+        ["condition", *(str(s) for s in SEEDS), "rank corr. with the control", "spill on `value-hsv`"],
+        rows,
+        f"""
+        **When `value-hsv` is learned, by condition and seed.** The first epoch at which the task score on
+        `value-hsv` reaches half its final value. The control and the two quiet conditions are read from their
+        stored trajectories, which score each op on a subset of the held-out contexts; `pool 1–3, soft τ` is
+        read from the reruns. Rank corr. with the control: the rank correlation of the row with the control row
+        over the eight seeds. Spill on `value-hsv`: the seeds whose largest drop on `value-hsv` at the end, net
+        of the control at the same seed, is over {VALUE_SPILL_MIN:g}. Net of the control, 705 drops out: the edit
+        costs its control `value-hsv` too (E1).
+        """,
+    )
+
+
 def condition_table() -> str:
     rows = [
         [
@@ -709,7 +768,7 @@ rf"""
 
 - [The reference edit beside the control (E1)](#the-reference-edit-beside-the-control-e1): the reruns match the stored runs. At the end of training, netting the edit against the reference edit sorts the eight seeds much as netting it against the control does. On the controls themselves, the e₁ edit costs some ops a few hundredths more than the reference edit does and others less, so the control adds a seed-to-seed term of its own. An edit at epoch 64 on two low-spill conditions finds no spill that isn't there at the end, but misses some that is.
 - [Spill along training (E2)](#spill-along-training-e2): spill appears in two ways. On three seeds it appears during the rise, as the pool sharpens and the anchor weight reaches its plateau. On 711 it stays to the end, on 707 it settles near the criterion, and on 708 it falls back under it. These three also swing the most from record to record while it lasts. On two seeds it grows after epoch 100, on `value-hsv`. Around epoch {STOP_EPOCH} the seeds sort roughly as they do at the end, apart from the late kind; the full order settles at about epoch {SETTLED:.0f}.
-- [The late kind and learning `value-hsv` (E3)](#the-late-kind-and-learning-value-hsv-e3): the late kind appears on two of the seeds that learn `value-hsv` last, while they learn it. On the seeds that learn it early, the edit costs `value-hsv` less than a reference edit does.
+- [The late kind and learning `value-hsv` (E3)](#the-late-kind-and-learning-value-hsv-e3): the late kind appears on two of the seeds that learn `value-hsv` last, while they learn it. On the seeds that learn it early, the edit costs `value-hsv` less than a reference edit does. The two quiet conditions learn it as late on some seeds and spill little on it.
 - [Color on e₁ at the other ops (E4)](#color-on-e1-at-the-other-ops-e4): e₁ holds almost no color information at the other ops, from about epoch 30 on, on every seed, and removing it barely changes how well the color can be read from the rest of the state. The fit from the whole state doesn't follow the spill either.
 
 ## Scope and method
@@ -768,7 +827,7 @@ The late kind grows on seeds 705 and 710, from about epoch 120 and 150 respectiv
 
 The early kind is also the jumpy kind. During the rise (epochs 20 to 180) the spill of 707, 708 and 711 changes by {np.mean([RISE_SWING[s] for s in EARLY_KIND]):.3f} per record on average, against {np.mean([RISE_SWING[s] for s in SEEDS if s not in EARLY_KIND]):.3f} on the other five seeds, including 705 and 710, whose late spill grows smoothly. After epoch 200 every seed settles (a standard deviation of about {LATE_SD:.3f} after epoch 300). So the swings flag the same runs as the level of the early spill does, and nothing more.
 
-The seeds within the criterion settle a little below zero (704, 706 and 709, at about −0.01): there the edit costs every other op a little less than a typical other axis does. That is how a clean anchor should look, with the other ops leaving e₁ alone while making some use of most other coordinates.
+The seeds within the criterion settle a little below zero (704, 706 and 709, at about −0.01): there the edit costs every other op a little less than a typical other axis does. That is how a very clean anchor looks, with the other ops leaving e₁ alone while making some use of most other coordinates, though a score a little above zero is still within the criterion.
 
 Smoothing doesn't bring the order forward much. The smoothed spill sorts the seeds as the end does from about epoch {SETTLED:.0f} on (a rank correlation over 0.9), and before about epoch 130 its rank correlation hovers around 0.5 to 0.6. Averaged over epochs 48 to 80, 707, 708 and 711 are clearly up, 710 is lowest of all, and 705 is among the runs within the criterion. The window over epochs 100 to 160 does better by rank ({WIN_RHO[(100, 160)]:.2f}) because the late rise of 705 and 710 has begun by then, but its correlation by value is {WIN_R[(100, 160)]:.2f}. The correlations by value lean on 711 early on: without it, the window over epochs 24 to 40 correlates {WIN_R_NO711[(24, 40)]:.2f} with the end.
 
@@ -786,9 +845,13 @@ Is the late kind tied to when the run learns `value-hsv`? Each op is learned in 
 
 The seeds learn `value-hsv` between about epoch {min(LEARNED.values()):.0f} and {max(LEARNED.values()):.0f}. The two seeds with the late kind are among the last to learn it (705 at epoch {LEARNED[705]:.0f}, 710 at {LEARNED[710]:.0f}, the latest), and their spill on it grows while they learn it and then stays. 708, which learns it at {LEARNED[708]:.0f}, ends with a little spill on it too ({num(float(VALUE_NET[708][-1]))}). On the seeds that learn it early, the edit costs `value-hsv` less than a reference edit does, by 0.015 to 0.05 at the end, so there `value-hsv` keeps further off e₁ than off a typical axis. Over the eight seeds, the later a seed learns `value-hsv`, the more the edit costs it at the end (rank correlation {VALUE_RHO:.2f}). 709 is the exception: it learns `value-hsv` late (epoch {LEARNED[709]:.0f}) and still keeps it off e₁.
 
+When an op is learned isn't fixed by the seed, though (table). The control also learns `value-hsv` at different times on different seeds, between epochs {min(CONTROL_LEARNED.values()):.0f} and {max(CONTROL_LEARNED.values()):.0f}, but which seeds are late changes with the condition, and in this condition the order is unrelated to the control's. So the anchor and anti terms shift when the op is learned. The two quiet conditions learn it as late or later on some seeds, `step, soft τ` at {max(VALUE_ACROSS[2][1].values()):.0f} on 709 and `falloff` at {max(VALUE_ACROSS[1][1].values()):.0f} on 706, and spill little on it. Learning late doesn't put an op on e₁ by itself; in those conditions something keeps e₁ closed to it.
+
+{value_table()}
+
 The early kind fits the same pattern loosely. Every seed learns `darken` by epoch {max(DARKEN_LEARNED.values()):.0f}, during the warm-up, and the early spill of 708 and 711 falls on it. On 707 the early spill falls on `hue-hsv`, which 707 learns at epoch {HUE_LEARNED[707]:.0f}, earlier than any other seed.
 
-So, as a lead: the spill lands on an op that is being learned at a time when e₁ is open to it, during the rise or later. This doesn't say which way it runs. Learning `value-hsv` late may leave it free to land on e₁, or whatever draws it to e₁ may also slow its learning.
+So, as a lead: in this condition the spill lands on an op that is being learned at a time when e₁ is open to it, during the rise or later, and the quiet conditions keep e₁ closed to an op they learn as late. Within this condition, it doesn't say which way it runs. Learning `value-hsv` late may leave it free to land on e₁, or whatever draws it to e₁ may also slow its learning.
 
 ## Color on e₁ at the other ops (E4)
 
@@ -815,6 +878,8 @@ The edit spills in two ways in this condition. The early kind appears during the
 A screen that edits a checkpoint around epoch 64 would see only the early kind (E2). On these seeds the late kind was the smaller, but it put one run over the criterion and another just under it, so such a screen would undercount. A screen late enough to see both, around epoch 200, would cost half a full run.
 
 Pooled over seeds, epoch {STOP_EPOCH} does tell the three conditions apart (table). `pool 1–3, soft τ` averages {num(float(np.mean(CONDITIONS[0][1])))} at epoch {STOP_EPOCH}, and half its runs end over the criterion. `falloff` and `step, soft τ` average about {num(float(np.mean(CONDITIONS[1][1])), ".3f")}, and few of their runs end over it. So a condition whose runs often spill early shows it in the mean at epoch {STOP_EPOCH}, even when a single run is noisy. But the mean can't see the late kind, and the two quiet conditions look alike at epoch {STOP_EPOCH} though they differ a little at the end. With three conditions this is a hint only: a pooled early score could rank arms by their early kind of spill, with a later check still needed for the late kind. The swings during the rise could serve the same way, since they mark the same runs.
+
+Is that enough to stop a condition early? As a rule for dropping a condition whose runs spill early, it may be. Scoring a record costs about 1% of training, and the runs of a condition that passes simply carry on, so the screen costs almost nothing, and each condition it stops saves the remaining five-sixths of its runs. It can't stop a condition for the late kind, so a condition that passes still needs its full runs before it is adopted. It pays when many arms are screened and a fair share of them spill early. With few arms, or arms that spill late, it saves little.
 
 {condition_table()}
 
