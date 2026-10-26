@@ -29,6 +29,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 from dataclasses import asdict, dataclass
+from collections.abc import Sequence
 from typing import Any
 
 from mini import Ctx, Experiment
@@ -198,7 +199,7 @@ def rows_of(meta, conditions: tuple[Condition, ...], stop: int | None, epochs: i
     return rows
 
 
-def train(ctx: Ctx, resolved: dict, rows: list[dict], resume: list[dict | None] | None = None) -> list[dict]:
+def train(ctx: Ctx, resolved: dict, rows: list[dict], resume: Sequence[dict | None] | None = None) -> list[dict]:
     """`train_one` on every row with the alignment map and kept checkpoints, carrying on *resume* where given."""
     n = len(rows)
     epoch_length = [ex2222.ex2217.epoch_length_of(resolved["meta"].total_tokens, r["config"]) for r in rows]
