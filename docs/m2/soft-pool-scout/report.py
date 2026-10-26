@@ -398,7 +398,7 @@ def depth_draw(data: dict, alt_text: str) -> str:
         alt_text=alt_text,
         caption=f"""
             **Where the op sits at epoch {STOP}, by slice.** α at the example answers (solid, one line per seed) and
-            at the query answer (dashed), at each slice, for the conditions at the top and the bottom of the ranking.
+            at the query answer (dashed), at each slice, for the three slice temperatures at the base timing and for the condition with the highest mean spill.
             The hairlines behind every panel are the seed means of every condition.
         """,
     )
@@ -530,7 +530,7 @@ rf"""
 
 If spill enters through block 1 while the pool is soft, then sharpening sooner, sharpening the slice pool further, or holding the pull back until e₁ is cleared might each close it. Which of them lowers the spill at epoch {STOP}?
 
-The slice temperature at the end does, and the others barely move it. The figure (bottom) groups the crossing by $\tau_\ell$: at 0.1 the four timing levels all sit at or below the quiet recipes, with no run of 32 over the criterion; at 0.2 the spill is a little higher, with {LEVEL_OVER[0.2]} runs over; at 0.4, the base level, {LEVEL_OVER[0.4]} of 32 are over. Within each level, sharpening by epoch 10, 20 or 40, or holding $\tau_\ell$ fixed from the start, makes no difference we can see at eight seeds. So it is how sharp the slice pool ends, not how soon it gets there, that matters for the early spill.
+The slice temperature at the end does, and the others barely move it. The figure (bottom) groups the crossing by $\tau_\ell$: at 0.1 the four timing levels all sit at or below the quiet recipes, with no run of 32 over the criterion; at 0.2 the spill is a little higher, with {LEVEL_OVER[0.2]} runs over; at 0.4, the base level, {LEVEL_OVER[0.4]} of 32 are over. Within each level, sharpening by epoch 10, 20 or 40, or holding $\tau_\ell$ fixed from the start, makes no difference we can see at eight seeds. So for the early spill, what matters is how sharp the slice pool ends, and how soon it gets there barely does.
 
 {screen_table()}
 
@@ -548,7 +548,7 @@ rf"""
 
 A sharper slice pool could lower the spill in a way we would not want: by settling the pull on one slice and one role, as the joint pool did in [slice-terms](/docs/m2/slice-terms/report.py), where one seed settled on the query answer and the op could not be removed. Where does the evidence for the op sit at epoch {STOP}?
 
-In the same place in every condition. The seed-mean α at the example answers peaks at slice 3 in all seventeen conditions, and α at the query answer is about the same everywhere (the table above). The figure shows the τ_ℓ ladder at the base timing, beside the condition that spilled most: the shapes are nearly the same, with one difference at slice 1.
+In the same place in every condition. The seed-mean α at the example answers peaks at slice 3 in all seventeen conditions, and α at the query answer is about the same everywhere (the table above). The figure shows the three levels of $\tau_\ell$ at the base timing, beside the condition that spilled most: the shapes are nearly the same, with one difference at slice 1.
 
 {depth_figure(["lt0.1-by40", "lt0.2-by40", ex.STORED, "fixed-stretch"])}
 
