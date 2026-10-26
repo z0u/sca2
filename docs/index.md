@@ -512,4 +512,12 @@ With the control near its best, we anchored `difference` on the new grammar. The
 
     <!-- mini:figures ./m2/soft-pool/report.py -->
 
+- [Three recipes side by side](./m2/recipe-compare/report.py)
+
+    A re-analysis of the stored runs of `falloff`, `step, soft τ` and `pool 1–3, soft τ` at the same eight seeds, under the median baseline of the D2.2 design. The soft start on the step stays close to `falloff` on every measurement. The pool over slices 1 to 3 removes about as much and costs the task least, and the evidence for the op peaks at slice 3 on every seed, but its edit spills over the criterion on two seeds. That spill enters with the edit at block 1, the one slice the pool pulls and the step leaves alone.
+
+    <span class="tags">`reanalysis` `in-context` `anchoring` `intervention`</span>
+
+    <!-- mini:figures ./m2/recipe-compare/report.py -->
+
 </details>
