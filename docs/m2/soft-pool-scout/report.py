@@ -201,6 +201,281 @@ for r in RUNS.values():
 N_OVER = sum(OVER_OPS.values())
 TOP_OP = max(OVER_OPS, key=OVER_OPS.__getitem__)
 
+# --- Stage 2: the finished runs ---------------------------------------------------------------------------------
+# The two leaders at epoch 400, beside the three recipes recipe-compare scored at the same seeds, each measured the
+# same way: the dose edit along every coordinate axis (reference-baseline), the edits restricted to slice sets
+# (split-anti-seeds), the dose arrays and the write arrays (edit-effects).
+
+rc = ex._load_sibling("recipe-compare", "soft_pool_scout_rc")
+LEADERS: list[str] = list(ex.LEADERS)
+FALLOFF, STEP_SOFT = "falloff", "step-soft"
+FINISHED = [FALLOFF, STEP_SOFT, ex.STORED, *LEADERS]
+"""The conditions of stage 2, by their names here: the two quiet recipes, the base, then the leaders."""
+STORED_AS = {FALLOFF: "falloff", STEP_SOFT: "step-soft", ex.STORED: "pool-123-soft"}
+"""The labels of the stored recipes in the runs of split-anti-seeds and soft-pool."""
+CONTROL = "control"
+FIN_SHOWN = {FALLOFF: "falloff", STEP_SOFT: "step, soft τ"} | {n: SHOWN[n] for n in (ex.STORED, *LEADERS)}
+GAMMAS: list[float] = list(ex.rb.DOSE_GAMMAS)
+FULL = len(GAMMAS) - 1
+E1 = 0  # the anchored axis, in code
+TASK_MEAN_GATE, TASK_OP_GATE = -0.02, -0.05  # the task gate of the D2.2 design
+LOST_BELOW = 0.5  # a finished run has lost the anchor when the full edit removes less than this
+Q = 0.99  # the quantile the bound and the write are taken at, as in edit-effects
+TOLERANCE = 1.25  # ex-2.2.1 allowed the write a quarter over the bound
+
+
+def fin_label(name: str, seed: int) -> str:
+    """The label of a finished run in the store of the experiment that trained it."""
+    return f"{STORED_AS.get(name, name)}-s{seed}"
+
+
+def fetch_arrays(refs: dict[str, str], keep: tuple[str, ...]) -> dict[str, dict[str, np.ndarray]]:
+    """The `.npz` behind each ref, by label, with only the *keep* arrays."""
+    store = project_store()
+    got = store.get_refs(list(refs.values()))
+    missing = [r for r, a in got.items() if a is None]
+    assert not missing, f"not published: {missing}"
+    arts = {r: a for r, a in got.items() if a is not None}
+    out = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = store.get_many([(arts[r], Path(tmp) / f"{lbl}.npz") for lbl, r in refs.items()])
+        for lbl, p in zip(refs, paths, strict=True):
+            with np.load(p) as z:
+                out[lbl] = {k: z[k] for k in keep}
+    return out
+
+
+_RB = {r["label"]: r for r in fetch_json(ex.rb.AXES_REF)["runs"]}
+AX = {(n, s): _RB[fin_label(n, s) if n == FALLOFF else ex.rb.SOFT_POOL + fin_label(n, s)] for n in STORED_AS for s in SEEDS}  # fmt: skip
+AX |= {(CONTROL, s): _RB[f"{CONTROL}-s{s}"] for s in SEEDS}
+AX |= {(r["condition"], r["model_seed"]): r for r in fetch_json(ex.AXES_REF)["runs"]}
+
+LEAN = {
+    r["label"]: r
+    for ref in (rc.sas.RESULTS_REF, rc.sp.RESULTS_REF, ex.RESULTS_REF)
+    for r in fetch_json(ref)["runs"]
+    if r["model_seed"] in SEEDS
+}
+LEAN_CONTROL = {
+    s: r
+    for r in fetch_json(rc.sas.lean.RESULTS_REF)["runs"]
+    for s in SEEDS
+    if r["label"] == rc.sas.ex2223.label_of(CONTROL, rc.sas.EPOCHS, s)
+}
+assert set(LEAN_CONTROL) == set(SEEDS)
+DOSE_SUMMARY = {r["label"]: r for ref in (rc.sas.DOSE_REF, rc.sp.DOSE_REF, ex.DOSE_REF) for r in fetch_json(ref)["runs"]}  # fmt: skip
+
+
+def dose_ref(name: str, seed: int) -> str:
+    lbl = fin_label(name, seed)
+    if name in LEADERS:
+        return ex.DOSE_ARRAYS_REF.format(label=lbl)
+    return (ex.sp.DOSE_ARRAYS_REF if name in (STEP_SOFT, ex.STORED) else rc.sas.DOSE_ARRAYS_REF).format(label=lbl)
+
+
+def write_ref(name: str, seed: int) -> str:
+    lbl = fin_label(name, seed)
+    if name in LEADERS:
+        return ex.WRITE_ARRAYS_REF.format(label=lbl)
+    return (rc.WRITE_ARRAYS_REF if name in (STEP_SOFT, ex.STORED) else rc.ee.ARRAYS_REF).format(label=lbl)
+
+
+DOSE = fetch_arrays(
+    {fin_label(n, s): dose_ref(n, s) for n in (*FINISHED, CONTROL) for s in SEEDS},
+    ("op_ids", "posterior", "clean_eem", "null_eem", "eem"),
+)
+ALPHA = fetch_arrays({fin_label(n, s): write_ref(n, s) for n in FINISHED for s in SEEDS}, ("clean", "arriving", "op_ids"))  # fmt: skip
+FITS_D = fetch_arrays({"fits": rc.ee.FITS_REF}, ("fits",))["fits"]["fits"][:, :, D]
+OP_IDS = DOSE[fin_label(CONTROL, SEEDS[0])]["op_ids"].astype(int)
+IS_D = OP_IDS == D
+for _lbl in DOSE:
+    assert (DOSE[_lbl]["op_ids"] == OP_IDS).all()
+for _lbl in ALPHA:
+    assert (ALPHA[_lbl]["op_ids"] == OP_IDS).all()
+
+
+def axis_scores(r: dict) -> dict[str, Any]:
+    """Removal at the full dose and the worst spill over doses for the e₁ edit on one run, net of the median drop
+    over every other coordinate axis of the same run (the D2.2 rule), and removal with nothing subtracted.
+    """
+    drop = np.asarray(r["drop"])  # (axes, doses, ops)
+    net = drop[E1] - np.median(drop[1:], axis=0)
+    span = r["clean"][D] - r["null"][D]
+    spill = net[:, OTHER].max(axis=1)
+    worst = int(spill.argmax())
+    return {
+        "removal": float(net[FULL, D] / span),
+        "raw": float(drop[E1][FULL, D] / span),
+        "spill": float(spill.max()),
+        "op": OPS[OTHER[int(net[worst, OTHER].argmax())]],
+    }
+
+
+def control_median_spill(name: str, s: int) -> float:
+    """The worst spill with the median taken over the other axes of the control in place of those of the run."""
+    net = np.asarray(AX[(name, s)]["drop"])[E1] - np.median(np.asarray(AX[(CONTROL, s)]["drop"])[1:], axis=0)
+    return float(net[:, OTHER].max())
+
+
+FIN = {(n, s): axis_scores(AX[(n, s)]) for n in FINISHED for s in SEEDS}
+
+
+def fin_seed(name: str, key: str) -> np.ndarray:
+    return np.array([FIN[(name, s)][key] for s in SEEDS])
+
+
+REMOVAL = {n: fin_seed(n, "removal") for n in FINISHED}
+RAW = {n: fin_seed(n, "raw") for n in FINISHED}
+FIN_SPILL = {n: fin_seed(n, "spill") for n in FINISHED}
+FIN_OVER = {n: int((FIN_SPILL[n] > CRITERION).sum()) for n in FINISHED}
+CTRL_OVER = {n: sum(control_median_spill(n, s) > CRITERION for s in SEEDS) for n in FINISHED}
+TASK = {n: np.array([np.asarray(AX[(n, s)]["clean"]) - np.asarray(AX[(CONTROL, s)]["clean"]) for s in SEEDS]) for n in FINISHED}  # fmt: skip
+N_FIN_LOST = sum(int((REMOVAL[n] < LOST_BELOW).sum()) for n in LEADERS)
+FIN_OPS = {n: [FIN[(n, s)]["op"] for s in SEEDS] for n in FINISHED}
+
+
+def paired(name: str, key: str, against: str) -> np.ndarray:
+    """The difference from *against* at each seed, which shares its initialization, batches and label draws."""
+    v = {"removal": REMOVAL, "spill": FIN_SPILL}[key]
+    return v[name] - v[against]
+
+
+# Spill along training, from the checkpoints each leader kept and the one it finished on (eight reference axes, as
+# spill-timing scored it), with the base from spill-timing's reruns, scored at every record.
+ALONG_EPOCHS = (*ex.KEEP_EPOCHS, ex.EPOCHS)
+_ALONG = fetch_json(ex.ALONG_REF)["runs"]
+ALONG = {
+    n: np.array(
+        [
+            [
+                next(
+                    reference_spill(r["es_clean"], r["es_edit"], r["es_sham"])
+                    for r in _ALONG
+                    if r["condition"] == n and r["model_seed"] == s and r["epoch"] == e
+                )
+                for e in ALONG_EPOCHS
+            ]
+            for s in SEEDS
+        ]
+    )
+    for n in LEADERS
+}
+
+
+def base_along(seed: int) -> list[float]:
+    traj = BASE_TRAJ[ex.spt.label_of(seed)]["traj"]
+    ep = np.asarray(traj["epoch"])
+    out = []
+    for e in ALONG_EPOCHS:
+        i = int(np.flatnonzero(np.isclose(ep, e))[0])
+        out.append(reference_spill(traj["es_clean"][i], traj["es_edit"][i], traj["es_sham"][i]))
+    return out
+
+
+ALONG[ex.STORED] = np.array([base_along(s) for s in SEEDS])  # (seeds, epochs)
+AT_STOP_COL = ALONG_EPOCHS.index(STOP)
+ALONG_NAMES = [ex.STORED, *LEADERS]
+# The runs that are quiet at the stop and go over the criterion or near it (within a quarter) later on.
+NEAR = 0.75 * CRITERION
+LATE = {n: [s for i, s in enumerate(SEEDS) if ALONG[n][i, AT_STOP_COL] <= NEAR < ALONG[n][i, AT_STOP_COL + 1 :].max()] for n in ALONG_NAMES}  # fmt: skip
+EARLY = {n: [s for i, s in enumerate(SEEDS) if ALONG[n][i, : AT_STOP_COL + 1].max() > CRITERION] for n in ALONG_NAMES}  # fmt: skip
+
+
+# The edits restricted to slice sets, net of the same edit on the control at the seed (split-anti-seeds).
+SLICE_SETS = ("embedding", "block 1", "blocks 2 to 4", "block 4", "blocks 1 to 4", "every slice")
+
+
+def slice_net(name: str, s: int, edit: str) -> np.ndarray:
+    return np.asarray(LEAN[fin_label(name, s)]["edits"][edit]) - np.asarray(LEAN_CONTROL[s]["edits"][edit])
+
+
+def slice_removal(name: str, s: int, edit: str) -> float:
+    r = LEAN[fin_label(name, s)]
+    return float(slice_net(name, s, edit)[D] / (r["clean"][D] - r["null"][D]))
+
+
+SLICE_REMOVAL = {n: {e: np.array([slice_removal(n, s, e) for s in SEEDS]) for e in SLICE_SETS} for n in FINISHED}
+SLICE_SPILL = {n: {e: np.array([slice_net(n, s, e)[OTHER].max() for s in SEEDS]) for e in SLICE_SETS} for n in FINISHED}  # fmt: skip
+LEAN_R = {n: np.array([LEAN[fin_label(n, s)]["r_light_emb"] for s in SEEDS]) for n in FINISHED}
+LEAN_R[CONTROL] = np.array([LEAN_CONTROL[s]["r_light_emb"] for s in SEEDS])
+
+
+@memo
+def turn_maps(clean: np.ndarray, arriving: np.ndarray, op_ids: np.ndarray, fits_d: np.ndarray) -> dict:
+    """The bound and the write of one run as alignments, `(slices, positions)`: the 99th percentile of |α| over the
+    contexts of the other ops, clean and as it arrives under the full edit, with the answers that fit `difference`
+    left out at the answers, as in edit-effects. Beside it, the same at the example answers that do not fit, by slice,
+    and the anchor by slice at the example answers and the query answer of `difference` contexts.
+    """
+    other = op_ids != D
+    c, a = np.abs(clean.astype(np.float32)), np.abs(arriving.astype(np.float32))
+    bound, write = np.quantile(c[:, other], Q, axis=1), np.quantile(a[:, other], Q, axis=1)
+    for e, p in enumerate(ANSWERS + [QUERY_ANSWER]):
+        keep = other & ~fits_d[:, e]
+        bound[:, p] = np.quantile(c[:, keep, p], Q, axis=1)
+        write[:, p] = np.quantile(a[:, keep, p], Q, axis=1)
+    cc = np.concatenate([c[:, other & ~fits_d[:, e], p] for e, p in enumerate(ANSWERS)], axis=1)
+    return {
+        "bound": bound,
+        "write": write,
+        "ans_bound": np.quantile(cc, Q, axis=1),
+        "alpha_d": c[:, op_ids == D][:, :, ANSWERS].mean(axis=(1, 2)),
+        "alpha_q": c[:, op_ids == D, QUERY_ANSWER].mean(axis=1),
+    }
+
+
+TURN = {(n, s): turn_maps(*(ALPHA[fin_label(n, s)][k] for k in ("clean", "arriving")), OP_IDS, FITS_D) for n in FINISHED for s in SEEDS}  # fmt: skip
+
+
+def turn_mean(name: str, key: str) -> np.ndarray:
+    return np.mean([TURN[(name, s)][key] for s in SEEDS], axis=0)
+
+
+def angle(alpha) -> np.ndarray:
+    return np.degrees(np.arcsin(np.clip(alpha, 0, 1)))
+
+
+RATIO = {n: np.arcsin(turn_mean(n, "write")) / np.arcsin(turn_mean(n, "bound")) for n in FINISHED}
+for _n in FINISHED:
+    assert np.allclose(RATIO[_n][0], 1.0, atol=1e-3), "the embedding sees the clean stream"
+
+
+def over_tolerance(name: str) -> list[tuple[int, int, int, float, float]]:
+    """Per run, the sites past the embedding where the write goes over the tolerance: seed, slice, position, the
+    ratio, and the bound there in degrees.
+    """
+    out = []
+    for s in SEEDS:
+        t = TURN[(name, s)]
+        r = np.arcsin(t["write"]) / np.arcsin(t["bound"])
+        for sl, p in zip(*np.nonzero(r[1:] > TOLERANCE), strict=True):
+            out.append((s, int(sl) + 1, int(p), float(r[sl + 1, p]), float(angle(t["bound"][sl + 1, p]))))
+    return out
+
+
+OVER_TOL = {n: over_tolerance(n) for n in FINISHED}
+FIN_ALPHA = {n: np.array([TURN[(n, s)]["alpha_d"] for s in SEEDS]) for n in FINISHED}
+FIN_PEAK = {n: FIN_ALPHA[n][:, 1:].argmax(axis=1) + 1 for n in FINISHED}
+
+
+def drop_of(lbl: str) -> np.ndarray:
+    r = DOSE[lbl]
+    return r["clean_eem"] - r["eem"][-1]
+
+
+def share(name: str, s: int) -> float:
+    """The share of the way to the target null the full edit takes on `difference` contexts, net of the control at
+    the seed, as a ratio of means.
+    """
+    lbl = fin_label(name, s)
+    drop = drop_of(lbl) - drop_of(fin_label(CONTROL, s))
+    dep = DOSE[lbl]["clean_eem"] - DOSE[lbl]["null_eem"]
+    return float(drop[IS_D].mean() / dep[IS_D].mean())
+
+
+SHARE = {n: np.array([share(n, s) for s in SEEDS]) for n in FINISHED}
+LANDING = {n: np.array([DOSE_SUMMARY[fin_label(n, s)]["landing"] for s in SEEDS]) for n in FINISHED}
+
 # --- Encoding ---------------------------------------------------------------------------------------------------
 
 RULE = light_dark("#333", "#ddd")
@@ -577,18 +852,317 @@ def slice1_draw(data: dict, alt_text: str) -> str:
     return _plot()
 
 
+# --- E4 to E6: the finished runs ---------------------------------------------------------------------------------
+
+FIN_MARKER = {FALLOFF: "D", STEP_SOFT: "v"}
+
+
+def fin_ink(name: str):
+    return QUIET_INK if name in FIN_MARKER else ink(BY_NAME[name])
+
+
+def fin_marker(name: str) -> str:
+    return FIN_MARKER.get(name) or marker(BY_NAME[name])
+
+
+def fin_tick(name: str) -> str:
+    return tex(FIN_SHOWN[name]) + (" (base)" if name == ex.STORED else "")
+
+
+def fmt(values, spec: str = ".2f") -> str:
+    v = np.asarray(list(values), float)
+    return f"{num(float(v.mean()), spec)} ({num(float(v.min()), spec)} to {num(float(v.max()), spec)})"
+
+
+def finished_figure() -> str:
+    data = {
+        "names": FINISHED,
+        "removal": {n: REMOVAL[n].tolist() for n in FINISHED},
+        "spill": {n: FIN_SPILL[n].tolist() for n in FINISHED},
+        "task": {n: TASK[n].mean(axis=1).tolist() for n in FINISHED},
+        "criterion": CRITERION,
+        "task_gate": TASK_MEAN_GATE,
+    }
+    alt = """
+        Three panels with one column per condition. Left: removal sits between about 0.85 and 0.9 for every
+        condition, with the two τ_ℓ 0.1 conditions highest and τ_ℓ 0.1, τ_ℓ fixed the tightest. Middle: spill sits
+        near zero for every condition but the base, whose seeds reach 0.055; the two τ_ℓ 0.1 conditions have two
+        seeds and one seed at the criterion line, none over it. Right: the task change sits near zero, the pool
+        conditions a little higher than falloff and step, soft τ, all above the gate.
+    """
+    return finished_draw(data, alt)
+
+
+@memo
+def finished_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="soft-pool-scout-finished",
+        alt_text=alt_text,
+        caption=f"""
+            **Removal, spill and task at epoch {ex.EPOCHS}, by condition.** One column per condition, the
+            {len(SEEDS)} seeds as small dots over a thin bar for their range, and the seed mean as the large mark.
+            **Left:** removal at the full dose, net of the median over the other axes of the run. **Middle:** spill,
+            the largest net drop on another op at any dose; the dashed line is the criterion, with the side over it
+            hatched. **Right:** the task change, the mean clean score over ops less that of the control at the seed;
+            the dashed line is the task gate on that mean, with the failing side hatched.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        names = data["names"]
+        fig, axes = plt.subplots(1, 3, figsize=(6.6, 2.9), layout="constrained")
+        rng = np.random.default_rng(0)
+        for ax, key in zip(axes, ("removal", "spill", "task"), strict=True):
+            for i, n in enumerate(names):
+                _dots(ax, i, data[key][n], fin_ink(n), fin_marker(n), rng)
+            ax.set_xticks(range(len(names)), [fin_tick(n) for n in names], rotation=40, ha="right", fontsize=6)
+            ax.set_xlim(-0.6, len(names) - 0.4)
+            ax.tick_params(labelsize=7)
+        axes[0].set_title("removal ↑", fontsize=8)
+        axes[1].set_title("spill ↓", fontsize=8)
+        axes[2].set_title("task change ↑", fontsize=8)
+        for ax, y, below in ((axes[1], data["criterion"], False), (axes[2], data["task_gate"], True)):
+            ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+            ax.axhline(y, color=RULE, lw=0.7, ls="--", zorder=1)
+            lo, hi = ax.get_ylim()
+            if below:
+                lo = min(lo, y - 0.005)
+                hatch(ax, lo, y, "//")
+            else:
+                hatch(ax, y, hi, "//")
+            ax.set_ylim(lo, hi)
+        return fig
+
+    return _plot()
+
+
+def finished_table() -> str:
+    rows = []
+    for n in FINISHED:
+        pair = []
+        for key in ("removal", "spill"):
+            if n in LEADERS:
+                g = paired(n, key, ex.STORED)
+                spec = ".2f" if key == "removal" else ".3f"
+                pair.append(f"{fmt(g, spec)}; {int((g > 0).sum())} up, {int((g < 0).sum())} down")
+            else:
+                pair.append("—")
+        t = TASK[n]
+        worst = np.unravel_index(int(t.argmin()), t.shape)
+        rows.append(
+            [
+                f"`{FIN_SHOWN[n]}`" + (" (base)" if n == ex.STORED else ""),
+                fmt(REMOVAL[n]),
+                pair[0],
+                fmt(FIN_SPILL[n], ".3f"),
+                pair[1],
+                f"{FIN_OVER[n]} of {len(SEEDS)}",
+                f"{CTRL_OVER[n]} of {len(SEEDS)}",
+                fmt(t.mean(axis=1), ".3f"),
+                f"{num(float(t.min()), '.3f')} (`{OPS[worst[1]]}`, {SEEDS[worst[0]]})",
+            ]
+        )
+    return table_html(
+        [
+            "condition",
+            "removal ↑",
+            "removal less base, paired",
+            "spill ↓",
+            "spill less base, paired",
+            "over criterion ↓",
+            "over, control median ↓",
+            "task change ↑",
+            "worst op change ↑",
+        ],  # fmt: skip
+        rows,
+        f"""
+        **Removal, spill and task at epoch {ex.EPOCHS}**, seed mean and range over {len(SEEDS)} runs. Removal and
+        spill are net of the median drop over the other 63 coordinate axes of the run, and "over, control median"
+        counts the runs over the criterion with the median taken in the control at the seed instead. The paired
+        columns are the condition less the base at the same seed, with the count of seeds on each side of zero. The
+        task change is the mean over ops of the clean score less that of the control at the seed; the worst op change
+        is the largest loss on one op at any seed. The rows for `falloff`, `step, soft τ` and the base are those of
+        recipe-compare.
+        """,
+    )
+
+
+def finished_seed_table() -> str:
+    rows = []
+    for n in (ex.STORED, *LEADERS):
+        rows.append([f"`{FIN_SHOWN[n]}`", "removal"] + [num(float(v), ".2f") for v in REMOVAL[n]])
+        rows.append(
+            ["", "spill"]
+            + [f"**{num(float(v))}**" if v > CRITERION else num(float(v)) for v in FIN_SPILL[n]]
+        )  # fmt: skip
+        rows.append(["", "op"] + [f"`{o}`" for o in FIN_OPS[n]])
+    return table_html(
+        ["condition", "measure", *[str(s) for s in SEEDS]],
+        rows,
+        """
+        **Removal and spill by seed**, as in the table above, with the op the spill is largest on. Bold marks a run
+        over the criterion.
+        """,
+    )
+
+
+def along_figure() -> str:
+    data = {
+        "names": ALONG_NAMES,
+        "epochs": list(ALONG_EPOCHS),
+        "spill": {n: ALONG[n].tolist() for n in ALONG_NAMES},
+        "seeds": SEEDS,
+        "criterion": CRITERION,
+        "stop": STOP,
+    }
+    alt = """
+        Three panels of spill against epoch, from 16 to 400 on a log scale, one line per seed. Base: three seeds
+        rise over the criterion by epoch 64 (711 already at 32), and 707 and 711 stay over it to the end; two more
+        seeds climb to near the criterion after epoch 128. τ_ℓ 0.1, by 40, and τ_ℓ 0.1, τ_ℓ fixed: every seed stays
+        under 0.016 up to epoch 128; after that two seeds (705 and 707) and one seed (707) rise to about the
+        criterion by epoch 400.
+    """
+    return along_draw(data, alt)
+
+
+@memo
+def along_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="soft-pool-scout-along",
+        alt_text=alt_text,
+        caption=f"""
+            **Spill along training.** The spill of each run (one line per seed) at the checkpoints kept at epochs
+            {", ".join(str(e) for e in data["epochs"][:-1])} and at the end, scored as at the stop, against the
+            median of eight reference edits. The base is spill-timing's rerun of soft-pool, scored at every record.
+            The dashed line is the criterion and the dotted line the stop of stage 1. The seeds named are the ones
+            that go over the criterion or come within a quarter of it.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        names = data["names"]
+        fig, axes = plt.subplots(1, len(names), figsize=(6.6, 2.6), layout="constrained", sharey=True)
+        ep = np.asarray(data["epochs"])
+        for ax, n in zip(axes, names, strict=True):
+            c = BY_NAME[n]
+            for v in data["spill"][n]:
+                v = np.asarray(v)
+                loud = v.max() > NEAR
+                ax.plot(ep, v, color=ink(c) if loud else GHOST, lw=1.0 if loud else 0.6, marker=marker(c),
+                        ms=3 if loud else 2, zorder=2 if loud else 1)  # fmt: skip
+            # Seed labels at the right end, nudged apart so they do not overlap.
+            ends = sorted((v[-1], s) for s, v in zip(data["seeds"], data["spill"][n], strict=True) if max(v) > NEAR)
+            ys: list[float] = []
+            for y, _ in ends:
+                ys.append(max(y, ys[-1] + 0.0045) if ys else y)
+            for (y, s), ty in zip(ends, ys, strict=True):
+                ax.annotate(str(s), (ep[-1], y), xytext=(ep[-1] * 1.07, ty), fontsize=6, va="center", color=ink(c))
+            ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+            ax.axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=1)
+            ax.axvline(data["stop"], color=RULE, lw=0.6, ls=":", zorder=0)
+            ax.set_xscale("log")
+            ax.set_xticks(ep, [str(e) for e in ep], fontsize=6)
+            ax.minorticks_off()
+            ax.set_xlim(ep[0] * 0.85, ep[-1] * 1.6)
+            ax.set_title(tex(SHOWN[n]) + (" (base)" if n == ex.STORED else ""), fontsize=7)
+            ax.set_xlabel("epoch", fontsize=7)
+            ax.tick_params(labelsize=7)
+        axes[0].set_ylabel("spill", fontsize=8)
+        return fig
+
+    return _plot()
+
+
+def restricted_table() -> str:
+    cols = ("block 1", "blocks 2 to 4")
+    rows = []
+    for n in FINISHED:
+        rows.append(
+            [
+                f"`{FIN_SHOWN[n]}`" + (" (base)" if n == ex.STORED else ""),
+                f"slice {int(np.median(FIN_PEAK[n]))}: {int((FIN_PEAK[n] == np.median(FIN_PEAK[n])).sum())}",
+            ]  # fmt: skip
+            + [fmt(SLICE_REMOVAL[n][e]) for e in cols]
+            + [
+                f"{fmt(SLICE_SPILL[n][e], '.3f')}; {int((SLICE_SPILL[n][e] > CRITERION).sum())} over"
+                for e in ("embedding", "block 1", "blocks 1 to 4", "every slice")
+            ]  # fmt: skip
+            + [fmt(LEAN_R[n])]
+        )
+    rows.append(["control", ""] + [""] * 6 + [fmt(LEAN_R[CONTROL])])
+    return table_html(
+        [
+            "condition",
+            "peak α, seeds",
+            "removal, block 1 alone ↑",
+            "removal, blocks 2 to 4 ↑",
+            "spill, embedding alone ↓",
+            "spill, block 1 alone ↓",
+            "spill, blocks 1 to 4 ↓",
+            "spill, every slice ↓",
+            "lightness on e₁, embedding table",
+        ],  # fmt: skip
+        rows,
+        """
+        **Where the evidence sits, and where the edit finds it.** The slice at which α at the example answers of
+        `difference` contexts peaks, with the count of seeds. Removal and spill under the full edit restricted to a
+        set of slices, at every position, net of the same edit on the control at the seed (the median baseline exists
+        only for the edit at every slice), with the count of runs over the criterion; seed mean and range. The last
+        column is the correlation, over the color embeddings, of the e₁ component with lightness (the lean of
+        embedding-lean). The first three rows are those of recipe-compare.
+        """,
+    )
+
+
+def edit_table() -> str:
+    rows = []
+    for n in FINISHED:
+        r = RATIO[n][1:]
+        sl, p = np.unravel_index(int(np.nanargmax(r)), r.shape)
+        over = OVER_TOL[n]
+        ab = angle(turn_mean(n, "ans_bound"))
+        rows.append(
+            [
+                f"`{FIN_SHOWN[n]}`" + (" (base)" if n == ex.STORED else ""),
+                f"{float(r[sl, p]):.2f} (slice {int(sl) + 1}, {float(angle(turn_mean(n, 'bound')[sl + 1, p])):.1f}°)",
+                f"{len(over)} (≤ {max(o[4] for o in over):.0f}°)" if over else "0",
+                f"{ab[0]:.0f}°, {ab[1]:.0f}°",
+                fmt(SHARE[n]),
+                fmt(LANDING[n]),
+            ]
+        )
+    return table_html(
+        [
+            "condition",
+            "largest write over bound ↓",
+            "sites over 1.25×, all runs ↓",
+            "bound at example answers, emb and slice 1 ↓",
+            "share removed ↑",
+            "landing ↑",
+        ],  # fmt: skip
+        rows,
+        f"""
+        **The write, the grading and the landing.** The largest ratio of write to bound in angle over the slices past
+        the embedding and every position, from the seed-mean quantiles as in edit-effects, with where it falls and
+        the bound there. The sites over {TOLERANCE}× count slice and position pairs over all {len(SEEDS)} runs, each
+        run taken on its own, with the largest bound among them. The bound at the example answers is over those that
+        do not fit `difference`. The share removed is over every `difference` context, net of the control at the
+        seed, and the landing is the share of the way to the target null in total variation; seed mean and range.
+        The first three rows are those of recipe-compare.
+        """,
+    )
+
+
 # %%
 rf"""
 # Soft pool scout
 
 /// tip |
 <!-- lede -->
-We screened sixteen schedules of the pooled pull at epoch {STOP}, looking for one that stops the early spill of `pool 1–3, soft τ`. A sharper pool over slices did it: with the slice temperature ending at 0.1, every run spilled about as little as the quiet recipes, whenever the temperatures sharpened. Moving the anchor warm-up did not help, and fixing the temperatures from the start spilled more.
+We screened sixteen schedules of the pooled pull at epoch {STOP}, looking for one that stops the early spill of `pool 1–3, soft τ`. A sharper pool over slices did it: with the slice temperature ending at 0.1, no run spilled early, whenever the temperatures sharpened. Carried on to epoch {ex.EPOCHS}, the two conditions we finished stay within the spill criterion on every seed and remove a little more than the recipe of record, at no cost to the task. Holding the slice temperature at 0.1 from the start is the cleaner of the two, and it is a candidate for the recipe of record.
 ///
 
 [Recipe-compare](/docs/m2/recipe-compare/report.py) left one thing between `pool 1–3, soft τ` and the recipe of record: two of its eight runs go over the spill criterion, and the spill enters at block 1, the one slice the pool pulls and the step leaves alone. [Spill-timing](/docs/m2/spill-timing/report.py) found that both of those runs spill early, while the pool sharpens, and that this early kind already shows at epoch {STOP}. So a schedule that keeps block 1 closed should show it at epoch {STOP}, at a sixth of the cost of a full run.
 
-This report trains sixteen conditions of the pool at its eight seeds ({SEEDS[0]} to {SEEDS[-1]}), each changing when the two pool temperatures sharpen, how sharp the pool over slices ends, or when the anchor weight warms up. Every run stops at epoch {STOP}, where we score whether it is keeping the anchor and how much the edit spills. This is stage 1. In stage 2, the two conditions with $\tau_\ell$ ending at 0.1 that change least (sharpening by epoch 40 as the base does, and held at 0.1 from the start) are carried on to epoch 400 from where they stopped. TODO: stage 2 results.
+This report trains sixteen conditions of the pool at its eight seeds ({SEEDS[0]} to {SEEDS[-1]}), each changing when the two pool temperatures sharpen, how sharp the pool over slices ends, or when the anchor weight warms up. Every run stops at epoch {STOP}, where we score whether it is keeping the anchor and how much the edit spills. This is stage 1. In stage 2, the two conditions with $\tau_\ell$ ending at 0.1 that change least (sharpening by epoch 40 as the base does, and held at 0.1 from the start) are carried on to epoch {ex.EPOCHS} from where they stopped, and measured as recipe-compare measured the three recipes, with the spill along training from checkpoints kept on the way.
 """
 
 # %%
@@ -599,6 +1173,9 @@ rf"""
 - [Lost anchors (E1)](#lost-anchors-e1): no schedule lost the anchor. All {N_RUNS} runs, the base included, are called kept, the lowest well above the line, though the fixed temperatures and the stretched warm-up keep it a little less firmly.
 - [Spill at epoch {STOP} (E2)](#spill-at-epoch-{STOP}-e2): the slice temperature at the end decides the spill, and when the temperatures sharpen hardly matters. At τ_ℓ 0.1 no run is over the criterion, and the four conditions sit at or below the quiet recipes. At 0.4 (the base) about a quarter of the runs are over. The delayed and stretched warm-ups spill as much as the base, and fixing the temperatures from the start spills the most.
 - [Where the evidence is heading (E3)](#where-the-evidence-is-heading-e3): every condition peaks at slice 3, and none leans on the query answer. What changes is slice 1: a sharper pool over slices puts less of the anchor there, and the runs that spill are the ones with more of it at slice 1.
+- [Removal, spill and task at epoch {ex.EPOCHS} (E4)](#removal-spill-and-task-at-epoch-{ex.EPOCHS}-e4): both finished conditions keep the anchor, remove a little more than `falloff` and the base, and stay within the spill criterion on every seed, with one or two seeds at the line. Neither costs the task. Holding $\tau_\ell$ fixed is the tighter of the two on removal and spill.
+- [Spill along training (E5)](#spill-along-training-e5): no finished run spills early. The spill that remains comes late, after epoch 128, on one or two seeds, and reaches about the criterion by the end. So the screen at epoch {STOP} called the early kind correctly, and the late kind is what stage 2 adds.
+- [Where the spill enters (E6)](#where-the-spill-enters-e6): the evidence still peaks at slice 3 on every seed. The edit at block 1 alone costs the other ops about what it costs them under the step, less than under the base, and the other ops sit as far from e₁ at the first two slices as under the step. The lean of the color embeddings along lightness falls back to the level of the step too.
 
 ## Scope and method
 
@@ -617,6 +1194,18 @@ A screen at epoch {STOP} can rank the conditions by the early kind of spill and 
 - The call: α (the cosine of the state with e₁) at the example answers at slice {ex.lr.TRACK_SLICE}, averaged over epochs {ex.lr.WINDOW[0]} to {ex.lr.WINDOW[1]}. As in the loss-rate screen, a run is called lost below {LOST_MAX:g}, kept from {KEPT_MIN:g}, and uncertain between.
 - Spill at epoch {STOP}: the largest drop on another op when e₁ is projected out at every position and slice, less the median drop under eight reference edits (each projecting out one other basis direction), over the whole held-out set, as in spill-timing. A drop is in expected exact match. Lower is better. The criterion is {CRITERION:g}, though at epoch {STOP} it is a guide only, since it is set for a finished run.
 - Where the evidence for the op sits: α at the example answers and at the query answer, by slice, at epoch {STOP}.
+
+### Stage 2
+
+The read of stage 1 picked two conditions to finish: $\tau_\ell$ ending at 0.1 and sharpening by epoch 40, as the base does, and $\tau_\ell$ held at 0.1 from the start while $\tau_p$ sharpens by 40. Each run carries on from its stop at epoch {STOP} to epoch {ex.EPOCHS}, keeping checkpoints at epochs {", ".join(str(e) for e in ex.KEEP_EPOCHS)}. A resumed run matches a straight run bit for bit, so these are the runs the full schedule would have given.
+
+The finished runs are measured as [recipe-compare](/docs/m2/recipe-compare/report.py) measured `falloff`, `step, soft τ` and the base at the same seeds, and set beside its numbers for those three. Each run at a seed shares its initialization, batches and label draws with the base and with the control of ex-2.2.23 at that seed, so each comparison is paired by seed, and the paired difference from the base says whether a gap is larger than the variation between seeds. Eight seeds cannot add to a count of lost anchors, which the loss-rate screen took at forty seeds for the step recipes and nobody has taken for the pool.
+
+- Removal: the drop in the score of `difference` under the full edit, as a share of the way from the clean score to the target null, net of the median drop under the same edit along each of the other 63 coordinate axes of the run (the rule of the D2.2 design). A run that removes less than {LOST_BELOW:g} has lost the anchor.
+- Spill: the largest drop on another op at any dose, net of the same median. The criterion is {CRITERION:g}.
+- Task change: the clean score per op, less that of the control at the seed. The task gate fails below {TASK_MEAN_GATE:g} on the mean over ops, or below {TASK_OP_GATE:g} on any one op.
+- Spill along training: the spill at each kept checkpoint and at the end, against eight reference edits, as at the stop.
+- Restricted edits, the write, the grading and the landing, as in recipe-compare: the full edit made at a set of slices only, net of the same edit on the control; how much e₁ the blocks after the edit put back on the other ops, against the bound the clean pass sets; the share removed on `difference` contexts; and how far the edited answers move toward the target null.
 """
 
 # %%
@@ -677,8 +1266,58 @@ This fits the account recipe-compare gave: the pool spills when it puts part of 
 
 # %%
 
-r"""
+rf"""
+## Removal, spill and task at epoch {ex.EPOCHS} (E4)
+
+The screen ranked the conditions by the early kind of spill only. Do the two finished conditions keep the anchor, stay within the spill criterion and leave the task alone at the end of training, seed by seed, against the base and the two quiet recipes?
+
+They do. No finished run lost the anchor: the lowest removal is {min(REMOVAL[n].min() for n in LEADERS):.2f}. Both conditions remove a little more than the base, on most seeds (the paired column of the table), and a little more than `falloff` on the mean too. Holding $\tau_\ell$ fixed gives the tightest removal of the five, with all eight seeds between {REMOVAL[LEADERS[1]].min():.2f} and {REMOVAL[LEADERS[1]].max():.2f}.
+
+{finished_figure()}
+
+{finished_table()}
+
+On spill, neither condition has a run over the criterion, where the base has {FIN_OVER[ex.STORED]}. The two seeds the base spills on most (707 and 711) are where the change shows best: at 711 both conditions sit below zero, and at 707 both come down to the line. That leaves one or two seeds per condition at the criterion: 705 and 707 under `{SHOWN[LEADERS[0]]}`, and 707 under `{SHOWN[LEADERS[1]]}`, each within a thousandth of it. Taking the median from the control at the seed instead puts one run of `{SHOWN[LEADERS[0]]}` over the line (705), and none of `{SHOWN[LEADERS[1]]}`.
+
+On the task, both pass the gate on the seed mean, and no op at any seed goes past the per-op line. The pool keeps the advantage recipe-compare found for it, a task change near zero. One run of `{SHOWN[LEADERS[0]]}` (708) is a little under the line for the mean over ops, at the seed where `falloff` is lowest too.
+
+{finished_seed_table()}
+
+## Spill along training (E5)
+
+[Spill-timing](/docs/m2/spill-timing/report.py) found two kinds of spill under the base: an early kind, which rises while the pool sharpens and already shows at epoch {STOP}, and a late kind, which grows after epoch 100 on seeds that learn `value-hsv` late. Stage 1 could see only the first. Which kind is left on the seeds that come near the criterion at epoch {ex.EPOCHS}?
+
+The late kind. Under the base, three seeds go over the criterion by epoch {STOP}, and 711 already at epoch 32. Under the two finished conditions no seed goes over it, and up to epoch 128 the largest spill is {ALONG[LEADERS[0]][:, :4].max():.3f} under `{SHOWN[LEADERS[0]]}` and {ALONG[LEADERS[1]][:, :4].max():.3f} under `{SHOWN[LEADERS[1]]}`. After that the seeds named in the figure climb to about the criterion by the end.
+
+{along_figure()}
+
+So the screen at epoch {STOP} called the early kind correctly: the conditions it found quiet stayed quiet through the part of training it covers. What it could not see is the late kind, and here the late kind is about as large as under the base on its late seeds (705 and 710 come to about 0.02 there too). The late spill also lands on other ops than spill-timing saw: on `hue-hsv` and `darken` at 705 and 707 under `{SHOWN[LEADERS[0]]}`, and on `mix` at 707 under `{SHOWN[LEADERS[1]]}`, where the late kind in the base was on `value-hsv`. Two or three runs are too few to say whether that is a different kind of late spill or the same one landing elsewhere.
+
+## Where the spill enters (E6)
+
+Recipe-compare traced the spill of the base to the edit at block 1, and E3 found that a sharper slice pool puts less of the anchor at slice 1. Does the edit at block 1 alone now cost the other ops less, and does the rest of what the edit does stay as it was?
+
+{restricted_table()}
+
+The evidence settles where it did. Under both conditions α at the example answers peaks at slice 3 on every seed, as under the base. The edit at blocks 2 to 4 removes most of the op on every seed but 710, which falls short under every recipe, and the edit at block 4 alone removes nothing. The edit at the embedding alone spills nothing, and neither does the edit at blocks 2 to 4.
+
+The edit at block 1 alone costs the other ops less than under the base, and about what it costs them under `step, soft τ`: the mean is between the step and the base under `{SHOWN[LEADERS[0]]}` and below the step under `{SHOWN[LEADERS[1]]}`. So the sharper slice pool closes block 1 about as far as leaving it out of the pull does. As recipe-compare noted, the block-1 edit on its own overstates what the full edit costs: under `{SHOWN[LEADERS[1]]}` it goes over the criterion on two seeds whose full edit stays within it.
+
+With the edit at every slice, net of the control rather than of the median, `{SHOWN[LEADERS[0]]}` has three runs over the criterion and `{SHOWN[LEADERS[1]]}` none. Under this baseline `step, soft τ` has two over, so these counts are best compared with one another, and on them holding $\tau_\ell$ fixed is the quieter of the two.
+
+The embedding table moves with the slice pool as well. Under the base the e₁ components of the color embeddings follow lightness closely on every seed (the lean of [embedding-lean](/docs/m2/embedding-lean/report.py)); under both finished conditions the lean is back at about the level of the step, and it varies from seed to seed as it does there. That fits a pull that reaches slice 1 less.
+
+{edit_table()}
+
+What the edit does downstream barely changes, and where it changes it moves toward the step. The write stays close to the bound past the embedding, with fewer sites over the tolerance than under the base. The bound at the example answers of the other ops, which recipe-compare found about 3× as wide at the embedding under the base as under `falloff`, is back at the width of `falloff` at the embedding and a little narrower at slice 1. So the other ops sit as far from e₁ at the first two slices as under the step. The share removed and the landing are about the same as under every recipe.
+
 ## Discussion
 
-TODO after stage 2.
+A sharper pool over slices is what the base lacked. With $\tau_\ell$ at 0.1, the pool over slices 1 to 3 keeps the anchor, removes a little more than the recipe of record, costs the task nothing, and stays within the spill criterion on every seed. The early spill that put two runs of the base over the criterion is gone, and with it the signs of block 1 open to the edit: the wider bound at the first two slices, the lean in the embedding table, and the larger cost of the block-1 edit.
+
+Of the two, holding $\tau_\ell$ at 0.1 from the start is the cleaner. It removes the most and the most evenly, has no run over the criterion under either median, and none under the control-netted edit at every slice. It also has one schedule fewer than the base, since only $\tau_p$ sharpens. The other condition is close behind, and the gap between them rests on two or three runs near the line, so it could be chance at eight seeds.
+
+What is left is the late kind of spill, which brings one or two seeds per condition to about the criterion by the end. It is about as large as under the base on its late seeds, so it does not seem to come from the sharper slice pool, and nothing in this study acts on it. The term still changing when it appears is the anti weight, partway through its anneal, so an anneal that starts later or runs slower is the next thing to try on it.
+
+The step has two things the pool still lacks: a count of lost anchors at forty seeds, and a set of fresh seeds. The pool with $\tau_\ell$ fixed at 0.1 has neither. A confirmation at seeds 712 to 719 with their controls would give it the second, and a loss-rate screen the first, before it could replace `step, soft τ` as the recipe of record. Since the pool chooses the slice within a range set by the architecture, it would be the easier recipe to carry to another model.
 """
