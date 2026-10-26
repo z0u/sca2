@@ -899,7 +899,7 @@ def finished_draw(data: dict, alt_text: str) -> str:
         name="soft-pool-scout-finished",
         alt_text=alt_text,
         caption=f"""
-            **Removal, spill and task at epoch {ex.EPOCHS}, by condition.** One column per condition, the
+            **Removal, spill, and task at epoch {ex.EPOCHS}, by condition.** One column per condition, the
             {len(SEEDS)} seeds as small dots over a thin bar for their range, and the seed mean as the large mark.
             **Left:** removal at the full dose, net of the median over the other axes of the run. **Middle:** spill,
             the largest net drop on another op at any dose; the dashed line is the criterion, with the side over it
@@ -975,7 +975,7 @@ def finished_table() -> str:
         ],  # fmt: skip
         rows,
         f"""
-        **Removal, spill and task at epoch {ex.EPOCHS}**, seed mean and range over {len(SEEDS)} runs. Removal and
+        **Removal, spill, and task at epoch {ex.EPOCHS}**, seed mean and range over {len(SEEDS)} runs. Removal and
         spill are net of the median drop over the other 63 coordinate axes of the run, and "over, control median"
         counts the runs over the criterion with the median taken in the control at the seed instead. The paired
         columns are the condition less the base at the same seed, with the count of seeds on each side of zero. The
@@ -992,7 +992,7 @@ def finished_seed_table() -> str:
         rows.append([f"`{FIN_SHOWN[n]}`", "removal"] + [num(float(v), ".2f") for v in REMOVAL[n]])
         rows.append(
             ["", "spill"]
-            + [f"**{num(float(v))}**" if v > CRITERION else num(float(v)) for v in FIN_SPILL[n]]
+            + [f"<strong>{num(float(v))}</strong>" if v > CRITERION else num(float(v)) for v in FIN_SPILL[n]]
         )  # fmt: skip
         rows.append(["", "op"] + [f"`{o}`" for o in FIN_OPS[n]])
     return table_html(
@@ -1032,7 +1032,8 @@ def along_draw(data: dict, alt_text: str) -> str:
         caption=f"""
             **Spill along training.** The spill of each run (one line per seed) at the checkpoints kept at epochs
             {", ".join(str(e) for e in data["epochs"][:-1])} and at the end, scored as at the stop, against the
-            median of eight reference edits. The base is spill-timing's rerun of soft-pool, scored at every record.
+            median of eight reference edits rather than the 63 axes of E4, so a run at the line there can fall on
+            either side of it here. The base is spill-timing's rerun of soft-pool, scored at every record.
             The dashed line is the criterion and the dotted line the stop of stage 1. The seeds named are the ones
             that go over the criterion or come within a quarter of it.
         """,
@@ -1164,7 +1165,7 @@ We carried two of these conditions on to epoch {ex.EPOCHS}. Both stay within the
 
 [Recipe-compare](/docs/m2/recipe-compare/report.py) left one thing between `pool 1–3, soft τ` and the recipe of record: two of its eight runs go over the spill criterion, and the spill enters at block 1, the one slice the pool pulls and the step leaves alone. [Spill-timing](/docs/m2/spill-timing/report.py) found that both of those runs spill early, while the pool sharpens, and that this early kind already shows at epoch {STOP}. So a schedule that keeps block 1 closed should show it at epoch {STOP}, at a sixth of the cost of a full run.
 
-This report trains sixteen conditions of the pool at its eight seeds ({SEEDS[0]} to {SEEDS[-1]}), each changing when the two pool temperatures sharpen, how sharp the pool over slices ends, or when the anchor weight warms up. Every run stops at epoch {STOP}, where we score whether it is keeping the anchor and how much the edit spills. This is stage 1. In stage 2, the two conditions with $\tau_\ell$ ending at 0.1 that change least (sharpening by epoch 40 as the base does, and held at 0.1 from the start) are carried on to epoch {ex.EPOCHS} from where they stopped, and measured as recipe-compare measured the three recipes, with the spill along training from checkpoints kept on the way.
+This report trains sixteen conditions of the pool at its eight seeds ({SEEDS[0]} to {SEEDS[-1]}), each changing when the two pool temperatures sharpen, how sharp the pool over slices ends, or when the anchor weight warms up. Every run stops at epoch {STOP}, where we score whether it is keeping the anchor and how much the edit spills. This is stage 1. In stage 2, the two conditions with $\tau_\ell$ ending at 0.1 that change least from the base (sharpening by epoch 40 as the base does, and held at 0.1 from the start) are carried on to epoch {ex.EPOCHS} from where they stopped, and measured as recipe-compare measured the three recipes, with the spill along training from checkpoints kept on the way.
 """
 
 # %%
@@ -1175,8 +1176,8 @@ rf"""
 - [Lost anchors (E1)](#lost-anchors-e1): no schedule lost the anchor. All {N_RUNS} runs, the base included, are called kept, the lowest well above the line. The fixed temperatures and the stretched warm-up keep it a little less firmly.
 - [Spill at epoch {STOP} (E2)](#spill-at-epoch-{STOP}-e2): the final slice temperature decides the spill; when the temperatures sharpen hardly matters. At τ_ℓ 0.1 no run is over the criterion, and the four conditions sit at or below the quiet recipes. At 0.4 (the base) about a quarter of the runs are over. Moving the $\lambda_a$ warm-up shifts the spill by less than the seeds vary, and fixing the temperatures from the start spills the most.
 - [Where the evidence is heading (E3)](#where-the-evidence-is-heading-e3): every condition peaks at slice 3, and none leans on the query answer. What changes is slice 1: a sharper pool over slices puts less of the anchor there, and the runs that spill are the ones with more of it at slice 1.
-- [Removal, spill and task at epoch {ex.EPOCHS} (E4)](#removal-spill-and-task-at-epoch-{ex.EPOCHS}-e4): both finished conditions keep the anchor, remove a little more than `falloff` and the base, and stay within the spill criterion on every seed, with one or two seeds at the line. Neither costs the task. Holding $\tau_\ell$ fixed is the tighter of the two on removal and spill.
-- [Spill along training (E5)](#spill-along-training-e5): no finished run spills early. The spill that remains comes late, after epoch 128, on one or two seeds, and reaches about the criterion by the end. So the screen at epoch {STOP} called the early kind correctly, and the late kind is what stage 2 adds.
+- [Removal, spill, and task at epoch {ex.EPOCHS} (E4)](#removal-spill-and-task-at-epoch-{ex.EPOCHS}-e4): both finished conditions keep the anchor, remove a little more than `falloff` and the base, and stay within the spill criterion on every seed, with one or two seeds at the line. Neither costs the task. Holding $\tau_\ell$ fixed is the tighter of the two on removal and spill.
+- [Spill along training (E5)](#spill-along-training-e5): no finished run spills early. The spill that remains comes late, after epoch 128, on one or two seeds, and reaches about the criterion by the end. So the screen at epoch {STOP} called the early kind correctly, and only the finished runs show the late kind.
 - [Where the spill enters (E6)](#where-the-spill-enters-e6): the evidence still peaks at slice 3 on every seed. The edit at block 1 alone costs the other ops about what it costs them under the step, and less than under the base. With $\tau_\ell$ fixed that holds seed by seed; when it sharpens by 40 it holds on the mean only. The other ops sit as far from e₁ at the first two slices as under the step, and the lean of the color embeddings along lightness falls back to the level of the step.
 
 ## Scope and method
@@ -1199,17 +1200,17 @@ A screen at epoch {STOP} can rank the conditions by the early kind of spill and 
 
 ### Stage 2
 
-Each run of the two finished conditions ($\tau_\ell$ ending at 0.1 and sharpening by epoch 40, and $\tau_\ell$ held at 0.1 from the start while $\tau_p$ sharpens by 40) carries on from epoch {STOP} to epoch {ex.EPOCHS}. The checkpoints kept at epochs {", ".join(str(e) for e in ex.KEEP_EPOCHS)} along the way are scored for the spill.
+Each run of the two finished conditions ($\tau_\ell$ ending at 0.1 and sharpening by epoch 40, and $\tau_\ell$ held at 0.1 from the start while $\tau_p$ sharpens by 40) carries on from epoch {STOP} to epoch {ex.EPOCHS}. The checkpoints kept at epochs {", ".join(str(e) for e in ex.KEEP_EPOCHS[:-1])}, and {ex.KEEP_EPOCHS[-1]} along the way are scored for the spill.
 
 We measure the finished runs as [recipe-compare](/docs/m2/recipe-compare/report.py) measured `falloff`, `step, soft τ`, and the base at the same seeds, and set them beside its numbers for those three. Each run at a seed shares its initialization, batches, and label draws with the base and with the control of ex-2.2.23 at that seed. So each comparison is paired by seed, and the paired difference from the base says whether a gap is larger than the variation between seeds.
-
-Eight seeds are too few to add to a count of lost anchors. The loss-rate screen took that count at forty seeds for the step recipes, and nobody has taken it for the pool.
 
 - Removal: the drop in the score of `difference` under the full edit, as a share of the way from the clean score to the target null. It is net of the median drop under the same edit along each of the other 63 coordinate axes of the run (the rule of the D2.2 design). A run that removes less than {LOST_BELOW:g} has lost the anchor.
 - Spill: the largest drop on another op at any dose, net of the same median. The criterion is {CRITERION:g}.
 - Task change: the clean score per op, less that of the control at the seed. The task gate fails below {TASK_MEAN_GATE:g} on the mean over ops, or below {TASK_OP_GATE:g} on any one op.
 - Spill along training: the spill at each kept checkpoint and at the end, against eight reference edits, as at the stop.
 - Restricted edits, the write, the grading, and the landing, as in recipe-compare: the full edit made at a set of slices only, net of the same edit on the control; how much e₁ the blocks after the edit put back on the other ops, against the bound the clean pass sets; the share removed on `difference` contexts; and how far the edited answers move toward the target null.
+
+Eight seeds are too few to add to a count of lost anchors. The loss-rate screen took that count at forty seeds for the step recipes, and nobody has taken it for the pool.
 """
 
 # %%
@@ -1271,21 +1272,21 @@ This fits the account recipe-compare gave: the pool spills when it puts part of 
 # %%
 
 rf"""
-## Removal, spill and task at epoch {ex.EPOCHS} (E4)
+## Removal, spill, and task at epoch {ex.EPOCHS} (E4)
 
-Do the two finished conditions keep the anchor, stay within the spill criterion and leave the task alone at the end of training, seed by seed, against the base and the two quiet recipes?
+Do the two finished conditions keep the anchor, stay within the spill criterion, and leave the task alone at the end of training, seed by seed, against the base and the two quiet recipes?
 
-They do. No finished run lost the anchor: the lowest removal is {min(REMOVAL[n].min() for n in LEADERS):.2f}. Both conditions remove a little more than the base on most seeds (the paired column of the table), and a little more than `falloff` on the mean. Holding $\tau_\ell$ fixed gives the tightest removal of the five, with all eight seeds between {REMOVAL[LEADERS[1]].min():.2f} and {REMOVAL[LEADERS[1]].max():.2f}.
+They do. No finished run lost the anchor: the lowest removal is {min(REMOVAL[n].min() for n in LEADERS):.2f}. Both conditions remove a little more than the base on most seeds (the paired column of the table), and a little more than `falloff` on the mean. Holding $\tau_\ell$ fixed gives the tightest removal of the five (the figure, left), with all eight seeds between {REMOVAL[LEADERS[1]].min():.2f} and {REMOVAL[LEADERS[1]].max():.2f}.
 
 {finished_figure()}
 
 {finished_table()}
 
-On spill, neither condition has a run over the criterion, where the base has {FIN_OVER[ex.STORED]}. The change shows best on the two seeds the base spills on most: at 711 both conditions sit below zero, and at 707 both come down to the line.
+On spill (middle), neither condition has a run over the criterion, where the base has {FIN_OVER[ex.STORED]}. The change shows best on the two seeds the base spills on most (the table by seed, below): at 711 both conditions sit below zero, and at 707 both come down to the line.
 
 That leaves one or two seeds per condition at the criterion, each within a thousandth of it: 705 and 707 under `{SHOWN[LEADERS[0]]}`, and 707 under `{SHOWN[LEADERS[1]]}`. Taking the median over the other axes of the control at the seed, in place of those of the run, puts one run of `{SHOWN[LEADERS[0]]}` over the line (705), and none of `{SHOWN[LEADERS[1]]}`.
 
-On the task, both pass the gate on the seed mean, and no op at any seed goes past the per-op line, so the pool keeps the task change near zero that recipe-compare found for it. One run of `{SHOWN[LEADERS[0]]}` (708) is a little under the line for the mean over ops, at the seed where `falloff` is lowest too.
+On the task (right), both pass the gate on the seed mean, and no op at any seed goes past the per-op line, so the task change stays near zero, as recipe-compare found for the pool. One run of `{SHOWN[LEADERS[0]]}` (708) is a little under the line for the mean over ops, at the seed where `falloff` is lowest too.
 
 {finished_seed_table()}
 
@@ -1293,7 +1294,7 @@ On the task, both pass the gate on the seed mean, and no op at any seed goes pas
 
 [Spill-timing](/docs/m2/spill-timing/report.py) found two kinds of spill under the base: an early kind, which rises while the pool sharpens and already shows at epoch {STOP}, and a late kind, which grows after epoch 100 on seeds that learn `value-hsv` late. Which kind is left on the seeds that come near the criterion at epoch {ex.EPOCHS}?
 
-The late kind. Under the base, three seeds go over the criterion by epoch {STOP}, and 711 does so already at epoch 32. Under the two finished conditions no seed goes over it, and up to epoch 128 the largest spill is {ALONG[LEADERS[0]][:, :4].max():.3f} under `{SHOWN[LEADERS[0]]}` and {ALONG[LEADERS[1]][:, :4].max():.3f} under `{SHOWN[LEADERS[1]]}`. After that, two seeds under `{SHOWN[LEADERS[0]]}` ({" and ".join(str(s) for s in LATE[LEADERS[0]])}) and one under `{SHOWN[LEADERS[1]]}` ({LATE[LEADERS[1]][0]}) climb to about the criterion by the end.
+The late kind. Under the base, three seeds go over the criterion by epoch {STOP}, and 711 does so already at epoch 32. Under the two finished conditions no seed goes over it by then, and up to epoch 128 the largest spill is {ALONG[LEADERS[0]][:, :4].max():.3f} under `{SHOWN[LEADERS[0]]}` and {ALONG[LEADERS[1]][:, :4].max():.3f} under `{SHOWN[LEADERS[1]]}`. After that, two seeds under `{SHOWN[LEADERS[0]]}` ({" and ".join(str(s) for s in LATE[LEADERS[0]])}) and one under `{SHOWN[LEADERS[1]]}` ({LATE[LEADERS[1]][0]}) climb to about the criterion by the end.
 
 {along_figure()}
 
@@ -1307,7 +1308,7 @@ Recipe-compare traced the spill of the base to the edit at block 1, and E3 found
 
 {restricted_table()}
 
-The evidence settles where it did. Under both conditions α at the example answers peaks at slice 3 on every seed, as under the base. The edit at blocks 2 to 4 removes most of the op on every seed but 710, which falls short under every recipe. The edit at block 4 alone removes nothing. The edit at the embedding alone spills nothing, and neither does the edit at blocks 2 to 4.
+The evidence settles where it did. Under both conditions α at the example answers peaks at slice 3 on every seed, as under the base. The edit at blocks 2 to 4 removes most of the op on every seed but 710, which falls short under every recipe. The edit at block 4 alone removes nothing. The edit at the embedding alone spills nothing, and neither does the edit at blocks 2 to 4 (this one and the edit at block 4 are not in the table).
 
 The edit at block 1 alone costs the other ops less than under the base on the mean, and about what it costs them under `step, soft τ`: the mean is between the step and the base under `{SHOWN[LEADERS[0]]}` and below the step under `{SHOWN[LEADERS[1]]}`.
 
@@ -1324,7 +1325,7 @@ The embedding table moves with the slice pool as well. Under the base the e₁ c
 
 What the edit does downstream barely changes, and where it changes it moves toward the step. The write stays close to the bound past the embedding, with fewer sites over the tolerance than under the base, and the share removed and the landing are about the same as under every recipe.
 
-Recipe-compare found the bound at the example answers of the other ops about 3× as wide at the embedding under the base as under `falloff`. Here it is back at the width of `falloff` at the embedding, and a little narrower at slice 1. So the other ops sit as far from e₁ at the first two slices as under the step.
+Recipe-compare found the bound at the example answers of the other ops about 3× as wide at the embedding under the base as under `falloff`. Under both finished conditions it is back at the width of `falloff` at the embedding, and a little narrower at slice 1. So the other ops sit as far from e₁ at the first two slices as under the step.
 
 ## Discussion
 
