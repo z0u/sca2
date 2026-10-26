@@ -1113,6 +1113,66 @@ def restricted_table() -> str:
     )
 
 
+def block1_figure() -> str:
+    names = [ex.STORED, *LEADERS]
+    edits = ("block 1", "every slice")
+    data = {
+        "names": names,
+        "edits": list(edits),
+        "spill": {e: {n: SLICE_SPILL[n][e].tolist() for n in names} for e in edits},
+        "seeds": SEEDS,
+        "criterion": CRITERION,
+    }
+    alt = """
+        Two panels, one point per run at each seed from 704 to 711, for the base and the two finished conditions.
+        Left, the edit at block 1 alone: the base is highest at 707, 708 and 711 (0.04 to 0.09); τ_ℓ 0.1, by 40 sits
+        near the base or above it on most seeds, between about 0.01 and 0.04, and well below it at 711; τ_ℓ 0.1, τ_ℓ
+        fixed sits below the base on most seeds, with one high point at 709. Right, the edit at every slice: the base
+        reaches 0.07 at 711; by 40 is over the criterion at 704, 705 and 707; τ_ℓ fixed stays under it everywhere.
+    """
+    return block1_draw(data, alt)
+
+
+@memo
+def block1_draw(data: dict, alt_text: str) -> str:
+    @themed(
+        name="soft-pool-scout-block1",
+        alt_text=alt_text,
+        caption="""
+            **Spill under the edit at block 1 alone, and at every slice, seed by seed.** The largest drop on another
+            op under the full edit made at those slices only, net of the same edit on the control at the seed, for
+            the base (hollow) and the two finished conditions, offset a little at each seed. The dashed line is the
+            criterion, with the side over it hatched.
+        """,
+    )
+    def _plot() -> plt.Figure:
+        names = data["names"]
+        fig, axes = plt.subplots(1, 2, figsize=(6.4, 2.6), layout="constrained", sharey=True)
+        x = np.arange(len(data["seeds"]))
+        for ax, e in zip(axes, data["edits"], strict=True):
+            for j, n in enumerate(names):
+                c = BY_NAME[n]
+                hollow = n == ex.STORED
+                ax.plot(x + (j - 1) * 0.18, data["spill"][e][n], marker(c), ls="none", ms=4.5,
+                        color=ink(c), mfc="none" if hollow else ink(c), mew=1.0, label=tex(SHOWN[n]) + (" (base)" if hollow else ""))  # fmt: skip
+            ax.axhline(0, color=ZERO, lw=0.5, zorder=0)
+            ax.axhline(data["criterion"], color=RULE, lw=0.7, ls="--", zorder=1)
+            ax.set_xticks(x, [str(s) for s in data["seeds"]], fontsize=7)
+            ax.set_title(f"edit at {e}" if e == "every slice" else f"edit at {e} alone", fontsize=8)
+            ax.set_xlabel("seed", fontsize=7)
+            ax.tick_params(labelsize=7)
+        lo, hi = axes[0].get_ylim()
+        for ax in axes:
+            hatch(ax, data["criterion"], hi, "//")
+            ax.set_ylim(lo, hi)
+        axes[0].set_ylabel("spill, net of control", fontsize=8)
+        handles, labels = axes[0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc="outside upper center", ncols=len(labels), frameon=False, fontsize=6)
+        return fig
+
+    return _plot()
+
+
 def edit_table() -> str:
     rows = []
     for n in FINISHED:
@@ -1312,7 +1372,9 @@ The evidence settles where it did. Under both conditions α at the example answe
 
 The edit at block 1 alone costs the other ops less than under the base on the mean, and about what it costs them under `step, soft τ`: the mean is between the step and the base under `{SHOWN[LEADERS[0]]}` and below the step under `{SHOWN[LEADERS[1]]}`.
 
-Seed by seed the two conditions differ. `{SHOWN[LEADERS[1]]}` is below the base on six seeds of eight, where `{SHOWN[LEADERS[0]]}` is below it on three, and the lower mean under `{SHOWN[LEADERS[0]]}` comes from 711, the seed the base spills on most at block 1. So holding $\tau_\ell$ fixed closes block 1 about as far as leaving it out of the pull does, and sharpening to 0.1 by epoch 40 does so on the mean, less surely seed by seed.
+Seed by seed the two conditions differ. `{SHOWN[LEADERS[1]]}` is below the base on six seeds of eight, where `{SHOWN[LEADERS[0]]}` is below it on three, and the lower mean under `{SHOWN[LEADERS[0]]}` comes from 711, the seed the base spills on most at block 1. So holding $\tau_\ell$ fixed closes block 1 about as far as leaving it out of the pull does, and sharpening to 0.1 by epoch 40 does so on the mean, carried by one seed.
+
+{block1_figure()}
 
 As recipe-compare noted, the block-1 edit on its own overstates what the full edit costs: under `{SHOWN[LEADERS[1]]}` it goes over the criterion on two seeds whose full edit stays within it.
 <!-- REVIEW: added the paired-by-seed reading of the block-1 edit. On the mean both conditions sit below the base, but `τ_ℓ 0.1, by 40` is above the base on five seeds of eight (SLICE_SPILL[n]["block 1"] against the base's, seed by seed), and without 711 its mean is above the base's, so the mean alone overstated it. The same holds for the control-netted edit at every slice, below (above the base on five seeds). Verify: the per-seed block-1 and every-slice spill of the base and the two leaders. -->
@@ -1339,6 +1401,6 @@ The other condition is close behind on the median baseline of the D2.2 design, w
 
 What is left is the late kind of spill, which brings one or two seeds per condition to about the criterion by the end. It is about as large as under the base on its late seeds, so it does not seem to come from the sharper slice pool, and nothing in this study acts on it. When it appears, the term still changing is the anti weight, partway through its anneal, so if anything in the recipe acts on the late kind, that anneal is the likelier place.
 
-Before the pool with $\tau_\ell$ fixed at 0.1 could replace `falloff` as the recipe of record, it would need two things the step has: a count of lost anchors at forty seeds, which a loss-rate screen would give, and a set of fresh seeds, which a confirmation at seeds 712 to 719 with their controls would give. Since the pool chooses the slice within a range set by the architecture, it would be the easier recipe to carry to another model.
+Before the pool with $\tau_\ell$ fixed at 0.1 could replace `falloff` as the recipe of record, it would need two things the step has: a count of lost anchors at forty seeds, which a loss-rate screen would give, and a set of fresh seeds, which a confirmation at seeds 712 to 719 with their controls would give. Since the pool chooses the slice within a range set by the architecture, it would also be the easier recipe to carry to another model, as recipe-compare argued.
 <!-- REVIEW: was "replace `step, soft τ`"; the report's own Scope and method and the D2.2 design doc name `falloff` as the recipe of record, and the two things named (forty seeds, fresh seeds) are what `falloff` has. Verify: docs/m2/d2.2/design.md, the recipe block. -->
 """
