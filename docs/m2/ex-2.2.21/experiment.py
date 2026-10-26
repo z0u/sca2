@@ -555,6 +555,7 @@ def train_one(
     stop_epoch: int | None = None,
     record_extra=None,
     keep_epochs: tuple[int, ...] = (),
+    resume: dict | None = None,
 ) -> dict:
     """Train one run over the op set *ops*: ex-2.2.16's context-keyed anchor (crop policy `whole`, the label variant
     and slices given), recording every *traj_stride* steps both ex-2.2.16's trajectory on the probe set (the op
@@ -579,11 +580,16 @@ def train_one(
     choice), all in one artifact (`kept_checkpoints`, with the epochs in `kept_epochs`), so a later question about
     when something appears can be scored on the stored run; `kept_checkpoint` loads one. Empty, the result is as it
     was without the argument.
+
+    A run stopped before the end also returns `resume_state`, what it takes to carry on from the stop. Passing that
+    run's result as *resume*, with the arguments of a straight run (*stop_epoch* past the stop), carries it on and
+    returns what the straight run would: its trajectory, its end checkpoint, and the checkpoints it keeps, the ones
+    the stopped run kept included.
     """
     import shutil
 
     from sca.anchoring import AnchorSpec, AntiSpec, LabelSpec, alignment
-    from sca.compute.training import train_anchored
+    from sca.compute.training import resume_state_dir, train_anchored
     from sca.data.named_colors import WordTokenizer
     from sca.data.ops import PALETTE
     from sca.intervention import Subspace, logits_at, projection
@@ -591,7 +597,9 @@ def train_one(
 
     n_ops = len(ops)
     workdir = get_data_dir() / "cells" / label
-    shutil.rmtree(workdir / "along", ignore_errors=True)  # kept checkpoints of an earlier attempt
+    for name in ("along", "resume"):  # kept checkpoints and resume state of an earlier attempt
+        shutil.rmtree(workdir / name, ignore_errors=True)
+    resumed = _fetch_resume(resume, workdir) if resume is not None else None
     corpus_dir = get(corpus, workdir / "corpus")
     tokenizer = WordTokenizer(config.tokenizer)
     a_id = ops.index(ANCHORED_OP)
@@ -651,6 +659,7 @@ def train_one(
         }
 
     more = record_extra(config, ops, k, holdout, workdir) if record_extra is not None else None
+    extra = resumed if resumed is not None else extra
 
     def on_record(_index: int, model) -> None:
         cos = alignment(model, probe_tokens)  # (L1, N, T)
@@ -705,11 +714,13 @@ def train_one(
         on_record=on_record,
         stop_epoch=stop_epoch,
         keep_epochs=keep_epochs,
+        resume_from=(resume_state_dir(workdir) if resumed is not None else None),
     )
     epoch_train_loss = np.asarray([m.train_loss for m in metrics], dtype=np.float64)
     epoch_axis = np.arange(1, len(epoch_train_loss) + 1, dtype=np.float64)
     end = config.scheduler.epochs if stop_epoch is None else stop_epoch
-    kept = sorted(e for e in set(keep_epochs) if e < end)
+    # Read off the directory, which holds a resumed run's earlier ones too (those the stopped run kept).
+    kept = sorted(int(p.name.removeprefix("epoch-")) for p in (workdir / "along").glob("epoch-*"))
     if kept:
         kept_out = {
             "kept_epochs": kept,
@@ -717,6 +728,8 @@ def train_one(
         }
     else:
         kept_out = {}
+    if end < config.scheduler.epochs:
+        kept_out["resume_state"] = _put_resume(extra, workdir, label)
     return {
         "label": label,
         "val_loss": [m.val_loss for m in metrics],
@@ -731,6 +744,36 @@ def train_one(
         | extra,
         "checkpoint": put(workdir / "model", name=f"ex-2.2.21-{label}-ckpt"),
     } | kept_out
+
+
+def _fetch_resume(resume: dict, workdir) -> dict:
+    """A stopped run's resume state and kept checkpoints fetched into *workdir*, where `train_one` keeps its own;
+    returns the measurements its records took (`_put_resume`).
+    """
+    import pickle
+
+    from sca.compute.training import resume_state_dir
+    from mini.store import get
+
+    get(resume["resume_state"], resume_state_dir(workdir))
+    if "kept_checkpoints" in resume:
+        get(resume["kept_checkpoints"], workdir / "along")
+    with open(resume_state_dir(workdir) / "extra.pkl", "rb") as f:
+        return pickle.load(f)
+
+
+def _put_resume(extra: dict, workdir, label: str):
+    """The resume state `train_anchored` wrote at the stop, with `train_one`'s own record measurements beside it,
+    as one artifact. The last record is the one at the stop (`train_anchored`), so the measurements leave it out.
+    """
+    import pickle
+
+    from sca.compute.training import resume_state_dir
+    from mini.store import put
+
+    with open(resume_state_dir(workdir) / "extra.pkl", "wb") as f:
+        pickle.dump({k: v[:-1] for k, v in extra.items()}, f)
+    return put(resume_state_dir(workdir), name=f"ex-2.2.21-{label}-resume")
 
 
 KEEP_EPOCHS = (16, 32, 64, 128, 256)

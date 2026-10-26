@@ -32,7 +32,7 @@ from sca.anchoring import (
 )
 from sca.compute.data_pipelines import save_data
 from sca.compute.model import load_checkpoint
-from sca.compute.training import kept_checkpoint_dir, train_anchored
+from sca.compute.training import kept_checkpoint_dir, resume_state_dir, train_anchored
 from sca.config import (
     CorpusMetadata,
     DataConfig,
@@ -808,6 +808,83 @@ def test_kept_checkpoints_leave_the_run_unchanged(data_dir, tmp_path):
     assert at is not None and at.epoch == 7  # zero-based: the metrics of the eighth epoch
     assert at.val_loss == metrics[7].val_loss
     assert any(not np.array_equal(a, b) for a, b in zip(leaves(model), leaves(kept), strict=True))  # an earlier model
+
+
+def test_a_resumed_run_is_the_straight_run(data_dir, tmp_path):
+    """Stopped after 6 of 15 epochs and resumed, a run ends where the straight one does: model, optimizer state,
+    metrics, trajectory, record calls and kept checkpoints. The terms all move over the stop (a scheduled pool
+    temperature, a per-slice anti weight), and the stride leaves the stop off a record.
+    """
+    label_p = np.zeros(64)
+    label_p[COLORS[0]] = 0.5
+    tokens, weights = probe_set()
+    anchor = AnchorSpec(
+        peak=1.0, warmup_epochs=2, anneal_start=13, anneal_end=15, tau=0.1, tau_start=1.0, tau_anneal_end=8.0
+    )
+    anti = AntiSpec(
+        lam=1.0, peak_ratio=1.0, hold_ratio=0.1, anneal_end=8, anchor_anneal_start=13, anchor_anneal_end=15,
+        hold=(0.2, 0.05),
+    )  # fmt: skip
+
+    def train(name: str, **kw):
+        calls = []
+        model, metrics, traj = train_anchored(
+            training_config(),
+            data_dir,
+            anchor=anchor,
+            anti=anti,
+            label_p=label_p,
+            probe_tokens=tokens,
+            probe_weights=weights,
+            anchor_slices=(1, 2),
+            checkpoint_dir=tmp_path / name,
+            traj_stride=7,
+            keep_epochs=(4, 6, 8),
+            on_record=lambda i, m: calls.append((i, float(jax.tree.leaves(eqx.filter(m, eqx.is_array))[0].sum()))),
+            **kw,
+        )
+        return model, metrics, traj, calls
+
+    straight = train("straight")
+    stopped = train("stopped", stop_epoch=6)
+    resumed = train("resumed", resume_from=resume_state_dir(tmp_path / "stopped"))
+
+    def leaves(tree) -> list:
+        return jax.tree.leaves(eqx.filter(tree, eqx.is_array))
+
+    for a, b in zip(leaves(straight[0]), leaves(resumed[0]), strict=True):
+        np.testing.assert_array_equal(a, b)
+    assert resumed[1] == straight[1]  # every epoch metric, the stopped run's included
+    assert set(resumed[2]) == set(straight[2])
+    for k, v in straight[2].items():
+        np.testing.assert_array_equal(resumed[2][k], v, err_msg=k)
+    # The stopped run made one record more than the straight run had by then: the one at the stop.
+    n_before = len(stopped[3]) - 1
+    assert stopped[3][:n_before] == straight[3][:n_before]
+    assert resumed[3] == straight[3][n_before:]
+
+    def kept(name: str, epoch: int) -> list:
+        return leaves(load_checkpoint(kept_checkpoint_dir(tmp_path / name, epoch))[0])
+
+    assert sorted(p.name for p in (tmp_path / "resumed" / "along").iterdir()) == ["epoch-006", "epoch-008"]
+    for epoch in (6, 8):  # the one due at the stop comes from the resumed model
+        for a, b in zip(kept("straight", epoch), kept("resumed", epoch), strict=True):
+            np.testing.assert_array_equal(a, b)
+    assert not resume_state_dir(tmp_path / "straight").exists()
+    with pytest.raises(ValueError, match="another config"):
+        train_anchored(
+            training_config(seed=1),
+            data_dir,
+            anchor=anchor,
+            anti=anti,
+            label_p=label_p,
+            probe_tokens=tokens,
+            probe_weights=weights,
+            anchor_slices=(1, 2),
+            checkpoint_dir=tmp_path / "other",
+            traj_stride=7,
+            resume_from=resume_state_dir(tmp_path / "stopped"),
+        )
 
 
 def test_pooled_training_runs_and_records_the_weight_profile(data_dir, tmp_path):

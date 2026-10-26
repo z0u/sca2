@@ -1,3 +1,4 @@
+import pickle
 from collections.abc import Callable
 from pathlib import Path
 
@@ -226,6 +227,29 @@ def kept_checkpoint_dir(checkpoint_dir: Path, epoch: int) -> Path:
     return checkpoint_dir / "along" / f"epoch-{epoch:03d}"
 
 
+def resume_state_dir(checkpoint_dir: Path) -> Path:
+    """Where `train_anchored` writes the state a run stopped early (*stop_epoch*) resumes from (*resume_from*)."""
+    return checkpoint_dir / "resume"
+
+
+def _save_resume(path: Path, model, opt_state, state: dict) -> None:
+    """The model and optimizer state as leaves, and the loop's own state (step, random stream, trajectory) pickled."""
+    path.mkdir(parents=True, exist_ok=True)
+    eqx.tree_serialise_leaves(path / "model.eqx", model)
+    eqx.tree_serialise_leaves(path / "opt_state.eqx", opt_state)
+    with open(path / "state.pkl", "wb") as f:
+        pickle.dump(state, f)
+
+
+def _load_resume(path: Path, model, opt_state) -> tuple:
+    """`_save_resume` read back into a freshly built *model* and *opt_state* of the same structure."""
+    with open(path / "state.pkl", "rb") as f:
+        state = pickle.load(f)
+    model = eqx.tree_deserialise_leaves(path / "model.eqx", model)
+    opt_state = eqx.tree_deserialise_leaves(path / "opt_state.eqx", opt_state)
+    return model, opt_state, state
+
+
 def train_anchored(  # noqa: C901 — one loop with two optional terms; the branches are the options
     config: TrainingConfig,
     data_dir: Path,
@@ -253,6 +277,7 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
     loss_mask: np.ndarray | None = None,
     stop_epoch: int | None = None,
     keep_epochs: tuple[int, ...] = (),
+    resume_from: Path | None = None,
 ) -> tuple[LanguageModel, list[TrainingMetrics], dict[str, np.ndarray]]:
     """Train with a concept anchor, recording the alignment trajectory as it goes.
 
@@ -319,13 +344,28 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
             verification-line loss mask); `None` for no masking.
         stop_epoch: stop after this many epochs of the full-length schedule,
             or None to train to its end. The learning rate, the term weights
-            and the batches up to the stop are those of the full run.
+            and the batches up to the stop are those of the full run. A stop
+            before the end also writes what *resume_from* needs to carry on
+            (`resume_state_dir`). The returned trajectory then ends with a
+            record at the stop, which a straight run has only when the stop
+            falls on *traj_stride*; the resume state is taken before it, so a
+            resumed run leaves it out, and a caller keeping its own record
+            measurements (*on_record*) drops its last one.
         keep_epochs: epochs after which to keep a checkpoint of the model as it
             stands, each in its own directory under *checkpoint_dir*
             (`kept_checkpoint_dir`). Epochs at or
             past the end are skipped, since the end checkpoint already holds
             that model. Saving draws nothing from the random streams, so the
             run is the same with or without them.
+        resume_from: a directory a stopped run wrote (`resume_state_dir`), to
+            carry that run on from its stop with the same config and terms:
+            the model, the optimizer state, the step, the random stream, the
+            metrics and the trajectory so far come from it, so the run, its
+            metrics and its trajectory are those of a straight run. A kept
+            checkpoint due at the stop (*keep_epochs*) is written from the
+            resumed model; earlier ones are the stopped run's to hand over.
+            *on_record* sees the new records only, with indices that carry on
+            from the stopped run.
     """
     if crop is not None and (anchor.tau is None or fallback is not None):
         raise ValueError("a crop policy needs a pooled anchor (tau set) and no fallback spec")
@@ -422,7 +462,24 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
         expected["fallback"] = "down"
     expect_metrics(**expected)
     end = config.scheduler.epochs if stop_epoch is None else stop_epoch
-    for epoch in range(end):
+    start = 0
+    if resume_from is not None:
+        model, opt_state, state = _load_resume(resume_from, model, opt_state)
+        if state["config"] != config.model_dump(mode="json"):
+            raise ValueError("the resume state was written by a run with another config")
+        if (state["epoch_length"], state["traj_stride"]) != (epoch_length, traj_stride):
+            raise ValueError("the resume state was written with another epoch length or trajectory stride")
+        start, step = state["epoch"], state["step"]
+        if start >= end:
+            raise ValueError(f"the resume state is at epoch {start}, which is not before the end ({end})")
+        rng.bit_generator.state = state["rng"]
+        traj.clear()
+        traj.update(state["traj"])
+        all_metrics = list(state["metrics"])
+        window.values, window.last = state["window"]
+        if start in keep_epochs:
+            save_checkpoint(model, config, all_metrics[-1], kept_checkpoint_dir(checkpoint_dir, start))
+    for epoch in range(start, end):
         train_losses, anchor_losses, anti_losses = [], [], []
         batches = sample_anchored_batches(
             train_data,
@@ -491,6 +548,24 @@ def train_anchored(  # noqa: C901 — one loop with two optional terms; the bran
         if epoch + 1 in keep_epochs and epoch + 1 < end:
             save_checkpoint(model, config, all_metrics[-1], kept_checkpoint_dir(checkpoint_dir, epoch + 1))
 
+    if end < config.scheduler.epochs:
+        # Taken before the record at the stop, which a straight run would not make here.
+        _save_resume(
+            resume_state_dir(checkpoint_dir),
+            model,
+            opt_state,
+            {
+                "config": config.model_dump(mode="json"),
+                "epoch_length": epoch_length,
+                "traj_stride": traj_stride,
+                "epoch": end,
+                "step": step,
+                "rng": rng.bit_generator.state,
+                "traj": traj,
+                "metrics": all_metrics,
+                "window": (window.values, window.last),
+            },
+        )
     record(
         step,
         float(anchor(end)),
